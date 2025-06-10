@@ -97,7 +97,7 @@ const Admin = () => {
   };
 
   return (
-    <div className="space-y-8 p-6 max-w-7xl mx-auto">
+    <div className="space-y-8  mx-auto">
       {showNotification && (
         <div className="bg-yellow-100 border border-yellow-300 text-yellow-800 p-4 flex justify-between items-center rounded shadow">
           <span>

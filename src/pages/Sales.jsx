@@ -1,57 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { FaEnvelope, FaEllipsisV } from "react-icons/fa";
-import AddCollegeModal from "../components/Sales/AddCollege"; // Ensure correct relative path
-
-const dummyData = {
-  hot: [
-    {
-      id: 1,
-      name: "Harvard University",
-      city: "Cambridge",
-      state: "MA",
-      contact: "John Doe",
-      phone: "123-456-7890",
-    },
-    {
-      id: 2,
-      name: "Stanford University",
-      city: "Stanford",
-      state: "CA",
-      contact: "Jane Smith",
-      phone: "987-654-3210",
-    },
-  ],
-  warm: [
-    {
-      id: 3,
-      name: "University of Chicago",
-      city: "Chicago",
-      state: "IL",
-      contact: "Mike Ross",
-      phone: "456-123-7890",
-    },
-  ],
-  cold: [
-    {
-      id: 4,
-      name: "Duke University",
-      city: "Durham",
-      state: "NC",
-      contact: "Rachel Zane",
-      phone: "321-654-9870",
-    },
-  ],
-  renewal: [
-    {
-      id: 5,
-      name: "MIT",
-      city: "Cambridge",
-      state: "MA",
-      contact: "Eli Gold",
-      phone: "111-222-3333",
-    },
-  ],
-};
+import { ref, onValue } from "firebase/database";
+import { realtimeDb } from "../firebase";
+import AddCollegeModal from "../components/Sales/AddCollege";
 
 const tabLabels = {
   hot: "Hot",
@@ -79,157 +30,241 @@ const tabColorMap = {
   },
 };
 
+const rowColorMap = {
+  hot: "bg-red-50",
+  warm: "bg-yellow-50",
+  cold: "bg-green-50",
+  renewal: "bg-blue-50",
+};
+
+const headerColorMap = {
+  hot: "bg-red-100 text-red-800",
+  warm: "bg-yellow-100 text-yellow-800",
+  cold: "bg-green-100 text-green-800",
+  renewal: "bg-blue-100 text-blue-800",
+};
+
 function Sales() {
   const [activeTab, setActiveTab] = useState("hot");
   const [dropdownOpenId, setDropdownOpenId] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [leads, setLeads] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const leadsRef = ref(realtimeDb, "leads");
+    const unsubscribe = onValue(
+      leadsRef,
+      (snapshot) => {
+        const data = snapshot.val() || {};
+        setLeads(data);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Failed to fetch leads:", error);
+        setLoading(false);
+      }
+    );
+    return () => unsubscribe();
+  }, []);
 
   const toggleDropdown = (id) => {
     setDropdownOpenId(dropdownOpenId === id ? null : id);
   };
 
-  const rowColorMap = {
-    hot: "bg-red-50",
-    warm: "bg-yellow-50",
-    cold: "bg-green-50",
-    renewal: "bg-blue-50",
-  };
+  const formatDate = (ms) =>
+    new Date(ms).toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
 
-  const headerColorMap = {
-    hot: "bg-red-100 text-red-800",
-    warm: "bg-yellow-100 text-yellow-800",
-    cold: "bg-green-100 text-green-800",
-    renewal: "bg-blue-100 text-blue-800",
+  const filteredLeads = Object.entries(leads).filter(
+    ([id, lead]) => (lead.phase || "hot") === activeTab
+  );
+
+  // Fixed column widths in pixels
+  const columnWidths = {
+    businessName: 200,
+    address: 180,
+    city: 120,
+    state: 120,
+    pocName: 150,
+    phoneNo: 120,
+    email: 180,
+    createdAt: 120,
+    actions: 80,
   };
 
   return (
-    <div className="p-8 bg-gray-50 min-h-screen font-sans relative">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h2 className="text-4xl font-extrabold text-gray-900 tracking-tight">
-            Leads
-          </h2>
-          <button
-            onClick={() => setShowModal(true)}
-            className="bg-blue-600 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-blue-800 transition"
-          >
-            Add College
-          </button>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex gap-4 mb-8">
-          {Object.keys(tabLabels).map((key) => (
+    <div className="bg-gray-50 min-h-screen font-sans relative">
+      <div className="mx-auto  px-4 py-6">
+        {/* Header Section */}
+        <div className="max-w-full">
+          <div className="flex justify-between items-center mb-8">
+            <h2 className="text-4xl font-extrabold text-gray-900 tracking-tight">
+              Leads
+            </h2>
             <button
-              key={key}
-              onClick={() => setActiveTab(key)}
-              className={`flex-1 py-3 rounded-full text-sm font-semibold transition duration-300 ease-in-out ${
-                activeTab === key
-                  ? tabColorMap[key].active
-                  : tabColorMap[key].inactive
-              }`}
+              onClick={() => setShowModal(true)}
+              className="bg-blue-600 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-blue-800 transition whitespace-nowrap"
             >
-              {tabLabels[key]}
+              Add College
             </button>
-          ))}
+          </div>
+
+          {/* Scrollable Tabs */}
+          <div className="overflow-x-auto pb-2 mb-6 ">
+            <div className="flex gap-4 w-max min-w-full">
+              {Object.keys(tabLabels).map((key) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveTab(key)}
+                  className={`flex-1 min-w-[120px] py-3 rounded-full text-sm font-semibold transition duration-300 ease-in-out ${
+                    activeTab === key
+                      ? tabColorMap[key].active
+                      : tabColorMap[key].inactive
+                  } whitespace-nowrap`}
+                >
+                  {tabLabels[key]}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
-        {/* Table */}
-        <div className="bg-white shadow-lg rounded-lg overflow-visible border border-gray-200">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead
-              className={`text-sm font-semibold ${headerColorMap[activeTab]}`}
+        {/* Table Container */}
+        <div className="bg-white shadow-lg rounded-lg border border-gray-200 overflow-hidden ">
+          <div className="overflow-x-auto">
+            <table
+              className="min-w-full divide-y divide-gray-200"
+              style={{ tableLayout: "fixed" }}
             >
-              <tr>
-                {[
-                  "College Name",
-                  "City",
-                  "State",
-                  "Contact Person",
-                  "Phone",
-                  "Email",
-                  "Actions",
-                ].map((header) => (
-                  <th
-                    key={header}
-                    className="px-6 py-4 text-left select-none"
-                    style={
-                      header === "Actions" || header === "Email"
-                        ? { textAlign: "center" }
-                        : {}
-                    }
-                  >
-                    {header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="text-gray-800 divide-y divide-gray-100">
-              {dummyData[activeTab].map((college) => (
-                <tr
-                  key={college.id}
-                  className={`${rowColorMap[activeTab]} hover:bg-gray-100 transition-colors duration-200 cursor-pointer`}
-                >
-                  <td className="px-6 py-4 font-medium">{college.name}</td>
-                  <td className="px-6 py-4">{college.city}</td>
-                  <td className="px-6 py-4">{college.state}</td>
-                  <td className="px-6 py-4">{college.contact}</td>
-                  <td className="px-6 py-4">{college.phone}</td>
-                  <td className="px-6 py-4 text-center">
-                    <button className="text-blue-600 hover:text-blue-800 transition">
-                      <FaEnvelope size={18} />
-                    </button>
-                  </td>
-                  <td className="px-6 py-4 text-center relative">
-                    <button
-                      onClick={() => toggleDropdown(college.id)}
-                      className="text-gray-500 hover:text-gray-700 focus:outline-none transition"
-                      aria-label="Actions menu"
-                    >
-                      <FaEllipsisV size={18} />
-                    </button>
+              <colgroup>
+                <col style={{ width: `${columnWidths.businessName}px` }} />
+                <col style={{ width: `${columnWidths.address}px` }} />
+                <col style={{ width: `${columnWidths.city}px` }} />
+                <col style={{ width: `${columnWidths.state}px` }} />
+                <col style={{ width: `${columnWidths.pocName}px` }} />
+                <col style={{ width: `${columnWidths.phoneNo}px` }} />
+                <col style={{ width: `${columnWidths.email}px` }} />
+                <col style={{ width: `${columnWidths.createdAt}px` }} />
+                <col style={{ width: `${columnWidths.actions}px` }} />
+              </colgroup>
 
-                    {dropdownOpenId === college.id && (
-                      <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-300 rounded-lg shadow-xl z-50 ring-1 ring-black ring-opacity-5">
-                        <ul className="divide-y divide-gray-100">
-                          {[
-                            "Call",
-                            "Follow Up",
-                            "Cold",
-                            "Warm",
-                            "Hot",
-                            "Closure",
-                          ].map((action) => (
-                            <li
-                              key={action}
-                              className="px-4 py-3 text-gray-700 hover:bg-gray-100 hover:text-gray-900 cursor-pointer text-sm font-medium"
-                              onClick={() => setDropdownOpenId(null)}
-                            >
-                              {action}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {dummyData[activeTab].length === 0 && (
+              <thead
+                className={`text-sm font-semibold ${headerColorMap[activeTab]}`}
+              >
                 <tr>
-                  <td
-                    colSpan="7"
-                    className="text-center py-8 text-gray-400 italic select-none"
-                  >
-                    No records found.
-                  </td>
+                  <th className="px-4 py-4 text-left truncate">
+                    Business Name
+                  </th>
+                  <th className="px-4 py-4 text-left truncate">Address</th>
+                  <th className="px-4 py-4 text-left truncate">City</th>
+                  <th className="px-4 py-4 text-left truncate">State</th>
+                  <th className="px-4 py-4 text-left truncate">
+                    Contact Person
+                  </th>
+                  <th className="px-4 py-4 text-left truncate">Phone</th>
+                  <th className="px-4 py-4 text-left truncate">Email</th>
+                  <th className="px-4 py-4 text-left truncate">Created At</th>
+                  <th className="px-4 py-4 text-center truncate">Actions</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+
+              <tbody className="text-gray-800 divide-y divide-gray-100">
+                {loading ? (
+                  <tr>
+                    <td colSpan="9" className="text-center py-8">
+                      Loading leads...
+                    </td>
+                  </tr>
+                ) : filteredLeads.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan="9"
+                      className="text-center py-8 text-gray-400 italic"
+                    >
+                      No records found.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredLeads.map(([id, lead]) => (
+                    <tr
+                      key={id}
+                      className={`${rowColorMap[activeTab]} hover:bg-gray-100 transition-colors duration-200`}
+                    >
+                      <td
+                        className="px-4 py-4 truncate"
+                        title={lead.businessName}
+                      >
+                        {lead.businessName}
+                      </td>
+                      <td className="px-4 py-4 truncate" title={lead.address}>
+                        {lead.address}
+                      </td>
+                      <td className="px-4 py-4 truncate" title={lead.city}>
+                        {lead.city}
+                      </td>
+                      <td className="px-4 py-4 truncate" title={lead.state}>
+                        {lead.state}
+                      </td>
+                      <td className="px-4 py-4 truncate" title={lead.pocName}>
+                        {lead.pocName}
+                      </td>
+                      <td className="px-4 py-4 truncate" title={lead.phoneNo}>
+                        {lead.phoneNo}
+                      </td>
+                      <td className="px-4 py-4 truncate" title={lead.email}>
+                        {lead.email || "-"}
+                      </td>
+                      <td
+                        className="px-4 py-4 truncate"
+                        title={formatDate(lead.createdAt)}
+                      >
+                        {formatDate(lead.createdAt)}
+                      </td>
+                      <td className="px-4 py-4 text-center relative">
+                        <button
+                          onClick={() => toggleDropdown(id)}
+                          className="text-gray-500 hover:text-gray-700 focus:outline-none transition"
+                          aria-label="Actions menu"
+                        >
+                          <FaEllipsisV size={18} />
+                        </button>
+
+                        {dropdownOpenId === id && (
+                          <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-300 rounded-lg shadow-xl z-50 ring-1 ring-black ring-opacity-5">
+                            <ul className="divide-y divide-gray-100">
+                              {[
+                                "Call",
+                                "Follow Up",
+                                "Cold",
+                                "Warm",
+                                "Hot",
+                                "Closure",
+                              ].map((action) => (
+                                <li
+                                  key={action}
+                                  className="px-4 py-3 text-gray-700 hover:bg-gray-100 hover:text-gray-900 cursor-pointer text-sm font-medium"
+                                  onClick={() => setDropdownOpenId(null)}
+                                >
+                                  {action}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
-      {/* Modal */}
       <AddCollegeModal show={showModal} onClose={() => setShowModal(false)} />
     </div>
   );

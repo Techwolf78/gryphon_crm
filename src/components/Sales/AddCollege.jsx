@@ -1,5 +1,8 @@
+// src/components/Sales/AddCollegeModal.jsx
 import React, { useState } from "react";
-import stateCityData from "./stateCityData";
+import stateCityData from "../Sales/stateCityData";
+import { auth, realtimeDb } from "../../firebase";
+import { ref, push } from "firebase/database";
 
 function AddCollegeModal({ show, onClose }) {
   const [businessName, setBusinessName] = useState("");
@@ -9,6 +12,7 @@ function AddCollegeModal({ show, onClose }) {
   const [email, setEmail] = useState("");
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
+  const [phase, setPhase] = useState("");  // New state for phase
 
   const handleClose = () => {
     setBusinessName("");
@@ -18,7 +22,43 @@ function AddCollegeModal({ show, onClose }) {
     setEmail("");
     setState("");
     setCity("");
+    setPhase(""); // reset phase
     onClose();
+  };
+
+  const handleAddBusiness = async () => {
+    const user = auth.currentUser;
+
+    if (!user) {
+      alert("You must be logged in to add a lead.");
+      return;
+    }
+
+    const timestamp = Date.now();
+
+    const newLead = {
+      businessName,
+      address,
+      pocName,
+      phoneNo,
+      email,
+      state,
+      city,
+      phase,  // save phase here
+      createdBy: user.uid,
+      createdAt: timestamp,
+      lastUpdatedBy: user.uid,
+      lastUpdatedAt: timestamp,
+    };
+
+    try {
+      await push(ref(realtimeDb, "leads"), newLead);
+      alert("Lead added successfully.");
+      handleClose();
+    } catch (error) {
+      console.error("Error adding lead:", error);
+      alert("Failed to add lead. Please try again.");
+    }
   };
 
   const isFormValid =
@@ -26,7 +66,8 @@ function AddCollegeModal({ show, onClose }) {
     pocName.trim() &&
     phoneNo.trim() &&
     state &&
-    city;
+    city &&
+    phase;  // validate phase too
 
   if (!show) return null;
 
@@ -148,11 +189,31 @@ function AddCollegeModal({ show, onClose }) {
               </select>
             </div>
           )}
+
+          {/* Phase Dropdown - NEW */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-2">
+              Phase<span className="text-red-500">*</span>
+            </label>
+            <select
+              value={phase}
+              onChange={(e) => setPhase(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
+            >
+              <option value="">Select Phase</option>
+              <option value="cold">Cold</option>
+              <option value="warm">Warm</option>
+              <option value="hot">Hot</option>
+              <option value="closure">Closure</option>
+              <option value="renewal">Renewal</option>
+            </select>
+          </div>
         </div>
 
         {/* Buttons */}
         <div className="flex justify-between items-center mt-6">
           <button
+            onClick={handleAddBusiness}
             disabled={!isFormValid}
             className={`px-5 py-2.5 rounded-lg text-white font-medium transition ${
               isFormValid
