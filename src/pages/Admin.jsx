@@ -112,7 +112,7 @@ const Admin = () => {
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-10">
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <h1 className="text-3xl font-bold text-blue-900 tracking-tight">
+        <h1 className="text-4xl font-extrabold text-blue-900 tracking-tight">
           Admin Dashboard
         </h1>
       </header>
