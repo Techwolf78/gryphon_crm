@@ -1,6 +1,7 @@
+// Sales.jsx
 import React, { useState, useEffect } from "react";
 import { FaEnvelope, FaEllipsisV } from "react-icons/fa";
-import { ref, onValue } from "firebase/database";
+import { ref, onValue, update } from "firebase/database";
 import { realtimeDb } from "../firebase";
 import AddCollegeModal from "../components/Sales/AddCollege";
 
@@ -44,10 +45,42 @@ const headerColorMap = {
   renewal: "bg-blue-100 text-blue-800",
 };
 
+const ClosureFormModal = ({ show, onClose, lead }) => {
+  if (!show || !lead) return null;
+
+  return (
+    <div className="fixed inset-0 z-[999999] bg-black bg-opacity-50 flex justify-center items-center">
+      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+        <h2 className="text-xl font-bold mb-4">Closure Form</h2>
+        <div className="space-y-3 text-sm">
+          <div><strong>Business:</strong> {lead.businessName}</div>
+          <div><strong>City:</strong> {lead.city}</div>
+          <div><strong>Phone:</strong> {lead.phoneNo}</div>
+          <div><strong>Email:</strong> {lead.email}</div>
+          <div><strong>POC:</strong> {lead.pocName}</div>
+          <div><strong>State:</strong> {lead.state}</div>
+          <div><strong>Address:</strong> {lead.address}</div>
+        </div>
+        <div className="mt-6 text-right">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 function Sales() {
   const [activeTab, setActiveTab] = useState("hot");
   const [dropdownOpenId, setDropdownOpenId] = useState(null);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
   const [showModal, setShowModal] = useState(false);
+  const [showClosureModal, setShowClosureModal] = useState(false);
+  const [selectedLead, setSelectedLead] = useState(null);
   const [leads, setLeads] = useState({});
   const [loading, setLoading] = useState(true);
 
@@ -68,8 +101,31 @@ function Sales() {
     return () => unsubscribe();
   }, []);
 
-  const toggleDropdown = (id) => {
-    setDropdownOpenId(dropdownOpenId === id ? null : id);
+  const toggleDropdown = (id, e) => {
+    if (dropdownOpenId === id) {
+      setDropdownOpenId(null);
+    } else {
+      const rect = e.currentTarget.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + 8,
+        left: rect.right - 160,
+      });
+      setDropdownOpenId(id);
+    }
+  };
+
+  const updateLeadPhase = async (id, newPhase) => {
+    const leadRef = ref(realtimeDb, `leads/${id}`);
+    try {
+      await update(leadRef, { phase: newPhase });
+    } catch (err) {
+      console.error("Phase update failed", err);
+    }
+  };
+
+  const handleClosureClick = (lead) => {
+    setSelectedLead(lead);
+    setShowClosureModal(true);
   };
 
   const formatDate = (ms) =>
@@ -80,29 +136,14 @@ function Sales() {
     });
 
   const filteredLeads = Object.entries(leads).filter(
-    ([id, lead]) => (lead.phase || "hot") === activeTab
+    ([, lead]) => (lead.phase || "hot") === activeTab
   );
-
-  // Fixed column widths in pixels
-  const columnWidths = {
-    businessName: 200,
-    address: 180,
-    city: 120,
-    state: 120,
-    pocName: 150,
-    phoneNo: 120,
-    email: 180,
-    createdAt: 120,
-    actions: 80,
-  };
 
   return (
     <div className="bg-gray-50 min-h-screen font-sans relative">
-      <div className="mx-auto ">
+      <div className="mx-auto">
         <div className="flex justify-between items-center mb-8">
-          <h2 className="text-4xl font-extrabold text-gray-900 tracking-tight">
-            Leads
-          </h2>
+          <h2 className="text-4xl font-extrabold text-gray-900 tracking-tight">Leads</h2>
           <button
             onClick={() => setShowModal(true)}
             className="bg-blue-600 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-blue-800 transition"
@@ -111,16 +152,13 @@ function Sales() {
           </button>
         </div>
 
-        {/* Tabs */}
         <div className="flex gap-4 mb-8">
           {Object.keys(tabLabels).map((key) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
               className={`flex-1 py-3 rounded-full text-sm font-semibold transition duration-300 ease-in-out ${
-                activeTab === key
-                  ? tabColorMap[key].active
-                  : tabColorMap[key].inactive
+                activeTab === key ? tabColorMap[key].active : tabColorMap[key].inactive
               }`}
             >
               {tabLabels[key]}
@@ -128,7 +166,6 @@ function Sales() {
           ))}
         </div>
 
-        {/* Table Container with Horizontal Scroll */}
         <div className="bg-white shadow-lg rounded-lg overflow-x-auto border border-gray-200">
           <table className="min-w-full divide-y divide-gray-200">
             <thead
@@ -164,7 +201,6 @@ function Sales() {
                 </th>
               </tr>
             </thead>
-
             <tbody className="text-gray-800 divide-y divide-gray-100">
               {loading ? (
                 <tr>
@@ -174,10 +210,7 @@ function Sales() {
                 </tr>
               ) : filteredLeads.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan="9"
-                    className="text-center py-8 text-gray-400 italic"
-                  >
+                  <td colSpan="9" className="text-center py-8 text-gray-400 italic">
                     No records found.
                   </td>
                 </tr>
@@ -187,6 +220,7 @@ function Sales() {
                     key={id}
                     className={`${rowColorMap[activeTab]} hover:bg-gray-100 transition-colors duration-200`}
                   >
+
                     <td
                       className="px-4 py-4 whitespace-normal break-words"
                       title={lead.businessName}
@@ -240,35 +274,11 @@ function Sales() {
                       style={{ width: columnWidths.actions }}
                     >
                       <button
-                        onClick={() => toggleDropdown(id)}
+                        onClick={(e) => toggleDropdown(id, e)}
                         className="text-gray-500 hover:text-gray-700 focus:outline-none transition"
-                        aria-label="Actions menu"
                       >
                         <FaEllipsisV size={18} />
                       </button>
-
-                      {dropdownOpenId === id && (
-                        <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-300 rounded-lg shadow-xl z-50 ring-1 ring-black ring-opacity-5">
-                          <ul className="divide-y divide-gray-100">
-                            {[
-                              "Call",
-                              "Follow Up",
-                              "Cold",
-                              "Warm",
-                              "Hot",
-                              "Closure",
-                            ].map((action) => (
-                              <li
-                                key={action}
-                                className="px-4 py-3 text-gray-700 hover:bg-gray-100 hover:text-gray-900 cursor-pointer text-sm font-medium"
-                                onClick={() => setDropdownOpenId(null)}
-                              >
-                                {action}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
                     </td>
                   </tr>
                 ))
@@ -278,7 +288,70 @@ function Sales() {
         </div>
       </div>
 
+      {/* Dropdown Actions */}
+      {dropdownOpenId && leads[dropdownOpenId] && (
+        <div
+          className="fixed top-0 left-0 w-screen h-screen z-[99999]"
+          onClick={() => setDropdownOpenId(null)}
+        >
+          <div
+            className="absolute bg-white/30 backdrop-blur-md border border-white/20 rounded-xl shadow-xl w-40 p-2"
+            style={{ top: dropdownPosition.top, left: dropdownPosition.left }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ul className="divide-y divide-white/20">
+              <li>
+                <a
+                  href={`tel:${leads[dropdownOpenId].phoneNo}`}
+                  className="block px-4 py-2 text-sm hover:bg-white/40 rounded"
+                >
+                   Call
+                </a>
+              </li>
+              <li
+                className="px-4 py-2 hover:bg-white/40 text-sm cursor-pointer rounded"
+                onClick={() => {
+                  alert("Follow Up clicked");
+                  setDropdownOpenId(null);
+                }}
+              >
+                 Follow Up
+              </li>
+              {["hot", "warm", "cold", "renewal"]
+                .filter((phase) => phase !== activeTab)
+                .map((phase) => (
+                  <li
+                    key={phase}
+                    className="px-4 py-2 hover:bg-white/40 text-sm cursor-pointer rounded capitalize"
+                    onClick={async () => {
+                      await updateLeadPhase(dropdownOpenId, phase);
+                      setDropdownOpenId(null);
+                    }}
+                  >
+                     {tabLabels[phase]}
+                  </li>
+                ))}
+              <li
+                className="px-4 py-2 hover:bg-white/40 text-sm cursor-pointer rounded"
+                onClick={() => {
+                  handleClosureClick(leads[dropdownOpenId]);
+                  setDropdownOpenId(null);
+                }}
+              >
+               Closure
+              </li>
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {/* Modals */}
       <AddCollegeModal show={showModal} onClose={() => setShowModal(false)} />
+      <ClosureFormModal
+        show={showClosureModal}
+        onClose={() => setShowClosureModal(false)}
+        lead={selectedLead}
+      />
     </div>
   );
 }
