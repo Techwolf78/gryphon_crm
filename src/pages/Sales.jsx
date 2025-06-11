@@ -11,6 +11,19 @@ const tabLabels = {
   renewal: "Renewal",
 };
 
+  // Fixed column widths in pixels
+  const columnWidths = {
+    businessName: 200,
+    address: 180,
+    city: 120,
+    state: 120,
+    pocName: 150,
+    phoneNo: 120,
+    email: 180,
+    createdAt: 120,
+    actions: 80,
+  };
+
 const tabColorMap = {
   hot: {
     active: "bg-red-600 text-white shadow-md",
@@ -83,18 +96,7 @@ function Sales() {
     ([id, lead]) => (lead.phase || "hot") === activeTab
   );
 
-  // Fixed column widths in pixels
-  const columnWidths = {
-    businessName: 200,
-    address: 180,
-    city: 120,
-    state: 120,
-    pocName: 150,
-    phoneNo: 120,
-    email: 180,
-    createdAt: 120,
-    actions: 80,
-  };
+
 
   return (
     <div className="bg-gray-50 min-h-screen font-sans relative">
