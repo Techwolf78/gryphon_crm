@@ -167,38 +167,24 @@ function Sales() {
         </div>
 
         <div className="bg-white shadow-lg rounded-lg overflow-x-auto border border-gray-200">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead
-              className={`text-sm font-semibold ${headerColorMap[activeTab]}`}
-            >
+          <table className="min-w-full divide-y divide-gray-200" style={{ tableLayout: "fixed" }}>
+            <thead className={`text-sm font-semibold ${headerColorMap[activeTab]}`}>
               <tr>
-                <th className="px-4 py-4 text-left whitespace-normal break-words">
-                  Business Name
-                </th>
-                <th className="px-4 py-4 text-left whitespace-normal break-words">
-                  Address
-                </th>
-                <th className="px-4 py-4 text-left whitespace-normal break-words">
-                  City
-                </th>
-                <th className="px-4 py-4 text-left whitespace-normal break-words">
-                  State
-                </th>
-                <th className="px-4 py-4 text-left whitespace-normal break-words">
-                  Contact Person
-                </th>
-                <th className="px-4 py-4 text-left whitespace-normal break-words">
-                  Phone
-                </th>
-                <th className="px-4 py-4 text-left whitespace-normal break-words">
-                  Email
-                </th>
-                <th className="px-4 py-4 text-left whitespace-normal break-words">
-                  Created At
-                </th>
-                <th className="px-4 py-4 text-center whitespace-normal break-words">
-                  Actions
-                </th>
+                {[
+                  "Business Name",
+                  "Address",
+                  "City",
+                  "State",
+                  "Contact Person",
+                  "Phone",
+                  "Email",
+                  "Created At",
+                  "Actions",
+                ].map((title) => (
+                  <th key={title} className="px-4 py-4 text-left whitespace-normal break-words">
+                    {title}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="text-gray-800 divide-y divide-gray-100">
@@ -220,59 +206,23 @@ function Sales() {
                     key={id}
                     className={`${rowColorMap[activeTab]} hover:bg-gray-100 transition-colors duration-200`}
                   >
-
-                    <td
-                      className="px-4 py-4 whitespace-normal break-words"
-                      title={lead.businessName}
-                    >
-                      {lead.businessName}
-                    </td>
-                    <td
-                      className="px-4 py-4 whitespace-normal break-words"
-                      title={lead.address}
-                    >
-                      {lead.address}
-                    </td>
-                    <td
-                      className="px-4 py-4 whitespace-normal break-words"
-                      title={lead.city}
-                    >
-                      {lead.city}
-                    </td>
-                    <td
-                      className="px-4 py-4 whitespace-normal break-words"
-                      title={lead.state}
-                    >
-                      {lead.state}
-                    </td>
-                    <td
-                      className="px-4 py-4 whitespace-normal break-words"
-                      title={lead.pocName}
-                    >
-                      {lead.pocName}
-                    </td>
-                    <td
-                      className="px-4 py-4 whitespace-normal break-words"
-                      title={lead.phoneNo}
-                    >
-                      {lead.phoneNo}
-                    </td>
-                    <td
-                      className="px-4 py-4 whitespace-normal break-words"
-                      title={lead.email}
-                    >
-                      {lead.email || "-"}
-                    </td>
-                    <td
-                      className="px-4 py-4 whitespace-normal break-words"
-                      title={formatDate(lead.createdAt)}
-                    >
-                      {formatDate(lead.createdAt)}
-                    </td>
-                    <td
-                      className="px-4 py-4 text-center relative"
-                      style={{ width: columnWidths.actions }}
-                    >
+                    {[
+                      "businessName",
+                      "address",
+                      "city",
+                      "state",
+                      "pocName",
+                      "phoneNo",
+                      "email",
+                      "createdAt",
+                    ].map((field, i) => (
+                      <td key={i} className="px-4 py-4 whitespace-normal break-words">
+                        {field === "createdAt"
+                          ? formatDate(lead[field])
+                          : lead[field] || "-"}
+                      </td>
+                    ))}
+                    <td className="px-4 py-4 text-center relative">
                       <button
                         onClick={(e) => toggleDropdown(id, e)}
                         className="text-gray-500 hover:text-gray-700 focus:outline-none transition"
@@ -305,7 +255,7 @@ function Sales() {
                   href={`tel:${leads[dropdownOpenId].phoneNo}`}
                   className="block px-4 py-2 text-sm hover:bg-white/40 rounded"
                 >
-                   Call
+                 Call
                 </a>
               </li>
               <li
@@ -328,7 +278,7 @@ function Sales() {
                       setDropdownOpenId(null);
                     }}
                   >
-                     {tabLabels[phase]}
+                    Move to {tabLabels[phase]}
                   </li>
                 ))}
               <li
@@ -338,7 +288,7 @@ function Sales() {
                   setDropdownOpenId(null);
                 }}
               >
-               Closure
+                 Closure
               </li>
             </ul>
           </div>
