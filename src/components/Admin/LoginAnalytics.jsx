@@ -13,8 +13,18 @@ import { Bar } from "react-chartjs-2";
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
 const monthOrder = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
 ];
 
 // Utility to format logs into monthly data
@@ -73,29 +83,47 @@ const LoginAnalytics = ({ logs }) => {
     }
   }, [logs, visible]);
 
-  const barChartData = useMemo(() => ({
-    labels: chartData.labels,
-    datasets: [
-      {
-        label: "Logins",
-        data: chartData.values,
-        backgroundColor: "rgba(59, 130, 246, 0.7)",
-        borderRadius: 4,
-      },
-    ],
-  }), [chartData]);
+  const barChartData = useMemo(
+    () => ({
+      labels: chartData.labels,
+      datasets: [
+        {
+          label: "Logins",
+          data: chartData.values,
+          backgroundColor: "rgba(59, 130, 246, 0.7)",
+          borderRadius: 4,
+        },
+      ],
+    }),
+    [chartData]
+  );
 
   return (
     <section ref={containerRef}>
-      <h2 className="text-2xl font-semibold text-gray-800 mb-4">Login Analytics</h2>
-      <div className="bg-white p-6 rounded-lg shadow min-h-[300px] flex items-center justify-center">
-        {!visible ? (
-          <p className="text-gray-400 italic">Loading chart...</p>
-        ) : chartData.labels.length > 0 ? (
-          <Bar data={barChartData} options={{ responsive: true, maintainAspectRatio: false }} />
-        ) : (
-          <p className="text-gray-500 text-center">No login data available.</p>
-        )}
+      <h2 className="text-2xl font-semibold text-gray-800 mb-4">
+        Login Analytics
+      </h2>
+      <div className="bg-white p-6 rounded-lg shadow w-full overflow-hidden">
+        <div className="relative w-auto h-[300px]">
+          {!visible ? (
+            <p className="text-gray-400 italic text-center">Loading chart...</p>
+          ) : chartData.labels.length > 0 ? (
+            <Bar
+              data={barChartData}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                  y: { beginAtZero: true },
+                },
+              }}
+            />
+          ) : (
+            <p className="text-gray-500 text-center">
+              No login data available.
+            </p>
+          )}
+        </div>
       </div>
     </section>
   );

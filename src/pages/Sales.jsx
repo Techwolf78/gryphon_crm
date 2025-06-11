@@ -130,23 +130,38 @@ function Sales() {
 
         {/* Table Container with Horizontal Scroll */}
         <div className="bg-white shadow-lg rounded-lg overflow-x-auto border border-gray-200">
-          <table
-            className="min-w-full divide-y divide-gray-200"
-            style={{ tableLayout: "fixed" }}
-          >
+          <table className="min-w-full divide-y divide-gray-200">
             <thead
               className={`text-sm font-semibold ${headerColorMap[activeTab]}`}
             >
               <tr>
-                <th className="px-4 py-4 text-left whitespace-normal break-words">Business Name</th>
-                <th className="px-4 py-4 text-left whitespace-normal break-words">Address</th>
-                <th className="px-4 py-4 text-left whitespace-normal break-words">City</th>
-                <th className="px-4 py-4 text-left whitespace-normal break-words">State</th>
-                <th className="px-4 py-4 text-left whitespace-normal break-words">Contact Person</th>
-                <th className="px-4 py-4 text-left whitespace-normal break-words">Phone</th>
-                <th className="px-4 py-4 text-left whitespace-normal break-words">Email</th>
-                <th className="px-4 py-4 text-left whitespace-normal break-words">Created At</th>
-                <th className="px-4 py-4 text-center whitespace-normal break-words">Actions</th>
+                <th className="px-4 py-4 text-left whitespace-normal break-words">
+                  Business Name
+                </th>
+                <th className="px-4 py-4 text-left whitespace-normal break-words">
+                  Address
+                </th>
+                <th className="px-4 py-4 text-left whitespace-normal break-words">
+                  City
+                </th>
+                <th className="px-4 py-4 text-left whitespace-normal break-words">
+                  State
+                </th>
+                <th className="px-4 py-4 text-left whitespace-normal break-words">
+                  Contact Person
+                </th>
+                <th className="px-4 py-4 text-left whitespace-normal break-words">
+                  Phone
+                </th>
+                <th className="px-4 py-4 text-left whitespace-normal break-words">
+                  Email
+                </th>
+                <th className="px-4 py-4 text-left whitespace-normal break-words">
+                  Created At
+                </th>
+                <th className="px-4 py-4 text-center whitespace-normal break-words">
+                  Actions
+                </th>
               </tr>
             </thead>
 
@@ -178,22 +193,40 @@ function Sales() {
                     >
                       {lead.businessName}
                     </td>
-                    <td className="px-4 py-4 whitespace-normal break-words" title={lead.address}>
+                    <td
+                      className="px-4 py-4 whitespace-normal break-words"
+                      title={lead.address}
+                    >
                       {lead.address}
                     </td>
-                    <td className="px-4 py-4 whitespace-normal break-words" title={lead.city}>
+                    <td
+                      className="px-4 py-4 whitespace-normal break-words"
+                      title={lead.city}
+                    >
                       {lead.city}
                     </td>
-                    <td className="px-4 py-4 whitespace-normal break-words" title={lead.state}>
+                    <td
+                      className="px-4 py-4 whitespace-normal break-words"
+                      title={lead.state}
+                    >
                       {lead.state}
                     </td>
-                    <td className="px-4 py-4 whitespace-normal break-words" title={lead.pocName}>
+                    <td
+                      className="px-4 py-4 whitespace-normal break-words"
+                      title={lead.pocName}
+                    >
                       {lead.pocName}
                     </td>
-                    <td className="px-4 py-4 whitespace-normal break-words" title={lead.phoneNo}>
+                    <td
+                      className="px-4 py-4 whitespace-normal break-words"
+                      title={lead.phoneNo}
+                    >
                       {lead.phoneNo}
                     </td>
-                    <td className="px-4 py-4 whitespace-normal break-words" title={lead.email}>
+                    <td
+                      className="px-4 py-4 whitespace-normal break-words"
+                      title={lead.email}
+                    >
                       {lead.email || "-"}
                     </td>
                     <td
