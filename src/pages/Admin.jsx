@@ -1,5 +1,14 @@
-// src/pages/Admin.jsx
+// ✅ Full updated Admin Dashboard with Filters, Search, Pagination (Responsive)
 import React, { useEffect, useState } from "react";
+import {
+  FaSearch,
+  FaUserShield,
+  FaBuilding,
+  FaPlus,
+  FaSyncAlt,
+  FaTrash,
+} from "react-icons/fa";
+
 import {
   collection,
   getDocs,
@@ -10,20 +19,21 @@ import {
   limit,
 } from "firebase/firestore";
 import { db } from "../firebase";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrash } from "@fortawesome/free-solid-svg-icons";
-// At top, add import:
 import NewUser from "../components/Admin/NewUser";
-
 import AuditLogs from "../components/Admin/AuditLogs";
 import LoginAnalytics from "../components/Admin/LoginAnalytics";
 
 const Admin = () => {
-  const [showNotification, setShowNotification] = useState(true);
   const [users, setUsers] = useState([]);
   const [logs, setLogs] = useState([]);
   const [deleteUser, setDeleteUser] = useState(null);
   const [loadingDelete, setLoadingDelete] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
   useEffect(() => {
     const cachedLogs = sessionStorage.getItem("auditLogs");
@@ -35,43 +45,34 @@ const Admin = () => {
       return;
     }
 
-    const fetchData = async () => {
-      try {
-        const usersSnap = await getDocs(collection(db, "users"));
-        const logsSnap = await getDocs(
-          query(
-            collection(db, "audit_logs"),
-            orderBy("date", "desc"),
-            limit(50)
-          )
-        );
-
-        const userData = usersSnap.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        const logData = logsSnap.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-
-        setUsers(userData);
-        setLogs(logData);
-
-        sessionStorage.setItem("userList", JSON.stringify(userData));
-        sessionStorage.setItem("auditLogs", JSON.stringify(logData));
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      }
-    };
-
-    fetchData();
+    handleRefresh();
   }, []);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const usersSnap = await getDocs(collection(db, "users"));
+      const logsSnap = await getDocs(
+        query(collection(db, "audit_logs"), orderBy("date", "desc"), limit(50))
+      );
+
+      const userData = usersSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const logData = logsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
+      setUsers(userData);
+      setLogs(logData);
+
+      sessionStorage.setItem("userList", JSON.stringify(userData));
+      sessionStorage.setItem("auditLogs", JSON.stringify(logData));
+    } catch (error) {
+      console.error("Refresh error:", error);
+    }
+    setRefreshing(false);
+  };
 
   const handleDeleteUserConfirm = async () => {
     if (!deleteUser) return;
     setLoadingDelete(true);
-
     try {
       await deleteDoc(doc(db, "users", deleteUser.id));
       const updatedUsers = users.filter((u) => u.id !== deleteUser.id);
@@ -82,139 +83,141 @@ const Admin = () => {
       console.error("Error deleting user:", error);
       alert("Failed to delete user. Please try again.");
     }
-
     setLoadingDelete(false);
   };
 
-  const handleCancelDelete = () => {
-    setDeleteUser(null);
-  };
+  const handleCancelDelete = () => setDeleteUser(null);
 
-  const handleRefresh = () => {
-    sessionStorage.removeItem("userList");
-    sessionStorage.removeItem("auditLogs");
-    window.location.reload();
-  };
+  const filteredUsers = users.filter((u) => {
+    return (
+      (!search || u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase())) &&
+      (!roleFilter || u.role === roleFilter) &&
+      (!departmentFilter || u.department === departmentFilter)
+    );
+  });
+
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   return (
-    <div className="space-y-8 p-6 max-w-7xl mx-auto">
-      {showNotification && (
-        <div className="bg-yellow-100 border border-yellow-300 text-yellow-800 p-4 flex justify-between items-center rounded shadow">
-          <span>
-            🚧 Admin Dashboard is under development. Data is for demo purposes.
-          </span>
-          <button
-            onClick={() => setShowNotification(false)}
-            className="text-xl font-bold hover:text-yellow-900"
-            aria-label="Close notification"
-          >
-            &times;
-          </button>
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-10">
+      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+        <h1 className="text-3xl font-bold text-blue-900 tracking-tight">
+          Admin Dashboard
+        </h1>
+      </header>
+
+      <section className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <div className="bg-gradient-to-br from-blue-100 to-blue-300 p-6 rounded-2xl shadow-lg text-blue-900">
+          <h3 className="uppercase text-sm font-semibold">Total Users</h3>
+          <p className="text-4xl font-bold">{users.length}</p>
         </div>
-      )}
-
-      {/* Add User Button on top-left */}
-      <div className="flex justify-between items-center mb-4">
-        <NewUser onUserAdded={handleRefresh} />
-
-        {/* Refresh Button on top-right */}
-        <button
-          onClick={handleRefresh}
-          className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition"
-        >
-          🔄 Refresh Data
-        </button>
-      </div>
-
-      {/* Dashboard Stats */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow border">
-          <h3 className="text-sm text-gray-500 uppercase tracking-wide">
-            Total Users
-          </h3>
-          <p className="text-3xl font-bold text-gray-900">{users.length}</p>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow border">
-          <h3 className="text-sm text-gray-500 uppercase tracking-wide">
-            Active Sessions
-          </h3>
-          <p className="text-3xl font-bold text-gray-900">
-            {users.filter((user) => user.status === "Active").length}
+        <div className="bg-gradient-to-br from-green-100 to-green-300 p-6 rounded-2xl shadow-lg text-green-900">
+          <h3 className="uppercase text-sm font-semibold">Logins Today</h3>
+          <p className="text-4xl font-bold">
+            {logs.filter((log) => {
+              const today = new Date();
+              const logDate = new Date(log.date);
+              return (
+                log.action === "Logged in" &&
+                logDate.getDate() === today.getDate() &&
+                logDate.getMonth() === today.getMonth() &&
+                logDate.getFullYear() === today.getFullYear()
+              );
+            }).length}
           </p>
         </div>
-
-        <div className="bg-white p-6 rounded-lg shadow border">
-          <h3 className="text-sm text-gray-500 uppercase tracking-wide">
-            Logins Today
-          </h3>
-          <p className="text-3xl font-bold text-gray-900">
-            {
-              logs.filter((log) => {
-                const today = new Date();
-                const logDate = new Date(log.date);
-                return (
-                  log.action === "Logged in" &&
-                  logDate.getDate() === today.getDate() &&
-                  logDate.getMonth() === today.getMonth() &&
-                  logDate.getFullYear() === today.getFullYear()
-                );
-              }).length
-            }
-          </p>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow border">
-          <h3 className="text-sm text-gray-500 uppercase tracking-wide">
-            Errors Logged
-          </h3>
-          <p className="text-3xl font-bold text-gray-900">
-            {
-              logs.filter((log) => log.action?.toLowerCase().includes("error"))
-                .length
-            }
-          </p>
+        <div className="flex items-center justify-end">
+          <NewUser onUserAdded={handleRefresh} />
         </div>
       </section>
 
-      {/* User Management */}
-      <section>
-        <h2 className="text-2xl font-semibold text-gray-800 mb-4">
-          User Management
-        </h2>
-        <div className="overflow-x-auto rounded-lg shadow border bg-white">
-          <table className="w-full text-left text-sm divide-y divide-gray-200">
-            <thead className="bg-blue-50">
+      <section className="space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <h2 className="text-2xl font-semibold text-gray-800">User Management</h2>
+          <div className="flex flex-wrap gap-2 w-full md:w-auto">
+            <div className="relative flex-1 min-w-[150px]">
+              <FaSearch className="absolute left-3 top-3 text-gray-500" />
+              <input
+                type="text"
+                placeholder="Search by name"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-10 w-full px-4 py-2 text-sm shadow rounded"
+              />
+            </div>
+            <div className="relative flex-1 min-w-[150px]">
+              <FaUserShield className="absolute left-3 top-3 text-gray-500" />
+              <select
+                className="pl-10 pr-4 py-2 w-full text-sm shadow rounded"
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value)}
+              >
+                <option value="">All Roles</option>
+                {[...new Set(users.map((u) => u.role))].map((role) => (
+                  <option key={role} value={role}>{role}</option>
+                ))}
+              </select>
+            </div>
+            <div className="relative flex-1 min-w-[150px]">
+              <FaBuilding className="absolute left-3 top-3 text-gray-500" />
+              <select
+                className="pl-10 pr-4 py-2 w-full text-sm shadow rounded"
+                value={departmentFilter}
+                onChange={(e) => setDepartmentFilter(e.target.value)}
+              >
+                <option value="">All Departments</option>
+                {[...new Set(users.map((u) => u.department))].map((dep) => (
+                  <option key={dep} value={dep}>{dep}</option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={handleRefresh}
+              className={`p-2 bg-[#DBEAFE] text-[#4F39F6] rounded-full ${refreshing ? "animate-spin" : ""}`}
+              title="Refresh"
+            >
+              <FaSyncAlt size={20} />
+            </button>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto bg-white rounded-xl shadow border">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-blue-50 text-gray-600">
               <tr>
-                <th className="p-3 font-medium text-gray-700">Name</th>
-                <th className="p-3 font-medium text-gray-700">Email</th>
-                <th className="p-3 font-medium text-gray-700">Role</th>
-                <th className="p-3 font-medium text-gray-700">Department</th>
-                <th className="p-3 font-medium text-gray-700">Actions</th>
+                <th className="p-3">Name</th>
+                <th className="p-3">Email</th>
+                <th className="p-3">Role</th>
+                <th className="p-3">Department</th>
+                <th className="p-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {users.map((u) => (
-                <tr key={u.id} className="hover:bg-gray-50">
-                  <td className="p-3">{u.name}</td>
-                  <td className="p-3">{u.email}</td>
-                  <td className="p-3">{u.role}</td>
-                  <td className="p-3">{u.department}</td>
-                  <td className="p-3">
-                    <button
-                      onClick={() => setDeleteUser(u)}
-                      className="text-red-600 hover:text-red-800 transition"
-                      aria-label={`Delete ${u.name}`}
-                      title={`Delete ${u.name}`}
-                    >
-                      <FontAwesomeIcon icon={faTrash} size="lg" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {users.length === 0 && (
+            <tbody className="divide-y divide-gray-200">
+              {paginatedUsers.length ? (
+                paginatedUsers.map((u) => (
+                  <tr key={u.id} className="hover:bg-gray-50">
+                    <td className="p-3">{u.name}</td>
+                    <td className="p-3">{u.email}</td>
+                    <td className="p-3">{u.role}</td>
+                    <td className="p-3">{u.department}</td>
+                    <td className="p-3 text-right">
+                      <button
+                        onClick={() => setDeleteUser(u)}
+                        className="text-red-600 hover:text-red-800"
+                        title="Delete"
+                      >
+                        <FaTrash />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
                 <tr>
-                  <td colSpan="5" className="p-4 text-center text-gray-500">
+                  <td colSpan="5" className="text-center py-4 text-gray-500">
                     No users found.
                   </td>
                 </tr>
@@ -222,46 +225,43 @@ const Admin = () => {
             </tbody>
           </table>
         </div>
+
+        <div className="flex justify-end gap-2 pt-4 flex-wrap">
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+            <button
+              key={page}
+              onClick={() => setCurrentPage(page)}
+              className={`px-3 py-1 rounded border ${
+                page === currentPage ? "bg-blue-600 text-white" : "bg-white text-blue-600"
+              }`}
+            >
+              {page}
+            </button>
+          ))}
+        </div>
       </section>
 
-      {/* Login Analytics */}
       <LoginAnalytics logs={logs} />
-
-      {/* Audit Logs */}
       <AuditLogs logs={logs} />
 
-      {/* Delete Confirmation Modal */}
       {deleteUser && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-transparent"
-          aria-modal="true"
-          role="dialog"
-          aria-labelledby="modal-title"
-          aria-describedby="modal-description"
-        >
-          <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6">
-            <h3
-              id="modal-title"
-              className="text-lg font-semibold text-gray-900 mb-4"
-            >
-              Confirm Deletion
-            </h3>
-            <p id="modal-description" className="mb-6 text-gray-700">
-              Are you sure you want to delete user{" "}
-              <strong>{deleteUser.name}</strong>? This action cannot be undone.
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-xl shadow-lg max-w-md w-full">
+            <h3 className="text-lg font-semibold mb-4">Confirm Deletion</h3>
+            <p className="mb-6">
+              Are you sure you want to delete <strong>{deleteUser.name}</strong>?
             </p>
-            <div className="flex justify-end space-x-4">
+            <div className="flex justify-end gap-3">
               <button
                 onClick={handleCancelDelete}
-                className="px-4 py-2 rounded border border-gray-300 hover:bg-gray-100 transition"
-                disabled={loadingDelete}
+                className="px-4 py-2 border rounded hover:bg-gray-100"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteUserConfirm}
-                className="px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={loadingDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
               >
                 {loadingDelete ? "Deleting..." : "Delete"}
               </button>
