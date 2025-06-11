@@ -1,4 +1,3 @@
-// ✅ Full updated Admin Dashboard with Filters, Search, Pagination (Responsive)
 import React, { useEffect, useState } from "react";
 import {
   FaSearch,
@@ -90,7 +89,7 @@ const Admin = () => {
 
   const filteredUsers = users.filter((u) => {
     return (
-      (!search || u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase())) &&
+      (!search || u.name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase())) &&
       (!roleFilter || u.role === roleFilter) &&
       (!departmentFilter || u.department === departmentFilter)
     );
@@ -120,7 +119,7 @@ const Admin = () => {
           <p className="text-4xl font-bold">
             {logs.filter((log) => {
               const today = new Date();
-              const logDate = new Date(log.date);
+              const logDate = log.date?.toDate ? log.date.toDate() : new Date(log.date);
               return (
                 log.action === "Logged in" &&
                 logDate.getDate() === today.getDate() &&
