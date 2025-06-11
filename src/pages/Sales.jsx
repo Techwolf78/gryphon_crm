@@ -106,7 +106,7 @@ function Sales() {
     <div className="p-8 bg-gray-50 min-h-screen font-sans relative">
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-8">
-          <h2 className="text-4xl font-extrabold text-gray-900 tracking-tight">
+          <h2 className="text-4xl font-extrabold text-blue-900 tracking-tight">
             Leads
           </h2>
           <button
