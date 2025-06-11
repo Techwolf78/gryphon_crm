@@ -87,6 +87,7 @@ const Admin = () => {
 
   const handleCancelDelete = () => setDeleteUser(null);
 
+
   const filteredUsers = users.filter((u) => {
     return (
       (!search || u.name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase())) &&

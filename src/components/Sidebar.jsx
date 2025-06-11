@@ -2,8 +2,12 @@
 import React, { useContext } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import {
+  FiHome, FiUsers, FiDollarSign, FiBriefcase, FiBook,
+  FiTrendingUp, FiChevronLeft, FiChevronRight
+} from 'react-icons/fi';
 
-const Sidebar = () => {
+const Sidebar = ({ collapsed, onToggle }) => {
   const { user } = useContext(AuthContext);
   const location = useLocation();
 
@@ -13,49 +17,52 @@ const Sidebar = () => {
 
   const roleLinks = {
     admin: [
-      { label: 'Admin', path: '/dashboard/admin' },
-      { label: 'Sales', path: '/dashboard/sales' },
-      { label: 'Placement', path: '/dashboard/placement' },
-      { label: 'L & D', path: '/dashboard/learning-development' },
-      { label: 'D M', path: '/dashboard/digital-marketing' },
+      { label: 'Dashboard', path: '/dashboard', icon: <FiHome /> },
+      { label: 'Admin', path: '/dashboard/admin', icon: <FiUsers /> },
+      { label: 'Sales', path: '/dashboard/sales', icon: <FiDollarSign /> },
+      { label: 'Placement', path: '/dashboard/placement', icon: <FiBriefcase /> },
+      { label: 'L & D', path: '/dashboard/learning-development', icon: <FiBook /> },
+      { label: 'D M', path: '/dashboard/digital-marketing', icon: <FiTrendingUp /> },
     ],
-    sales: [{ label: 'Sales', path: '/dashboard/sales' }],
-    placement: [{ label: 'Placement', path: '/dashboard/placement' }],
-    learning: [{ label: 'L & D', path: '/dashboard/learning-development' }],
-    marketing: [{ label: 'D M', path: '/dashboard/digital-marketing' }],
+    sales: [{ label: 'Sales', path: '/dashboard/sales', icon: <FiDollarSign /> }],
+    placement: [{ label: 'Placement', path: '/dashboard/placement', icon: <FiBriefcase /> }],
+    learning: [{ label: 'L & D', path: '/dashboard/learning-development', icon: <FiBook /> }],
+    marketing: [{ label: 'D M', path: '/dashboard/digital-marketing', icon: <FiTrendingUp /> }],
   };
 
   const links = roleLinks[user.role] || [];
 
   return (
-    <aside className="w-64 bg-blue-700 text-white flex flex-col">
-      <div className="px-6 py-6 text-2xl font-bold border-b border-blue-600">
-        Gryphon CRM
+    <aside className={`
+      ${collapsed ? 'w-20' : 'w-64'}
+      bg-blue-700 text-white flex flex-col
+      fixed h-full z-50
+      transition-all duration-300 ease-in-out
+    `}>
+      <div className="px-6 py-6 text-2xl font-bold border-b border-blue-600 flex items-center justify-between">
+        {!collapsed && <span className="whitespace-nowrap">Gryphon CRM</span>}
+        <button 
+          onClick={onToggle}
+          className="text-white hover:text-blue-200 focus:outline-none"
+        >
+          {collapsed ? <FiChevronRight size={24} /> : <FiChevronLeft size={24} />}
+        </button>
       </div>
-<nav className="flex-grow px-4 py-6 space-y-3">
-  {user.role === 'admin' && (
-    <Link
-      to="/dashboard"
-      className={`block px-4 py-2 rounded hover:bg-blue-600 transition ${
-        isActive('/dashboard') ? 'bg-blue-800 font-semibold' : ''
-      }`}
-    >
-      Dashboard
-    </Link>
-  )}
-  {links.map(({ label, path }) => (
-    <Link
-      key={path}
-      to={path}
-      className={`block px-4 py-2 rounded hover:bg-blue-600 transition ${
-        isActive(path) ? 'bg-blue-800 font-semibold' : ''
-      }`}
-    >
-      {label}
-    </Link>
-  ))}
-</nav>
-
+      <nav className="flex-grow px-4 py-6 space-y-3 overflow-y-auto">
+        {links.map(({ label, path, icon }) => (
+          <Link
+            key={path}
+            to={path}
+            className={`flex items-center px-4 py-2 rounded hover:bg-blue-600 transition ${
+              isActive(path) ? 'bg-blue-800 font-semibold' : ''
+            }`}
+            title={collapsed ? label : ''}
+          >
+            <span className="text-xl">{icon}</span>
+            {!collapsed && <span className="ml-3 whitespace-nowrap">{label}</span>}
+          </Link>
+        ))}
+      </nav>
     </aside>
   );
 };
