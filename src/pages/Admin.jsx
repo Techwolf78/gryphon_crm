@@ -55,8 +55,14 @@ const Admin = () => {
         query(collection(db, "audit_logs"), orderBy("date", "desc"), limit(50))
       );
 
-      const userData = usersSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      const logData = logsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const userData = usersSnap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      const logData = logsSnap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
 
       setUsers(userData);
       setLogs(logData);
@@ -87,10 +93,11 @@ const Admin = () => {
 
   const handleCancelDelete = () => setDeleteUser(null);
 
-
   const filteredUsers = users.filter((u) => {
     return (
-      (!search || u.name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase())) &&
+      (!search ||
+        u.name?.toLowerCase().includes(search.toLowerCase()) ||
+        u.email?.toLowerCase().includes(search.toLowerCase())) &&
       (!roleFilter || u.role === roleFilter) &&
       (!departmentFilter || u.department === departmentFilter)
     );
@@ -118,16 +125,20 @@ const Admin = () => {
         <div className="bg-gradient-to-br from-green-100 to-green-300 p-6 rounded-2xl shadow-lg text-green-900">
           <h3 className="uppercase text-sm font-semibold">Logins Today</h3>
           <p className="text-4xl font-bold">
-            {logs.filter((log) => {
-              const today = new Date();
-              const logDate = log.date?.toDate ? log.date.toDate() : new Date(log.date);
-              return (
-                log.action === "Logged in" &&
-                logDate.getDate() === today.getDate() &&
-                logDate.getMonth() === today.getMonth() &&
-                logDate.getFullYear() === today.getFullYear()
-              );
-            }).length}
+            {
+              logs.filter((log) => {
+                const today = new Date();
+                const logDate = log.date?.toDate
+                  ? log.date.toDate()
+                  : new Date(log.date);
+                return (
+                  log.action === "Logged in" &&
+                  logDate.getDate() === today.getDate() &&
+                  logDate.getMonth() === today.getMonth() &&
+                  logDate.getFullYear() === today.getFullYear()
+                );
+              }).length
+            }
           </p>
         </div>
         <div className="flex items-center justify-end">
@@ -137,7 +148,9 @@ const Admin = () => {
 
       <section className="space-y-4">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <h2 className="text-2xl font-semibold text-gray-800">User Management</h2>
+          <h2 className="text-2xl font-semibold text-gray-800">
+            User Management
+          </h2>
           <div className="flex flex-wrap gap-2 w-full md:w-auto">
             <div className="relative flex-1 min-w-[150px]">
               <FaSearch className="absolute left-3 top-3 text-gray-500" />
@@ -158,7 +171,9 @@ const Admin = () => {
               >
                 <option value="">All Roles</option>
                 {[...new Set(users.map((u) => u.role))].map((role) => (
-                  <option key={role} value={role}>{role}</option>
+                  <option key={role} value={role}>
+                    {role}
+                  </option>
                 ))}
               </select>
             </div>
@@ -171,13 +186,17 @@ const Admin = () => {
               >
                 <option value="">All Departments</option>
                 {[...new Set(users.map((u) => u.department))].map((dep) => (
-                  <option key={dep} value={dep}>{dep}</option>
+                  <option key={dep} value={dep}>
+                    {dep}
+                  </option>
                 ))}
               </select>
             </div>
             <button
               onClick={handleRefresh}
-              className={`p-2 bg-[#DBEAFE] text-[#4F39F6] rounded-full ${refreshing ? "animate-spin" : ""}`}
+              className={`p-2 bg-[#DBEAFE] text-[#4F39F6] rounded-full ${
+                refreshing ? "animate-spin" : ""
+              }`}
               title="Refresh"
             >
               <FaSyncAlt size={20} />
@@ -189,22 +208,22 @@ const Admin = () => {
           <table className="w-full text-sm text-left">
             <thead className="bg-blue-50 text-gray-600">
               <tr>
-                <th className="p-3">Name</th>
-                <th className="p-3">Email</th>
-                <th className="p-3">Role</th>
-                <th className="p-3">Department</th>
-                <th className="p-3 text-right">Actions</th>
+                <th className="p-3 whitespace-normal break-words">Name</th>
+                <th className="p-3 whitespace-normal break-words">Email</th>
+                <th className="p-3 whitespace-normal break-words">Role</th>
+                <th className="p-3 whitespace-normal break-words">Department</th>
+                <th className="p-3 whitespace-normal break-words text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {paginatedUsers.length ? (
                 paginatedUsers.map((u) => (
                   <tr key={u.id} className="hover:bg-gray-50">
-                    <td className="p-3">{u.name}</td>
-                    <td className="p-3">{u.email}</td>
-                    <td className="p-3">{u.role}</td>
-                    <td className="p-3">{u.department}</td>
-                    <td className="p-3 text-right">
+                    <td className="p-3 whitespace-normal break-words">{u.name}</td>
+                    <td className="p-3 whitespace-normal break-words">{u.email}</td>
+                    <td className="p-3 whitespace-normal break-words">{u.role}</td>
+                    <td className="p-3 whitespace-normal break-words">{u.department}</td>
+                    <td className="p-3 whitespace-normal break-words text-right">
                       <button
                         onClick={() => setDeleteUser(u)}
                         className="text-red-600 hover:text-red-800"
@@ -232,7 +251,9 @@ const Admin = () => {
               key={page}
               onClick={() => setCurrentPage(page)}
               className={`px-3 py-1 rounded border ${
-                page === currentPage ? "bg-blue-600 text-white" : "bg-white text-blue-600"
+                page === currentPage
+                  ? "bg-blue-600 text-white"
+                  : "bg-white text-blue-600"
               }`}
             >
               {page}
@@ -249,7 +270,8 @@ const Admin = () => {
           <div className="bg-white p-6 rounded-xl shadow-lg max-w-md w-full">
             <h3 className="text-lg font-semibold mb-4">Confirm Deletion</h3>
             <p className="mb-6">
-              Are you sure you want to delete <strong>{deleteUser.name}</strong>?
+              Are you sure you want to delete <strong>{deleteUser.name}</strong>
+              ?
             </p>
             <div className="flex justify-end gap-3">
               <button
