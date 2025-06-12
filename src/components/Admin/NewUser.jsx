@@ -1,23 +1,25 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { db, secondaryAuth } from "../../firebase";
+import { AiOutlineUserAdd } from "react-icons/ai";
 import {
   createUserWithEmailAndPassword,
   updateProfile,
-  signOut
+  signOut,
 } from "firebase/auth";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import {
+  FaUser,
+  FaEnvelope,
+  FaLock,
+  FaUserTag,
+  FaBuilding,
+} from "react-icons/fa";
+import emailjs from "@emailjs/browser";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
-const departments = [
-  "Sales",
-  "Marketing",
-  "Learning Development",
-  "Placement",
-  "Executive",
-  "Admin",
-  "Manager",
-];
-
-const roles = ["User", "Admin", "Sales", "Manager", "Executive"];
+const departments = ["Sales", "Placement", "L & D", "DM"];
+const roles = ["User", "Head", "Executive", "Manager", "Assistant Manager"];
 
 const NewUser = ({ onUserAdded }) => {
   const [showForm, setShowForm] = useState(false);
@@ -38,6 +40,25 @@ const NewUser = ({ onUserAdded }) => {
     setError("");
   };
 
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === "Escape") {
+        setShowForm(false);
+        resetForm();
+      }
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, []);
+
+  useEffect(() => {
+    if (showForm) {
+      setTimeout(() => {
+        document.getElementById("nameInput")?.focus();
+      }, 100);
+    }
+  }, [showForm]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -49,12 +70,20 @@ const NewUser = ({ onUserAdded }) => {
       return;
     }
 
+    if (!roles.includes(role) || !departments.includes(department)) {
+      setError("Invalid role or department selected.");
+      setLoading(false);
+      return;
+    }
+
     try {
-      // Create user using secondary auth instance
-      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(
+        secondaryAuth,
+        email,
+        password
+      );
       await updateProfile(userCredential.user, { displayName: name });
 
-      // Add user to Firestore
       await addDoc(collection(db, "users"), {
         uid: userCredential.user.uid,
         name,
@@ -64,111 +93,170 @@ const NewUser = ({ onUserAdded }) => {
         createdAt: serverTimestamp(),
       });
 
-      // Clean up session from secondary app
+      try {
+        await emailjs.send(
+        "service_pskknsn",
+        "template_hu6vhxf",
+        {
+          name,
+          email,
+          password,
+          role,
+          department,
+        },
+        "zEVWxxT-QvGIrhvTV"
+      );
+      } catch (emailErr) {
+        console.error("EmailJS Error:", emailErr);
+        toast.warning("User added, but email not sent.");
+      }
+
       await signOut(secondaryAuth);
 
       resetForm();
       setShowForm(false);
       if (onUserAdded) onUserAdded();
-      alert("User added successfully!");
+      toast.success(`${name} (${role}, ${department}) added successfully!`);
     } catch (err) {
       console.error("Error adding user:", err);
-      setError(err.message || "Failed to add user");
+      toast.error(err.message || "Failed to add user");
     }
 
     setLoading(false);
   };
 
   return (
-    <div className="flex flex-col space-y-3 max-w-md w-full">
-      {!showForm && (
-        <button
-          onClick={() => setShowForm(true)}
-          className="self-start px-5 py-2 bg-green-600 text-white rounded-md shadow hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-400 transition"
-          aria-label="Add New User"
-        >
-          ➕ Add New User
-        </button>
-      )}
+    <div>
+      <button
+        onClick={() => setShowForm(true)}
+        className="w-full py-3 px-4 rounded-full font-semibold shadow transition-all duration-300 text-[#4F39F6] bg-[#DBEAFE]  flex items-center justify-center gap-2"
+      >
+        <AiOutlineUserAdd className="text-2xl" />
+        Add User
+      </button>
 
       {showForm && (
+        <div
+          className="fixed inset-0 backdrop-blur-sm bg-black/30 z-40"
+          onClick={() => {
+            setShowForm(false);
+            resetForm();
+          }}
+        ></div>
+      )}
+
+      <div
+        className={`fixed top-0 right-0 h-full w-full sm:w-[420px] bg-white/80 backdrop-blur-xl z-[100] transform transition-transform duration-300 shadow-2xl ${
+          showForm ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-300">
+          <h2 className="text-xl font-bold text-gray-800">Add New User</h2>
+          <button
+            onClick={() => {
+              setShowForm(false);
+              resetForm();
+            }}
+            className="text-2xl font-bold text-gray-600 hover:text-red-500"
+          >
+            &times;
+          </button>
+        </div>
+
         <form
           onSubmit={handleSubmit}
-          className="bg-white border border-gray-200 rounded-lg p-6 shadow-md space-y-5"
+          className="p-6 space-y-6 overflow-y-auto h-[calc(100%-64px)] custom-scrollbar"
         >
-          <h3 className="text-xl font-semibold text-gray-800 mb-4">
-            Add New User
-          </h3>
-
+          {/* Name */}
           <div>
-            <label className="block mb-1 text-gray-700 font-medium">Name</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              required
-            />
+            <div className="flex items-center border border-gray-300 bg-white/50 backdrop-blur rounded-xl px-3 py-2 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 transition">
+              <FaUser className="text-gray-400 mr-3" size={20} />
+              <input
+                id="nameInput"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="flex-grow focus:outline-none bg-transparent text-black"
+                placeholder="Enter full name"
+                required
+              />
+            </div>
           </div>
 
+          {/* Email */}
           <div>
-            <label className="block mb-1 text-gray-700 font-medium">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              required
-            />
+            <div className="flex items-center border border-gray-300 bg-white/50 backdrop-blur rounded-xl px-3 py-2 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 transition">
+              <FaEnvelope className="text-gray-400 mr-3" size={20} />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="flex-grow focus:outline-none bg-transparent text-black"
+                placeholder="Enter email"
+                required
+              />
+            </div>
           </div>
 
+          {/* Password */}
           <div>
-            <label className="block mb-1 text-gray-700 font-medium">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              minLength={6}
-              className="w-full px-3 py-2 border rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              required
-            />
+            <div className="flex items-center border border-gray-300 bg-white/50 backdrop-blur rounded-xl px-3 py-2 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 transition">
+              <FaLock className="text-gray-400 mr-3" size={20} />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                minLength={6}
+                className="flex-grow focus:outline-none bg-transparent text-black"
+                placeholder="Enter password"
+                required
+              />
+            </div>
           </div>
 
+          {/* Role */}
           <div>
-            <label className="block mb-1 text-gray-700 font-medium">Role</label>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-400"
-            >
-              {roles.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center border border-gray-300 bg-white/50 backdrop-blur rounded-xl px-3 py-2 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 transition ">
+              <FaUserTag className="text-gray-400 mr-3" size={20} />
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                className="flex-grow bg-transparent focus:outline-none text-black"
+              >
+                {roles.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
+          {/* Department */}
           <div>
-            <label className="block mb-1 text-gray-700 font-medium">Department</label>
-            <select
-              value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-400"
-            >
-              {departments.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center border border-gray-300 bg-white/50 backdrop-blur rounded-xl px-3 py-2 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 transition">
+              <FaBuilding className="text-gray-400 mr-3" size={20} />
+              <select
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+                className="flex-grow bg-transparent focus:outline-none text-black"
+              >
+                {departments.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
+          {/* Error */}
           {error && (
-            <p className="text-red-600 text-sm">{error}</p>
+            <p className="text-red-500 text-sm font-medium">{error}</p>
           )}
 
-          <div className="flex justify-end space-x-3">
+          {/* Action Buttons */}
+          <div className="flex justify-end space-x-3 pt-4">
             <button
               type="button"
               onClick={() => {
@@ -176,21 +264,47 @@ const NewUser = ({ onUserAdded }) => {
                 resetForm();
               }}
               disabled={loading}
-              className="px-4 py-2 rounded border border-gray-300 hover:bg-gray-100 transition focus:outline-none"
+              className="px-4 py-2 bg-red-200 rounded-full border border-gray-300 text-gray-700 hover:bg-red-500 hover:text-white transition duration-200"
             >
               Cancel
             </button>
-
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700 transition disabled:opacity-50"
+              className="px-6 py-2 rounded-full bg-green-200  border border-gray-300 text-gray-700 hover:bg-green-500 hover:text-white duration-300 ease-in-out disabled:opacity-50"
             >
-              {loading ? "Adding..." : "Add User"}
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <svg
+                    className="animate-spin h-5 w-5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="white"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="white"
+                      d="M4 12a8 8 0 018-8v8z"
+                    />
+                  </svg>
+                  Adding...
+                </span>
+              ) : (
+                "Add User"
+              )}
             </button>
           </div>
         </form>
-      )}
+      </div>
+
+      <ToastContainer position="top-right" autoClose={3000} />
     </div>
   );
 };

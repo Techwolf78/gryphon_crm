@@ -1,7 +1,12 @@
 // src/firebase.js
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
+import {
+  getAuth,
+  setPersistence,
+  browserLocalPersistence,
+} from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getDatabase } from "firebase/database"; // Realtime DB
 
 // Firebase config
 const firebaseConfig = {
@@ -14,14 +19,22 @@ const firebaseConfig = {
   measurementId: "G-0V7B973Q8T",
 };
 
-// Default app
+// Initialize default app
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+
+// Firebase services
 const auth = getAuth(app);
 setPersistence(auth, browserLocalPersistence);
 const db = getFirestore(app);
 
-// Secondary app for creating users
+// IMPORTANT: Use your region-specific database URL here
+const realtimeDb = getDatabase(
+  app,
+  "https://authencation-39485-default-rtdb.asia-southeast1.firebasedatabase.app"
+);
+
+// Secondary app (optional, for admin use)
 const secondaryApp = initializeApp(firebaseConfig, "Secondary");
 const secondaryAuth = getAuth(secondaryApp);
 
-export { auth, db, secondaryAuth };
+export { auth, db, realtimeDb, secondaryAuth };
