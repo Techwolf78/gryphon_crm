@@ -6,12 +6,13 @@ import {
   signOut,
 } from 'firebase/auth';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-
+ 
 export const AuthContext = createContext();
-
+ 
 const getRoleByEmail = (email) => {
   const roleMap = {
     'gryphoncrm@gmail.com': 'admin',
+    'gryphoncrm@gryphonacademy.co.in': 'admin',
     'nishad@gryphonacademy.co.in': 'sales',
     'shashikant@gryphonacademy.co.in': 'placement',
     'neha@gryphonacademy.co.in': 'learning',
@@ -19,7 +20,7 @@ const getRoleByEmail = (email) => {
   };
   return roleMap[email.toLowerCase()] || 'guest';
 };
-
+ 
 const getUserIP = async () => {
   try {
     const res = await fetch('https://api.ipify.org?format=json');
@@ -29,11 +30,11 @@ const getUserIP = async () => {
     return 'N/A';
   }
 };
-
+ 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-
+ 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
@@ -46,12 +47,12 @@ export const AuthProvider = ({ children }) => {
     });
     return () => unsub();
   }, []);
-
+ 
   const login = async (email, password) => {
     const userCred = await signInWithEmailAndPassword(auth, email, password);
     const role = getRoleByEmail(userCred.user.email);
     setUser({ ...userCred.user, role });
-
+ 
     // Log login to Firestore
     const ip = await getUserIP();
     await addDoc(collection(db, 'audit_logs'), {
@@ -62,16 +63,18 @@ export const AuthProvider = ({ children }) => {
       timestamp: serverTimestamp(),
     });
   };
-
+ 
   const logout = async () => {
     await signOut(auth);
     localStorage.clear();
     setUser(null);
   };
-
+ 
   return (
     <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user }}>
       {!loading && children}
     </AuthContext.Provider>
   );
 };
+ 
+ 

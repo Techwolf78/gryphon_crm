@@ -2,6 +2,14 @@ import React, { useContext } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 
+import {
+  FaStar,
+  FaQuestionCircle,
+  FaHome,
+  FaTachometerAlt,
+  FaSignOutAlt,
+} from 'react-icons/fa';
+
 const Navbar = () => {
   const { user, logout } = useContext(AuthContext);
   const location = useLocation();
@@ -19,6 +27,9 @@ const Navbar = () => {
     return email;
   };
 
+  const navItemClass =
+    'group flex items-center gap-2 relative transition text-white hover:text-white';
+
   return (
     <nav className="bg-blue-900 text-white px-6 py-4 flex justify-between items-center sticky top-0 z-50">
       <Link to="/" className="flex items-center">
@@ -29,50 +40,89 @@ const Navbar = () => {
         />
       </Link>
 
-      <div className="flex items-center space-x-4">
+      <div className="flex items-center space-x-6">
+        {/* Home Page: Features + FAQ + Login */}
         {isHome && !user && (
           <>
-            <a href="#features" className="hover:text-blue-100 transition">Features</a>
-            <a href="#faq" className="hover:text-blue-100 transition">FAQ</a>
+            <a href="#features" className="relative group text-white">
+              <span className="relative inline-block transition duration-300 group-hover:text-yellow-400">
+                Features
+                <span className="absolute left-0 -bottom-1 w-full h-0.5 bg-yellow-400 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-center duration-300"></span>
+              </span>
+            </a>
+            <a href="#faq" className="relative group text-white">
+              <span className="relative inline-block transition duration-300 group-hover:text-yellow-400">
+                FAQ
+                <span className="absolute left-0 -bottom-1 w-full h-0.5 bg-yellow-400 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-center duration-300"></span>
+              </span>
+            </a>
             <Link
               to="/login"
-              className="bg-blue-700 text-white px-4 py-2 rounded hover:bg-blue-600 transition"
+              className="relative group text-white transition"
             >
-              Login
+              <span className="relative inline-block transition duration-300 group-hover:text-yellow-400">
+                Login
+                <span className="absolute left-0 -bottom-1 w-full h-0.5 bg-yellow-400 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-center duration-300"></span>
+              </span>
             </Link>
           </>
         )}
 
+        {/* Login Page: Home icon with tooltip */}
         {isLogin && !user && (
-          <>
-            <Link to="/" className="hover:text-blue-100 transition">Home</Link>
-          </>
+          <div className="relative group">
+            <Link to="/" className="text-white hover:text-white">
+              <FaHome className="text-white text-4xl transition" />
+            </Link>
+            <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition pointer-events-none">
+              Home
+            </div>
+          </div>
         )}
 
+        {/* Authenticated User */}
         {user && (
           <>
             {user.role === 'admin' && (
-              <Link
-                to="/dashboard"
-                className={`transition ${
-                  isDashboard ? 'text-green-400 font-semibold' : 'hover:text-cyan-400'
-                }`}
-              >
-                Dashboard
+              <Link to="/dashboard" className={navItemClass}>
+                <FaTachometerAlt
+                  className={`transition ${
+                    isDashboard
+                      ? 'text-green-400 animate-pulse'
+                      : 'text-white group-hover:text-yellow-400'
+                  }`}
+                />
+                <span
+                  className={`relative inline-block transition duration-300 ${
+                    isDashboard ? 'text-green-400 font-semibold' : 'group-hover:text-yellow-400'
+                  }`}
+                >
+                  Dashboard
+                  <span className="absolute left-0 -bottom-1 w-full h-0.5 bg-yellow-400 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-center duration-300"></span>
+                </span>
               </Link>
             )}
-            <span className="text-sm font-medium bg-blue-800 text-white px-3 py-1 rounded">
+            <span className="text-sm font-medium bg-blue-800 text-white px-3 py-1 rounded animate-[fadein_0.5s_ease-out]">
               {formatDisplayName(user.email)}
             </span>
             <button
               onClick={logout}
-              className="bg-red-700 text-white px-4 py-2 rounded hover:bg-red-600 transition"
+              className="flex items-center gap-2 bg-red-700 text-white px-4 py-2 rounded hover:bg-red-600 transition"
             >
+              <FaSignOutAlt className="group-hover:text-yellow-400 transition" />
               Logout
             </button>
           </>
         )}
       </div>
+
+      {/* Inline animation keyframe */}
+      <style>{`
+        @keyframes fadein {
+          from { opacity: 0; transform: translateY(-5px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </nav>
   );
 };
