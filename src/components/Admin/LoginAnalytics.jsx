@@ -103,8 +103,8 @@ const LoginAnalytics = ({ logs }) => {
       <h2 className="text-2xl font-semibold text-gray-800 mb-4">
         Login Analytics
       </h2>
-      <div className="bg-white p-6 rounded-lg shadow w-full overflow-hidden">
-        <div className="relative w-auto h-[300px]">
+      <div className="bg-white pl-6 py-6 rounded-lg shadow w-full overflow-hidden">
+        <div className="relative w-[900px] h-[300px]">
           {!visible ? (
             <p className="text-gray-400 italic text-center">Loading chart...</p>
           ) : chartData.labels.length > 0 ? (

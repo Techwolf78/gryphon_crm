@@ -12,6 +12,7 @@ export const AuthContext = createContext();
 const getRoleByEmail = (email) => {
   const roleMap = {
     'gryphoncrm@gmail.com': 'admin',
+    'gryphoncrm@gryphonacademy.co.in': 'admin',
     'nishad@gryphonacademy.co.in': 'sales',
     'shashikant@gryphonacademy.co.in': 'placement',
     'neha@gryphonacademy.co.in': 'learning',
