@@ -13,6 +13,7 @@ import Sales from './pages/Sales';
 import Placement from './pages/Placement';
 import LearningDevelopment from './pages/LearningDevelopment';
 import DigitalMarketing from './pages/DigitalMarketing';
+import Footer from './pages/footer';
 
 function App() {
   return (
@@ -39,6 +40,7 @@ function App() {
             <Route path="digital-marketing" element={<DigitalMarketing />} />
           </Route>
         </Routes>
+        <Footer/>
       </Router>
     </AuthProvider>
   );
