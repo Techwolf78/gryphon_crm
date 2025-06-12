@@ -12,18 +12,6 @@ const tabLabels = {
   renewal: "Renewal",
 };
 
-  // Fixed column widths in pixels
-  const columnWidths = {
-    businessName: 200,
-    address: 180,
-    city: 120,
-    state: 120,
-    pocName: 150,
-    phoneNo: 120,
-    email: 180,
-    createdAt: 120,
-    actions: 80,
-  };
 
 const tabColorMap = {
   hot: {
@@ -217,7 +205,7 @@ function Sales() {
                 filteredLeads.map(([id, lead]) => (
                   <tr
                     key={id}
-                    className={`${rowColorMap[activeTab]} hover:bg-gray-100 transition-colors duration-200`}
+                    className={`${rowColorMap[activeTab]} hover:bg-white transition-colors duration-200`}
                   >
                     {[
                       "businessName",
