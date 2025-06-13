@@ -12,7 +12,6 @@ const tabLabels = {
   renewal: "Renewal",
 };
 
-
 const tabColorMap = {
   hot: {
     active: "bg-red-600 text-white shadow-md",
@@ -32,13 +31,6 @@ const tabColorMap = {
   },
 };
 
-const rowColorMap = {
-  hot: "bg-red-50",
-  warm: "bg-yellow-50",
-  cold: "bg-green-50",
-  renewal: "bg-blue-50",
-};
-
 const headerColorMap = {
   hot: "bg-red-100 text-red-800",
   warm: "bg-yellow-100 text-yellow-800",
@@ -54,13 +46,27 @@ const ClosureFormModal = ({ show, onClose, lead }) => {
       <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Closure Form</h2>
         <div className="space-y-3 text-sm">
-          <div><strong>Business:</strong> {lead.businessName}</div>
-          <div><strong>City:</strong> {lead.city}</div>
-          <div><strong>Phone:</strong> {lead.phoneNo}</div>
-          <div><strong>Email:</strong> {lead.email}</div>
-          <div><strong>POC:</strong> {lead.pocName}</div>
-          <div><strong>State:</strong> {lead.state}</div>
-          <div><strong>Address:</strong> {lead.address}</div>
+          <div>
+            <strong>Business:</strong> {lead.businessName}
+          </div>
+          <div>
+            <strong>City:</strong> {lead.city}
+          </div>
+          <div>
+            <strong>Phone:</strong> {lead.phoneNo}
+          </div>
+          <div>
+            <strong>Email:</strong> {lead.email}
+          </div>
+          <div>
+            <strong>POC:</strong> {lead.pocName}
+          </div>
+          <div>
+            <strong>State:</strong> {lead.state}
+          </div>
+          <div>
+            <strong>Address:</strong> {lead.address}
+          </div>
         </div>
         <div className="mt-6 text-right">
           <button
@@ -144,7 +150,9 @@ function Sales() {
     <div className="bg-gray-50 min-h-screen font-sans relative">
       <div className="mx-auto">
         <div className="flex justify-between items-center mb-8">
-          <h2 className="text-4xl font-extrabold text-gray-900 tracking-tight">Leads</h2>
+          <h2 className="text-4xl font-extrabold text-gray-900 tracking-tight">
+            Leads
+          </h2>
           <button
             onClick={() => setShowModal(true)}
             className="bg-blue-600 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-blue-800 transition"
@@ -159,84 +167,83 @@ function Sales() {
               key={key}
               onClick={() => setActiveTab(key)}
               className={`flex-1 py-3 rounded-full text-sm font-semibold transition duration-300 ease-in-out ${
-                activeTab === key ? tabColorMap[key].active : tabColorMap[key].inactive
+                activeTab === key
+                  ? tabColorMap[key].active
+                  : tabColorMap[key].inactive
               }`}
             >
               {tabLabels[key]}
             </button>
           ))}
         </div>
+<div className="space-y-2">
+  {/* Header Row */}
+  <div className={`grid grid-cols-9 text-sm font-semibold px-4 py-3 rounded-md ${headerColorMap[activeTab]}`}>
+    {[
+      "Business Name",
+      "Address",
+      "City",
+      "State",
+      "Contact Person",
+      "Phone",
+      "Email",
+      "Created At",
+      "Actions",
+    ].map((title) => (
+      <div key={title} className="whitespace-normal break-words">{title}</div>
+    ))}
+  </div>
 
-        <div className="bg-white shadow-lg rounded-lg overflow-x-auto border border-gray-200">
-          <table className="min-w-full divide-y divide-gray-200" style={{ tableLayout: "fixed" }}>
-            <thead className={`text-sm font-semibold ${headerColorMap[activeTab]}`}>
-              <tr>
-                {[
-                  "Business Name",
-                  "Address",
-                  "City",
-                  "State",
-                  "Contact Person",
-                  "Phone",
-                  "Email",
-                  "Created At",
-                  "Actions",
-                ].map((title) => (
-                  <th key={title} className="px-4 py-4 text-left whitespace-normal break-words">
-                    {title}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="text-gray-800 divide-y divide-gray-100">
-              {loading ? (
-                <tr>
-                  <td colSpan="9" className="text-center py-8">
-                    Loading leads...
-                  </td>
-                </tr>
-              ) : filteredLeads.length === 0 ? (
-                <tr>
-                  <td colSpan="9" className="text-center py-8 text-gray-400 italic">
-                    No records found.
-                  </td>
-                </tr>
-              ) : (
-                filteredLeads.map(([id, lead]) => (
-                  <tr
-                    key={id}
-                    className={`${rowColorMap[activeTab]} hover:bg-white transition-colors duration-200`}
-                  >
-                    {[
-                      "businessName",
-                      "address",
-                      "city",
-                      "state",
-                      "pocName",
-                      "phoneNo",
-                      "email",
-                      "createdAt",
-                    ].map((field, i) => (
-                      <td key={i} className="px-4 py-4 whitespace-normal break-words">
-                        {field === "createdAt"
-                          ? formatDate(lead[field])
-                          : lead[field] || "-"}
-                      </td>
-                    ))}
-                    <td className="px-4 py-4 text-center relative">
-                      <button
-                        onClick={(e) => toggleDropdown(id, e)}
-                        className="text-gray-500 hover:text-gray-700 focus:outline-none transition"
-                      >
-                        <FaEllipsisV size={18} />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+  {/* Rows */}
+  {loading ? (
+    <div className="text-center text-gray-500 py-10 col-span-9">Loading leads...</div>
+  ) : filteredLeads.length === 0 ? (
+    <div className="text-center text-gray-400 italic py-10 col-span-9">No records found.</div>
+  ) : (
+    filteredLeads.map(([id, lead]) => (
+      <div
+        key={id}
+        className={`grid grid-cols-9 gap-4 p-4 rounded-lg shadow-sm bg-white border-l-4 ${
+          activeTab === "hot"
+            ? "border-red-500"
+            : activeTab === "warm"
+            ? "border-yellow-400"
+            : activeTab === "cold"
+            ? "border-green-500"
+            : "border-blue-500"
+        }`}
+      >
+        {[
+          "businessName",
+          "address",
+          "city",
+          "state",
+          "pocName",
+          "phoneNo",
+          "email",
+          "createdAt",
+        ].map((field, i) => (
+          <div key={i} className="whitespace-normal break-words text-sm">
+            {field === "createdAt"
+              ? formatDate(lead[field])
+              : lead[field] || "-"}
+          </div>
+        ))}
+
+        <div className="text-center">
+          <button
+            onClick={(e) => toggleDropdown(id, e)}
+            className="text-gray-500 hover:text-gray-700 focus:outline-none transition"
+          >
+            <FaEllipsisV size={18} />
+          </button>
         </div>
+      </div>
+    ))
+  )}
+</div>
+
+
       </div>
 
       {/* Dropdown Actions */}
@@ -256,7 +263,7 @@ function Sales() {
                   href={`tel:${leads[dropdownOpenId].phoneNo}`}
                   className="block px-4 py-2 text-sm hover:bg-white/40 rounded"
                 >
-                 Call
+                  Call
                 </a>
               </li>
               <li
@@ -266,7 +273,7 @@ function Sales() {
                   setDropdownOpenId(null);
                 }}
               >
-                 Follow Up
+                Follow Up
               </li>
               {["hot", "warm", "cold", "renewal"]
                 .filter((phase) => phase !== activeTab)
@@ -289,7 +296,7 @@ function Sales() {
                   setDropdownOpenId(null);
                 }}
               >
-                 Closure
+                Closure
               </li>
             </ul>
           </div>
