@@ -4,6 +4,7 @@ import { FaEnvelope, FaEllipsisV } from "react-icons/fa";
 import { ref, onValue, update } from "firebase/database";
 import { realtimeDb } from "../firebase";
 import AddCollegeModal from "../components/Sales/AddCollege";
+import FollowUp from "../components/Sales/Followup";
 
 const tabLabels = {
   hot: "Hot",
@@ -40,7 +41,6 @@ const headerColorMap = {
 
 const ClosureFormModal = ({ show, onClose, lead }) => {
   if (!show || !lead) return null;
-
   return (
     <div className="fixed inset-0 z-[999999] bg-black bg-opacity-50 flex justify-center items-center">
       <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
@@ -88,25 +88,29 @@ function Sales() {
   const dropdownRef = useRef(null);
   const [showModal, setShowModal] = useState(false);
   const [showClosureModal, setShowClosureModal] = useState(false);
+  const [showFollowUpModal, setShowFollowUpModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
   const [leads, setLeads] = useState({});
+  const [followups, setFollowups] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const leadsRef = ref(realtimeDb, "leads");
-    const unsubscribe = onValue(
-      leadsRef,
-      (snapshot) => {
-        const data = snapshot.val() || {};
-        setLeads(data);
-        setLoading(false);
-      },
-      (error) => {
-        console.error("Failed to fetch leads:", error);
-        setLoading(false);
-      }
-    );
-    return () => unsubscribe();
+    const unsubLeads = onValue(leadsRef, (snapshot) => {
+      const data = snapshot.val() || {};
+      setLeads(data);
+      setLoading(false);
+    });
+
+    const followRef = ref(realtimeDb, "Followup");
+    const unsubF = onValue(followRef, (snapshot) => {
+      setFollowups(snapshot.val() || {});
+    });
+
+    return () => {
+      unsubLeads();
+      unsubF();
+    };
   }, []);
 
   // Close dropdown when clicking outside
@@ -152,17 +156,14 @@ function Sales() {
     }
   };
 
-  const handleClosureClick = (lead) => {
-    setSelectedLead(lead);
-    setShowClosureModal(true);
-  };
+  const getLatestFollowup = (lead) => {
+  const followData = lead.followup || {};
+  const entries = Object.entries(followData).sort((a, b) => a[1].timestamp - b[1].timestamp);
+  if (entries.length === 0) return "-";
+  const latest = entries[entries.length - 1][1];
+  return `${latest.date || "-"} ${latest.time || ""} - ${latest.remarks || ""}`;
+};
 
-  const formatDate = (ms) =>
-    new Date(ms).toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
 
   const filteredLeads = Object.entries(leads).filter(
     ([, lead]) => (lead.phase || "hot") === activeTab
@@ -199,11 +200,7 @@ function Sales() {
           ))}
         </div>
 
-        <div className="space-y-2">
-          {/* Header Row */}
-          <div
-            className={`grid grid-cols-9 text-sm font-semibold px-4 py-3 rounded-md ${headerColorMap[activeTab]}`}
-          >
+
             {[
               "Business Name",
               "Address",
@@ -342,13 +339,11 @@ function Sales() {
         </div>
       </div>
 
-      {/* Modals */}
       <AddCollegeModal show={showModal} onClose={() => setShowModal(false)} />
-      <ClosureFormModal
-        show={showClosureModal}
-        onClose={() => setShowClosureModal(false)}
-        lead={selectedLead}
-      />
+      <ClosureFormModal show={showClosureModal} onClose={() => setShowClosureModal(false)} lead={selectedLead} />
+      {showFollowUpModal && selectedLead && (
+        <FollowUp onClose={() => setShowFollowUpModal(false)} lead={selectedLead} />
+      )}
     </div>
   );
 }
