@@ -2,16 +2,16 @@ import React, { useContext, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { motion } from "framer-motion";
-import bgImage from '../../public/home/bg.avif';
-import faqBg from '../../public/home/faq-bg.avif';
-import img1 from '../../public/home/1.png';
-import img2 from '../../public/home/2.png';
-import img3 from '../../public/home/3.png';
-import img4 from '../../public/home/4.png';
+import bgImage from "../../public/home/bg.avif";
+import faqBg from "../../public/home/faq-bg.avif";
+import img1 from "../../public/home/1.png";
+import img2 from "../../public/home/2.png";
+import img3 from "../../public/home/3.png";
+import img4 from "../../public/home/4.png";
 import { FaArrowRight } from "react-icons/fa";
 
-import emgage from '../../public/home/emgage.png'
-import grm from '../../public/home/grm.jpg'
+import emgage from "../../public/home/emgage.png";
+import grm from "../../public/home/grm.jpg";
 const Home = () => {
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -48,46 +48,43 @@ const Home = () => {
             transition={{ delay: 0.6, duration: 1 }}
             className="mt-6 text-lg text-gray-100 tracking-wide text-center"
           >
-            Your all-in-one solution for managing leads, lessons, projects, payroll, and more — effortlessly.
+            Your all-in-one solution for managing leads, lessons, projects,
+            payroll, and more — effortlessly.
             <br />
-            Empower your team with smart tools, connected workflows, and a truly unified experience.
+            Empower your team with smart tools, connected workflows, and a truly
+            unified experience.
           </motion.p>
-    <motion.div
-  initial={{ opacity: 0, y: 20 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{ delay: 1.2, duration: 0.8 }}
-  className="mt-8 flex flex-col sm:flex-row justify-center gap-4"
->
-  {/* Get Started Button */}
-  
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.2, duration: 0.8 }}
+            className="mt-8 flex flex-col sm:flex-row justify-center gap-4"
+          >
+            {/* Get Started Button */}
 
-<Link
-  to="/login"
-  className="relative inline-flex items-center justify-center w-44 h-12 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-full shadow-[0_0_20px_rgba(139,92,246,0.6)] transition-all duration-300 hover:scale-105 hover:shadow-[0_0_30px_rgba(139,92,246,0.8)] group"
->
-  <span className="z-10 flex items-center gap-2">
-    Get Started
-    <FaArrowRight className="transition-transform duration-300 group-hover:translate-x-1" />
-  </span>
-  <span className="absolute right-0 w-2 h-full rounded-r-full bg-purple-500 blur-xl opacity-80" />
-</Link>
+            <Link
+              to="/login"
+              className="relative inline-flex items-center justify-center w-44 h-12 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-full shadow-[0_0_20px_rgba(139,92,246,0.6)] transition-all duration-300 hover:scale-105 hover:shadow-[0_0_30px_rgba(139,92,246,0.8)] group"
+            >
+              <span className="z-10 flex items-center gap-2">
+                Get Started
+                <FaArrowRight className="transition-transform duration-300 group-hover:translate-x-1" />
+              </span>
+              <span className="absolute right-0 w-2 h-full rounded-r-full bg-purple-500 blur-xl opacity-80" />
+            </Link>
 
-
-  {/* Emgage Button */}
-  <a
-    href="https://ess.emgage.work/"
-    target="_blank"
-    rel="noopener noreferrer"
-    className="relative inline-flex items-center justify-center w-44 h-12 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium rounded-full shadow-lg transition-all duration-300 hover:shadow-[0_0_10px_rgba(139,92,246,0.7)] hover:scale-105"
-  >
-      {/* <img src={emgage} alt="Emgage" className="w-5 h-5 object-contain mr-2" /> */}
-    <span className="z-10">Emgage HRMS</span>
-    <span className="absolute inset-0 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 opacity-0 transition-opacity duration-300 hover:opacity-20" />
-  </a>
-</motion.div>
-
-
-
+            {/* Emgage Button */}
+            <a
+              href="https://ess.emgage.work/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="relative inline-flex items-center justify-center w-44 h-12 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium rounded-full shadow-lg transition-all duration-300 hover:shadow-[0_0_10px_rgba(139,92,246,0.7)] hover:scale-105"
+            >
+              {/* <img src={emgage} alt="Emgage" className="w-5 h-5 object-contain mr-2" /> */}
+              <span className="z-10">Emgage HRMS</span>
+              <span className="absolute inset-0 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 opacity-0 transition-opacity duration-300 hover:opacity-20" />
+            </a>
+          </motion.div>
         </section>
       </div>
 
@@ -101,13 +98,13 @@ const Home = () => {
                 "Lead Management",
                 "Analytics Dashboard",
                 "Collaboration Tools",
-                "Client Support"
+                "Client Support",
               ];
               const desc = [
                 "Track and manage prospects with intelligent automation.",
                 "Gain real-time insights with customizable dashboards.",
                 "Work together with your team seamlessly inside the CRM.",
-                "Enjoy personalized assistance for any of your concerns."
+                "Enjoy personalized assistance for any of your concerns.",
               ];
               return (
                 <div
@@ -121,7 +118,11 @@ const Home = () => {
                       group-hover:rounded-full 
                       transition-all duration-500 ease-in-out"
                   >
-                    <img src={img} alt={titles[idx]} className="w-20 h-20 object-contain" />
+                    <img
+                      src={img}
+                      alt={titles[idx]}
+                      className="w-20 h-20 object-contain"
+                    />
                   </div>
                   <h3 className="text-xl font-semibold">{titles[idx]}</h3>
                   <p className="mt-2 text-white/90">{desc[idx]}</p>
@@ -139,35 +140,47 @@ const Home = () => {
         style={{ backgroundImage: `url(${faqBg})` }}
       >
         <div className="relative z-10 max-w-4xl mx-auto w-full">
-          <h2 className="text-4xl font-bold mb-10 text-center text-white">Frequently Asked Questions</h2>
+          <h2 className="text-4xl font-bold mb-10 text-center text-white">
+            Frequently Asked Questions
+          </h2>
           <div className="space-y-4">
             {[
               {
                 question: "Is Gryphon CRM free to use?",
-                answer: "Yes, we offer a free tier with core features. Premium plans are also available."
+                answer:
+                  "Yes, we offer a free tier with core features. Premium plans are also available.",
               },
               {
                 question: "Can I use Gryphon CRM on mobile?",
-                answer: "Absolutely! Our platform is fully responsive and works across all devices."
+                answer:
+                  "Absolutely! Our platform is fully responsive and works across all devices.",
               },
               {
                 question: "Is my data secure?",
-                answer: "Yes, we use industry-standard encryption and cloud security best practices."
-              }
+                answer:
+                  "Yes, we use industry-standard encryption and cloud security best practices.",
+              },
             ].map((item, index) => (
               <div
                 key={index}
                 className="group bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-6 transition-all duration-300 hover:bg-white/20 hover:shadow-lg cursor-pointer overflow-hidden"
               >
                 <div className="flex justify-between items-center">
-                  <h3 className="text-xl font-semibold text-white">{item.question}</h3>
+                  <h3 className="text-xl font-semibold text-white">
+                    {item.question}
+                  </h3>
                   <svg
                     className="w-5 h-5 text-white/80 transition-transform duration-300 group-hover:rotate-180"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
                   </svg>
                 </div>
                 <div className="max-h-0 overflow-hidden transition-all duration-300 group-hover:max-h-40 mt-0 group-hover:mt-3">

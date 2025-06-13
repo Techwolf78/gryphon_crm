@@ -1,5 +1,5 @@
 // Sales.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { FaEnvelope, FaEllipsisV } from "react-icons/fa";
 import { ref, onValue, update } from "firebase/database";
 import { realtimeDb } from "../firebase";
@@ -32,13 +32,6 @@ const tabColorMap = {
   },
 };
 
-const rowColorMap = {
-  hot: "bg-red-50",
-  warm: "bg-yellow-50",
-  cold: "bg-green-50",
-  renewal: "bg-blue-50",
-};
-
 const headerColorMap = {
   hot: "bg-red-100 text-red-800",
   warm: "bg-yellow-100 text-yellow-800",
@@ -53,13 +46,27 @@ const ClosureFormModal = ({ show, onClose, lead }) => {
       <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Closure Form</h2>
         <div className="space-y-3 text-sm">
-          <div><strong>Business:</strong> {lead.businessName}</div>
-          <div><strong>City:</strong> {lead.city}</div>
-          <div><strong>Phone:</strong> {lead.phoneNo}</div>
-          <div><strong>Email:</strong> {lead.email}</div>
-          <div><strong>POC:</strong> {lead.pocName}</div>
-          <div><strong>State:</strong> {lead.state}</div>
-          <div><strong>Address:</strong> {lead.address}</div>
+          <div>
+            <strong>Business:</strong> {lead.businessName}
+          </div>
+          <div>
+            <strong>City:</strong> {lead.city}
+          </div>
+          <div>
+            <strong>Phone:</strong> {lead.phoneNo}
+          </div>
+          <div>
+            <strong>Email:</strong> {lead.email}
+          </div>
+          <div>
+            <strong>POC:</strong> {lead.pocName}
+          </div>
+          <div>
+            <strong>State:</strong> {lead.state}
+          </div>
+          <div>
+            <strong>Address:</strong> {lead.address}
+          </div>
         </div>
         <div className="mt-6 text-right">
           <button
@@ -77,7 +84,8 @@ const ClosureFormModal = ({ show, onClose, lead }) => {
 function Sales() {
   const [activeTab, setActiveTab] = useState("hot");
   const [dropdownOpenId, setDropdownOpenId] = useState(null);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+  const [dropdownDirection, setDropdownDirection] = useState("down"); // 'down' or 'up'
+  const dropdownRef = useRef(null);
   const [showModal, setShowModal] = useState(false);
   const [showClosureModal, setShowClosureModal] = useState(false);
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
@@ -105,16 +113,37 @@ function Sales() {
     };
   }, []);
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpenId(null);
+        setDropdownDirection("down");
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const toggleDropdown = (id, e) => {
+    e.stopPropagation(); // Prevent event bubbling
+
     if (dropdownOpenId === id) {
       setDropdownOpenId(null);
+      setDropdownDirection("down");
     } else {
-      const rect = e.currentTarget.getBoundingClientRect();
-      setDropdownPosition({
-        top: rect.bottom + 8,
-        left: rect.right - 160,
-      });
       setDropdownOpenId(id);
+
+      // Check space below to decide dropdown direction
+      const buttonRect = e.currentTarget.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - buttonRect.bottom;
+      const dropdownHeight = 160; // approx dropdown height in px, adjust if your dropdown height differs
+
+      if (spaceBelow < dropdownHeight) {
+        setDropdownDirection("up");
+      } else {
+        setDropdownDirection("down");
+      }
     }
   };
 
@@ -143,8 +172,10 @@ function Sales() {
   return (
     <div className="bg-gray-50 min-h-screen font-sans relative">
       <div className="mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h2 className="text-4xl font-extrabold text-gray-900 tracking-tight">Leads</h2>
+        <div className="flex justify-between items-center mb-8 pt-2">
+          <h2 className="text-4xl font-extrabold text-gray-900 tracking-tight">
+            Leads
+          </h2>
           <button
             onClick={() => setShowModal(true)}
             className="bg-blue-600 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-blue-800 transition"
@@ -159,7 +190,9 @@ function Sales() {
               key={key}
               onClick={() => setActiveTab(key)}
               className={`flex-1 py-3 rounded-full text-sm font-semibold transition duration-300 ease-in-out ${
-                activeTab === key ? tabColorMap[key].active : tabColorMap[key].inactive
+                activeTab === key
+                  ? tabColorMap[key].active
+                  : tabColorMap[key].inactive
               }`}
             >
               {tabLabels[key]}
@@ -167,74 +200,144 @@ function Sales() {
           ))}
         </div>
 
-        <div className="bg-white shadow-lg rounded-lg overflow-x-auto border border-gray-200">
-          <table className="min-w-full divide-y divide-gray-200" style={{ tableLayout: "fixed" }}>
-            <thead className={`text-sm font-semibold ${headerColorMap[activeTab]}`}>
-              <tr>
-                {["Business Name","Address","City","State","Contact Person","Phone","Email","Created At","Follow-Up","Actions"].map((title) => (
-                  <th key={title} className="px-4 py-4 text-left whitespace-normal break-words">
-                    {title}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="text-gray-800 divide-y divide-gray-100">
-              {loading ? (
-                <tr><td colSpan="10" className="text-center py-8">Loading leads...</td></tr>
-              ) : filteredLeads.length === 0 ? (
-                <tr><td colSpan="10" className="text-center py-8 text-gray-400 italic">No records found.</td></tr>
-              ) : (
-                filteredLeads.map(([id, lead]) => (
-                  <tr key={id} className={`${rowColorMap[activeTab]} hover:bg-white transition-colors duration-200`}>
-                    {["businessName","address","city","state","pocName","phoneNo","email","createdAt"].map((field, i) => (
-                      <td key={i} className="px-4 py-4 whitespace-normal break-words">
-                        {field === "createdAt" ? new Date(lead[field]).toLocaleDateString() : lead[field] || "-"}
-                      </td>
-                    ))}
-                    <td className="px-4 py-4 whitespace-normal break-words">{getLatestFollowup(lead)}</td>
 
-                    <td className="px-4 py-4 text-center relative">
-                      <button
-                        onClick={(e) => toggleDropdown(id, e)}
-                        className="text-gray-500 hover:text-gray-700 focus:outline-none transition"
+            {[
+              "Business Name",
+              "Address",
+              "City",
+              "State",
+              "Contact Person",
+              "Phone",
+              "Email",
+              "Created At",
+              "Actions",
+            ].map((title) => (
+              <div key={title} className="whitespace-normal break-words">
+                {title}
+              </div>
+            ))}
+          </div>
+
+          {/* Rows */}
+          {loading ? (
+            <div className="text-center text-gray-500 py-10 col-span-9">
+              Loading leads...
+            </div>
+          ) : filteredLeads.length === 0 ? (
+            <div className="text-center text-gray-400 italic py-10 col-span-9">
+              No records found.
+            </div>
+          ) : (
+            filteredLeads.map(([id, lead]) => (
+              <div key={id} className="relative">
+                <div
+                  className={`grid grid-cols-9 gap-4 p-4 rounded-lg shadow-sm bg-white border-l-4 ${
+                    activeTab === "hot"
+                      ? "border-red-500"
+                      : activeTab === "warm"
+                      ? "border-yellow-400"
+                      : activeTab === "cold"
+                      ? "border-green-500"
+                      : "border-blue-500"
+                  }`}
+                >
+                  {[
+                    "businessName",
+                    "address",
+                    "city",
+                    "state",
+                    "pocName",
+                    "phoneNo",
+                    "email",
+                    "createdAt",
+                  ].map((field, i) => (
+                    <div
+                      key={i}
+                      className="whitespace-normal break-words text-sm"
+                    >
+                      {field === "createdAt"
+                        ? formatDate(lead[field])
+                        : lead[field] || "-"}
+                    </div>
+                  ))}
+
+                  <div className="text-center">
+                    <button
+                      onClick={(e) => toggleDropdown(id, e)}
+                      className="text-gray-500 hover:text-gray-700 focus:outline-none transition"
+                    >
+                      <FaEllipsisV size={18} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Dropdown Actions */}
+                {dropdownOpenId === id && (
+                  <div
+                    ref={dropdownRef}
+                    className="absolute z-[99999] bg-white/30 backdrop-blur-md border border-white/20 rounded-xl shadow-xl w-40 p-2"
+                    style={{
+                      right: "8px",
+                      top:
+                        dropdownDirection === "down"
+                          ? "calc(100% + 8px)"
+                          : "auto",
+                      bottom:
+                        dropdownDirection === "up"
+                          ? "calc(100% + 8px)"
+                          : "auto",
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <ul className="divide-y divide-white/20">
+                      <li>
+                        <a
+                          href={`tel:${leads[dropdownOpenId].phoneNo}`}
+                          className="block px-4 py-2 text-sm hover:bg-white/40 rounded"
+                        >
+                          Call
+                        </a>
+                      </li>
+                      <li
+                        className="px-4 py-2 hover:bg-white/40 text-sm cursor-pointer rounded"
+                        onClick={() => {
+                          alert("Follow Up clicked");
+                          setDropdownOpenId(null);
+                        }}
                       >
-                        <FaEllipsisV size={18} />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                        Follow Up
+                      </li>
+                      {["hot", "warm", "cold", "renewal"]
+                        .filter((phase) => phase !== activeTab)
+                        .map((phase) => (
+                          <li
+                            key={phase}
+                            className="px-4 py-2 hover:bg-white/40 text-sm cursor-pointer rounded capitalize"
+                            onClick={async () => {
+                              await updateLeadPhase(dropdownOpenId, phase);
+                              setDropdownOpenId(null);
+                            }}
+                          >
+                            Move to {tabLabels[phase]}
+                          </li>
+                        ))}
+                      <li
+                        className="px-4 py-2 hover:bg-white/40 text-sm cursor-pointer rounded"
+                        onClick={() => {
+                          handleClosureClick(leads[dropdownOpenId]);
+                          setDropdownOpenId(null);
+                        }}
+                      >
+                        Closure
+                      </li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
         </div>
       </div>
-
-      {dropdownOpenId && leads[dropdownOpenId] && (
-        <div className="fixed top-0 left-0 w-screen h-screen z-[99999]" onClick={() => setDropdownOpenId(null)}>
-          <div
-            className="absolute bg-white/30 backdrop-blur-md border border-white/20 rounded-xl shadow-xl w-40 p-2"
-            style={{ top: dropdownPosition.top, left: dropdownPosition.left }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <ul className="divide-y divide-white/20">
-              <li><a href={`tel:${leads[dropdownOpenId].phoneNo}`} className="block px-4 py-2 text-sm hover:bg-white/40 rounded">Call</a></li>
-              <li className="px-4 py-2 hover:bg-white/40 text-sm cursor-pointer rounded" onClick={() => {
-                setSelectedLead({ ...leads[dropdownOpenId], id: dropdownOpenId });
-                setShowFollowUpModal(true);
-                setDropdownOpenId(null);
-              }}>Follow Up</li>
-              {["hot","warm","cold","renewal"].filter((p) => p !== activeTab).map((phase) => (
-                <li key={phase} className="px-4 py-2 hover:bg-white/40 text-sm cursor-pointer rounded capitalize" onClick={async () => {
-                  await updateLeadPhase(dropdownOpenId, phase);
-                  setDropdownOpenId(null);
-                }}>
-                  Move to {tabLabels[phase]}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
 
       <AddCollegeModal show={showModal} onClose={() => setShowModal(false)} />
       <ClosureFormModal show={showClosureModal} onClose={() => setShowClosureModal(false)} lead={selectedLead} />

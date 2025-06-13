@@ -62,7 +62,7 @@ const Dashboard = () => {
         </div>
       )}
 
-      <header className="mb-10 mt-6 px-6">
+      <header className="mb-10 mt-6 ">
         <h1 className="text-4xl font-bold text-gray-900 mb-2">
           Welcome to your Dashboard
         </h1>
@@ -72,7 +72,7 @@ const Dashboard = () => {
       </header>
 
       {/* Stats Grid */}
-      <section className="px-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
+      <section className=" grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
         {stats.map((item) => (
           <div
             key={item.title}
