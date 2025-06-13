@@ -1,5 +1,5 @@
 // Sales.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { FaEnvelope, FaEllipsisV } from "react-icons/fa";
 import { ref, onValue, update } from "firebase/database";
 import { realtimeDb } from "../firebase";
@@ -84,7 +84,8 @@ const ClosureFormModal = ({ show, onClose, lead }) => {
 function Sales() {
   const [activeTab, setActiveTab] = useState("hot");
   const [dropdownOpenId, setDropdownOpenId] = useState(null);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+  const [dropdownDirection, setDropdownDirection] = useState("down"); // 'down' or 'up'
+  const dropdownRef = useRef(null);
   const [showModal, setShowModal] = useState(false);
   const [showClosureModal, setShowClosureModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
@@ -108,16 +109,37 @@ function Sales() {
     return () => unsubscribe();
   }, []);
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpenId(null);
+        setDropdownDirection("down");
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const toggleDropdown = (id, e) => {
+    e.stopPropagation(); // Prevent event bubbling
+
     if (dropdownOpenId === id) {
       setDropdownOpenId(null);
+      setDropdownDirection("down");
     } else {
-      const rect = e.currentTarget.getBoundingClientRect();
-      setDropdownPosition({
-        top: rect.bottom + 8,
-        left: rect.right - 160,
-      });
       setDropdownOpenId(id);
+
+      // Check space below to decide dropdown direction
+      const buttonRect = e.currentTarget.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - buttonRect.bottom;
+      const dropdownHeight = 160; // approx dropdown height in px, adjust if your dropdown height differs
+
+      if (spaceBelow < dropdownHeight) {
+        setDropdownDirection("up");
+      } else {
+        setDropdownDirection("down");
+      }
     }
   };
 
@@ -149,7 +171,7 @@ function Sales() {
   return (
     <div className="bg-gray-50 min-h-screen font-sans relative">
       <div className="mx-auto">
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex justify-between items-center mb-8 pt-2">
           <h2 className="text-4xl font-extrabold text-gray-900 tracking-tight">
             Leads
           </h2>
@@ -176,132 +198,149 @@ function Sales() {
             </button>
           ))}
         </div>
-<div className="space-y-2">
-  {/* Header Row */}
-  <div className={`grid grid-cols-9 text-sm font-semibold px-4 py-3 rounded-md ${headerColorMap[activeTab]}`}>
-    {[
-      "Business Name",
-      "Address",
-      "City",
-      "State",
-      "Contact Person",
-      "Phone",
-      "Email",
-      "Created At",
-      "Actions",
-    ].map((title) => (
-      <div key={title} className="whitespace-normal break-words">{title}</div>
-    ))}
-  </div>
 
-  {/* Rows */}
-  {loading ? (
-    <div className="text-center text-gray-500 py-10 col-span-9">Loading leads...</div>
-  ) : filteredLeads.length === 0 ? (
-    <div className="text-center text-gray-400 italic py-10 col-span-9">No records found.</div>
-  ) : (
-    filteredLeads.map(([id, lead]) => (
-      <div
-        key={id}
-        className={`grid grid-cols-9 gap-4 p-4 rounded-lg shadow-sm bg-white border-l-4 ${
-          activeTab === "hot"
-            ? "border-red-500"
-            : activeTab === "warm"
-            ? "border-yellow-400"
-            : activeTab === "cold"
-            ? "border-green-500"
-            : "border-blue-500"
-        }`}
-      >
-        {[
-          "businessName",
-          "address",
-          "city",
-          "state",
-          "pocName",
-          "phoneNo",
-          "email",
-          "createdAt",
-        ].map((field, i) => (
-          <div key={i} className="whitespace-normal break-words text-sm">
-            {field === "createdAt"
-              ? formatDate(lead[field])
-              : lead[field] || "-"}
-          </div>
-        ))}
-
-        <div className="text-center">
-          <button
-            onClick={(e) => toggleDropdown(id, e)}
-            className="text-gray-500 hover:text-gray-700 focus:outline-none transition"
-          >
-            <FaEllipsisV size={18} />
-          </button>
-        </div>
-      </div>
-    ))
-  )}
-</div>
-
-
-      </div>
-
-      {/* Dropdown Actions */}
-      {dropdownOpenId && leads[dropdownOpenId] && (
-        <div
-          className="fixed top-0 left-0 w-screen h-screen z-[99999]"
-          onClick={() => setDropdownOpenId(null)}
-        >
+        <div className="space-y-2">
+          {/* Header Row */}
           <div
-            className="absolute bg-white/30 backdrop-blur-md border border-white/20 rounded-xl shadow-xl w-40 p-2"
-            style={{ top: dropdownPosition.top, left: dropdownPosition.left }}
-            onClick={(e) => e.stopPropagation()}
+            className={`grid grid-cols-9 text-sm font-semibold px-4 py-3 rounded-md ${headerColorMap[activeTab]}`}
           >
-            <ul className="divide-y divide-white/20">
-              <li>
-                <a
-                  href={`tel:${leads[dropdownOpenId].phoneNo}`}
-                  className="block px-4 py-2 text-sm hover:bg-white/40 rounded"
-                >
-                  Call
-                </a>
-              </li>
-              <li
-                className="px-4 py-2 hover:bg-white/40 text-sm cursor-pointer rounded"
-                onClick={() => {
-                  alert("Follow Up clicked");
-                  setDropdownOpenId(null);
-                }}
-              >
-                Follow Up
-              </li>
-              {["hot", "warm", "cold", "renewal"]
-                .filter((phase) => phase !== activeTab)
-                .map((phase) => (
-                  <li
-                    key={phase}
-                    className="px-4 py-2 hover:bg-white/40 text-sm cursor-pointer rounded capitalize"
-                    onClick={async () => {
-                      await updateLeadPhase(dropdownOpenId, phase);
-                      setDropdownOpenId(null);
-                    }}
-                  >
-                    Move to {tabLabels[phase]}
-                  </li>
-                ))}
-              <li
-                className="px-4 py-2 hover:bg-white/40 text-sm cursor-pointer rounded"
-                onClick={() => {
-                  handleClosureClick(leads[dropdownOpenId]);
-                  setDropdownOpenId(null);
-                }}
-              >
-                Closure
-              </li>
-            </ul>
+            {[
+              "Business Name",
+              "Address",
+              "City",
+              "State",
+              "Contact Person",
+              "Phone",
+              "Email",
+              "Created At",
+              "Actions",
+            ].map((title) => (
+              <div key={title} className="whitespace-normal break-words">
+                {title}
+              </div>
+            ))}
           </div>
+
+          {/* Rows */}
+          {loading ? (
+            <div className="text-center text-gray-500 py-10 col-span-9">
+              Loading leads...
+            </div>
+          ) : filteredLeads.length === 0 ? (
+            <div className="text-center text-gray-400 italic py-10 col-span-9">
+              No records found.
+            </div>
+          ) : (
+            filteredLeads.map(([id, lead]) => (
+              <div key={id} className="relative">
+                <div
+                  className={`grid grid-cols-9 gap-4 p-4 rounded-lg shadow-sm bg-white border-l-4 ${
+                    activeTab === "hot"
+                      ? "border-red-500"
+                      : activeTab === "warm"
+                      ? "border-yellow-400"
+                      : activeTab === "cold"
+                      ? "border-green-500"
+                      : "border-blue-500"
+                  }`}
+                >
+                  {[
+                    "businessName",
+                    "address",
+                    "city",
+                    "state",
+                    "pocName",
+                    "phoneNo",
+                    "email",
+                    "createdAt",
+                  ].map((field, i) => (
+                    <div
+                      key={i}
+                      className="whitespace-normal break-words text-sm"
+                    >
+                      {field === "createdAt"
+                        ? formatDate(lead[field])
+                        : lead[field] || "-"}
+                    </div>
+                  ))}
+
+                  <div className="text-center">
+                    <button
+                      onClick={(e) => toggleDropdown(id, e)}
+                      className="text-gray-500 hover:text-gray-700 focus:outline-none transition"
+                    >
+                      <FaEllipsisV size={18} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Dropdown Actions */}
+                {dropdownOpenId === id && (
+                  <div
+                    ref={dropdownRef}
+                    className="absolute z-[99999] bg-white/30 backdrop-blur-md border border-white/20 rounded-xl shadow-xl w-40 p-2"
+                    style={{
+                      right: "8px",
+                      top:
+                        dropdownDirection === "down"
+                          ? "calc(100% + 8px)"
+                          : "auto",
+                      bottom:
+                        dropdownDirection === "up"
+                          ? "calc(100% + 8px)"
+                          : "auto",
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <ul className="divide-y divide-white/20">
+                      <li>
+                        <a
+                          href={`tel:${leads[dropdownOpenId].phoneNo}`}
+                          className="block px-4 py-2 text-sm hover:bg-white/40 rounded"
+                        >
+                          Call
+                        </a>
+                      </li>
+                      <li
+                        className="px-4 py-2 hover:bg-white/40 text-sm cursor-pointer rounded"
+                        onClick={() => {
+                          alert("Follow Up clicked");
+                          setDropdownOpenId(null);
+                        }}
+                      >
+                        Follow Up
+                      </li>
+                      {["hot", "warm", "cold", "renewal"]
+                        .filter((phase) => phase !== activeTab)
+                        .map((phase) => (
+                          <li
+                            key={phase}
+                            className="px-4 py-2 hover:bg-white/40 text-sm cursor-pointer rounded capitalize"
+                            onClick={async () => {
+                              await updateLeadPhase(dropdownOpenId, phase);
+                              setDropdownOpenId(null);
+                            }}
+                          >
+                            Move to {tabLabels[phase]}
+                          </li>
+                        ))}
+                      <li
+                        className="px-4 py-2 hover:bg-white/40 text-sm cursor-pointer rounded"
+                        onClick={() => {
+                          handleClosureClick(leads[dropdownOpenId]);
+                          setDropdownOpenId(null);
+                        }}
+                      >
+                        Closure
+                      </li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
         </div>
-      )}
+      </div>
 
       {/* Modals */}
       <AddCollegeModal show={showModal} onClose={() => setShowModal(false)} />
