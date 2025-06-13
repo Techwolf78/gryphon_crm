@@ -50,11 +50,11 @@ const AuditLogs = ({ logs }) => {
         <table className="w-full text-left text-sm divide-y divide-gray-200">
           <thead className="bg-blue-50">
             <tr>
-              <th className="p-3 font-medium text-gray-700">Date</th>
-              <th className="p-3 font-medium text-gray-700">Time</th>
-              <th className="p-3 font-medium text-gray-700">User</th>
-              <th className="p-3 font-medium text-gray-700">Action</th>
-              <th className="p-3 font-medium text-gray-700">IP</th>
+              <th className="p-3 whitespace-normal break-words font-medium text-gray-700">Date</th>
+              <th className="p-3 whitespace-normal break-words font-medium text-gray-700">Time</th>
+              <th className="p-3 whitespace-normal break-words font-medium text-gray-700">User</th>
+              <th className="p-3 whitespace-normal break-words font-medium text-gray-700">Action</th>
+              <th className="p-3 whitespace-normal break-words font-medium text-gray-700">IP</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -66,11 +66,11 @@ const AuditLogs = ({ logs }) => {
 
                 return (
                   <tr key={log.id} className="hover:bg-gray-50">
-                    <td className="p-3">{dateFormatted}</td>
-                    <td className="p-3">{timeFormatted}</td>
-                    <td className="p-3">{log.user}</td>
-                    <td className="p-3">{log.action}</td>
-                    <td className="p-3">{log.ip || "—"}</td>
+                    <td className="p-3 whitespace-normal break-words">{dateFormatted}</td>
+                    <td className="p-3 whitespace-normal break-words">{timeFormatted}</td>
+                    <td className="p-3 whitespace-normal break-words">{log.user}</td>
+                    <td className="p-3 whitespace-normal break-words">{log.action}</td>
+                    <td className="p-3 whitespace-normal break-words">{log.ip || "—"}</td>
                   </tr>
                 );
               })

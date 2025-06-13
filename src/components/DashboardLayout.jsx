@@ -1,7 +1,7 @@
 // components/DashboardLayout.jsx
 import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
+import { Outlet } from 'react-router-dom';
 
 const DashboardLayout = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -14,7 +14,7 @@ const DashboardLayout = () => {
       />
       <main className={`
         flex-grow transition-all duration-300 ease-in-out
-        ${sidebarCollapsed ? 'ml-20' : 'ml-64'}
+        ${sidebarCollapsed ? 'ml-20' : 'ml-40'}
         min-h-screen
       `}>
         <div className="p-8">

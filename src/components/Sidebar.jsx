@@ -3,14 +3,8 @@ import React, { useContext } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import {
-  FiHome,
-  FiUsers,
-  FiDollarSign,
-  FiBriefcase,
-  FiBook,
-  FiTrendingUp,
-  FiChevronLeft,
-  FiChevronRight
+  FiHome, FiUsers, FiDollarSign, FiBriefcase, FiBook,
+  FiTrendingUp, FiChevronLeft, FiChevronRight
 } from 'react-icons/fi';
 
 const Sidebar = ({ collapsed, onToggle }) => {
@@ -40,14 +34,13 @@ const Sidebar = ({ collapsed, onToggle }) => {
 
   return (
     <aside className={`
-      ${collapsed ? 'w-20' : 'w-64'}
+      ${collapsed ? 'w-20' : 'w-42'}
       bg-blue-700 text-white flex flex-col
       fixed h-full z-50
       transition-all duration-300 ease-in-out
-      flex-shrink-0
     `}>
       <div className="px-6 py-6 text-2xl font-bold border-b border-blue-600 flex items-center justify-between">
-        {!collapsed && <span className="whitespace-nowrap">Gryphon CRM</span>}
+        {!collapsed && <span className="whitespace-nowrap">GA CRM</span>}
         <button 
           onClick={onToggle}
           className="text-white hover:text-blue-200 focus:outline-none"
