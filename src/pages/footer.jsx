@@ -15,8 +15,8 @@ const Footer = () => {
       <div className="w-full flex justify-between items-center">
         {/* Left Side: Copyright */}
         <div className="text-sm">
-          &copy; {new Date().getFullYear()} Copyright:{' '}
-          <span className="font-semibold hover:underline cursor-pointer text-yellow-300">
+          &copy; {new Date().getFullYear()} Copyright{' '}
+          <span className="font-semibold  text-white">
             Gryphon Academy
           </span>
         </div>
