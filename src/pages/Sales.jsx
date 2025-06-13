@@ -4,6 +4,7 @@ import { FaEnvelope, FaEllipsisV } from "react-icons/fa";
 import { ref, onValue, update } from "firebase/database";
 import { realtimeDb } from "../firebase";
 import AddCollegeModal from "../components/Sales/AddCollege";
+import FollowUp from "../components/Sales/Followup";
 
 const tabLabels = {
   hot: "Hot",
@@ -11,7 +12,6 @@ const tabLabels = {
   cold: "Cold",
   renewal: "Renewal",
 };
-
 
 const tabColorMap = {
   hot: {
@@ -48,7 +48,6 @@ const headerColorMap = {
 
 const ClosureFormModal = ({ show, onClose, lead }) => {
   if (!show || !lead) return null;
-
   return (
     <div className="fixed inset-0 z-[999999] bg-black bg-opacity-50 flex justify-center items-center">
       <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
@@ -81,25 +80,29 @@ function Sales() {
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
   const [showModal, setShowModal] = useState(false);
   const [showClosureModal, setShowClosureModal] = useState(false);
+  const [showFollowUpModal, setShowFollowUpModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
   const [leads, setLeads] = useState({});
+  const [followups, setFollowups] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const leadsRef = ref(realtimeDb, "leads");
-    const unsubscribe = onValue(
-      leadsRef,
-      (snapshot) => {
-        const data = snapshot.val() || {};
-        setLeads(data);
-        setLoading(false);
-      },
-      (error) => {
-        console.error("Failed to fetch leads:", error);
-        setLoading(false);
-      }
-    );
-    return () => unsubscribe();
+    const unsubLeads = onValue(leadsRef, (snapshot) => {
+      const data = snapshot.val() || {};
+      setLeads(data);
+      setLoading(false);
+    });
+
+    const followRef = ref(realtimeDb, "Followup");
+    const unsubF = onValue(followRef, (snapshot) => {
+      setFollowups(snapshot.val() || {});
+    });
+
+    return () => {
+      unsubLeads();
+      unsubF();
+    };
   }, []);
 
   const toggleDropdown = (id, e) => {
@@ -124,17 +127,14 @@ function Sales() {
     }
   };
 
-  const handleClosureClick = (lead) => {
-    setSelectedLead(lead);
-    setShowClosureModal(true);
-  };
+  const getLatestFollowup = (lead) => {
+  const followData = lead.followup || {};
+  const entries = Object.entries(followData).sort((a, b) => a[1].timestamp - b[1].timestamp);
+  if (entries.length === 0) return "-";
+  const latest = entries[entries.length - 1][1];
+  return `${latest.date || "-"} ${latest.time || ""} - ${latest.remarks || ""}`;
+};
 
-  const formatDate = (ms) =>
-    new Date(ms).toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
 
   const filteredLeads = Object.entries(leads).filter(
     ([, lead]) => (lead.phase || "hot") === activeTab
@@ -171,17 +171,7 @@ function Sales() {
           <table className="min-w-full divide-y divide-gray-200" style={{ tableLayout: "fixed" }}>
             <thead className={`text-sm font-semibold ${headerColorMap[activeTab]}`}>
               <tr>
-                {[
-                  "Business Name",
-                  "Address",
-                  "City",
-                  "State",
-                  "Contact Person",
-                  "Phone",
-                  "Email",
-                  "Created At",
-                  "Actions",
-                ].map((title) => (
+                {["Business Name","Address","City","State","Contact Person","Phone","Email","Created At","Follow-Up","Actions"].map((title) => (
                   <th key={title} className="px-4 py-4 text-left whitespace-normal break-words">
                     {title}
                   </th>
@@ -190,39 +180,19 @@ function Sales() {
             </thead>
             <tbody className="text-gray-800 divide-y divide-gray-100">
               {loading ? (
-                <tr>
-                  <td colSpan="9" className="text-center py-8">
-                    Loading leads...
-                  </td>
-                </tr>
+                <tr><td colSpan="10" className="text-center py-8">Loading leads...</td></tr>
               ) : filteredLeads.length === 0 ? (
-                <tr>
-                  <td colSpan="9" className="text-center py-8 text-gray-400 italic">
-                    No records found.
-                  </td>
-                </tr>
+                <tr><td colSpan="10" className="text-center py-8 text-gray-400 italic">No records found.</td></tr>
               ) : (
                 filteredLeads.map(([id, lead]) => (
-                  <tr
-                    key={id}
-                    className={`${rowColorMap[activeTab]} hover:bg-white transition-colors duration-200`}
-                  >
-                    {[
-                      "businessName",
-                      "address",
-                      "city",
-                      "state",
-                      "pocName",
-                      "phoneNo",
-                      "email",
-                      "createdAt",
-                    ].map((field, i) => (
+                  <tr key={id} className={`${rowColorMap[activeTab]} hover:bg-white transition-colors duration-200`}>
+                    {["businessName","address","city","state","pocName","phoneNo","email","createdAt"].map((field, i) => (
                       <td key={i} className="px-4 py-4 whitespace-normal break-words">
-                        {field === "createdAt"
-                          ? formatDate(lead[field])
-                          : lead[field] || "-"}
+                        {field === "createdAt" ? new Date(lead[field]).toLocaleDateString() : lead[field] || "-"}
                       </td>
                     ))}
+                    <td className="px-4 py-4 whitespace-normal break-words">{getLatestFollowup(lead)}</td>
+
                     <td className="px-4 py-4 text-center relative">
                       <button
                         onClick={(e) => toggleDropdown(id, e)}
@@ -239,70 +209,38 @@ function Sales() {
         </div>
       </div>
 
-      {/* Dropdown Actions */}
       {dropdownOpenId && leads[dropdownOpenId] && (
-        <div
-          className="fixed top-0 left-0 w-screen h-screen z-[99999]"
-          onClick={() => setDropdownOpenId(null)}
-        >
+        <div className="fixed top-0 left-0 w-screen h-screen z-[99999]" onClick={() => setDropdownOpenId(null)}>
           <div
             className="absolute bg-white/30 backdrop-blur-md border border-white/20 rounded-xl shadow-xl w-40 p-2"
             style={{ top: dropdownPosition.top, left: dropdownPosition.left }}
             onClick={(e) => e.stopPropagation()}
           >
             <ul className="divide-y divide-white/20">
-              <li>
-                <a
-                  href={`tel:${leads[dropdownOpenId].phoneNo}`}
-                  className="block px-4 py-2 text-sm hover:bg-white/40 rounded"
-                >
-                 Call
-                </a>
-              </li>
-              <li
-                className="px-4 py-2 hover:bg-white/40 text-sm cursor-pointer rounded"
-                onClick={() => {
-                  alert("Follow Up clicked");
+              <li><a href={`tel:${leads[dropdownOpenId].phoneNo}`} className="block px-4 py-2 text-sm hover:bg-white/40 rounded">Call</a></li>
+              <li className="px-4 py-2 hover:bg-white/40 text-sm cursor-pointer rounded" onClick={() => {
+                setSelectedLead({ ...leads[dropdownOpenId], id: dropdownOpenId });
+                setShowFollowUpModal(true);
+                setDropdownOpenId(null);
+              }}>Follow Up</li>
+              {["hot","warm","cold","renewal"].filter((p) => p !== activeTab).map((phase) => (
+                <li key={phase} className="px-4 py-2 hover:bg-white/40 text-sm cursor-pointer rounded capitalize" onClick={async () => {
+                  await updateLeadPhase(dropdownOpenId, phase);
                   setDropdownOpenId(null);
-                }}
-              >
-                 Follow Up
-              </li>
-              {["hot", "warm", "cold", "renewal"]
-                .filter((phase) => phase !== activeTab)
-                .map((phase) => (
-                  <li
-                    key={phase}
-                    className="px-4 py-2 hover:bg-white/40 text-sm cursor-pointer rounded capitalize"
-                    onClick={async () => {
-                      await updateLeadPhase(dropdownOpenId, phase);
-                      setDropdownOpenId(null);
-                    }}
-                  >
-                    Move to {tabLabels[phase]}
-                  </li>
-                ))}
-              <li
-                className="px-4 py-2 hover:bg-white/40 text-sm cursor-pointer rounded"
-                onClick={() => {
-                  handleClosureClick(leads[dropdownOpenId]);
-                  setDropdownOpenId(null);
-                }}
-              >
-                 Closure
-              </li>
+                }}>
+                  Move to {tabLabels[phase]}
+                </li>
+              ))}
             </ul>
           </div>
         </div>
       )}
 
-      {/* Modals */}
       <AddCollegeModal show={showModal} onClose={() => setShowModal(false)} />
-      <ClosureFormModal
-        show={showClosureModal}
-        onClose={() => setShowClosureModal(false)}
-        lead={selectedLead}
-      />
+      <ClosureFormModal show={showClosureModal} onClose={() => setShowClosureModal(false)} lead={selectedLead} />
+      {showFollowUpModal && selectedLead && (
+        <FollowUp onClose={() => setShowFollowUpModal(false)} lead={selectedLead} />
+      )}
     </div>
   );
 }
