@@ -13,6 +13,7 @@ import Placement from './pages/Placement';
 import LearningDevelopment from './pages/LearningDevelopment';
 import DigitalMarketing from './pages/DigitalMarketing';
 import Footer from './pages/footer';
+import UpdateProfile from './components/UpdateProfile'; 
 
 const AppContent = () => {
   const location = useLocation();
@@ -23,6 +24,8 @@ const AppContent = () => {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/profile" element={<UpdateProfile />} />
+
         <Route
           path="/dashboard"
           element={
@@ -39,6 +42,7 @@ const AppContent = () => {
           <Route path="digital-marketing" element={<DigitalMarketing />} />
         </Route>
       </Routes>
+
       {(location.pathname === '/' || location.pathname === '/login') && <Footer />}
     </>
   );
