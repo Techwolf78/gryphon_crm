@@ -80,7 +80,7 @@ function AddCollegeModal({ show, onClose }) {
           {/* Business Name */}
           <div>
             <label className="block text-sm font-semibold text-gray-600 mb-2">
-              Business Name<span className="text-red-500">*</span>
+              College Name<span className="text-red-500">*</span>
             </label>
             <input
               type="text"
