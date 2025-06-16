@@ -23,14 +23,7 @@ const FollowUp = ({ lead, onClose }) => {
   const [pastFollowups, setPastFollowups] = useState([]);
   const [timeView, setTimeView] = useState("hours");
 
-  useEffect(() => {
-    if (lead?.id) {
-      setDate(dayjs().format("YYYY-MM-DD"));
-      fetchPastFollowups();
-    }
-  }, [lead]);
-
-  const fetchPastFollowups = async () => {
+  const fetchPastFollowups = React.useCallback(async () => {
     try {
       const followRef = ref(realtimeDb, `leads/${lead.id}/followup`);
       const snapshot = await get(followRef);
@@ -55,7 +48,14 @@ const FollowUp = ({ lead, onClose }) => {
     } catch (err) {
       console.error("Error fetching past followups:", err);
     }
-  };
+  }, [lead?.id]);
+
+  useEffect(() => {
+    if (lead?.id) {
+      setDate(dayjs().format("YYYY-MM-DD"));
+      fetchPastFollowups();
+    }
+  }, [lead, fetchPastFollowups]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -277,11 +277,7 @@ const FollowUp = ({ lead, onClose }) => {
                 {pastFollowups.map((followup, index) => (
                   <div
                     key={followup.key}
-                    className={`border rounded-xl p-4 transition-all ${
-                      index === 0
-                        ? "bg-green-50 border-green-200"
-                        : "bg-red-50 border-red-200"
-                    }`}
+                    className="bg-white border border-gray-200 rounded-xl p-4 transition-all"
                   >
                     <div>
                       <div className="flex items-center gap-2">
@@ -289,13 +285,7 @@ const FollowUp = ({ lead, onClose }) => {
                           {followup.formattedDate ||
                             dayjs(followup.date).format("MMM D, YYYY")}
                         </span>
-                        <span
-                          className={`text-xs font-medium px-2 py-1 rounded-full ${
-                            index === 0
-                              ? "bg-green-200 text-green-900"
-                              : "bg-red-200 text-red-900"
-                          }`}
-                        >
+                        <span className="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full">
                           {followup.time}
                         </span>
                       </div>

@@ -138,11 +138,11 @@ function Sales() {
   );
 
   // Define the grid columns based on the fields we want to display
-  const gridColumns = "grid grid-cols-10 gap-4";
+  const gridColumns = "grid grid-cols-8 gap-4";
 
   return (
-    <div className="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen font-sans p-4 md:p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen font-sans ">
+      <div className=" mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
@@ -201,191 +201,194 @@ function Sales() {
           ))}
         </div>
 
-        {/* Grid Header */}
-        <div
-          className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-4 rounded-xl mb-3`}
-        >
-          <div className="font-semibold">Business</div>
-          <div className="font-semibold">Address</div>
-          <div className="font-semibold">City</div>
-          <div className="font-semibold">State</div>
-          <div className="font-semibold">Contact</div>
-          <div className="font-semibold">Phone</div>
-          <div className="font-semibold">Email</div>
-          <div className="font-semibold">Created</div>
-          <div className="font-semibold">Follow-Up</div>
-          <div className="font-semibold text-center">Actions</div>
-        </div>
+        <div className="overflow-x-auto">
+          <div className="w-auto space-y-3">
+            {/* Grid Header */}
 
-        {/* Grid Rows */}
-        <div className="space-y-3">
-          {loading ? (
-            <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            <div
+              className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-4 rounded-xl mb-3`}
+            >
+              {/* header columns */}
+              <div className="font-semibold">College Name</div>
+              <div className="font-semibold">City</div>
+              <div className="font-semibold">Contact Name</div>
+              <div className="font-semibold">Phone No.</div>
+              <div className="font-semibold">Email ID</div>
+              <div className="font-semibold">Opened Date</div>
+              <div className="font-semibold">Follow-Ups</div>
+              <div className="font-semibold text-center">Actions</div>
             </div>
-          ) : filteredLeads.length === 0 ? (
-            <div className="bg-white rounded-xl p-8 text-center border-2 border-dashed border-gray-200">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-16 w-16 mx-auto text-gray-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-              <h3 className="mt-4 text-lg font-medium text-gray-900">
-                No leads found
-              </h3>
-              <p className="mt-1 text-gray-500">
-                Get started by adding a new college
-              </p>
-              <button
-                onClick={() => setShowModal(true)}
-                className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition"
-              >
-                Add College
-              </button>
-            </div>
-          ) : (
-            filteredLeads.map(([id, lead]) => (
-              <div key={id} className="relative group">
-                <div
-                  className={`${gridColumns} gap-4 p-5 rounded-xl bg-white shadow-sm hover:shadow-md transition-all duration-300 ${borderColorMap[activeTab]}`}
-                >
-                  {[
-                    "businessName",
-                    "address",
-                    "city",
-                    "state",
-                    "pocName",
-                    "phoneNo",
-                    "email",
-                    "createdAt",
-                  ].map((field, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center text-sm text-gray-700"
-                    >
-                      {field === "createdAt"
-                        ? formatDate(lead[field])
-                        : lead[field] || "-"}
-                    </div>
-                  ))}
 
-                  <div className="flex items-center text-sm text-gray-700">
-                    {getLatestFollowup(lead)}
-                  </div>
-
-                  <div className="flex justify-center items-center">
-                    <button
-                      onClick={(e) => toggleDropdown(id, e)}
-                      className={`text-gray-500 hover:text-gray-700 focus:outline-none transition p-2 rounded-full hover:bg-gray-100 ${
-                        dropdownOpenId === id
-                          ? "bg-gray-200 text-gray-900 shadow-inner"
-                          : ""
-                      }`}
-                      aria-expanded={dropdownOpenId === id}
-                      aria-haspopup="true"
-                      aria-label={
-                        dropdownOpenId === id
-                          ? "Close actions menu"
-                          : "Open actions menu"
-                      }
-                    >
-                      {dropdownOpenId === id ? (
-                        <FaTimes
-                          size={16}
-                          className="text-gray-900 transition-transform"
-                        />
-                      ) : (
-                        <FaEllipsisV
-                          size={16}
-                          className="text-gray-500 hover:text-gray-700 transition"
-                        />
-                      )}
-                    </button>
-                  </div>
+            {/* Grid Rows */}
+            <div className="space-y-3">
+              {loading ? (
+                <div className="flex justify-center items-center h-64">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
                 </div>
-
-                {/* Dropdown Actions */}
-                {dropdownOpenId === id && (
-                  <div
-                    ref={dropdownRef}
-                    className="absolute z-50 bg-white rounded-xl shadow-xl w-48 overflow-hidden right-4 top-full mt-1 animate-fadeIn"
+              ) : filteredLeads.length === 0 ? (
+                <div className="bg-white rounded-xl p-8 text-center border-2 border-dashed border-gray-200">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-16 w-16 mx-auto text-gray-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
                   >
-                    <div className="py-1">
-                      <a
-                        href={`tel:${leads[dropdownOpenId].phoneNo}`}
-                        className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition"
-                      >
-                        <FaPhone className="text-blue-500 mr-3" />
-                        Call
-                      </a>
-                      <button
-                        className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition"
-                        onClick={() => {
-                          setSelectedLead({
-                            ...leads[dropdownOpenId],
-                            id: dropdownOpenId,
-                          });
-                          setShowFollowUpModal(true);
-                          setDropdownOpenId(null);
-                        }}
-                      >
-                        <FaCalendarCheck className="text-purple-500 mr-3" />
-                        Follow Up
-                      </button>
-                      <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                        Move to
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v1H3V7zm0 4h18v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6z"
+                    />
+                  </svg>
+
+                  <h3 className="mt-4 text-lg font-medium text-gray-900">
+                    No leads found
+                  </h3>
+                  <p className="mt-1 text-gray-500">
+                    Get started by adding a new college
+                  </p>
+                  <button
+                    onClick={() => setShowModal(true)}
+                    className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition"
+                  >
+                    Add College
+                  </button>
+                </div>
+              ) : (
+                filteredLeads.map(([id, lead]) => (
+                  <div key={id} className="relative group">
+                    <div
+                      className={`${gridColumns} gap-4 p-5 rounded-xl bg-white shadow-sm hover:shadow-md transition-all duration-300 ${borderColorMap[activeTab]}`}
+                    >
+                      {[
+                        "businessName",
+                        "city",
+                        "pocName",
+                        "phoneNo",
+                        "email",
+                        "createdAt",
+                      ].map((field, i) => (
+                        <div
+                          key={i}
+                          className="break-words whitespace-normal text-sm text-gray-700 min-w-0"
+                        >
+                          {field === "createdAt"
+                            ? formatDate(lead[field])
+                            : lead[field] || "-"}
+                        </div>
+                      ))}
+
+                      <div className="flex items-center text-sm text-gray-700">
+                        {getLatestFollowup(lead)}
                       </div>
-                      {["hot", "warm", "cold", "renewal"]
-                        .filter((phase) => phase !== activeTab)
-                        .map((phase) => (
+
+                      <div className="flex justify-center items-center">
+                        <button
+                          onClick={(e) => toggleDropdown(id, e)}
+                          className={`text-gray-500 hover:text-gray-700 focus:outline-none transition p-2 rounded-full hover:bg-gray-100 ${
+                            dropdownOpenId === id
+                              ? "bg-gray-200 text-gray-900 shadow-inner"
+                              : ""
+                          }`}
+                          aria-expanded={dropdownOpenId === id}
+                          aria-haspopup="true"
+                          aria-label={
+                            dropdownOpenId === id
+                              ? "Close actions menu"
+                              : "Open actions menu"
+                          }
+                        >
+                          {dropdownOpenId === id ? (
+                            <FaTimes
+                              size={16}
+                              className="text-gray-900 transition-transform"
+                            />
+                          ) : (
+                            <FaEllipsisV
+                              size={16}
+                              className="text-gray-500 hover:text-gray-700 transition"
+                            />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Dropdown Actions */}
+                    {dropdownOpenId === id && (
+                      <div
+                        ref={dropdownRef}
+                        className="absolute z-50 bg-white rounded-xl shadow-xl w-48 overflow-hidden right-4 top-full mt-1 animate-fadeIn"
+                      >
+                        <div className="py-1">
+                          <a
+                            href={`tel:${leads[dropdownOpenId].phoneNo}`}
+                            className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition"
+                          >
+                            <FaPhone className="text-blue-500 mr-3" />
+                            Call
+                          </a>
                           <button
-                            key={phase}
                             className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition"
-                            onClick={async () => {
-                              await updateLeadPhase(dropdownOpenId, phase);
+                            onClick={() => {
+                              setSelectedLead({
+                                ...leads[dropdownOpenId],
+                                id: dropdownOpenId,
+                              });
+                              setShowFollowUpModal(true);
                               setDropdownOpenId(null);
                             }}
                           >
-                            <FaArrowRight
-                              className={`${
-                                phase === "hot"
-                                  ? "text-red-500"
-                                  : phase === "warm"
-                                  ? "text-amber-500"
-                                  : phase === "cold"
-                                  ? "text-emerald-500"
-                                  : "text-blue-500"
-                              } mr-3`}
-                            />
-                            {tabLabels[phase]}
+                            <FaCalendarCheck className="text-purple-500 mr-3" />
+                            Follow Up
                           </button>
-                        ))}
-                      <button
-                        className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-t border-gray-100 mt-1 transition"
-                        onClick={() => {
-                          setSelectedLead(leads[dropdownOpenId]);
-                          setShowClosureModal(true);
-                          setDropdownOpenId(null);
-                        }}
-                      >
-                        <FaCheckCircle className="text-green-500 mr-3" />
-                        Closure
-                      </button>
-                    </div>
+                          <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            Move to
+                          </div>
+                          {["hot", "warm", "cold", "renewal"]
+                            .filter((phase) => phase !== activeTab)
+                            .map((phase) => (
+                              <button
+                                key={phase}
+                                className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition"
+                                onClick={async () => {
+                                  await updateLeadPhase(dropdownOpenId, phase);
+                                  setDropdownOpenId(null);
+                                }}
+                              >
+                                <FaArrowRight
+                                  className={`${
+                                    phase === "hot"
+                                      ? "text-red-500"
+                                      : phase === "warm"
+                                      ? "text-amber-500"
+                                      : phase === "cold"
+                                      ? "text-emerald-500"
+                                      : "text-blue-500"
+                                  } mr-3`}
+                                />
+                                {tabLabels[phase]}
+                              </button>
+                            ))}
+                          <button
+                            className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-t border-gray-100 mt-1 transition"
+                            onClick={() => {
+                              setSelectedLead(leads[dropdownOpenId]);
+                              setShowClosureModal(true);
+                              setDropdownOpenId(null);
+                            }}
+                          >
+                            <FaCheckCircle className="text-green-500 mr-3" />
+                            Closure
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            ))
-          )}
+                ))
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
