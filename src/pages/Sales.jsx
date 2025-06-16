@@ -16,7 +16,7 @@ import AddCollegeModal from "../components/Sales/AddCollege";
 import FollowUp from "../components/Sales/Followup";
 import ClosureFormModal from "../components/Sales/ClosureFormModal"; // Import the closure modal
 import LeadDetailsModal from "../components/Sales/LeadDetailsModal";
-
+import DropdownActions from "../components/Sales/DropdownAction";
 const tabLabels = {
   hot: "Hot",
   warm: "Warm",
@@ -118,27 +118,28 @@ function Sales() {
     }
   };
 
-// In Sales.jsx
-const handleSaveLead = async (updatedLead) => {
-  if (!updatedLead?.id) return;
-  
-  // Convert date string back to timestamp if it exists
-  if (updatedLead.createdAt && typeof updatedLead.createdAt === 'string') {
-    updatedLead.createdAt = new Date(updatedLead.createdAt).getTime();
-  }
+  // In Sales.jsx
+  const handleSaveLead = async (updatedLead) => {
+    if (!updatedLead?.id) return;
 
-  const leadRef = ref(realtimeDb, `leads/${updatedLead.id}`);
-  
-  const { id, ...dataToUpdate } = updatedLead;
-  
-  try {
-    await update(leadRef, dataToUpdate);
-    setShowDetailsModal(false);
-    setSelectedLead(null);
-  } catch (error) {
-    console.error("Failed to update lead", error);
-  }
-};
+    // Convert date string back to timestamp if it exists
+    if (updatedLead.createdAt && typeof updatedLead.createdAt === 'string') {
+      updatedLead.createdAt = new Date(updatedLead.createdAt).getTime();
+    }
+
+    const leadRef = ref(realtimeDb, `leads/${updatedLead.id}`);
+
+    const { id, ...dataToUpdate } = updatedLead;
+
+    try {
+      await update(leadRef, dataToUpdate);
+      setShowDetailsModal(false);
+      setSelectedLead(null);
+    } catch (error) {
+      console.error("Failed to update lead", error);
+    }
+  };
+
 
   const getLatestFollowup = (lead) => {
     const followData = lead.followup || {};
@@ -147,9 +148,8 @@ const handleSaveLead = async (updatedLead) => {
     );
     if (entries.length === 0) return "-";
     const latest = entries[entries.length - 1][1];
-    return `${latest.date || "-"} ${latest.time || ""} - ${
-      latest.remarks || ""
-    }`;
+    return `${latest.date || "-"} ${latest.time || ""} - ${latest.remarks || ""
+      }`;
   };
 
   const formatDate = (ms) =>
@@ -203,23 +203,20 @@ const handleSaveLead = async (updatedLead) => {
             <button
               key={key}
               onClick={() => setActiveTab(key)}
-              className={`py-3.5 rounded-xl text-sm font-semibold transition-all duration-300 ease-out transform hover:scale-[1.02] ${
-                activeTab === key
+              className={`py-3.5 rounded-xl text-sm font-semibold transition-all duration-300 ease-out transform hover:scale-[1.02] ${activeTab === key
                   ? tabColorMap[key].active
                   : tabColorMap[key].inactive
-              } ${
-                activeTab === key ? "ring-2 ring-offset-2 ring-opacity-50" : ""
-              } ${
-                activeTab === key
+                } ${activeTab === key ? "ring-2 ring-offset-2 ring-opacity-50" : ""
+                } ${activeTab === key
                   ? key === "hot"
                     ? "ring-red-500"
                     : key === "warm"
-                    ? "ring-amber-400"
-                    : key === "cold"
-                    ? "ring-emerald-500"
-                    : "ring-blue-500"
+                      ? "ring-amber-400"
+                      : key === "cold"
+                        ? "ring-emerald-500"
+                        : "ring-blue-500"
                   : ""
-              }
+                }
 `}
             >
               {tabLabels[key]}
@@ -315,11 +312,10 @@ const handleSaveLead = async (updatedLead) => {
                             e.stopPropagation();
                             toggleDropdown(id, e);
                           }}
-                          className={`text-gray-500 hover:text-gray-700 focus:outline-none transition p-2 rounded-full hover:bg-gray-100 ${
-                            dropdownOpenId === id
+                          className={`text-gray-500 hover:text-gray-700 focus:outline-none transition p-2 rounded-full hover:bg-gray-100 ${dropdownOpenId === id
                               ? "bg-gray-200 text-gray-900 shadow-inner"
                               : ""
-                          }`}
+                            }`}
                           aria-expanded={dropdownOpenId === id}
                           aria-haspopup="true"
                           aria-label={
@@ -342,93 +338,21 @@ const handleSaveLead = async (updatedLead) => {
                         </button>
                       </div>
                     </div>
-
-                    {/* Dropdown Actions */}
                     {dropdownOpenId === id && (
-                      <div
-                        ref={dropdownRef}
-                        className="absolute z-50 bg-white rounded-xl shadow-xl w-48 overflow-hidden right-4 top-full mt-1 animate-fadeIn"
-                      >
-                        <div className="py-1">
-                          <a
-                            href={`tel:${leads[dropdownOpenId].phoneNo}`}
-                            className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition"
-                          >
-                            <FaPhone className="text-blue-500 mr-3" />
-                            Call
-                          </a>
-                          <button
-                            className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition"
-                            onClick={() => {
-                              setSelectedLead({
-                                ...leads[dropdownOpenId],
-                                id: dropdownOpenId,
-                              });
-                              setShowFollowUpModal(true);
-                              setDropdownOpenId(null);
-                            }}
-                          >
-                            <FaCalendarCheck className="text-purple-500 mr-3" />
-                            Follow Up
-                          </button>
-                          {/* Add this new Edit option */}
-                          <button
-                            className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedLead({
-                                ...leads[dropdownOpenId],
-                                id: dropdownOpenId,
-                              });
-                              setShowDetailsModal(true);
-                              setDropdownOpenId(null);
-                            }}
-                          >
-                            <FaEdit className="text-indigo-500 mr-3" />
-                            Edit
-                          </button>
-                          <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                            Move to
-                          </div>
-                          {["hot", "warm", "cold", "renewal"]
-                            .filter((phase) => phase !== activeTab)
-                            .map((phase) => (
-                              <button
-                                key={phase}
-                                className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition"
-                                onClick={async () => {
-                                  await updateLeadPhase(dropdownOpenId, phase);
-                                  setDropdownOpenId(null);
-                                }}
-                              >
-                                <FaArrowRight
-                                  className={`${
-                                    phase === "hot"
-                                      ? "text-red-500"
-                                      : phase === "warm"
-                                      ? "text-amber-500"
-                                      : phase === "cold"
-                                      ? "text-emerald-500"
-                                      : "text-blue-500"
-                                  } mr-3`}
-                                />
-                                {tabLabels[phase]}
-                              </button>
-                            ))}
-                          <button
-                            className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-t border-gray-100 mt-1 transition"
-                            onClick={() => {
-                              setSelectedLead(leads[dropdownOpenId]);
-                              setShowClosureModal(true);
-                              setDropdownOpenId(null);
-                            }}
-                          >
-                            <FaCheckCircle className="text-green-500 mr-3" />
-                            Closure
-                          </button>
-                        </div>
-                      </div>
+                      <DropdownActions
+                        leadId={id}
+                        leadData={lead}
+                        closeDropdown={() => setDropdownOpenId(null)}
+                        setSelectedLead={setSelectedLead}
+                        setShowFollowUpModal={setShowFollowUpModal}
+                        setShowDetailsModal={setShowDetailsModal}
+                        setShowClosureModal={setShowClosureModal}
+                        updateLeadPhase={updateLeadPhase}
+                        activeTab={activeTab}
+                      />
+
                     )}
+
                   </div>
                 ))
               )}
