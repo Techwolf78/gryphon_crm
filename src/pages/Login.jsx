@@ -136,7 +136,9 @@ export default function LoginPage() {
  
   return (
     <div className="py-6 flex items-center justify-center bg-white font-sans relative overflow-hidden">
+
       <div className="w-[60%] h-[70vh]  rounded-xl flex relative shadow-lg overflow-hidden bg-white z-10">
+
         <div className="w-1/2 relative flex items-start justify-center pt-20 overflow-hidden bg-transparent">
           <div className="absolute w-[650px] h-[650px] rounded-full top-[-250px] left-[-250px] z-0 bg-[radial-gradient(circle_at_top_left,_#3886FF_0%,_#1C398E_60%,_#0f1e47_100%)]"></div>
           <div className="absolute w-[130px] h-[130px] rounded-full top-[250px] left-[250px] z-20 shadow-xl bg-gradient-to-br from-[#3886FF] via-[#2952B0] to-[#1C398E]"></div>

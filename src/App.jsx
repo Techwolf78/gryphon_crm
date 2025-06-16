@@ -43,7 +43,7 @@ const AppContent = () => {
         </Route>
       </Routes>
 
-      {(location.pathname === '/' || location.pathname === '/login') && <Footer />}
+      {(location.pathname === '/' || location.pathname === '/') && <Footer />}
     </>
   );
 };
