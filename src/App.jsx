@@ -24,7 +24,7 @@ const AppContent = () => {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/profile" element={<UpdateProfile />} />
+        
 
         <Route
           path="/dashboard"
@@ -35,6 +35,7 @@ const AppContent = () => {
           }
         >
           <Route index element={<Dashboard />} />
+          <Route path="profile" element={<UpdateProfile />} />
           <Route path="admin" element={<Admin />} />
           <Route path="sales" element={<Sales />} />
           <Route path="placement" element={<Placement />} />
