@@ -1,5 +1,7 @@
 // Sales.jsx
 import React, { useState, useEffect, useRef } from "react";
+// Add to your existing import statements
+import { FaEdit } from "react-icons/fa";
 import {
   FaEllipsisV,
   FaPhone,
@@ -116,21 +118,27 @@ function Sales() {
     }
   };
 
-  const handleSaveLead = async (updatedLead) => {
-    if (!updatedLead?.id) return;
-    const leadRef = ref(realtimeDb, `leads/${updatedLead.id}`);
+// In Sales.jsx
+const handleSaveLead = async (updatedLead) => {
+  if (!updatedLead?.id) return;
+  
+  // Convert date string back to timestamp if it exists
+  if (updatedLead.createdAt && typeof updatedLead.createdAt === 'string') {
+    updatedLead.createdAt = new Date(updatedLead.createdAt).getTime();
+  }
 
-    // We don't want to overwrite 'id' in DB, so omit it
-    const { id, ...dataToUpdate } = updatedLead;
-
-    try {
-      await update(leadRef, dataToUpdate);
-      setShowDetailsModal(false);
-      setSelectedLead(null);
-    } catch (error) {
-      console.error("Failed to update lead", error);
-    }
-  };
+  const leadRef = ref(realtimeDb, `leads/${updatedLead.id}`);
+  
+  const { id, ...dataToUpdate } = updatedLead;
+  
+  try {
+    await update(leadRef, dataToUpdate);
+    setShowDetailsModal(false);
+    setSelectedLead(null);
+  } catch (error) {
+    console.error("Failed to update lead", error);
+  }
+};
 
   const getLatestFollowup = (lead) => {
     const followData = lead.followup || {};
@@ -275,14 +283,7 @@ function Sales() {
                 </div>
               ) : (
                 filteredLeads.map(([id, lead]) => (
-                  <div
-                    key={id}
-                    className="relative group cursor-pointer"
-                    onClick={() => {
-                      setSelectedLead({ id, ...lead });
-                      setShowDetailsModal(true);
-                    }}
-                  >
+                  <div key={id} className="relative group cursor-pointer">
                     <div
                       className={`${gridColumns} gap-4 p-5 rounded-xl bg-white shadow-sm hover:shadow-md transition-all duration-300 ${borderColorMap[activeTab]}`}
                     >
@@ -369,6 +370,22 @@ function Sales() {
                           >
                             <FaCalendarCheck className="text-purple-500 mr-3" />
                             Follow Up
+                          </button>
+                          {/* Add this new Edit option */}
+                          <button
+                            className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedLead({
+                                ...leads[dropdownOpenId],
+                                id: dropdownOpenId,
+                              });
+                              setShowDetailsModal(true);
+                              setDropdownOpenId(null);
+                            }}
+                          >
+                            <FaEdit className="text-indigo-500 mr-3" />
+                            Edit
                           </button>
                           <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                             Move to

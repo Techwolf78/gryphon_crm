@@ -24,19 +24,43 @@ function LeadDetailsModal({ show, onClose, lead, onSave }) {
     // Add more if needed
   };
 
-  // Format date for display/editing
+  // Replace the existing formatDateForInput function with this:
   const formatDateForInput = (ms) => {
     if (!ms) return "";
-    const date = new Date(ms);
-    if (isNaN(date)) return "";
-    return date.toISOString().substring(0, 10);
+
+    // Handle both string and number timestamps
+    const timestamp = typeof ms === "string" ? parseInt(ms) : ms;
+
+    try {
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) return "";
+
+      // Format as YYYY-MM-DD for date input
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+
+      return `${year}-${month}-${day}`;
+    } catch (e) {
+      console.error("Date formatting error:", e);
+      return "";
+    }
   };
 
-  // Handle form changes
+  // Replace the existing handleChange function with this:
   const handleChange = (key, value) => {
+    // Special handling for date fields
+    if (key === "createdAt") {
+      const date = new Date(value);
+      if (!isNaN(date.getTime())) {
+        setFormData((prev) => ({ ...prev, [key]: date.getTime() }));
+        return;
+      }
+    }
+
+    // Normal field handling
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
-
   // Save button handler
   const handleSave = () => {
     // Transform date input back to timestamp if needed
@@ -86,6 +110,7 @@ function LeadDetailsModal({ show, onClose, lead, onSave }) {
                 customLabels[key] ||
                 key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
+              // For "createdAt" show date picker input
               // For "createdAt" show date picker input
               if (key === "createdAt") {
                 return (
