@@ -13,6 +13,7 @@ import { realtimeDb } from "../firebase";
 import AddCollegeModal from "../components/Sales/AddCollege";
 import FollowUp from "../components/Sales/Followup";
 import ClosureFormModal from "../components/Sales/ClosureFormModal"; // Import the closure modal
+import LeadDetailsModal from "../components/Sales/LeadDetailsModal";
 
 const tabLabels = {
   hot: "Hot",
@@ -69,6 +70,7 @@ function Sales() {
   const [leads, setLeads] = useState({});
   const [followups, setFollowups] = useState({});
   const [loading, setLoading] = useState(true);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   useEffect(() => {
     const leadsRef = ref(realtimeDb, "leads");
@@ -111,6 +113,22 @@ function Sales() {
       await update(leadRef, { phase: newPhase });
     } catch (err) {
       console.error("Phase update failed", err);
+    }
+  };
+
+  const handleSaveLead = async (updatedLead) => {
+    if (!updatedLead?.id) return;
+    const leadRef = ref(realtimeDb, `leads/${updatedLead.id}`);
+
+    // We don't want to overwrite 'id' in DB, so omit it
+    const { id, ...dataToUpdate } = updatedLead;
+
+    try {
+      await update(leadRef, dataToUpdate);
+      setShowDetailsModal(false);
+      setSelectedLead(null);
+    } catch (error) {
+      console.error("Failed to update lead", error);
     }
   };
 
@@ -201,7 +219,7 @@ function Sales() {
           ))}
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto md:overflow-visible">
           <div className="w-auto space-y-3">
             {/* Grid Header */}
 
@@ -257,7 +275,14 @@ function Sales() {
                 </div>
               ) : (
                 filteredLeads.map(([id, lead]) => (
-                  <div key={id} className="relative group">
+                  <div
+                    key={id}
+                    className="relative group cursor-pointer"
+                    onClick={() => {
+                      setSelectedLead({ id, ...lead });
+                      setShowDetailsModal(true);
+                    }}
+                  >
                     <div
                       className={`${gridColumns} gap-4 p-5 rounded-xl bg-white shadow-sm hover:shadow-md transition-all duration-300 ${borderColorMap[activeTab]}`}
                     >
@@ -279,13 +304,16 @@ function Sales() {
                         </div>
                       ))}
 
-                      <div className="flex items-center text-sm text-gray-700">
+                      <div className="break-words whitespace-normal text-sm text-gray-700 min-w-0">
                         {getLatestFollowup(lead)}
                       </div>
 
                       <div className="flex justify-center items-center">
                         <button
-                          onClick={(e) => toggleDropdown(id, e)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleDropdown(id, e);
+                          }}
                           className={`text-gray-500 hover:text-gray-700 focus:outline-none transition p-2 rounded-full hover:bg-gray-100 ${
                             dropdownOpenId === id
                               ? "bg-gray-200 text-gray-900 shadow-inner"
@@ -393,6 +421,14 @@ function Sales() {
       </div>
 
       <AddCollegeModal show={showModal} onClose={() => setShowModal(false)} />
+
+      <LeadDetailsModal
+        show={showDetailsModal}
+        onClose={() => setShowDetailsModal(false)}
+        lead={selectedLead}
+        onSave={handleSaveLead}
+      />
+
       <ClosureFormModal
         show={showClosureModal}
         onClose={() => setShowClosureModal(false)}
