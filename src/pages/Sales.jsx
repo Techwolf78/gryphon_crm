@@ -140,6 +140,7 @@ function Sales() {
     }
   };
 
+
   const getLatestFollowup = (lead) => {
     const followData = lead.followup || {};
     const entries = Object.entries(followData).sort(
@@ -349,6 +350,7 @@ function Sales() {
                         updateLeadPhase={updateLeadPhase}
                         activeTab={activeTab}
                       />
+
                     )}
 
                   </div>
