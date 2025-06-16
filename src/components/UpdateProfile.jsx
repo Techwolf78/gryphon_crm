@@ -3,7 +3,12 @@ import { AuthContext } from '../context/AuthContext';
 import { get, set, ref } from 'firebase/database';
 import { realtimeDb } from '../firebase';
 import { toast } from 'react-toastify';
-import { FaCloudUploadAlt, FaCamera } from 'react-icons/fa';
+import {
+  FaCloudUploadAlt,
+  FaCamera,
+  FaArrowRight,
+  FaUserCircle,
+} from 'react-icons/fa';
 import defaultIcon from '/home/profile1.png';
 
 const avatars = [
@@ -20,7 +25,7 @@ const avatars = [
 
 const MAX_SIZE_MB = 10;
 
-export default function UpdateProfile() {
+export default function UpdateProfile({ onClose }) {
   const { user, setPhotoURL } = useContext(AuthContext);
   const [currentImage, setCurrentImage] = useState('');
   const [selectedImage, setSelectedImage] = useState('');
@@ -104,10 +109,6 @@ export default function UpdateProfile() {
     }
   };
 
-  const handleRemove = () => {
-    setSelectedImage('');
-  };
-
   const handleAvatarClick = (img) => {
     setSelectedImage(img);
     toast.success('Avatar selected');
@@ -118,20 +119,64 @@ export default function UpdateProfile() {
       <div
         onDrop={handleDrop}
         onDragOver={(e) => e.preventDefault()}
-        className="bg-white border-2 border-dashed border-purple-300 rounded-xl w-full max-w-md p-6 text-center shadow-lg"
+        className="bg-white rounded-xl w-full max-w-md p-6 text-center shadow-lg relative"
       >
+        {/* ❌ Close Button */}
+        <button
+          onClick={onClose || (() => window.history.back())}
+          className="absolute top-3 right-3 text-gray-500 hover:text-red-600 text-4xl font-bold"
+          aria-label="Close"
+        >
+          ×
+        </button>
+
         <div className="flex flex-col items-center mb-6">
-          <FaCloudUploadAlt className="text-purple-600 text-4xl mb-2" />
+          <FaCloudUploadAlt className="text-blue-800 text-4xl mb-2" />
           <h2 className="text-lg font-semibold">Upload a file</h2>
           <p className="text-sm text-gray-500">
             Drag or paste a file here, or choose an option below.
           </p>
         </div>
 
+        <div className="mb-6">
+          <div className="flex justify-between items-center border-2 border-dashed border-blue-300 p-4 rounded-xl shadow-inner w-full max-w-md mx-auto">
+            {/* Current Image */}
+            <div className="flex flex-col items-center">
+              <img
+                src={currentImage || defaultIcon}
+                alt="Current"
+                className="w-24 h-24 rounded-full object-cover border-2 border-gray-300"
+              />
+              <span className="text-xs mt-2 text-gray-500">Current</span>
+            </div>
+
+            {/* Arrow */}
+            <div className="mx-4 text-3xl text-blue-800">
+              <FaArrowRight />
+            </div>
+
+            {/* Selected Image */}
+            <div className="flex flex-col items-center">
+              {selectedImage && selectedImage !== currentImage ? (
+                <>
+                  <img
+                    src={selectedImage}
+                    alt="Selected"
+                    className="w-24 h-24 rounded-full object-cover border-2 border-blue-500"
+                  />
+                  <span className="text-xs mt-2 text-gray-500">Selected</span>
+                </>
+              ) : (
+                <FaUserCircle className="text-gray-400 w-24 h-24" />
+              )}
+            </div>
+          </div>
+        </div>
+
         <div className="flex justify-center gap-3 mb-4">
           <button
             onClick={() => fileRef.current.click()}
-            className="bg-purple-600 text-white py-2 px-4 rounded hover:bg-purple-700 transition"
+            className="bg-blue-800 text-white py-2 px-4 rounded hover:bg-blue-700 transition"
           >
             Choose File
           </button>
@@ -150,17 +195,6 @@ export default function UpdateProfile() {
           />
         </div>
 
-        {selectedImage && (
-          <div className="mb-6">
-            <img
-              src={selectedImage}
-              alt="Preview"
-              className="w-32 h-32 mx-auto rounded-full object-cover object-top border-4 border-purple-400"
-            />
-            <p className="text-sm text-gray-600 mt-2">Selected Image Preview</p>
-          </div>
-        )}
-
         {/* Avatar Selection */}
         <h3 className="text-sm font-medium text-gray-700 mb-2">Choose Your Avatar Here</h3>
         <div className="flex flex-wrap justify-center gap-2 mb-6">
@@ -171,26 +205,25 @@ export default function UpdateProfile() {
               alt="avatar"
               onClick={() => handleAvatarClick(img)}
               className={`h-10 w-10 rounded-full cursor-pointer border-2 transition ${
-                selectedImage === img ? 'border-purple-600 scale-110' : 'hover:border-purple-400'
+                selectedImage === img
+                  ? 'border-blue-800 scale-110'
+                  : 'hover:border-blue-400'
               }`}
             />
           ))}
         </div>
 
-        <div className="flex gap-3 justify-center">
-          <button
-            onClick={handleSave}
-            className="bg-green-600 text-white py-2 px-5 rounded hover:bg-green-700 transition"
-          >
-            Save
-          </button>
-          <button
-            onClick={handleRemove}
-            className="bg-red-500 text-white py-2 px-5 rounded hover:bg-red-600 transition"
-          >
-            Remove
-          </button>
-        </div>
+        <button
+          onClick={handleSave}
+          disabled={!selectedImage || selectedImage === currentImage}
+          className={`py-2 px-5 rounded transition text-white ${
+            !selectedImage || selectedImage === currentImage
+              ? 'bg-gray-400 cursor-not-allowed'
+              : 'bg-green-800 hover:bg-green-700'
+          }`}
+        >
+          Upload
+        </button>
 
         {uploading && (
           <p className="mt-4 text-sm text-gray-500 animate-pulse">Uploading...</p>
