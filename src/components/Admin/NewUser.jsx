@@ -84,14 +84,15 @@ const NewUser = ({ onUserAdded }) => {
       );
       await updateProfile(userCredential.user, { displayName: name });
 
-      await addDoc(collection(db, "users"), {
-        uid: userCredential.user.uid,
-        name,
-        email,
-        role,
-        department,
-        createdAt: serverTimestamp(),
-      });
+// Inside handleSubmit in NewUser.jsx
+await addDoc(collection(db, "users"), {
+  uid: userCredential.user.uid,
+  name,
+  email,
+  role,       // Save role (from your form)
+  department, // Save department (from your form)
+  createdAt: serverTimestamp(),
+});
 
       try {
         await emailjs.send(

@@ -1,16 +1,16 @@
-import React, { useContext, useState, useRef, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
+import React, { useContext, useState, useRef, useEffect } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { AuthContext } from "../context/AuthContext";
 import {
   FaHome,
   FaTachometerAlt,
   FaSignOutAlt,
   FaUserEdit,
   FaUserCircle,
-} from 'react-icons/fa';
-import { toast } from 'react-toastify';
+} from "react-icons/fa";
+import { toast } from "react-toastify";
 
-const Navbar = ({ onImageClick }) => {
+const Navbar = ({ onImageClick = () => {} }) => {
   const { user, logout, photoURL } = useContext(AuthContext);
   const location = useLocation();
   const navigate = useNavigate();
@@ -18,14 +18,14 @@ const Navbar = ({ onImageClick }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef();
 
-  const isHome = location.pathname === '/';
-  const isLogin = location.pathname === '/login';
-  const isDashboard = location.pathname === '/dashboard';
+  const isHome = location.pathname === "/";
+  const isLogin = location.pathname === "/login";
+  const isDashboard = location.pathname === "/dashboard";
 
   const formatDisplayName = (email) => {
-    const domain = '@gryphonacademy.co.in';
+    const domain = "@gryphonacademy.co.in";
     if (email.endsWith(domain)) {
-      const namePart = email.split('@')[0];
+      const namePart = email.split("@")[0];
       return namePart.charAt(0).toUpperCase() + namePart.slice(1);
     }
     return email;
@@ -37,19 +37,19 @@ const Navbar = ({ onImageClick }) => {
         setIsDropdownOpen(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const handleLogout = () => {
     setIsDropdownOpen(false);
     logout();
-    toast.success('Logged out successfully!');
-    navigate('/login');
+    toast.success("Logged out successfully!");
+    navigate("/login");
   };
 
   const navItemClass =
-    'group flex items-center gap-2 relative transition text-white hover:text-white';
+    "group flex items-center gap-2 relative transition text-white hover:text-white";
 
   return (
     <nav className="bg-blue-900 text-white px-6 py-4 flex justify-between items-center sticky top-0 z-50">
@@ -98,20 +98,20 @@ const Navbar = ({ onImageClick }) => {
 
         {user && (
           <>
-            {user.role === 'admin' && (
+            {user.role === "admin" && (
               <Link to="/dashboard" className={navItemClass}>
                 <FaTachometerAlt
                   className={`transition ${
                     isDashboard
-                      ? 'text-green-400 animate-pulse'
-                      : 'text-white group-hover:text-yellow-400'
+                      ? "text-green-400 animate-pulse"
+                      : "text-white group-hover:text-yellow-400"
                   }`}
                 />
                 <span
                   className={`relative inline-block transition duration-300 ${
                     isDashboard
-                      ? 'text-green-400 font-semibold'
-                      : 'group-hover:text-yellow-400'
+                      ? "text-green-400 font-semibold"
+                      : "group-hover:text-yellow-400"
                   }`}
                 >
                   Dashboard
@@ -119,7 +119,6 @@ const Navbar = ({ onImageClick }) => {
                 </span>
               </Link>
             )}
-
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setIsDropdownOpen((prev) => !prev)}
@@ -129,17 +128,15 @@ const Navbar = ({ onImageClick }) => {
                   <img
                     src={photoURL}
                     alt="Profile"
-                    className="h-9 w-9 rounded-full object-cover object-top border-2 border-yellow-400 cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsDropdownOpen(false);
-                      onImageClick(); // 🔥 Call parent to open modal
-                    }}
+                    className="h-9 w-9 rounded-full object-cover object-top border-2 border-yellow-400"
+                    // Remove onClick from image since we want the parent button to handle all clicks
                   />
                 ) : (
                   <FaUserCircle className="text-2xl text-yellow-400" />
                 )}
-                <span className="font-medium">{formatDisplayName(user.email)}</span>
+                <span className="font-medium">
+                  {formatDisplayName(user.email)}
+                </span>
               </button>
 
               {isDropdownOpen && (
