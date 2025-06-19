@@ -24,6 +24,7 @@ const tabLabels = {
   renewal: "Renewal",
 };
 
+
 const tabColorMap = {
   hot: {
     active: "bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg",
@@ -73,6 +74,20 @@ function Sales() {
   const [followups, setFollowups] = useState({});
   const [loading, setLoading] = useState(true);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  // 👇 Yeh andar hona chahiye, not outside the component
+const phaseCounts = {
+  hot: 0,
+  warm: 0,
+  cold: 0,
+  renewal: 0,
+};
+
+Object.values(leads).forEach((lead) => {
+  const phase = lead.phase || "hot";
+  if (phaseCounts[phase] !== undefined) {
+    phaseCounts[phase]++;
+  }
+});
 
   useEffect(() => {
     const leadsRef = ref(realtimeDb, "leads");
@@ -200,28 +215,32 @@ function Sales() {
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
           {Object.keys(tabLabels).map((key) => (
-            <button
-              key={key}
-              onClick={() => setActiveTab(key)}
-              className={`py-3.5 rounded-xl text-sm font-semibold transition-all duration-300 ease-out transform hover:scale-[1.02] ${activeTab === key
-                  ? tabColorMap[key].active
-                  : tabColorMap[key].inactive
-                } ${activeTab === key ? "ring-2 ring-offset-2 ring-opacity-50" : ""
-                } ${activeTab === key
-                  ? key === "hot"
-                    ? "ring-red-500"
-                    : key === "warm"
-                      ? "ring-amber-400"
-                      : key === "cold"
-                        ? "ring-emerald-500"
-                        : "ring-blue-500"
-                  : ""
-                }
-`}
-            >
-              {tabLabels[key]}
-            </button>
-          ))}
+  <button
+    key={key}
+    onClick={() => setActiveTab(key)}
+    className={`py-3.5 rounded-xl text-sm font-semibold transition-all duration-300 ease-out transform hover:scale-[1.02] ${
+      activeTab === key ? tabColorMap[key].active : tabColorMap[key].inactive
+    } ${
+      activeTab === key ? "ring-2 ring-offset-2 ring-opacity-50" : ""
+    } ${
+      activeTab === key
+        ? key === "hot"
+          ? "ring-red-500"
+          : key === "warm"
+          ? "ring-amber-400"
+          : key === "cold"
+          ? "ring-emerald-500"
+          : "ring-blue-500"
+        : ""
+    }`}
+  >
+    {tabLabels[key]}{" "}
+    <span className="ml-1 text-xs font-bold">
+      ({phaseCounts[key]})
+    </span>
+  </button>
+))}
+
         </div>
 
         <div className="overflow-x-auto md:overflow-visible">

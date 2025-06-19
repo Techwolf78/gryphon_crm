@@ -41,7 +41,13 @@ const Sidebar = ({ collapsed, onToggle }) => {
 
   const normalizedRole = normalizeRole(user.role);
 
-  const isActive = (path) => location.pathname.startsWith(path);
+  const isActive = (path) => {
+  if (path === '/dashboard') {
+    return location.pathname === '/dashboard';
+  }
+  return location.pathname.startsWith(path);
+};
+
 
   // 🟢 Important: skipRedirect set here for dashboard only
   const commonLinks = [
