@@ -25,9 +25,8 @@ const AppContent = () => {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
 
-        {/* Protected Dashboard routes with nested routing */}
-        <Route 
-          path="/dashboard" 
+        <Route
+          path="/dashboard"
           element={
             <ProtectedRoute>
               <DashboardLayout />
@@ -44,19 +43,19 @@ const AppContent = () => {
         </Route>
       </Routes>
 
-      {(location.pathname === '/' || location.pathname === '/') && <Footer />}
+
+
+      {location.pathname === '/' && <Footer />}
     </>
   );
 };
 
-function App() {
-  return (
-    <AuthProvider>
-      <Router>
-        <AppContent />
-      </Router>
-    </AuthProvider>
-  );
-}
+const App = () => (
+  <AuthProvider>
+    <Router>
+      <AppContent />
+    </Router>
+  </AuthProvider>
+);
 
 export default App;
