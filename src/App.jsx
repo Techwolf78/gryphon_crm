@@ -11,9 +11,9 @@ import Admin from './pages/Admin';
 import Sales from './pages/Sales';
 import Placement from './pages/Placement';
 import LearningDevelopment from './pages/LearningDevelopment';
-import DigitalMarketing from './pages/DigitalMarketing';
+import DigitalMarketing from './pages/Marketing';
 import Footer from './pages/footer';
-import UpdateProfile from './components/UpdateProfile'; 
+import UpdateProfile from './components/UpdateProfile';
 
 const AppContent = () => {
   const location = useLocation();
@@ -24,23 +24,23 @@ const AppContent = () => {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
-        
 
-        <Route
-          path="/dashboard"
+        {/* Protected Dashboard routes with nested routing */}
+        <Route 
+          path="/dashboard" 
           element={
             <ProtectedRoute>
               <DashboardLayout />
             </ProtectedRoute>
           }
         >
-          <Route index element={<Dashboard />} />
+          <Route index element={<Dashboard />} />  {/* /dashboard */}
           <Route path="profile" element={<UpdateProfile />} />
           <Route path="admin" element={<Admin />} />
           <Route path="sales" element={<Sales />} />
           <Route path="placement" element={<Placement />} />
           <Route path="learning-development" element={<LearningDevelopment />} />
-          <Route path="digital-marketing" element={<DigitalMarketing />} />
+          <Route path="marketing" element={<DigitalMarketing />} />
         </Route>
       </Routes>
 

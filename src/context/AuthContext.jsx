@@ -9,23 +9,16 @@ import {
   addDoc,
   collection,
   serverTimestamp,
+  doc,
+  getDoc,
+  query,
+  where,
+  getDocs,
 } from 'firebase/firestore';
 
-import { get, ref as dbRef } from 'firebase/database'; // 🔁 Add this
+import { get, ref as dbRef } from 'firebase/database';
 
 export const AuthContext = createContext();
-
-const getRoleByEmail = (email) => {
-  const roleMap = {
-    'gryphoncrm@gmail.com': 'admin',
-    'gryphoncrm@gryphonacademy.co.in': 'admin',
-    'nishad@gryphonacademy.co.in': 'sales',
-    'shashikant@gryphonacademy.co.in': 'placement',
-    'neha@gryphonacademy.co.in': 'learning',
-    'nasim@gryphonacademy.co.in': 'marketing',
-  };
-  return roleMap[email.toLowerCase()] || 'guest';
-};
 
 const getUserIP = async () => {
   try {
@@ -42,24 +35,30 @@ export const AuthProvider = ({ children }) => {
   const [photoURL, setPhotoURL] = useState('');
   const [loading, setLoading] = useState(true);
 
+  // 1. On Auth State Changed — fetch department by email from Firestore
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        const role = getRoleByEmail(firebaseUser.email);
-
-        // 🔁 Fetch photoURL from Realtime DB
-        let photo = '';
         try {
-          const snap = await get(dbRef(realtimeDb, `users/${firebaseUser.uid}`));
-          if (snap.exists()) {
-            photo = snap.val().photoURL || '';
-          }
-        } catch (err) {
-          console.error('Error fetching profile photo from RTDB:', err);
-        }
+          // Email se user ko Firestore users collection se find karo
+          const q = query(collection(db, 'users'), where('email', '==', firebaseUser.email));
+          const querySnapshot = await getDocs(q);
 
-        setUser({ ...firebaseUser, role });
-        setPhotoURL(photo);
+          if (!querySnapshot.empty) {
+            const userData = querySnapshot.docs[0].data();
+            console.log('User department (onAuthStateChanged):', userData.department);
+            setUser({ ...firebaseUser, role: userData.department || 'guest' });
+            setPhotoURL(userData.photoURL || '');
+          } else {
+            console.log('No user found with this email in Firestore (onAuthStateChanged)');
+            setUser({ ...firebaseUser, role: 'guest' });
+            setPhotoURL('');
+          }
+        } catch (error) {
+          console.error('Error fetching user data by email:', error);
+          setUser({ ...firebaseUser, role: 'guest' });
+          setPhotoURL('');
+        }
       } else {
         setUser(null);
         setPhotoURL('');
@@ -70,25 +69,31 @@ export const AuthProvider = ({ children }) => {
     return () => unsub();
   }, []);
 
+  // 2. Login function me bhi department fetch karke console me print karenge
   const login = async (email, password) => {
     const userCred = await signInWithEmailAndPassword(auth, email, password);
-    const role = getRoleByEmail(userCred.user.email);
-    setUser({ ...userCred.user, role });
 
-    // 🔁 Fetch photoURL from Realtime DB
-    let photo = '';
     try {
-      const snap = await get(dbRef(realtimeDb, `users/${userCred.user.uid}`));
-      if (snap.exists()) {
-        photo = snap.val().photoURL || '';
+      const q = query(collection(db, 'users'), where('email', '==', userCred.user.email));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        const userData = querySnapshot.docs[0].data();
+        console.log('Department fetched from Firestore (login):', userData.department);
+        setUser({ ...userCred.user, role: userData.department || 'guest' });
+        setPhotoURL(userData.photoURL || '');
+      } else {
+        console.log('No user found with this email in Firestore (login)');
+        setUser({ ...userCred.user, role: 'guest' });
+        setPhotoURL('');
       }
     } catch (err) {
-      console.error('Error fetching profile photo from RTDB (login):', err);
+      console.error('Error fetching department from Firestore (login):', err);
+      setUser({ ...userCred.user, role: 'guest' });
+      setPhotoURL('');
     }
 
-    setPhotoURL(photo);
-
-    // Log login to Firestore
+    // Log login IP in Firestore audit_logs
     const ip = await getUserIP();
     await addDoc(collection(db, 'audit_logs'), {
       user: email,
@@ -114,7 +119,7 @@ export const AuthProvider = ({ children }) => {
         logout,
         isAuthenticated: !!user,
         photoURL,
-        setPhotoURL, // ✅ still exposed
+        setPhotoURL,
       }}
     >
       {!loading && children}

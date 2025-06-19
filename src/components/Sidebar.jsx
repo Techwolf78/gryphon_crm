@@ -13,24 +13,39 @@ const Sidebar = ({ collapsed, onToggle }) => {
 
   if (!user) return null;
 
+  // Normalize role to lowercase and trim spaces
+  const normalizedRole = user.role.toLowerCase().trim();
+
   const isActive = (path) => location.pathname === path;
+
+  const commonLinks = [
+    { label: 'Dashboard', path: '/dashboard', icon: <FiHome /> }
+  ];
 
   const roleLinks = {
     admin: [
-      { label: 'Dashboard', path: '/dashboard', icon: <FiHome /> },
       { label: 'Admin', path: '/dashboard/admin', icon: <FiUsers /> },
       { label: 'Sales', path: '/dashboard/sales', icon: <FiDollarSign /> },
       { label: 'Placement', path: '/dashboard/placement', icon: <FiBriefcase /> },
       { label: 'L & D', path: '/dashboard/learning-development', icon: <FiBook /> },
-      { label: 'D M', path: '/dashboard/digital-marketing', icon: <FiTrendingUp /> },
+      { label: 'D M', path: '/dashboard/marketing', icon: <FiTrendingUp /> },  // updated path here
     ],
-    sales: [{ label: 'Sales', path: '/dashboard/sales', icon: <FiDollarSign /> }],
-    placement: [{ label: 'Placement', path: '/dashboard/placement', icon: <FiBriefcase /> }],
-    learning: [{ label: 'L & D', path: '/dashboard/learning-development', icon: <FiBook /> }],
-    marketing: [{ label: 'D M', path: '/dashboard/digital-marketing', icon: <FiTrendingUp /> }],
+    sales: [
+      { label: 'Sales', path: '/dashboard/sales', icon: <FiDollarSign /> }
+    ],
+    placement: [
+      { label: 'Placement', path: '/dashboard/placement', icon: <FiBriefcase /> }
+    ],
+    learning: [
+      { label: 'L & D', path: '/dashboard/learning-development', icon: <FiBook /> }
+    ],
+    marketing: [
+      { label: 'D M', path: '/dashboard/marketing', icon: <FiTrendingUp /> }  // updated path here
+    ],
   };
 
-  const links = roleLinks[user.role] || [];
+  // Sidebar me links aise milega:
+  const links = [...commonLinks, ...(roleLinks[normalizedRole] || [])];
 
   return (
     <aside className={`
