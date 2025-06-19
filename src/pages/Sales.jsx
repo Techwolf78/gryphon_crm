@@ -386,6 +386,7 @@ function Sales() {
                         setShowClosureModal={setShowClosureModal}
                         updateLeadPhase={updateLeadPhase}
                         activeTab={activeTab}
+                         dropdownRef={dropdownRef} // 👈 Add this line
                       />
                     )}
                   </div>

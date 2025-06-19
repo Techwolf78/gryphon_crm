@@ -25,11 +25,14 @@ export default function DropdownActions({
   setShowClosureModal,
   updateLeadPhase,
   activeTab,
+  dropdownRef,
 }) {
   const [assignHovered, setAssignHovered] = useState(false);
 
   return (
-    <div className="absolute z-50 bg-white rounded-xl shadow-xl w-48 overflow-visible -right-4 top-full mt-1 animate-fadeIn">
+    <div 
+     ref={dropdownRef} // 👈 Attach ref to the wrapper
+    className="absolute z-50 bg-white rounded-xl shadow-xl w-48 overflow-visible -right-4 top-full mt-1 animate-fadeIn">
       <div className="py-1 relative">
         <a
           href={`tel:${leadData.phoneNo}`}
@@ -70,7 +73,6 @@ export default function DropdownActions({
         >
           <FaArrowRight className="text-indigo-500 mr-3" />
           Assign
-
           {assignHovered && (
             <div className="absolute right-full top-0 ml-2 w-40 bg-white border rounded-lg shadow-lg z-50 p-2 animate-fadeIn">
               {dummyUsers.map((user) => (
