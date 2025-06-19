@@ -18,6 +18,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
 
 import AddCollegeModal from "../components/Sales/AddCollege";
 import FollowUp from "../components/Sales/Followup";
@@ -80,6 +81,7 @@ function Sales() {
   const [leads, setLeads] = useState({});
   const [followups, setFollowups] = useState({});
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   // 👇 Yeh andar hona chahiye, not outside the component
   const phaseCounts = {
@@ -95,6 +97,20 @@ function Sales() {
       phaseCounts[phase]++;
     }
   });
+
+  useEffect(() => {
+  const auth = getAuth();
+  const unsubscribe = onAuthStateChanged(auth, (user) => {
+    if (user) {
+      setCurrentUser(user);
+    } else {
+      setCurrentUser(null); // handle logout or unauthenticated user
+    }
+  });
+
+  return () => unsubscribe();
+}, []);
+
 
   useEffect(() => {
     const unsubLeads = onSnapshot(collection(db, "leads"), (snapshot) => {
@@ -184,9 +200,11 @@ function Sales() {
       day: "numeric",
     });
 
-  const filteredLeads = Object.entries(leads).filter(
-    ([, lead]) => (lead.phase || "hot") === activeTab
-  );
+ const filteredLeads = Object.entries(leads).filter(
+  ([, lead]) =>
+    (lead.phase || "hot") === activeTab &&
+    lead.assignedTo?.uid === currentUser?.uid
+);
 
   // Define the grid columns based on the fields we want to display
   const gridColumns = "grid grid-cols-9 gap-4";
