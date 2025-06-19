@@ -45,7 +45,11 @@ function AddCollegeModal({ show, onClose }) {
       state,
       city,
       phase,
-      createdBy: user.uid,
+      assignedTo: {
+        uid: user.uid,
+        name: user.displayName?.trim() || "No Name Provided",
+        email: user.email || "No Email Provided",
+      },
       createdAt: timestamp,
       lastUpdatedBy: user.uid,
       lastUpdatedAt: timestamp,

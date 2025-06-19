@@ -19,7 +19,6 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 
-
 import AddCollegeModal from "../components/Sales/AddCollege";
 import FollowUp from "../components/Sales/Followup";
 import ClosureFormModal from "../components/Sales/ClosureFormModal"; // Import the closure modal
@@ -337,9 +336,12 @@ function Sales() {
                         {getLatestFollowup(lead)}
                       </div>
                       <div className="break-words whitespace-normal text-sm text-gray-700 min-w-0">
-                        {users[lead.assignedTo]?.name || lead.assignedTo || "-"}
-                      </div>{" "}
-                      {/* 👈 Add this new column */}
+                        {lead.assignedTo?.uid &&
+                        users[lead.assignedTo.uid]?.name
+                          ? users[lead.assignedTo.uid].name
+                          : lead.assignedTo?.name || "-"}
+                      </div>
+
                       <div className="flex justify-center items-center">
                         <button
                           onClick={(e) => {
