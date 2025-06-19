@@ -1,26 +1,7 @@
-import React, { useState, useContext, useEffect } from "react";
-import { AuthContext } from "../context/AuthContext";
-import { useNavigate } from "react-router-dom";
+import React, { useState } from "react";
 
 const Dashboard = () => {
   const [showBanner, setShowBanner] = useState(true);
-  const { user } = useContext(AuthContext);
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (user && user.role !== "admin") {
-      // Redirect non-admin users to their allowed page
-      if (user.role === "sales") navigate("/dashboard/sales");
-      else if (user.role === "placement") navigate("/dashboard/placement");
-      else if (user.role === "learning")
-        navigate("/dashboard/learning-development");
-      else if (user.role === "marketing")
-        navigate("/dashboard/digital-marketing");
-      else navigate("/");
-    }
-  }, [user, navigate]);
-
-  if (!user || user.role !== "admin") return null; // Or loading indicator
 
   const stats = [
     {
@@ -56,6 +37,7 @@ const Dashboard = () => {
           <button
             className="text-yellow-800 hover:text-yellow-600 font-bold text-xl leading-none"
             onClick={() => setShowBanner(false)}
+            aria-label="Close banner"
           >
             &times;
           </button>
@@ -72,16 +54,14 @@ const Dashboard = () => {
       </header>
 
       {/* Stats Grid */}
-      <section className=" grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
+      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
         {stats.map((item) => (
           <div
             key={item.title}
             className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 hover:shadow-md transition"
           >
             <h2 className="text-sm text-gray-500 font-medium">{item.title}</h2>
-            <p className="text-2xl font-semibold text-gray-800 mt-1">
-              {item.value}
-            </p>
+            <p className="text-2xl font-semibold text-gray-800 mt-1">{item.value}</p>
             <p className="text-sm text-green-600 mt-1">{item.description}</p>
           </div>
         ))}
@@ -89,12 +69,9 @@ const Dashboard = () => {
 
       {/* Placeholder for more widgets */}
       <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mx-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">
-          Upcoming Features
-        </h2>
+        <h2 className="text-xl font-bold text-gray-900 mb-4">Upcoming Features</h2>
         <p className="text-gray-700">
-          Soon you’ll be able to view team activity, timeline insights, and
-          customizable reports.
+          Soon you’ll be able to view team activity, timeline insights, and customizable reports.
         </p>
       </section>
     </div>
