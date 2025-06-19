@@ -1,8 +1,8 @@
 // src/components/Sales/AddCollegeModal.jsx
 import React, { useState } from "react";
 import stateCityData from "../Sales/stateCityData";
-import { auth, realtimeDb } from "../../firebase";
-import { ref, push } from "firebase/database";
+import { auth, db } from "../../firebase"; // import Firestore db
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 function AddCollegeModal({ show, onClose }) {
   const [businessName, setBusinessName] = useState("");
@@ -12,7 +12,7 @@ function AddCollegeModal({ show, onClose }) {
   const [email, setEmail] = useState("");
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
-  const [phase, setPhase] = useState("");  // New state for phase
+  const [phase, setPhase] = useState(""); // New state for phase
 
   const handleClose = () => {
     setBusinessName("");
@@ -22,7 +22,7 @@ function AddCollegeModal({ show, onClose }) {
     setEmail("");
     setState("");
     setCity("");
-    setPhase(""); // reset phase
+    setPhase("");
     onClose();
   };
 
@@ -44,15 +44,17 @@ function AddCollegeModal({ show, onClose }) {
       email,
       state,
       city,
-      phase,  // save phase here
+      phase,
       createdBy: user.uid,
       createdAt: timestamp,
       lastUpdatedBy: user.uid,
       lastUpdatedAt: timestamp,
+      firestoreTimestamp: serverTimestamp(),
     };
 
     try {
-      await push(ref(realtimeDb, "leads"), newLead);
+      // Add new lead as a Firestore document to 'leads' collection
+      await addDoc(collection(db, "leads"), newLead);
       alert("Lead added successfully.");
       handleClose();
     } catch (error) {
@@ -67,7 +69,7 @@ function AddCollegeModal({ show, onClose }) {
     phoneNo.trim() &&
     state &&
     city &&
-    phase;  // validate phase too
+    phase;
 
   if (!show) return null;
 

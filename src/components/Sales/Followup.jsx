@@ -1,18 +1,21 @@
-import React, { useState, useEffect } from "react";
-import { ref, get, update } from "firebase/database";
+import React, { useState, useEffect, useCallback } from "react";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 dayjs.extend(relativeTime);
+
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { StaticTimePicker } from "@mui/x-date-pickers/StaticTimePicker";
-import { realtimeDb } from "../../firebase";
+
 import {
   FaRegClock,
   FaTimes,
   FaCalendarAlt,
   FaStickyNote,
 } from "react-icons/fa";
+
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { db } from "../../firebase";  // <-- fixed import here
 
 const FollowUp = ({ lead, onClose }) => {
   const [date, setDate] = useState(dayjs().format("YYYY-MM-DD"));
@@ -23,25 +26,23 @@ const FollowUp = ({ lead, onClose }) => {
   const [pastFollowups, setPastFollowups] = useState([]);
   const [timeView, setTimeView] = useState("hours");
 
-  const fetchPastFollowups = React.useCallback(async () => {
+  const fetchPastFollowups = useCallback(async () => {
+    if (!lead?.id) return;
+
     try {
-      const followRef = ref(realtimeDb, `leads/${lead.id}/followup`);
-      const snapshot = await get(followRef);
-      const existing = snapshot.val() || {};
+      const docRef = doc(db, "leads", lead.id);
+      const snapshot = await getDoc(docRef);
+      const leadData = snapshot.data() || {};
+      const existing = leadData.followup || {};
 
       const entries = Object.entries(existing)
-        .map(([key, value]) => {
-          const timestamp = value.timestamp;
-          const relativeTime = dayjs(timestamp).fromNow(); // ✅ key fix here
-
-          return {
-            key,
-            ...value,
-            timestamp,
-            datetime: new Date(timestamp),
-            relativeTime,
-          };
-        })
+        .map(([key, value]) => ({
+          key,
+          ...value,
+          timestamp: value.timestamp,
+          datetime: new Date(value.timestamp),
+          relativeTime: dayjs(value.timestamp).fromNow(),
+        }))
         .sort((a, b) => b.timestamp - a.timestamp);
 
       setPastFollowups(entries);
@@ -59,15 +60,15 @@ const FollowUp = ({ lead, onClose }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!lead?.id) return;
     setLoading(true);
 
-    const followRef = ref(realtimeDb, `leads/${lead.id}/followup`);
-
     try {
-      const snapshot = await get(followRef);
-      const existing = snapshot.val() || {};
+      const docRef = doc(db, "leads", lead.id);
+      const snapshot = await getDoc(docRef);
+      const leadData = snapshot.data() || {};
+      const existing = leadData.followup || {};
 
-      // Limit to 6 entries (remove oldest if needed)
       const entries = Object.entries(existing);
       if (entries.length >= 6) {
         const sorted = entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
@@ -76,6 +77,7 @@ const FollowUp = ({ lead, onClose }) => {
 
       const newKey = `follow${Date.now()}`;
       const formattedTime = time.format("hh:mm A");
+
       existing[newKey] = {
         date,
         time: formattedTime,
@@ -84,11 +86,11 @@ const FollowUp = ({ lead, onClose }) => {
         formattedDate: dayjs(date).format("MMM D, YYYY"),
       };
 
-      await update(followRef, existing);
+      await updateDoc(docRef, { followup: existing });
       onClose();
     } catch (err) {
-      console.error("Error:", err);
-      alert("Failed to save.\n" + err.message);
+      console.error("Error saving followup:", err);
+      alert("Failed to save follow-up.\n" + err.message);
     } finally {
       setLoading(false);
     }
@@ -127,25 +129,20 @@ const FollowUp = ({ lead, onClose }) => {
             </h3>
 
             <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Date Input */}
-              <div className="relative">
+              <div>
                 <label className="block text-gray-600 font-medium mb-2">
                   Date
                 </label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    required
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-700 shadow-sm outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  {/* Removed calendar icon here */}
-                </div>
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  required
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3"
+                />
               </div>
 
-              {/* Time Display + Clock Icon + Conditional Picker */}
-              <div className="relative">
+              <div>
                 <label className="block text-gray-600 font-medium mb-2">
                   Time
                 </label>
@@ -154,21 +151,16 @@ const FollowUp = ({ lead, onClose }) => {
                     setTimeView("hours");
                     setShowClock(true);
                   }}
-                  className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 border border-gray-300 cursor-pointer hover:border-blue-400 transition"
+                  className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 border border-gray-300 cursor-pointer hover:border-blue-400"
                 >
                   <span className="text-gray-800 text-lg font-medium">
                     {time.format("hh:mm A")}
                   </span>
-                  <button
-                    type="button"
-                    className="text-blue-600 hover:text-blue-800 text-xl"
-                  >
-                    <FaRegClock />
-                  </button>
+                  <FaRegClock className="text-blue-600 text-xl" />
                 </div>
 
                 {showClock && (
-                  <div className="mt-3 bg-white border rounded-xl shadow-lg overflow-hidden transition-all duration-300">
+                  <div className="mt-3 bg-white border rounded-xl shadow-lg">
                     <LocalizationProvider dateAdapter={AdapterDayjs}>
                       <StaticTimePicker
                         displayStaticWrapperAs="mobile"
@@ -177,11 +169,11 @@ const FollowUp = ({ lead, onClose }) => {
                         onChange={(newValue) => {
                           if (timeView === "hours") {
                             setTime(newValue);
-                            setTimeView("minutes"); // switch to minute view
-                          } else if (timeView === "minutes") {
+                            setTimeView("minutes");
+                          } else {
                             setTime(newValue);
-                            setShowClock(false); // close after selecting minute
-                            setTimeView("hours"); // reset for next time
+                            setShowClock(false);
+                            setTimeView("hours");
                           }
                         }}
                         view={timeView}
@@ -197,7 +189,6 @@ const FollowUp = ({ lead, onClose }) => {
                 )}
               </div>
 
-              {/* Remarks */}
               <div>
                 <label className="block text-gray-600 font-medium mb-2">
                   Remarks
@@ -207,58 +198,30 @@ const FollowUp = ({ lead, onClose }) => {
                   onChange={(e) => setRemarks(e.target.value)}
                   required
                   rows={4}
-                  className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-700 shadow-sm outline-none resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3"
                   placeholder="Meeting notes, discussion points, next steps..."
                 />
               </div>
 
-              {/* Buttons */}
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-5 py-2.5 rounded-xl font-medium transition-all"
+                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-5 py-2.5 rounded-xl"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="bg-gradient-to-r from-blue-600 to-indigo-700 hover:opacity-90 text-white px-6 py-2.5 rounded-xl font-medium transition-all shadow-md flex items-center"
+                  className="bg-gradient-to-r from-blue-600 to-indigo-700 hover:opacity-90 text-white px-6 py-2.5 rounded-xl"
                 >
-                  {loading ? (
-                    <>
-                      <svg
-                        className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        ></circle>
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        ></path>
-                      </svg>
-                      Saving...
-                    </>
-                  ) : (
-                    "Schedule Follow Up"
-                  )}
+                  {loading ? "Saving..." : "Schedule Follow Up"}
                 </button>
               </div>
             </form>
           </div>
 
-          {/* Past Followups */}
           <div className="border-l border-gray-200 pl-6 md:pl-8">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <FaRegClock className="text-indigo-600" />
@@ -268,16 +231,13 @@ const FollowUp = ({ lead, onClose }) => {
             {pastFollowups.length === 0 ? (
               <div className="bg-blue-50 rounded-xl p-5 text-center">
                 <p className="text-gray-600">No previous followups recorded</p>
-                <p className="text-sm text-gray-500 mt-1">
-                  New followups will appear here
-                </p>
               </div>
             ) : (
               <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
                 {pastFollowups.map((followup, index) => (
                   <div
                     key={followup.key}
-                    className="bg-white border border-gray-200 rounded-xl p-4 transition-all"
+                    className="bg-white border border-gray-200 rounded-xl p-4"
                   >
                     <div>
                       <div className="flex items-center gap-2">
@@ -290,8 +250,6 @@ const FollowUp = ({ lead, onClose }) => {
                         </span>
                       </div>
                       <p className="text-gray-600 mt-2">{followup.remarks}</p>
-
-                      {/* ✅ Bottom-left corner tag */}
                       <div className="mt-4">
                         {index === 0 ? (
                           <span className="bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded-full">

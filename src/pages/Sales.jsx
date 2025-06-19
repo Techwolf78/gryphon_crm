@@ -10,8 +10,16 @@ import {
   FaCheckCircle,
 } from "react-icons/fa";
 import { FaTimes } from "react-icons/fa";
-import { ref, onValue, update } from "firebase/database";
-import { realtimeDb } from "../firebase";
+import {
+  getFirestore,
+  collection,
+  doc,
+  onSnapshot,
+  updateDoc,
+} from "firebase/firestore";
+import { db } from "../firebase";
+
+
 import AddCollegeModal from "../components/Sales/AddCollege";
 import FollowUp from "../components/Sales/Followup";
 import ClosureFormModal from "../components/Sales/ClosureFormModal"; // Import the closure modal
@@ -23,7 +31,6 @@ const tabLabels = {
   cold: "Cold",
   renewal: "Renewal",
 };
-
 
 const tabColorMap = {
   hot: {
@@ -64,6 +71,7 @@ const headerColorMap = {
 
 function Sales() {
   const [activeTab, setActiveTab] = useState("hot");
+  const [users, setUsers] = useState({});
   const [dropdownOpenId, setDropdownOpenId] = useState(null);
   const dropdownRef = useRef(null);
   const [showModal, setShowModal] = useState(false);
@@ -75,36 +83,41 @@ function Sales() {
   const [loading, setLoading] = useState(true);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   // 👇 Yeh andar hona chahiye, not outside the component
-const phaseCounts = {
-  hot: 0,
-  warm: 0,
-  cold: 0,
-  renewal: 0,
-};
+  const phaseCounts = {
+    hot: 0,
+    warm: 0,
+    cold: 0,
+    renewal: 0,
+  };
 
-Object.values(leads).forEach((lead) => {
-  const phase = lead.phase || "hot";
-  if (phaseCounts[phase] !== undefined) {
-    phaseCounts[phase]++;
-  }
-});
+  Object.values(leads).forEach((lead) => {
+    const phase = lead.phase || "hot";
+    if (phaseCounts[phase] !== undefined) {
+      phaseCounts[phase]++;
+    }
+  });
 
   useEffect(() => {
-    const leadsRef = ref(realtimeDb, "leads");
-    const unsubLeads = onValue(leadsRef, (snapshot) => {
-      const data = snapshot.val() || {};
+    const unsubLeads = onSnapshot(collection(db, "leads"), (snapshot) => {
+      const data = {};
+      snapshot.forEach((doc) => {
+        data[doc.id] = { id: doc.id, ...doc.data() };
+      });
       setLeads(data);
       setLoading(false);
     });
 
-    const followRef = ref(realtimeDb, "Followup");
-    const unsubF = onValue(followRef, (snapshot) => {
-      setFollowups(snapshot.val() || {});
+    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+      const data = {};
+      snapshot.forEach((doc) => {
+        data[doc.id] = { id: doc.id, ...doc.data() };
+      });
+      setUsers(data);
     });
 
     return () => {
       unsubLeads();
-      unsubF();
+      unsubUsers();
     };
   }, []);
 
@@ -125,9 +138,8 @@ Object.values(leads).forEach((lead) => {
   };
 
   const updateLeadPhase = async (id, newPhase) => {
-    const leadRef = ref(realtimeDb, `leads/${id}`);
     try {
-      await update(leadRef, { phase: newPhase });
+      await updateDoc(doc(db, "leads", id), { phase: newPhase });
     } catch (err) {
       console.error("Phase update failed", err);
     }
@@ -138,23 +150,21 @@ Object.values(leads).forEach((lead) => {
     if (!updatedLead?.id) return;
 
     // Convert date string back to timestamp if it exists
-    if (updatedLead.createdAt && typeof updatedLead.createdAt === 'string') {
+    if (updatedLead.createdAt && typeof updatedLead.createdAt === "string") {
       updatedLead.createdAt = new Date(updatedLead.createdAt).getTime();
     }
-
-    const leadRef = ref(realtimeDb, `leads/${updatedLead.id}`);
 
     const { id, ...dataToUpdate } = updatedLead;
 
     try {
-      await update(leadRef, dataToUpdate);
+      await updateDoc(doc(db, "leads", updatedLead.id), dataToUpdate);
+
       setShowDetailsModal(false);
       setSelectedLead(null);
     } catch (error) {
       console.error("Failed to update lead", error);
     }
   };
-
 
   const getLatestFollowup = (lead) => {
     const followData = lead.followup || {};
@@ -163,8 +173,9 @@ Object.values(leads).forEach((lead) => {
     );
     if (entries.length === 0) return "-";
     const latest = entries[entries.length - 1][1];
-    return `${latest.date || "-"} ${latest.time || ""} - ${latest.remarks || ""
-      }`;
+    return `${latest.date || "-"} ${latest.time || ""} - ${
+      latest.remarks || ""
+    }`;
   };
 
   const formatDate = (ms) =>
@@ -179,7 +190,7 @@ Object.values(leads).forEach((lead) => {
   );
 
   // Define the grid columns based on the fields we want to display
-  const gridColumns = "grid grid-cols-8 gap-4";
+  const gridColumns = "grid grid-cols-9 gap-4";
 
   return (
     <div className="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen font-sans ">
@@ -215,32 +226,33 @@ Object.values(leads).forEach((lead) => {
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
           {Object.keys(tabLabels).map((key) => (
-  <button
-    key={key}
-    onClick={() => setActiveTab(key)}
-    className={`py-3.5 rounded-xl text-sm font-semibold transition-all duration-300 ease-out transform hover:scale-[1.02] ${
-      activeTab === key ? tabColorMap[key].active : tabColorMap[key].inactive
-    } ${
-      activeTab === key ? "ring-2 ring-offset-2 ring-opacity-50" : ""
-    } ${
-      activeTab === key
-        ? key === "hot"
-          ? "ring-red-500"
-          : key === "warm"
-          ? "ring-amber-400"
-          : key === "cold"
-          ? "ring-emerald-500"
-          : "ring-blue-500"
-        : ""
-    }`}
-  >
-    {tabLabels[key]}{" "}
-    <span className="ml-1 text-xs font-bold">
-      ({phaseCounts[key]})
-    </span>
-  </button>
-))}
-
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={`py-3.5 rounded-xl text-sm font-semibold transition-all duration-300 ease-out transform hover:scale-[1.02] ${
+                activeTab === key
+                  ? tabColorMap[key].active
+                  : tabColorMap[key].inactive
+              } ${
+                activeTab === key ? "ring-2 ring-offset-2 ring-opacity-50" : ""
+              } ${
+                activeTab === key
+                  ? key === "hot"
+                    ? "ring-red-500"
+                    : key === "warm"
+                    ? "ring-amber-400"
+                    : key === "cold"
+                    ? "ring-emerald-500"
+                    : "ring-blue-500"
+                  : ""
+              }`}
+            >
+              {tabLabels[key]}{" "}
+              <span className="ml-1 text-xs font-bold">
+                ({phaseCounts[key]})
+              </span>
+            </button>
+          ))}
         </div>
 
         <div className="overflow-x-auto md:overflow-visible">
@@ -250,7 +262,6 @@ Object.values(leads).forEach((lead) => {
             <div
               className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-4 rounded-xl mb-3`}
             >
-              {/* header columns */}
               <div className="font-semibold">College Name</div>
               <div className="font-semibold">City</div>
               <div className="font-semibold">Contact Name</div>
@@ -258,6 +269,8 @@ Object.values(leads).forEach((lead) => {
               <div className="font-semibold">Email ID</div>
               <div className="font-semibold">Opened Date</div>
               <div className="font-semibold">Follow-Ups</div>
+              <div className="font-semibold">Assigned To</div>{" "}
+              {/* 👈 Add this */}
               <div className="font-semibold text-center">Actions</div>
             </div>
 
@@ -320,21 +333,24 @@ Object.values(leads).forEach((lead) => {
                             : lead[field] || "-"}
                         </div>
                       ))}
-
                       <div className="break-words whitespace-normal text-sm text-gray-700 min-w-0">
                         {getLatestFollowup(lead)}
                       </div>
-
+                      <div className="break-words whitespace-normal text-sm text-gray-700 min-w-0">
+                        {users[lead.assignedTo]?.name || lead.assignedTo || "-"}
+                      </div>{" "}
+                      {/* 👈 Add this new column */}
                       <div className="flex justify-center items-center">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             toggleDropdown(id, e);
                           }}
-                          className={`text-gray-500 hover:text-gray-700 focus:outline-none transition p-2 rounded-full hover:bg-gray-100 ${dropdownOpenId === id
+                          className={`text-gray-500 hover:text-gray-700 focus:outline-none transition p-2 rounded-full hover:bg-gray-100 ${
+                            dropdownOpenId === id
                               ? "bg-gray-200 text-gray-900 shadow-inner"
                               : ""
-                            }`}
+                          }`}
                           aria-expanded={dropdownOpenId === id}
                           aria-haspopup="true"
                           aria-label={
@@ -369,9 +385,7 @@ Object.values(leads).forEach((lead) => {
                         updateLeadPhase={updateLeadPhase}
                         activeTab={activeTab}
                       />
-
                     )}
-
                   </div>
                 ))
               )}
