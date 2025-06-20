@@ -5,7 +5,7 @@ import { FaTimes } from "react-icons/fa";
 import { collection, doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-
+import FollowupAlerts from "../components/Sales/FollowupAlerts";
 import AddCollegeModal from "../components/Sales/AddCollege";
 import FollowUp from "../components/Sales/Followup";
 import ClosureFormModal from "../components/Sales/ClosureFormModal"; // Import the closure modal
@@ -67,7 +67,6 @@ function Sales() {
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
   const [leads, setLeads] = useState({});
-  const [followups, setFollowups] = useState({});
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -193,7 +192,7 @@ function Sales() {
       updatedLead.createdAt = new Date(updatedLead.createdAt).getTime();
     }
 
-    const { id, ...dataToUpdate } = updatedLead;
+    const { ...dataToUpdate } = updatedLead;
 
     try {
       await updateDoc(doc(db, "leads", updatedLead.id), dataToUpdate);
@@ -286,8 +285,8 @@ function Sales() {
         return () => clearTimeout(timer); // Cleanup
       }
     }
-  }, [leads, loading]);
-
+  }, [leads, loading, currentUser?.uid]);
+  // Fix: include currentUser?.uid as dependency
   function convertTo24HrTime(timeStr) {
     if (!timeStr) return "00:00:00";
     const [time, modifier] = timeStr.split(" ");
@@ -643,81 +642,14 @@ function Sales() {
         }
         
       `}</style>
-      {showTodayFollowUpAlert && (
-        <div className="fixed top-6 right-6 z-50 max-w-sm w-full bg-white border border-gray-200 rounded-xl shadow-lg transition-transform transform hover:scale-105 hover:shadow-xl duration-300 ease-in-out animate-slideInRight">
-          <div className="p-4 flex items-start space-x-3">
-            {/* Icon or indicator */}
-            <div className="flex-shrink-0">
-              <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full shadow-inner">
-                <svg
-                  className="w-6 h-6 text-blue-600"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M8 16l4-4-4-4m4 4h8"
-                  />
-                </svg>
-              </div>
-            </div>
 
-            {/* Content */}
-            <div className="flex-1">
-              <h2 className="text-lg font-semibold text-gray-900 mb-1">
-                📅 Today’s Follow-ups!
-              </h2>
-              <p className="text-gray-700 text-sm mb-4">
-                You have{" "}
-                <span className="font-medium">{todayFollowUps.length}</span>{" "}
-                lead(s) with a follow-up scheduled for today.
-              </p>
-              <div className="flex justify-end space-x-2">
-                <button
-                  onClick={() => setShowTodayFollowUpAlert(false)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm px-4 py-2 rounded-lg transition duration-200"
-                >
-                  Got it
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {reminderPopup && (
-        <div className="fixed top-24 right-6 z-50 max-w-sm w-full bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-xl shadow-lg animate-fadeIn">
-          <div className="flex items-start space-x-3">
-            <div className="flex-shrink-0">
-              <div className="flex items-center justify-center w-10 h-10 bg-yellow-100 rounded-full">
-                ⏰
-              </div>
-            </div>
-            <div className="flex-1">
-              <h3 className="text-yellow-800 font-semibold text-md">
-                Follow-up Reminder
-              </h3>
-              <p className="text-sm text-yellow-700 mt-1">
-                You have a follow-up with{" "}
-                <strong>{reminderPopup.college}</strong> at{" "}
-                <strong>{reminderPopup.time}</strong>
-              </p>
-              <div className="flex justify-end mt-3 space-x-2">
-                <button
-                  onClick={() => setReminderPopup(null)}
-                  className="bg-yellow-500 hover:bg-yellow-600 text-white text-sm px-3 py-1 rounded-md transition"
-                >
-                  Dismiss
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <FollowupAlerts
+        todayFollowUps={todayFollowUps}
+        showTodayFollowUpAlert={showTodayFollowUpAlert}
+        setShowTodayFollowUpAlert={setShowTodayFollowUpAlert}
+        reminderPopup={reminderPopup}
+        setReminderPopup={setReminderPopup}
+      />
 
       <style>{`
   @keyframes slideInRight {
