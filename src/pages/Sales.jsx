@@ -71,6 +71,8 @@ function Sales() {
   const [currentUser, setCurrentUser] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [viewMyLeadsOnly, setViewMyLeadsOnly] = useState(true); // Default to true now
+  const [todayFollowUps, setTodayFollowUps] = useState([]);
+  const [showTodayFollowUpAlert, setShowTodayFollowUpAlert] = useState(false);
 
   const computePhaseCounts = () => {
     const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
@@ -244,6 +246,38 @@ function Sales() {
 
   // Define the grid columns based on the fields we want to display
   const gridColumns = "grid grid-cols-9 gap-4";
+
+
+  useEffect(() => {
+  if (!loading && Object.keys(leads).length > 0) {
+    const today = new Date().toISOString().split("T")[0]; // e.g. "2025-06-20"
+
+   const matchingLeads = Object.values(leads).filter((lead) => {
+  // 🔴 Only check if lead is assigned to current user
+  if (lead.assignedTo?.uid !== currentUser?.uid) return false;
+
+  if ((lead.phase || "hot") !== "hot") return false;
+  if (!lead.followup) return false;
+
+  const followupEntries = Object.values(lead.followup);
+  if (followupEntries.length === 0) return false;
+
+  const sortedFollowups = followupEntries.sort(
+    (a, b) => b.timestamp - a.timestamp
+  );
+
+  const latestFollowup = sortedFollowups[0];
+  return latestFollowup.date === today;
+});
+
+
+    if (matchingLeads.length > 0) {
+      setTodayFollowUps(matchingLeads);
+      setShowTodayFollowUpAlert(true);
+    }
+  }
+}, [leads, loading]);
+
 
   return (
     <div className="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen font-sans ">
@@ -541,7 +575,74 @@ function Sales() {
         .animate-fadeIn {
           animation: fadeIn 0.2s ease-out;
         }
-      `}</style>
+        
+      `
+      }</style>
+ {showTodayFollowUpAlert && (
+  <div className="fixed top-6 right-6 z-50 max-w-sm w-full bg-white border border-gray-200 rounded-xl shadow-lg transition-transform transform hover:scale-105 hover:shadow-xl duration-300 ease-in-out animate-slideInRight">
+    <div className="p-4 flex items-start space-x-3">
+      {/* Icon or indicator */}
+      <div className="flex-shrink-0">
+        <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full shadow-inner">
+          <svg
+            className="w-6 h-6 text-blue-600"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 16l4-4-4-4m4 4h8" />
+          </svg>
+        </div>
+      </div>
+      
+      {/* Content */}
+      <div className="flex-1">
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">
+          📅 Today’s Follow-ups!
+        </h2>
+        <p className="text-gray-700 text-sm mb-4">
+          You have <span className="font-medium">{todayFollowUps.length}</span> lead(s) with a follow-up scheduled for today.
+        </p>
+        <div className="flex justify-end space-x-2">
+          <button
+            onClick={() => setShowTodayFollowUpAlert(false)}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm px-4 py-2 rounded-lg transition duration-200"
+          >
+            Got it
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
+      <style>{`
+  @keyframes slideInRight {
+    0% {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    15% {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    85% {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+  }
+
+  .animate-slideInRight {
+    animation: slideInRight 4s ease-in-out forwards;
+  }
+`}</style>
+
     </div>
   );
 }
