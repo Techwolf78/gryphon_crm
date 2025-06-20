@@ -74,6 +74,7 @@ function Sales() {
   const [todayFollowUps, setTodayFollowUps] = useState([]);
   const [showTodayFollowUpAlert, setShowTodayFollowUpAlert] = useState(false);
   const [reminderPopup, setReminderPopup] = useState(null); // For 15 min reminders
+  const remindedLeadsRef = useRef(new Set());
 
   const computePhaseCounts = () => {
     const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
@@ -313,22 +314,24 @@ function Sales() {
         if (entries.length === 0) return false;
 
         const latest = entries.sort((a, b) => b.timestamp - a.timestamp)[0];
-
         const followUpTime = new Date(
           `${latest.date}T${convertTo24HrTime(latest.time)}`
         );
-        const reminderTime = new Date(followUpTime.getTime() - 15 * 60 * 1000); // 15 minutes before
+        const reminderTime = new Date(followUpTime.getTime() - 15 * 60 * 1000);
 
         const isToday =
           latest.date === now.toISOString().split("T")[0] &&
           reminderTime <= now &&
           followUpTime > now;
 
-        // Ensure reminder hasn't been shown already
-        return isToday && reminderPopup?.leadId !== lead.id;
+        const alreadyReminded = remindedLeadsRef.current.has(lead.id);
+
+        return isToday && !alreadyReminded;
       });
 
       if (upcomingReminder) {
+        remindedLeadsRef.current.add(upcomingReminder.id); // ✅ Track shown reminders
+
         setReminderPopup({
           leadId: upcomingReminder.id,
           college: upcomingReminder.businessName,
@@ -337,10 +340,10 @@ function Sales() {
           )[0].time,
         });
       }
-    }, 60000); // check every 1 minute
+    }, 60000);
 
     return () => clearInterval(interval);
-  }, [leads, currentUser, reminderPopup]);
+  }, [leads, currentUser]);
 
   return (
     <div className="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen font-sans ">
