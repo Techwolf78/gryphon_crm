@@ -74,6 +74,7 @@ function Sales() {
   const [viewMyLeadsOnly, setViewMyLeadsOnly] = useState(true); // Default to true now
   const [todayFollowUps, setTodayFollowUps] = useState([]);
   const [showTodayFollowUpAlert, setShowTodayFollowUpAlert] = useState(false);
+  const [reminderPopup, setReminderPopup] = useState(null); // For 15 min reminders
 
   const computePhaseCounts = () => {
     const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
@@ -248,37 +249,99 @@ function Sales() {
   // Define the grid columns based on the fields we want to display
   const gridColumns = "grid grid-cols-9 gap-4";
 
+  useEffect(() => {
+    if (!loading && Object.keys(leads).length > 0) {
+      const now = new Date();
+      const todayStr = now.toISOString().split("T")[0];
+
+      const matchingLeads = Object.values(leads).filter((lead) => {
+        if (lead.assignedTo?.uid !== currentUser?.uid) return false;
+        if ((lead.phase || "hot") !== "hot") return false;
+        if (!lead.followup) return false;
+
+        const followupEntries = Object.values(lead.followup);
+        if (followupEntries.length === 0) return false;
+
+        const sortedFollowups = followupEntries.sort(
+          (a, b) => b.timestamp - a.timestamp
+        );
+        const latest = sortedFollowups[0];
+        if (latest.date !== todayStr) return false;
+
+        const followUpDateTime = new Date(
+          `${latest.date}T${convertTo24HrTime(latest.time)}`
+        );
+        return followUpDateTime > now;
+      });
+
+      if (matchingLeads.length > 0) {
+        setTodayFollowUps(matchingLeads);
+        setShowTodayFollowUpAlert(true);
+
+        // ✅ Automatically hide after 4 seconds
+        const timer = setTimeout(() => {
+          setShowTodayFollowUpAlert(false);
+        }, 4000);
+
+        return () => clearTimeout(timer); // Cleanup
+      }
+    }
+  }, [leads, loading]);
+
+  function convertTo24HrTime(timeStr) {
+    if (!timeStr) return "00:00:00";
+    const [time, modifier] = timeStr.split(" ");
+    let [hours, minutes] = time.split(":").map(Number);
+
+    if (modifier === "PM" && hours !== 12) hours += 12;
+    if (modifier === "AM" && hours === 12) hours = 0;
+
+    return `${hours.toString().padStart(2, "0")}:${minutes
+      .toString()
+      .padStart(2, "0")}:00`;
+  }
 
   useEffect(() => {
-  if (!loading && Object.keys(leads).length > 0) {
-    const today = new Date().toISOString().split("T")[0]; // e.g. "2025-06-20"
+    const interval = setInterval(() => {
+      const now = new Date();
 
-   const matchingLeads = Object.values(leads).filter((lead) => {
-  // 🔴 Only check if lead is assigned to current user
-  if (lead.assignedTo?.uid !== currentUser?.uid) return false;
+      const upcomingReminder = Object.values(leads).find((lead) => {
+        if (lead.assignedTo?.uid !== currentUser?.uid) return false;
+        if ((lead.phase || "hot") !== "hot") return false;
+        if (!lead.followup) return false;
 
-  if ((lead.phase || "hot") !== "hot") return false;
-  if (!lead.followup) return false;
+        const entries = Object.values(lead.followup);
+        if (entries.length === 0) return false;
 
-  const followupEntries = Object.values(lead.followup);
-  if (followupEntries.length === 0) return false;
+        const latest = entries.sort((a, b) => b.timestamp - a.timestamp)[0];
 
-  const sortedFollowups = followupEntries.sort(
-    (a, b) => b.timestamp - a.timestamp
-  );
+        const followUpTime = new Date(
+          `${latest.date}T${convertTo24HrTime(latest.time)}`
+        );
+        const reminderTime = new Date(followUpTime.getTime() - 15 * 60 * 1000); // 15 minutes before
 
-  const latestFollowup = sortedFollowups[0];
-  return latestFollowup.date === today;
-});
+        const isToday =
+          latest.date === now.toISOString().split("T")[0] &&
+          reminderTime <= now &&
+          followUpTime > now;
 
+        // Ensure reminder hasn't been shown already
+        return isToday && reminderPopup?.leadId !== lead.id;
+      });
 
-    if (matchingLeads.length > 0) {
-      setTodayFollowUps(matchingLeads);
-      setShowTodayFollowUpAlert(true);
-    }
-  }
-}, [leads, loading]);
+      if (upcomingReminder) {
+        setReminderPopup({
+          leadId: upcomingReminder.id,
+          college: upcomingReminder.businessName,
+          time: Object.values(upcomingReminder.followup).sort(
+            (a, b) => b.timestamp - a.timestamp
+          )[0].time,
+        });
+      }
+    }, 60000); // check every 1 minute
 
+    return () => clearInterval(interval);
+  }, [leads, currentUser, reminderPopup]);
 
   return (
     <div className="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen font-sans ">
@@ -579,47 +642,95 @@ function Sales() {
           animation: fadeIn 0.2s ease-out;
         }
         
-      `
-      }</style>
- {showTodayFollowUpAlert && (
-  <div className="fixed top-6 right-6 z-50 max-w-sm w-full bg-white border border-gray-200 rounded-xl shadow-lg transition-transform transform hover:scale-105 hover:shadow-xl duration-300 ease-in-out animate-slideInRight">
-    <div className="p-4 flex items-start space-x-3">
-      {/* Icon or indicator */}
-      <div className="flex-shrink-0">
-        <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full shadow-inner">
-          <svg
-            className="w-6 h-6 text-blue-600"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8 16l4-4-4-4m4 4h8" />
-          </svg>
+      `}</style>
+      {showTodayFollowUpAlert && (
+        <div className="fixed top-6 right-6 z-50 max-w-sm w-full bg-white border border-gray-200 rounded-xl shadow-lg transition-transform transform hover:scale-105 hover:shadow-xl duration-300 ease-in-out animate-slideInRight">
+          <div className="p-4 flex items-start space-x-3">
+            {/* Icon or indicator */}
+            <div className="flex-shrink-0">
+              <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full shadow-inner">
+                <svg
+                  className="w-6 h-6 text-blue-600"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M8 16l4-4-4-4m4 4h8"
+                  />
+                </svg>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1">
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">
+                📅 Today’s Follow-ups!
+              </h2>
+              <p className="text-gray-700 text-sm mb-4">
+                You have{" "}
+                <span className="font-medium">{todayFollowUps.length}</span>{" "}
+                lead(s) with a follow-up scheduled for today.
+              </p>
+              <div className="flex justify-end space-x-2">
+                <button
+                  onClick={() => setShowTodayFollowUpAlert(false)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm px-4 py-2 rounded-lg transition duration-200"
+                >
+                  Got it
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-      
-      {/* Content */}
-      <div className="flex-1">
-        <h2 className="text-lg font-semibold text-gray-900 mb-1">
-          📅 Today’s Follow-ups!
-        </h2>
-        <p className="text-gray-700 text-sm mb-4">
-          You have <span className="font-medium">{todayFollowUps.length}</span> lead(s) with a follow-up scheduled for today.
-        </p>
-        <div className="flex justify-end space-x-2">
-          <button
-            onClick={() => setShowTodayFollowUpAlert(false)}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm px-4 py-2 rounded-lg transition duration-200"
-          >
-            Got it
-          </button>
+      )}
+
+      {reminderPopup && (
+        <div className="fixed top-24 right-6 z-50 max-w-sm w-full bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-xl shadow-lg animate-fadeIn">
+          <div className="flex items-start space-x-3">
+            <div className="flex-shrink-0">
+              <div className="flex items-center justify-center w-10 h-10 bg-yellow-100 rounded-full">
+                ⏰
+              </div>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-yellow-800 font-semibold text-md">
+                Follow-up Reminder
+              </h3>
+              <p className="text-sm text-yellow-700 mt-1">
+                You have a follow-up with{" "}
+                <strong>{reminderPopup.college}</strong> at{" "}
+                <strong>{reminderPopup.time}</strong>
+              </p>
+              <div className="flex justify-end mt-3 space-x-2">
+                <button
+                  onClick={() => {
+                    // Dismiss the reminder and show it again in 5 minutes
+                    const snoozedReminder = { ...reminderPopup };
+                    setReminderPopup(null);
+                    setTimeout(() => {
+                      setReminderPopup(snoozedReminder);
+                    }, 5 * 60 * 1000); // 5 minutes
+                  }}
+                  className="bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm px-3 py-1 rounded-md transition"
+                >
+                  Snooze 5 min
+                </button>
+                <button
+                  onClick={() => setReminderPopup(null)}
+                  className="bg-yellow-500 hover:bg-yellow-600 text-white text-sm px-3 py-1 rounded-md transition"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-  </div>
-)}
+      )}
 
       <style>{`
   @keyframes slideInRight {
@@ -645,7 +756,6 @@ function Sales() {
     animation: slideInRight 4s ease-in-out forwards;
   }
 `}</style>
-
     </div>
   );
 }
