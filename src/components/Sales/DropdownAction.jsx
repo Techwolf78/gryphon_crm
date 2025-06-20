@@ -48,7 +48,7 @@ export default function DropdownActions({
           }}
         >
           <FaCalendarCheck className="text-purple-500 mr-3" />
-          Follow Up
+          Meetings
         </button>
         <button
           className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition"

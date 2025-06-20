@@ -13,9 +13,11 @@ import {
   FaCalendarAlt,
   FaStickyNote,
 } from "react-icons/fa";
-
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { db } from "../../firebase";  // <-- fixed import here
+import { db } from "../../firebase";
+
+import { useMsal } from "@azure/msal-react";
+import { InteractionRequiredAuthError } from "@azure/msal-browser";
 
 const FollowUp = ({ lead, onClose }) => {
   const [date, setDate] = useState(dayjs().format("YYYY-MM-DD"));
@@ -26,9 +28,12 @@ const FollowUp = ({ lead, onClose }) => {
   const [pastFollowups, setPastFollowups] = useState([]);
   const [timeView, setTimeView] = useState("hours");
 
+  const { instance, accounts } = useMsal();
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const graphScopes = ["User.Read", "Calendars.ReadWrite"];
+
   const fetchPastFollowups = useCallback(async () => {
     if (!lead?.id) return;
-
     try {
       const docRef = doc(db, "leads", lead.id);
       const snapshot = await getDoc(docRef);
@@ -57,6 +62,80 @@ const FollowUp = ({ lead, onClose }) => {
       fetchPastFollowups();
     }
   }, [lead, fetchPastFollowups]);
+
+  const getAccessToken = async () => {
+    try {
+      const response = await instance.acquireTokenSilent({
+        scopes: graphScopes,
+        account: accounts[0],
+      });
+      return response.accessToken;
+    } catch (err) {
+      if (err instanceof InteractionRequiredAuthError) {
+        const response = await instance.acquireTokenPopup({
+          scopes: graphScopes,
+        });
+        return response.accessToken;
+      } else {
+        throw err;
+      }
+    }
+  };
+
+  const createCalendarEvent = async () => {
+    try {
+      if (!accounts[0]) {
+        await instance.loginPopup({ scopes: graphScopes });
+      }
+
+      const accessToken = await getAccessToken();
+
+      const eventStart = dayjs(`${date} ${time.format("HH:mm")}`);
+      const eventEnd = eventStart.add(30, "minute");
+
+      const event = {
+        subject: `Follow-up: ${lead.businessName}`,
+        body: {
+          contentType: "HTML",
+          content: remarks,
+        },
+        start: {
+          dateTime: eventStart.toISOString(),
+          timeZone: timezone,
+        },
+        end: {
+          dateTime: eventEnd.toISOString(),
+          timeZone: timezone,
+        },
+        attendees: lead.email
+          ? [
+              {
+                emailAddress: {
+                  address: lead.email,
+                  name: lead.pocName || "Client",
+                },
+                type: "required",
+              },
+            ]
+          : [],
+        isReminderOn: true,
+        reminderMinutesBeforeStart: 10,
+      };
+
+      await fetch("https://graph.microsoft.com/v1.0/me/events", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(event),
+      });
+
+      console.log("Event created in Microsoft 365 calendar.");
+    } catch (err) {
+      console.error("Failed to create calendar event:", err);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -87,6 +166,7 @@ const FollowUp = ({ lead, onClose }) => {
       };
 
       await updateDoc(docRef, { followup: existing });
+      await createCalendarEvent(); // 🗓️ Add to calendar
       onClose();
     } catch (err) {
       console.error("Error saving followup:", err);
@@ -96,8 +176,7 @@ const FollowUp = ({ lead, onClose }) => {
     }
   };
 
-  if (!lead || !lead.id) return null;
-
+  // 🔁 The JSX remains unchanged
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-lg flex items-center justify-center z-[9999] px-4 py-6">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-fadeIn">
@@ -106,7 +185,7 @@ const FollowUp = ({ lead, onClose }) => {
             <div>
               <h2 className="text-2xl font-bold flex items-center gap-3">
                 <FaCalendarAlt className="text-yellow-300" />
-                Schedule Follow Up
+                Schedule Meetings
               </h2>
               <p className="text-blue-100 mt-1">
                 {lead.businessName} • {lead.pocName}
@@ -125,7 +204,7 @@ const FollowUp = ({ lead, onClose }) => {
           <div>
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <FaStickyNote className="text-indigo-600" />
-              New Follow Up
+              New Meeting
             </h3>
 
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -225,12 +304,12 @@ const FollowUp = ({ lead, onClose }) => {
           <div className="border-l border-gray-200 pl-6 md:pl-8">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <FaRegClock className="text-indigo-600" />
-              Previous Followups
+              Previous Meetings
             </h3>
 
             {pastFollowups.length === 0 ? (
-              <div className="bg-blue-50 rounded-xl p-5 text-center">
-                <p className="text-gray-600">No previous followups recorded</p>
+              <div className="bg-blue-50 rounded-xl p-2 text-center text-base">
+                <p className="text-gray-600">No previous meetings recorded</p>
               </div>
             ) : (
               <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
