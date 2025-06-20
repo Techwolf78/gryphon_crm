@@ -11,7 +11,6 @@ import {
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase"; // adjust the path if needed
 
-
 export default function DropdownActions({
   leadId,
   leadData,
@@ -79,23 +78,22 @@ export default function DropdownActions({
                 .map((user) => (
                   <button
                     key={user.uid}
-   onClick={async () => {
-  try {
-    await updateDoc(doc(db, "leads", leadId), {
-      assignedTo: {
-        uid: user.uid,
-        name: user.name,
-        email: user.email,
-      },
-    });
-    console.log("Assigned to:", user.name);
-  } catch (error) {
-    console.error("Error assigning lead:", error);
-  }
-  setAssignHovered(false);
-  closeDropdown();
-}}
-
+                    onClick={async () => {
+                      try {
+                        await updateDoc(doc(db, "leads", leadId), {
+                          assignedTo: {
+                            uid: user.uid,
+                            name: user.name,
+                            email: user.email,
+                          },
+                        });
+                        console.log("Assigned to:", user.name);
+                      } catch (error) {
+                        console.error("Error assigning lead:", error);
+                      }
+                      setAssignHovered(false);
+                      closeDropdown();
+                    }}
                     className="block w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded"
                   >
                     {user.name}
@@ -108,7 +106,7 @@ export default function DropdownActions({
         <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
           Move to
         </div>
-        {["hot", "warm", "cold", "renewal"]
+        {["hot", "warm", "cold", "closed"]
           .filter((phase) => phase !== activeTab)
           .map((phase) => (
             <button

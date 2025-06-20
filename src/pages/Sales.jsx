@@ -11,6 +11,7 @@ import FollowUp from "../components/Sales/Followup";
 import ClosureFormModal from "../components/Sales/ClosureFormModal"; // Import the closure modal
 import LeadDetailsModal from "../components/Sales/LeadDetailsModal";
 import DropdownActions from "../components/Sales/DropdownAction";
+import ClosedLeads from "../components/Sales/ClosedLeads";
 // Updated tabLabels
 const tabLabels = {
   hot: "Hot",
@@ -387,6 +388,8 @@ function Sales() {
                 <div className="flex justify-center items-center h-64">
                   <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
                 </div>
+              ) : activeTab === "closed" ? (
+                <ClosedLeads leads={leads} users={users} />
               ) : filteredLeads.length === 0 ? (
                 <div className="bg-white rounded-xl p-8 text-center border-2 border-dashed border-gray-200">
                   <svg
