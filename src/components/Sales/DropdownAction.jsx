@@ -8,12 +8,9 @@ import {
   FaCheckCircle,
   FaTimes,
 } from "react-icons/fa";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "../../firebase"; // adjust the path if needed
 
-const dummyUsers = [
-  { id: "u1", name: "Ravi" },
-  { id: "u2", name: "Anita" },
-  { id: "u3", name: "John" },
-];
 
 export default function DropdownActions({
   leadId,
@@ -26,13 +23,15 @@ export default function DropdownActions({
   updateLeadPhase,
   activeTab,
   dropdownRef,
+  users, // ✅ Add this
 }) {
   const [assignHovered, setAssignHovered] = useState(false);
 
   return (
-    <div 
-     ref={dropdownRef} // 👈 Attach ref to the wrapper
-    className="absolute z-50 bg-white rounded-xl shadow-xl w-48 overflow-visible -right-4 top-full mt-1 animate-fadeIn">
+    <div
+      ref={dropdownRef} // 👈 Attach ref to the wrapper
+      className="absolute z-50 bg-white rounded-xl shadow-xl w-48 overflow-visible -right-4 top-full mt-1 animate-fadeIn"
+    >
       <div className="py-1 relative">
         <a
           href={`tel:${leadData.phoneNo}`}
@@ -75,19 +74,33 @@ export default function DropdownActions({
           Assign
           {assignHovered && (
             <div className="absolute right-full top-0 ml-2 w-40 bg-white border rounded-lg shadow-lg z-50 p-2 animate-fadeIn">
-              {dummyUsers.map((user) => (
-                <button
-                  key={user.id}
-                  onClick={() => {
-                    console.log("Assigned to:", user.name);
-                    setAssignHovered(false);
-                    closeDropdown();
-                  }}
-                  className="block w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                >
-                  {user.name}
-                </button>
-              ))}
+              {Object.values(users)
+                .filter((user) => user.department === "Sales") // ✅ Filter by department
+                .map((user) => (
+                  <button
+                    key={user.uid}
+   onClick={async () => {
+  try {
+    await updateDoc(doc(db, "leads", leadId), {
+      assignedTo: {
+        uid: user.uid,
+        name: user.name,
+        email: user.email,
+      },
+    });
+    console.log("Assigned to:", user.name);
+  } catch (error) {
+    console.error("Error assigning lead:", error);
+  }
+  setAssignHovered(false);
+  closeDropdown();
+}}
+
+                    className="block w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                  >
+                    {user.name}
+                  </button>
+                ))}
             </div>
           )}
         </div>

@@ -11,7 +11,6 @@ function LeadDetailsModal({ show, onClose, lead, onSave }) {
     email: "",
     createdAt: "",
     phase: "",
-    assignedTo: "", // include more if needed
   };
 
   const [formData, setFormData] = useState(defaultLeadFields);
@@ -33,7 +32,6 @@ function LeadDetailsModal({ show, onClose, lead, onSave }) {
     email: "Email ID",
     createdAt: "Opened Date",
     phase: "Phase",
-    assignedTo: "Assigned To",
   };
 
   const formatDateForInput = (ms) => {

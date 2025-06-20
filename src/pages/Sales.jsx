@@ -18,6 +18,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
 
 import AddCollegeModal from "../components/Sales/AddCollege";
 import FollowUp from "../components/Sales/Followup";
@@ -80,21 +81,60 @@ function Sales() {
   const [leads, setLeads] = useState({});
   const [followups, setFollowups] = useState({});
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  // 👇 Yeh andar hona chahiye, not outside the component
-  const phaseCounts = {
-    hot: 0,
-    warm: 0,
-    cold: 0,
-    renewal: 0,
+  const [viewMyLeadsOnly, setViewMyLeadsOnly] = useState(false);
+
+  const computePhaseCounts = () => {
+    const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
+    const counts = {
+      hot: 0,
+      warm: 0,
+      cold: 0,
+      renewal: 0,
+    };
+
+    if (!user) return counts;
+
+    const isSalesDept = user.department === "Sales";
+    const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
+    const isLowerRole = ["Assistant Manager", "Executive"].includes(user.role);
+
+    Object.values(leads).forEach((lead) => {
+      const phase = lead.phase || "hot";
+      const isOwnLead = lead.assignedTo?.uid === currentUser?.uid;
+
+      const shouldInclude =
+        isSalesDept && isHigherRole
+          ? viewMyLeadsOnly
+            ? isOwnLead
+            : true
+          : isSalesDept && isLowerRole
+          ? isOwnLead
+          : false;
+
+      if (shouldInclude && counts[phase] !== undefined) {
+        counts[phase]++;
+      }
+    });
+
+    return counts;
   };
 
-  Object.values(leads).forEach((lead) => {
-    const phase = lead.phase || "hot";
-    if (phaseCounts[phase] !== undefined) {
-      phaseCounts[phase]++;
-    }
-  });
+  const phaseCounts = computePhaseCounts();
+
+  useEffect(() => {
+    const auth = getAuth();
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setCurrentUser(user);
+      } else {
+        setCurrentUser(null); // handle logout or unauthenticated user
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     const unsubLeads = onSnapshot(collection(db, "leads"), (snapshot) => {
@@ -184,9 +224,27 @@ function Sales() {
       day: "numeric",
     });
 
-  const filteredLeads = Object.entries(leads).filter(
-    ([, lead]) => (lead.phase || "hot") === activeTab
-  );
+  const filteredLeads = Object.entries(leads).filter(([, lead]) => {
+    const phaseMatch = (lead.phase || "hot") === activeTab;
+    const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
+    if (!user) return false;
+
+    const isSalesDept = user.department === "Sales";
+    const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
+    const isLowerRole = ["Assistant Manager", "Executive"].includes(user.role);
+
+    if (isSalesDept && isHigherRole) {
+      return viewMyLeadsOnly
+        ? phaseMatch && lead.assignedTo?.uid === currentUser?.uid
+        : phaseMatch;
+    }
+
+    if (isSalesDept && isLowerRole) {
+      return phaseMatch && lead.assignedTo?.uid === currentUser?.uid;
+    }
+
+    return false;
+  });
 
   // Define the grid columns based on the fields we want to display
   const gridColumns = "grid grid-cols-9 gap-4";
@@ -202,6 +260,60 @@ function Sales() {
             <p className="text-gray-600 mt-1">
               Manage your leads and follow-ups
             </p>
+
+            {currentUser &&
+              (() => {
+                const role = Object.values(users).find(
+                  (u) => u.uid === currentUser.uid
+                )?.role;
+                const isHigherRole = ["Director", "Head", "Manager"].includes(
+                  role
+                );
+
+                return (
+                  <div className="flex items-center gap-2 mt-2">
+                    <p
+                      className={`text-xs font-medium px-3 py-1 rounded-full ${
+                        isHigherRole
+                          ? "bg-green-100 text-green-700"
+                          : "bg-blue-100 text-blue-700"
+                      }`}
+                    >
+                      Viewing:{" "}
+                      {isHigherRole
+                        ? viewMyLeadsOnly
+                          ? "My Leads Only"
+                          : "All Sales Leads"
+                        : "My Leads Only"}
+                    </p>
+
+                    {isHigherRole && (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setViewMyLeadsOnly(false)}
+                          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${
+                            !viewMyLeadsOnly
+                              ? "bg-blue-600 text-white border-blue-600"
+                              : "bg-white text-blue-600 border-blue-300"
+                          }`}
+                        >
+                          My Team
+                        </button>
+                        <button
+                          onClick={() => setViewMyLeadsOnly(true)}
+                          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${
+                            viewMyLeadsOnly
+                              ? "bg-blue-600 text-white border-blue-600"
+                              : "bg-white text-blue-600 border-blue-300"
+                          }`}
+                        >
+                          My Leads
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
           </div>
           <button
             onClick={() => setShowModal(true)}
@@ -376,18 +488,20 @@ function Sales() {
                       </div>
                     </div>
                     {dropdownOpenId === id && (
-                      <DropdownActions
-                        leadId={id}
-                        leadData={lead}
-                        closeDropdown={() => setDropdownOpenId(null)}
-                        setSelectedLead={setSelectedLead}
-                        setShowFollowUpModal={setShowFollowUpModal}
-                        setShowDetailsModal={setShowDetailsModal}
-                        setShowClosureModal={setShowClosureModal}
-                        updateLeadPhase={updateLeadPhase}
-                        activeTab={activeTab}
-                         dropdownRef={dropdownRef} // 👈 Add this line
-                      />
+<DropdownActions
+  leadId={id}
+  leadData={lead}
+  closeDropdown={() => setDropdownOpenId(null)}
+  setSelectedLead={setSelectedLead}
+  setShowFollowUpModal={setShowFollowUpModal}
+  setShowDetailsModal={setShowDetailsModal}
+  setShowClosureModal={setShowClosureModal}
+  updateLeadPhase={updateLeadPhase}
+  activeTab={activeTab}
+  dropdownRef={dropdownRef}
+  users={users} // ✅ Pass users here
+/>
+
                     )}
                   </div>
                 ))
