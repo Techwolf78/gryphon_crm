@@ -1,22 +1,8 @@
 // Sales.jsx
 import React, { useState, useEffect, useRef } from "react";
-// Add to your existing import statements
-import { FaEdit } from "react-icons/fa";
-import {
-  FaEllipsisV,
-  FaPhone,
-  FaCalendarCheck,
-  FaArrowRight,
-  FaCheckCircle,
-} from "react-icons/fa";
+import { FaEllipsisV } from "react-icons/fa";
 import { FaTimes } from "react-icons/fa";
-import {
-  getFirestore,
-  collection,
-  doc,
-  onSnapshot,
-  updateDoc,
-} from "firebase/firestore";
+import { collection, doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 
@@ -25,13 +11,15 @@ import FollowUp from "../components/Sales/Followup";
 import ClosureFormModal from "../components/Sales/ClosureFormModal"; // Import the closure modal
 import LeadDetailsModal from "../components/Sales/LeadDetailsModal";
 import DropdownActions from "../components/Sales/DropdownAction";
+// Updated tabLabels
 const tabLabels = {
   hot: "Hot",
   warm: "Warm",
   cold: "Cold",
-  renewal: "Renewal",
+  closed: "Closed", // Changed from renewal to closed
 };
 
+// Updated color scheme
 const tabColorMap = {
   hot: {
     active: "bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg",
@@ -43,30 +31,29 @@ const tabColorMap = {
       "bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200",
   },
   cold: {
-    active:
-      "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg",
+    active: "bg-gradient-to-r from-cyan-400 to-cyan-500 text-white shadow-lg", // Changed to icy blue
     inactive:
-      "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200",
+      "bg-cyan-50 text-cyan-600 hover:bg-cyan-100 border border-cyan-200", // Changed to icy blue
   },
-  renewal: {
-    active: "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg",
+  closed: {
+    active: "bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg", // Changed to success green
     inactive:
-      "bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200",
+      "bg-green-50 text-green-600 hover:bg-green-100 border border-green-200", // Changed to success green
   },
 };
 
 const borderColorMap = {
   hot: "border-l-4 border-red-500",
   warm: "border-l-4 border-amber-400",
-  cold: "border-l-4 border-emerald-500",
-  renewal: "border-l-4 border-blue-500",
+  cold: "border-l-4 border-cyan-400", // Changed to icy blue
+  closed: "border-l-4 border-green-500", // Changed to success green
 };
 
 const headerColorMap = {
   hot: "bg-red-50 text-red-800 border-b border-red-200",
   warm: "bg-amber-50 text-amber-800 border-b border-amber-200",
-  cold: "bg-emerald-50 text-emerald-800 border-b border-emerald-200",
-  renewal: "bg-blue-50 text-blue-800 border-b border-blue-200",
+  cold: "bg-cyan-50 text-cyan-800 border-b border-cyan-200", // Changed to icy blue
+  closed: "bg-green-50 text-green-800 border-b border-green-200", // Changed to success green
 };
 
 function Sales() {
@@ -83,7 +70,7 @@ function Sales() {
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [viewMyLeadsOnly, setViewMyLeadsOnly] = useState(false);
+  const [viewMyLeadsOnly, setViewMyLeadsOnly] = useState(true); // Default to true now
 
   const computePhaseCounts = () => {
     const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
@@ -91,7 +78,7 @@ function Sales() {
       hot: 0,
       warm: 0,
       cold: 0,
-      renewal: 0,
+      closed: 0, // Changed from renewal to closed
     };
 
     if (!user) return counts;
@@ -128,13 +115,22 @@ function Sales() {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         setCurrentUser(user);
+        // Check user role and set viewMyLeadsOnly accordingly
+        const userData = Object.values(users).find((u) => u.uid === user.uid);
+        if (userData) {
+          const isHigherRole = ["Director", "Head", "Manager"].includes(
+            userData.role
+          );
+          // For higher roles, default to "My Leads" view
+          setViewMyLeadsOnly(isHigherRole);
+        }
       } else {
-        setCurrentUser(null); // handle logout or unauthenticated user
+        setCurrentUser(null);
       }
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [users]); // Add users as dependency
 
   useEffect(() => {
     const unsubLeads = onSnapshot(collection(db, "leads"), (snapshot) => {
@@ -290,16 +286,6 @@ function Sales() {
                     {isHigherRole && (
                       <div className="flex gap-2">
                         <button
-                          onClick={() => setViewMyLeadsOnly(false)}
-                          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${
-                            !viewMyLeadsOnly
-                              ? "bg-blue-600 text-white border-blue-600"
-                              : "bg-white text-blue-600 border-blue-300"
-                          }`}
-                        >
-                          My Team
-                        </button>
-                        <button
                           onClick={() => setViewMyLeadsOnly(true)}
                           className={`text-xs font-medium px-3 py-1 rounded-full border transition ${
                             viewMyLeadsOnly
@@ -308,6 +294,16 @@ function Sales() {
                           }`}
                         >
                           My Leads
+                        </button>
+                        <button
+                          onClick={() => setViewMyLeadsOnly(false)}
+                          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${
+                            !viewMyLeadsOnly
+                              ? "bg-blue-600 text-white border-blue-600"
+                              : "bg-white text-blue-600 border-blue-300"
+                          }`}
+                        >
+                          My Team
                         </button>
                       </div>
                     )}
@@ -353,8 +349,8 @@ function Sales() {
                     : key === "warm"
                     ? "ring-amber-400"
                     : key === "cold"
-                    ? "ring-emerald-500"
-                    : "ring-blue-500"
+                    ? "ring-cyan-400" // Changed to icy blue
+                    : "ring-green-500" // Changed to success green
                   : ""
               }`}
             >
@@ -488,20 +484,19 @@ function Sales() {
                       </div>
                     </div>
                     {dropdownOpenId === id && (
-<DropdownActions
-  leadId={id}
-  leadData={lead}
-  closeDropdown={() => setDropdownOpenId(null)}
-  setSelectedLead={setSelectedLead}
-  setShowFollowUpModal={setShowFollowUpModal}
-  setShowDetailsModal={setShowDetailsModal}
-  setShowClosureModal={setShowClosureModal}
-  updateLeadPhase={updateLeadPhase}
-  activeTab={activeTab}
-  dropdownRef={dropdownRef}
-  users={users} // ✅ Pass users here
-/>
-
+                      <DropdownActions
+                        leadId={id}
+                        leadData={lead}
+                        closeDropdown={() => setDropdownOpenId(null)}
+                        setSelectedLead={setSelectedLead}
+                        setShowFollowUpModal={setShowFollowUpModal}
+                        setShowDetailsModal={setShowDetailsModal}
+                        setShowClosureModal={setShowClosureModal}
+                        updateLeadPhase={updateLeadPhase}
+                        activeTab={activeTab}
+                        dropdownRef={dropdownRef}
+                        users={users} // ✅ Pass users here
+                      />
                     )}
                   </div>
                 ))

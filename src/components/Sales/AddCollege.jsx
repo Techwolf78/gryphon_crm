@@ -1,7 +1,6 @@
-// src/components/Sales/AddCollegeModal.jsx
 import React, { useState } from "react";
 import stateCityData from "../Sales/stateCityData";
-import { auth, db } from "../../firebase"; // import Firestore db
+import { auth, db } from "../../firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 function AddCollegeModal({ show, onClose }) {
@@ -12,7 +11,7 @@ function AddCollegeModal({ show, onClose }) {
   const [email, setEmail] = useState("");
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
-  const [phase, setPhase] = useState(""); // New state for phase
+  const [phase, setPhase] = useState("hot"); // Set default to "hot"
 
   const handleClose = () => {
     setBusinessName("");
@@ -22,7 +21,7 @@ function AddCollegeModal({ show, onClose }) {
     setEmail("");
     setState("");
     setCity("");
-    setPhase("");
+    setPhase("hot"); // Reset to "hot" on close
     onClose();
   };
 
@@ -44,7 +43,7 @@ function AddCollegeModal({ show, onClose }) {
       email,
       state,
       city,
-      phase,
+      phase: phase || "hot", // Fallback to "hot" if empty
       assignedTo: {
         uid: user.uid,
         name: user.displayName?.trim() || "No Name Provided",
@@ -57,7 +56,6 @@ function AddCollegeModal({ show, onClose }) {
     };
 
     try {
-      // Add new lead as a Firestore document to 'leads' collection
       await addDoc(collection(db, "leads"), newLead);
       alert("Lead added successfully.");
       handleClose();
@@ -196,7 +194,7 @@ function AddCollegeModal({ show, onClose }) {
             </div>
           )}
 
-          {/* Phase Dropdown - NEW */}
+          {/* Phase Dropdown */}
           <div>
             <label className="block text-sm font-semibold text-gray-600 mb-2">
               Phase<span className="text-red-500">*</span>
@@ -206,12 +204,10 @@ function AddCollegeModal({ show, onClose }) {
               onChange={(e) => setPhase(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
             >
-              <option value="">Select Phase</option>
-              <option value="cold">Cold</option>
-              <option value="warm">Warm</option>
               <option value="hot">Hot</option>
-              <option value="closure">Closure</option>
-              <option value="renewal">Renewal</option>
+              <option value="warm">Warm</option>
+              <option value="cold">Cold</option>
+              <option value="closed">Closed</option>
             </select>
           </div>
         </div>
