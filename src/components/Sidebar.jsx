@@ -29,7 +29,6 @@ const roleLinks = {
   ]
 };
 
-// Role name cleaner
 const normalizeRole = (role) =>
   role?.toLowerCase().replace('&', 'and').replace(/\s+/g, '-').trim();
 
@@ -42,14 +41,12 @@ const Sidebar = ({ collapsed, onToggle }) => {
   const normalizedRole = normalizeRole(user.role);
 
   const isActive = (path) => {
-  if (path === '/dashboard') {
-    return location.pathname === '/dashboard';
-  }
-  return location.pathname.startsWith(path);
-};
+    if (path === '/dashboard') {
+      return location.pathname === '/dashboard';
+    }
+    return location.pathname.startsWith(path);
+  };
 
-
-  // 🟢 Important: skipRedirect set here for dashboard only
   const commonLinks = [
     { label: 'Dashboard', path: '/dashboard', icon: <FiHome />, skipRedirect: true }
   ];
@@ -59,15 +56,15 @@ const Sidebar = ({ collapsed, onToggle }) => {
   return (
     <aside className={`
       ${collapsed ? 'w-20' : 'w-[168px]'}
-      bg-blue-700 text-white flex flex-col
+      bg-white border-r border-gray-200 flex flex-col
       fixed h-full z-50
       transition-all duration-300 ease-in-out
     `}>
-      <div className="px-6 py-6 text-2xl font-bold border-b border-blue-600 flex items-center justify-between">
-        {!collapsed && <span className="whitespace-nowrap">GA CRM</span>}
+      <div className="px-6 py-6 text-2xl font-bold border-b border-gray-200 flex items-center justify-between">
+        {!collapsed && <span className="whitespace-nowrap text-gray-800">GA CRM</span>}
         <button
           onClick={onToggle}
-          className="text-white hover:text-blue-200 focus:outline-none"
+          className="text-gray-500 hover:text-blue-600 focus:outline-none"
           aria-label="Toggle Sidebar"
         >
           {collapsed ? <FiChevronRight size={24} /> : <FiChevronLeft size={24} />}
@@ -80,8 +77,10 @@ const Sidebar = ({ collapsed, onToggle }) => {
             key={path}
             to={path}
             state={skipRedirect ? { skipRedirect: true } : undefined}
-            className={`flex items-center px-4 py-2 rounded hover:bg-blue-600 transition ${
-              isActive(path) ? 'bg-blue-800 font-semibold' : ''
+            className={`flex items-center px-4 py-2 rounded transition ${
+              isActive(path) 
+                ? 'bg-blue-50 text-blue-600 font-semibold' 
+                : 'text-gray-600 hover:bg-gray-100 hover:text-blue-600'
             }`}
             title={collapsed ? label : ''}
             aria-label={label}
