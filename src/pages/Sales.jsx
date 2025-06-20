@@ -708,19 +708,6 @@ function Sales() {
               </p>
               <div className="flex justify-end mt-3 space-x-2">
                 <button
-                  onClick={() => {
-                    // Dismiss the reminder and show it again in 5 minutes
-                    const snoozedReminder = { ...reminderPopup };
-                    setReminderPopup(null);
-                    setTimeout(() => {
-                      setReminderPopup(snoozedReminder);
-                    }, 5 * 60 * 1000); // 5 minutes
-                  }}
-                  className="bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm px-3 py-1 rounded-md transition"
-                >
-                  Snooze 5 min
-                </button>
-                <button
                   onClick={() => setReminderPopup(null)}
                   className="bg-yellow-500 hover:bg-yellow-600 text-white text-sm px-3 py-1 rounded-md transition"
                 >
