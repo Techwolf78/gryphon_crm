@@ -247,7 +247,7 @@ function Sales() {
   });
 
   // Define the grid columns based on the fields we want to display
-  const gridColumns = "grid grid-cols-9 gap-4";
+  const gridColumns = "grid grid-cols-10 gap-4";
 
   useEffect(() => {
     if (!loading && Object.keys(leads).length > 0) {
@@ -466,20 +466,19 @@ function Sales() {
           <div className="w-auto space-y-3">
             {/* Grid Header */}
 
-            <div
-              className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-4 rounded-xl mb-3`}
-            >
-              <div className="font-semibold">College Name</div>
-              <div className="font-semibold">City</div>
-              <div className="font-semibold">Contact Name</div>
-              <div className="font-semibold">Phone No.</div>
-              <div className="font-semibold">Email ID</div>
-              <div className="font-semibold">Opened Date</div>
-              <div className="font-semibold">Follow-Ups</div>
-              <div className="font-semibold">Assigned To</div>{" "}
-              {/* 👈 Add this */}
-              <div className="font-semibold text-center">Actions</div>
-            </div>
+          <div className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-4 rounded-xl mb-3`}>
+  <div className="font-semibold">College Name</div>
+  <div className="font-semibold">City</div>
+  <div className="font-semibold">Contact Name</div>
+  <div className="font-semibold">Phone No.</div>
+  <div className="font-semibold">Email ID</div>
+  <div className="font-semibold">Opened Date</div>
+  <div className="font-semibold">Expected Closure</div> {/* 👈 New column */}
+  <div className="font-semibold">Follow-Ups</div>
+  <div className="font-semibold">Assigned To</div>
+  <div className="font-semibold text-center">Actions</div>
+</div>
+
 
             {/* Grid Rows */}
             <div className="space-y-3">
@@ -526,22 +525,23 @@ function Sales() {
                       className={`${gridColumns} gap-4 p-5 rounded-xl bg-white shadow-sm hover:shadow-md transition-all duration-300 ${borderColorMap[activeTab]}`}
                     >
                       {[
-                        "businessName",
-                        "city",
-                        "pocName",
-                        "phoneNo",
-                        "email",
-                        "createdAt",
-                      ].map((field, i) => (
-                        <div
-                          key={i}
-                          className="break-words whitespace-normal text-sm text-gray-700 min-w-0"
-                        >
-                          {field === "createdAt"
-                            ? formatDate(lead[field])
-                            : lead[field] || "-"}
-                        </div>
-                      ))}
+  "businessName",
+  "city",
+  "pocName",
+  "phoneNo",
+  "email",
+  "createdAt",
+  "expectedClosureDate", // 👈 Add this field
+].map((field, i) => (
+  <div key={i} className="break-words whitespace-normal text-sm text-gray-700 min-w-0">
+    {field === "createdAt" || field === "expectedClosure"
+      ? lead[field]
+        ? formatDate(lead[field])
+        : "-"
+      : lead[field] || "-"}
+  </div>
+))
+}
                       <div className="break-words whitespace-normal text-sm text-gray-700 min-w-0">
                         {getLatestFollowup(lead)}
                       </div>
