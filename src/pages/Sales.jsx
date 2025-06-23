@@ -114,8 +114,8 @@ function Sales() {
             ? isOwnLead
             : true
           : isSalesDept && isLowerRole
-          ? isOwnLead
-          : false;
+            ? isOwnLead
+            : false;
 
       if (shouldInclude && counts[phase] !== undefined) {
         counts[phase]++;
@@ -225,9 +225,8 @@ function Sales() {
     );
     if (entries.length === 0) return "-";
     const latest = entries[entries.length - 1][1];
-    return `${latest.date || "-"} ${latest.time || ""} - ${
-      latest.remarks || ""
-    }`;
+    return `${latest.date || "-"} ${latest.time || ""} - ${latest.remarks || ""
+      }`;
   };
 
   const formatDate = (ms) =>
@@ -239,8 +238,8 @@ function Sales() {
 
   const filteredLeads = Object.entries(leads).filter(([, lead]) => {
     const computedPhase = getLeadPhase(lead.expectedClosureDate);
-if (!computedPhase) return false; // Skip leads without expected date
-const phaseMatch = computedPhase === activeTab;
+    if (!computedPhase) return false; // Skip leads without expected date
+    const phaseMatch = computedPhase === activeTab;
 
     const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
     if (!user) return false;
@@ -385,11 +384,10 @@ const phaseMatch = computedPhase === activeTab;
                 return (
                   <div className="flex items-center gap-2 mt-2">
                     <p
-                      className={`text-xs font-medium px-3 py-1 rounded-full ${
-                        isHigherRole
+                      className={`text-xs font-medium px-3 py-1 rounded-full ${isHigherRole
                           ? "bg-green-100 text-green-700"
                           : "bg-blue-100 text-blue-700"
-                      }`}
+                        }`}
                     >
                       Viewing:{" "}
                       {isHigherRole
@@ -403,21 +401,19 @@ const phaseMatch = computedPhase === activeTab;
                       <div className="flex gap-2">
                         <button
                           onClick={() => setViewMyLeadsOnly(true)}
-                          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${
-                            viewMyLeadsOnly
+                          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${viewMyLeadsOnly
                               ? "bg-blue-600 text-white border-blue-600"
                               : "bg-white text-blue-600 border-blue-300"
-                          }`}
+                            }`}
                         >
                           My Leads
                         </button>
                         <button
                           onClick={() => setViewMyLeadsOnly(false)}
-                          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${
-                            !viewMyLeadsOnly
+                          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${!viewMyLeadsOnly
                               ? "bg-blue-600 text-white border-blue-600"
                               : "bg-white text-blue-600 border-blue-300"
-                          }`}
+                            }`}
                         >
                           My Team
                         </button>
@@ -452,23 +448,20 @@ const phaseMatch = computedPhase === activeTab;
             <button
               key={key}
               onClick={() => setActiveTab(key)}
-              className={`py-3.5 rounded-xl text-sm font-semibold transition-all duration-300 ease-out transform hover:scale-[1.02] ${
-                activeTab === key
+              className={`py-3.5 rounded-xl text-sm font-semibold transition-all duration-300 ease-out transform hover:scale-[1.02] ${activeTab === key
                   ? tabColorMap[key].active
                   : tabColorMap[key].inactive
-              } ${
-                activeTab === key ? "ring-2 ring-offset-2 ring-opacity-50" : ""
-              } ${
-                activeTab === key
+                } ${activeTab === key ? "ring-2 ring-offset-2 ring-opacity-50" : ""
+                } ${activeTab === key
                   ? key === "hot"
                     ? "ring-red-500"
                     : key === "warm"
-                    ? "ring-amber-400"
-                    : key === "cold"
-                    ? "ring-cyan-400" // Changed to icy blue
-                    : "ring-green-500" // Changed to success green
+                      ? "ring-amber-400"
+                      : key === "cold"
+                        ? "ring-cyan-400" // Changed to icy blue
+                        : "ring-green-500" // Changed to success green
                   : ""
-              }`}
+                }`}
             >
               {tabLabels[key]}{" "}
               <span className="ml-1 text-xs font-bold">
@@ -482,18 +475,18 @@ const phaseMatch = computedPhase === activeTab;
           <div className="w-auto space-y-3">
             {/* Grid Header */}
 
-          <div className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-4 rounded-xl mb-3`}>
-  <div className="font-semibold">College Name</div>
-  <div className="font-semibold">City</div>
-  <div className="font-semibold">Contact Name</div>
-  <div className="font-semibold">Phone No.</div>
-  <div className="font-semibold">Email ID</div>
-  <div className="font-semibold">Opened Date</div>
-  <div className="font-semibold">Expected Closure</div> {/* 👈 New column */}
-  <div className="font-semibold">Follow-Ups</div>
-  <div className="font-semibold">Assigned To</div>
-  <div className="font-semibold text-center">Actions</div>
-</div>
+            <div className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-4 rounded-xl mb-3`}>
+              <div className="font-semibold">College Name</div>
+              <div className="font-semibold">City</div>
+              <div className="font-semibold">Contact Name</div>
+              <div className="font-semibold">Phone No.</div>
+              <div className="font-semibold">Email ID</div>
+              <div className="font-semibold">Opened Date</div>
+              <div className="font-semibold">Expected Closure</div> {/* 👈 New column */}
+              <div className="font-semibold">Follow-Ups</div>
+              <div className="font-semibold">Assigned To</div>
+              <div className="font-semibold text-center">Actions</div>
+            </div>
 
 
             {/* Grid Rows */}
@@ -541,29 +534,29 @@ const phaseMatch = computedPhase === activeTab;
                       className={`${gridColumns} gap-4 p-5 rounded-xl bg-white shadow-sm hover:shadow-md transition-all duration-300 ${borderColorMap[activeTab]}`}
                     >
                       {[
-  "businessName",
-  "city",
-  "pocName",
-  "phoneNo",
-  "email",
-  "createdAt",
-  "expectedClosureDate", // 👈 Add this field
-].map((field, i) => (
-  <div key={i} className="break-words whitespace-normal text-sm text-gray-700 min-w-0">
-    {field === "createdAt" || field === "expectedClosure"
-      ? lead[field]
-        ? formatDate(lead[field])
-        : "-"
-      : lead[field] || "-"}
-  </div>
-))
-}
+                        "businessName",
+                        "city",
+                        "pocName",
+                        "phoneNo",
+                        "email",
+                        "createdAt",
+                        "expectedClosureDate", // 👈 Add this field
+                      ].map((field, i) => (
+                        <div key={i} className="break-words whitespace-normal text-sm text-gray-700 min-w-0">
+                          {field === "createdAt" || field === "expectedClosure"
+                            ? lead[field]
+                              ? formatDate(lead[field])
+                              : "-"
+                            : lead[field] || "-"}
+                        </div>
+                      ))
+                      }
                       <div className="break-words whitespace-normal text-sm text-gray-700 min-w-0">
                         {getLatestFollowup(lead)}
                       </div>
                       <div className="break-words whitespace-normal text-sm text-gray-700 min-w-0">
                         {lead.assignedTo?.uid &&
-                        users[lead.assignedTo.uid]?.name
+                          users[lead.assignedTo.uid]?.name
                           ? users[lead.assignedTo.uid].name
                           : lead.assignedTo?.name || "-"}
                       </div>
@@ -574,11 +567,10 @@ const phaseMatch = computedPhase === activeTab;
                             e.stopPropagation();
                             toggleDropdown(id, e);
                           }}
-                          className={`text-gray-500 hover:text-gray-700 focus:outline-none transition p-2 rounded-full hover:bg-gray-100 ${
-                            dropdownOpenId === id
+                          className={`text-gray-500 hover:text-gray-700 focus:outline-none transition p-2 rounded-full hover:bg-gray-100 ${dropdownOpenId === id
                               ? "bg-gray-200 text-gray-900 shadow-inner"
                               : ""
-                          }`}
+                            }`}
                           aria-expanded={dropdownOpenId === id}
                           aria-haspopup="true"
                           aria-label={
@@ -634,12 +626,12 @@ const phaseMatch = computedPhase === activeTab;
       />
 
       {showClosureModal && selectedLead && (
-  <TrainingForm
-    show={showClosureModal}
-    onClose={() => setShowClosureModal(false)}
-    lead={selectedLead}
-  />
-)}
+        <TrainingForm
+          show={showClosureModal}
+          onClose={() => setShowClosureModal(false)}
+          lead={selectedLead}
+        />
+      )}
 
       {showFollowUpModal && selectedLead && (
         <FollowUp
