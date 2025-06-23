@@ -11,7 +11,10 @@ function AddCollegeModal({ show, onClose }) {
   const [email, setEmail] = useState("");
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
-  const [phase, setPhase] = useState("hot"); // Set default to "hot"
+  const [expectedClosureDate, setExpectedClosureDate] = useState("");
+
+  // Fixed phase to 'cold'
+  const phase = "cold";
 
   const handleClose = () => {
     setBusinessName("");
@@ -21,7 +24,7 @@ function AddCollegeModal({ show, onClose }) {
     setEmail("");
     setState("");
     setCity("");
-    setPhase("hot"); // Reset to "hot" on close
+    setExpectedClosureDate("");
     onClose();
   };
 
@@ -43,7 +46,8 @@ function AddCollegeModal({ show, onClose }) {
       email,
       state,
       city,
-      phase: phase || "hot", // Fallback to "hot" if empty
+      phase, // fixed to cold
+      expectedClosureDate: expectedClosureDate || null,
       assignedTo: {
         uid: user.uid,
         name: user.displayName?.trim() || "No Name Provided",
@@ -70,8 +74,7 @@ function AddCollegeModal({ show, onClose }) {
     pocName.trim() &&
     phoneNo.trim() &&
     state &&
-    city &&
-    phase;
+    city;
 
   if (!show) return null;
 
@@ -90,7 +93,7 @@ function AddCollegeModal({ show, onClose }) {
               type="text"
               value={businessName}
               onChange={(e) => setBusinessName(e.target.value)}
-              placeholder="e.g. Acme Corp"
+              placeholder="e.g. Acme College"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
             />
           </div>
@@ -146,7 +149,7 @@ function AddCollegeModal({ show, onClose }) {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="e.g. contact@business.com"
+              placeholder="e.g. contact@college.com"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
             />
           </div>
@@ -194,21 +197,31 @@ function AddCollegeModal({ show, onClose }) {
             </div>
           )}
 
-          {/* Phase Dropdown */}
+          {/* Phase (fixed to 'cold') */}
           <div>
             <label className="block text-sm font-semibold text-gray-600 mb-2">
-              Phase<span className="text-red-500">*</span>
+              Phase
             </label>
-            <select
-              value={phase}
-              onChange={(e) => setPhase(e.target.value)}
+            <input
+              type="text"
+              value="cold"
+              disabled
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
+            />
+          </div>
+
+          {/* Expected Closure Date */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-2">
+              Expected Closure Date
+            </label>
+            <input
+              type="date"
+              value={expectedClosureDate}
+              min={new Date().toISOString().split("T")[0]}
+              onChange={(e) => setExpectedClosureDate(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
-            >
-              <option value="hot">Hot</option>
-              <option value="warm">Warm</option>
-              <option value="cold">Cold</option>
-              <option value="closed">Closed</option>
-            </select>
+            />
           </div>
         </div>
 
