@@ -12,7 +12,19 @@ import ClosureFormModal from "../components/Sales/ClosureFormModal"; // Import t
 import LeadDetailsModal from "../components/Sales/LeadDetailsModal";
 import DropdownActions from "../components/Sales/DropdownAction";
 import ClosedLeads from "../components/Sales/ClosedLeads";
-// Updated tabLabels
+
+function getLeadPhase(expectedClosureDate) {
+  if (!expectedClosureDate) return null;
+
+  const now = new Date();
+  const expectedDate = new Date(expectedClosureDate);
+  const diffInDays = Math.ceil((expectedDate - now) / (1000 * 60 * 60 * 24));
+
+  if (diffInDays > 45) return "cold";
+  if (diffInDays > 30) return "warm";
+  return "hot";
+}
+
 const tabLabels = {
   hot: "Hot",
   warm: "Warm",
@@ -92,7 +104,7 @@ function Sales() {
     const isLowerRole = ["Assistant Manager", "Executive"].includes(user.role);
 
     Object.values(leads).forEach((lead) => {
-      const phase = lead.phase || "hot";
+      const phase = getLeadPhase(lead.expectedClosureDate);
       const isOwnLead = lead.assignedTo?.uid === currentUser?.uid;
 
       const shouldInclude =
@@ -225,7 +237,10 @@ function Sales() {
     });
 
   const filteredLeads = Object.entries(leads).filter(([, lead]) => {
-    const phaseMatch = (lead.phase || "hot") === activeTab;
+    const computedPhase = getLeadPhase(lead.expectedClosureDate);
+if (!computedPhase) return false; // Skip leads without expected date
+const phaseMatch = computedPhase === activeTab;
+
     const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
     if (!user) return false;
 

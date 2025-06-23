@@ -13,9 +13,6 @@ function AddCollegeModal({ show, onClose }) {
   const [city, setCity] = useState("");
   const [expectedClosureDate, setExpectedClosureDate] = useState("");
 
-  // Fixed phase to 'cold'
-  const phase = "cold";
-
   const handleClose = () => {
     setBusinessName("");
     setAddress("");
@@ -46,7 +43,6 @@ function AddCollegeModal({ show, onClose }) {
       email,
       state,
       city,
-      phase, // fixed to cold
       expectedClosureDate: expectedClosureDate || null,
       assignedTo: {
         uid: user.uid,
@@ -196,19 +192,6 @@ function AddCollegeModal({ show, onClose }) {
               </select>
             </div>
           )}
-
-          {/* Phase (fixed to 'cold') */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-2">
-              Phase
-            </label>
-            <input
-              type="text"
-              value="cold"
-              disabled
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
-            />
-          </div>
 
           {/* Expected Closure Date */}
           <div>
