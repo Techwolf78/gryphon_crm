@@ -11,8 +11,18 @@ function AddCollegeModal({ show, onClose }) {
   const [email, setEmail] = useState("");
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
-
   const [expectedClosureDate, setExpectedClosureDate] = useState("");
+
+  // Calculate phase based on expectedClosureDate
+  const getLeadPhase = (expectedDateInput) => {
+    if (!expectedDateInput) return "cold";
+    const now = new Date();
+    const expectedDate = new Date(expectedDateInput);
+    const diffInDays = Math.ceil((expectedDate - now) / (1000 * 60 * 60 * 24));
+    if (diffInDays > 45) return "cold";
+    if (diffInDays > 30) return "warm";
+    return "hot";
+  };
 
   const handleClose = () => {
     setBusinessName("");
@@ -33,7 +43,19 @@ function AddCollegeModal({ show, onClose }) {
       return;
     }
 
+    // Convert expectedClosureDate to timestamp if exists
+    let expectedClosureTimestamp = null;
+    if (expectedClosureDate) {
+      const d = new Date(expectedClosureDate);
+      if (!isNaN(d.getTime())) {
+        expectedClosureTimestamp = d.getTime();
+      }
+    }
+
+    const phase = getLeadPhase(expectedClosureTimestamp);
+
     const timestamp = Date.now();
+
     const newLead = {
       businessName,
       address,
@@ -42,7 +64,8 @@ function AddCollegeModal({ show, onClose }) {
       email,
       state,
       city,
-      expectedClosureDate: expectedClosureDate || null,
+      expectedClosureDate: expectedClosureTimestamp,
+      phase,
       assignedTo: {
         uid: user.uid,
         name: user.displayName?.trim() || "No Name Provided",
@@ -166,7 +189,6 @@ function AddCollegeModal({ show, onClose }) {
               ))}
             </select>
           </div>
-
 
           {/* City Dropdown */}
           {state && (
