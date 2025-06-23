@@ -81,7 +81,7 @@ const TrainingForm = ({ show, onClose, lead }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center px-4">
+<div className="fixed inset-0 z-50  backdrop-blur-sm flex items-center justify-center px-4">
       <div className="bg-white w-full max-w-6xl h-[90vh] rounded-xl shadow-xl overflow-hidden flex flex-col animate-fadeIn">
         {/* Modal Header */}
         <div className="flex justify-between items-center px-6 py-4 border-b bg-blue-100">
