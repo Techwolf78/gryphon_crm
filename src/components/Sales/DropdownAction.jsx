@@ -1,4 +1,3 @@
-// DropdownActions.jsx
 import React, { useState } from "react";
 import {
   FaPhone,
@@ -6,7 +5,6 @@ import {
   FaEdit,
   FaArrowRight,
   FaCheckCircle,
-  FaTimes,
 } from "react-icons/fa";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase"; // adjust the path if needed
@@ -18,7 +16,7 @@ export default function DropdownActions({
   setSelectedLead,
   setShowFollowUpModal,
   setShowDetailsModal,
-  setShowClosureModal,
+  setShowClosureModal, // 👈 Receive setter from parent
   updateLeadPhase,
   activeTab,
   dropdownRef,
@@ -32,6 +30,7 @@ export default function DropdownActions({
       className="absolute z-50 bg-white rounded-xl shadow-xl w-48 overflow-visible -right-4 top-full mt-1 animate-fadeIn"
     >
       <div className="py-1 relative">
+        {/* Call */}
         <a
           href={`tel:${leadData.phoneNo}`}
           className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition"
@@ -39,6 +38,8 @@ export default function DropdownActions({
           <FaPhone className="text-blue-500 mr-3" />
           Call
         </a>
+
+        {/* Follow Up */}
         <button
           className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition"
           onClick={() => {
@@ -50,6 +51,8 @@ export default function DropdownActions({
           <FaCalendarCheck className="text-purple-500 mr-3" />
           Meetings
         </button>
+
+        {/* Edit */}
         <button
           className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition"
           onClick={(e) => {
@@ -63,7 +66,7 @@ export default function DropdownActions({
           Edit
         </button>
 
-        {/* Assign hover menu */}
+        {/* Assign Dropdown */}
         <div
           className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition relative group cursor-pointer"
           onMouseEnter={() => setAssignHovered(true)}
@@ -103,6 +106,7 @@ export default function DropdownActions({
           )}
         </div>
 
+        {/* Phase Change */}
         <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
           Move to
         </div>
@@ -131,17 +135,25 @@ export default function DropdownActions({
               {phase.charAt(0).toUpperCase() + phase.slice(1)}
             </button>
           ))}
+
+        {/* Closure: Opens TrainingForm */}
         <button
-          className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-t border-gray-100 mt-1 transition"
-          onClick={() => {
-            setSelectedLead(leadData);
-            setShowClosureModal(true);
-            closeDropdown();
-          }}
-        >
-          <FaCheckCircle className="text-green-500 mr-3" />
-          Closure
-        </button>
+  className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-t border-gray-100 mt-1 transition"
+  onClick={() => {
+    // Set the selected lead to pass data into TrainingForm
+    setSelectedLead({ ...leadData, id: leadId });
+
+    // Show the TrainingForm modal
+    setShowClosureModal(true);
+
+    // Close the dropdown
+    closeDropdown();
+  }}
+>
+  <FaCheckCircle className="text-green-500 mr-3" />
+  Closure
+</button>
+
       </div>
     </div>
   );

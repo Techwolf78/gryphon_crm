@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { FiX, FiInfo } from "react-icons/fi";
 
 function LeadDetailsModal({ show, onClose, lead, onSave }) {
-  // All expected lead fields with default values
+  // All expected lead fields with default values, including expectedClosureDate
   const defaultLeadFields = {
     businessName: "",
     city: "",
@@ -11,6 +11,7 @@ function LeadDetailsModal({ show, onClose, lead, onSave }) {
     email: "",
     createdAt: "",
     phase: "",
+    expectedClosureDate: "", // Added this field
   };
 
   const [formData, setFormData] = useState(defaultLeadFields);
@@ -32,11 +33,22 @@ function LeadDetailsModal({ show, onClose, lead, onSave }) {
     email: "Email ID",
     createdAt: "Opened Date",
     phase: "Phase",
+    expectedClosureDate: "Expected Closure Date", // Label for new field
   };
 
-  const formatDateForInput = (ms) => {
-    if (!ms) return "";
-    const timestamp = typeof ms === "string" ? parseInt(ms) : ms;
+  // Format timestamp or ISO string to YYYY-MM-DD for date input
+  const formatDateForInput = (value) => {
+    if (!value) return "";
+    let timestamp = value;
+    if (typeof value === "string" && !isNaN(Date.parse(value))) {
+      // If ISO string
+      const d = new Date(value);
+      timestamp = d.getTime();
+    } else if (typeof value === "string") {
+      // maybe numeric string
+      timestamp = parseInt(value);
+    }
+
     try {
       const date = new Date(timestamp);
       if (isNaN(date.getTime())) return "";
@@ -44,14 +56,15 @@ function LeadDetailsModal({ show, onClose, lead, onSave }) {
       const month = String(date.getMonth() + 1).padStart(2, "0");
       const day = String(date.getDate()).padStart(2, "0");
       return `${year}-${month}-${day}`;
-    } catch (e) {
-      console.error("Date formatting error:", e);
+    } catch {
       return "";
     }
   };
 
+  // Handle input changes
   const handleChange = (key, value) => {
-    if (key === "createdAt") {
+    // For date fields, convert to timestamp for storage
+    if (key === "createdAt" || key === "expectedClosureDate") {
       const date = new Date(value);
       if (!isNaN(date.getTime())) {
         setFormData((prev) => ({ ...prev, [key]: date.getTime() }));
@@ -61,6 +74,7 @@ function LeadDetailsModal({ show, onClose, lead, onSave }) {
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
+  // On save, send updated data (timestamps for dates)
   const handleSave = () => {
     const updatedData = {
       ...formData,
@@ -68,6 +82,10 @@ function LeadDetailsModal({ show, onClose, lead, onSave }) {
         typeof formData.createdAt === "string"
           ? new Date(formData.createdAt).getTime()
           : formData.createdAt,
+      expectedClosureDate:
+        typeof formData.expectedClosureDate === "string"
+          ? new Date(formData.expectedClosureDate).getTime()
+          : formData.expectedClosureDate,
     };
     onSave(updatedData);
   };
@@ -105,7 +123,7 @@ function LeadDetailsModal({ show, onClose, lead, onSave }) {
                 customLabels[key] ||
                 key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
-              if (key === "createdAt") {
+              if (key === "createdAt" || key === "expectedClosureDate") {
                 return (
                   <div
                     key={key}

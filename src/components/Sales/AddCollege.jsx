@@ -11,10 +11,8 @@ function AddCollegeModal({ show, onClose }) {
   const [email, setEmail] = useState("");
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
-  const [expectedClosureDate, setExpectedClosureDate] = useState("");
 
-  // Fixed phase to 'cold'
-  const phase = "cold";
+  const [expectedClosureDate, setExpectedClosureDate] = useState("");
 
   const handleClose = () => {
     setBusinessName("");
@@ -30,14 +28,12 @@ function AddCollegeModal({ show, onClose }) {
 
   const handleAddBusiness = async () => {
     const user = auth.currentUser;
-
     if (!user) {
       alert("You must be logged in to add a lead.");
       return;
     }
 
     const timestamp = Date.now();
-
     const newLead = {
       businessName,
       address,
@@ -46,7 +42,6 @@ function AddCollegeModal({ show, onClose }) {
       email,
       state,
       city,
-      phase, // fixed to cold
       expectedClosureDate: expectedClosureDate || null,
       assignedTo: {
         uid: user.uid,
@@ -79,14 +74,14 @@ function AddCollegeModal({ show, onClose }) {
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-xl overflow-y-auto max-h-[95vh]">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6">Add New Lead</h2>
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center px-2 py-4">
+      <div className="bg-white w-full max-w-2xl rounded-2xl shadow-lg p-6 sm:p-8 overflow-y-auto max-h-[95vh]">
+        <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">Add New College Lead</h2>
 
-        <div className="grid grid-cols-1 gap-4 mb-6">
-          {/* Business Name */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* College Name */}
+          <div className="col-span-1 md:col-span-2">
+            <label className="text-sm font-medium text-gray-700 mb-1 block">
               College Name<span className="text-red-500">*</span>
             </label>
             <input
@@ -99,22 +94,20 @@ function AddCollegeModal({ show, onClose }) {
           </div>
 
           {/* Address */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-2">
-              Address
-            </label>
+          <div className="col-span-1 md:col-span-2">
+            <label className="text-sm font-medium text-gray-700 mb-1 block">Address</label>
             <input
               type="text"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               placeholder="e.g. 123 Main St"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-600"
             />
           </div>
 
           {/* POC Name */}
           <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-2">
+            <label className="text-sm font-medium text-gray-700 mb-1 block">
               POC Name<span className="text-red-500">*</span>
             </label>
             <input
@@ -122,13 +115,13 @@ function AddCollegeModal({ show, onClose }) {
               value={pocName}
               onChange={(e) => setPocName(e.target.value)}
               placeholder="e.g. John Doe"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-600"
             />
           </div>
 
           {/* Phone Number */}
           <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-2">
+            <label className="text-sm font-medium text-gray-700 mb-1 block">
               Phone No.<span className="text-red-500">*</span>
             </label>
             <input
@@ -136,15 +129,13 @@ function AddCollegeModal({ show, onClose }) {
               value={phoneNo}
               onChange={(e) => setPhoneNo(e.target.value)}
               placeholder="e.g. +91 9876543210"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-600"
             />
           </div>
 
           {/* Email */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-2">
-              Email
-            </label>
+          <div className="col-span-1 md:col-span-2">
+            <label className="text-sm font-medium text-gray-700 mb-1 block">Email</label>
             <input
               type="email"
               value={email}
@@ -154,9 +145,9 @@ function AddCollegeModal({ show, onClose }) {
             />
           </div>
 
-          {/* State Dropdown */}
+          {/* State */}
           <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-2">
+            <label className="text-sm font-medium text-gray-700 mb-1 block">
               State<span className="text-red-500">*</span>
             </label>
             <select
@@ -165,7 +156,7 @@ function AddCollegeModal({ show, onClose }) {
                 setState(e.target.value);
                 setCity("");
               }}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-600"
             >
               <option value="">Select State</option>
               {Object.keys(stateCityData).map((st) => (
@@ -175,6 +166,7 @@ function AddCollegeModal({ show, onClose }) {
               ))}
             </select>
           </div>
+
 
           {/* City Dropdown */}
           {state && (
@@ -197,19 +189,6 @@ function AddCollegeModal({ show, onClose }) {
             </div>
           )}
 
-          {/* Phase (fixed to 'cold') */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-2">
-              Phase
-            </label>
-            <input
-              type="text"
-              value="cold"
-              disabled
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
-            />
-          </div>
-
           {/* Expected Closure Date */}
           <div>
             <label className="block text-sm font-semibold text-gray-600 mb-2">
@@ -226,24 +205,24 @@ function AddCollegeModal({ show, onClose }) {
         </div>
 
         {/* Buttons */}
-        <div className="flex justify-between items-center mt-6">
+        <div className="mt-8 flex justify-between">
+          <button
+            onClick={handleClose}
+            className="text-sm text-gray-600 hover:bg-red-600 hover:text-white px-4 py-2 rounded-lg transition"
+          >
+            Cancel
+          </button>
+
           <button
             onClick={handleAddBusiness}
             disabled={!isFormValid}
-            className={`px-5 py-2.5 rounded-lg text-white font-medium transition ${
+            className={`px-6 py-2.5 rounded-lg font-semibold text-white transition ${
               isFormValid
-                ? "bg-blue-600 hover:bg-blue-800"
+                ? "bg-blue-600 hover:bg-blue-700"
                 : "bg-gray-400 cursor-not-allowed"
             }`}
           >
             Add Business
-          </button>
-
-          <button
-            onClick={handleClose}
-            className="text-sm text-gray-500 hover:text-white hover:bg-red-600 px-4 py-2 rounded-lg transition"
-          >
-            Cancel
           </button>
         </div>
       </div>
