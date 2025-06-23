@@ -8,24 +8,11 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import FollowupAlerts from "../components/Sales/FollowupAlerts";
 import AddCollegeModal from "../components/Sales/AddCollege";
 import FollowUp from "../components/Sales/Followup";
-// import ClosureFormModal from "../components/Sales/ClosureFormModal"; // Import the closure modal
 import TrainingForm from "../components/Sales/ClosureForm/TrainingForm";
 import LeadDetailsModal from "../components/Sales/LeadDetailsModal";
 import DropdownActions from "../components/Sales/DropdownAction";
 import ClosedLeads from "../components/Sales/ClosedLeads";
-
-function getLeadPhase(expectedClosureDate) {
-  if (!expectedClosureDate) return null;
-
-  const now = new Date();
-  const expectedDate = new Date(expectedClosureDate);
-  const diffInDays = Math.ceil((expectedDate - now) / (1000 * 60 * 60 * 24));
-
-  if (diffInDays > 45) return "cold";
-  if (diffInDays > 30) return "warm";
-  return "hot";
-}
-
+// Updated tabLabels
 const tabLabels = {
   hot: "Hot",
   warm: "Warm",
@@ -105,7 +92,7 @@ function Sales() {
     const isLowerRole = ["Assistant Manager", "Executive"].includes(user.role);
 
     Object.values(leads).forEach((lead) => {
-      const phase = getLeadPhase(lead.expectedClosureDate);
+      const phase = lead.phase || "hot";
       const isOwnLead = lead.assignedTo?.uid === currentUser?.uid;
 
       const shouldInclude =
@@ -238,10 +225,7 @@ function Sales() {
     });
 
   const filteredLeads = Object.entries(leads).filter(([, lead]) => {
-    const computedPhase = getLeadPhase(lead.expectedClosureDate);
-if (!computedPhase) return false; // Skip leads without expected date
-const phaseMatch = computedPhase === activeTab;
-
+    const phaseMatch = (lead.phase || "hot") === activeTab;
     const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
     if (!user) return false;
 
@@ -482,19 +466,21 @@ const phaseMatch = computedPhase === activeTab;
           <div className="w-auto space-y-3">
             {/* Grid Header */}
 
-          <div className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-4 rounded-xl mb-3`}>
-  <div className="font-semibold">College Name</div>
-  <div className="font-semibold">City</div>
-  <div className="font-semibold">Contact Name</div>
-  <div className="font-semibold">Phone No.</div>
-  <div className="font-semibold">Email ID</div>
-  <div className="font-semibold">Opened Date</div>
-  <div className="font-semibold">Expected Closure</div> {/* 👈 New column */}
-  <div className="font-semibold">Follow-Ups</div>
-  <div className="font-semibold">Assigned To</div>
-  <div className="font-semibold text-center">Actions</div>
-</div>
-
+            <div
+              className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-4 rounded-xl mb-3`}
+            >
+              <div className="font-semibold">College Name</div>
+              <div className="font-semibold">City</div>
+              <div className="font-semibold">Contact Name</div>
+              <div className="font-semibold">Phone No.</div>
+              <div className="font-semibold">Email ID</div>
+              <div className="font-semibold">Opened Date</div>
+              <div className="font-semibold">Expected Closure</div>{" "}
+              {/* 👈 New column */}
+              <div className="font-semibold">Follow-Ups</div>
+              <div className="font-semibold">Assigned To</div>
+              <div className="font-semibold text-center">Actions</div>
+            </div>
 
             {/* Grid Rows */}
             <div className="space-y-3">
@@ -503,7 +489,13 @@ const phaseMatch = computedPhase === activeTab;
                   <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
                 </div>
               ) : activeTab === "closed" ? (
-                <ClosedLeads leads={leads} users={users} />
+                // In Sales.jsx, where you render ClosedLeads:
+                <ClosedLeads
+                  leads={leads}
+                  users={users}
+                  viewMyLeadsOnly={viewMyLeadsOnly}
+                  currentUser={currentUser}
+                />
               ) : filteredLeads.length === 0 ? (
                 <div className="bg-white rounded-xl p-8 text-center border-2 border-dashed border-gray-200">
                   <svg
@@ -541,23 +533,25 @@ const phaseMatch = computedPhase === activeTab;
                       className={`${gridColumns} gap-4 p-5 rounded-xl bg-white shadow-sm hover:shadow-md transition-all duration-300 ${borderColorMap[activeTab]}`}
                     >
                       {[
-  "businessName",
-  "city",
-  "pocName",
-  "phoneNo",
-  "email",
-  "createdAt",
-  "expectedClosureDate", // 👈 Add this field
-].map((field, i) => (
-  <div key={i} className="break-words whitespace-normal text-sm text-gray-700 min-w-0">
-    {field === "createdAt" || field === "expectedClosure"
-      ? lead[field]
-        ? formatDate(lead[field])
-        : "-"
-      : lead[field] || "-"}
-  </div>
-))
-}
+                        "businessName",
+                        "city",
+                        "pocName",
+                        "phoneNo",
+                        "email",
+                        "createdAt",
+                        "expectedClosureDate", // 👈 Add this field
+                      ].map((field, i) => (
+                        <div
+                          key={i}
+                          className="break-words whitespace-normal text-sm text-gray-700 min-w-0"
+                        >
+                          {field === "createdAt" || field === "expectedClosure"
+                            ? lead[field]
+                              ? formatDate(lead[field])
+                              : "-"
+                            : lead[field] || "-"}
+                        </div>
+                      ))}
                       <div className="break-words whitespace-normal text-sm text-gray-700 min-w-0">
                         {getLatestFollowup(lead)}
                       </div>
@@ -634,13 +628,12 @@ const phaseMatch = computedPhase === activeTab;
       />
 
       {showClosureModal && selectedLead && (
-  <TrainingForm
-    show={showClosureModal}
-    onClose={() => setShowClosureModal(false)}
-    lead={selectedLead}
-  />
-)}
-
+        <TrainingForm
+          show={showClosureModal}
+          onClose={() => setShowClosureModal(false)}
+          lead={selectedLead}
+        />
+      )}
       {showFollowUpModal && selectedLead && (
         <FollowUp
           onClose={() => setShowFollowUpModal(false)}
