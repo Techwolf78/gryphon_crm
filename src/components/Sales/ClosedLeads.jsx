@@ -11,6 +11,7 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser }) => {
   const [targets, setTargets] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
+  
 
   // Fetch quarterly targets from Firestore
   useEffect(() => {
@@ -130,25 +131,23 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser }) => {
               </button>
             ))}
           </div>
-          {/* Quarter Filter */}
-          <div className="flex items-center bg-gray-50 rounded-lg p-1">
-            {["current", "Q1", "Q2", "Q3", "Q4", "all"].map(q => (
-              <button key={q} onClick={() => setQuarterFilter(q)}
-                className={`px-3 py-2 text-sm font-medium rounded-md ${
-                  activeQuarter === (q === "current" ? currentQuarter : q)
-                    ? "bg-white shadow-sm text-blue-600" : "text-gray-500 hover:text-gray-700"
-                }`}>
-                {q === "current" ? "Current" : q}
-              </button>
-            ))}
-            {/* PY selector example */}
-            <button onClick={() => setQuarterFilter(`PY_${selectedFY}`)}
-              className={`px-3 py-2 text-sm font-medium rounded-md ${
-                quarterFilter === `PY_${selectedFY}` ? "bg-white shadow-sm text-blue-600" : "text-gray-500 hover:text-gray-700"
-              }`}>
-              PY
-            </button>
-          </div>
+{/* Quarter Filter Dropdown */}
+<div>
+  <select
+    value={quarterFilter}
+    onChange={(e) => setQuarterFilter(e.target.value)}
+    className="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 bg-white shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+  >
+    <option value="current">Current</option>
+    <option value="Q1">Q1</option>
+    <option value="Q2">Q2</option>
+    <option value="Q3">Q3</option>
+    <option value="Q4">Q4</option>
+    <option value="all">All</option>
+    <option value={`PY_${getFinancialYearFromDate(today)}`}>PY</option>
+  </select>
+</div>
+
         </div>
       </div>
 
@@ -273,3 +272,4 @@ ClosedLeads.propTypes = {
 };
 
 export default ClosedLeads;
+
