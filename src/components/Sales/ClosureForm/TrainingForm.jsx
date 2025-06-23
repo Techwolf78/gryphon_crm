@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { FaTimes } from "react-icons/fa";
 
@@ -10,55 +9,52 @@ import PaymentInfoSection from "./PaymentInfoSection";
 import MOUUploadSection from "./MOUUploadSection";
 
 const TrainingForm = ({ show, onClose, lead }) => {
-  if (!show || !lead) return null;
-
   const [formData, setFormData] = useState({
-  projectCode: "",
-  collegeName: lead?.businessName || "",
-  address: lead?.address || "",
-  city: lead?.city || "",
-  state: lead?.state || "",
-  pincode: "",
-  gstNumber: "",
+    projectCode: "",
+    collegeName: lead?.businessName || "",
+    address: lead?.address || "",
+    city: lead?.city || "",
+    state: lead?.state || "",
+    pincode: "",
+    gstNumber: "",
 
-  // POC Info
-  tpoName: "",
-  tpoEmail: "",
-  tpoPhone: "",
-  trainingName: "",
-  trainingEmail: "",
-  trainingPhone: "",
-  accountName: "",
-  accountEmail: "",
-  accountPhone: "",
+    // POC Info
+    tpoName: "",
+    tpoEmail: "",
+    tpoPhone: "",
+    trainingName: "",
+    trainingEmail: "",
+    trainingPhone: "",
+    accountName: "",
+    accountEmail: "",
+    accountPhone: "",
 
-  // Student Info
-  course: "",
-  year: "",
-  studentList: [],
-  courses: [{ specialization: "", students: "" }],
+    // Student Info
+    course: "",
+    year: "",
+    studentList: [],
+    courses: [{ specialization: "", students: "" }],
 
-  // Topic Info
-  topics: [{ topic: "", hours: "" }],
+    // Topic Info
+    topics: [{ topic: "", hours: "" }],
 
-  // Payment Info
-  paymentType: "",
-  gstType: "include",
-  perStudentCost: 0,
-  totalCost: 0,
-  studentCount: 0,
+    // Payment Info
+    paymentType: "",
+    gstType: "include",
+    perStudentCost: 0,
+    totalCost: 0,
+    studentCount: 0,
 
-  // All payment types
-  paymentSplits: [],       // For AT, AP, ATT, ATP, etc.
-  emiMonths: 0,            // For EMI
-  emiSplits: [],           // For EMI
+    // All payment types
+    paymentSplits: [],
+    emiMonths: 0,
+    emiSplits: [],
 
-  // Additional Info
-  invoiceNumber: "",
-  additionalNotes: "",
-  splitTotal: 0
-});
-
+    // Additional Info
+    invoiceNumber: "",
+    additionalNotes: "",
+    splitTotal: 0,
+  });
 
   const [studentFile, setStudentFile] = useState(null);
   const [mouFile, setMouFile] = useState(null);
@@ -80,8 +76,11 @@ const TrainingForm = ({ show, onClose, lead }) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  // ✅ Return after hooks
+  if (!show || !lead) return null;
+
   return (
-<div className="fixed inset-0 z-50  backdrop-blur-sm flex items-center justify-center px-4">
+    <div className="fixed inset-0 z-50 backdrop-blur-sm flex items-center justify-center px-4">
       <div className="bg-white w-full max-w-6xl h-[90vh] rounded-xl shadow-xl overflow-hidden flex flex-col animate-fadeIn">
         {/* Modal Header */}
         <div className="flex justify-between items-center px-6 py-4 border-b bg-blue-100">
@@ -101,23 +100,27 @@ const TrainingForm = ({ show, onClose, lead }) => {
         </div>
 
         {/* Modal Form Content */}
-        <form className="flex-1 overflow-y-auto p-6 space-y-6 text-sm" onSubmit={(e) => {
-          e.preventDefault();
-          console.log("Form submitted", formData);
-        }}>
+        <form
+          className="flex-1 overflow-y-auto p-6 space-y-6 text-sm"
+          onSubmit={(e) => {
+            e.preventDefault();
+            console.log("Form submitted", formData);
+          }}
+        >
           <CollegeInfoSection formData={formData} setFormData={setFormData} handleChange={handleChange} />
           <POCInfoSection formData={formData} handleChange={handleChange} />
-
-          <StudentBreakdownSection formData={formData} setFormData={setFormData} studentFile={studentFile} setStudentFile={setStudentFile} />
+          <StudentBreakdownSection
+            formData={formData}
+            setFormData={setFormData}
+            studentFile={studentFile}
+            setStudentFile={setStudentFile}
+          />
           <TopicBreakdownSection formData={formData} setFormData={setFormData} />
           <PaymentInfoSection formData={formData} setFormData={setFormData} />
           <MOUUploadSection mouFile={mouFile} setMouFile={setMouFile} />
 
           <div className="pt-4">
-            <button
-              type="submit"
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
-            >
+            <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
               Submit
             </button>
           </div>
@@ -144,4 +147,3 @@ const TrainingForm = ({ show, onClose, lead }) => {
 };
 
 export default TrainingForm;
-
