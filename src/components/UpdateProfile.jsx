@@ -9,7 +9,6 @@ import {
   FaArrowRight,
   FaUserCircle,
   FaArrowLeft,
-  FaTimes,
 } from 'react-icons/fa';
 import defaultIcon from '/home/profile1.png';
 
@@ -106,7 +105,7 @@ export default function UpdateProfile({ onClose }) {
 
   const handleSave = async () => {
     if (!user || !selectedImage || selectedImage === currentImage) return;
-    
+
     try {
       await set(ref(realtimeDb, `users/${user.uid}`), {
         photoURL: selectedImage,
@@ -132,23 +131,16 @@ export default function UpdateProfile({ onClose }) {
         onDragOver={(e) => e.preventDefault()}
         className="bg-white rounded-xl w-full max-w-md p-6 text-center shadow-lg relative"
       >
-        {/* Header with Back and Close buttons */}
-        <div className="absolute top-3 right-3 flex gap-2">
+        {/* Left-side Back button */}
+        <div className="absolute top-3 left-3">
           <button
             onClick={() => window.history.back()}
-            className="text-gray-500 hover:text-blue-600 text-2xl transition-colors"
+            className="text-gray-600 hover:text-blue-700 flex items-center gap-1 text-sm font-medium"
             aria-label="Go back"
             title="Back"
           >
-            <FaArrowLeft />
-          </button>
-          <button
-            onClick={onClose || (() => window.history.back())}
-            className="text-gray-500 hover:text-red-600 text-2xl transition-colors"
-            aria-label="Close"
-            title="Close"
-          >
-            <FaTimes />
+            <FaArrowLeft className="text-lg" />
+            <span>Back</span>
           </button>
         </div>
 

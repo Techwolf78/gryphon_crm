@@ -14,7 +14,8 @@ import { ref, onValue, update } from "firebase/database";
 import { realtimeDb } from "../firebase";
 import AddCollegeModal from "../components/Sales/AddCollege";
 import FollowUp from "../components/Sales/Followup";
-import ClosureFormModal from "../components/Sales/ClosureFormModal"; // Import the closure modal
+// import ClosureFormModal from "../components/Sales/ClosureFormModal"; // Import the closure modal
+import TrainingForm from "../components/Sales/ClosureForm/TrainingForm";
 import LeadDetailsModal from "../components/Sales/LeadDetailsModal";
 import DropdownActions from "../components/Sales/DropdownAction";
 const tabLabels = {
@@ -370,11 +371,14 @@ function Sales() {
         onSave={handleSaveLead}
       />
 
-      <ClosureFormModal
-        show={showClosureModal}
-        onClose={() => setShowClosureModal(false)}
-        lead={selectedLead}
-      />
+      {showClosureModal && selectedLead && (
+  <TrainingForm
+    show={showClosureModal}
+    onClose={() => setShowClosureModal(false)}
+    lead={selectedLead}
+  />
+)}
+
       {showFollowUpModal && selectedLead && (
         <FollowUp
           onClose={() => setShowFollowUpModal(false)}
