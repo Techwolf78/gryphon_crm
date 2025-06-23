@@ -7,7 +7,7 @@ import {
   FaCheckCircle,
 } from "react-icons/fa";
 import { doc, updateDoc } from "firebase/firestore";
-import { db } from "../../firebase"; // adjust the path if needed
+import { db } from "../../firebase"; // adjust path if needed
 
 export default function DropdownActions({
   leadId,
@@ -16,28 +16,26 @@ export default function DropdownActions({
   setSelectedLead,
   setShowFollowUpModal,
   setShowDetailsModal,
-  setShowClosureModal, // 👈 Receive setter from parent
+  setShowClosureModal,
   updateLeadPhase,
   activeTab,
   dropdownRef,
-  users, // ✅ Add this
+  users,
+
+  // ✅ NEW Props
+  setShowExpectedDateModal,
+  setPendingPhaseChange,
+  setLeadBeingUpdated,
 }) {
   const [assignHovered, setAssignHovered] = useState(false);
 
   return (
     <div
-      ref={dropdownRef} // 👈 Attach ref to the wrapper
+      ref={dropdownRef}
       className="absolute z-50 bg-white rounded-xl shadow-xl w-48 overflow-visible -right-4 top-full mt-1 animate-fadeIn"
     >
       <div className="py-1 relative">
-        {/* Call */}
-        <a
-          href={`tel:${leadData.phoneNo}`}
-          className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition"
-        >
-          <FaPhone className="text-blue-500 mr-3" />
-          Call
-        </a>
+
 
         {/* Follow Up */}
         <button
@@ -77,7 +75,7 @@ export default function DropdownActions({
           {assignHovered && (
             <div className="absolute right-full top-0 ml-2 w-40 bg-white border rounded-lg shadow-lg z-50 p-2 animate-fadeIn">
               {Object.values(users)
-                .filter((user) => user.department === "Sales") // ✅ Filter by department
+                .filter((user) => user.department === "Sales")
                 .map((user) => (
                   <button
                     key={user.uid}
@@ -105,55 +103,59 @@ export default function DropdownActions({
             </div>
           )}
         </div>
-
         {/* Phase Change */}
         <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
           Move to
         </div>
-        {["hot", "warm", "cold", "closed"]
+        {["hot", "warm", "cold"] // removed "closed"
           .filter((phase) => phase !== activeTab)
           .map((phase) => (
             <button
               key={phase}
               className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition"
               onClick={async () => {
-                await updateLeadPhase(leadId, phase);
+                const isFromHotToWarmOrCold =
+                  leadData.phase === "hot" &&
+                  (phase === "warm" || phase === "cold");
+
+                if (isFromHotToWarmOrCold) {
+                  setLeadBeingUpdated({ ...leadData, id: leadId });
+                  setPendingPhaseChange(phase);
+                  setShowExpectedDateModal(true);
+                } else {
+                  await updateLeadPhase(leadId, phase);
+                }
+
                 closeDropdown();
               }}
             >
               <FaArrowRight
-                className={`${
-                  phase === "hot"
+                className={`${phase === "hot"
                     ? "text-red-500"
                     : phase === "warm"
-                    ? "text-amber-500"
-                    : phase === "cold"
-                    ? "text-emerald-500"
-                    : "text-blue-500"
-                } mr-3`}
+                      ? "text-amber-500"
+                      : "text-emerald-500"
+                  } mr-3`}
               />
               {phase.charAt(0).toUpperCase() + phase.slice(1)}
             </button>
           ))}
 
-        {/* Closure: Opens TrainingForm */}
-        <button
-  className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-t border-gray-100 mt-1 transition"
-  onClick={() => {
-    // Set the selected lead to pass data into TrainingForm
-    setSelectedLead({ ...leadData, id: leadId });
 
-    // Show the TrainingForm modal
-    setShowClosureModal(true);
-
-    // Close the dropdown
-    closeDropdown();
-  }}
->
-  <FaCheckCircle className="text-green-500 mr-3" />
-  Closure
-</button>
-
+        {/* Closure - only show if lead is in 'hot' phase */}
+        {leadData.phase === "hot" && (
+          <button
+            className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-t border-gray-100 mt-1 transition"
+            onClick={() => {
+              setSelectedLead({ ...leadData, id: leadId });
+              setShowClosureModal(true);
+              closeDropdown();
+            }}
+          >
+            <FaCheckCircle className="text-green-500 mr-3" />
+            Closure
+          </button>
+        )}
       </div>
     </div>
   );

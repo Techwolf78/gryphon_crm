@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { FiX, FiInfo } from "react-icons/fi";
 
 function LeadDetailsModal({ show, onClose, lead, onSave }) {
-  // All expected lead fields with default values, including expectedClosureDate
   const defaultLeadFields = {
     businessName: "",
     city: "",
@@ -11,11 +10,23 @@ function LeadDetailsModal({ show, onClose, lead, onSave }) {
     email: "",
     createdAt: "",
     phase: "",
-    expectedClosureDate: "", // Added this field
+    expectedClosureDate: "",
+  };
+
+  // Function to determine phase based on expectedClosureDate
+  const getLeadPhase = (expectedDateInput) => {
+    if (!expectedDateInput) return "hot";
+    const now = new Date();
+    const expectedDate = new Date(expectedDateInput);
+    const diffInDays = Math.ceil((expectedDate - now) / (1000 * 60 * 60 * 24));
+    if (diffInDays > 45) return "cold";
+    if (diffInDays > 30) return "warm";
+    return "hot";
   };
 
   const [formData, setFormData] = useState(defaultLeadFields);
 
+  // When lead prop changes, update formData state
   useEffect(() => {
     if (lead) {
       setFormData({ ...defaultLeadFields, ...lead });
@@ -24,8 +35,8 @@ function LeadDetailsModal({ show, onClose, lead, onSave }) {
 
   if (!show || !lead) return null;
 
-  // Optional display names for nicer labels
-  const customLabels = {
+  // Labels for fields (can adjust for UI)
+  const labels = {
     businessName: "College Name",
     city: "City",
     pocName: "Contact Name",
@@ -33,48 +44,54 @@ function LeadDetailsModal({ show, onClose, lead, onSave }) {
     email: "Email ID",
     createdAt: "Opened Date",
     phase: "Phase",
-    expectedClosureDate: "Expected Closure Date", // Label for new field
+    expectedClosureDate: "Expected Closure Date",
   };
 
-  // Format timestamp or ISO string to YYYY-MM-DD for date input
+  // Convert timestamp or string to yyyy-mm-dd for date input
   const formatDateForInput = (value) => {
     if (!value) return "";
     let timestamp = value;
+
     if (typeof value === "string" && !isNaN(Date.parse(value))) {
-      // If ISO string
-      const d = new Date(value);
-      timestamp = d.getTime();
+      timestamp = new Date(value).getTime();
     } else if (typeof value === "string") {
-      // maybe numeric string
       timestamp = parseInt(value);
     }
 
-    try {
-      const date = new Date(timestamp);
-      if (isNaN(date.getTime())) return "";
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      return `${year}-${month}-${day}`;
-    } catch {
-      return "";
-    }
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return "";
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
   };
 
-  // Handle input changes
+  // Handle input changes in form
   const handleChange = (key, value) => {
-    // For date fields, convert to timestamp for storage
+    let updatedData = { ...formData };
+
     if (key === "createdAt" || key === "expectedClosureDate") {
       const date = new Date(value);
       if (!isNaN(date.getTime())) {
-        setFormData((prev) => ({ ...prev, [key]: date.getTime() }));
+        updatedData[key] = date.getTime();
+
+        // Update phase automatically when expectedClosureDate changes
+        if (key === "expectedClosureDate") {
+          updatedData.phase = getLeadPhase(date);
+        }
+
+        setFormData(updatedData);
         return;
       }
     }
-    setFormData((prev) => ({ ...prev, [key]: value }));
+
+    updatedData[key] = value;
+    setFormData(updatedData);
   };
 
-  // On save, send updated data (timestamps for dates)
+  // Save handler sends data with timestamps for dates
   const handleSave = () => {
     const updatedData = {
       ...formData,
@@ -87,9 +104,11 @@ function LeadDetailsModal({ show, onClose, lead, onSave }) {
           ? new Date(formData.expectedClosureDate).getTime()
           : formData.expectedClosureDate,
     };
+
     onSave(updatedData);
   };
 
+  // Keys we want editable in the modal
   const editableKeys = Object.keys(defaultLeadFields);
 
   return (
@@ -107,22 +126,21 @@ function LeadDetailsModal({ show, onClose, lead, onSave }) {
             </p>
           </div>
           <button
-            className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
             onClick={onClose}
+            className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
             aria-label="Close modal"
           >
             <FiX className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Content */}
+        {/* Body/Form */}
         <div className="overflow-y-auto p-6 flex-1">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {editableKeys.map((key) => {
-              const label =
-                customLabels[key] ||
-                key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+              const label = labels[key] || key;
 
+              // Date inputs for createdAt and expectedClosureDate
               if (key === "createdAt" || key === "expectedClosureDate") {
                 return (
                   <div
@@ -142,6 +160,7 @@ function LeadDetailsModal({ show, onClose, lead, onSave }) {
                 );
               }
 
+              // For all other text inputs
               return (
                 <div
                   key={key}
@@ -165,14 +184,14 @@ function LeadDetailsModal({ show, onClose, lead, onSave }) {
         {/* Footer */}
         <div className="border-t border-gray-200 bg-white p-4 flex-shrink-0 flex justify-end gap-3">
           <button
-            className="px-4 py-2 text-sm sm:text-base text-gray-600 hover:text-gray-800 font-medium rounded-lg transition-colors"
             onClick={onClose}
+            className="px-4 py-2 text-sm sm:text-base text-gray-600 hover:text-gray-800 font-medium rounded-lg transition-colors"
           >
             Cancel
           </button>
           <button
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm sm:text-base font-medium rounded-lg transition-colors"
             onClick={handleSave}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm sm:text-base font-medium rounded-lg transition-colors"
           >
             Save
           </button>
