@@ -18,8 +18,8 @@ import emailjs from "@emailjs/browser";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-const departments = ["Sales", "Placement", "L & D", "DM"];
-const roles = ["User", "Head", "Executive", "Manager", "Assistant Manager"];
+const departments = ["Sales", "Placement", "L & D", "DM", "Admin"];
+const roles = ["Director", "Head", "Manager", "Assistant Manager", "Executive"];
 
 const NewUser = ({ onUserAdded }) => {
   const [showForm, setShowForm] = useState(false);
@@ -84,29 +84,29 @@ const NewUser = ({ onUserAdded }) => {
       );
       await updateProfile(userCredential.user, { displayName: name });
 
-// Inside handleSubmit in NewUser.jsx
-await addDoc(collection(db, "users"), {
-  uid: userCredential.user.uid,
-  name,
-  email,
-  role,       // Save role (from your form)
-  department, // Save department (from your form)
-  createdAt: serverTimestamp(),
-});
+      // Inside handleSubmit in NewUser.jsx
+      await addDoc(collection(db, "users"), {
+        uid: userCredential.user.uid,
+        name,
+        email,
+        role, // Save role (from your form)
+        department, // Save department (from your form)
+        createdAt: serverTimestamp(),
+      });
 
       try {
         await emailjs.send(
-        "service_pskknsn",
-        "template_hu6vhxf",
-        {
-          name,
-          email,
-          password,
-          role,
-          department,
-        },
-        "zEVWxxT-QvGIrhvTV"
-      );
+          "service_pskknsn",
+          "template_hu6vhxf",
+          {
+            name,
+            email,
+            password,
+            role,
+            department,
+          },
+          "zEVWxxT-QvGIrhvTV"
+        );
       } catch (emailErr) {
         console.error("EmailJS Error:", emailErr);
         toast.warning("User added, but email not sent.");
@@ -252,9 +252,7 @@ await addDoc(collection(db, "users"), {
           </div>
 
           {/* Error */}
-          {error && (
-            <p className="text-red-500 text-sm font-medium">{error}</p>
-          )}
+          {error && <p className="text-red-500 text-sm font-medium">{error}</p>}
 
           {/* Action Buttons */}
           <div className="flex justify-end space-x-3 pt-4">

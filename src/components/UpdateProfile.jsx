@@ -1,7 +1,7 @@
 import React, { useContext, useState, useEffect, useRef } from 'react';
 import { AuthContext } from '../context/AuthContext';
-import { get, set, ref } from 'firebase/database';
-import { realtimeDb } from '../firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 import { toast } from 'react-toastify';
 import {
   FaCloudUploadAlt,
@@ -38,9 +38,10 @@ export default function UpdateProfile({ onClose }) {
     if (user) {
       const fetchImage = async () => {
         try {
-          const snapshot = await get(ref(realtimeDb, `users/${user.uid}`));
-          if (snapshot.exists()) {
-            const data = snapshot.val();
+          const docRef = doc(db, 'users', user.uid);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
             if (data.photoURL) {
               setCurrentImage(data.photoURL);
               setSelectedImage(data.photoURL);
@@ -107,9 +108,11 @@ export default function UpdateProfile({ onClose }) {
     if (!user || !selectedImage || selectedImage === currentImage) return;
 
     try {
-      await set(ref(realtimeDb, `users/${user.uid}`), {
-        photoURL: selectedImage,
-      });
+      await setDoc(
+        doc(db, 'users', user.uid),
+        { photoURL: selectedImage },
+        { merge: true }
+      );
       setPhotoURL(selectedImage);
       setCurrentImage(selectedImage);
       toast.success('Profile updated successfully!');

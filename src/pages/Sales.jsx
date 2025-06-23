@@ -1,30 +1,27 @@
 // Sales.jsx
 import React, { useState, useEffect, useRef } from "react";
-// Add to your existing import statements
-import { FaEdit } from "react-icons/fa";
-import {
-  FaEllipsisV,
-  FaPhone,
-  FaCalendarCheck,
-  FaArrowRight,
-  FaCheckCircle,
-} from "react-icons/fa";
+import { FaEllipsisV } from "react-icons/fa";
 import { FaTimes } from "react-icons/fa";
-import { ref, onValue, update } from "firebase/database";
-import { realtimeDb } from "../firebase";
+import { collection, doc, onSnapshot, updateDoc } from "firebase/firestore";
+import { db } from "../firebase";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+import FollowupAlerts from "../components/Sales/FollowupAlerts";
 import AddCollegeModal from "../components/Sales/AddCollege";
 import FollowUp from "../components/Sales/Followup";
 // import ClosureFormModal from "../components/Sales/ClosureFormModal"; // Import the closure modal
 import TrainingForm from "../components/Sales/ClosureForm/TrainingForm";
 import LeadDetailsModal from "../components/Sales/LeadDetailsModal";
 import DropdownActions from "../components/Sales/DropdownAction";
+import ClosedLeads from "../components/Sales/ClosedLeads";
+// Updated tabLabels
 const tabLabels = {
   hot: "Hot",
   warm: "Warm",
   cold: "Cold",
-  renewal: "Renewal",
+  closed: "Closed", // Changed from renewal to closed
 };
 
+// Updated color scheme
 const tabColorMap = {
   hot: {
     active: "bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg",
@@ -36,34 +33,34 @@ const tabColorMap = {
       "bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200",
   },
   cold: {
-    active:
-      "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg",
+    active: "bg-gradient-to-r from-cyan-400 to-cyan-500 text-white shadow-lg", // Changed to icy blue
     inactive:
-      "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200",
+      "bg-cyan-50 text-cyan-600 hover:bg-cyan-100 border border-cyan-200", // Changed to icy blue
   },
-  renewal: {
-    active: "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg",
+  closed: {
+    active: "bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg", // Changed to success green
     inactive:
-      "bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200",
+      "bg-green-50 text-green-600 hover:bg-green-100 border border-green-200", // Changed to success green
   },
 };
 
 const borderColorMap = {
   hot: "border-l-4 border-red-500",
   warm: "border-l-4 border-amber-400",
-  cold: "border-l-4 border-emerald-500",
-  renewal: "border-l-4 border-blue-500",
+  cold: "border-l-4 border-cyan-400", // Changed to icy blue
+  closed: "border-l-4 border-green-500", // Changed to success green
 };
 
 const headerColorMap = {
   hot: "bg-red-50 text-red-800 border-b border-red-200",
   warm: "bg-amber-50 text-amber-800 border-b border-amber-200",
-  cold: "bg-emerald-50 text-emerald-800 border-b border-emerald-200",
-  renewal: "bg-blue-50 text-blue-800 border-b border-blue-200",
+  cold: "bg-cyan-50 text-cyan-800 border-b border-cyan-200", // Changed to icy blue
+  closed: "bg-green-50 text-green-800 border-b border-green-200", // Changed to success green
 };
 
 function Sales() {
   const [activeTab, setActiveTab] = useState("hot");
+  const [users, setUsers] = useState({});
   const [dropdownOpenId, setDropdownOpenId] = useState(null);
   const dropdownRef = useRef(null);
   const [showModal, setShowModal] = useState(false);
@@ -71,26 +68,96 @@ function Sales() {
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
   const [leads, setLeads] = useState({});
-  const [followups, setFollowups] = useState({});
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [viewMyLeadsOnly, setViewMyLeadsOnly] = useState(true); // Default to true now
+  const [todayFollowUps, setTodayFollowUps] = useState([]);
+  const [showTodayFollowUpAlert, setShowTodayFollowUpAlert] = useState(false);
+  const [reminderPopup, setReminderPopup] = useState(null); // For 15 min reminders
+  const remindedLeadsRef = useRef(new Set());
+
+  const computePhaseCounts = () => {
+    const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
+    const counts = {
+      hot: 0,
+      warm: 0,
+      cold: 0,
+      closed: 0, // Changed from renewal to closed
+    };
+
+    if (!user) return counts;
+
+    const isSalesDept = user.department === "Sales";
+    const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
+    const isLowerRole = ["Assistant Manager", "Executive"].includes(user.role);
+
+    Object.values(leads).forEach((lead) => {
+      const phase = lead.phase || "hot";
+      const isOwnLead = lead.assignedTo?.uid === currentUser?.uid;
+
+      const shouldInclude =
+        isSalesDept && isHigherRole
+          ? viewMyLeadsOnly
+            ? isOwnLead
+            : true
+          : isSalesDept && isLowerRole
+          ? isOwnLead
+          : false;
+
+      if (shouldInclude && counts[phase] !== undefined) {
+        counts[phase]++;
+      }
+    });
+
+    return counts;
+  };
+
+  const phaseCounts = computePhaseCounts();
 
   useEffect(() => {
-    const leadsRef = ref(realtimeDb, "leads");
-    const unsubLeads = onValue(leadsRef, (snapshot) => {
-      const data = snapshot.val() || {};
+    const auth = getAuth();
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setCurrentUser(user);
+        // Check user role and set viewMyLeadsOnly accordingly
+        const userData = Object.values(users).find((u) => u.uid === user.uid);
+        if (userData) {
+          const isHigherRole = ["Director", "Head", "Manager"].includes(
+            userData.role
+          );
+          // For higher roles, default to "My Leads" view
+          setViewMyLeadsOnly(isHigherRole);
+        }
+      } else {
+        setCurrentUser(null);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [users]); // Add users as dependency
+
+  useEffect(() => {
+    const unsubLeads = onSnapshot(collection(db, "leads"), (snapshot) => {
+      const data = {};
+      snapshot.forEach((doc) => {
+        data[doc.id] = { id: doc.id, ...doc.data() };
+      });
       setLeads(data);
       setLoading(false);
     });
 
-    const followRef = ref(realtimeDb, "Followup");
-    const unsubF = onValue(followRef, (snapshot) => {
-      setFollowups(snapshot.val() || {});
+    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+      const data = {};
+      snapshot.forEach((doc) => {
+        data[doc.id] = { id: doc.id, ...doc.data() };
+      });
+      setUsers(data);
     });
 
     return () => {
       unsubLeads();
-      unsubF();
+      unsubUsers();
     };
   }, []);
 
@@ -111,9 +178,8 @@ function Sales() {
   };
 
   const updateLeadPhase = async (id, newPhase) => {
-    const leadRef = ref(realtimeDb, `leads/${id}`);
     try {
-      await update(leadRef, { phase: newPhase });
+      await updateDoc(doc(db, "leads", id), { phase: newPhase });
     } catch (err) {
       console.error("Phase update failed", err);
     }
@@ -124,23 +190,21 @@ function Sales() {
     if (!updatedLead?.id) return;
 
     // Convert date string back to timestamp if it exists
-    if (updatedLead.createdAt && typeof updatedLead.createdAt === 'string') {
+    if (updatedLead.createdAt && typeof updatedLead.createdAt === "string") {
       updatedLead.createdAt = new Date(updatedLead.createdAt).getTime();
     }
 
-    const leadRef = ref(realtimeDb, `leads/${updatedLead.id}`);
-
-    const { id, ...dataToUpdate } = updatedLead;
+    const { ...dataToUpdate } = updatedLead;
 
     try {
-      await update(leadRef, dataToUpdate);
+      await updateDoc(doc(db, "leads", updatedLead.id), dataToUpdate);
+
       setShowDetailsModal(false);
       setSelectedLead(null);
     } catch (error) {
       console.error("Failed to update lead", error);
     }
   };
-
 
   const getLatestFollowup = (lead) => {
     const followData = lead.followup || {};
@@ -149,8 +213,9 @@ function Sales() {
     );
     if (entries.length === 0) return "-";
     const latest = entries[entries.length - 1][1];
-    return `${latest.date || "-"} ${latest.time || ""} - ${latest.remarks || ""
-      }`;
+    return `${latest.date || "-"} ${latest.time || ""} - ${
+      latest.remarks || ""
+    }`;
   };
 
   const formatDate = (ms) =>
@@ -160,12 +225,126 @@ function Sales() {
       day: "numeric",
     });
 
-  const filteredLeads = Object.entries(leads).filter(
-    ([, lead]) => (lead.phase || "hot") === activeTab
-  );
+  const filteredLeads = Object.entries(leads).filter(([, lead]) => {
+    const phaseMatch = (lead.phase || "hot") === activeTab;
+    const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
+    if (!user) return false;
+
+    const isSalesDept = user.department === "Sales";
+    const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
+    const isLowerRole = ["Assistant Manager", "Executive"].includes(user.role);
+
+    if (isSalesDept && isHigherRole) {
+      return viewMyLeadsOnly
+        ? phaseMatch && lead.assignedTo?.uid === currentUser?.uid
+        : phaseMatch;
+    }
+
+    if (isSalesDept && isLowerRole) {
+      return phaseMatch && lead.assignedTo?.uid === currentUser?.uid;
+    }
+
+    return false;
+  });
 
   // Define the grid columns based on the fields we want to display
-  const gridColumns = "grid grid-cols-8 gap-4";
+  const gridColumns = "grid grid-cols-10 gap-4";
+
+  useEffect(() => {
+    if (!loading && Object.keys(leads).length > 0) {
+      const now = new Date();
+      const todayStr = now.toISOString().split("T")[0];
+
+      const matchingLeads = Object.values(leads).filter((lead) => {
+        if (lead.assignedTo?.uid !== currentUser?.uid) return false;
+        if ((lead.phase || "hot") !== "hot") return false;
+        if (!lead.followup) return false;
+
+        const followupEntries = Object.values(lead.followup);
+        if (followupEntries.length === 0) return false;
+
+        const sortedFollowups = followupEntries.sort(
+          (a, b) => b.timestamp - a.timestamp
+        );
+        const latest = sortedFollowups[0];
+        if (latest.date !== todayStr) return false;
+
+        const followUpDateTime = new Date(
+          `${latest.date}T${convertTo24HrTime(latest.time)}`
+        );
+        return followUpDateTime > now;
+      });
+
+      if (matchingLeads.length > 0) {
+        setTodayFollowUps(matchingLeads);
+        setShowTodayFollowUpAlert(true);
+
+        // ✅ Automatically hide after 4 seconds
+        const timer = setTimeout(() => {
+          setShowTodayFollowUpAlert(false);
+        }, 4000);
+
+        return () => clearTimeout(timer); // Cleanup
+      }
+    }
+  }, [leads, loading, currentUser?.uid]);
+  // Fix: include currentUser?.uid as dependency
+  function convertTo24HrTime(timeStr) {
+    if (!timeStr) return "00:00:00";
+    const [time, modifier] = timeStr.split(" ");
+    let [hours, minutes] = time.split(":").map(Number);
+
+    if (modifier === "PM" && hours !== 12) hours += 12;
+    if (modifier === "AM" && hours === 12) hours = 0;
+
+    return `${hours.toString().padStart(2, "0")}:${minutes
+      .toString()
+      .padStart(2, "0")}:00`;
+  }
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date();
+
+      const upcomingReminder = Object.values(leads).find((lead) => {
+        if (lead.assignedTo?.uid !== currentUser?.uid) return false;
+        if ((lead.phase || "hot") !== "hot") return false;
+        if (!lead.followup) return false;
+
+        const entries = Object.values(lead.followup);
+        if (entries.length === 0) return false;
+
+        const latest = entries.sort((a, b) => b.timestamp - a.timestamp)[0];
+        const followUpTime = new Date(
+          `${latest.date}T${convertTo24HrTime(latest.time)}`
+        );
+        const reminderTime = new Date(followUpTime.getTime() - 15 * 60 * 1000);
+
+        const isToday =
+          latest.date === now.toISOString().split("T")[0] &&
+          reminderTime <= now &&
+          followUpTime > now;
+
+        const alreadyReminded = remindedLeadsRef.current.has(lead.id);
+
+        return isToday && !alreadyReminded;
+      });
+
+      if (upcomingReminder) {
+        remindedLeadsRef.current.add(upcomingReminder.id); // ✅ Track shown reminders
+
+        setReminderPopup({
+          leadId: upcomingReminder.id,
+          college: upcomingReminder.businessName,
+          time: Object.values(upcomingReminder.followup).sort(
+            (a, b) => b.timestamp - a.timestamp
+          )[0].time,
+        });
+      }
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, [leads, currentUser]);
 
   return (
     <div className="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen font-sans ">
@@ -178,6 +357,60 @@ function Sales() {
             <p className="text-gray-600 mt-1">
               Manage your leads and follow-ups
             </p>
+
+            {currentUser &&
+              (() => {
+                const role = Object.values(users).find(
+                  (u) => u.uid === currentUser.uid
+                )?.role;
+                const isHigherRole = ["Director", "Head", "Manager"].includes(
+                  role
+                );
+
+                return (
+                  <div className="flex items-center gap-2 mt-2">
+                    <p
+                      className={`text-xs font-medium px-3 py-1 rounded-full ${
+                        isHigherRole
+                          ? "bg-green-100 text-green-700"
+                          : "bg-blue-100 text-blue-700"
+                      }`}
+                    >
+                      Viewing:{" "}
+                      {isHigherRole
+                        ? viewMyLeadsOnly
+                          ? "My Leads Only"
+                          : "All Sales Leads"
+                        : "My Leads Only"}
+                    </p>
+
+                    {isHigherRole && (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setViewMyLeadsOnly(true)}
+                          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${
+                            viewMyLeadsOnly
+                              ? "bg-blue-600 text-white border-blue-600"
+                              : "bg-white text-blue-600 border-blue-300"
+                          }`}
+                        >
+                          My Leads
+                        </button>
+                        <button
+                          onClick={() => setViewMyLeadsOnly(false)}
+                          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${
+                            !viewMyLeadsOnly
+                              ? "bg-blue-600 text-white border-blue-600"
+                              : "bg-white text-blue-600 border-blue-300"
+                          }`}
+                        >
+                          My Team
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
           </div>
           <button
             onClick={() => setShowModal(true)}
@@ -204,23 +437,28 @@ function Sales() {
             <button
               key={key}
               onClick={() => setActiveTab(key)}
-              className={`py-3.5 rounded-xl text-sm font-semibold transition-all duration-300 ease-out transform hover:scale-[1.02] ${activeTab === key
+              className={`py-3.5 rounded-xl text-sm font-semibold transition-all duration-300 ease-out transform hover:scale-[1.02] ${
+                activeTab === key
                   ? tabColorMap[key].active
                   : tabColorMap[key].inactive
-                } ${activeTab === key ? "ring-2 ring-offset-2 ring-opacity-50" : ""
-                } ${activeTab === key
+              } ${
+                activeTab === key ? "ring-2 ring-offset-2 ring-opacity-50" : ""
+              } ${
+                activeTab === key
                   ? key === "hot"
                     ? "ring-red-500"
                     : key === "warm"
-                      ? "ring-amber-400"
-                      : key === "cold"
-                        ? "ring-emerald-500"
-                        : "ring-blue-500"
+                    ? "ring-amber-400"
+                    : key === "cold"
+                    ? "ring-cyan-400" // Changed to icy blue
+                    : "ring-green-500" // Changed to success green
                   : ""
-                }
-`}
+              }`}
             >
-              {tabLabels[key]}
+              {tabLabels[key]}{" "}
+              <span className="ml-1 text-xs font-bold">
+                ({phaseCounts[key]})
+              </span>
             </button>
           ))}
         </div>
@@ -229,19 +467,19 @@ function Sales() {
           <div className="w-auto space-y-3">
             {/* Grid Header */}
 
-            <div
-              className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-4 rounded-xl mb-3`}
-            >
-              {/* header columns */}
-              <div className="font-semibold">College Name</div>
-              <div className="font-semibold">City</div>
-              <div className="font-semibold">Contact Name</div>
-              <div className="font-semibold">Phone No.</div>
-              <div className="font-semibold">Email ID</div>
-              <div className="font-semibold">Opened Date</div>
-              <div className="font-semibold">Follow-Ups</div>
-              <div className="font-semibold text-center">Actions</div>
-            </div>
+          <div className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-4 rounded-xl mb-3`}>
+  <div className="font-semibold">College Name</div>
+  <div className="font-semibold">City</div>
+  <div className="font-semibold">Contact Name</div>
+  <div className="font-semibold">Phone No.</div>
+  <div className="font-semibold">Email ID</div>
+  <div className="font-semibold">Opened Date</div>
+  <div className="font-semibold">Expected Closure</div> {/* 👈 New column */}
+  <div className="font-semibold">Follow-Ups</div>
+  <div className="font-semibold">Assigned To</div>
+  <div className="font-semibold text-center">Actions</div>
+</div>
+
 
             {/* Grid Rows */}
             <div className="space-y-3">
@@ -249,6 +487,8 @@ function Sales() {
                 <div className="flex justify-center items-center h-64">
                   <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
                 </div>
+              ) : activeTab === "closed" ? (
+                <ClosedLeads leads={leads} users={users} />
               ) : filteredLeads.length === 0 ? (
                 <div className="bg-white rounded-xl p-8 text-center border-2 border-dashed border-gray-200">
                   <svg
@@ -286,25 +526,31 @@ function Sales() {
                       className={`${gridColumns} gap-4 p-5 rounded-xl bg-white shadow-sm hover:shadow-md transition-all duration-300 ${borderColorMap[activeTab]}`}
                     >
                       {[
-                        "businessName",
-                        "city",
-                        "pocName",
-                        "phoneNo",
-                        "email",
-                        "createdAt",
-                      ].map((field, i) => (
-                        <div
-                          key={i}
-                          className="break-words whitespace-normal text-sm text-gray-700 min-w-0"
-                        >
-                          {field === "createdAt"
-                            ? formatDate(lead[field])
-                            : lead[field] || "-"}
-                        </div>
-                      ))}
-
+  "businessName",
+  "city",
+  "pocName",
+  "phoneNo",
+  "email",
+  "createdAt",
+  "expectedClosureDate", // 👈 Add this field
+].map((field, i) => (
+  <div key={i} className="break-words whitespace-normal text-sm text-gray-700 min-w-0">
+    {field === "createdAt" || field === "expectedClosure"
+      ? lead[field]
+        ? formatDate(lead[field])
+        : "-"
+      : lead[field] || "-"}
+  </div>
+))
+}
                       <div className="break-words whitespace-normal text-sm text-gray-700 min-w-0">
                         {getLatestFollowup(lead)}
+                      </div>
+                      <div className="break-words whitespace-normal text-sm text-gray-700 min-w-0">
+                        {lead.assignedTo?.uid &&
+                        users[lead.assignedTo.uid]?.name
+                          ? users[lead.assignedTo.uid].name
+                          : lead.assignedTo?.name || "-"}
                       </div>
 
                       <div className="flex justify-center items-center">
@@ -313,10 +559,11 @@ function Sales() {
                             e.stopPropagation();
                             toggleDropdown(id, e);
                           }}
-                          className={`text-gray-500 hover:text-gray-700 focus:outline-none transition p-2 rounded-full hover:bg-gray-100 ${dropdownOpenId === id
+                          className={`text-gray-500 hover:text-gray-700 focus:outline-none transition p-2 rounded-full hover:bg-gray-100 ${
+                            dropdownOpenId === id
                               ? "bg-gray-200 text-gray-900 shadow-inner"
                               : ""
-                            }`}
+                          }`}
                           aria-expanded={dropdownOpenId === id}
                           aria-haspopup="true"
                           aria-label={
@@ -350,10 +597,10 @@ function Sales() {
                         setShowClosureModal={setShowClosureModal}
                         updateLeadPhase={updateLeadPhase}
                         activeTab={activeTab}
+                        dropdownRef={dropdownRef}
+                        users={users} // ✅ Pass users here
                       />
-
                     )}
-
                   </div>
                 ))
               )}
@@ -400,7 +647,41 @@ function Sales() {
         .animate-fadeIn {
           animation: fadeIn 0.2s ease-out;
         }
+        
       `}</style>
+
+      <FollowupAlerts
+        todayFollowUps={todayFollowUps}
+        showTodayFollowUpAlert={showTodayFollowUpAlert}
+        setShowTodayFollowUpAlert={setShowTodayFollowUpAlert}
+        reminderPopup={reminderPopup}
+        setReminderPopup={setReminderPopup}
+      />
+
+      <style>{`
+  @keyframes slideInRight {
+    0% {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    15% {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    85% {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+  }
+
+  .animate-slideInRight {
+    animation: slideInRight 4s ease-in-out forwards;
+  }
+`}</style>
     </div>
   );
 }

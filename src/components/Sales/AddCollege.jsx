@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import stateCityData from "../Sales/stateCityData";
-import { auth, realtimeDb } from "../../firebase";
-import { ref, push } from "firebase/database";
+import { auth, db } from "../../firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 function AddCollegeModal({ show, onClose }) {
   const [businessName, setBusinessName] = useState("");
@@ -11,7 +11,11 @@ function AddCollegeModal({ show, onClose }) {
   const [email, setEmail] = useState("");
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
-  const [phase, setPhase] = useState("");
+
+  const [expectedClosureDate, setExpectedClosureDate] = useState("");
+
+  // Fixed phase to 'cold'
+  const phase = "cold";
 
   const handleClose = () => {
     setBusinessName("");
@@ -21,7 +25,7 @@ function AddCollegeModal({ show, onClose }) {
     setEmail("");
     setState("");
     setCity("");
-    setPhase("");
+    setExpectedClosureDate("");
     onClose();
   };
 
@@ -41,15 +45,21 @@ function AddCollegeModal({ show, onClose }) {
       email,
       state,
       city,
-      phase,
-      createdBy: user.uid,
+      phase, // fixed to cold
+      expectedClosureDate: expectedClosureDate || null,
+      assignedTo: {
+        uid: user.uid,
+        name: user.displayName?.trim() || "No Name Provided",
+        email: user.email || "No Email Provided",
+      },
       createdAt: timestamp,
       lastUpdatedBy: user.uid,
       lastUpdatedAt: timestamp,
+      firestoreTimestamp: serverTimestamp(),
     };
 
     try {
-      await push(ref(realtimeDb, "leads"), newLead);
+      await addDoc(collection(db, "leads"), newLead);
       alert("Lead added successfully.");
       handleClose();
     } catch (error) {
@@ -63,8 +73,7 @@ function AddCollegeModal({ show, onClose }) {
     pocName.trim() &&
     phoneNo.trim() &&
     state &&
-    city &&
-    phase;
+    city;
 
   if (!show) return null;
 
@@ -83,8 +92,8 @@ function AddCollegeModal({ show, onClose }) {
               type="text"
               value={businessName}
               onChange={(e) => setBusinessName(e.target.value)}
-              placeholder="e.g. Acme Corp"
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-600"
+              placeholder="e.g. Acme College"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
             />
           </div>
 
@@ -135,8 +144,8 @@ function AddCollegeModal({ show, onClose }) {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="e.g. contact@business.com"
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-600"
+              placeholder="e.g. contact@college.com"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
             />
           </div>
 
@@ -162,42 +171,53 @@ function AddCollegeModal({ show, onClose }) {
             </select>
           </div>
 
-          {/* City */}
+
+          {/* City Dropdown */}
+          {state && (
+            <div>
+              <label className="block text-sm font-semibold text-gray-600 mb-2">
+                City<span className="text-red-500">*</span>
+              </label>
+              <select
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
+              >
+                <option value="">Select City</option>
+                {stateCityData[state].map((ct) => (
+                  <option key={ct} value={ct}>
+                    {ct}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Phase (fixed to 'cold') */}
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-1 block">
-              City<span className="text-red-500">*</span>
+            <label className="block text-sm font-semibold text-gray-600 mb-2">
+              Phase
             </label>
-            <select
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-600"
-            >
-              <option value="">Select City</option>
-              {state && stateCityData[state]?.map((ct) => (
-                <option key={ct} value={ct}>
-                  {ct}
-                </option>
-              ))}
-            </select>
+            <input
+              type="text"
+              value="cold"
+              disabled
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
+            />
           </div>
 
-          {/* Phase */}
-          <div className="col-span-1 md:col-span-2">
-            <label className="text-sm font-medium text-gray-700 mb-1 block">
-              Phase<span className="text-red-500">*</span>
+          {/* Expected Closure Date */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-2">
+              Expected Closure Date
             </label>
-            <select
-              value={phase}
-              onChange={(e) => setPhase(e.target.value)}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-600"
-            >
-              <option value="">Select Phase</option>
-              <option value="cold">Cold</option>
-              <option value="warm">Warm</option>
-              <option value="hot">Hot</option>
-              <option value="closure">Closure</option>
-              <option value="renewal">Renewal</option>
-            </select>
+            <input
+              type="date"
+              value={expectedClosureDate}
+              min={new Date().toISOString().split("T")[0]}
+              onChange={(e) => setExpectedClosureDate(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
+            />
           </div>
         </div>
 

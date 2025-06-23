@@ -1,68 +1,63 @@
-import React, { createContext, useEffect, useState } from 'react';
-import { auth, db, realtimeDb } from '../firebase';
+import React, { createContext, useEffect, useState } from "react";
+import { auth, db } from "../firebase"; // removed realtimeDb import
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut,
-} from 'firebase/auth';
+} from "firebase/auth";
 import {
   addDoc,
   collection,
   serverTimestamp,
-} from 'firebase/firestore';
-
-import { get, ref as dbRef } from 'firebase/database'; // 🔁 Add this
+  query,
+  where,
+  getDocs,
+} from "firebase/firestore";
 
 export const AuthContext = createContext();
 
-const getRoleByEmail = (email) => {
-  const roleMap = {
-    'gryphoncrm@gmail.com': 'admin',
-    'gryphoncrm@gryphonacademy.co.in': 'admin',
-    'nishad@gryphonacademy.co.in': 'sales',
-    'shashikant@gryphonacademy.co.in': 'placement',
-    'neha@gryphonacademy.co.in': 'learning',
-    'nasim@gryphonacademy.co.in': 'marketing',
-  };
-  return roleMap[email.toLowerCase()] || 'guest';
-};
-
 const getUserIP = async () => {
   try {
-    const res = await fetch('https://api.ipify.org?format=json');
+    const res = await fetch("https://api.ipify.org?format=json");
     const data = await res.json();
     return data.ip;
   } catch (err) {
-    return 'N/A';
+    return "N/A";
   }
 };
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [photoURL, setPhotoURL] = useState('');
+  const [photoURL, setPhotoURL] = useState("");
   const [loading, setLoading] = useState(true);
 
+  // Listen to auth state changes and fetch user role from Firestore
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        const role = getRoleByEmail(firebaseUser.email);
-
-        // 🔁 Fetch photoURL from Realtime DB
-        let photo = '';
         try {
-          const snap = await get(dbRef(realtimeDb, `users/${firebaseUser.uid}`));
-          if (snap.exists()) {
-            photo = snap.val().photoURL || '';
-          }
-        } catch (err) {
-          console.error('Error fetching profile photo from RTDB:', err);
-        }
+          const q = query(
+            collection(db, "users"),
+            where("email", "==", firebaseUser.email)
+          );
+          const querySnapshot = await getDocs(q);
 
-        setUser({ ...firebaseUser, role });
-        setPhotoURL(photo);
+          if (!querySnapshot.empty) {
+            const userData = querySnapshot.docs[0].data();
+            setUser({ ...firebaseUser, role: userData.department || "guest" });
+            setPhotoURL(userData.photoURL || "");
+          } else {
+            setUser({ ...firebaseUser, role: "guest" });
+            setPhotoURL("");
+          }
+        } catch (error) {
+          console.error("Error fetching user data by email:", error);
+          setUser({ ...firebaseUser, role: "guest" });
+          setPhotoURL("");
+        }
       } else {
         setUser(null);
-        setPhotoURL('');
+        setPhotoURL("");
       }
       setLoading(false);
     });
@@ -70,40 +65,45 @@ export const AuthProvider = ({ children }) => {
     return () => unsub();
   }, []);
 
+  // Login function fetches user role & logs IP audit to Firestore
   const login = async (email, password) => {
     const userCred = await signInWithEmailAndPassword(auth, email, password);
-    const role = getRoleByEmail(userCred.user.email);
-    setUser({ ...userCred.user, role });
 
-    // 🔁 Fetch photoURL from Realtime DB
-    let photo = '';
     try {
-      const snap = await get(dbRef(realtimeDb, `users/${userCred.user.uid}`));
-      if (snap.exists()) {
-        photo = snap.val().photoURL || '';
+      const q = query(collection(db, "users"), where("email", "==", userCred.user.email));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        const userData = querySnapshot.docs[0].data();
+        setUser({ ...userCred.user, role: userData.department || "guest" });
+        setPhotoURL(userData.photoURL || "");
+      } else {
+        setUser({ ...userCred.user, role: "guest" });
+        setPhotoURL("");
       }
     } catch (err) {
-      console.error('Error fetching profile photo from RTDB (login):', err);
+      console.error("Error fetching department from Firestore (login):", err);
+      setUser({ ...userCred.user, role: "guest" });
+      setPhotoURL("");
     }
 
-    setPhotoURL(photo);
-
-    // Log login to Firestore
+    // Log login IP to Firestore audit_logs
     const ip = await getUserIP();
-    await addDoc(collection(db, 'audit_logs'), {
+    await addDoc(collection(db, "audit_logs"), {
       user: email,
-      action: 'Logged in',
+      action: "Logged in",
       ip,
       date: new Date().toISOString(),
       timestamp: serverTimestamp(),
     });
   };
 
+  // Logout clears user info & local storage
   const logout = async () => {
     await signOut(auth);
     localStorage.clear();
     setUser(null);
-    setPhotoURL('');
+    setPhotoURL("");
   };
 
   return (
@@ -114,7 +114,7 @@ export const AuthProvider = ({ children }) => {
         logout,
         isAuthenticated: !!user,
         photoURL,
-        setPhotoURL, // ✅ still exposed
+        setPhotoURL,
       }}
     >
       {!loading && children}
