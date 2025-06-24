@@ -9,6 +9,17 @@ import TrainingForm from "../components/Sales/ClosureForm/TrainingForm";
 import LeadDetailsModal from "../components/Sales/LeadDetailsModal";
 import ExpectedDateModal from "../components/Sales/ExpectedDateWarning";
 import LeadsTable from "../components/Sales/LeadTable";
+// Add these imports at the top of your Sales.jsx
+import {
+  FiFilter,
+  FiDownload,
+  FiUpload,
+  FiX,
+  FiChevronDown,
+} from "react-icons/fi";
+import { CSVLink } from "react-csv";
+import Papa from "papaparse";
+import LeadFilters from "../components/Sales/LeadFilters"; // Adjust path as needed
 const tabLabels = {
   hot: "Hot",
   warm: "Warm",
@@ -38,8 +49,6 @@ const tabColorMap = {
   },
 };
 
-
-
 function Sales() {
   const [activeTab, setActiveTab] = useState("hot");
   const [users, setUsers] = useState({});
@@ -62,6 +71,19 @@ function Sales() {
   const [pendingPhaseChange, setPendingPhaseChange] = useState(null); // "warm" ya "cold"
   const [leadBeingUpdated, setLeadBeingUpdated] = useState(null); // lead object
   const [expectedDate, setExpectedDate] = useState(""); // date string like "2025-06-25"
+  const [filters, setFilters] = useState({});
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  // Add this function to handle filter changes
+  const handleFilterChange = (newFilters) => {
+    setFilters(newFilters);
+  };
+
+  // Add this function to handle CSV import
+  const handleImportComplete = (importedData) => {
+    // Implement your import logic here
+    console.log("Imported data:", importedData);
+  };
 
   const computePhaseCounts = () => {
     const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
@@ -88,8 +110,8 @@ function Sales() {
             ? isOwnLead
             : true
           : isSalesDept && isLowerRole
-            ? isOwnLead
-            : false;
+          ? isOwnLead
+          : false;
 
       if (shouldInclude && counts[phase] !== undefined) {
         counts[phase]++;
@@ -192,28 +214,24 @@ function Sales() {
     }
   };
 
-  const getLatestFollowup = (lead) => {
-    const followData = lead.followup || {};
-    const entries = Object.entries(followData).sort(
-      (a, b) => a[1].timestamp - b[1].timestamp
-    );
-    if (entries.length === 0) return "-";
-    const latest = entries[entries.length - 1][1];
-    return `${latest.date || "-"} ${latest.time || ""} - ${latest.remarks || ""
-      }`;
-  };
-
-  const formatDate = (ms) =>
-    new Date(ms).toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-
   const filteredLeads = Object.entries(leads).filter(([, lead]) => {
     const phaseMatch = (lead.phase || "hot") === activeTab;
     const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
     if (!user) return false;
+
+    // Apply additional filters
+    const matchesFilters =
+      (!filters.city || lead.city?.includes(filters.city)) &&
+      (!filters.assignedTo || lead.assignedTo?.uid === filters.assignedTo) &&
+      (!filters.dateRange?.start ||
+        lead.createdAt >= new Date(filters.dateRange.start).getTime()) &&
+      (!filters.dateRange?.end ||
+        lead.createdAt <= new Date(filters.dateRange.end).getTime()) &&
+      (!filters.pocName ||
+        lead.pocName?.toLowerCase().includes(filters.pocName.toLowerCase())) &&
+      (!filters.phoneNo || lead.phoneNo?.includes(filters.phoneNo)) &&
+      (!filters.email ||
+        lead.email?.toLowerCase().includes(filters.email.toLowerCase()));
 
     const isSalesDept = user.department === "Sales";
     const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
@@ -221,12 +239,18 @@ function Sales() {
 
     if (isSalesDept && isHigherRole) {
       return viewMyLeadsOnly
-        ? phaseMatch && lead.assignedTo?.uid === currentUser?.uid
-        : phaseMatch;
+        ? phaseMatch &&
+            matchesFilters &&
+            lead.assignedTo?.uid === currentUser?.uid
+        : phaseMatch && matchesFilters;
     }
 
     if (isSalesDept && isLowerRole) {
-      return phaseMatch && lead.assignedTo?.uid === currentUser?.uid;
+      return (
+        phaseMatch &&
+        matchesFilters &&
+        lead.assignedTo?.uid === currentUser?.uid
+      );
     }
 
     return false;
@@ -343,57 +367,86 @@ function Sales() {
               Manage your leads and follow-ups
             </p>
 
-            {currentUser &&
-              (() => {
-                const role = Object.values(users).find(
-                  (u) => u.uid === currentUser.uid
-                )?.role;
-                const isHigherRole = ["Director", "Head", "Manager"].includes(
-                  role
-                );
+            <div className="flex items-center justify-between mt-2">
+              {currentUser &&
+                (() => {
+                  const role = Object.values(users).find(
+                    (u) => u.uid === currentUser.uid
+                  )?.role;
+                  const isHigherRole = ["Director", "Head", "Manager"].includes(
+                    role
+                  );
 
-                return (
-                  <div className="flex items-center gap-2 mt-2">
-                    <p
-                      className={`text-xs font-medium px-3 py-1 rounded-full ${isHigherRole
-                          ? "bg-green-100 text-green-700"
-                          : "bg-blue-100 text-blue-700"
+                  return (
+                    <div className="flex items-center gap-2">
+                      <p
+                        className={`text-xs font-medium px-3 py-1 rounded-full ${
+                          isHigherRole
+                            ? "bg-green-100 text-green-700"
+                            : "bg-blue-100 text-blue-700"
                         }`}
-                    >
-                      Viewing:{" "}
-                      {isHigherRole
-                        ? viewMyLeadsOnly
-                          ? "My Leads Only"
-                          : "All Sales Leads"
-                        : "My Leads Only"}
-                    </p>
+                      >
+                        Viewing:{" "}
+                        {isHigherRole
+                          ? viewMyLeadsOnly
+                            ? "My Leads Only"
+                            : "All Sales Leads"
+                          : "My Leads Only"}
+                      </p>
 
-                    {isHigherRole && (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setViewMyLeadsOnly(true)}
-                          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${viewMyLeadsOnly
-                              ? "bg-blue-600 text-white border-blue-600"
-                              : "bg-white text-blue-600 border-blue-300"
+                      {isHigherRole && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setViewMyLeadsOnly(true)}
+                            className={`text-xs font-medium px-3 py-1 rounded-full border transition ${
+                              viewMyLeadsOnly
+                                ? "bg-blue-600 text-white border-blue-600"
+                                : "bg-white text-blue-600 border-blue-300"
                             }`}
-                        >
-                          My Leads
-                        </button>
-                        <button
-                          onClick={() => setViewMyLeadsOnly(false)}
-                          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${!viewMyLeadsOnly
-                              ? "bg-blue-600 text-white border-blue-600"
-                              : "bg-white text-blue-600 border-blue-300"
+                          >
+                            My Leads
+                          </button>
+                          <button
+                            onClick={() => setViewMyLeadsOnly(false)}
+                            className={`text-xs font-medium px-3 py-1 rounded-full border transition ${
+                              !viewMyLeadsOnly
+                                ? "bg-blue-600 text-white border-blue-600"
+                                : "bg-white text-blue-600 border-blue-300"
                             }`}
-                        >
-                          My Team
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
+                          >
+                            My Team
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+              {/* Move the filter button here */}
+              <button
+                onClick={() => setIsFilterOpen(!isFilterOpen)}
+                className={`flex items-center space-x-2 px-3 py-1 rounded-full border transition-colors text-xs ${
+                  isFilterOpen
+                    ? "bg-blue-50 border-blue-200 text-blue-600"
+                    : "bg-white border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                <FiFilter className="w-4 h-4" />
+                <span>Filters</span>
+                {Object.values(filters).some(
+                  (filter) =>
+                    (typeof filter === "string" && filter) ||
+                    (typeof filter === "object" &&
+                      Object.values(filter).some(Boolean))
+                ) && (
+                  <span className="bg-blue-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
+                    !
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
+
           <button
             onClick={() => setShowModal(true)}
             className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-5 py-2.5 rounded-xl font-semibold hover:opacity-90 transition-all shadow-md flex items-center"
@@ -414,25 +467,38 @@ function Sales() {
           </button>
         </div>
 
+        <LeadFilters
+          leads={leads}
+          users={users}
+          currentUser={currentUser}
+          onFilterChange={handleFilterChange}
+          onImportComplete={handleImportComplete}
+          isFilterOpen={isFilterOpen}
+          setIsFilterOpen={setIsFilterOpen}
+        />
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
           {Object.keys(tabLabels).map((key) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
-              className={`py-3.5 rounded-xl text-sm font-semibold transition-all duration-300 ease-out transform hover:scale-[1.02] ${activeTab === key
+              className={`py-3.5 rounded-xl text-sm font-semibold transition-all duration-300 ease-out transform hover:scale-[1.02] ${
+                activeTab === key
                   ? tabColorMap[key].active
                   : tabColorMap[key].inactive
-                } ${activeTab === key ? "ring-2 ring-offset-2 ring-opacity-50" : ""
-                } ${activeTab === key
+              } ${
+                activeTab === key ? "ring-2 ring-offset-2 ring-opacity-50" : ""
+              } ${
+                activeTab === key
                   ? key === "hot"
                     ? "ring-red-500"
                     : key === "warm"
-                      ? "ring-amber-400"
-                      : key === "cold"
-                        ? "ring-cyan-400" // Changed to icy blue
-                        : "ring-green-500" // Changed to success green
+                    ? "ring-amber-400"
+                    : key === "cold"
+                    ? "ring-cyan-400" // Changed to icy blue
+                    : "ring-green-500" // Changed to success green
                   : ""
-                }`}
+              }`}
             >
               {tabLabels[key]}{" "}
               <span className="ml-1 text-xs font-bold">
@@ -441,6 +507,7 @@ function Sales() {
             </button>
           ))}
         </div>
+
         <LeadsTable
           loading={loading}
           activeTab={activeTab}
@@ -462,23 +529,19 @@ function Sales() {
           headerColorMap={{
             open: "bg-blue-100",
             inProgress: "bg-yellow-100",
-            closed: "bg-gray-100",  // agar zarurat ho to add karo
+            closed: "bg-gray-100", // agar zarurat ho to add karo
           }}
           borderColorMap={{
             open: "border-blue-400",
             inProgress: "border-yellow-400",
-            closed: "border-gray-400",  // agar zarurat ho to add karo
+            closed: "border-gray-400", // agar zarurat ho to add karo
           }}
           setShowModal={setShowModal}
-
           // Add props needed for ClosedLeads
           leads={leads}
           viewMyLeadsOnly={viewMyLeadsOnly}
           currentUser={currentUser}
         />
-
-
-
       </div>
 
       <AddCollegeModal show={showModal} onClose={() => setShowModal(false)} />
