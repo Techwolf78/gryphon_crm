@@ -466,21 +466,23 @@ function Sales() {
           <div className="w-auto space-y-3">
             {/* Grid Header */}
 
-            <div
-              className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-4 rounded-xl mb-3`}
-            >
-              <div className="font-semibold">College Name</div>
-              <div className="font-semibold">City</div>
-              <div className="font-semibold">Contact Name</div>
-              <div className="font-semibold">Phone No.</div>
-              <div className="font-semibold">Email ID</div>
-              <div className="font-semibold">Opened Date</div>
-              <div className="font-semibold">Expected Closure</div>{" "}
-              {/* 👈 New column */}
-              <div className="font-semibold">Follow-Ups</div>
-              <div className="font-semibold">Assigned To</div>
-              <div className="font-semibold text-center">Actions</div>
-            </div>
+          {activeTab !== "closed" && (
+  <div
+    className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-4 rounded-xl mb-3`}
+  >
+    <div className="font-semibold">College Name</div>
+    <div className="font-semibold">City</div>
+    <div className="font-semibold">Contact Name</div>
+    <div className="font-semibold">Phone No.</div>
+    <div className="font-semibold">Email ID</div>
+    <div className="font-semibold">Opened Date</div>
+    <div className="font-semibold">Expected Closure</div>
+    <div className="font-semibold">Follow-Ups</div>
+    <div className="font-semibold">Assigned To</div>
+    <div className="font-semibold text-center">Actions</div>
+  </div>
+)}
+
 
             {/* Grid Rows */}
             <div className="space-y-3">
