@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { FaEllipsisV, FaTimes } from "react-icons/fa";
 import DropdownActions from "./DropdownAction";
 import ClosedLeads from "./ClosedLeads";
@@ -17,7 +17,7 @@ const headerColorMap = {
   closed: "bg-green-50 text-green-800 border-b border-green-200",
 };
 
-// 🔧 Helpers
+// Helpers
 function formatDate(timestamp) {
   if (!timestamp) return "-";
   return new Date(timestamp).toLocaleDateString();
@@ -28,7 +28,6 @@ function getLatestFollowup(lead) {
   return lead.followups[lead.followups.length - 1].note || "-";
 }
 
-// 🧩 Component
 export default function LeadsTable({
   loading,
   activeTab,
@@ -51,7 +50,9 @@ export default function LeadsTable({
   viewMyLeadsOnly,
   currentUser,
 }) {
-  const gridColumns = "grid grid-cols-11 gap-4"; // Define default layout
+  const [selectedLeadForDetails, setSelectedLeadForDetails] = useState(null);
+
+  const gridColumns = "grid grid-cols-11 gap-4";
 
   if (loading) {
     return (
@@ -103,100 +104,156 @@ export default function LeadsTable({
   }
 
   return (
-    <div className="overflow-x-auto md:overflow-visible">
-      <div className="w-auto space-y-3">
-        {/* Header */}
-        <div
-          className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-4 rounded-xl mb-3`}
-        >
-          <div>College Name</div>
-          <div>City</div>
-          <div>Contact Name</div>
-          <div>Phone No.</div>
-          <div>Email ID</div>
-          <div>TCV</div>
-          <div>Opened Date</div>
-          <div>Expected Closure</div>
-          <div>Follow-Ups</div>
-          <div>Assigned To</div>
-          <div className="text-center">Actions</div>
-        </div>
+    <>
+      <div className="overflow-x-auto md:overflow-visible">
+        <div className="w-auto space-y-3">
+          {/* Header */}
+          <div
+            className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-4 rounded-xl mb-3`}
+          >
+            <div>College Name</div>
+            <div>City</div>
+            <div>Contact Name</div>
+            <div>Phone No.</div>
+            <div>Email ID</div>
+            <div>TCV</div>
+            <div>Opened Date</div>
+            <div>Expected Closure</div>
+            <div>Follow-Ups</div>
+            <div>Assigned To</div>
+            <div className="text-center">Actions</div>
+          </div>
 
-        {/* Rows */}
-        <div className="space-y-3">
-          {filteredLeads.map(([id, lead]) => (
-            <div key={id} className="relative group cursor-pointer">
+          {/* Rows */}
+          <div className="space-y-3">
+            {filteredLeads.map(([id, lead]) => (
               <div
-                className={`${gridColumns} gap-4 p-5 rounded-xl bg-white shadow-sm hover:shadow-md transition-all duration-300 ${borderColorMap[activeTab]}`}
+                key={id}
+                className="relative group cursor-pointer"
+                onClick={() => setSelectedLeadForDetails(lead)}
               >
-                {[
-                  "businessName",
-                  "city",
-                  "pocName",
-                  "phoneNo",
-                  "email",
-                  "tcv",
-                  "createdAt",
-                  "expectedClosureDate",
-                ].map((field, i) => (
-                  <div key={i} className="text-sm text-gray-700">
-                    {(field === "createdAt" || field === "expectedClosureDate") && lead[field]
-                      ? formatDate(lead[field])
-                      : lead[field] || "-"}
-                  </div>
-                ))}
-
-                <div className="text-sm text-gray-700 break-words whitespace-normal min-w-0">
-                  {getLatestFollowup(lead)}
-                </div>
-
-                <div className="text-sm text-gray-700 break-words whitespace-normal min-w-0">
-                  {lead.assignedTo?.uid && users[lead.assignedTo.uid]?.name
-                    ? users[lead.assignedTo.uid].name
-                    : lead.assignedTo?.name || "-"}
-                </div>
-
-                <div className="flex justify-center items-center">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleDropdown(id, e);
-                    }}
-                    className={`text-gray-500 hover:text-gray-700 focus:outline-none transition p-2 rounded-full hover:bg-gray-100 ${
-                      dropdownOpenId === id ? "bg-gray-200 text-gray-900 shadow-inner" : ""
+                <div
+                  className={`${gridColumns} gap-4 p-5 rounded-xl bg-white shadow-sm hover:shadow-md transition-all duration-300 ${borderColorMap[activeTab]
                     }`}
-                    aria-expanded={dropdownOpenId === id}
-                    aria-haspopup="true"
-                    aria-label={dropdownOpenId === id ? "Close actions menu" : "Open actions menu"}
-                  >
-                    {dropdownOpenId === id ? <FaTimes size={16} /> : <FaEllipsisV size={16} />}
-                  </button>
-                </div>
-              </div>
+                >
+                  {[
+                    "businessName",
+                    "city",
+                    "pocName",
+                    "phoneNo",
+                    "email",
+                    "tcv",
+                    "createdAt",
+                    "expectedClosureDate",
+                  ].map((field, i) => (
+                    <div key={i} className="text-sm text-gray-700">
+                      {(field === "createdAt" || field === "expectedClosureDate") && lead[field]
+                        ? formatDate(lead[field])
+                        : lead[field] || "-"}
+                    </div>
+                  ))}
 
-              {/* Dropdown Actions */}
-              {dropdownOpenId === id && (
-                <DropdownActions
-                  leadId={id}
-                  leadData={lead}
-                  closeDropdown={() => setDropdownOpenId(null)}
-                  setSelectedLead={setSelectedLead}
-                  setShowFollowUpModal={setShowFollowUpModal}
-                  setShowDetailsModal={setShowDetailsModal}
-                  setShowClosureModal={setShowClosureModal}
-                  updateLeadPhase={updateLeadPhase}
-                  activeTab={activeTab}
-                  dropdownRef={dropdownRef}
-                  users={users}
-                  setShowExpectedDateModal={setShowExpectedDateModal}
-                  setPendingPhaseChange={setPendingPhaseChange}
-                  setLeadBeingUpdated={setLeadBeingUpdated}
-                />
-              )}
-            </div>
-          ))}
+                  <div className="text-sm text-gray-700 break-words whitespace-normal min-w-0">
+                    {getLatestFollowup(lead)}
+                  </div>
+
+                  <div className="text-sm text-gray-700 break-words whitespace-normal min-w-0">
+                    {lead.assignedTo?.uid && users[lead.assignedTo.uid]?.name
+                      ? users[lead.assignedTo.uid].name
+                      : lead.assignedTo?.name || "-"}
+                  </div>
+
+                  <div className="flex justify-center items-center">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleDropdown(id, e);
+                      }}
+                      className={`text-gray-500 hover:text-gray-700 focus:outline-none transition p-2 rounded-full hover:bg-gray-100 ${
+                        dropdownOpenId === id ? "bg-gray-200 text-gray-900 shadow-inner" : ""
+                      }`}
+                      aria-expanded={dropdownOpenId === id}
+                      aria-haspopup="true"
+                      aria-label={dropdownOpenId === id ? "Close actions menu" : "Open actions menu"}
+                    >
+                      {dropdownOpenId === id ? <FaTimes size={16} /> : <FaEllipsisV size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Dropdown Actions */}
+                {dropdownOpenId === id && (
+                  <DropdownActions
+                    leadId={id}
+                    leadData={lead}
+                    closeDropdown={() => setDropdownOpenId(null)}
+                    setSelectedLead={setSelectedLead}
+                    setShowFollowUpModal={setShowFollowUpModal}
+                    setShowDetailsModal={setShowDetailsModal}
+                    setShowClosureModal={setShowClosureModal}
+                    updateLeadPhase={updateLeadPhase}
+                    activeTab={activeTab}
+                    dropdownRef={dropdownRef}
+                    users={users}
+                    setShowExpectedDateModal={setShowExpectedDateModal}
+                    setPendingPhaseChange={setPendingPhaseChange}
+                    setLeadBeingUpdated={setLeadBeingUpdated}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Lead Details Modal */}
+      {selectedLeadForDetails && (
+        <div
+          className="fixed inset-0 backdrop-blur-sm bg-opacity-50 flex justify-center items-center z-50"
+          onClick={() => setSelectedLeadForDetails(null)}
+        >
+          <div
+            className="bg-white p-6 rounded-lg max-w-lg w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-bold mb-4">Lead Details</h2>
+            <p>
+              <strong>College Name:</strong> {selectedLeadForDetails.businessName}
+            </p>
+            <p>
+              <strong>City:</strong> {selectedLeadForDetails.city}
+            </p>
+            <p>
+              <strong>Contact:</strong> {selectedLeadForDetails.pocName}
+            </p>
+            <p>
+              <strong>Phone:</strong> {selectedLeadForDetails.phoneNo}
+            </p>
+            <p>
+              <strong>Email:</strong> {selectedLeadForDetails.email}
+            </p>
+            <p>
+              <strong>TCV:</strong> {selectedLeadForDetails.tcv}
+            </p>
+            <p>
+              <strong>Opened Date:</strong> {formatDate(selectedLeadForDetails.createdAt)}
+            </p>
+            <p>
+              <strong>Expected Closure:</strong> {formatDate(selectedLeadForDetails.expectedClosureDate)}
+            </p>
+            <p>
+              <strong>Latest Followup:</strong> {getLatestFollowup(selectedLeadForDetails)}
+            </p>
+
+            <button
+              className="mt-4 bg-red-600 text-white px-4 py-2 rounded"
+              onClick={() => setSelectedLeadForDetails(null)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

@@ -6,7 +6,7 @@ import FollowupAlerts from "../components/Sales/FollowupAlerts";
 import AddCollegeModal from "../components/Sales/AddCollege";
 import FollowUp from "../components/Sales/Followup";
 import TrainingForm from "../components/Sales/ClosureForm/TrainingForm";
-import LeadDetailsModal from "../components/Sales/LeadDetailsModal";
+import LeadDetailsModal from "../components/Sales/EditDetailsModal";
 import ExpectedDateModal from "../components/Sales/ExpectedDateWarning";
 import LeadsTable from "../components/Sales/LeadTable";
 const tabLabels = {
