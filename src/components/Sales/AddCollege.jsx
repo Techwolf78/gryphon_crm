@@ -1,7 +1,19 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import stateCityData from "../Sales/stateCityData";
 import { auth, db } from "../../firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+
+const courseSpecializations = {
+  Engineering: ["CS", "IT", "ENTC", "CS-Cyber Security", "Mechanical", "Civil", "Electrical", "Chemical", "CS-AI-ML", "CS-AI-DS", "Other"],
+  MBA: ["Marketing", "Finance", "HR", "Operations", "Other"],
+  BBA: ["International Business", "General", "Finance", "Other"],
+  BCA: ["Computer Applications", "Other"],
+  MCA: ["Computer Science", "Other"],
+  Diploma: ["Mechanical", "Civil", "Electrical", "Computer", "Other"],
+  BSC: ["Physics", "Chemistry", "Mathematics", "CS", "Other"],
+  MSC: ["Physics", "Chemistry", "Mathematics", "CS", "Other"],
+  Others: ["Other"]
+};
 
 function AddCollegeModal({ show, onClose }) {
   const [businessName, setBusinessName] = useState("");
@@ -12,8 +24,18 @@ function AddCollegeModal({ show, onClose }) {
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
   const [expectedClosureDate, setExpectedClosureDate] = useState("");
+  const [courseType, setCourseType] = useState("");
+  const [specialization, setSpecialization] = useState("");
+  const [studentCount, setStudentCount] = useState("");
+  const [perStudentCost, setPerStudentCost] = useState("");
+  const [tcv, setTcv] = useState(0);
 
-  // Calculate phase based on expectedClosureDate
+  useEffect(() => {
+    const count = parseInt(studentCount) || 0;
+    const cost = parseFloat(perStudentCost) || 0;
+    setTcv(count * cost);
+  }, [studentCount, perStudentCost]);
+
   const getLeadPhase = (expectedDateInput) => {
     if (!expectedDateInput) return "cold";
     const now = new Date();
@@ -33,6 +55,11 @@ function AddCollegeModal({ show, onClose }) {
     setState("");
     setCity("");
     setExpectedClosureDate("");
+    setCourseType("");
+    setSpecialization("");
+    setStudentCount("");
+    setPerStudentCost("");
+    setTcv(0);
     onClose();
   };
 
@@ -43,7 +70,6 @@ function AddCollegeModal({ show, onClose }) {
       return;
     }
 
-    // Convert expectedClosureDate to timestamp if exists
     let expectedClosureTimestamp = null;
     if (expectedClosureDate) {
       const d = new Date(expectedClosureDate);
@@ -53,7 +79,6 @@ function AddCollegeModal({ show, onClose }) {
     }
 
     const phase = getLeadPhase(expectedClosureTimestamp);
-
     const timestamp = Date.now();
 
     const newLead = {
@@ -65,6 +90,11 @@ function AddCollegeModal({ show, onClose }) {
       state,
       city,
       expectedClosureDate: expectedClosureTimestamp,
+      courseType,
+      specialization,
+      studentCount: parseInt(studentCount),
+      perStudentCost: parseFloat(perStudentCost),
+      tcv,
       phase,
       assignedTo: {
         uid: user.uid,
@@ -92,7 +122,9 @@ function AddCollegeModal({ show, onClose }) {
     pocName.trim() &&
     phoneNo.trim() &&
     state &&
-    city;
+    city &&
+    courseType &&
+    specialization;
 
   if (!show) return null;
 
@@ -124,7 +156,7 @@ function AddCollegeModal({ show, onClose }) {
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               placeholder="e.g. 123 Main St"
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-600"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
             />
           </div>
 
@@ -138,7 +170,7 @@ function AddCollegeModal({ show, onClose }) {
               value={pocName}
               onChange={(e) => setPocName(e.target.value)}
               placeholder="e.g. John Doe"
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-600"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
             />
           </div>
 
@@ -152,7 +184,7 @@ function AddCollegeModal({ show, onClose }) {
               value={phoneNo}
               onChange={(e) => setPhoneNo(e.target.value)}
               placeholder="e.g. +91 9876543210"
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-600"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
             />
           </div>
 
@@ -179,7 +211,7 @@ function AddCollegeModal({ show, onClose }) {
                 setState(e.target.value);
                 setCity("");
               }}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-600"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
             >
               <option value="">Select State</option>
               {Object.keys(stateCityData).map((st) => (
@@ -190,10 +222,10 @@ function AddCollegeModal({ show, onClose }) {
             </select>
           </div>
 
-          {/* City Dropdown */}
+          {/* City */}
           {state && (
             <div>
-              <label className="block text-sm font-semibold text-gray-600 mb-2">
+              <label className="text-sm font-medium text-gray-700 mb-1 block">
                 City<span className="text-red-500">*</span>
               </label>
               <select
@@ -213,7 +245,7 @@ function AddCollegeModal({ show, onClose }) {
 
           {/* Expected Closure Date */}
           <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-2">
+            <label className="text-sm font-medium text-gray-700 mb-1 block">
               Expected Closure Date
             </label>
             <input
@@ -223,6 +255,88 @@ function AddCollegeModal({ show, onClose }) {
               onChange={(e) => setExpectedClosureDate(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
             />
+          </div>
+
+          {/* Course Type */}
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">
+              Course Type<span className="text-red-500">*</span>
+            </label>
+            <select
+              value={courseType}
+              onChange={(e) => {
+                setCourseType(e.target.value);
+                setSpecialization("");
+              }}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
+            >
+              <option value="">Select Course</option>
+              {Object.keys(courseSpecializations).map((course) => (
+                <option key={course} value={course}>
+                  {course}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Specialization */}
+          {courseType && (
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-1 block">
+                Specialization<span className="text-red-500">*</span>
+              </label>
+              <select
+                value={specialization}
+                onChange={(e) => setSpecialization(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
+              >
+                <option value="">Select Specialization</option>
+                {courseSpecializations[courseType].map((spec) => (
+                  <option key={spec} value={spec}>
+                    {spec}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Student Count, Per Student Cost, TCV */}
+          <div className="col-span-1 md:col-span-2 flex gap-4 items-end">
+            <div className="flex-1">
+              <label className="text-sm font-medium text-gray-700 mb-1 block">
+                Student Count
+              </label>
+              <input
+                type="number"
+                value={studentCount}
+                onChange={(e) => setStudentCount(e.target.value)}
+                placeholder="e.g. 120"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-sm font-medium text-gray-700 mb-1 block">
+                Per Student Cost
+              </label>
+              <input
+                type="number"
+                value={perStudentCost}
+                onChange={(e) => setPerStudentCost(e.target.value)}
+                placeholder="e.g. 1500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-sm font-medium text-gray-700 mb-1 block">
+                TCV
+              </label>
+              <input
+                type="number"
+                value={tcv}
+                disabled
+                className="w-full px-4 py-2 border border-gray-300 bg-gray-100 rounded-lg"
+              />
+            </div>
           </div>
         </div>
 
@@ -234,7 +348,6 @@ function AddCollegeModal({ show, onClose }) {
           >
             Cancel
           </button>
-
           <button
             onClick={handleAddBusiness}
             disabled={!isFormValid}
