@@ -1,5 +1,9 @@
+
 import React, { useState, useEffect } from "react";
 import { FaTimes } from "react-icons/fa";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "../../../firebase";
+import { AuthContext } from "../../../context/AuthContext";
 
 import CollegeInfoSection from "./CollegeInfoSection";
 import POCInfoSection from "./POCInfoSection";
@@ -7,6 +11,7 @@ import StudentBreakdownSection from "./StudentBreakdownSection";
 import TopicBreakdownSection from "./TopicBreakdownSection";
 import PaymentInfoSection from "./PaymentInfoSection";
 import MOUUploadSection from "./MOUUploadSection";
+
 
 const TrainingForm = ({ show, onClose, lead }) => {
   const [formData, setFormData] = useState({
@@ -18,7 +23,6 @@ const TrainingForm = ({ show, onClose, lead }) => {
     pincode: "",
     gstNumber: "",
 
-    // POC Info
     tpoName: "",
     tpoEmail: "",
     tpoPhone: "",
@@ -28,6 +32,7 @@ const TrainingForm = ({ show, onClose, lead }) => {
     accountName: "",
     accountEmail: "",
     accountPhone: "",
+
 
     // Student Info
     course: "",
@@ -45,17 +50,18 @@ const TrainingForm = ({ show, onClose, lead }) => {
     totalCost: 0,
     studentCount: 0,
 
-    // All payment types
+
     paymentSplits: [],
     emiMonths: 0,
     emiSplits: [],
-
-    // Additional Info
     invoiceNumber: "",
     additionalNotes: "",
     splitTotal: 0,
   });
 
+  const [collegeCodeError, setCollegeCodeError] = useState("");
+  const [pincodeError, setPincodeError] = useState("");
+  const [gstError, setGstError] = useState("");
   const [studentFile, setStudentFile] = useState(null);
   const [mouFile, setMouFile] = useState(null);
 
@@ -71,8 +77,46 @@ const TrainingForm = ({ show, onClose, lead }) => {
     }));
   }, [formData.courses, formData.perStudentCost]);
 
+  useEffect(() => {
+    if (
+      formData.collegeCode &&
+      formData.course &&
+      formData.year &&
+      formData.deliveryType &&
+      formData.passingYear
+    ) {
+      const passYear = formData.passingYear.split("-");
+      const shortPassYear = `${passYear[0].slice(-2)}-${passYear[1].slice(-2)}`;
+
+      const coursePart = formData.course === "Engineering" ? "ENGG" : formData.course;
+
+      const code = `${formData.collegeCode}/${coursePart}/${formData.year}/${formData.deliveryType}/${shortPassYear}`;
+      setFormData((prev) => ({ ...prev, projectCode: code }));
+    }
+  }, [formData.collegeCode, formData.course, formData.year, formData.deliveryType, formData.passingYear]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
+
+    if (name === "collegeCode") {
+      const isValid = /^[A-Z]*$/.test(value);
+      setCollegeCodeError(isValid ? "" : "Only uppercase letters (A-Z) allowed");
+    }
+
+    if (name === "pincode") {
+      const isValid = /^[0-9]{0,6}$/.test(value);
+      setPincodeError(
+        value && !isValid ? "Pincode must be up to 6 digits only" : ""
+      );
+    }
+
+    if (name === "gstNumber") {
+      const isValid = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(value);
+      setGstError(
+        value && !isValid ? "Invalid GST number format" : ""
+      );
+    }
+
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -85,19 +129,20 @@ const TrainingForm = ({ show, onClose, lead }) => {
         {/* Modal Header */}
         <div className="flex justify-between items-center px-6 py-4 border-b bg-blue-100">
           <h2 className="text-xl font-bold text-gray-800">Client Onboarding Form</h2>
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3 w-[450px]">
             <input
               name="projectCode"
               value={formData.projectCode}
-              onChange={handleChange}
               placeholder="Project Code"
-              className="px-3 py-1 border rounded-md text-sm"
+              className="px-4 py-2 border rounded-lg text-base w-full font-semibold text-blue-700 bg-gray-100 cursor-not-allowed shadow-sm"
+              readOnly
             />
             <button onClick={onClose} className="text-xl text-red-500 hover:text-red-700">
               <FaTimes />
             </button>
           </div>
         </div>
+
 
         {/* Modal Form Content */}
         <form

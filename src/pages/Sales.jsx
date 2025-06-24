@@ -1,4 +1,3 @@
-// Sales.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { FaEllipsisV } from "react-icons/fa";
 import { FaTimes } from "react-icons/fa";
