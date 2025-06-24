@@ -38,7 +38,7 @@ const AppContent = () => {
           <Route path="admin" element={<Admin />} />
           <Route path="sales" element={<Sales />} />
           <Route path="placement" element={<Placement />} />
-          <Route path="learning-development" element={<LearningDevelopment />} />
+          <Route path="learning" element={<LearningDevelopment />} />
           <Route path="marketing" element={<DigitalMarketing />} />
         </Route>
       </Routes>

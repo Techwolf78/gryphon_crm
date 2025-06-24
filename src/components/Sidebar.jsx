@@ -12,7 +12,7 @@ const roleLinks = {
     { label: 'Admin', path: '/dashboard/admin', icon: <FiUsers /> },
     { label: 'Sales', path: '/dashboard/sales', icon: <FiDollarSign /> },
     { label: 'Placement', path: '/dashboard/placement', icon: <FiBriefcase /> },
-    { label: 'L & D', path: '/dashboard/learning-development', icon: <FiBook /> },
+    { label: 'L & D', path: '/dashboard/learning', icon: <FiBook /> },
     { label: 'D M', path: '/dashboard/marketing', icon: <FiTrendingUp /> },
   ],
   sales: [
@@ -21,8 +21,8 @@ const roleLinks = {
   placement: [
     { label: 'Placement', path: '/dashboard/placement', icon: <FiBriefcase /> }
   ],
-  'learning-development': [
-    { label: 'L & D', path: '/dashboard/learning-development', icon: <FiBook /> }
+  learning: [  // Changed from 'l-and-d'
+    { label: 'L & D', path: '/dashboard/learning', icon: <FiBook /> }
   ],
   marketing: [
     { label: 'D M', path: '/dashboard/marketing', icon: <FiTrendingUp /> }
@@ -33,12 +33,13 @@ const normalizeRole = (role) =>
   role?.toLowerCase().replace('&', 'and').replace(/\s+/g, '-').trim();
 
 const Sidebar = ({ collapsed, onToggle }) => {
-  const { user } = useContext(AuthContext);
+  const { user, loading } = useContext(AuthContext);  // Add loading
   const location = useLocation();
 
-  if (!user) return null;
+if (!user || loading) return null;  // Add loading check
 
   const normalizedRole = normalizeRole(user.role);
+  
 
   const isActive = (path) => {
     if (path === '/dashboard') {
