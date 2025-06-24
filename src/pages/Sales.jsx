@@ -1,245 +1,746 @@
 // Sales.jsx
-import React, { useState, useEffect } from "react";
-import { FaEnvelope, FaEllipsisV } from "react-icons/fa";
-import { ref, onValue, update } from "firebase/database";
-import { realtimeDb } from "../firebase";
+import React, { useState, useEffect, useRef } from "react";
+import { FaEllipsisV } from "react-icons/fa";
+import { FaTimes } from "react-icons/fa";
+import { collection, doc, onSnapshot, updateDoc } from "firebase/firestore";
+import { db } from "../firebase";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+import FollowupAlerts from "../components/Sales/FollowupAlerts";
 import AddCollegeModal from "../components/Sales/AddCollege";
 import FollowUp from "../components/Sales/Followup";
-
+import TrainingForm from "../components/Sales/ClosureForm/TrainingForm";
+import LeadDetailsModal from "../components/Sales/LeadDetailsModal";
+import DropdownActions from "../components/Sales/DropdownAction";
+import ClosedLeads from "../components/Sales/ClosedLeads";
+// Updated tabLabels
 const tabLabels = {
   hot: "Hot",
   warm: "Warm",
   cold: "Cold",
-  renewal: "Renewal",
+  closed: "Closed", // Changed from renewal to closed
 };
 
+// Updated color scheme
 const tabColorMap = {
   hot: {
-    active: "bg-red-600 text-white shadow-md",
-    inactive: "bg-red-100 text-red-600 hover:bg-red-200",
+    active: "bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg",
+    inactive: "bg-red-50 text-red-600 hover:bg-red-100 border border-red-200",
   },
   warm: {
-    active: "bg-yellow-500 text-white shadow-md",
-    inactive: "bg-yellow-100 text-yellow-600 hover:bg-yellow-200",
+    active: "bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-lg",
+    inactive:
+      "bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200",
   },
   cold: {
-    active: "bg-green-600 text-white shadow-md",
-    inactive: "bg-green-100 text-green-600 hover:bg-green-200",
+    active: "bg-gradient-to-r from-cyan-400 to-cyan-500 text-white shadow-lg", // Changed to icy blue
+    inactive:
+      "bg-cyan-50 text-cyan-600 hover:bg-cyan-100 border border-cyan-200", // Changed to icy blue
   },
-  renewal: {
-    active: "bg-blue-600 text-white shadow-md",
-    inactive: "bg-blue-100 text-blue-600 hover:bg-blue-200",
+  closed: {
+    active: "bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg", // Changed to success green
+    inactive:
+      "bg-green-50 text-green-600 hover:bg-green-100 border border-green-200", // Changed to success green
   },
 };
 
-const rowColorMap = {
-  hot: "bg-red-50",
-  warm: "bg-yellow-50",
-  cold: "bg-green-50",
-  renewal: "bg-blue-50",
+const borderColorMap = {
+  hot: "border-l-4 border-red-500",
+  warm: "border-l-4 border-amber-400",
+  cold: "border-l-4 border-cyan-400", // Changed to icy blue
+  closed: "border-l-4 border-green-500", // Changed to success green
 };
 
 const headerColorMap = {
-  hot: "bg-red-100 text-red-800",
-  warm: "bg-yellow-100 text-yellow-800",
-  cold: "bg-green-100 text-green-800",
-  renewal: "bg-blue-100 text-blue-800",
-};
-
-const ClosureFormModal = ({ show, onClose, lead }) => {
-  if (!show || !lead) return null;
-  return (
-    <div className="fixed inset-0 z-[999999] bg-black bg-opacity-50 flex justify-center items-center">
-      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold mb-4">Closure Form</h2>
-        <div className="space-y-3 text-sm">
-          <div><strong>Business:</strong> {lead.businessName}</div>
-          <div><strong>City:</strong> {lead.city}</div>
-          <div><strong>Phone:</strong> {lead.phoneNo}</div>
-          <div><strong>Email:</strong> {lead.email}</div>
-          <div><strong>POC:</strong> {lead.pocName}</div>
-          <div><strong>State:</strong> {lead.state}</div>
-          <div><strong>Address:</strong> {lead.address}</div>
-        </div>
-        <div className="mt-6 text-right">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  hot: "bg-red-50 text-red-800 border-b border-red-200",
+  warm: "bg-amber-50 text-amber-800 border-b border-amber-200",
+  cold: "bg-cyan-50 text-cyan-800 border-b border-cyan-200", // Changed to icy blue
+  closed: "bg-green-50 text-green-800 border-b border-green-200", // Changed to success green
 };
 
 function Sales() {
   const [activeTab, setActiveTab] = useState("hot");
+  const [users, setUsers] = useState({});
   const [dropdownOpenId, setDropdownOpenId] = useState(null);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+  const dropdownRef = useRef(null);
   const [showModal, setShowModal] = useState(false);
   const [showClosureModal, setShowClosureModal] = useState(false);
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
   const [leads, setLeads] = useState({});
-  const [followups, setFollowups] = useState({});
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [viewMyLeadsOnly, setViewMyLeadsOnly] = useState(true); // Default to true now
+  const [todayFollowUps, setTodayFollowUps] = useState([]);
+  const [showTodayFollowUpAlert, setShowTodayFollowUpAlert] = useState(false);
+  const [reminderPopup, setReminderPopup] = useState(null); // For 15 min reminders
+  const remindedLeadsRef = useRef(new Set());
+  // const [showExpectedDateModal, setShowExpectedDateModal] = useState(false);
+  // const [pendingPhaseChange, setPendingPhaseChange] = useState(null);
+  const [showExpectedDateModal, setShowExpectedDateModal] = useState(false);
+  const [pendingPhaseChange, setPendingPhaseChange] = useState(null); // "warm" ya "cold"
+  const [leadBeingUpdated, setLeadBeingUpdated] = useState(null); // lead object
+  const [expectedDate, setExpectedDate] = useState(""); // date string like "2025-06-25"
+
+
+  const computePhaseCounts = () => {
+    const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
+    const counts = {
+      hot: 0,
+      warm: 0,
+      cold: 0,
+      closed: 0, // Changed from renewal to closed
+    };
+
+    if (!user) return counts;
+
+    const isSalesDept = user.department === "Sales";
+    const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
+    const isLowerRole = ["Assistant Manager", "Executive"].includes(user.role);
+
+    Object.values(leads).forEach((lead) => {
+      const phase = lead.phase || "hot";
+      const isOwnLead = lead.assignedTo?.uid === currentUser?.uid;
+
+      const shouldInclude =
+        isSalesDept && isHigherRole
+          ? viewMyLeadsOnly
+            ? isOwnLead
+            : true
+          : isSalesDept && isLowerRole
+            ? isOwnLead
+            : false;
+
+      if (shouldInclude && counts[phase] !== undefined) {
+        counts[phase]++;
+      }
+    });
+
+    return counts;
+  };
+
+  const phaseCounts = computePhaseCounts();
 
   useEffect(() => {
-    const leadsRef = ref(realtimeDb, "leads");
-    const unsubLeads = onValue(leadsRef, (snapshot) => {
-      const data = snapshot.val() || {};
+    const auth = getAuth();
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setCurrentUser(user);
+        // Check user role and set viewMyLeadsOnly accordingly
+        const userData = Object.values(users).find((u) => u.uid === user.uid);
+        if (userData) {
+          const isHigherRole = ["Director", "Head", "Manager"].includes(
+            userData.role
+          );
+          // For higher roles, default to "My Leads" view
+          setViewMyLeadsOnly(isHigherRole);
+        }
+      } else {
+        setCurrentUser(null);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [users]); // Add users as dependency
+
+  useEffect(() => {
+    const unsubLeads = onSnapshot(collection(db, "leads"), (snapshot) => {
+      const data = {};
+      snapshot.forEach((doc) => {
+        data[doc.id] = { id: doc.id, ...doc.data() };
+      });
       setLeads(data);
       setLoading(false);
     });
 
-    const followRef = ref(realtimeDb, "Followup");
-    const unsubF = onValue(followRef, (snapshot) => {
-      setFollowups(snapshot.val() || {});
+    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+      const data = {};
+      snapshot.forEach((doc) => {
+        data[doc.id] = { id: doc.id, ...doc.data() };
+      });
+      setUsers(data);
     });
 
     return () => {
       unsubLeads();
-      unsubF();
+      unsubUsers();
     };
   }, []);
 
-  const toggleDropdown = (id, e) => {
-    if (dropdownOpenId === id) {
-      setDropdownOpenId(null);
-    } else {
-      const rect = e.currentTarget.getBoundingClientRect();
-      setDropdownPosition({
-        top: rect.bottom + 8,
-        left: rect.right - 160,
-      });
-      setDropdownOpenId(id);
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpenId(null);
+      }
     }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const toggleDropdown = (id, e) => {
+    e.stopPropagation();
+    setDropdownOpenId((currentId) => (currentId === id ? null : id));
   };
 
   const updateLeadPhase = async (id, newPhase) => {
-    const leadRef = ref(realtimeDb, `leads/${id}`);
     try {
-      await update(leadRef, { phase: newPhase });
+      await updateDoc(doc(db, "leads", id), { phase: newPhase });
     } catch (err) {
       console.error("Phase update failed", err);
     }
   };
 
+  // In Sales.jsx
+  const handleSaveLead = async (updatedLead) => {
+    if (!updatedLead?.id) return;
+
+    // Convert date string back to timestamp if it exists
+    if (updatedLead.createdAt && typeof updatedLead.createdAt === "string") {
+      updatedLead.createdAt = new Date(updatedLead.createdAt).getTime();
+    }
+
+    const { ...dataToUpdate } = updatedLead;
+
+    try {
+      await updateDoc(doc(db, "leads", updatedLead.id), dataToUpdate);
+
+      setShowDetailsModal(false);
+      setSelectedLead(null);
+    } catch (error) {
+      console.error("Failed to update lead", error);
+    }
+  };
+
   const getLatestFollowup = (lead) => {
-  const followData = lead.followup || {};
-  const entries = Object.entries(followData).sort((a, b) => a[1].timestamp - b[1].timestamp);
-  if (entries.length === 0) return "-";
-  const latest = entries[entries.length - 1][1];
-  return `${latest.date || "-"} ${latest.time || ""} - ${latest.remarks || ""}`;
-};
+    const followData = lead.followup || {};
+    const entries = Object.entries(followData).sort(
+      (a, b) => a[1].timestamp - b[1].timestamp
+    );
+    if (entries.length === 0) return "-";
+    const latest = entries[entries.length - 1][1];
+    return `${latest.date || "-"} ${latest.time || ""} - ${latest.remarks || ""
+      }`;
+  };
 
+  const formatDate = (ms) =>
+    new Date(ms).toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
 
-  const filteredLeads = Object.entries(leads).filter(
-    ([, lead]) => (lead.phase || "hot") === activeTab
-  );
+  const filteredLeads = Object.entries(leads).filter(([, lead]) => {
+    const phaseMatch = (lead.phase || "hot") === activeTab;
+    const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
+    if (!user) return false;
+
+    const isSalesDept = user.department === "Sales";
+    const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
+    const isLowerRole = ["Assistant Manager", "Executive"].includes(user.role);
+
+    if (isSalesDept && isHigherRole) {
+      return viewMyLeadsOnly
+        ? phaseMatch && lead.assignedTo?.uid === currentUser?.uid
+        : phaseMatch;
+    }
+
+    if (isSalesDept && isLowerRole) {
+      return phaseMatch && lead.assignedTo?.uid === currentUser?.uid;
+    }
+
+    return false;
+  });
+
+  // Define the grid columns based on the fields we want to display
+  const gridColumns = "grid grid-cols-10 gap-4";
+
+  useEffect(() => {
+    if (!loading && Object.keys(leads).length > 0) {
+      const now = new Date();
+      const todayStr = now.toISOString().split("T")[0];
+
+      const matchingLeads = Object.values(leads).filter((lead) => {
+        if (lead.assignedTo?.uid !== currentUser?.uid) return false;
+        if ((lead.phase || "hot") !== "hot") return false;
+        if (!lead.followup) return false;
+
+        const followupEntries = Object.values(lead.followup);
+        if (followupEntries.length === 0) return false;
+
+        const sortedFollowups = followupEntries.sort(
+          (a, b) => b.timestamp - a.timestamp
+        );
+        const latest = sortedFollowups[0];
+        if (latest.date !== todayStr) return false;
+
+        const followUpDateTime = new Date(
+          `${latest.date}T${convertTo24HrTime(latest.time)}`
+        );
+        return followUpDateTime > now;
+      });
+
+      if (matchingLeads.length > 0) {
+        setTodayFollowUps(matchingLeads);
+        setShowTodayFollowUpAlert(true);
+
+        // ✅ Automatically hide after 4 seconds
+        const timer = setTimeout(() => {
+          setShowTodayFollowUpAlert(false);
+        }, 4000);
+
+        return () => clearTimeout(timer); // Cleanup
+      }
+    }
+  }, [leads, loading, currentUser?.uid]);
+  // Fix: include currentUser?.uid as dependency
+  function convertTo24HrTime(timeStr) {
+    if (!timeStr) return "00:00:00";
+    const [time, modifier] = timeStr.split(" ");
+    let [hours, minutes] = time.split(":").map(Number);
+
+    if (modifier === "PM" && hours !== 12) hours += 12;
+    if (modifier === "AM" && hours === 12) hours = 0;
+
+    return `${hours.toString().padStart(2, "0")}:${minutes
+      .toString()
+      .padStart(2, "0")}:00`;
+  }
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date();
+
+      const upcomingReminder = Object.values(leads).find((lead) => {
+        if (lead.assignedTo?.uid !== currentUser?.uid) return false;
+        if ((lead.phase || "hot") !== "hot") return false;
+        if (!lead.followup) return false;
+
+        const entries = Object.values(lead.followup);
+        if (entries.length === 0) return false;
+
+        const latest = entries.sort((a, b) => b.timestamp - a.timestamp)[0];
+        const followUpTime = new Date(
+          `${latest.date}T${convertTo24HrTime(latest.time)}`
+        );
+        const reminderTime = new Date(followUpTime.getTime() - 15 * 60 * 1000);
+
+        const isToday =
+          latest.date === now.toISOString().split("T")[0] &&
+          reminderTime <= now &&
+          followUpTime > now;
+
+        const alreadyReminded = remindedLeadsRef.current.has(lead.id);
+
+        return isToday && !alreadyReminded;
+      });
+
+      if (upcomingReminder) {
+        remindedLeadsRef.current.add(upcomingReminder.id); // ✅ Track shown reminders
+
+        setReminderPopup({
+          leadId: upcomingReminder.id,
+          college: upcomingReminder.businessName,
+          time: Object.values(upcomingReminder.followup).sort(
+            (a, b) => b.timestamp - a.timestamp
+          )[0].time,
+        });
+      }
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, [leads, currentUser]);
 
   return (
-    <div className="bg-gray-50 min-h-screen font-sans relative">
-      <div className="mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h2 className="text-4xl font-extrabold text-gray-900 tracking-tight">Leads</h2>
+    <div className="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen font-sans ">
+      <div className=" mx-auto">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+              Sales Dashboard
+            </h1>
+            <p className="text-gray-600 mt-1">
+              Manage your leads and follow-ups
+            </p>
+
+            {currentUser &&
+              (() => {
+                const role = Object.values(users).find(
+                  (u) => u.uid === currentUser.uid
+                )?.role;
+                const isHigherRole = ["Director", "Head", "Manager"].includes(
+                  role
+                );
+
+                return (
+                  <div className="flex items-center gap-2 mt-2">
+                    <p
+                      className={`text-xs font-medium px-3 py-1 rounded-full ${isHigherRole
+                        ? "bg-green-100 text-green-700"
+                        : "bg-blue-100 text-blue-700"
+                        }`}
+                    >
+                      Viewing:{" "}
+                      {isHigherRole
+                        ? viewMyLeadsOnly
+                          ? "My Leads Only"
+                          : "All Sales Leads"
+                        : "My Leads Only"}
+                    </p>
+
+                    {isHigherRole && (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setViewMyLeadsOnly(true)}
+                          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${viewMyLeadsOnly
+                            ? "bg-blue-600 text-white border-blue-600"
+                            : "bg-white text-blue-600 border-blue-300"
+                            }`}
+                        >
+                          My Leads
+                        </button>
+                        <button
+                          onClick={() => setViewMyLeadsOnly(false)}
+                          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${!viewMyLeadsOnly
+                            ? "bg-blue-600 text-white border-blue-600"
+                            : "bg-white text-blue-600 border-blue-300"
+                            }`}
+                        >
+                          My Team
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+          </div>
           <button
             onClick={() => setShowModal(true)}
-            className="bg-blue-600 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-blue-800 transition"
+            className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-5 py-2.5 rounded-xl font-semibold hover:opacity-90 transition-all shadow-md flex items-center"
           >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5 mr-2"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"
+                clipRule="evenodd"
+              />
+            </svg>
             Add College
           </button>
         </div>
 
-        <div className="flex gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
           {Object.keys(tabLabels).map((key) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
-              className={`flex-1 py-3 rounded-full text-sm font-semibold transition duration-300 ease-in-out ${
-                activeTab === key ? tabColorMap[key].active : tabColorMap[key].inactive
-              }`}
+              className={`py-3.5 rounded-xl text-sm font-semibold transition-all duration-300 ease-out transform hover:scale-[1.02] ${activeTab === key
+                ? tabColorMap[key].active
+                : tabColorMap[key].inactive
+                } ${activeTab === key ? "ring-2 ring-offset-2 ring-opacity-50" : ""
+                } ${activeTab === key
+                  ? key === "hot"
+                    ? "ring-red-500"
+                    : key === "warm"
+                      ? "ring-amber-400"
+                      : key === "cold"
+                        ? "ring-cyan-400" // Changed to icy blue
+                        : "ring-green-500" // Changed to success green
+                  : ""
+                }`}
             >
-              {tabLabels[key]}
+              {tabLabels[key]}{" "}
+              <span className="ml-1 text-xs font-bold">
+                ({phaseCounts[key]})
+              </span>
             </button>
           ))}
         </div>
 
-        <div className="bg-white shadow-lg rounded-lg overflow-x-auto border border-gray-200">
-          <table className="min-w-full divide-y divide-gray-200" style={{ tableLayout: "fixed" }}>
-            <thead className={`text-sm font-semibold ${headerColorMap[activeTab]}`}>
-              <tr>
-                {["Business Name","Address","City","State","Contact Person","Phone","Email","Created At","Follow-Up","Actions"].map((title) => (
-                  <th key={title} className="px-4 py-4 text-left whitespace-normal break-words">
-                    {title}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="text-gray-800 divide-y divide-gray-100">
+        <div className="overflow-x-auto md:overflow-visible">
+          <div className="w-auto space-y-3">
+            {/* Grid Header */}
+
+            <div
+              className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-4 rounded-xl mb-3`}
+            >
+              <div className="font-semibold">College Name</div>
+              <div className="font-semibold">City</div>
+              <div className="font-semibold">Contact Name</div>
+              <div className="font-semibold">Phone No.</div>
+              <div className="font-semibold">Email ID</div>
+              <div className="font-semibold">Opened Date</div>
+              <div className="font-semibold">Expected Closure</div>{" "}
+              {/* 👈 New column */}
+              <div className="font-semibold">Follow-Ups</div>
+              <div className="font-semibold">Assigned To</div>
+              <div className="font-semibold text-center">Actions</div>
+            </div>
+
+            {/* Grid Rows */}
+            <div className="space-y-3">
               {loading ? (
-                <tr><td colSpan="10" className="text-center py-8">Loading leads...</td></tr>
+                <div className="flex justify-center items-center h-64">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+                </div>
+              ) : activeTab === "closed" ? (
+                // In Sales.jsx, where you render ClosedLeads:
+                <ClosedLeads
+                  leads={leads}
+                  users={users}
+                  viewMyLeadsOnly={viewMyLeadsOnly}
+                  currentUser={currentUser}
+                />
               ) : filteredLeads.length === 0 ? (
-                <tr><td colSpan="10" className="text-center py-8 text-gray-400 italic">No records found.</td></tr>
+                <div className="bg-white rounded-xl p-8 text-center border-2 border-dashed border-gray-200">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-16 w-16 mx-auto text-gray-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v1H3V7zm0 4h18v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6z"
+                    />
+                  </svg>
+
+                  <h3 className="mt-4 text-lg font-medium text-gray-900">
+                    No leads found
+                  </h3>
+                  <p className="mt-1 text-gray-500">
+                    Get started by adding a new college
+                  </p>
+                  <button
+                    onClick={() => setShowModal(true)}
+                    className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition"
+                  >
+                    Add College
+                  </button>
+                </div>
               ) : (
                 filteredLeads.map(([id, lead]) => (
-                  <tr key={id} className={`${rowColorMap[activeTab]} hover:bg-white transition-colors duration-200`}>
-                    {["businessName","address","city","state","pocName","phoneNo","email","createdAt"].map((field, i) => (
-                      <td key={i} className="px-4 py-4 whitespace-normal break-words">
-                        {field === "createdAt" ? new Date(lead[field]).toLocaleDateString() : lead[field] || "-"}
-                      </td>
-                    ))}
-                    <td className="px-4 py-4 whitespace-normal break-words">{getLatestFollowup(lead)}</td>
-                    <td className="px-4 py-4 text-center relative">
-                      <button
-                        onClick={(e) => toggleDropdown(id, e)}
-                        className="text-gray-500 hover:text-gray-700 focus:outline-none transition"
-                      >
-                        <FaEllipsisV size={18} />
-                      </button>
-                    </td>
-                  </tr>
+                  <div key={id} className="relative group cursor-pointer">
+                    <div
+                      className={`${gridColumns} gap-4 p-5 rounded-xl bg-white shadow-sm hover:shadow-md transition-all duration-300 ${borderColorMap[activeTab]}`}
+                    >
+                      {[
+                        "businessName",
+                        "city",
+                        "pocName",
+                        "phoneNo",
+                        "email",
+                        "createdAt",
+                        "expectedClosureDate",
+                      ].map((field, i) => (
+                        <div key={i} className="text-sm text-gray-700">
+                          {(field === "createdAt" || field === "expectedClosureDate") && lead[field]
+                            ? formatDate(lead[field])
+                            : lead[field] || "-"}
+                        </div>
+                      ))
+                      }
+                      <div className="break-words whitespace-normal text-sm text-gray-700 min-w-0">
+                        {getLatestFollowup(lead)}
+                      </div>
+                      <div className="break-words whitespace-normal text-sm text-gray-700 min-w-0">
+                        {lead.assignedTo?.uid &&
+                          users[lead.assignedTo.uid]?.name
+                          ? users[lead.assignedTo.uid].name
+                          : lead.assignedTo?.name || "-"}
+                      </div>
+
+                      <div className="flex justify-center items-center">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleDropdown(id, e);
+                          }}
+                          className={`text-gray-500 hover:text-gray-700 focus:outline-none transition p-2 rounded-full hover:bg-gray-100 ${dropdownOpenId === id
+                            ? "bg-gray-200 text-gray-900 shadow-inner"
+                            : ""
+                            }`}
+                          aria-expanded={dropdownOpenId === id}
+                          aria-haspopup="true"
+                          aria-label={
+                            dropdownOpenId === id
+                              ? "Close actions menu"
+                              : "Open actions menu"
+                          }
+                        >
+                          {dropdownOpenId === id ? (
+                            <FaTimes
+                              size={16}
+                              className="text-gray-900 transition-transform"
+                            />
+                          ) : (
+                            <FaEllipsisV
+                              size={16}
+                              className="text-gray-500 hover:text-gray-700 transition"
+                            />
+                          )}
+                        </button>
+                      </div>
+
+                      {dropdownOpenId === id && (
+                        <DropdownActions
+                          leadId={id}
+                          leadData={lead}
+                          closeDropdown={() => setDropdownOpenId(null)}
+                          setSelectedLead={setSelectedLead}
+                          setShowFollowUpModal={setShowFollowUpModal}
+                          setShowDetailsModal={setShowDetailsModal}
+                          setShowClosureModal={setShowClosureModal}
+                          updateLeadPhase={updateLeadPhase}
+                          activeTab={activeTab}
+                          dropdownRef={dropdownRef}
+                          users={users}
+                          // Add these props:
+                          setShowExpectedDateModal={setShowExpectedDateModal}
+                          setLeadBeingUpdated={setLeadBeingUpdated}
+                          setPendingPhaseChange={setPendingPhaseChange}
+                        />
+                      )}
+                    </div>
+                    {dropdownOpenId === id && (
+                      <DropdownActions
+                        leadId={id}
+                        leadData={lead}
+                        closeDropdown={() => setDropdownOpenId(null)}
+                        setSelectedLead={setSelectedLead}
+                        setShowFollowUpModal={setShowFollowUpModal}
+                        setShowDetailsModal={setShowDetailsModal}
+                        setShowClosureModal={setShowClosureModal}
+                        updateLeadPhase={updateLeadPhase}
+                        activeTab={activeTab}
+                        dropdownRef={dropdownRef}
+                        users={users} // ✅ Pass users here
+                        setShowExpectedDateModal={setShowExpectedDateModal}
+                        setPendingPhaseChange={setPendingPhaseChange}
+                        setLeadBeingUpdated={setLeadBeingUpdated}
+                      />
+                    )}
+                  </div>
                 ))
               )}
-            </tbody>
-          </table>
+            </div>
+          </div>
         </div>
       </div>
 
-      {dropdownOpenId && leads[dropdownOpenId] && (
-        <div className="fixed top-0 left-0 w-screen h-screen z-[99999]" onClick={() => setDropdownOpenId(null)}>
-          <div
-            className="absolute bg-white/30 backdrop-blur-md border border-white/20 rounded-xl shadow-xl w-40 p-2"
-            style={{ top: dropdownPosition.top, left: dropdownPosition.left }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <ul className="divide-y divide-white/20">
-              <li><a href={`tel:${leads[dropdownOpenId].phoneNo}`} className="block px-4 py-2 text-sm hover:bg-white/40 rounded">Call</a></li>
-              <li className="px-4 py-2 hover:bg-white/40 text-sm cursor-pointer rounded" onClick={() => {
-                setSelectedLead({ ...leads[dropdownOpenId], id: dropdownOpenId });
-                setShowFollowUpModal(true);
-                setDropdownOpenId(null);
-              }}>Follow Up</li>
-              {["hot","warm","cold","renewal"].filter((p) => p !== activeTab).map((phase) => (
-                <li key={phase} className="px-4 py-2 hover:bg-white/40 text-sm cursor-pointer rounded capitalize" onClick={async () => {
-                  await updateLeadPhase(dropdownOpenId, phase);
-                  setDropdownOpenId(null);
-                }}>
-                  Move to {tabLabels[phase]}
-                </li>
-              ))}
-            </ul>
+      <AddCollegeModal show={showModal} onClose={() => setShowModal(false)} />
+
+      <LeadDetailsModal
+        show={showDetailsModal}
+        onClose={() => setShowDetailsModal(false)}
+        lead={selectedLead}
+        onSave={handleSaveLead}
+      />
+
+      {showClosureModal && selectedLead && (
+        <TrainingForm
+          show={showClosureModal}
+          onClose={() => setShowClosureModal(false)}
+          lead={selectedLead}
+        />
+      )}
+      {showFollowUpModal && selectedLead && (
+        <FollowUp
+          onClose={() => setShowFollowUpModal(false)}
+          lead={selectedLead}
+        />
+      )}
+
+      <FollowupAlerts
+        todayFollowUps={todayFollowUps}
+        showTodayFollowUpAlert={showTodayFollowUpAlert}
+        setShowTodayFollowUpAlert={setShowTodayFollowUpAlert}
+        reminderPopup={reminderPopup}
+        setReminderPopup={setReminderPopup}
+      />
+
+      <style>{`
+  @keyframes slideInRight {
+    0% {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    15% {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    85% {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+  }
+
+  .animate-slideInRight {
+    animation: slideInRight 4s ease-in-out forwards;
+  }
+`}</style>
+      {showExpectedDateModal && (
+        <div className="fixed inset-0 backdrop-blur-sm bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg w-96 shadow-lg">
+
+            <h2 className="text-lg font-semibold mb-4">
+              Set Expected Closure Date
+            </h2>
+            <input
+              type="date"
+              className="border w-full p-2 rounded mb-4"
+              value={expectedDate}
+              onChange={(e) => setExpectedDate(e.target.value)}
+            />
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowExpectedDateModal(false);
+                  setExpectedDate("");
+                  setLeadBeingUpdated(null);
+                  setPendingPhaseChange(null);
+                }}
+                className="px-4 py-2 bg-gray-200 rounded"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+
+                  if (!expectedDate || !leadBeingUpdated || !pendingPhaseChange)
+                    return;
+
+                  await updateDoc(doc(db, "leads", leadBeingUpdated.id), {
+                    phase: pendingPhaseChange,
+                    expectedClosureDate: new Date(expectedDate).getTime(),
+                  });
+
+                  setShowExpectedDateModal(false);
+                  setExpectedDate("");
+                  setLeadBeingUpdated(null);
+                  setPendingPhaseChange(null);
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded"
+              >
+                Confirm
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      <AddCollegeModal show={showModal} onClose={() => setShowModal(false)} />
-      <ClosureFormModal show={showClosureModal} onClose={() => setShowClosureModal(false)} lead={selectedLead} />
-      {showFollowUpModal && selectedLead && (
-        <FollowUp onClose={() => setShowFollowUpModal(false)} lead={selectedLead} />
-      )}
     </div>
   );
 }
