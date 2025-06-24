@@ -4,9 +4,9 @@ import { AuthContext } from '../context/AuthContext';
 import Sidebar from './Sidebar';
 
 const DashboardLayout = () => {
-  const { user, loading } = useContext(AuthContext);  // Add loading
+  const { user } = useContext(AuthContext);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  if (loading) return <div>Loading...</div>;  // Add loading state
+
   return (
     <div className="min-h-screen flex bg-gray-50">
       <Sidebar

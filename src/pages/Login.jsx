@@ -2,14 +2,6 @@ import React, { useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { FaEye, FaEyeSlash, FaEnvelope, FaLock } from "react-icons/fa";
-
-// Add this at the top with other imports
-const normalizeRole = (role) => {
-  if (!role) return '';
-  const lowerRole = role.toLowerCase().trim();
-  if (lowerRole === 'l & d') return 'learning';
-  return lowerRole.replace('&', 'and').replace(/\s+/g, '-');
-};
  
 export default function LoginPage() {
   const { login, user } = useContext(AuthContext);
@@ -36,16 +28,15 @@ export default function LoginPage() {
  
   useEffect(() => {
     if (user) {
-      const normalizedRole = normalizeRole(user.role);
-      if (normalizedRole === 'admin') navigate("/dashboard");
-      else if (normalizedRole === 'sales') navigate("/dashboard/sales");
-      else if (normalizedRole === 'placement') navigate("/dashboard/placement");
-      else if (normalizedRole === 'learning') navigate("/dashboard/learning");
-      else if (normalizedRole === 'marketing') navigate("/dashboard/marketing");
+      if (user.role === "admin") navigate("/dashboard");
+      else if (user.role === "sales") navigate("/dashboard/sales");
+      else if (user.role === "placement") navigate("/dashboard/placement");
+      else if (user.role === "learning") navigate("/dashboard/learning-development");
+      else if (user.role === "marketing") navigate("/dashboard/marketing");
       else navigate("/");
     }
   }, [user, navigate]);
-
+ 
   const validate = () => {
     const newErrors = {};
     const emailRegex = /^[a-zA-Z0-9._%+-]+@gryphon(?:academy)?\.co\.in$/;
