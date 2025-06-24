@@ -5,10 +5,10 @@ import {
   FiHome, FiUsers, FiDollarSign, FiBriefcase, FiBook,
   FiTrendingUp, FiChevronLeft, FiChevronRight
 } from 'react-icons/fi';
-
+ 
 // Role-based links
 const roleLinks = {
-  admin: [
+   admin: [
     { label: 'Admin', path: '/dashboard/admin', icon: <FiUsers /> },
     { label: 'Sales', path: '/dashboard/sales', icon: <FiDollarSign /> },
     { label: 'Placement', path: '/dashboard/placement', icon: <FiBriefcase /> },
@@ -28,44 +28,44 @@ const roleLinks = {
     { label: 'D M', path: '/dashboard/marketing', icon: <FiTrendingUp /> }
   ]
 };
-
+ 
 const normalizeRole = (role) => {
   if (!role) return '';
-
+ 
   // Convert role to lowercase and remove spaces/special chars for matching
   const normalized = role.toLowerCase().replace(/[^a-z0-9]/g, '');
-
+ 
   // Map stored department names to sidebar role keys
+  if (normalized.includes('admin')) return 'admin'; // Ensure "admin" is detected
   if (normalized.includes('sales')) return 'sales';
   if (normalized.includes('placement')) return 'placement';
   if (normalized.includes('ld') || normalized.includes('learning')) return 'learning-development';
   if (normalized.includes('dm') || normalized.includes('marketing')) return 'marketing';
-  if (normalized.includes('admin')) return 'admin';
-
+ 
   return '';
 };
-
+ 
 const Sidebar = ({ collapsed, onToggle }) => {
   const { user } = useContext(AuthContext);
   const location = useLocation();
-
+ 
   if (!user) return null;
-
+ 
   const normalizedRole = normalizeRole(user.role);
-
+ 
   const isActive = (path) => {
     if (path === '/dashboard') {
       return location.pathname === '/dashboard';
     }
     return location.pathname.startsWith(path);
   };
-
+ 
   const commonLinks = [
     { label: 'Dashboard', path: '/dashboard', icon: <FiHome />, skipRedirect: true }
   ];
-
+ 
   const links = [...commonLinks, ...(roleLinks[normalizedRole] || [])];
-
+ 
   return (
     <aside className={`
       ${collapsed ? 'w-20' : 'w-[168px]'}
@@ -83,7 +83,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
           {collapsed ? <FiChevronRight size={24} /> : <FiChevronLeft size={24} />}
         </button>
       </div>
-
+ 
       <nav className="flex-grow px-4 py-6 space-y-3 overflow-y-auto">
         {links.map(({ label, path, icon, skipRedirect }) => (
           <Link
@@ -91,8 +91,8 @@ const Sidebar = ({ collapsed, onToggle }) => {
             to={path}
             state={skipRedirect ? { skipRedirect: true } : undefined}
             className={`flex items-center px-4 py-2 rounded transition ${
-              isActive(path) 
-                ? 'bg-blue-50 text-blue-600 font-semibold' 
+              isActive(path)
+                ? 'bg-blue-50 text-blue-600 font-semibold'
                 : 'text-gray-600 hover:bg-gray-100 hover:text-blue-600'
             }`}
             title={collapsed ? label : ''}
@@ -106,5 +106,6 @@ const Sidebar = ({ collapsed, onToggle }) => {
     </aside>
   );
 };
-
+ 
 export default Sidebar;
+ 
