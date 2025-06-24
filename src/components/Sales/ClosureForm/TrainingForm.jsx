@@ -13,7 +13,7 @@ import MOUUploadSection from "./MOUUploadSection";
 
 const TrainingForm = ({ show, onClose, lead, users }) => {
   const { currentUser } = useContext(AuthContext);
-  if (!show || !lead) return null;
+
 
   const [formData, setFormData] = useState({
     projectCode: "",
@@ -177,6 +177,8 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
       alert("Something went wrong. Please try again.");
     }
   };
+
+    if (!show || !lead) return null;
 
   return (
     <div className="fixed inset-0 z-50 backdrop-blur-sm flex items-center justify-center px-4">
