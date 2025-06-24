@@ -589,6 +589,26 @@ function Sales() {
                           )}
                         </button>
                       </div>
+
+                      {dropdownOpenId === id && (
+                        <DropdownActions
+                          leadId={id}
+                          leadData={lead}
+                          closeDropdown={() => setDropdownOpenId(null)}
+                          setSelectedLead={setSelectedLead}
+                          setShowFollowUpModal={setShowFollowUpModal}
+                          setShowDetailsModal={setShowDetailsModal}
+                          setShowClosureModal={setShowClosureModal}
+                          updateLeadPhase={updateLeadPhase}
+                          activeTab={activeTab}
+                          dropdownRef={dropdownRef}
+                          users={users}
+                          // Add these props:
+                          setShowExpectedDateModal={setShowExpectedDateModal}
+                          setLeadBeingUpdated={setLeadBeingUpdated}
+                          setPendingPhaseChange={setPendingPhaseChange}
+                        />
+                      )}
                     </div>
                     {dropdownOpenId === id && (
                       <DropdownActions
@@ -639,23 +659,6 @@ function Sales() {
         />
       )}
 
-      <style>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(-5px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-fadeIn {
-          animation: fadeIn 0.2s ease-out;
-        }
-        
-      `}</style>
-
       <FollowupAlerts
         todayFollowUps={todayFollowUps}
         showTodayFollowUpAlert={showTodayFollowUpAlert}
@@ -691,7 +694,10 @@ function Sales() {
       {showExpectedDateModal && (
         <div className="fixed inset-0 backdrop-blur-sm bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg w-96 shadow-lg">
-            <h2 className="text-lg font-semibold mb-4">Set Expected Closure Date</h2>
+
+            <h2 className="text-lg font-semibold mb-4">
+              Set Expected Closure Date
+            </h2>
             <input
               type="date"
               className="border w-full p-2 rounded mb-4"
@@ -712,7 +718,9 @@ function Sales() {
               </button>
               <button
                 onClick={async () => {
-                  if (!expectedDate || !leadBeingUpdated || !pendingPhaseChange) return;
+
+                  if (!expectedDate || !leadBeingUpdated || !pendingPhaseChange)
+                    return;
 
                   await updateDoc(doc(db, "leads", leadBeingUpdated.id), {
                     phase: pendingPhaseChange,
