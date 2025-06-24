@@ -102,7 +102,23 @@ export default function LeadsTable({
       </div>
     );
   }
+ const getLatestFollowup = (lead) => {
+    const followData = lead.followup || {};
+    const entries = Object.entries(followData).sort(
+      (a, b) => a[1].timestamp - b[1].timestamp
+    );
+    if (entries.length === 0) return "-";
+    const latest = entries[entries.length - 1][1];
+    return `${latest.date || "-"} ${latest.time || ""} - ${latest.remarks || ""
+      }`;
+  };
 
+  const formatDate = (ms) =>
+    new Date(ms).toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
   return (
     <>
       <div className="overflow-x-auto md:overflow-visible">

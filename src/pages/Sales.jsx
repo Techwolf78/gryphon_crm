@@ -192,23 +192,7 @@ function Sales() {
     }
   };
 
-  const getLatestFollowup = (lead) => {
-    const followData = lead.followup || {};
-    const entries = Object.entries(followData).sort(
-      (a, b) => a[1].timestamp - b[1].timestamp
-    );
-    if (entries.length === 0) return "-";
-    const latest = entries[entries.length - 1][1];
-    return `${latest.date || "-"} ${latest.time || ""} - ${latest.remarks || ""
-      }`;
-  };
-
-  const formatDate = (ms) =>
-    new Date(ms).toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+ 
 
   const filteredLeads = Object.entries(leads).filter(([, lead]) => {
     const phaseMatch = (lead.phase || "hot") === activeTab;
@@ -413,7 +397,6 @@ function Sales() {
             Add College
           </button>
         </div>
-
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
           {Object.keys(tabLabels).map((key) => (
             <button
