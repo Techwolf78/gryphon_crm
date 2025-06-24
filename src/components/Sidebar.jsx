@@ -29,8 +29,21 @@ const roleLinks = {
   ]
 };
 
-const normalizeRole = (role) =>
-  role?.toLowerCase().replace('&', 'and').replace(/\s+/g, '-').trim();
+const normalizeRole = (role) => {
+  if (!role) return '';
+
+  // Convert role to lowercase and remove spaces/special chars for matching
+  const normalized = role.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  // Map stored department names to sidebar role keys
+  if (normalized.includes('sales')) return 'sales';
+  if (normalized.includes('placement')) return 'placement';
+  if (normalized.includes('ld') || normalized.includes('learning')) return 'learning-development';
+  if (normalized.includes('dm') || normalized.includes('marketing')) return 'marketing';
+  if (normalized.includes('admin')) return 'admin';
+
+  return '';
+};
 
 const Sidebar = ({ collapsed, onToggle }) => {
   const { user } = useContext(AuthContext);
