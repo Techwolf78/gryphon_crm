@@ -32,7 +32,7 @@ export default function LoginPage() {
       else if (user.role === "sales") navigate("/dashboard/sales");
       else if (user.role === "placement") navigate("/dashboard/placement");
       else if (user.role === "learning") navigate("/dashboard/learning-development");
-      else if (user.role === "marketing") navigate("/dashboard/marketing");
+      else if (user.role === "DM") navigate("/dashboard/marketing");
       else navigate("/");
     }
   }, [user, navigate]);

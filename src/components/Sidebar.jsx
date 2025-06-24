@@ -13,7 +13,7 @@ const roleLinks = {
     { label: 'Sales', path: '/dashboard/sales', icon: <FiDollarSign /> },
     { label: 'Placement', path: '/dashboard/placement', icon: <FiBriefcase /> },
     { label: 'L & D', path: '/dashboard/learning-development', icon: <FiBook /> },
-    { label: 'D M', path: '/dashboard/marketing', icon: <FiTrendingUp /> },
+    { label: 'DM', path: '/dashboard/marketing', icon: <FiTrendingUp /> },
   ],
   sales: [
     { label: 'Sales', path: '/dashboard/sales', icon: <FiDollarSign /> }
@@ -24,8 +24,8 @@ const roleLinks = {
   'learning-development': [
     { label: 'L & D', path: '/dashboard/learning-development', icon: <FiBook /> }
   ],
-  marketing: [
-    { label: 'D M', path: '/dashboard/marketing', icon: <FiTrendingUp /> }
+  dm: [
+    { label: 'DM', path: '/dashboard/marketing', icon: <FiTrendingUp /> }
   ]
 };
 
