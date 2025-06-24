@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useContext } from "react";
+
+import React, { useState, useEffect } from "react";
 import { FaTimes } from "react-icons/fa";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../../firebase";
@@ -11,14 +12,11 @@ import TopicBreakdownSection from "./TopicBreakdownSection";
 import PaymentInfoSection from "./PaymentInfoSection";
 import MOUUploadSection from "./MOUUploadSection";
 
-const TrainingForm = ({ show, onClose, lead, users }) => {
-  const { currentUser } = useContext(AuthContext);
-  if (!show || !lead) return null;
 
+const TrainingForm = ({ show, onClose, lead }) => {
   const [formData, setFormData] = useState({
     projectCode: "",
     collegeName: lead?.businessName || "",
-    collegeCode: "",
     address: lead?.address || "",
     city: lead?.city || "",
     state: lead?.state || "",
@@ -35,26 +33,27 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
     accountEmail: "",
     accountPhone: "",
 
-    course: "",
-    otherCourseText: "",
-    year: "",
-    deliveryType: "",
-    passingYear: "",
-    studentList: [],
-    courses: [{ specialization: "", othersSpecText: "", students: "" }],
 
+    // Student Info
+    course: "",
+    year: "",
+    studentList: [],
+    courses: [{ specialization: "", students: "" }],
+
+    // Topic Info
     topics: [{ topic: "", hours: "" }],
 
+    // Payment Info
     paymentType: "",
     gstType: "include",
     perStudentCost: 0,
     totalCost: 0,
     studentCount: 0,
 
+
     paymentSplits: [],
     emiMonths: 0,
     emiSplits: [],
-
     invoiceNumber: "",
     additionalNotes: "",
     splitTotal: 0,
@@ -121,66 +120,13 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    try {
-      const assignedUser = users?.[lead?.assignedTo?.uid] || {};
-
-      await addDoc(collection(db, "trainingForms"), {
-        projectCode: formData.projectCode,
-        collegeName: formData.collegeName,
-        collegeCode: formData.collegeCode,
-        address: formData.address,
-        city: formData.city,
-        state: formData.state,
-        pincode: formData.pincode,
-        gstNumber: formData.gstNumber,
-        tpoName: formData.tpoName,
-        tpoEmail: formData.tpoEmail,
-        tpoPhone: formData.tpoPhone,
-        trainingName: formData.trainingName,
-        trainingEmail: formData.trainingEmail,
-        trainingPhone: formData.trainingPhone,
-        accountName: formData.accountName,
-        accountEmail: formData.accountEmail,
-        accountPhone: formData.accountPhone,
-        course: formData.course,
-        otherCourseText: formData.otherCourseText,
-        year: formData.year,
-        deliveryType: formData.deliveryType,
-        passingYear: formData.passingYear,
-        studentCount: formData.studentCount,
-        perStudentCost: formData.perStudentCost,
-        totalCost: formData.totalCost,
-        paymentType: formData.paymentType,
-        gstType: formData.gstType,
-        invoiceNumber: formData.invoiceNumber,
-        additionalNotes: formData.additionalNotes,
-        splitTotal: formData.splitTotal,
-        paymentSplits: [...formData.paymentSplits],
-        emiSplits: [...formData.emiSplits],
-        courses: [...formData.courses],
-        topics: [...formData.topics],
-        createdAt: serverTimestamp(),
-        createdBy: {
-          email: lead?.assignedTo?.email || assignedUser?.email || "Unknown",
-          uid: lead?.assignedTo?.uid || "",
-          name: lead?.assignedTo?.name || assignedUser?.name || ""
-        }
-      });
-
-      alert("Form submitted successfully!");
-      onClose();
-    } catch (error) {
-      console.error("Error adding document: ", error);
-      alert("Something went wrong. Please try again.");
-    }
-  };
+  // ✅ Return after hooks
+  if (!show || !lead) return null;
 
   return (
     <div className="fixed inset-0 z-50 backdrop-blur-sm flex items-center justify-center px-4">
-      <div className="bg-white w-full max-w-7xl h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-fadeIn">
+      <div className="bg-white w-full max-w-6xl h-[90vh] rounded-xl shadow-xl overflow-hidden flex flex-col animate-fadeIn">
+        {/* Modal Header */}
         <div className="flex justify-between items-center px-6 py-4 border-b bg-blue-100">
           <h2 className="text-xl font-bold text-gray-800">Client Onboarding Form</h2>
           <div className="flex items-center space-x-3 w-[450px]">
@@ -197,17 +143,23 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
           </div>
         </div>
 
-        <form className="flex-1 overflow-y-auto p-6 space-y-6 text-sm" onSubmit={handleSubmit}>
-          <CollegeInfoSection 
-            formData={formData} 
-            setFormData={setFormData} 
-            handleChange={handleChange} 
-            collegeCodeError={collegeCodeError} 
-            pincodeError={pincodeError} 
-            gstError={gstError} 
-          />
+
+        {/* Modal Form Content */}
+        <form
+          className="flex-1 overflow-y-auto p-6 space-y-6 text-sm"
+          onSubmit={(e) => {
+            e.preventDefault();
+            console.log("Form submitted", formData);
+          }}
+        >
+          <CollegeInfoSection formData={formData} setFormData={setFormData} handleChange={handleChange} />
           <POCInfoSection formData={formData} handleChange={handleChange} />
-          <StudentBreakdownSection formData={formData} setFormData={setFormData} studentFile={studentFile} setStudentFile={setStudentFile} />
+          <StudentBreakdownSection
+            formData={formData}
+            setFormData={setFormData}
+            studentFile={studentFile}
+            setStudentFile={setStudentFile}
+          />
           <TopicBreakdownSection formData={formData} setFormData={setFormData} />
           <PaymentInfoSection formData={formData} setFormData={setFormData} />
           <MOUUploadSection mouFile={mouFile} setMouFile={setMouFile} />

@@ -74,6 +74,13 @@ function Sales() {
   const [showTodayFollowUpAlert, setShowTodayFollowUpAlert] = useState(false);
   const [reminderPopup, setReminderPopup] = useState(null); // For 15 min reminders
   const remindedLeadsRef = useRef(new Set());
+  // const [showExpectedDateModal, setShowExpectedDateModal] = useState(false);
+  // const [pendingPhaseChange, setPendingPhaseChange] = useState(null);
+  const [showExpectedDateModal, setShowExpectedDateModal] = useState(false);
+  const [pendingPhaseChange, setPendingPhaseChange] = useState(null); // "warm" ya "cold"
+  const [leadBeingUpdated, setLeadBeingUpdated] = useState(null); // lead object
+  const [expectedDate, setExpectedDate] = useState(""); // date string like "2025-06-25"
+
 
   const computePhaseCounts = () => {
     const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
@@ -100,8 +107,8 @@ function Sales() {
             ? isOwnLead
             : true
           : isSalesDept && isLowerRole
-          ? isOwnLead
-          : false;
+            ? isOwnLead
+            : false;
 
       if (shouldInclude && counts[phase] !== undefined) {
         counts[phase]++;
@@ -211,9 +218,8 @@ function Sales() {
     );
     if (entries.length === 0) return "-";
     const latest = entries[entries.length - 1][1];
-    return `${latest.date || "-"} ${latest.time || ""} - ${
-      latest.remarks || ""
-    }`;
+    return `${latest.date || "-"} ${latest.time || ""} - ${latest.remarks || ""
+      }`;
   };
 
   const formatDate = (ms) =>
@@ -368,11 +374,10 @@ function Sales() {
                 return (
                   <div className="flex items-center gap-2 mt-2">
                     <p
-                      className={`text-xs font-medium px-3 py-1 rounded-full ${
-                        isHigherRole
-                          ? "bg-green-100 text-green-700"
-                          : "bg-blue-100 text-blue-700"
-                      }`}
+                      className={`text-xs font-medium px-3 py-1 rounded-full ${isHigherRole
+                        ? "bg-green-100 text-green-700"
+                        : "bg-blue-100 text-blue-700"
+                        }`}
                     >
                       Viewing:{" "}
                       {isHigherRole
@@ -386,21 +391,19 @@ function Sales() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => setViewMyLeadsOnly(true)}
-                          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${
-                            viewMyLeadsOnly
-                              ? "bg-blue-600 text-white border-blue-600"
-                              : "bg-white text-blue-600 border-blue-300"
-                          }`}
+                          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${viewMyLeadsOnly
+                            ? "bg-blue-600 text-white border-blue-600"
+                            : "bg-white text-blue-600 border-blue-300"
+                            }`}
                         >
                           My Leads
                         </button>
                         <button
                           onClick={() => setViewMyLeadsOnly(false)}
-                          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${
-                            !viewMyLeadsOnly
-                              ? "bg-blue-600 text-white border-blue-600"
-                              : "bg-white text-blue-600 border-blue-300"
-                          }`}
+                          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${!viewMyLeadsOnly
+                            ? "bg-blue-600 text-white border-blue-600"
+                            : "bg-white text-blue-600 border-blue-300"
+                            }`}
                         >
                           My Team
                         </button>
@@ -435,23 +438,20 @@ function Sales() {
             <button
               key={key}
               onClick={() => setActiveTab(key)}
-              className={`py-3.5 rounded-xl text-sm font-semibold transition-all duration-300 ease-out transform hover:scale-[1.02] ${
-                activeTab === key
-                  ? tabColorMap[key].active
-                  : tabColorMap[key].inactive
-              } ${
-                activeTab === key ? "ring-2 ring-offset-2 ring-opacity-50" : ""
-              } ${
-                activeTab === key
+              className={`py-3.5 rounded-xl text-sm font-semibold transition-all duration-300 ease-out transform hover:scale-[1.02] ${activeTab === key
+                ? tabColorMap[key].active
+                : tabColorMap[key].inactive
+                } ${activeTab === key ? "ring-2 ring-offset-2 ring-opacity-50" : ""
+                } ${activeTab === key
                   ? key === "hot"
                     ? "ring-red-500"
                     : key === "warm"
-                    ? "ring-amber-400"
-                    : key === "cold"
-                    ? "ring-cyan-400" // Changed to icy blue
-                    : "ring-green-500" // Changed to success green
+                      ? "ring-amber-400"
+                      : key === "cold"
+                        ? "ring-cyan-400" // Changed to icy blue
+                        : "ring-green-500" // Changed to success green
                   : ""
-              }`}
+                }`}
             >
               {tabLabels[key]}{" "}
               <span className="ml-1 text-xs font-bold">
@@ -465,21 +465,23 @@ function Sales() {
           <div className="w-auto space-y-3">
             {/* Grid Header */}
 
-            <div
-              className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-4 rounded-xl mb-3`}
-            >
-              <div className="font-semibold">College Name</div>
-              <div className="font-semibold">City</div>
-              <div className="font-semibold">Contact Name</div>
-              <div className="font-semibold">Phone No.</div>
-              <div className="font-semibold">Email ID</div>
-              <div className="font-semibold">Opened Date</div>
-              <div className="font-semibold">Expected Closure</div>{" "}
-              {/* 👈 New column */}
-              <div className="font-semibold">Follow-Ups</div>
-              <div className="font-semibold">Assigned To</div>
-              <div className="font-semibold text-center">Actions</div>
-            </div>
+          {activeTab !== "closed" && (
+  <div
+    className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-4 rounded-xl mb-3`}
+  >
+    <div className="font-semibold">College Name</div>
+    <div className="font-semibold">City</div>
+    <div className="font-semibold">Contact Name</div>
+    <div className="font-semibold">Phone No.</div>
+    <div className="font-semibold">Email ID</div>
+    <div className="font-semibold">Opened Date</div>
+    <div className="font-semibold">Expected Closure</div>
+    <div className="font-semibold">Follow-Ups</div>
+    <div className="font-semibold">Assigned To</div>
+    <div className="font-semibold text-center">Actions</div>
+  </div>
+)}
+
 
             {/* Grid Rows */}
             <div className="space-y-3">
@@ -538,25 +540,21 @@ function Sales() {
                         "phoneNo",
                         "email",
                         "createdAt",
-                        "expectedClosureDate", // 👈 Add this field
+                        "expectedClosureDate",
                       ].map((field, i) => (
-                        <div
-                          key={i}
-                          className="break-words whitespace-normal text-sm text-gray-700 min-w-0"
-                        >
-                          {field === "createdAt" || field === "expectedClosure"
-                            ? lead[field]
-                              ? formatDate(lead[field])
-                              : "-"
+                        <div key={i} className="text-sm text-gray-700">
+                          {(field === "createdAt" || field === "expectedClosureDate") && lead[field]
+                            ? formatDate(lead[field])
                             : lead[field] || "-"}
                         </div>
-                      ))}
+                      ))
+                      }
                       <div className="break-words whitespace-normal text-sm text-gray-700 min-w-0">
                         {getLatestFollowup(lead)}
                       </div>
                       <div className="break-words whitespace-normal text-sm text-gray-700 min-w-0">
                         {lead.assignedTo?.uid &&
-                        users[lead.assignedTo.uid]?.name
+                          users[lead.assignedTo.uid]?.name
                           ? users[lead.assignedTo.uid].name
                           : lead.assignedTo?.name || "-"}
                       </div>
@@ -567,11 +565,10 @@ function Sales() {
                             e.stopPropagation();
                             toggleDropdown(id, e);
                           }}
-                          className={`text-gray-500 hover:text-gray-700 focus:outline-none transition p-2 rounded-full hover:bg-gray-100 ${
-                            dropdownOpenId === id
-                              ? "bg-gray-200 text-gray-900 shadow-inner"
-                              : ""
-                          }`}
+                          className={`text-gray-500 hover:text-gray-700 focus:outline-none transition p-2 rounded-full hover:bg-gray-100 ${dropdownOpenId === id
+                            ? "bg-gray-200 text-gray-900 shadow-inner"
+                            : ""
+                            }`}
                           aria-expanded={dropdownOpenId === id}
                           aria-haspopup="true"
                           aria-label={
@@ -593,6 +590,26 @@ function Sales() {
                           )}
                         </button>
                       </div>
+
+                      {dropdownOpenId === id && (
+                        <DropdownActions
+                          leadId={id}
+                          leadData={lead}
+                          closeDropdown={() => setDropdownOpenId(null)}
+                          setSelectedLead={setSelectedLead}
+                          setShowFollowUpModal={setShowFollowUpModal}
+                          setShowDetailsModal={setShowDetailsModal}
+                          setShowClosureModal={setShowClosureModal}
+                          updateLeadPhase={updateLeadPhase}
+                          activeTab={activeTab}
+                          dropdownRef={dropdownRef}
+                          users={users}
+                          // Add these props:
+                          setShowExpectedDateModal={setShowExpectedDateModal}
+                          setLeadBeingUpdated={setLeadBeingUpdated}
+                          setPendingPhaseChange={setPendingPhaseChange}
+                        />
+                      )}
                     </div>
                     {dropdownOpenId === id && (
                       <DropdownActions
@@ -607,6 +624,9 @@ function Sales() {
                         activeTab={activeTab}
                         dropdownRef={dropdownRef}
                         users={users} // ✅ Pass users here
+                        setShowExpectedDateModal={setShowExpectedDateModal}
+                        setPendingPhaseChange={setPendingPhaseChange}
+                        setLeadBeingUpdated={setLeadBeingUpdated}
                       />
                     )}
                   </div>
@@ -640,23 +660,6 @@ function Sales() {
         />
       )}
 
-      <style>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(-5px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-fadeIn {
-          animation: fadeIn 0.2s ease-out;
-        }
-        
-      `}</style>
-
       <FollowupAlerts
         todayFollowUps={todayFollowUps}
         showTodayFollowUpAlert={showTodayFollowUpAlert}
@@ -689,6 +692,56 @@ function Sales() {
     animation: slideInRight 4s ease-in-out forwards;
   }
 `}</style>
+      {showExpectedDateModal && (
+        <div className="fixed inset-0 backdrop-blur-sm bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg w-96 shadow-lg">
+
+            <h2 className="text-lg font-semibold mb-4">
+              Set Expected Closure Date
+            </h2>
+            <input
+              type="date"
+              className="border w-full p-2 rounded mb-4"
+              value={expectedDate}
+              onChange={(e) => setExpectedDate(e.target.value)}
+            />
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowExpectedDateModal(false);
+                  setExpectedDate("");
+                  setLeadBeingUpdated(null);
+                  setPendingPhaseChange(null);
+                }}
+                className="px-4 py-2 bg-gray-200 rounded"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+
+                  if (!expectedDate || !leadBeingUpdated || !pendingPhaseChange)
+                    return;
+
+                  await updateDoc(doc(db, "leads", leadBeingUpdated.id), {
+                    phase: pendingPhaseChange,
+                    expectedClosureDate: new Date(expectedDate).getTime(),
+                  });
+
+                  setShowExpectedDateModal(false);
+                  setExpectedDate("");
+                  setLeadBeingUpdated(null);
+                  setPendingPhaseChange(null);
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
