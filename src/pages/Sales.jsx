@@ -75,6 +75,12 @@ function Sales() {
   const [showTodayFollowUpAlert, setShowTodayFollowUpAlert] = useState(false);
   const [reminderPopup, setReminderPopup] = useState(null); // For 15 min reminders
   const remindedLeadsRef = useRef(new Set());
+  // const [showExpectedDateModal, setShowExpectedDateModal] = useState(false);
+  // const [pendingPhaseChange, setPendingPhaseChange] = useState(null);
+  const [showExpectedDateModal, setShowExpectedDateModal] = useState(false);
+  const [pendingPhaseChange, setPendingPhaseChange] = useState(null); // "warm" ya "cold"
+  const [leadBeingUpdated, setLeadBeingUpdated] = useState(null); // lead object
+  const [expectedDate, setExpectedDate] = useState(""); // date string like "2025-06-25"
 
   const computePhaseCounts = () => {
     const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
@@ -601,6 +607,10 @@ function Sales() {
                           activeTab={activeTab}
                           dropdownRef={dropdownRef}
                           users={users}
+                          // Add these props:
+                          setShowExpectedDateModal={setShowExpectedDateModal}
+                          setLeadBeingUpdated={setLeadBeingUpdated}
+                          setPendingPhaseChange={setPendingPhaseChange}
                         />
                       )}
                     </div>
@@ -635,23 +645,6 @@ function Sales() {
         />
       )}
 
-      <style>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(-5px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-fadeIn {
-          animation: fadeIn 0.2s ease-out;
-        }
-        
-      `}</style>
-
       <FollowupAlerts
         todayFollowUps={todayFollowUps}
         showTodayFollowUpAlert={showTodayFollowUpAlert}
@@ -684,6 +677,53 @@ function Sales() {
     animation: slideInRight 4s ease-in-out forwards;
   }
 `}</style>
+      {showExpectedDateModal && (
+        <div className="fixed inset-0 backdrop-blur-sm bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg w-96 shadow-lg">
+            <h2 className="text-lg font-semibold mb-4">
+              Set Expected Closure Date
+            </h2>
+            <input
+              type="date"
+              className="border w-full p-2 rounded mb-4"
+              value={expectedDate}
+              onChange={(e) => setExpectedDate(e.target.value)}
+            />
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowExpectedDateModal(false);
+                  setExpectedDate("");
+                  setLeadBeingUpdated(null);
+                  setPendingPhaseChange(null);
+                }}
+                className="px-4 py-2 bg-gray-200 rounded"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!expectedDate || !leadBeingUpdated || !pendingPhaseChange)
+                    return;
+
+                  await updateDoc(doc(db, "leads", leadBeingUpdated.id), {
+                    phase: pendingPhaseChange,
+                    expectedClosureDate: new Date(expectedDate).getTime(),
+                  });
+
+                  setShowExpectedDateModal(false);
+                  setExpectedDate("");
+                  setLeadBeingUpdated(null);
+                  setPendingPhaseChange(null);
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
