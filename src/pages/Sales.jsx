@@ -1,4 +1,3 @@
-// Sales.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { FaEllipsisV } from "react-icons/fa";
 import { FaTimes } from "react-icons/fa";
@@ -8,7 +7,6 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import FollowupAlerts from "../components/Sales/FollowupAlerts";
 import AddCollegeModal from "../components/Sales/AddCollege";
 import FollowUp from "../components/Sales/Followup";
-// import ClosureFormModal from "../components/Sales/ClosureFormModal"; // Import the closure modal
 import TrainingForm from "../components/Sales/ClosureForm/TrainingForm";
 import LeadDetailsModal from "../components/Sales/LeadDetailsModal";
 import DropdownActions from "../components/Sales/DropdownAction";
@@ -467,19 +465,21 @@ function Sales() {
           <div className="w-auto space-y-3">
             {/* Grid Header */}
 
-          <div className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-4 rounded-xl mb-3`}>
-  <div className="font-semibold">College Name</div>
-  <div className="font-semibold">City</div>
-  <div className="font-semibold">Contact Name</div>
-  <div className="font-semibold">Phone No.</div>
-  <div className="font-semibold">Email ID</div>
-  <div className="font-semibold">Opened Date</div>
-  <div className="font-semibold">Expected Closure</div> {/* 👈 New column */}
-  <div className="font-semibold">Follow-Ups</div>
-  <div className="font-semibold">Assigned To</div>
-  <div className="font-semibold text-center">Actions</div>
-</div>
-
+            <div
+              className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-4 rounded-xl mb-3`}
+            >
+              <div className="font-semibold">College Name</div>
+              <div className="font-semibold">City</div>
+              <div className="font-semibold">Contact Name</div>
+              <div className="font-semibold">Phone No.</div>
+              <div className="font-semibold">Email ID</div>
+              <div className="font-semibold">Opened Date</div>
+              <div className="font-semibold">Expected Closure</div>{" "}
+              {/* 👈 New column */}
+              <div className="font-semibold">Follow-Ups</div>
+              <div className="font-semibold">Assigned To</div>
+              <div className="font-semibold text-center">Actions</div>
+            </div>
 
             {/* Grid Rows */}
             <div className="space-y-3">
@@ -488,7 +488,13 @@ function Sales() {
                   <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
                 </div>
               ) : activeTab === "closed" ? (
-                <ClosedLeads leads={leads} users={users} />
+                // In Sales.jsx, where you render ClosedLeads:
+                <ClosedLeads
+                  leads={leads}
+                  users={users}
+                  viewMyLeadsOnly={viewMyLeadsOnly}
+                  currentUser={currentUser}
+                />
               ) : filteredLeads.length === 0 ? (
                 <div className="bg-white rounded-xl p-8 text-center border-2 border-dashed border-gray-200">
                   <svg
@@ -526,23 +532,25 @@ function Sales() {
                       className={`${gridColumns} gap-4 p-5 rounded-xl bg-white shadow-sm hover:shadow-md transition-all duration-300 ${borderColorMap[activeTab]}`}
                     >
                       {[
-  "businessName",
-  "city",
-  "pocName",
-  "phoneNo",
-  "email",
-  "createdAt",
-  "expectedClosureDate", // 👈 Add this field
-].map((field, i) => (
-  <div key={i} className="break-words whitespace-normal text-sm text-gray-700 min-w-0">
-    {field === "createdAt" || field === "expectedClosure"
-      ? lead[field]
-        ? formatDate(lead[field])
-        : "-"
-      : lead[field] || "-"}
-  </div>
-))
-}
+                        "businessName",
+                        "city",
+                        "pocName",
+                        "phoneNo",
+                        "email",
+                        "createdAt",
+                        "expectedClosureDate", // 👈 Add this field
+                      ].map((field, i) => (
+                        <div
+                          key={i}
+                          className="break-words whitespace-normal text-sm text-gray-700 min-w-0"
+                        >
+                          {field === "createdAt" || field === "expectedClosure"
+                            ? lead[field]
+                              ? formatDate(lead[field])
+                              : "-"
+                            : lead[field] || "-"}
+                        </div>
+                      ))}
                       <div className="break-words whitespace-normal text-sm text-gray-700 min-w-0">
                         {getLatestFollowup(lead)}
                       </div>
@@ -619,13 +627,12 @@ function Sales() {
       />
 
       {showClosureModal && selectedLead && (
-  <TrainingForm
-    show={showClosureModal}
-    onClose={() => setShowClosureModal(false)}
-    lead={selectedLead}
-  />
-)}
-
+        <TrainingForm
+          show={showClosureModal}
+          onClose={() => setShowClosureModal(false)}
+          lead={selectedLead}
+        />
+      )}
       {showFollowUpModal && selectedLead && (
         <FollowUp
           onClose={() => setShowFollowUpModal(false)}
