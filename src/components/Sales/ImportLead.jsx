@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { FiUpload, FiDownload, FiChevronDown, FiX, FiCheck } from "react-icons/fi";
 import Papa from "papaparse";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style"; // styling supported version
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../firebase"; // Adjust path as needed
 import { getAuth } from "firebase/auth";
