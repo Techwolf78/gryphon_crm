@@ -16,7 +16,21 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
     followupsArray.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     const latest = followupsArray[0];
 
-    return `${latest.formattedDate || latest.date || ""} - ${latest.remarks || ""}`;
+    return `${latest.formattedDate || latest.date || ""} - ${
+      latest.remarks || ""
+    }`;
+  };
+
+  const parseDate = (date) => {
+    if (!date) return "";
+    try {
+      if (date.seconds) {
+        return new Date(date.seconds * 1000).toLocaleDateString();
+      }
+      return new Date(date).toLocaleDateString();
+    } catch {
+      return "";
+    }
   };
 
   // Filter out leads with phase = closed
@@ -42,12 +56,8 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
           "Phone No.": lead.phoneNo || "",
           "Email ID": lead.email || "",
           TCV: lead.tcv || "",
-          "Opened Date": lead.createdAt
-            ? new Date(lead.createdAt).toLocaleDateString()
-            : "",
-          "Expected Closure": lead.expectedClosureDate
-            ? new Date(lead.expectedClosureDate).toLocaleDateString()
-            : "",
+          "Opened Date": parseDate(lead.createdAt),
+          "Expected Closure": parseDate(lead.expectedClosureDate),
           "Follow-Ups": getLatestFollowUp(lead.followup),
           "Assigned To": lead.assignedTo?.name || "",
         });
@@ -75,7 +85,10 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
       if (data.length === 0) return;
 
       const headers = Object.keys(data[0]);
-      const sheetData = [headers, ...data.map((obj) => headers.map((h) => obj[h]))];
+      const sheetData = [
+        headers,
+        ...data.map((obj) => headers.map((h) => obj[h])),
+      ];
 
       const ws = XLSX.utils.aoa_to_sheet(sheetData);
 
@@ -134,7 +147,11 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
         }
       }
 
-      XLSX.utils.book_append_sheet(wb, ws, `${phase[0].toUpperCase()}${phase.slice(1)} Leads`);
+      XLSX.utils.book_append_sheet(
+        wb,
+        ws,
+        `${phase[0].toUpperCase()}${phase.slice(1)} Leads`
+      );
     });
 
     const fileName =
@@ -160,7 +177,9 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
         <FiDownload className="w-4 h-4 mr-2" />
         Export
         <FiChevronDown
-          className={`w-3 h-3 ml-2 transition-transform ${menuOpen ? "rotate-180" : "rotate-0"}`}
+          className={`w-3 h-3 ml-2 transition-transform ${
+            menuOpen ? "rotate-180" : "rotate-0"
+          }`}
         />
       </button>
 
