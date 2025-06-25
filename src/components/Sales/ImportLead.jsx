@@ -218,7 +218,7 @@ const downloadSampleFile = () => {
   // Create sample data with all table columns
   const sampleData = [
     {
-      // Required fields (will be highlighted green)
+      // Required fields (will be highlighted green) gh
       businessName: "ABC College",
       city: "New York",
       pocName: "John Doe",
