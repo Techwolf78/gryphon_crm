@@ -129,7 +129,7 @@ function AddCollegeModal({ show, onClose }) {
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center px-2 py-4">
+    <div className="fixed inset-0 z-52 bg-black/40 backdrop-blur-sm flex items-center justify-center px-2 py-4">
       <div className="bg-white w-full max-w-2xl rounded-2xl shadow-lg p-6 sm:p-8 overflow-y-auto max-h-[95vh]">
         <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">Add New College Lead</h2>
 
