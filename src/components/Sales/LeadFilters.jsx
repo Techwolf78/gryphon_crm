@@ -1,7 +1,7 @@
-import { CSVLink } from "react-csv";
-import { FiDownload, FiUpload, FiFilter, FiX } from "react-icons/fi";
-import Papa from "papaparse";
 import { useState, useEffect, useRef } from "react";
+import { FiFilter, FiX } from "react-icons/fi";
+import ExportLead from "./ExportLead";
+import ImportLead from "./ImportLead";
 
 function LeadFilters({
   filteredLeads,
@@ -31,7 +31,6 @@ function LeadFilters({
         displayName: user.name || user.displayName,
       }))
       .filter((user) => user.displayName),
-
     pocNames: [
       ...new Set(
         Object.values(leads)
@@ -78,22 +77,6 @@ function LeadFilters({
     };
   }, [isFilterOpen, setIsFilterOpen]);
 
-  const handleCSVUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        handleImportComplete(results.data);
-      },
-      error: (err) => {
-        console.error("Error parsing CSV:", err);
-      },
-    });
-  };
-
   const applyFilters = () => {
     setFilters(localFilters);
     setIsFilterOpen(false);
@@ -112,35 +95,11 @@ function LeadFilters({
 
   return (
     <div className="flex items-center gap-3 px-4 relative">
-      {/* Export Button */}
-      <CSVLink
-        data={filteredLeads.map(([, lead]) => ({
-          BusinessName: lead.businessName,
-          City: lead.city,
-          Phone: lead.phoneNo,
-          Email: lead.email,
-          Phase: lead.phase,
-          AssignedTo: lead.assignedTo?.displayName || "",
-          CreatedAt: new Date(lead.createdAt).toLocaleDateString(),
-        }))}
-        filename={"leads_export.csv"}
-        className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border border-gray-300 bg-gradient-to-r from-blue-50 to-white text-blue-700 hover:from-blue-100 hover:to-white hover:shadow-md transition-all"
-      >
-        <FiDownload className="w-4 h-4" />
-        <span>Export</span>
-      </CSVLink>
+      {/* Export Component */}
+      <ExportLead filteredLeads={filteredLeads} />
 
-      {/* Import Button */}
-      <label className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border border-gray-300 bg-gradient-to-r from-green-50 to-white text-green-700 hover:from-green-100 hover:to-white hover:shadow-md transition-all cursor-pointer">
-        <FiUpload className="w-4 h-4" />
-        <span>Import</span>
-        <input
-          type="file"
-          accept=".csv"
-          onChange={handleCSVUpload}
-          className="hidden"
-        />
-      </label>
+      {/* Import Component */}
+      <ImportLead handleImportComplete={handleImportComplete} />
 
       {/* Filter Toggle Button */}
       <div className="relative">
@@ -357,7 +316,7 @@ function LeadFilters({
               </div>
             </div>
 
-            {/* Action Buttons - Centered at bottom */}
+            {/* Action Buttons */}
             <div className="flex justify-center gap-4 mt-6">
               <button
                 onClick={resetFilters}
