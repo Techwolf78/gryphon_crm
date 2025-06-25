@@ -148,7 +148,9 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
         await updateDoc(leadRef, {
           phase: "closed",
           closureType: "new",
-          closedDate: new Date().toISOString()
+          closedDate: new Date().toISOString(),
+          totalCost:formData.totalCost
+
         });
       }
     } catch (err) {

@@ -315,7 +315,7 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser }) => {
                     {formatDate(lead.closedDate)}
                   </td>
                   <td className="px-6 py-4 font-medium text-gray-900">
-                    {formatCurrency(lead.amount)}
+                    {formatCurrency(lead.totalCost)}
                   </td>
                   <td className="px-6 py-4 flex items-center">
                     <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-xs font-medium">
