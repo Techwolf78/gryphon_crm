@@ -2,14 +2,14 @@ import React, { useState } from "react";
 import { FaEllipsisV, FaTimes } from "react-icons/fa";
 import DropdownActions from "./DropdownAction";
 import ClosedLeads from "./ClosedLeads";
-
+ 
 const borderColorMap = {
   hot: "border-l-4 border-red-500",
   warm: "border-l-4 border-amber-400",
   cold: "border-l-4 border-cyan-400",
   closed: "border-l-4 border-green-500",
 };
-
+ 
 const headerColorMap = {
   hot: "bg-red-50 text-red-800 border-b border-red-200",
   warm: "bg-amber-50 text-amber-800 border-b border-amber-200",
@@ -22,7 +22,7 @@ function formatDate(timestamp) {
   if (!timestamp) return "-";
   return new Date(timestamp).toLocaleDateString();
 }
-
+ 
 function getLatestFollowup(lead) {
   if (!lead.followups || lead.followups.length === 0) return "-";
   return lead.followups[lead.followups.length - 1].note || "-";
@@ -52,8 +52,9 @@ export default function LeadsTable({
 }) {
   const [selectedLeadForDetails, setSelectedLeadForDetails] = useState(null);
 
+ 
   const gridColumns = "grid grid-cols-11 gap-4";
-
+ 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -61,7 +62,7 @@ export default function LeadsTable({
       </div>
     );
   }
-
+ 
   if (activeTab === "closed") {
     return (
       <ClosedLeads
@@ -72,7 +73,7 @@ export default function LeadsTable({
       />
     );
   }
-
+ 
   if (filteredLeads.length === 0) {
     return (
       <div className="bg-white rounded-xl p-8 text-center border-2 border-dashed border-gray-200">
@@ -90,7 +91,7 @@ export default function LeadsTable({
             d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v1H3V7zm0 4h18v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6z"
           />
         </svg>
-
+ 
         <h3 className="mt-4 text-lg font-medium text-gray-900">No leads found</h3>
         <p className="mt-1 text-gray-500">Get started by adding a new college</p>
         <button
@@ -169,10 +170,11 @@ export default function LeadsTable({
                     </div>
                   ))}
 
+ 
                   <div className="text-sm text-gray-700 break-words whitespace-normal min-w-0">
                     {getLatestFollowup(lead)}
                   </div>
-
+ 
                   <div className="text-sm text-gray-700 break-words whitespace-normal min-w-0">
                     {lead.assignedTo?.uid && users[lead.assignedTo.uid]?.name
                       ? users[lead.assignedTo.uid].name
@@ -290,9 +292,58 @@ export default function LeadsTable({
           Close
         </button>
       </div>
-    </div>
-  </div>
-)}
+
+ 
+      {/* Lead Details Modal */}
+      {selectedLeadForDetails && (
+        <div
+          className="fixed inset-0 backdrop-blur-sm bg-opacity-50 flex justify-center items-center z-50"
+          onClick={() => setSelectedLeadForDetails(null)}
+        >
+          <div
+            className="bg-white p-6 rounded-lg max-w-lg w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-bold mb-4">Lead Details</h2>
+            <p>
+              <strong>College Name:</strong> {selectedLeadForDetails.businessName}
+            </p>
+            <p>
+              <strong>City:</strong> {selectedLeadForDetails.city}
+            </p>
+            <p>
+              <strong>Contact:</strong> {selectedLeadForDetails.pocName}
+            </p>
+            <p>
+              <strong>Phone:</strong> {selectedLeadForDetails.phoneNo}
+            </p>
+            <p>
+              <strong>Email:</strong> {selectedLeadForDetails.email}
+            </p>
+            <p>
+              <strong>TCV:</strong> {selectedLeadForDetails.tcv}
+            </p>
+            <p>
+              <strong>Opened Date:</strong> {formatDate(selectedLeadForDetails.createdAt)}
+            </p>
+            <p>
+              <strong>Expected Closure:</strong> {formatDate(selectedLeadForDetails.expectedClosureDate)}
+            </p>
+            <p>
+              <strong>Latest Followup:</strong> {getLatestFollowup(selectedLeadForDetails)}
+            </p>
+ 
+            <button
+              className="mt-4 bg-red-600 text-white px-4 py-2 rounded"
+              onClick={() => setSelectedLeadForDetails(null)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
+ 
+ 

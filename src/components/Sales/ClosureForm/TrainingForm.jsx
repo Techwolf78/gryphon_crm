@@ -63,6 +63,8 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
   const [gstError, setGstError] = useState("");
   const [studentFile, setStudentFile] = useState(null);
   const [mouFile, setMouFile] = useState(null);
+  const [studentFileError, setStudentFileError] = useState("");
+  const [mouFileError, setMouFileError] = useState("");
 
   // Auto-calculate studentCount and totalCost based on courses
   useEffect(() => {
@@ -121,7 +123,25 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Step 1: Update lead status to "closed"
+
+    let hasError = false;
+
+    if (!studentFile) {
+      setStudentFileError("Please upload the Student Excel file.");
+      hasError = true;
+    } else {
+      setStudentFileError("");
+    }
+
+    if (!mouFile) {
+      setMouFileError("Please upload the MOU file.");
+      hasError = true;
+    } else {
+      setMouFileError("");
+    }
+
+    if (hasError) return;
+
     try {
       if (lead?.id) {
         const leadRef = doc(db, "leads", lead.id);
@@ -196,7 +216,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
       <div className="bg-white w-full max-w-7xl h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-fadeIn">
         {/* Header */}
         <div className="flex justify-between items-center px-6 py-4 border-b bg-blue-100">
-          <h2 className="text-xl font-bold text-gray-800">Client Onboarding Form</h2>
+          <h2 className="text-2xl font-bold text-blue-800">Client Onboarding Form</h2>
           <div className="flex items-center space-x-3 w-[450px]">
             <input
               name="projectCode"
@@ -227,10 +247,16 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
             setFormData={setFormData}
             studentFile={studentFile}
             setStudentFile={setStudentFile}
+
+            studentFileError={studentFileError}
           />
           <TopicBreakdownSection formData={formData} setFormData={setFormData} />
           <PaymentInfoSection formData={formData} setFormData={setFormData} />
-          <MOUUploadSection mouFile={mouFile} setMouFile={setMouFile} />
+          <MOUUploadSection
+            mouFile={mouFile}
+            setMouFile={setMouFile}
+            mouFileError={mouFileError}
+          />
 
           {/* Submit Button */}
           <div className="pt-4">

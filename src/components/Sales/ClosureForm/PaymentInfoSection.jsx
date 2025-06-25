@@ -5,8 +5,6 @@ const inputClass =
 
 const paymentFields = {
   AT: ["Advance", "Training"],
-  AP: ["Advance", "Placement"],
-  ATT: ["Advance", "Training", "Training"],
   ATP: ["Advance", "Training", "Placement"],
   ATTP: ["Advance", "Training", "Training", "Placement"],
   ATTT: ["Advance", "Training", "Training", "Training"],
@@ -39,9 +37,8 @@ const PaymentInfoSection = ({ formData, setFormData }) => {
   };
 
   const validatePercentageSum = () => {
-    const splits = formData.paymentType === "EMI"
-      ? autoEmiSplits || []
-      : formData.paymentSplits || [];
+    const splits =
+      formData.paymentType === "EMI" ? autoEmiSplits || [] : formData.paymentSplits || [];
     const sum = splits.reduce((acc, v) => acc + (parseFloat(v) || 0), 0);
     return sum.toFixed(2) === "100.00";
   };
@@ -66,11 +63,13 @@ const PaymentInfoSection = ({ formData, setFormData }) => {
 
   return (
     <section className="p-5 bg-white rounded-xl shadow-lg space-y-6">
-      <h3 className="font-bold text-2xl text-blue-700 border-b pb-3">Payment Information</h3>
+      <h3 className="font-semibold text-2xl text-blue-700 border-b pb-3">Payment Information</h3>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <label className="block font-medium mb-1">Total Students</label>
+          <label className="block font-medium mb-1">
+            Total Students <span className="text-red-500">*</span>
+          </label>
           <input
             className={`${inputClass} bg-gray-100`}
             value={formData.studentCount === 0 ? "" : formData.studentCount || ""}
@@ -78,7 +77,9 @@ const PaymentInfoSection = ({ formData, setFormData }) => {
           />
         </div>
         <div>
-          <label className="block font-medium mb-1">Cost per Student (₹)</label>
+          <label className="block font-medium mb-1">
+            Cost per Student (₹) <span className="text-red-500">*</span>
+          </label>
           <input
             type="number"
             className={inputClass}
@@ -87,7 +88,9 @@ const PaymentInfoSection = ({ formData, setFormData }) => {
           />
         </div>
         <div>
-          <label className="block font-medium mb-1">Total Amount (₹)</label>
+          <label className="block font-medium mb-1">
+            Total Amount (₹) <span className="text-red-500">*</span>
+          </label>
           <input
             className={`${inputClass} bg-gray-100`}
             value={formData.totalCost === 0 ? "" : formData.totalCost || ""}
@@ -97,7 +100,9 @@ const PaymentInfoSection = ({ formData, setFormData }) => {
       </div>
 
       <div>
-        <label className="block font-medium mb-1">Payment Type</label>
+        <label className="block font-medium mb-1">
+          Payment Type <span className="text-red-500">*</span>
+        </label>
         <select
           className={inputClass}
           value={formData.paymentType || ""}
@@ -117,17 +122,19 @@ const PaymentInfoSection = ({ formData, setFormData }) => {
           }}
         >
           <option value="">Select</option>
-          {Object.keys(paymentFields).map((type) => (
-            <option key={type} value={type}>
-              {type}
-            </option>
-          ))}
+          <option value="AT">AT - Advanced Training</option>
+          <option value="ATP">ATP - Advanced Training Placement</option>
+          <option value="ATTP">ATTP - Advanced Training Technical Placement</option>
+          <option value="ATTT">ATTT - Advanced Technical Training & Placement</option>
+          <option value="EMI">EMI - Easy Monthly Installments</option>
         </select>
       </div>
 
       {formData.paymentType && (
         <div>
-          <label className="block font-medium mb-1">GST Type</label>
+          <label className="block font-medium mb-1">
+            GST Type <span className="text-red-500">*</span>
+          </label>
           <div className="flex flex-wrap gap-4">
             <label className="flex items-center gap-2">
               <input
@@ -168,7 +175,7 @@ const PaymentInfoSection = ({ formData, setFormData }) => {
             return (
               <div key={i} className="p-4 bg-gray-50 rounded-lg shadow-md space-y-2">
                 <label className="block font-medium">
-                  {label} %
+                  {label} % <span className="text-red-500">*</span>
                   <span className="ml-2 text-sm text-gray-500">
                     (₹{baseAmount.toFixed(2)} + ₹{gstAmount.toFixed(2)} GST = ₹{totalWithGST.toFixed(2)})
                   </span>
@@ -188,7 +195,9 @@ const PaymentInfoSection = ({ formData, setFormData }) => {
       {formData.paymentType === "EMI" && formData.gstType && (
         <>
           <div>
-            <label className="block font-medium mb-1">No. of Installments</label>
+            <label className="block font-medium mb-1">
+              No. of Installments <span className="text-red-500">*</span>
+            </label>
             <input
               type="number"
               className={inputClass}
@@ -203,13 +212,32 @@ const PaymentInfoSection = ({ formData, setFormData }) => {
 
           {autoEmiSplits.length > 0 && (
             <div className="p-5 bg-blue-50 rounded-lg shadow-md space-y-3">
-              <h4 className="text-lg font-bold text-blue-800">Installments Summary (1 to {formData.emiMonths})</h4>
+              <h4 className="text-lg font-bold text-blue-800">
+                Installments Summary (1 to {formData.emiMonths})
+              </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-auto-fit gap-4">
                 <p className="text-sm text-gray-700">Installments: {formData.emiMonths}</p>
                 <p className="text-sm text-gray-700">Each Installment: {autoEmiSplits[0]}%</p>
-                <p className="text-sm text-gray-700">Base Amount: ₹{((autoEmiSplits[0] / 100) * formData.totalCost).toFixed(2)}</p>
-                <p className="text-sm text-gray-700">GST ({formData.gstType === "include" ? "18%" : "0%"}): ₹{((formData.gstType === "include" ? 0.18 : 0) * (autoEmiSplits[0] / 100) * formData.totalCost).toFixed(2)}</p>
-                <p className="text-sm text-gray-900 font-semibold col-span-2">Total per Installment: ₹{(((autoEmiSplits[0] / 100) * formData.totalCost) + ((formData.gstType === "include" ? 0.18 : 0) * (autoEmiSplits[0] / 100) * formData.totalCost)).toFixed(2)}</p>
+                <p className="text-sm text-gray-700">
+                  Base Amount: ₹{((autoEmiSplits[0] / 100) * formData.totalCost).toFixed(2)}
+                </p>
+                <p className="text-sm text-gray-700">
+                  GST ({formData.gstType === "include" ? "18%" : "0%"}): ₹
+                  {(
+                    (formData.gstType === "include" ? 0.18 : 0) *
+                    (autoEmiSplits[0] / 100) *
+                    formData.totalCost
+                  ).toFixed(2)}
+                </p>
+                <p className="text-sm text-gray-900 font-semibold col-span-2">
+                  Total per Installment: ₹
+                  {(
+                    ((autoEmiSplits[0] / 100) * formData.totalCost) +
+                    ((formData.gstType === "include" ? 0.18 : 0) *
+                      (autoEmiSplits[0] / 100) *
+                      formData.totalCost)
+                  ).toFixed(2)}
+                </p>
               </div>
 
               <button
@@ -231,10 +259,18 @@ const PaymentInfoSection = ({ formData, setFormData }) => {
                     return (
                       <div key={i} className="p-4 bg-white rounded-lg shadow border space-y-1">
                         <p className="font-semibold">Installment {i + 1}</p>
-                        <p className="text-sm text-gray-700">Amount: ₹{baseAmount.toFixed(2)}</p>
-                        <p className="text-sm text-gray-700">GST: ₹{gstAmount.toFixed(2)}</p>
-                        <p className="text-sm text-gray-900 font-semibold">Total: ₹{totalWithGST.toFixed(2)}</p>
-                        <p className="text-xs text-gray-500">Calculation: {percent}% of ₹{formData.totalCost.toFixed(2)} + GST</p>
+                        <p className="text-sm text-gray-700">
+                          Amount: ₹{baseAmount.toFixed(2)}
+                        </p>
+                        <p className="text-sm text-gray-700">
+                          GST: ₹{gstAmount.toFixed(2)}
+                        </p>
+                        <p className="text-sm text-gray-900 font-semibold">
+                          Total: ₹{totalWithGST.toFixed(2)}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Calculation: {percent}% of ₹{formData.totalCost.toFixed(2)} + GST
+                        </p>
                       </div>
                     );
                   })}

@@ -8,7 +8,7 @@ import {
 } from "react-icons/fa";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase"; // adjust path if needed
-
+ 
 export default function DropdownActions({
   leadId,
   leadData,
@@ -26,7 +26,7 @@ export default function DropdownActions({
   setLeadBeingUpdated,
 }) {
   const [assignHovered, setAssignHovered] = useState(false);
-
+ 
   return (
     <div
       ref={dropdownRef}
@@ -35,6 +35,7 @@ export default function DropdownActions({
     >
       <div className="py-1 relative">
 
+ 
         {/* Follow Up */}
         <button
           className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition"
@@ -48,7 +49,7 @@ export default function DropdownActions({
           <FaCalendarCheck className="text-purple-500 mr-3" />
           Meetings
         </button>
-
+ 
         {/* Edit */}
         <button
           className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition"
@@ -62,7 +63,7 @@ export default function DropdownActions({
           <FaEdit className="text-indigo-500 mr-3" />
           Edit
         </button>
-
+ 
         {/* Assign Dropdown */}
         <div
           className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition relative group cursor-pointer"
@@ -105,6 +106,7 @@ export default function DropdownActions({
           )}
         </div>
 
+ 
         {/* Phase Change Header */}
         <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
           Move to
@@ -122,7 +124,7 @@ export default function DropdownActions({
                 const isFromHotToWarmOrCold =
                   leadData.phase === "hot" &&
                   (phase === "warm" || phase === "cold");
-
+ 
                 if (isFromHotToWarmOrCold) {
                   setLeadBeingUpdated({ ...leadData, id: leadId });
                   setPendingPhaseChange(phase);
@@ -130,7 +132,7 @@ export default function DropdownActions({
                 } else {
                   await updateLeadPhase(leadId, phase);
                 }
-
+ 
                 closeDropdown();
               }}
             >
