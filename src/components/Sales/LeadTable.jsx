@@ -149,7 +149,7 @@ export default function LeadsTable({
                 onClick={() => setSelectedLeadForDetails(lead)}
               >
                 <div
-                  className={`${gridColumns} gap-4 p-5 rounded-xl bg-white shadow-sm hover:shadow-md transition-all duration-300 ${borderColorMap[activeTab]
+                  className={`${gridColumns} gap-4 whitespace-nowrap p-5 rounded-xl bg-white shadow-sm hover:shadow-md transition-all duration-300 ${borderColorMap[activeTab]
                     }`}
                 >
                   {[
