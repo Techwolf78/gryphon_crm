@@ -1,6 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
-import { FaEllipsisV } from "react-icons/fa";
-import { FaTimes } from "react-icons/fa";
+import { useState, useEffect, useRef } from "react";
 import { collection, doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
@@ -9,16 +7,15 @@ import AddCollegeModal from "../components/Sales/AddCollege";
 import FollowUp from "../components/Sales/Followup";
 import TrainingForm from "../components/Sales/ClosureForm/TrainingForm";
 import LeadDetailsModal from "../components/Sales/LeadDetailsModal";
-import DropdownActions from "../components/Sales/DropdownAction";
-import ClosedLeads from "../components/Sales/ClosedLeads";
-// Updated tabLabels
+import ExpectedDateModal from "../components/Sales/ExpectedDateWarning";
+import LeadsTable from "../components/Sales/LeadTable";
+import LeadFilters from "../components/Sales/LeadFilters"; // Adjust path as needed
 const tabLabels = {
   hot: "Hot",
   warm: "Warm",
   cold: "Cold",
   closed: "Closed", // Changed from renewal to closed
 };
-
 // Updated color scheme
 const tabColorMap = {
   hot: {
@@ -42,20 +39,6 @@ const tabColorMap = {
   },
 };
 
-const borderColorMap = {
-  hot: "border-l-4 border-red-500",
-  warm: "border-l-4 border-amber-400",
-  cold: "border-l-4 border-cyan-400", // Changed to icy blue
-  closed: "border-l-4 border-green-500", // Changed to success green
-};
-
-const headerColorMap = {
-  hot: "bg-red-50 text-red-800 border-b border-red-200",
-  warm: "bg-amber-50 text-amber-800 border-b border-amber-200",
-  cold: "bg-cyan-50 text-cyan-800 border-b border-cyan-200", // Changed to icy blue
-  closed: "bg-green-50 text-green-800 border-b border-green-200", // Changed to success green
-};
-
 function Sales() {
   const [activeTab, setActiveTab] = useState("hot");
   const [users, setUsers] = useState({});
@@ -74,12 +57,23 @@ function Sales() {
   const [showTodayFollowUpAlert, setShowTodayFollowUpAlert] = useState(false);
   const [reminderPopup, setReminderPopup] = useState(null); // For 15 min reminders
   const remindedLeadsRef = useRef(new Set());
-  // const [showExpectedDateModal, setShowExpectedDateModal] = useState(false);
-  // const [pendingPhaseChange, setPendingPhaseChange] = useState(null);
   const [showExpectedDateModal, setShowExpectedDateModal] = useState(false);
   const [pendingPhaseChange, setPendingPhaseChange] = useState(null); // "warm" ya "cold"
   const [leadBeingUpdated, setLeadBeingUpdated] = useState(null); // lead object
   const [expectedDate, setExpectedDate] = useState(""); // date string like "2025-06-25"
+  const [filters, setFilters] = useState({});
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  // Add this function to handle filter changes
+  const handleFilterChange = (newFilters) => {
+    setFilters(newFilters);
+  };
+
+  // Add this function to handle CSV import
+  const handleImportComplete = (importedData) => {
+    // Implement your import logic here
+    console.log("Imported data:", importedData);
+  };
 
   const computePhaseCounts = () => {
     const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
@@ -210,29 +204,24 @@ function Sales() {
     }
   };
 
-  const getLatestFollowup = (lead) => {
-    const followData = lead.followup || {};
-    const entries = Object.entries(followData).sort(
-      (a, b) => a[1].timestamp - b[1].timestamp
-    );
-    if (entries.length === 0) return "-";
-    const latest = entries[entries.length - 1][1];
-    return `${latest.date || "-"} ${latest.time || ""} - ${
-      latest.remarks || ""
-    }`;
-  };
-
-  const formatDate = (ms) =>
-    new Date(ms).toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-
   const filteredLeads = Object.entries(leads).filter(([, lead]) => {
     const phaseMatch = (lead.phase || "hot") === activeTab;
     const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
     if (!user) return false;
+
+    // Apply additional filters
+    const matchesFilters =
+      (!filters.city || lead.city?.includes(filters.city)) &&
+      (!filters.assignedTo || lead.assignedTo?.uid === filters.assignedTo) &&
+      (!filters.dateRange?.start ||
+        lead.createdAt >= new Date(filters.dateRange.start).getTime()) &&
+      (!filters.dateRange?.end ||
+        lead.createdAt <= new Date(filters.dateRange.end).getTime()) &&
+      (!filters.pocName ||
+        lead.pocName?.toLowerCase().includes(filters.pocName.toLowerCase())) &&
+      (!filters.phoneNo || lead.phoneNo?.includes(filters.phoneNo)) &&
+      (!filters.email ||
+        lead.email?.toLowerCase().includes(filters.email.toLowerCase()));
 
     const isSalesDept = user.department === "Sales";
     const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
@@ -240,19 +229,25 @@ function Sales() {
 
     if (isSalesDept && isHigherRole) {
       return viewMyLeadsOnly
-        ? phaseMatch && lead.assignedTo?.uid === currentUser?.uid
-        : phaseMatch;
+        ? phaseMatch &&
+            matchesFilters &&
+            lead.assignedTo?.uid === currentUser?.uid
+        : phaseMatch && matchesFilters;
     }
 
     if (isSalesDept && isLowerRole) {
-      return phaseMatch && lead.assignedTo?.uid === currentUser?.uid;
+      return (
+        phaseMatch &&
+        matchesFilters &&
+        lead.assignedTo?.uid === currentUser?.uid
+      );
     }
 
     return false;
   });
 
   // Define the grid columns based on the fields we want to display
-  const gridColumns = "grid grid-cols-10 gap-4";
+  // const gridColumns = "grid grid-cols-11 gap-4";
 
   useEffect(() => {
     if (!loading && Object.keys(leads).length > 0) {
@@ -362,60 +357,74 @@ function Sales() {
               Manage your leads and follow-ups
             </p>
 
-            {currentUser &&
-              (() => {
-                const role = Object.values(users).find(
-                  (u) => u.uid === currentUser.uid
-                )?.role;
-                const isHigherRole = ["Director", "Head", "Manager"].includes(
-                  role
-                );
+            <div className="flex items-center justify-between mt-2">
+              {currentUser &&
+                (() => {
+                  const role = Object.values(users).find(
+                    (u) => u.uid === currentUser.uid
+                  )?.role;
+                  const isHigherRole = ["Director", "Head", "Manager"].includes(
+                    role
+                  );
 
-                return (
-                  <div className="flex items-center gap-2 mt-2">
-                    <p
-                      className={`text-xs font-medium px-3 py-1 rounded-full ${
-                        isHigherRole
-                          ? "bg-green-100 text-green-700"
-                          : "bg-blue-100 text-blue-700"
-                      }`}
-                    >
-                      Viewing:{" "}
-                      {isHigherRole
-                        ? viewMyLeadsOnly
-                          ? "My Leads Only"
-                          : "All Sales Leads"
-                        : "My Leads Only"}
-                    </p>
+                  return (
+                    <div className="flex items-center gap-2">
+                      <p
+                        className={`text-xs font-medium px-3 py-1 rounded-full ${
+                          isHigherRole
+                            ? "bg-green-100 text-green-700"
+                            : "bg-blue-100 text-blue-700"
+                        }`}
+                      >
+                        Viewing:{" "}
+                        {isHigherRole
+                          ? viewMyLeadsOnly
+                            ? "My Leads Only"
+                            : "All Sales Leads"
+                          : "My Leads Only"}
+                      </p>
 
-                    {isHigherRole && (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setViewMyLeadsOnly(true)}
-                          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${
-                            viewMyLeadsOnly
-                              ? "bg-blue-600 text-white border-blue-600"
-                              : "bg-white text-blue-600 border-blue-300"
-                          }`}
-                        >
-                          My Leads
-                        </button>
-                        <button
-                          onClick={() => setViewMyLeadsOnly(false)}
-                          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${
-                            !viewMyLeadsOnly
-                              ? "bg-blue-600 text-white border-blue-600"
-                              : "bg-white text-blue-600 border-blue-300"
-                          }`}
-                        >
-                          My Team
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
+                      {isHigherRole && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setViewMyLeadsOnly(true)}
+                            className={`text-xs font-medium px-3 py-1 rounded-full border transition ${
+                              viewMyLeadsOnly
+                                ? "bg-blue-600 text-white border-blue-600"
+                                : "bg-white text-blue-600 border-blue-300"
+                            }`}
+                          >
+                            My Leads
+                          </button>
+                          <button
+                            onClick={() => setViewMyLeadsOnly(false)}
+                            className={`text-xs font-medium px-3 py-1 rounded-full border transition ${
+                              !viewMyLeadsOnly
+                                ? "bg-blue-600 text-white border-blue-600"
+                                : "bg-white text-blue-600 border-blue-300"
+                            }`}
+                          >
+                            My Team
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+              <LeadFilters
+                filteredLeads={filteredLeads}
+                handleImportComplete={handleImportComplete}
+                filters={filters}
+                setFilters={setFilters}
+                isFilterOpen={isFilterOpen}
+                setIsFilterOpen={setIsFilterOpen}
+                users={users}
+                leads={leads} // Pass leads data to extract filter options
+              />
+            </div>
           </div>
+
           <button
             onClick={() => setShowModal(true)}
             className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-5 py-2.5 rounded-xl font-semibold hover:opacity-90 transition-all shadow-md flex items-center"
@@ -467,181 +476,40 @@ function Sales() {
           ))}
         </div>
 
-        <div className="overflow-x-auto md:overflow-visible">
-          <div className="w-auto space-y-3">
-            {/* Grid Header */}
-
-            {activeTab !== "closed" && (
-              <div
-                className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-4 rounded-xl mb-3`}
-              >
-                <div className="font-semibold">College Name</div>
-                <div className="font-semibold">City</div>
-                <div className="font-semibold">Contact Name</div>
-                <div className="font-semibold">Phone No.</div>
-                <div className="font-semibold">Email ID</div>
-                <div className="font-semibold">Opened Date</div>
-                <div className="font-semibold">Expected Closure</div>
-                <div className="font-semibold">Follow-Ups</div>
-                <div className="font-semibold">Assigned To</div>
-                <div className="font-semibold text-center">Actions</div>
-              </div>
-            )}
-
-            {/* Grid Rows */}
-            <div className="space-y-3">
-              {loading ? (
-                <div className="flex justify-center items-center h-64">
-                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-                </div>
-              ) : activeTab === "closed" ? (
-                // In Sales.jsx, where you render ClosedLeads:
-                <ClosedLeads
-                  leads={leads}
-                  users={users}
-                  viewMyLeadsOnly={viewMyLeadsOnly}
-                  currentUser={currentUser}
-                />
-              ) : filteredLeads.length === 0 ? (
-                <div className="bg-white rounded-xl p-8 text-center border-2 border-dashed border-gray-200">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-16 w-16 mx-auto text-gray-400"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v1H3V7zm0 4h18v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6z"
-                    />
-                  </svg>
-
-                  <h3 className="mt-4 text-lg font-medium text-gray-900">
-                    No leads found
-                  </h3>
-                  <p className="mt-1 text-gray-500">
-                    Get started by adding a new college
-                  </p>
-                  <button
-                    onClick={() => setShowModal(true)}
-                    className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition"
-                  >
-                    Add College
-                  </button>
-                </div>
-              ) : (
-                filteredLeads.map(([id, lead]) => (
-                  <div key={id} className="relative group cursor-pointer">
-                    <div
-                      className={`${gridColumns} gap-4 p-5 rounded-xl bg-white shadow-sm hover:shadow-md transition-all duration-300 ${borderColorMap[activeTab]}`}
-                    >
-                      {[
-                        "businessName",
-                        "city",
-                        "pocName",
-                        "phoneNo",
-                        "email",
-                        "createdAt",
-                        "expectedClosureDate",
-                      ].map((field, i) => (
-                        <div key={i} className="text-sm text-gray-700">
-                          {(field === "createdAt" ||
-                            field === "expectedClosureDate") &&
-                          lead[field]
-                            ? formatDate(lead[field])
-                            : lead[field] || "-"}
-                        </div>
-                      ))}
-                      <div className="break-words whitespace-normal text-sm text-gray-700 min-w-0">
-                        {getLatestFollowup(lead)}
-                      </div>
-                      <div className="break-words whitespace-normal text-sm text-gray-700 min-w-0">
-                        {lead.assignedTo?.uid &&
-                        users[lead.assignedTo.uid]?.name
-                          ? users[lead.assignedTo.uid].name
-                          : lead.assignedTo?.name || "-"}
-                      </div>
-
-                      <div className="flex justify-center items-center">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleDropdown(id, e);
-                          }}
-                          className={`text-gray-500 hover:text-gray-700 focus:outline-none transition p-2 rounded-full hover:bg-gray-100 ${
-                            dropdownOpenId === id
-                              ? "bg-gray-200 text-gray-900 shadow-inner"
-                              : ""
-                          }`}
-                          aria-expanded={dropdownOpenId === id}
-                          aria-haspopup="true"
-                          aria-label={
-                            dropdownOpenId === id
-                              ? "Close actions menu"
-                              : "Open actions menu"
-                          }
-                        >
-                          {dropdownOpenId === id ? (
-                            <FaTimes
-                              size={16}
-                              className="text-gray-900 transition-transform"
-                            />
-                          ) : (
-                            <FaEllipsisV
-                              size={16}
-                              className="text-gray-500 hover:text-gray-700 transition"
-                            />
-                          )}
-                        </button>
-                      </div>
-
-                      {dropdownOpenId === id && (
-                        <DropdownActions
-                          leadId={id}
-                          leadData={lead}
-                          closeDropdown={() => setDropdownOpenId(null)}
-                          setSelectedLead={setSelectedLead}
-                          setShowFollowUpModal={setShowFollowUpModal}
-                          setShowDetailsModal={setShowDetailsModal}
-                          setShowClosureModal={setShowClosureModal}
-                          updateLeadPhase={updateLeadPhase}
-                          activeTab={activeTab}
-                          dropdownRef={dropdownRef}
-                          users={users}
-                          // Add these props:
-                          setShowExpectedDateModal={setShowExpectedDateModal}
-                          setLeadBeingUpdated={setLeadBeingUpdated}
-                          setPendingPhaseChange={setPendingPhaseChange}
-                        />
-                      )}
-                    </div>
-                    {dropdownOpenId === id && (
-                      <DropdownActions
-                        leadId={id}
-                        leadData={lead}
-                        closeDropdown={() => setDropdownOpenId(null)}
-                        setSelectedLead={setSelectedLead}
-                        setShowFollowUpModal={setShowFollowUpModal}
-                        setShowDetailsModal={setShowDetailsModal}
-                        setShowClosureModal={setShowClosureModal}
-                        updateLeadPhase={updateLeadPhase}
-                        activeTab={activeTab}
-                        dropdownRef={dropdownRef}
-                        users={users} // ✅ Pass users here
-                        setShowExpectedDateModal={setShowExpectedDateModal}
-                        setPendingPhaseChange={setPendingPhaseChange}
-                        setLeadBeingUpdated={setLeadBeingUpdated}
-                      />
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
+        <LeadsTable
+          loading={loading}
+          activeTab={activeTab}
+          filteredLeads={filteredLeads}
+          users={users}
+          dropdownOpenId={dropdownOpenId}
+          setDropdownOpenId={setDropdownOpenId}
+          toggleDropdown={toggleDropdown}
+          setSelectedLead={setSelectedLead}
+          setShowFollowUpModal={setShowFollowUpModal}
+          setShowDetailsModal={setShowDetailsModal}
+          setShowClosureModal={setShowClosureModal}
+          updateLeadPhase={updateLeadPhase}
+          dropdownRef={dropdownRef}
+          setShowExpectedDateModal={setShowExpectedDateModal}
+          setPendingPhaseChange={setPendingPhaseChange}
+          setLeadBeingUpdated={setLeadBeingUpdated}
+          gridColumns="grid grid-cols-11 gap-4"
+          headerColorMap={{
+            open: "bg-blue-100",
+            inProgress: "bg-yellow-100",
+            closed: "bg-gray-100", // agar zarurat ho to add karo
+          }}
+          borderColorMap={{
+            open: "border-blue-400",
+            inProgress: "border-yellow-400",
+            closed: "border-gray-400", // agar zarurat ho to add karo
+          }}
+          setShowModal={setShowModal}
+          // Add props needed for ClosedLeads
+          leads={leads}
+          viewMyLeadsOnly={viewMyLeadsOnly}
+          currentUser={currentUser}
+        />
       </div>
 
       <AddCollegeModal show={showModal} onClose={() => setShowModal(false)} />
@@ -699,53 +567,22 @@ function Sales() {
     animation: slideInRight 4s ease-in-out forwards;
   }
 `}</style>
-      {showExpectedDateModal && (
-        <div className="fixed inset-0 backdrop-blur-sm bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-96 shadow-lg">
-            <h2 className="text-lg font-semibold mb-4">
-              Set Expected Closure Date
-            </h2>
-            <input
-              type="date"
-              className="border w-full p-2 rounded mb-4"
-              value={expectedDate}
-              onChange={(e) => setExpectedDate(e.target.value)}
-            />
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  setShowExpectedDateModal(false);
-                  setExpectedDate("");
-                  setLeadBeingUpdated(null);
-                  setPendingPhaseChange(null);
-                }}
-                className="px-4 py-2 bg-gray-200 rounded"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={async () => {
-                  if (!expectedDate || !leadBeingUpdated || !pendingPhaseChange)
-                    return;
 
-                  await updateDoc(doc(db, "leads", leadBeingUpdated.id), {
-                    phase: pendingPhaseChange,
-                    expectedClosureDate: new Date(expectedDate).getTime(),
-                  });
-
-                  setShowExpectedDateModal(false);
-                  setExpectedDate("");
-                  setLeadBeingUpdated(null);
-                  setPendingPhaseChange(null);
-                }}
-                className="px-4 py-2 bg-blue-600 text-white rounded"
-              >
-                Confirm
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ExpectedDateModal
+        show={showExpectedDateModal}
+        onClose={() => {
+          setShowExpectedDateModal(false);
+          setExpectedDate("");
+          setLeadBeingUpdated(null);
+          setPendingPhaseChange(null);
+        }}
+        expectedDate={expectedDate}
+        setExpectedDate={setExpectedDate}
+        leadBeingUpdated={leadBeingUpdated}
+        setLeadBeingUpdated={setLeadBeingUpdated}
+        pendingPhaseChange={pendingPhaseChange}
+        setPendingPhaseChange={setPendingPhaseChange}
+      />
     </div>
   );
 }
