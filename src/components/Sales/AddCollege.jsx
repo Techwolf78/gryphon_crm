@@ -4,7 +4,19 @@ import { auth, db } from "../../firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 const courseSpecializations = {
-  Engineering: ["CS", "IT", "ENTC", "CS-Cyber Security", "Mechanical", "Civil", "Electrical", "Chemical", "CS-AI-ML", "CS-AI-DS", "Other"],
+  Engineering: [
+    "CS",
+    "IT",
+    "ENTC",
+    "CS-Cyber Security",
+    "Mechanical",
+    "Civil",
+    "Electrical",
+    "Chemical",
+    "CS-AI-ML",
+    "CS-AI-DS",
+    "Other",
+  ],
   MBA: ["Marketing", "Finance", "HR", "Operations", "Other"],
   BBA: ["International Business", "General", "Finance", "Other"],
   BCA: ["Computer Applications", "Other"],
@@ -12,7 +24,7 @@ const courseSpecializations = {
   Diploma: ["Mechanical", "Civil", "Electrical", "Computer", "Other"],
   BSC: ["Physics", "Chemistry", "Mathematics", "CS", "Other"],
   MSC: ["Physics", "Chemistry", "Mathematics", "CS", "Other"],
-  Others: ["Other"]
+  Others: ["Other"],
 };
 
 function AddCollegeModal({ show, onClose }) {
@@ -131,7 +143,9 @@ function AddCollegeModal({ show, onClose }) {
   return (
     <div className="fixed inset-0 z-52 bg-black/40 backdrop-blur-sm flex items-center justify-center px-2 py-4">
       <div className="bg-white w-full max-w-2xl rounded-2xl shadow-lg p-6 sm:p-8 overflow-y-auto max-h-[95vh]">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">Add New College Lead</h2>
+        <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">
+          Add New College Lead
+        </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* College Name */}
@@ -150,7 +164,9 @@ function AddCollegeModal({ show, onClose }) {
 
           {/* Address */}
           <div className="col-span-1 md:col-span-2">
-            <label className="text-sm font-medium text-gray-700 mb-1 block">Address</label>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">
+              Address
+            </label>
             <input
               type="text"
               value={address}
@@ -190,7 +206,9 @@ function AddCollegeModal({ show, onClose }) {
 
           {/* Email */}
           <div className="col-span-1 md:col-span-2">
-            <label className="text-sm font-medium text-gray-700 mb-1 block">Email</label>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">
+              Email
+            </label>
             <input
               type="email"
               value={email}
