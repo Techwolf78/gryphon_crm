@@ -214,7 +214,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
   if (!show || !lead) return null;
 
   return (
-    <div className="fixed inset-0 z-50 backdrop-blur-sm flex items-center justify-center px-4">
+    <div className="fixed inset-0  backdrop-blur-sm flex items-center justify-center px-4 z-54">
       <div className="bg-white w-full max-w-7xl h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-fadeIn">
         {/* Header */}
         <div className="flex justify-between items-center px-6 py-4 border-b bg-blue-100">
