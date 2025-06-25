@@ -1,4 +1,4 @@
-import  { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { collection, doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
@@ -345,8 +345,6 @@ function Sales() {
     return () => clearInterval(interval);
   }, [leads, currentUser]);
 
-
-
   return (
     <div className="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen font-sans ">
       <div className=" mx-auto">
@@ -418,8 +416,11 @@ function Sales() {
                 filteredLeads={filteredLeads}
                 handleImportComplete={handleImportComplete}
                 filters={filters}
+                setFilters={setFilters}
                 isFilterOpen={isFilterOpen}
                 setIsFilterOpen={setIsFilterOpen}
+                users={users}
+                leads={leads} // Pass leads data to extract filter options
               />
             </div>
           </div>
