@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import  { useState, useEffect, useRef } from "react";
 import { collection, doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
@@ -9,16 +9,6 @@ import TrainingForm from "../components/Sales/ClosureForm/TrainingForm";
 import LeadDetailsModal from "../components/Sales/LeadDetailsModal";
 import ExpectedDateModal from "../components/Sales/ExpectedDateWarning";
 import LeadsTable from "../components/Sales/LeadTable";
-// Add these imports at the top of your Sales.jsx
-import {
-  FiFilter,
-  FiDownload,
-  FiUpload,
-  FiX,
-  FiChevronDown,
-} from "react-icons/fi";
-import { CSVLink } from "react-csv";
-import Papa from "papaparse";
 import LeadFilters from "../components/Sales/LeadFilters"; // Adjust path as needed
 const tabLabels = {
   hot: "Hot",
@@ -355,6 +345,8 @@ function Sales() {
     return () => clearInterval(interval);
   }, [leads, currentUser]);
 
+
+
   return (
     <div className="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen font-sans ">
       <div className=" mx-auto">
@@ -422,28 +414,13 @@ function Sales() {
                   );
                 })()}
 
-              {/* Move the filter button here */}
-              <button
-                onClick={() => setIsFilterOpen(!isFilterOpen)}
-                className={`flex items-center space-x-2 px-3 py-1 rounded-full border transition-colors text-xs ${
-                  isFilterOpen
-                    ? "bg-blue-50 border-blue-200 text-blue-600"
-                    : "bg-white border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                <FiFilter className="w-4 h-4" />
-                <span>Filters</span>
-                {Object.values(filters).some(
-                  (filter) =>
-                    (typeof filter === "string" && filter) ||
-                    (typeof filter === "object" &&
-                      Object.values(filter).some(Boolean))
-                ) && (
-                  <span className="bg-blue-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
-                    !
-                  </span>
-                )}
-              </button>
+              <LeadFilters
+                filteredLeads={filteredLeads}
+                handleImportComplete={handleImportComplete}
+                filters={filters}
+                isFilterOpen={isFilterOpen}
+                setIsFilterOpen={setIsFilterOpen}
+              />
             </div>
           </div>
 
@@ -466,16 +443,6 @@ function Sales() {
             Add College
           </button>
         </div>
-
-        <LeadFilters
-          leads={leads}
-          users={users}
-          currentUser={currentUser}
-          onFilterChange={handleFilterChange}
-          onImportComplete={handleImportComplete}
-          isFilterOpen={isFilterOpen}
-          setIsFilterOpen={setIsFilterOpen}
-        />
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
           {Object.keys(tabLabels).map((key) => (
