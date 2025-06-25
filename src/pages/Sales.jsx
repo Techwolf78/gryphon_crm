@@ -6,7 +6,7 @@ import FollowupAlerts from "../components/Sales/FollowupAlerts";
 import AddCollegeModal from "../components/Sales/AddCollege";
 import FollowUp from "../components/Sales/Followup";
 import TrainingForm from "../components/Sales/ClosureForm/TrainingForm";
-import LeadDetailsModal from "../components/Sales/LeadDetailsModal";
+import LeadDetailsModal from "../components/Sales/EditDetailsModal";
 import ExpectedDateModal from "../components/Sales/ExpectedDateWarning";
 import LeadsTable from "../components/Sales/LeadTable";
 import LeadFilters from "../components/Sales/LeadFilters"; // Adjust path as needed
@@ -203,6 +203,7 @@ function Sales() {
       console.error("Failed to update lead", error);
     }
   };
+
 
   const filteredLeads = Object.entries(leads).filter(([, lead]) => {
     const phaseMatch = (lead.phase || "hot") === activeTab;
@@ -444,7 +445,6 @@ function Sales() {
             Add College
           </button>
         </div>
-
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
           {Object.keys(tabLabels).map((key) => (
             <button

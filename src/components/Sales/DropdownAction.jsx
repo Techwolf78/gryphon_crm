@@ -34,6 +34,7 @@ export default function DropdownActions({
       onClick={(e) => e.stopPropagation()} // ✅ Prevent bubbling from anywhere inside
     >
       <div className="py-1 relative">
+
  
         {/* Follow Up */}
         <button
@@ -104,12 +105,13 @@ export default function DropdownActions({
             </div>
           )}
         </div>
+
  
         {/* Phase Change Header */}
         <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
           Move to
         </div>
- 
+
         {/* Phase Change Buttons */}
         {["hot", "warm", "cold"]
           .filter((phase) => phase !== activeTab)
@@ -145,7 +147,7 @@ export default function DropdownActions({
               {phase.charAt(0).toUpperCase() + phase.slice(1)}
             </button>
           ))}
- 
+
         {/* Closure Button */}
         {leadData.phase === "hot" && (
           <button
@@ -165,5 +167,4 @@ export default function DropdownActions({
     </div>
   );
 }
- 
- 
+

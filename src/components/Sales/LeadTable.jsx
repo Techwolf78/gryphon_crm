@@ -16,7 +16,7 @@ const headerColorMap = {
   cold: "bg-cyan-50 text-cyan-800 border-b border-cyan-200",
   closed: "bg-green-50 text-green-800 border-b border-green-200",
 };
- 
+
 // Helpers
 function formatDate(timestamp) {
   if (!timestamp) return "-";
@@ -27,7 +27,7 @@ function getLatestFollowup(lead) {
   if (!lead.followups || lead.followups.length === 0) return "-";
   return lead.followups[lead.followups.length - 1].note || "-";
 }
- 
+
 export default function LeadsTable({
   loading,
   activeTab,
@@ -51,6 +51,7 @@ export default function LeadsTable({
   currentUser,
 }) {
   const [selectedLeadForDetails, setSelectedLeadForDetails] = useState(null);
+
  
   const gridColumns = "grid grid-cols-11 gap-4";
  
@@ -112,7 +113,7 @@ export default function LeadsTable({
     return `${latest.date || "-"} ${latest.time || ""} - ${latest.remarks || ""
       }`;
   };
- 
+
   const formatDate = (ms) =>
     new Date(ms).toLocaleDateString(undefined, {
       year: "numeric",
@@ -139,7 +140,7 @@ export default function LeadsTable({
             <div>Assigned To</div>
             <div className="text-center">Actions</div>
           </div>
- 
+
           {/* Rows */}
           <div className="space-y-3">
             {filteredLeads.map(([id, lead]) => (
@@ -168,6 +169,7 @@ export default function LeadsTable({
                         : lead[field] || "-"}
                     </div>
                   ))}
+
  
                   <div className="text-sm text-gray-700 break-words whitespace-normal min-w-0">
                     {getLatestFollowup(lead)}
@@ -178,7 +180,7 @@ export default function LeadsTable({
                       ? users[lead.assignedTo.uid].name
                       : lead.assignedTo?.name || "-"}
                   </div>
- 
+
                   <div className="flex justify-center items-center">
                     <button
                       onClick={(e) => {
@@ -196,7 +198,7 @@ export default function LeadsTable({
                     </button>
                   </div>
                 </div>
- 
+
                 {/* Dropdown Actions */}
                 {dropdownOpenId === id && (
                   <DropdownActions
@@ -221,6 +223,76 @@ export default function LeadsTable({
           </div>
         </div>
       </div>
+
+     {selectedLeadForDetails && (
+  <div
+    className="fixed inset-0 bg-opacity-50 backdrop-blur-md flex items-center justify-center z-50 transition-opacity duration-300"
+    onClick={() => setSelectedLeadForDetails(null)}
+  >
+    <div
+      className="bg-white rounded-lg shadow-lg max-w-2xl w-full mx-4 p-8 transform transition-transform duration-300 "
+      onClick={(e) => e.stopPropagation()}
+    >
+      <h2 className="text-2xl font-semibold mb-6 border-b border-gray-200 pb-2">
+        Lead Details
+      </h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700 mb-6">
+        <div>
+          <p className="font-medium">College Name:</p>
+          <p className="mt-1">{selectedLeadForDetails.businessName}</p>
+        </div>
+        <div>
+          <p className="font-medium">City:</p>
+          <p className="mt-1">{selectedLeadForDetails.city}</p>
+        </div>
+        <div>
+          <p className="font-medium">Contact:</p>
+          <p className="mt-1">{selectedLeadForDetails.pocName}</p>
+        </div>
+        <div>
+          <p className="font-medium">Phone:</p>
+          <p className="mt-1">{selectedLeadForDetails.phoneNo}</p>
+        </div>
+        <div>
+          <p className="font-medium">Email:</p>
+          <p className="mt-1">{selectedLeadForDetails.email}</p>
+        </div>
+        <div>
+          <p className="font-medium">TCV:</p>
+          <p className="mt-1">{selectedLeadForDetails.tcv}</p>
+        </div>
+        <div>
+          <p className="font-medium">Opened Date:</p>
+          <p className="mt-1">{formatDate(selectedLeadForDetails.createdAt)}</p>
+        </div>
+        <div>
+          <p className="font-medium">Expected Closure:</p>
+          <p className="mt-1">{formatDate(selectedLeadForDetails.expectedClosureDate)}</p>
+        </div>
+        {/* Assigned To Section */}
+        <div >
+          <p className="font-medium mb-1">Assigned To:</p>
+          <p className="mt-1">
+            {selectedLeadForDetails.assignedTo?.uid && users[selectedLeadForDetails.assignedTo.uid]
+              ? users[selectedLeadForDetails.assignedTo.uid].name
+              : selectedLeadForDetails.assignedTo?.name || "-"}
+          </p>
+        </div>
+        {/* Latest Followup */}
+        <div>
+          <p className="font-medium mb-1">Latest Followup:</p>
+          <p className="mt-1">{getLatestFollowup(selectedLeadForDetails)}</p>
+        </div>
+      </div>
+      <div className="flex justify-end">
+        <button
+          className="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded transition duration-200 shadow-md"
+          onClick={() => setSelectedLeadForDetails(null)}
+        >
+          Close
+        </button>
+      </div>
+
  
       {/* Lead Details Modal */}
       {selectedLeadForDetails && (
