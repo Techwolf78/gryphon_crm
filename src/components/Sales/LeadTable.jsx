@@ -222,54 +222,77 @@ export default function LeadsTable({
         </div>
       </div>
 
-      {/* Lead Details Modal */}
-      {selectedLeadForDetails && (
-        <div
-          className="fixed inset-0 backdrop-blur-sm bg-opacity-50 flex justify-center items-center z-50"
+     {selectedLeadForDetails && (
+  <div
+    className="fixed inset-0 bg-opacity-50 backdrop-blur-md flex items-center justify-center z-50 transition-opacity duration-300"
+    onClick={() => setSelectedLeadForDetails(null)}
+  >
+    <div
+      className="bg-white rounded-lg shadow-lg max-w-2xl w-full mx-4 p-8 transform transition-transform duration-300 "
+      onClick={(e) => e.stopPropagation()}
+    >
+      <h2 className="text-2xl font-semibold mb-6 border-b border-gray-200 pb-2">
+        Lead Details
+      </h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700 mb-6">
+        <div>
+          <p className="font-medium">College Name:</p>
+          <p className="mt-1">{selectedLeadForDetails.businessName}</p>
+        </div>
+        <div>
+          <p className="font-medium">City:</p>
+          <p className="mt-1">{selectedLeadForDetails.city}</p>
+        </div>
+        <div>
+          <p className="font-medium">Contact:</p>
+          <p className="mt-1">{selectedLeadForDetails.pocName}</p>
+        </div>
+        <div>
+          <p className="font-medium">Phone:</p>
+          <p className="mt-1">{selectedLeadForDetails.phoneNo}</p>
+        </div>
+        <div>
+          <p className="font-medium">Email:</p>
+          <p className="mt-1">{selectedLeadForDetails.email}</p>
+        </div>
+        <div>
+          <p className="font-medium">TCV:</p>
+          <p className="mt-1">{selectedLeadForDetails.tcv}</p>
+        </div>
+        <div>
+          <p className="font-medium">Opened Date:</p>
+          <p className="mt-1">{formatDate(selectedLeadForDetails.createdAt)}</p>
+        </div>
+        <div>
+          <p className="font-medium">Expected Closure:</p>
+          <p className="mt-1">{formatDate(selectedLeadForDetails.expectedClosureDate)}</p>
+        </div>
+        {/* Assigned To Section */}
+        <div >
+          <p className="font-medium mb-1">Assigned To:</p>
+          <p className="mt-1">
+            {selectedLeadForDetails.assignedTo?.uid && users[selectedLeadForDetails.assignedTo.uid]
+              ? users[selectedLeadForDetails.assignedTo.uid].name
+              : selectedLeadForDetails.assignedTo?.name || "-"}
+          </p>
+        </div>
+        {/* Latest Followup */}
+        <div>
+          <p className="font-medium mb-1">Latest Followup:</p>
+          <p className="mt-1">{getLatestFollowup(selectedLeadForDetails)}</p>
+        </div>
+      </div>
+      <div className="flex justify-end">
+        <button
+          className="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded transition duration-200 shadow-md"
           onClick={() => setSelectedLeadForDetails(null)}
         >
-          <div
-            className="bg-white p-6 rounded-lg max-w-lg w-full"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-xl font-bold mb-4">Lead Details</h2>
-            <p>
-              <strong>College Name:</strong> {selectedLeadForDetails.businessName}
-            </p>
-            <p>
-              <strong>City:</strong> {selectedLeadForDetails.city}
-            </p>
-            <p>
-              <strong>Contact:</strong> {selectedLeadForDetails.pocName}
-            </p>
-            <p>
-              <strong>Phone:</strong> {selectedLeadForDetails.phoneNo}
-            </p>
-            <p>
-              <strong>Email:</strong> {selectedLeadForDetails.email}
-            </p>
-            <p>
-              <strong>TCV:</strong> {selectedLeadForDetails.tcv}
-            </p>
-            <p>
-              <strong>Opened Date:</strong> {formatDate(selectedLeadForDetails.createdAt)}
-            </p>
-            <p>
-              <strong>Expected Closure:</strong> {formatDate(selectedLeadForDetails.expectedClosureDate)}
-            </p>
-            <p>
-              <strong>Latest Followup:</strong> {getLatestFollowup(selectedLeadForDetails)}
-            </p>
-
-            <button
-              className="mt-4 bg-red-600 text-white px-4 py-2 rounded"
-              onClick={() => setSelectedLeadForDetails(null)}
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </>
   );
 }

@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useContext } from "react";
 import { FaTimes } from "react-icons/fa";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
 import { AuthContext } from "../../../context/AuthContext";
-
 import CollegeInfoSection from "./CollegeInfoSection";
 import POCInfoSection from "./POCInfoSection";
 import StudentBreakdownSection from "./StudentBreakdownSection";
@@ -13,7 +12,6 @@ import MOUUploadSection from "./MOUUploadSection";
 
 const TrainingForm = ({ show, onClose, lead, users }) => {
   const { currentUser } = useContext(AuthContext);
-
 
   const [formData, setFormData] = useState({
     projectCode: "",
@@ -66,6 +64,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
   const [studentFile, setStudentFile] = useState(null);
   const [mouFile, setMouFile] = useState(null);
 
+  // Auto-calculate studentCount and totalCost based on courses
   useEffect(() => {
     const totalStudents = formData.courses.reduce(
       (sum, item) => sum + (parseInt(item.students) || 0),
@@ -78,6 +77,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
     }));
   }, [formData.courses, formData.perStudentCost]);
 
+  // Generate projectCode based on form data
   useEffect(() => {
     if (
       formData.collegeCode &&
@@ -88,7 +88,6 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
     ) {
       const passYear = formData.passingYear.split("-");
       const shortPassYear = `${passYear[0].slice(-2)}-${passYear[1].slice(-2)}`;
-
       const coursePart = formData.course === "Engineering" ? "ENGG" : formData.course;
 
       const code = `${formData.collegeCode}/${coursePart}/${formData.year}/${formData.deliveryType}/${shortPassYear}`;
@@ -96,6 +95,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
     }
   }, [formData.collegeCode, formData.course, formData.year, formData.deliveryType, formData.passingYear]);
 
+  // Handle input changes and validation
   const handleChange = (e) => {
     const { name, value } = e.target;
 
@@ -106,27 +106,38 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
 
     if (name === "pincode") {
       const isValid = /^[0-9]{0,6}$/.test(value);
-      setPincodeError(
-        value && !isValid ? "Pincode must be up to 6 digits only" : ""
-      );
+      setPincodeError(value && !isValid ? "Pincode must be up to 6 digits only" : "");
     }
 
     if (name === "gstNumber") {
       const isValid = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(value);
-      setGstError(
-        value && !isValid ? "Invalid GST number format" : ""
-      );
+      setGstError(value && !isValid ? "Invalid GST number format" : "");
     }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // Step 1: Update lead status to "closed"
+    try {
+      if (lead?.id) {
+        const leadRef = doc(db, "leads", lead.id);
+        await updateDoc(leadRef, {
+          phase: "closed",
+          closureType: "new",
+          closedDate: new Date().toISOString()
+        });
+      }
+    } catch (err) {
+      console.error("Error updating lead: ", err);
+    }
+
+    // Step 2: Save form data to Firebase
     try {
       const assignedUser = users?.[lead?.assignedTo?.uid] || {};
-
       await addDoc(collection(db, "trainingForms"), {
         projectCode: formData.projectCode,
         collegeName: formData.collegeName,
@@ -172,17 +183,18 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
 
       alert("Form submitted successfully!");
       onClose();
-    } catch (error) {
-      console.error("Error adding document: ", error);
+    } catch (err) {
+      console.error("Error submitting form: ", err);
       alert("Something went wrong. Please try again.");
     }
   };
 
-    if (!show || !lead) return null;
+  if (!show || !lead) return null;
 
   return (
     <div className="fixed inset-0 z-50 backdrop-blur-sm flex items-center justify-center px-4">
       <div className="bg-white w-full max-w-7xl h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-fadeIn">
+        {/* Header */}
         <div className="flex justify-between items-center px-6 py-4 border-b bg-blue-100">
           <h2 className="text-xl font-bold text-gray-800">Client Onboarding Form</h2>
           <div className="flex items-center space-x-3 w-[450px]">
@@ -199,29 +211,40 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
           </div>
         </div>
 
+        {/* Form */}
         <form className="flex-1 overflow-y-auto p-6 space-y-6 text-sm" onSubmit={handleSubmit}>
-          <CollegeInfoSection 
-            formData={formData} 
-            setFormData={setFormData} 
-            handleChange={handleChange} 
-            collegeCodeError={collegeCodeError} 
-            pincodeError={pincodeError} 
-            gstError={gstError} 
+          <CollegeInfoSection
+            formData={formData}
+            setFormData={setFormData}
+            handleChange={handleChange}
+            collegeCodeError={collegeCodeError}
+            pincodeError={pincodeError}
+            gstError={gstError}
           />
           <POCInfoSection formData={formData} handleChange={handleChange} />
-          <StudentBreakdownSection formData={formData} setFormData={setFormData} studentFile={studentFile} setStudentFile={setStudentFile} />
+          <StudentBreakdownSection
+            formData={formData}
+            setFormData={setFormData}
+            studentFile={studentFile}
+            setStudentFile={setStudentFile}
+          />
           <TopicBreakdownSection formData={formData} setFormData={setFormData} />
           <PaymentInfoSection formData={formData} setFormData={setFormData} />
           <MOUUploadSection mouFile={mouFile} setMouFile={setMouFile} />
 
+          {/* Submit Button */}
           <div className="pt-4">
-            <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+            <button
+              type="submit"
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+            >
               Submit
             </button>
           </div>
         </form>
       </div>
 
+      {/* Animation styles */}
       <style>{`
         @keyframes fadeIn {
           from {

@@ -159,7 +159,6 @@ function LeadDetailsModal({ show, onClose, lead, onSave }) {
                   </div>
                 );
               }
-
               // For all other text inputs
               return (
                 <div
@@ -173,8 +172,11 @@ function LeadDetailsModal({ show, onClose, lead, onSave }) {
                     type="text"
                     value={formData[key] || ""}
                     onChange={(e) => handleChange(key, e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500
+    ${key === "phase" ? "bg-gray-100 text-gray-500 cursor-not-allowed" : ""}`}
+                    disabled={key === "phase"}
                   />
+
                 </div>
               );
             })}

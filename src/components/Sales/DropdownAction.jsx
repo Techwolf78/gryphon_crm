@@ -21,7 +21,6 @@ export default function DropdownActions({
   activeTab,
   dropdownRef,
   users,
-  // ✅ NEW Props
   setShowExpectedDateModal,
   setPendingPhaseChange,
   setLeadBeingUpdated,
@@ -32,14 +31,15 @@ export default function DropdownActions({
     <div
       ref={dropdownRef}
       className="absolute z-50 bg-white rounded-xl shadow-xl w-48 overflow-visible -right-4 top-full mt-1 animate-fadeIn"
+      onClick={(e) => e.stopPropagation()} // ✅ Prevent bubbling from anywhere inside
     >
       <div className="py-1 relative">
-
 
         {/* Follow Up */}
         <button
           className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition"
-          onClick={() => {
+          onClick={(e) => {
+            e.stopPropagation();
             setSelectedLead({ ...leadData, id: leadId });
             setShowFollowUpModal(true);
             closeDropdown();
@@ -68,6 +68,7 @@ export default function DropdownActions({
           className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition relative group cursor-pointer"
           onMouseEnter={() => setAssignHovered(true)}
           onMouseLeave={() => setAssignHovered(false)}
+          onClick={(e) => e.stopPropagation()} // ✅ prevent row click
         >
           <FaArrowRight className="text-indigo-500 mr-3" />
           Assign
@@ -78,7 +79,8 @@ export default function DropdownActions({
                 .map((user) => (
                   <button
                     key={user.uid}
-                    onClick={async () => {
+                    onClick={async (e) => {
+                      e.stopPropagation();
                       try {
                         await updateDoc(doc(db, "leads", leadId), {
                           assignedTo: {
@@ -102,17 +104,21 @@ export default function DropdownActions({
             </div>
           )}
         </div>
-        {/* Phase Change */}
+
+        {/* Phase Change Header */}
         <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
           Move to
         </div>
-        {["hot", "warm", "cold"] // removed "closed"
+
+        {/* Phase Change Buttons */}
+        {["hot", "warm", "cold"]
           .filter((phase) => phase !== activeTab)
           .map((phase) => (
             <button
               key={phase}
               className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition"
-              onClick={async () => {
+              onClick={async (e) => {
+                e.stopPropagation();
                 const isFromHotToWarmOrCold =
                   leadData.phase === "hot" &&
                   (phase === "warm" || phase === "cold");
@@ -130,22 +136,22 @@ export default function DropdownActions({
             >
               <FaArrowRight
                 className={`${phase === "hot"
-                    ? "text-red-500"
-                    : phase === "warm"
-                      ? "text-amber-500"
-                      : "text-emerald-500"
+                  ? "text-red-500"
+                  : phase === "warm"
+                    ? "text-amber-500"
+                    : "text-emerald-500"
                   } mr-3`}
               />
               {phase.charAt(0).toUpperCase() + phase.slice(1)}
             </button>
           ))}
 
-
-        {/* Closure - only show if lead is in 'hot' phase */}
+        {/* Closure Button */}
         {leadData.phase === "hot" && (
           <button
             className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-t border-gray-100 mt-1 transition"
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
               setSelectedLead({ ...leadData, id: leadId });
               setShowClosureModal(true);
               closeDropdown();
@@ -159,3 +165,4 @@ export default function DropdownActions({
     </div>
   );
 }
+
