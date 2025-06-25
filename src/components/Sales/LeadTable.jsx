@@ -17,17 +17,6 @@ const headerColorMap = {
   closed: "bg-green-50 text-green-800 border-b border-green-200",
 };
 
-// Helpers
-function formatDate(timestamp) {
-  if (!timestamp) return "-";
-  return new Date(timestamp).toLocaleDateString();
-}
-
-function getLatestFollowup(lead) {
-  if (!lead.followups || lead.followups.length === 0) return "-";
-  return lead.followups[lead.followups.length - 1].note || "-";
-}
-
 export default function LeadsTable({
   loading,
   activeTab,
@@ -102,8 +91,7 @@ export default function LeadsTable({
       </div>
     );
   }
-
-  const getLatestFollowup = (lead) => {
+ const getLatestFollowup = (lead) => {
     const followData = lead.followup || {};
     const entries = Object.entries(followData).sort(
       (a, b) => a[1].timestamp - b[1].timestamp
@@ -120,26 +108,25 @@ export default function LeadsTable({
       month: "short",
       day: "numeric",
     });
-
   return (
     <>
       <div className="overflow-x-auto md:overflow-visible">
         <div className="w-auto space-y-3">
           {/* Header */}
           <div
-            className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-2 rounded-xl mb-3`}
+            className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-4 rounded-xl mb-3`}
           >
-            <div className="break-words">College<br/>Name</div>
-            <div className="break-words">City</div>
-            <div className="break-words">Contact<br/>Name</div>
-            <div className="break-words">Phone<br/>No.</div>
-            <div className="break-words">Email<br/>ID</div>
-            <div className="break-words">TCV</div>
-            <div className="break-words">Opened<br/>Date</div>
-            <div className="break-words">Expected<br/>Closure</div>
-            <div className="break-words">Follow-<br/>Ups</div>
-            <div className="break-words">Assigned<br/>To</div>
-            <div className="text-center break-words">Actions</div>
+            <div>College Name</div>
+            <div>City</div>
+            <div>Contact Name</div>
+            <div>Phone No.</div>
+            <div>Email ID</div>
+            <div>TCV</div>
+            <div>Opened Date</div>
+            <div>Expected Closure</div>
+            <div>Follow-Ups</div>
+            <div>Assigned To</div>
+            <div className="text-center">Actions</div>
           </div>
 
           {/* Rows */}
@@ -164,18 +151,18 @@ export default function LeadsTable({
                     "createdAt",
                     "expectedClosureDate",
                   ].map((field, i) => (
-                    <div key={i} className="text-sm text-gray-700 break-words whitespace-normal">
+                    <div key={i} className="text-sm text-gray-700">
                       {(field === "createdAt" || field === "expectedClosureDate") && lead[field]
                         ? formatDate(lead[field])
                         : lead[field] || "-"}
                     </div>
                   ))}
 
-                  <div className="text-sm text-gray-700 break-words whitespace-normal">
+                  <div className="text-sm text-gray-700 break-words whitespace-normal min-w-0">
                     {getLatestFollowup(lead)}
                   </div>
 
-                  <div className="text-sm text-gray-700 break-words whitespace-normal">
+                  <div className="text-sm text-gray-700 break-words whitespace-normal min-w-0">
                     {lead.assignedTo?.uid && users[lead.assignedTo.uid]?.name
                       ? users[lead.assignedTo.uid].name
                       : lead.assignedTo?.name || "-"}
@@ -224,74 +211,51 @@ export default function LeadsTable({
         </div>
       </div>
 
+      {/* Lead Details Modal */}
       {selectedLeadForDetails && (
         <div
-          className="fixed inset-0 bg-opacity-50 backdrop-blur-md flex items-center justify-center z-50 transition-opacity duration-300"
+          className="fixed inset-0 backdrop-blur-sm bg-opacity-50 flex justify-center items-center z-50"
           onClick={() => setSelectedLeadForDetails(null)}
         >
           <div
-            className="bg-white rounded-lg shadow-lg max-w-2xl w-full mx-4 p-8 transform transition-transform duration-300 "
+            className="bg-white p-6 rounded-lg max-w-lg w-full"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-2xl font-semibold mb-6 border-b border-gray-200 pb-2">
-              Lead Details
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700 mb-6">
-              <div>
-                <p className="font-medium">College Name:</p>
-                <p className="mt-1">{selectedLeadForDetails.businessName}</p>
-              </div>
-              <div>
-                <p className="font-medium">City:</p>
-                <p className="mt-1">{selectedLeadForDetails.city}</p>
-              </div>
-              <div>
-                <p className="font-medium">Contact:</p>
-                <p className="mt-1">{selectedLeadForDetails.pocName}</p>
-              </div>
-              <div>
-                <p className="font-medium">Phone:</p>
-                <p className="mt-1">{selectedLeadForDetails.phoneNo}</p>
-              </div>
-              <div>
-                <p className="font-medium">Email:</p>
-                <p className="mt-1">{selectedLeadForDetails.email}</p>
-              </div>
-              <div>
-                <p className="font-medium">TCV:</p>
-                <p className="mt-1">{selectedLeadForDetails.tcv}</p>
-              </div>
-              <div>
-                <p className="font-medium">Opened Date:</p>
-                <p className="mt-1">{formatDate(selectedLeadForDetails.createdAt)}</p>
-              </div>
-              <div>
-                <p className="font-medium">Expected Closure:</p>
-                <p className="mt-1">{formatDate(selectedLeadForDetails.expectedClosureDate)}</p>
-              </div>
-              {/* Assigned To Section */}
-              <div>
-                <p className="font-medium mb-1">Assigned To:</p>
-                <p className="mt-1">
-                  {selectedLeadForDetails.assignedTo?.uid && users[selectedLeadForDetails.assignedTo.uid]
-                    ? users[selectedLeadForDetails.assignedTo.uid].name
-                    : selectedLeadForDetails.assignedTo?.name || "-"}
-                </p>
-              </div>
-              {/* Latest Followup */}
-              <div>
-                <p className="font-medium mb-1">Latest Followup:</p>
-                <p className="mt-1">{getLatestFollowup(selectedLeadForDetails)}</p>
-              </div>
-            </div>
-            <div className="flex justify-end">
-              <button
-                className="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded transition duration-200 shadow-md"
-                onClick={() => setSelectedLeadForDetails(null)}
-              >
-                Close
-              </button>
-            </div>
+            <h2 className="text-xl font-bold mb-4">Lead Details</h2>
+            <p>
+              <strong>College Name:</strong> {selectedLeadForDetails.businessName}
+            </p>
+            <p>
+              <strong>City:</strong> {selectedLeadForDetails.city}
+            </p>
+            <p>
+              <strong>Contact:</strong> {selectedLeadForDetails.pocName}
+            </p>
+            <p>
+              <strong>Phone:</strong> {selectedLeadForDetails.phoneNo}
+            </p>
+            <p>
+              <strong>Email:</strong> {selectedLeadForDetails.email}
+            </p>
+            <p>
+              <strong>TCV:</strong> {selectedLeadForDetails.tcv}
+            </p>
+            <p>
+              <strong>Opened Date:</strong> {formatDate(selectedLeadForDetails.createdAt)}
+            </p>
+            <p>
+              <strong>Expected Closure:</strong> {formatDate(selectedLeadForDetails.expectedClosureDate)}
+            </p>
+            <p>
+              <strong>Latest Followup:</strong> {getLatestFollowup(selectedLeadForDetails)}
+            </p>
+
+            <button
+              className="mt-4 bg-red-600 text-white px-4 py-2 rounded"
+              onClick={() => setSelectedLeadForDetails(null)}
+            >
+              Close
+            </button>
           </div>
         </div>
       )}

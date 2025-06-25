@@ -27,6 +27,7 @@
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.13",
     "emailjs-com": "^3.2.0",
+    "file-saver": "^2.0.5",
     "firebase": "^11.9.0",
     "framer-motion": "^12.16.0",
     "papaparse": "^5.5.3",
@@ -38,7 +39,8 @@
     "react-router-dom": "^7.6.2",
     "react-time-picker": "^7.0.0",
     "react-toastify": "^11.0.5",
-    "tailwindcss": "^4.1.8"
+    "tailwindcss": "^4.1.8",
+    "xlsx-js-style": "^1.2.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
