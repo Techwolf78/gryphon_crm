@@ -14,7 +14,6 @@ import MOUUploadSection from "./MOUUploadSection";
 const TrainingForm = ({ show, onClose, lead, users }) => {
   const { currentUser } = useContext(AuthContext);
 
-
   const [formData, setFormData] = useState({
     projectCode: "",
     collegeName: lead?.businessName || "",
@@ -65,6 +64,8 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
   const [gstError, setGstError] = useState("");
   const [studentFile, setStudentFile] = useState(null);
   const [mouFile, setMouFile] = useState(null);
+  const [studentFileError, setStudentFileError] = useState("");
+  const [mouFileError, setMouFileError] = useState("");
 
   useEffect(() => {
     const totalStudents = formData.courses.reduce(
@@ -124,6 +125,24 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    let hasError = false;
+
+    if (!studentFile) {
+      setStudentFileError("Please upload the Student Excel file.");
+      hasError = true;
+    } else {
+      setStudentFileError("");
+    }
+
+    if (!mouFile) {
+      setMouFileError("Please upload the MOU file.");
+      hasError = true;
+    } else {
+      setMouFileError("");
+    }
+
+    if (hasError) return;
+
     try {
       const assignedUser = users?.[lead?.assignedTo?.uid] || {};
 
@@ -178,13 +197,13 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
     }
   };
 
-    if (!show || !lead) return null;
+  if (!show || !lead) return null;
 
   return (
     <div className="fixed inset-0 z-50 backdrop-blur-sm flex items-center justify-center px-4">
       <div className="bg-white w-full max-w-7xl h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-fadeIn">
         <div className="flex justify-between items-center px-6 py-4 border-b bg-blue-100">
-          <h2 className="text-xl font-bold text-gray-800">Client Onboarding Form</h2>
+          <h2 className="text-2xl font-bold text-blue-800">Client Onboarding Form</h2>
           <div className="flex items-center space-x-3 w-[450px]">
             <input
               name="projectCode"
@@ -209,10 +228,20 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
             gstError={gstError} 
           />
           <POCInfoSection formData={formData} handleChange={handleChange} />
-          <StudentBreakdownSection formData={formData} setFormData={setFormData} studentFile={studentFile} setStudentFile={setStudentFile} />
+          <StudentBreakdownSection
+            formData={formData}
+            setFormData={setFormData}
+            studentFile={studentFile}
+            setStudentFile={setStudentFile}
+            studentFileError={studentFileError}
+          />
           <TopicBreakdownSection formData={formData} setFormData={setFormData} />
           <PaymentInfoSection formData={formData} setFormData={setFormData} />
-          <MOUUploadSection mouFile={mouFile} setMouFile={setMouFile} />
+          <MOUUploadSection
+            mouFile={mouFile}
+            setMouFile={setMouFile}
+            mouFileError={mouFileError}
+          />
 
           <div className="pt-4">
             <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
