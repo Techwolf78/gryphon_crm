@@ -91,8 +91,12 @@ export default function LeadsTable({
           />
         </svg>
 
-        <h3 className="mt-4 text-lg font-medium text-gray-900">No leads found</h3>
-        <p className="mt-1 text-gray-500">Get started by adding a new college</p>
+        <h3 className="mt-4 text-lg font-medium text-gray-900">
+          No leads found
+        </h3>
+        <p className="mt-1 text-gray-500">
+          Get started by adding a new college
+        </p>
         <button
           onClick={() => setShowModal(true)}
           className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition"
@@ -110,8 +114,9 @@ export default function LeadsTable({
     );
     if (entries.length === 0) return "-";
     const latest = entries[entries.length - 1][1];
-    return `${latest.date || "-"} ${latest.time || ""} - ${latest.remarks || ""
-      }`;
+    return `${latest.date || "-"} ${latest.time || ""} - ${
+      latest.remarks || ""
+    }`;
   };
 
   const formatDate = (ms) =>
@@ -129,16 +134,48 @@ export default function LeadsTable({
           <div
             className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-2 rounded-xl mb-3`}
           >
-            <div className="break-words">College<br/>Name</div>
+            <div className="break-words">
+              College
+              <br />
+              Name
+            </div>
             <div className="break-words">City</div>
-            <div className="break-words">Contact<br/>Name</div>
-            <div className="break-words">Phone<br/>No.</div>
-            <div className="break-words">Email<br/>ID</div>
+            <div className="break-words">
+              Contact
+              <br />
+              Name
+            </div>
+            <div className="break-words">
+              Phone
+              <br />
+              No.
+            </div>
+            <div className="break-words">
+              Email
+              <br />
+              ID
+            </div>
             <div className="break-words">TCV</div>
-            <div className="break-words">Opened<br/>Date</div>
-            <div className="break-words">Expected<br/>Closure</div>
-            <div className="break-words">Follow-<br/>Ups</div>
-            <div className="break-words">Assigned<br/>To</div>
+            <div className="break-words">
+              Opened
+              <br />
+              Date
+            </div>
+            <div className="break-words">
+              Expected
+              <br />
+              Closure
+            </div>
+            <div className="break-words">
+              Follow-
+              <br />
+              Ups
+            </div>
+            <div className="break-words">
+              Assigned
+              <br />
+              To
+            </div>
             <div className="text-center break-words">Actions</div>
           </div>
 
@@ -151,8 +188,7 @@ export default function LeadsTable({
                 onClick={() => setSelectedLeadForDetails(lead)}
               >
                 <div
-                  className={`${gridColumns} gap-4 p-5 rounded-xl bg-white shadow-sm hover:shadow-md transition-all duration-300 ${borderColorMap[activeTab]
-                    }`}
+                  className={`${gridColumns} gap-4 p-5 rounded-xl bg-white shadow-sm hover:shadow-md transition-all duration-300 ${borderColorMap[activeTab]}`}
                 >
                   {[
                     "businessName",
@@ -161,12 +197,22 @@ export default function LeadsTable({
                     "phoneNo",
                     "email",
                     "tcv",
-                    "createdAt",
+                    "openedDate",
                     "expectedClosureDate",
                   ].map((field, i) => (
-                    <div key={i} className="text-sm text-gray-700 break-words whitespace-normal">
-                      {(field === "createdAt" || field === "expectedClosureDate") && lead[field]
-                        ? formatDate(lead[field])
+                    <div
+                      key={i}
+                      className="text-sm text-gray-700 break-words whitespace-normal"
+                    >
+                      {(field === "openedDate" ||
+                        field === "expectedClosureDate") &&
+                      (lead[field] ||
+                        (field === "openedDate" && lead.createdAt))
+                        ? formatDate(
+                            field === "openedDate"
+                              ? lead.openedDate || lead.createdAt
+                              : lead[field]
+                          )
                         : lead[field] || "-"}
                     </div>
                   ))}
@@ -188,13 +234,23 @@ export default function LeadsTable({
                         toggleDropdown(id, e);
                       }}
                       className={`text-gray-500 hover:text-gray-700 focus:outline-none transition p-2 rounded-full hover:bg-gray-100 ${
-                        dropdownOpenId === id ? "bg-gray-200 text-gray-900 shadow-inner" : ""
+                        dropdownOpenId === id
+                          ? "bg-gray-200 text-gray-900 shadow-inner"
+                          : ""
                       }`}
                       aria-expanded={dropdownOpenId === id}
                       aria-haspopup="true"
-                      aria-label={dropdownOpenId === id ? "Close actions menu" : "Open actions menu"}
+                      aria-label={
+                        dropdownOpenId === id
+                          ? "Close actions menu"
+                          : "Open actions menu"
+                      }
                     >
-                      {dropdownOpenId === id ? <FaTimes size={16} /> : <FaEllipsisV size={16} />}
+                      {dropdownOpenId === id ? (
+                        <FaTimes size={16} />
+                      ) : (
+                        <FaEllipsisV size={16} />
+                      )}
                     </button>
                   </div>
                 </div>
@@ -226,7 +282,7 @@ export default function LeadsTable({
 
       {selectedLeadForDetails && (
         <div
-          className="fixed inset-0 bg-opacity-50 backdrop-blur-md flex items-center justify-center z-50 transition-opacity duration-300"
+          className="fixed inset-0 bg-opacity-50 backdrop-blur-md flex items-center justify-center z-54 transition-opacity duration-300"
           onClick={() => setSelectedLeadForDetails(null)}
         >
           <div
@@ -263,17 +319,25 @@ export default function LeadsTable({
               </div>
               <div>
                 <p className="font-medium">Opened Date:</p>
-                <p className="mt-1">{formatDate(selectedLeadForDetails.createdAt)}</p>
+                <p className="mt-1">
+                  {formatDate(
+                    selectedLeadForDetails.openedDate ||
+                      selectedLeadForDetails.createdAt
+                  )}
+                </p>
               </div>
               <div>
                 <p className="font-medium">Expected Closure:</p>
-                <p className="mt-1">{formatDate(selectedLeadForDetails.expectedClosureDate)}</p>
+                <p className="mt-1">
+                  {formatDate(selectedLeadForDetails.expectedClosureDate)}
+                </p>
               </div>
               {/* Assigned To Section */}
               <div>
                 <p className="font-medium mb-1">Assigned To:</p>
                 <p className="mt-1">
-                  {selectedLeadForDetails.assignedTo?.uid && users[selectedLeadForDetails.assignedTo.uid]
+                  {selectedLeadForDetails.assignedTo?.uid &&
+                  users[selectedLeadForDetails.assignedTo.uid]
                     ? users[selectedLeadForDetails.assignedTo.uid].name
                     : selectedLeadForDetails.assignedTo?.name || "-"}
                 </p>
@@ -281,7 +345,9 @@ export default function LeadsTable({
               {/* Latest Followup */}
               <div>
                 <p className="font-medium mb-1">Latest Followup:</p>
-                <p className="mt-1">{getLatestFollowup(selectedLeadForDetails)}</p>
+                <p className="mt-1">
+                  {getLatestFollowup(selectedLeadForDetails)}
+                </p>
               </div>
             </div>
             <div className="flex justify-end">
