@@ -41,6 +41,8 @@ function AddCollegeModal({ show, onClose }) {
   const [studentCount, setStudentCount] = useState("");
   const [perStudentCost, setPerStudentCost] = useState("");
   const [tcv, setTcv] = useState(0);
+  const [manualSpecialization, setManualSpecialization] = useState("");
+  const [manualCourseType, setManualCourseType] = useState("");
 
   useEffect(() => {
     const count = parseInt(studentCount) || 0;
@@ -75,6 +77,7 @@ function AddCollegeModal({ show, onClose }) {
     onClose();
   };
 
+  // Modify the handleAddBusiness function to use manualSpecialization when applicable
   const handleAddBusiness = async () => {
     const user = auth.currentUser;
     if (!user) {
@@ -93,6 +96,16 @@ function AddCollegeModal({ show, onClose }) {
     const phase = getLeadPhase(expectedClosureTimestamp);
     const timestamp = Date.now();
 
+    const finalCourseType =
+      courseType === "Others" && manualCourseType.trim()
+        ? manualCourseType.trim()
+        : courseType;
+
+    const finalSpecialization =
+      specialization === "Other" && manualSpecialization.trim()
+        ? manualSpecialization.trim()
+        : specialization;
+
     const newLead = {
       businessName,
       address,
@@ -102,8 +115,8 @@ function AddCollegeModal({ show, onClose }) {
       state,
       city,
       expectedClosureDate: expectedClosureTimestamp,
-      courseType,
-      specialization,
+      courseType: finalCourseType,
+      specialization: finalSpecialization,
       studentCount: parseInt(studentCount),
       perStudentCost: parseFloat(perStudentCost),
       tcv,
@@ -135,8 +148,10 @@ function AddCollegeModal({ show, onClose }) {
     phoneNo.trim() &&
     state &&
     city &&
-    courseType &&
-    specialization;
+    ((courseType !== "Others" && courseType) ||
+      (courseType === "Others" && manualCourseType.trim())) &&
+    ((specialization !== "Other" && specialization) ||
+      (specialization === "Other" && manualSpecialization.trim()));
 
   if (!show) return null;
 
@@ -285,6 +300,7 @@ function AddCollegeModal({ show, onClose }) {
               onChange={(e) => {
                 setCourseType(e.target.value);
                 setSpecialization("");
+                setManualSpecialization("");
               }}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
             >
@@ -297,6 +313,31 @@ function AddCollegeModal({ show, onClose }) {
             </select>
           </div>
 
+          {courseType === "Others" && (
+            <div className="mt-2">
+              <label className="text-sm font-medium text-gray-700 mb-1 block">
+                Please specify Course Type
+                <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={manualCourseType}
+                onChange={(e) => setManualCourseType(e.target.value)}
+                placeholder="Enter custom course type"
+                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600 ${
+                  !manualCourseType.trim() && isFormValid
+                    ? "border-red-500"
+                    : "border-gray-300"
+                }`}
+              />
+              {!manualCourseType.trim() && isFormValid && (
+                <p className="text-red-500 text-xs mt-1">
+                  This field is required
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Specialization */}
           {courseType && (
             <div>
@@ -305,7 +346,10 @@ function AddCollegeModal({ show, onClose }) {
               </label>
               <select
                 value={specialization}
-                onChange={(e) => setSpecialization(e.target.value)}
+                onChange={(e) => {
+                  setSpecialization(e.target.value);
+                  setManualSpecialization("");
+                }}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
               >
                 <option value="">Select Specialization</option>
@@ -315,6 +359,32 @@ function AddCollegeModal({ show, onClose }) {
                   </option>
                 ))}
               </select>
+
+              {specialization === "Other" && (
+                <div className="mt-2">
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">
+                    Please specify Specialization
+                    <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={manualSpecialization}
+                    onChange={(e) => setManualSpecialization(e.target.value)}
+                    placeholder="Enter custom specialization"
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600 ${
+                      !manualSpecialization.trim() && isFormValid
+                        ? "border-red-500"
+                        : "border-gray-300"
+                    }`}
+                    required
+                  />
+                  {!manualSpecialization.trim() && isFormValid && (
+                    <p className="text-red-500 text-xs mt-1">
+                      This field is required
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
