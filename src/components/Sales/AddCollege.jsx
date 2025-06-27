@@ -246,7 +246,7 @@ function AddCollegeModal({ show, onClose }) {
           {/* Expected Closure Date */}
           <div>
             <label className="text-sm font-medium text-gray-700 mb-1 block">
-              Expected Closure Date
+              Expected Closure Date <span className="text-red-500">*</span>
             </label>
             <input
               type="date"
@@ -304,7 +304,7 @@ function AddCollegeModal({ show, onClose }) {
           <div className="col-span-1 md:col-span-2 flex gap-4 items-end">
             <div className="flex-1">
               <label className="text-sm font-medium text-gray-700 mb-1 block">
-                Student Count
+                Student Count <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
@@ -316,7 +316,7 @@ function AddCollegeModal({ show, onClose }) {
             </div>
             <div className="flex-1">
               <label className="text-sm font-medium text-gray-700 mb-1 block">
-                Per Student Cost
+                Per Student Cost <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
@@ -328,7 +328,7 @@ function AddCollegeModal({ show, onClose }) {
             </div>
             <div className="flex-1">
               <label className="text-sm font-medium text-gray-700 mb-1 block">
-                TCV
+                TCV <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"

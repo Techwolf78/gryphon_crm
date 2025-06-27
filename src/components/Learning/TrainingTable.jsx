@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { FaBars } from "react-icons/fa"; // Exact burger button icon
+import { FaEllipsisV } from "react-icons/fa"; // Changed to three dots icon
 
 function TrainingTable({ trainingData, onRowClick }) {
   const [menuOpenId, setMenuOpenId] = useState(null);
@@ -18,7 +18,9 @@ function TrainingTable({ trainingData, onRowClick }) {
         <div className="w-1/5">College</div>
         <div className="w-1/5">Students</div>
         <div className="w-1/5">Per Student Cost</div>
-        <div className="w-1/5 flex justify-between items-center">Total Hours <span className="invisible">Action</span></div>
+        <div className="w-1/5 flex justify-between items-center">
+          Total Hours <span className="invisible">Action</span>
+        </div>
       </div>
 
       {/* Data Rows */}
@@ -35,14 +37,14 @@ function TrainingTable({ trainingData, onRowClick }) {
           <div className="w-1/5">{item.studentCount}</div>
           <div className="w-1/5">₹ {item.perStudentCost?.toLocaleString()}</div>
           <div className="w-1/5 flex justify-between items-center">
-            {item.totalHours || "-"}
+            {item.totalHours !== undefined ? item.totalHours : "-"}
 
-            {/* Burger Button */}
+            {/* Three dots button */}
             <button
               onClick={(e) => toggleMenu(item.id, e)}
               className="text-gray-600 hover:text-gray-900 p-1 rounded-full hover:bg-gray-200 transition z-10"
             >
-              <FaBars size={18} />
+              <FaEllipsisV size={18} />
             </button>
 
             {/* Dropdown Menu */}

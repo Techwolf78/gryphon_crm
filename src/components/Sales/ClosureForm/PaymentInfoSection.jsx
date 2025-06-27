@@ -164,8 +164,33 @@ const PaymentInfoSection = ({ formData, setFormData }) => {
         </div>
       )}
 
+      {formData.paymentType && formData.paymentType !== "EMI" && formData.totalCost > 0 && formData.gstType && (
+        <div className="mt-4 p-4 bg-blue-50 rounded-lg shadow-md space-y-1">
+          <h4 className="font-medium text-blue-800">Net Payable Amount</h4>
+          <p className="text-gray-700">
+            Base Amount: ₹{formData.totalCost.toFixed(2)}
+          </p>
+          <p className="text-gray-700">
+            GST ({formData.gstType === "include" ? "18%" : "0%"}): ₹
+            {(
+              (formData.gstType === "include" ? 0.18 : 0) * formData.totalCost
+            ).toFixed(2)}
+          </p>
+          <p className="font-semibold text-lg text-blue-900">
+            Total Payable: ₹
+            {(
+              formData.totalCost +
+              (formData.gstType === "include" ? 0.18 * formData.totalCost : 0)
+            ).toFixed(2)}
+          </p>
+        </div>
+      )}
+
       {formData.paymentType && formData.gstType && formData.paymentType !== "EMI" && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-auto-fit gap-4">
+        <div className={`grid gap-4 ${
+    fields.length <= 3 ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3" : "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
+  }`}
+>
           {fields.map((label, i) => {
             const percent = formData.paymentSplits?.[i] ?? "";
             const baseAmount = ((parseFloat(percent) || 0) / 100) * formData.totalCost;
