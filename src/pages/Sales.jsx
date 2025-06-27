@@ -204,7 +204,6 @@ function Sales() {
     }
   };
 
-
   const filteredLeads = Object.entries(leads).filter(([, lead]) => {
     const phaseMatch = (lead.phase || "hot") === activeTab;
     const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
