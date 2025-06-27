@@ -1,11 +1,9 @@
-import React from "react";
-
 const FollowupAlerts = ({
   todayFollowUps,
   showTodayFollowUpAlert,
   setShowTodayFollowUpAlert,
   reminderPopup,
-  setReminderPopup
+  setReminderPopup,
 }) => {
   return (
     <>
@@ -14,15 +12,30 @@ const FollowupAlerts = ({
           <div className="p-4 flex items-start space-x-3">
             <div className="flex-shrink-0">
               <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full shadow-inner">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 16l4-4-4-4m4 4h8" />
+                <svg
+                  className="w-6 h-6 text-blue-600"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M8 16l4-4-4-4m4 4h8"
+                  />
                 </svg>
               </div>
             </div>
             <div className="flex-1">
-              <h2 className="text-lg font-semibold text-gray-900 mb-1">📅 Today's Follow-ups!</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">
+                📅 Today's Meetings!
+              </h2>
               <p className="text-gray-700 text-sm mb-4">
-                You have <span className="font-medium">{todayFollowUps.length}</span> lead(s) with a follow-up scheduled for today.
+                You have{" "}
+                <span className="font-medium">{todayFollowUps.length}</span>{" "}
+                lead(s) with a meeting scheduled for today.
               </p>
               <div className="flex justify-end space-x-2">
                 <button
@@ -46,9 +59,12 @@ const FollowupAlerts = ({
               </div>
             </div>
             <div className="flex-1">
-              <h3 className="text-yellow-800 font-semibold text-md">Follow-up Reminder</h3>
+              <h3 className="text-yellow-800 font-semibold text-md">
+                Meeting Reminder
+              </h3>
               <p className="text-sm text-yellow-700 mt-1">
-                You have a follow-up with <strong>{reminderPopup.college}</strong> at <strong>{reminderPopup.time}</strong>
+                You have a meeting with <strong>{reminderPopup.college}</strong>{" "}
+                at <strong>{reminderPopup.time}</strong>
               </p>
               <div className="flex justify-end mt-3">
                 <button
