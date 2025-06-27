@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { FaTimes } from "react-icons/fa";
-
+import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
+import { db } from "../../../firebase";
+import { AuthContext } from "../../../context/AuthContext";
 import CollegeInfoSection from "./CollegeInfoSection";
 import POCInfoSection from "./POCInfoSection";
 import StudentBreakdownSection from "./StudentBreakdownSection";
@@ -8,17 +10,19 @@ import TopicBreakdownSection from "./TopicBreakdownSection";
 import PaymentInfoSection from "./PaymentInfoSection";
 import MOUUploadSection from "./MOUUploadSection";
 
-const TrainingForm = ({ show, onClose, lead }) => {
+const TrainingForm = ({ show, onClose, lead, users }) => {
+  const { currentUser } = useContext(AuthContext);
+
   const [formData, setFormData] = useState({
     projectCode: "",
     collegeName: lead?.businessName || "",
+    collegeCode: "",
     address: lead?.address || "",
     city: lead?.city || "",
     state: lead?.state || "",
     pincode: "",
     gstNumber: "",
 
-    // POC Info
     tpoName: "",
     tpoEmail: "",
     tpoPhone: "",
@@ -29,36 +33,40 @@ const TrainingForm = ({ show, onClose, lead }) => {
     accountEmail: "",
     accountPhone: "",
 
-    // Student Info
     course: "",
+    otherCourseText: "",
     year: "",
+    deliveryType: "",
+    passingYear: "",
     studentList: [],
-    courses: [{ specialization: "", students: "" }],
+    courses: [{ specialization: "", othersSpecText: "", students: "" }],
 
-    // Topic Info
     topics: [{ topic: "", hours: "" }],
 
-    // Payment Info
     paymentType: "",
     gstType: "include",
     perStudentCost: 0,
     totalCost: 0,
     studentCount: 0,
 
-    // All payment types
     paymentSplits: [],
     emiMonths: 0,
     emiSplits: [],
 
-    // Additional Info
     invoiceNumber: "",
     additionalNotes: "",
     splitTotal: 0,
   });
 
+  const [collegeCodeError, setCollegeCodeError] = useState("");
+  const [pincodeError, setPincodeError] = useState("");
+  const [gstError, setGstError] = useState("");
   const [studentFile, setStudentFile] = useState(null);
   const [mouFile, setMouFile] = useState(null);
+  const [studentFileError, setStudentFileError] = useState("");
+  const [mouFileError, setMouFileError] = useState("");
 
+  // Auto-calculate studentCount and totalCost based on courses
   useEffect(() => {
     const totalStudents = formData.courses.reduce(
       (sum, item) => sum + (parseInt(item.students) || 0),
@@ -71,27 +79,153 @@ const TrainingForm = ({ show, onClose, lead }) => {
     }));
   }, [formData.courses, formData.perStudentCost]);
 
+  // Generate projectCode based on form data
+  useEffect(() => {
+    if (
+      formData.collegeCode &&
+      formData.course &&
+      formData.year &&
+      formData.deliveryType &&
+      formData.passingYear
+    ) {
+      const passYear = formData.passingYear.split("-");
+      const shortPassYear = `${passYear[0].slice(-2)}-${passYear[1].slice(-2)}`;
+      const coursePart = formData.course === "Engineering" ? "ENGG" : formData.course;
+
+      const code = `${formData.collegeCode}/${coursePart}/${formData.year}/${formData.deliveryType}/${shortPassYear}`;
+      setFormData((prev) => ({ ...prev, projectCode: code }));
+    }
+  }, [formData.collegeCode, formData.course, formData.year, formData.deliveryType, formData.passingYear]);
+
+  // Handle input changes and validation
   const handleChange = (e) => {
     const { name, value } = e.target;
+
+    if (name === "collegeCode") {
+      const isValid = /^[A-Z]*$/.test(value);
+      setCollegeCodeError(isValid ? "" : "Only uppercase letters (A-Z) allowed");
+    }
+
+    if (name === "pincode") {
+      const isValid = /^[0-9]{0,6}$/.test(value);
+      setPincodeError(value && !isValid ? "Pincode must be up to 6 digits only" : "");
+    }
+
+    if (name === "gstNumber") {
+      const isValid = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(value);
+      setGstError(value && !isValid ? "Invalid GST number format" : "");
+    }
+
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // ✅ Return after hooks
+  // Handle form submission
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+
+    let hasError = false;
+
+    if (!studentFile) {
+      setStudentFileError("Please upload the Student Excel file.");
+      hasError = true;
+    } else {
+      setStudentFileError("");
+    }
+
+    if (!mouFile) {
+      setMouFileError("Please upload the MOU file.");
+      hasError = true;
+    } else {
+      setMouFileError("");
+    }
+
+    if (hasError) return;
+
+    try {
+      if (lead?.id) {
+        const leadRef = doc(db, "leads", lead.id);
+        await updateDoc(leadRef, {
+          phase: "closed",
+          closureType: "new",
+          closedDate: new Date().toISOString(),
+          totalCost:formData.totalCost
+
+        });
+      }
+    } catch (err) {
+      console.error("Error updating lead: ", err);
+    }
+
+    // Step 2: Save form data to Firebase
+    try {
+      const assignedUser = users?.[lead?.assignedTo?.uid] || {};
+      await addDoc(collection(db, "trainingForms"), {
+        projectCode: formData.projectCode,
+        collegeName: formData.collegeName,
+        collegeCode: formData.collegeCode,
+        address: formData.address,
+        city: formData.city,
+        state: formData.state,
+        pincode: formData.pincode,
+        gstNumber: formData.gstNumber,
+        tpoName: formData.tpoName,
+        tpoEmail: formData.tpoEmail,
+        tpoPhone: formData.tpoPhone,
+        trainingName: formData.trainingName,
+        trainingEmail: formData.trainingEmail,
+        trainingPhone: formData.trainingPhone,
+        accountName: formData.accountName,
+        accountEmail: formData.accountEmail,
+        accountPhone: formData.accountPhone,
+        course: formData.course,
+        otherCourseText: formData.otherCourseText,
+        year: formData.year,
+        deliveryType: formData.deliveryType,
+        passingYear: formData.passingYear,
+        studentCount: formData.studentCount,
+        perStudentCost: formData.perStudentCost,
+        totalCost: formData.totalCost,
+        paymentType: formData.paymentType,
+        gstType: formData.gstType,
+        invoiceNumber: formData.invoiceNumber,
+        additionalNotes: formData.additionalNotes,
+        splitTotal: formData.splitTotal,
+        paymentSplits: [...formData.paymentSplits],
+        emiSplits: [...formData.emiSplits],
+        courses: [...formData.courses],
+        topics: [...formData.topics],
+        createdAt: serverTimestamp(),
+        createdBy: {
+          email: lead?.assignedTo?.email || assignedUser?.email || "Unknown",
+          uid: lead?.assignedTo?.uid || "",
+          name: lead?.assignedTo?.name || assignedUser?.name || ""
+        }
+      });
+
+      alert("Form submitted successfully!");
+      onClose();
+    } catch (err) {
+      console.error("Error submitting form: ", err);
+      alert("Something went wrong. Please try again.");
+    }
+  };
+
   if (!show || !lead) return null;
 
   return (
-    <div className="fixed inset-0 z-50 backdrop-blur-sm flex items-center justify-center px-4">
-      <div className="bg-white w-full max-w-6xl h-[90vh] rounded-xl shadow-xl overflow-hidden flex flex-col animate-fadeIn">
-        {/* Modal Header */}
+    <div className="fixed inset-0  backdrop-blur-sm flex items-center justify-center px-4 z-54">
+      <div className="bg-white w-full max-w-7xl h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-fadeIn">
+        {/* Header */}
         <div className="flex justify-between items-center px-6 py-4 border-b bg-blue-100">
-          <h2 className="text-xl font-bold text-gray-800">Client Onboarding Form</h2>
-          <div className="flex items-center space-x-3">
+          <h2 className="text-2xl font-bold text-blue-800">Client Onboarding Form</h2>
+          <div className="flex items-center space-x-3 w-[450px]">
             <input
               name="projectCode"
               value={formData.projectCode}
-              onChange={handleChange}
               placeholder="Project Code"
-              className="px-3 py-1 border rounded-md text-sm"
+              className="px-4 py-2 border rounded-lg text-base w-full font-semibold text-blue-700 bg-gray-100 cursor-not-allowed shadow-sm"
+              readOnly
             />
             <button onClick={onClose} className="text-xl text-red-500 hover:text-red-700">
               <FaTimes />
@@ -99,34 +233,46 @@ const TrainingForm = ({ show, onClose, lead }) => {
           </div>
         </div>
 
-        {/* Modal Form Content */}
-        <form
-          className="flex-1 overflow-y-auto p-6 space-y-6 text-sm"
-          onSubmit={(e) => {
-            e.preventDefault();
-            console.log("Form submitted", formData);
-          }}
-        >
-          <CollegeInfoSection formData={formData} setFormData={setFormData} handleChange={handleChange} />
+        {/* Form */}
+        <form className="flex-1 overflow-y-auto p-6 space-y-6 text-sm" onSubmit={handleSubmit}>
+          <CollegeInfoSection
+            formData={formData}
+            setFormData={setFormData}
+            handleChange={handleChange}
+            collegeCodeError={collegeCodeError}
+            pincodeError={pincodeError}
+            gstError={gstError}
+          />
           <POCInfoSection formData={formData} handleChange={handleChange} />
           <StudentBreakdownSection
             formData={formData}
             setFormData={setFormData}
             studentFile={studentFile}
             setStudentFile={setStudentFile}
+
+            studentFileError={studentFileError}
           />
           <TopicBreakdownSection formData={formData} setFormData={setFormData} />
           <PaymentInfoSection formData={formData} setFormData={setFormData} />
-          <MOUUploadSection mouFile={mouFile} setMouFile={setMouFile} />
+          <MOUUploadSection
+            mouFile={mouFile}
+            setMouFile={setMouFile}
+            mouFileError={mouFileError}
+          />
 
+          {/* Submit Button */}
           <div className="pt-4">
-            <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+            <button
+              type="submit"
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+            >
               Submit
             </button>
           </div>
         </form>
       </div>
 
+      {/* Animation styles */}
       <style>{`
         @keyframes fadeIn {
           from {

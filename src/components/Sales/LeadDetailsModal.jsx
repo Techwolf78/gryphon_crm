@@ -1,204 +1,305 @@
-import React, { useState, useEffect } from "react";
-import { FiX, FiInfo } from "react-icons/fi";
 
-function LeadDetailsModal({ show, onClose, lead, onSave }) {
-  const defaultLeadFields = {
-    businessName: "",
-    city: "",
-    pocName: "",
-    phoneNo: "",
-    email: "",
-    createdAt: "",
-    phase: "",
-    expectedClosureDate: "",
-  };
+const statusColorMap = {
+  hot: {
+    border: "border-red-500",
+    bg: "bg-red-50",
+    text: "text-red-600",
+    badge: "bg-red-100 text-red-800",
+  },
+  warm: {
+    border: "border-amber-400",
+    bg: "bg-amber-50",
+    text: "text-amber-600",
+    badge: "bg-amber-100 text-amber-800",
+  },
+  cold: {
+    border: "border-cyan-400",
+    bg: "bg-cyan-50",
+    text: "text-cyan-600",
+    badge: "bg-cyan-100 text-cyan-800",
+  },
+  closed: {
+    border: "border-green-500",
+    bg: "bg-green-50",
+    text: "text-green-600",
+    badge: "bg-green-100 text-green-800",
+  },
+};
 
-  // Function to determine phase based on expectedClosureDate
-  const getLeadPhase = (expectedDateInput) => {
-    if (!expectedDateInput) return "hot";
-    const now = new Date();
-    const expectedDate = new Date(expectedDateInput);
-    const diffInDays = Math.ceil((expectedDate - now) / (1000 * 60 * 60 * 24));
-    if (diffInDays > 45) return "cold";
-    if (diffInDays > 30) return "warm";
-    return "hot";
-  };
+const formatDate = (ms) =>
+  ms
+    ? new Date(ms).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    : "-";
 
-  const [formData, setFormData] = useState(defaultLeadFields);
+const getLatestFollowup = (lead) => {
+  const followData = lead.followup || {};
+  const entries = Object.entries(followData).sort(
+    (a, b) => a[1].timestamp - b[1].timestamp
+  );
+  if (entries.length === 0) return "-";
+  const latest = entries[entries.length - 1][1];
+  return `${latest.date || "-"} ${latest.time || ""} - ${latest.remarks || ""}`;
+};
 
-  // When lead prop changes, update formData state
-  useEffect(() => {
-    if (lead) {
-      setFormData({ ...defaultLeadFields, ...lead });
-    }
-  }, [lead]);
+export default function LeadDetailsModal({
+  selectedLead,
+  onClose,
+  users,
+  activeTab,
+}) {
+  if (!selectedLead) return null;
 
-  if (!show || !lead) return null;
-
-  // Labels for fields (can adjust for UI)
-  const labels = {
-    businessName: "College Name",
-    city: "City",
-    pocName: "Contact Name",
-    phoneNo: "Phone No.",
-    email: "Email ID",
-    createdAt: "Opened Date",
-    phase: "Phase",
-    expectedClosureDate: "Expected Closure Date",
-  };
-
-  // Convert timestamp or string to yyyy-mm-dd for date input
-  const formatDateForInput = (value) => {
-    if (!value) return "";
-    let timestamp = value;
-
-    if (typeof value === "string" && !isNaN(Date.parse(value))) {
-      timestamp = new Date(value).getTime();
-    } else if (typeof value === "string") {
-      timestamp = parseInt(value);
-    }
-
-    const date = new Date(timestamp);
-    if (isNaN(date.getTime())) return "";
-
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-
-    return `${year}-${month}-${day}`;
-  };
-
-  // Handle input changes in form
-  const handleChange = (key, value) => {
-    let updatedData = { ...formData };
-
-    if (key === "createdAt" || key === "expectedClosureDate") {
-      const date = new Date(value);
-      if (!isNaN(date.getTime())) {
-        updatedData[key] = date.getTime();
-
-        // Update phase automatically when expectedClosureDate changes
-        if (key === "expectedClosureDate") {
-          updatedData.phase = getLeadPhase(date);
-        }
-
-        setFormData(updatedData);
-        return;
-      }
-    }
-
-    updatedData[key] = value;
-    setFormData(updatedData);
-  };
-
-  // Save handler sends data with timestamps for dates
-  const handleSave = () => {
-    const updatedData = {
-      ...formData,
-      createdAt:
-        typeof formData.createdAt === "string"
-          ? new Date(formData.createdAt).getTime()
-          : formData.createdAt,
-      expectedClosureDate:
-        typeof formData.expectedClosureDate === "string"
-          ? new Date(formData.expectedClosureDate).getTime()
-          : formData.expectedClosureDate,
-    };
-
-    onSave(updatedData);
-  };
-
-  // Keys we want editable in the modal
-  const editableKeys = Object.keys(defaultLeadFields);
+  const statusColors = statusColorMap[activeTab] || statusColorMap.hot;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden transform transition-all">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-52 animate-fadeIn">
+      <div
+        className={`relative bg-white rounded-xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto ${statusColors.border} border-l-8`}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-5 flex justify-between items-center">
+        <div
+          className={`sticky top-0 ${statusColors.bg} p-6 rounded-t-xl flex justify-between items-center`}
+        >
           <div>
-            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-              <FiInfo className="text-white" />
-              Edit Lead Details
+            <h2 className="text-2xl font-bold text-gray-900">
+              {selectedLead.businessName || "Unnamed Lead"}
             </h2>
-            <p className="text-blue-100 text-sm mt-1 truncate">
-              {formData.businessName || "Lead Information"}
-            </p>
+            <div className="flex items-center mt-2 space-x-4">
+              <span
+                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusColors.badge}`}
+              >
+                {activeTab.toUpperCase()}
+              </span>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
-            aria-label="Close modal"
+            className="text-gray-400 hover:text-gray-500 transition-colors"
           >
-            <FiX className="w-5 h-5" />
+            <svg
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
           </button>
         </div>
 
-        {/* Body/Form */}
-        <div className="overflow-y-auto p-6 flex-1">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {editableKeys.map((key) => {
-              const label = labels[key] || key;
-
-              // Date inputs for createdAt and expectedClosureDate
-              if (key === "createdAt" || key === "expectedClosureDate") {
-                return (
-                  <div
-                    key={key}
-                    className="border border-gray-100 rounded-lg p-4 hover:shadow transition-shadow"
-                  >
-                    <label className="block text-xs font-semibold uppercase text-gray-500 tracking-wide mb-1">
-                      {label}
-                    </label>
-                    <input
-                      type="date"
-                      value={formatDateForInput(formData[key])}
-                      onChange={(e) => handleChange(key, e.target.value)}
-                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
+        {/* Main Content */}
+        <div className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Column 1 */}
+            <div className="space-y-6">
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="text-lg font-semibold text-gray-800 mb-3 border-b pb-2">
+                  Basic Information
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">
+                      Contact Person
+                    </p>
+                    <p className="mt-1 text-gray-900">
+                      {selectedLead.pocName || "-"}
+                    </p>
                   </div>
-                );
-              }
-
-              // For all other text inputs
-              return (
-                <div
-                  key={key}
-                  className="border border-gray-100 rounded-lg p-4 hover:shadow transition-shadow"
-                >
-                  <label className="block text-xs font-semibold uppercase text-gray-500 tracking-wide mb-1">
-                    {label}
-                  </label>
-                  <input
-                    type="text"
-                    value={formData[key] || ""}
-                    onChange={(e) => handleChange(key, e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">
+                      Phone Number
+                    </p>
+                    <p className="mt-1 text-gray-900">
+                      {selectedLead.phoneNo || "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">
+                      Email Address
+                    </p>
+                    <p className="mt-1 text-gray-900 break-all">
+                      {selectedLead.email || "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">
+                      Assigned To
+                    </p>
+                    <p className="mt-1 text-gray-900">
+                      {selectedLead.assignedTo?.uid &&
+                      users?.[selectedLead.assignedTo.uid]
+                        ? users[selectedLead.assignedTo.uid].name
+                        : selectedLead.assignedTo?.name || "-"}
+                    </p>
+                  </div>
                 </div>
-              );
-            })}
+              </div>
+
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="text-lg font-semibold text-gray-800 mb-3 border-b pb-2">
+                  Location Details
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Address</p>
+                    <p className="mt-1 text-gray-900">
+                      {selectedLead.address || "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">City</p>
+                    <p className="mt-1 text-gray-900">
+                      {selectedLead.city || "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">State</p>
+                    <p className="mt-1 text-gray-900">
+                      {selectedLead.state || "-"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Column 2 */}
+            <div className="space-y-6">
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="text-lg font-semibold text-gray-800 mb-3 border-b pb-2">
+                  Academic Details
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">
+                      Specialization
+                    </p>
+                    <p className="mt-1 text-gray-900">
+                      {selectedLead.specialization || "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">
+                      Course Type
+                    </p>
+                    <p className="mt-1 text-gray-900">
+                      {selectedLead.courseType || "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">
+                      Closure Type
+                    </p>
+                    <p className="mt-1 text-gray-900">
+                      {selectedLead.closureType || "-"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="text-lg font-semibold text-gray-800 mb-3 border-b pb-2">
+                  Financial Details
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">
+                      Total Contract Value
+                    </p>
+                    <p className="mt-1 text-gray-900">
+                      {selectedLead.tcv
+                        ? `₹${selectedLead.tcv.toLocaleString()}`
+                        : "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">
+                      Per Student Cost
+                    </p>
+                    <p className="mt-1 text-gray-900">
+                      {selectedLead.perStudentCost
+                        ? `₹${selectedLead.perStudentCost.toLocaleString()}`
+                        : "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">
+                      Student Count
+                    </p>
+                    <p className="mt-1 text-gray-900">
+                      {selectedLead.studentCount || "-"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="text-lg font-semibold text-gray-800 mb-3 border-b pb-2">
+                  Timeline
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">
+                      Opened Date
+                    </p>
+                    <p className="mt-1 text-gray-900">
+                      {formatDate(
+                        selectedLead.openedDate || selectedLead.createdAt
+                      )}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">
+                      Expected Closure
+                    </p>
+                    <p className="mt-1 text-gray-900">
+                      {formatDate(selectedLead.expectedClosureDate)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">
+                      Latest Followup
+                    </p>
+                    <p className="mt-1 text-gray-900">
+                      {getLatestFollowup(selectedLead)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 bg-white p-4 flex-shrink-0 flex justify-end gap-3">
+        <div className="sticky bottom-0 bg-white border-t p-4 flex justify-end space-x-3 rounded-b-xl">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm sm:text-base text-gray-600 hover:text-gray-800 font-medium rounded-lg transition-colors"
+            className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium"
           >
-            Cancel
+            Close
           </button>
           <button
-            onClick={handleSave}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm sm:text-base font-medium rounded-lg transition-colors"
+            className={`px-6 py-2 rounded-lg text-white ${statusColors.bg.replace(
+              "50",
+              "600"
+            )} hover:${statusColors.bg.replace(
+              "50",
+              "700"
+            )} transition-colors font-medium`}
           >
-            Save
+            Take Action
           </button>
         </div>
       </div>
     </div>
   );
 }
-
-export default LeadDetailsModal;
