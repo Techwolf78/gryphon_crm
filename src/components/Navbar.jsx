@@ -52,8 +52,7 @@ const Navbar = ({ onImageClick = () => {} }) => {
     "group flex items-center gap-2 relative transition text-white hover:text-white";
 
   return (
-    <nav className="bg-blue-900 text-white px-6 py-4 flex justify-between items-center sticky top-0 z-52">
-
+<nav className="bg-blue-900 text-white px-6 py-4 flex justify-between items-center sticky top-0 z-52">
       <Link to="/" className="flex items-center">
         <img
           src="https://res.cloudinary.com/dcjmaapvi/image/upload/v1740489025/ga-hori_ylcnm3.png"
