@@ -65,12 +65,13 @@ export default function LeadsTable({
 
   if (activeTab === "closed") {
     return (
-      <ClosedLeads
-        leads={leads}
-        users={users}
-        viewMyLeadsOnly={viewMyLeadsOnly}
-        currentUser={currentUser}
-      />
+<ClosedLeads
+      leads={leads}
+      users={users} // Keep this one
+      viewMyLeadsOnly={viewMyLeadsOnly}
+      currentUser={currentUser}
+      // Remove the duplicate users={users} below
+    />
     );
   }
 
@@ -277,14 +278,14 @@ export default function LeadsTable({
         </div>
       </div>
 
-{selectedLeadForDetails && (
-  <LeadDetailsModal
-    selectedLead={selectedLeadForDetails}
-    onClose={() => setSelectedLeadForDetails(null)}
-    users={users}
-    activeTab={activeTab}
-  />
-)}
+      {selectedLeadForDetails && (
+        <LeadDetailsModal
+          selectedLead={selectedLeadForDetails}
+          onClose={() => setSelectedLeadForDetails(null)}
+          users={users}
+          activeTab={activeTab}
+        />
+      )}
     </>
   );
 }
