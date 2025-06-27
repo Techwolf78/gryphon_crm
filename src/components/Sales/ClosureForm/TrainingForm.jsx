@@ -15,7 +15,8 @@ import PropTypes from "prop-types";
 // Validation functions
 const validateCollegeCode = (value) => /^[A-Z]*$/.test(value);
 const validatePincode = (value) => /^[0-9]{0,6}$/.test(value);
-const validateGST = (value) => /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(value);
+const validateGST = (value) =>
+  /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(value);
 
 const TrainingForm = ({ show, onClose, lead, users }) => {
   const { currentUser } = useContext(AuthContext);
@@ -112,17 +113,27 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
       const code = `${collegeCode}/${coursePart}/${year}/${deliveryType}/${shortPassYear}`;
       setFormData((prev) => ({ ...prev, projectCode: code }));
     }
-  }, [formData.collegeCode, formData.course, formData.year, formData.deliveryType, formData.passingYear]);
+  }, [
+    formData.collegeCode,
+    formData.course,
+    formData.year,
+    formData.deliveryType,
+    formData.passingYear,
+  ]);
 
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;
     setHasUnsavedChanges(true);
 
     if (name === "collegeCode") {
-      setCollegeCodeError(validateCollegeCode(value) ? "" : "Only uppercase letters (A-Z) allowed");
+      setCollegeCodeError(
+        validateCollegeCode(value) ? "" : "Only uppercase letters (A-Z) allowed"
+      );
     }
     if (name === "pincode") {
-      setPincodeError(validatePincode(value) ? "" : "Pincode must be up to 6 digits only");
+      setPincodeError(
+        validatePincode(value) ? "" : "Pincode must be up to 6 digits only"
+      );
     }
     if (name === "gstNumber") {
       setGstError(value && !validateGST(value) ? "Invalid GST number format" : "");
@@ -220,7 +231,10 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
   };
 
   const handleClose = useCallback(() => {
-    if (hasUnsavedChanges && !window.confirm("You have unsaved changes. Are you sure you want to close?")) {
+    if (
+      hasUnsavedChanges &&
+      !window.confirm("You have unsaved changes. Are you sure you want to close?")
+    ) {
       return;
     }
     onClose();
@@ -241,7 +255,11 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
               className="px-4 py-2 border rounded-lg text-base w-full font-semibold text-blue-700 bg-gray-100 cursor-not-allowed"
               readOnly
             />
-            <button onClick={handleClose} className="text-xl text-red-500 hover:text-red-700" aria-label="Close form">
+            <button
+              onClick={handleClose}
+              className="text-xl text-red-500 hover:text-red-700"
+              aria-label="Close form"
+            >
               <FaTimes />
             </button>
           </div>
@@ -274,7 +292,6 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
             setContractStartDate={setContractStartDate}
             contractEndDate={contractEndDate}
             setContractEndDate={setContractEndDate}
-            docId={lead?.id}
           />
 
           <div className="pt-4 flex justify-end space-x-4">

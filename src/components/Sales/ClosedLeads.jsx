@@ -9,7 +9,7 @@ import {
 } from "react-icons/fi";
 import PropTypes from "prop-types";
 import { db } from "../../firebase";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import TargetWithEdit from "./TargetWithEdit";
 
 const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
@@ -83,21 +83,59 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
     }
   }, []);
 
-  const getCumulativeTarget = useCallback(
-    (fy, upTo) => {
-      const quartersOrder = ["Q1", "Q2", "Q3", "Q4"];
-      const idx = quartersOrder.indexOf(upTo);
-      if (idx === -1) return 0;
+const getCumulativeTarget = useCallback(
+  (fy, upTo) => {
+    const quartersOrder = ["Q1", "Q2", "Q3", "Q4"];
+    const idx = quartersOrder.indexOf(upTo);
+    if (idx === -1) return 0;
 
-      return quartersOrder.slice(0, idx + 1).reduce((sum, q) => {
-        const rec = targets.find(
-          (t) => t.financial_year === fy && t.quarter === q
-        );
-        return sum + (rec?.target_amount || 0);
-      }, 0);
-    },
-    [targets]
-  );
+    // Calculate base target (sum of targets up to the specified quarter)
+    const baseTarget = quartersOrder.slice(0, idx + 1).reduce((sum, q) => {
+      const rec = targets.find(
+        (t) => t.financial_year === fy && t.quarter === q
+      );
+      return sum + (rec?.target_amount || 0);
+    }, 0);
+
+    // If it's Q1, just return the base target (no previous quarter to carry deficit from)
+    if (idx === 0) return baseTarget;
+
+    // Calculate deficit from previous quarters
+    let carriedDeficit = 0;
+    for (let i = 0; i < idx; i++) {
+      const quarter = quartersOrder[i];
+      const range = getQuarterRange(quarter, fy);
+      if (!range) continue;
+
+      // Calculate achieved for this quarter
+      const quarterAchieved = Object.entries(leads)
+        .filter(([, lead]) => lead.phase === "closed")
+        .filter(
+          ([, lead]) =>
+            !viewMyLeadsOnly || lead.assignedTo?.uid === currentUser?.uid
+        )
+        .filter(([, lead]) => {
+          const d = new Date(lead.closedDate);
+          return d >= range[0] && d <= range[1];
+        })
+        .reduce((sum, [, lead]) => sum + (lead.totalCost || 0), 0);
+
+      // Get this quarter's target
+      const quarterTarget = targets.find(
+        (t) => t.financial_year === fy && t.quarter === quarter
+      )?.target_amount || 0;
+
+      // Add any deficit to carriedDeficit
+      const deficit = quarterTarget - quarterAchieved;
+      if (deficit > 0) {
+        carriedDeficit += deficit;
+      }
+    }
+
+    return baseTarget + carriedDeficit;
+  },
+  [targets, leads, viewMyLeadsOnly, currentUser?.uid, getQuarterRange]
+);
 
   // Determine selected FY and quarter
   const today = new Date();
@@ -152,13 +190,13 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
     [filteredLeads]
   );
 
-  const quarterTarget = useMemo(
-    () =>
-      activeQuarter === "all"
-        ? getCumulativeTarget(selectedFY, "Q4")
-        : getCumulativeTarget(selectedFY, activeQuarter),
-    [activeQuarter, selectedFY, getCumulativeTarget]
-  );
+const quarterTarget = useMemo(
+  () =>
+    activeQuarter === "all"
+      ? getCumulativeTarget(selectedFY, "Q4")
+      : getCumulativeTarget(selectedFY, activeQuarter),
+  [activeQuarter, selectedFY, getCumulativeTarget]
+);
 
   const deficitValue = quarterTarget - achievedValue;
   const progressPercent =
