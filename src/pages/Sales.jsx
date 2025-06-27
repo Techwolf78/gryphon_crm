@@ -76,7 +76,7 @@ function Sales() {
   };
 
   const computePhaseCounts = () => {
-    const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
+    const user = users[currentUser?.uid];
     const counts = {
       hot: 0,
       warm: 0,
@@ -145,13 +145,17 @@ function Sales() {
       setLoading(false);
     });
 
-    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
-      const data = {};
-      snapshot.forEach((doc) => {
-        data[doc.id] = { id: doc.id, ...doc.data() };
-      });
-      setUsers(data);
-    });
+const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+  const data = {};
+  snapshot.forEach((doc) => {
+    const userData = { id: doc.id, ...doc.data() };
+    if (userData.uid) {
+      data[userData.uid] = userData;
+    }
+  });
+  setUsers(data);
+});
+
 
     return () => {
       unsubLeads();
@@ -206,7 +210,7 @@ function Sales() {
 
   const filteredLeads = Object.entries(leads).filter(([, lead]) => {
     const phaseMatch = (lead.phase || "hot") === activeTab;
-    const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
+    const user = users[currentUser?.uid];
     if (!user) return false;
 
     // Apply additional filters
