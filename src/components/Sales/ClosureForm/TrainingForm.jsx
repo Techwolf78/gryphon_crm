@@ -68,8 +68,9 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
   const [mouFile, setMouFile] = useState(null);
   const [studentFileError, setStudentFileError] = useState("");
   const [mouFileError, setMouFileError] = useState("");
+  const [contractStartDate, setContractStartDate] = useState("");
+  const [contractEndDate, setContractEndDate] = useState("");
 
-  // Initialize form with lead data
   useEffect(() => {
     if (lead) {
       setFormData((prev) => ({
@@ -85,10 +86,11 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
         tpoEmail: lead.email || "",
         tpoPhone: lead.phoneNo || "",
       }));
+      setContractStartDate(lead.contractStartDate || "");
+      setContractEndDate(lead.contractEndDate || "");
     }
   }, [lead]);
 
-  // Calculate total students and cost
   useEffect(() => {
     const totalStudents = formData.courses.reduce(
       (sum, item) => sum + (parseInt(item.students) || 0),
@@ -101,7 +103,6 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
     }));
   }, [formData.courses, formData.perStudentCost]);
 
-  // Generate project code
   useEffect(() => {
     const { collegeCode, course, year, deliveryType, passingYear } = formData;
     if (collegeCode && course && year && deliveryType && passingYear) {
@@ -113,7 +114,6 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
     }
   }, [formData.collegeCode, formData.course, formData.year, formData.deliveryType, formData.passingYear]);
 
-  // Track form changes
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;
     setHasUnsavedChanges(true);
@@ -130,7 +130,6 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   }, []);
 
-  // Cloudinary file upload
   const uploadFileToCloudinary = async (file, folderName) => {
     const url = "https://api.cloudinary.com/v1_1/da0ypp61n/raw/upload";
     const formData = new FormData();
@@ -140,66 +139,61 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
 
     const res = await fetch(url, { method: "POST", body: formData });
     const data = await res.json();
-    
-    if (!res.ok) {
+
+    if (!res.ok || !data.secure_url) {
       throw new Error(data.error?.message || "File upload failed");
     }
-    
-    if (!data.secure_url) {
-      throw new Error("Failed to get file URL from Cloudinary");
-    }
-    
     return data.secure_url;
   };
 
-  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Validate required files
     if (!studentFile) {
       setStudentFileError("Please upload the Student Excel file.");
       setIsSubmitting(false);
       return;
     }
-    setStudentFileError("");
-
     if (!mouFile) {
       setMouFileError("Please upload the MOU file.");
       setIsSubmitting(false);
       return;
     }
-    setMouFileError("");
+    if (!contractStartDate || !contractEndDate) {
+      toast.error("Please select both Contract Start Date and End Date.");
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
-      // Show loading toast
       const toastId = toast.loading("Submitting form and uploading files...");
 
-      // Upload files in parallel
       const [studentUrl, mouUrl] = await Promise.all([
         uploadFileToCloudinary(studentFile, "training-forms/student-files"),
         uploadFileToCloudinary(mouFile, "training-forms/mou-files"),
       ]);
 
-      // Update lead status if exists
       if (lead?.id) {
         const leadRef = doc(db, "leads", lead.id);
         await updateDoc(leadRef, {
           phase: "closed",
           closureType: "new",
           closedDate: new Date().toISOString(),
+          totalCost: formData.totalCost,
+          contractStartDate,
+          contractEndDate,
         });
       }
 
-      // Get assigned user info
       const assignedUser = users?.[lead?.assignedTo?.uid] || {};
 
-      // Submit form data
       await addDoc(collection(db, "trainingForms"), {
         ...formData,
         studentFileUrl: studentUrl,
         mouFileUrl: mouUrl,
+        contractStartDate,
+        contractEndDate,
         createdAt: serverTimestamp(),
         createdBy: {
           email: lead?.assignedTo?.email || assignedUser?.email || "Unknown",
@@ -208,7 +202,6 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
         },
       });
 
-      // Update toast to success
       toast.update(toastId, {
         render: "Form submitted successfully!",
         type: "success",
@@ -226,7 +219,6 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
     }
   };
 
-  // Handle close with confirmation
   const handleClose = useCallback(() => {
     if (hasUnsavedChanges && !window.confirm("You have unsaved changes. Are you sure you want to close?")) {
       return;
@@ -237,8 +229,8 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
   if (!show || !lead) return null;
 
   return (
-    <div className="fixed inset-0 z-54 backdrop-blur-sm flex items-center justify-center px-4">
-      <div className="bg-white w-full max-w-7xl h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+    <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center px-4 z-54">
+      <div className="bg-white w-full max-w-7xl h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-fadeIn">
         <div className="flex justify-between items-center px-6 py-4 border-b bg-blue-100">
           <h2 className="text-2xl font-bold text-blue-800">Client Onboarding Form</h2>
           <div className="flex items-center space-x-3 w-[450px]">
@@ -249,11 +241,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
               className="px-4 py-2 border rounded-lg text-base w-full font-semibold text-blue-700 bg-gray-100 cursor-not-allowed"
               readOnly
             />
-            <button 
-              onClick={handleClose} 
-              className="text-xl text-red-500 hover:text-red-700"
-              aria-label="Close form"
-            >
+            <button onClick={handleClose} className="text-xl text-red-500 hover:text-red-700" aria-label="Close form">
               <FaTimes />
             </button>
           </div>
@@ -282,6 +270,11 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
             mouFile={mouFile}
             setMouFile={setMouFile}
             mouFileError={mouFileError}
+            contractStartDate={contractStartDate}
+            setContractStartDate={setContractStartDate}
+            contractEndDate={contractEndDate}
+            setContractEndDate={setContractEndDate}
+            docId={lead?.id}
           />
 
           <div className="pt-4 flex justify-end space-x-4">

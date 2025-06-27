@@ -284,7 +284,7 @@ const FollowUp = ({ lead, onClose }) => {
             <div>
               <h2 className="text-2xl font-bold flex items-center gap-3">
                 <FaCalendarAlt className="text-yellow-300" />
-                Schedule Meetings
+                Schedule Meeting
               </h2>
               <p className="text-blue-100 mt-1">
                 {lead.businessName} • {lead.pocName}
@@ -444,7 +444,7 @@ const FollowUp = ({ lead, onClose }) => {
                   disabled={loading}
                   className="bg-gradient-to-r from-blue-600 to-indigo-700 hover:opacity-90 text-white px-6 py-2.5 rounded-xl"
                 >
-                  {loading ? "Saving..." : "Schedule Follow Up"}
+                  {loading ? "Saving..." : "Schedule Meeting"}
                 </button>
               </div>
             </form>

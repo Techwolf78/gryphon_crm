@@ -1,7 +1,9 @@
-import { CSVLink } from "react-csv";
-import { FiDownload, FiUpload, FiFilter, FiX } from "react-icons/fi";
-import Papa from "papaparse";
 import { useState, useEffect, useRef } from "react";
+import { FiFilter, FiX } from "react-icons/fi";
+import ExportLead from "./ExportLead";
+import ImportLead from "./ImportLead";
+import { db } from "../../firebase"; // Firebase config
+import { collection, getDocs } from "firebase/firestore";
 
 function LeadFilters({
   filteredLeads,
@@ -14,9 +16,24 @@ function LeadFilters({
   leads,
 }) {
   const [localFilters, setLocalFilters] = useState(filters);
+  const [allLeads, setAllLeads] = useState([]);
   const filterPanelRef = useRef(null);
 
-  // Extract unique values for dropdown options from leads data
+  // Fetch all leads from Firebase
+  useEffect(() => {
+    const fetchAllLeads = async () => {
+      try {
+        const snapshot = await getDocs(collection(db, "leads"));
+        const fetchedLeads = snapshot.docs.map((doc) => [doc.id, doc.data()]);
+        setAllLeads(fetchedLeads);
+      } catch (error) {
+        console.error("Error fetching all leads:", error);
+      }
+    };
+    fetchAllLeads();
+  }, []);
+
+  // Generate filter options from leads and users data
   const filterOptions = {
     cities: [
       ...new Set(
@@ -31,7 +48,6 @@ function LeadFilters({
         displayName: user.name || user.displayName,
       }))
       .filter((user) => user.displayName),
-
     pocNames: [
       ...new Set(
         Object.values(leads)
@@ -55,10 +71,12 @@ function LeadFilters({
     ],
   };
 
+  // Sync localFilters with parent filters
   useEffect(() => {
     setLocalFilters(filters);
   }, [filters]);
 
+  // Close filter panel on outside click
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -72,38 +90,24 @@ function LeadFilters({
     if (isFilterOpen) {
       document.addEventListener("mousedown", handleClickOutside);
     }
-
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isFilterOpen, setIsFilterOpen]);
 
-  const handleCSVUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        handleImportComplete(results.data);
-      },
-      error: (err) => {
-        console.error("Error parsing CSV:", err);
-      },
-    });
-  };
-
+  // Apply filters
   const applyFilters = () => {
     setFilters(localFilters);
     setIsFilterOpen(false);
   };
 
+  // Reset filters
   const resetFilters = () => {
     setLocalFilters({});
     setFilters({});
   };
 
+  // Check if any filter is active
   const hasActiveFilters = Object.values(filters).some(
     (filter) =>
       (typeof filter === "string" && filter) ||
@@ -112,41 +116,15 @@ function LeadFilters({
 
   return (
     <div className="flex items-center gap-3 px-4 relative">
-      {/* Export Button */}
-      <CSVLink
-        data={filteredLeads.map(([, lead]) => ({
-          BusinessName: lead.businessName,
-          City: lead.city,
-          Phone: lead.phoneNo,
-          Email: lead.email,
-          Phase: lead.phase,
-          AssignedTo: lead.assignedTo?.displayName || "",
-          CreatedAt: new Date(lead.createdAt).toLocaleDateString(),
-        }))}
-        filename={"leads_export.csv"}
-        className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border border-gray-300 bg-gradient-to-r from-blue-50 to-white text-blue-700 hover:from-blue-100 hover:to-white hover:shadow-md transition-all"
-      >
-        <FiDownload className="w-4 h-4" />
-        <span>Export</span>
-      </CSVLink>
+      {/* Export & Import */}
+<ExportLead filteredLeads={filteredLeads} allLeads={allLeads} />
+      <ImportLead handleImportComplete={handleImportComplete} />
 
-      {/* Import Button */}
-      <label className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border border-gray-300 bg-gradient-to-r from-green-50 to-white text-green-700 hover:from-green-100 hover:to-white hover:shadow-md transition-all cursor-pointer">
-        <FiUpload className="w-4 h-4" />
-        <span>Import</span>
-        <input
-          type="file"
-          accept=".csv"
-          onChange={handleCSVUpload}
-          className="hidden"
-        />
-      </label>
-
-      {/* Filter Toggle Button */}
+      {/* Filter Button */}
       <div className="relative">
         <button
           onClick={() => setIsFilterOpen(!isFilterOpen)}
-          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border transition-all hover:shadow-md ${
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border transition-all ${
             isFilterOpen || hasActiveFilters
               ? "bg-blue-100 border-blue-300 text-blue-800"
               : "bg-gradient-to-r from-gray-50 to-white border-gray-300 text-gray-700 hover:from-gray-100"
@@ -161,7 +139,7 @@ function LeadFilters({
           )}
         </button>
 
-        {/* Horizontal Filter Panel */}
+        {/* Filter Panel */}
         {isFilterOpen && (
           <div
             ref={filterPanelRef}
@@ -178,7 +156,7 @@ function LeadFilters({
               </button>
             </div>
 
-            {/* Horizontal Filter Grid */}
+            {/* Filter Grid */}
             <div
               className="grid gap-4"
               style={{ gridTemplateColumns: "1.5fr 3fr 1.5fr" }}
@@ -206,7 +184,7 @@ function LeadFilters({
                   </select>
                 </div>
 
-                {/* Assigned Person Filter */}
+                {/* Assigned To */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Assigned To
@@ -237,7 +215,7 @@ function LeadFilters({
 
               {/* Column 2 */}
               <div className="space-y-4">
-                {/* Date Range Filter */}
+                {/* Date Range */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Date Range
@@ -280,7 +258,7 @@ function LeadFilters({
                   </div>
                 </div>
 
-                {/* POC Name Filter */}
+                {/* Contact Person (pocName) */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Contact Person
@@ -297,9 +275,7 @@ function LeadFilters({
                   >
                     <option value="">All Contacts</option>
                     {filterOptions.pocNames.map((name) => (
-                      <option key={name} value={name}>
-                        {name}
-                      </option>
+                      <option key={name} value={name}>{name}</option>
                     ))}
                   </select>
                 </div>
@@ -307,7 +283,7 @@ function LeadFilters({
 
               {/* Column 3 */}
               <div className="space-y-4">
-                {/* Phone Number Filter */}
+                {/* Phone Number */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Phone Number
@@ -324,14 +300,12 @@ function LeadFilters({
                   >
                     <option value="">All Phone Numbers</option>
                     {filterOptions.phoneNumbers.map((phone) => (
-                      <option key={phone} value={phone}>
-                        {phone}
-                      </option>
+                      <option key={phone} value={phone}>{phone}</option>
                     ))}
                   </select>
                 </div>
 
-                {/* Email Filter */}
+                {/* Email */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Email
@@ -348,16 +322,14 @@ function LeadFilters({
                   >
                     <option value="">All Emails</option>
                     {filterOptions.emails.map((email) => (
-                      <option key={email} value={email}>
-                        {email}
-                      </option>
+                      <option key={email} value={email}>{email}</option>
                     ))}
                   </select>
                 </div>
               </div>
             </div>
 
-            {/* Action Buttons - Centered at bottom */}
+            {/* Buttons */}
             <div className="flex justify-center gap-4 mt-6">
               <button
                 onClick={resetFilters}
