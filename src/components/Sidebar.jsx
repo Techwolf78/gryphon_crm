@@ -74,7 +74,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
       transition-all duration-300 ease-in-out
     `}>
       <div className="px-6 py-6 text-2xl font-bold border-b border-gray-200 flex items-center justify-between">
-        {!collapsed && <span className="whitespace-nowrap text-gray-800">GA CRM</span>}
+        {!collapsed && <span className="whitespace-nowrap text-gray-800">SYNC</span>}
         <button
           onClick={onToggle}
           className="text-gray-500 hover:text-blue-600 focus:outline-none"
