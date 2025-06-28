@@ -51,7 +51,7 @@ const AppContent = () => {
 };
 
 const App = () => (
-  <AuthProvider>
+  <AuthProvider >
     <Router>
       <AppContent />
     </Router>

@@ -69,14 +69,34 @@ function Sales() {
     console.log("Imported data:", importedData);
   };
 
-const computePhaseCounts = () => {
-  const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
-  const counts = {
-    hot: 0,
-    warm: 0,
-    cold: 0,
-    closed: 0,
-  };
+
+  const computePhaseCounts = () => {
+    const user = users[currentUser?.uid];
+    const counts = {
+      hot: 0,
+      warm: 0,
+      cold: 0,
+      closed: 0, // Changed from renewal to closed
+    };
+
+    if (!user) return counts;
+
+    const isSalesDept = user.department === "Sales";
+    const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
+    const isLowerRole = ["Assistant Manager", "Executive"].includes(user.role);
+
+    Object.values(leads).forEach((lead) => {
+      const phase = lead.phase || "hot";
+      const isOwnLead = lead.assignedTo?.uid === currentUser?.uid;
+
+      const shouldInclude =
+        isSalesDept && isHigherRole
+          ? viewMyLeadsOnly
+            ? isOwnLead
+            : true
+          : isSalesDept && isLowerRole
+          ? isOwnLead
+          : false;
 
   if (!user) return counts;
 
@@ -150,13 +170,17 @@ const computePhaseCounts = () => {
       setLoading(false);
     });
 
-    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
-      const data = {};
-      snapshot.forEach((doc) => {
-        data[doc.id] = { id: doc.id, ...doc.data() };
-      });
-      setUsers(data);
-    });
+const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+  const data = {};
+  snapshot.forEach((doc) => {
+    const userData = { id: doc.id, ...doc.data() };
+    if (userData.uid) {
+      data[userData.uid] = userData;
+    }
+  });
+  setUsers(data);
+});
+
 
     return () => {
       unsubLeads();
@@ -209,34 +233,36 @@ const computePhaseCounts = () => {
     }
   };
 
+  const filteredLeads = Object.entries(leads).filter(([, lead]) => {
+    const phaseMatch = (lead.phase || "hot") === activeTab;
+    const user = users[currentUser?.uid];
+    if (!user) return false;
 
- const filteredLeads = Object.entries(leads).filter(([, lead]) => {
-  const phaseMatch = (lead.phase || "hot") === activeTab;
-  const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
-  if (!user) return false;
+    // Apply additional filters
+    const matchesFilters =
+      (!filters.city || lead.city?.includes(filters.city)) &&
+      (!filters.assignedTo || lead.assignedTo?.uid === filters.assignedTo) &&
+      (!filters.dateRange?.start ||
+        lead.createdAt >= new Date(filters.dateRange.start).getTime()) &&
+      (!filters.dateRange?.end ||
+        lead.createdAt <= new Date(filters.dateRange.end).getTime()) &&
+      (!filters.pocName ||
+        lead.pocName?.toLowerCase().includes(filters.pocName.toLowerCase())) &&
+      (!filters.phoneNo || lead.phoneNo?.includes(filters.phoneNo)) &&
+      (!filters.email ||
+        lead.email?.toLowerCase().includes(filters.email.toLowerCase()));
 
-  const matchesFilters =
-    (!filters.city || lead.city?.includes(filters.city)) &&
-    (!filters.assignedTo || lead.assignedTo?.uid === filters.assignedTo) &&
-    (!filters.dateRange?.start ||
-      lead.createdAt >= new Date(filters.dateRange.start).getTime()) &&
-    (!filters.dateRange?.end ||
-      lead.createdAt <= new Date(filters.dateRange.end).getTime()) &&
-    (!filters.pocName ||
-      lead.pocName?.toLowerCase().includes(filters.pocName.toLowerCase())) &&
-    (!filters.phoneNo || lead.phoneNo?.includes(filters.phoneNo)) &&
-    (!filters.email ||
-      lead.email?.toLowerCase().includes(filters.email.toLowerCase()));
+    const isSalesDept = user.department === "Sales";
+    const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
+    const isLowerRole = ["Assistant Manager", "Executive"].includes(user.role);
 
-  const isSalesDept = user.department === "Sales";
-  const isDirectorOrHead = ["Director", "Head"].includes(user.role);
-  const isManager = user.role === "Manager";
-  const isLowerRole = ["Assistant Manager", "Executive"].includes(user.role);
-
-  if (isSalesDept && isDirectorOrHead) {
-    // ✅ Full access (view all)
-    return phaseMatch && matchesFilters;
-  }
+    if (isSalesDept && isHigherRole) {
+      return viewMyLeadsOnly
+        ? phaseMatch &&
+            matchesFilters &&
+            lead.assignedTo?.uid === currentUser?.uid
+        : phaseMatch && matchesFilters;
+    }
 
   if (isSalesDept && isManager) {
     if (viewMyLeadsOnly) {
