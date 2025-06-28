@@ -40,7 +40,6 @@
     "react-time-picker": "^7.0.0",
     "react-toastify": "^11.0.5",
     "tailwindcss": "^4.1.8",
-    "xlsx": "^0.18.5",
     "xlsx-js-style": "^1.2.0"
   },
   "devDependencies": {
