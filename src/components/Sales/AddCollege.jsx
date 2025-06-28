@@ -52,6 +52,7 @@ const accreditationOptions = [
 ];
 
 function AddCollegeModal({ show, onClose }) {
+  const [contactMethod, setContactMethod] = useState("Visit");
   const [businessName, setBusinessName] = useState("");
   const [address, setAddress] = useState("");
   const [pocName, setPocName] = useState("");
@@ -808,7 +809,33 @@ function AddCollegeModal({ show, onClose }) {
                 </div>
               )}
             </div>
-
+              <div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">
+    Contact Method<span className="text-red-500 ml-1">*</span>
+  </label>
+  <div className="flex items-center space-x-4">
+    <label className="flex items-center">
+      <input
+        type="radio"
+        value="Visit"
+        checked={contactMethod === "Visit"}
+        onChange={(e) => setContactMethod(e.target.value)}
+        className="form-radio text-blue-600"
+      />
+      <span className="ml-2 text-sm text-gray-700">Visit</span>
+    </label>
+    <label className="flex items-center">
+      <input
+        type="radio"
+        value="Call"
+        checked={contactMethod === "Call"}
+        onChange={(e) => setContactMethod(e.target.value)}
+        className="form-radio text-blue-600"
+      />
+      <span className="ml-2 text-sm text-gray-700">Call</span>
+    </label>
+  </div>
+</div>
             {/* Student Count, Per Student Cost, TCV */}
             <div className="col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
