@@ -64,16 +64,11 @@ function Sales() {
   const [filters, setFilters] = useState({});
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
-  // Add this function to handle filter changes
-  const handleFilterChange = (newFilters) => {
-    setFilters(newFilters);
-  };
-
-  // Add this function to handle CSV import
   const handleImportComplete = (importedData) => {
     // Implement your import logic here
     console.log("Imported data:", importedData);
   };
+
 
   const computePhaseCounts = () => {
     const user = users[currentUser?.uid];
@@ -103,13 +98,43 @@ function Sales() {
           ? isOwnLead
           : false;
 
-      if (shouldInclude && counts[phase] !== undefined) {
-        counts[phase]++;
-      }
-    });
+  if (!user) return counts;
 
-    return counts;
-  };
+  const isSalesDept = user.department === "Sales";
+  const isDirectorOrHead = ["Director", "Head"].includes(user.role);
+  const isManager = user.role === "Manager";
+  const isLowerRole = ["Assistant Manager", "Executive"].includes(user.role);
+
+  const reportingUids = isManager
+    ? Object.values(users)
+        .filter(
+          (u) =>
+            u.reportingManager === user.name &&
+            ["Assistant Manager", "Executive"].includes(u.role)
+        )
+        .map((u) => u.uid)
+    : [];
+
+  Object.values(leads).forEach((lead) => {
+    const phase = lead.phase || "hot";
+
+    if (isSalesDept && isDirectorOrHead) {
+      // View all leads
+      counts[phase]++;
+    } else if (isSalesDept && isManager) {
+      if (viewMyLeadsOnly) {
+        if (lead.assignedTo?.uid === currentUser?.uid) counts[phase]++;
+      } else {
+        if (reportingUids.includes(lead.assignedTo?.uid)) counts[phase]++;
+      }
+    } else if (isSalesDept && isLowerRole) {
+      if (lead.assignedTo?.uid === currentUser?.uid) counts[phase]++;
+    }
+  });
+
+  return counts;
+};
+
 
   const phaseCounts = computePhaseCounts();
 
@@ -239,16 +264,45 @@ const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
         : phaseMatch && matchesFilters;
     }
 
-    if (isSalesDept && isLowerRole) {
+  if (isSalesDept && isManager) {
+    if (viewMyLeadsOnly) {
+      // ✅ View only manager's own leads
       return (
         phaseMatch &&
         matchesFilters &&
         lead.assignedTo?.uid === currentUser?.uid
       );
-    }
+    } else {
+      // ✅ View only leads of AM/Exec reporting to this manager
+      const reportingUids = Object.values(users)
+        .filter(
+          (u) =>
+            u.reportingManager === user.name &&
+            ["Assistant Manager", "Executive"].includes(u.role)
+        )
+        .map((u) => u.uid);
 
-    return false;
-  });
+      return (
+        phaseMatch &&
+        matchesFilters &&
+        reportingUids.includes(lead.assignedTo?.uid)
+      );
+    }
+  }
+
+  if (isSalesDept && isLowerRole) {
+    // ✅ View own leads
+    return (
+      phaseMatch &&
+      matchesFilters &&
+      lead.assignedTo?.uid === currentUser?.uid
+    );
+  }
+
+  // ❌ No access for other departments
+  return false;
+});
+
 
   // Define the grid columns based on the fields we want to display
   // const gridColumns = "grid grid-cols-11 gap-4";
