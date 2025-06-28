@@ -6,7 +6,14 @@ import {
   updateProfile,
   signOut,
 } from "firebase/auth";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  getDocs,
+  query,
+  where,
+} from "firebase/firestore";
 import {
   FaUser,
   FaEnvelope,
@@ -30,6 +37,40 @@ const NewUser = ({ onUserAdded }) => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [reportingManagers, setReportingManagers] = useState([]);
+  const [selectedReportingManager, setSelectedReportingManager] = useState("");
+
+  useEffect(() => {
+    const fetchManagers = async () => {
+      if (
+        (role === "Assistant Manager" || role === "Executive") &&
+        department === "Sales"
+      ) {
+        try {
+          const q = query(
+            collection(db, "users"),
+            where("role", "==", "Manager"),
+            where("department", "==", "Sales")
+          );
+          const querySnapshot = await getDocs(q);
+
+          const managers = querySnapshot.docs.map((doc) => ({
+            id: doc.id,
+            name: doc.data().name,
+          }));
+
+          setReportingManagers(managers);
+        } catch (err) {
+          console.error("Error fetching managers:", err);
+        }
+      } else {
+        setReportingManagers([]);
+        setSelectedReportingManager("");
+      }
+    };
+
+    fetchManagers();
+  }, [role, department]);
 
   const resetForm = () => {
     setName("");
@@ -38,6 +79,8 @@ const NewUser = ({ onUserAdded }) => {
     setDepartment("Sales");
     setPassword("");
     setError("");
+    setSelectedReportingManager("");
+    setReportingManagers([]);
   };
 
   useEffect(() => {
@@ -76,6 +119,15 @@ const NewUser = ({ onUserAdded }) => {
       return;
     }
 
+    if (
+      (role === "Assistant Manager" || role === "Executive") &&
+      !selectedReportingManager
+    ) {
+      setError("Please select a Reporting Manager.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const userCredential = await createUserWithEmailAndPassword(
         secondaryAuth,
@@ -84,13 +136,16 @@ const NewUser = ({ onUserAdded }) => {
       );
       await updateProfile(userCredential.user, { displayName: name });
 
-      // Inside handleSubmit in NewUser.jsx
       await addDoc(collection(db, "users"), {
         uid: userCredential.user.uid,
         name,
         email,
-        role, // Save role (from your form)
-        department, // Save department (from your form)
+        role,
+        department,
+        reportingManager:
+          role === "Assistant Manager" || role === "Executive"
+            ? selectedReportingManager
+            : null,
         createdAt: serverTimestamp(),
       });
 
@@ -104,6 +159,10 @@ const NewUser = ({ onUserAdded }) => {
             password,
             role,
             department,
+            reportingManager:
+              role === "Assistant Manager" || role === "Executive"
+                ? selectedReportingManager
+                : "N/A",
           },
           "zEVWxxT-QvGIrhvTV"
         );
@@ -217,7 +276,7 @@ const NewUser = ({ onUserAdded }) => {
 
           {/* Role */}
           <div>
-            <div className="flex items-center border border-gray-300 bg-white/50 backdrop-blur rounded-xl px-3 py-2 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 transition ">
+            <div className="flex items-center border border-gray-300 bg-white/50 backdrop-blur rounded-xl px-3 py-2 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 transition">
               <FaUserTag className="text-gray-400 mr-3" size={20} />
               <select
                 value={role}
@@ -232,6 +291,29 @@ const NewUser = ({ onUserAdded }) => {
               </select>
             </div>
           </div>
+
+          {/* Reporting Manager Dropdown (only for Assistant Manager & Executive in Sales) */}
+{(role === "Assistant Manager" || role === "Executive") && department === "Sales" && (
+  <div>
+    <div className="flex items-center border border-gray-300 bg-white/50 backdrop-blur rounded-xl px-3 py-2 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 transition">
+      <FaUser className="text-gray-400 mr-3" size={20} />
+      <select
+        value={selectedReportingManager}
+        onChange={(e) => setSelectedReportingManager(e.target.value)}
+        className="flex-grow bg-transparent focus:outline-none text-black"
+        required
+      >
+        <option value="">Select Reporting Manager</option>
+        {reportingManagers.map((manager) => (
+          <option key={manager.id} value={manager.name}>
+            {manager.name}
+          </option>
+        ))}
+      </select>
+    </div>
+  </div>
+)}
+
 
           {/* Department */}
           <div>
@@ -251,10 +333,12 @@ const NewUser = ({ onUserAdded }) => {
             </div>
           </div>
 
-          {/* Error */}
+          
+
+          {/* Error Message */}
           {error && <p className="text-red-500 text-sm font-medium">{error}</p>}
 
-          {/* Action Buttons */}
+          {/* Buttons */}
           <div className="flex justify-end space-x-3 pt-4">
             <button
               type="button"
@@ -270,7 +354,7 @@ const NewUser = ({ onUserAdded }) => {
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 rounded-full bg-green-200  border border-gray-300 text-gray-700 hover:bg-green-500 hover:text-white duration-300 ease-in-out disabled:opacity-50"
+              className="px-6 py-2 rounded-full bg-green-200 border border-gray-300 text-gray-700 hover:bg-green-500 hover:text-white duration-300 ease-in-out disabled:opacity-50"
             >
               {loading ? (
                 <span className="flex items-center gap-2">

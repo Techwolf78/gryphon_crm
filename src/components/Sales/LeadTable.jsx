@@ -18,16 +18,7 @@ const headerColorMap = {
   closed: "bg-green-50 text-green-800 border-b border-green-200",
 };
 
-// Helpers
-function formatDate(timestamp) {
-  if (!timestamp) return "-";
-  return new Date(timestamp).toLocaleDateString();
-}
 
-function getLatestFollowup(lead) {
-  if (!lead.followups || lead.followups.length === 0) return "-";
-  return lead.followups[lead.followups.length - 1].note || "-";
-}
 
 export default function LeadsTable({
   loading,
@@ -266,6 +257,7 @@ export default function LeadsTable({
                     activeTab={activeTab}
                     dropdownRef={dropdownRef}
                     users={users}
+                    currentUser={currentUser} 
                     setShowExpectedDateModal={setShowExpectedDateModal}
                     setPendingPhaseChange={setPendingPhaseChange}
                     setLeadBeingUpdated={setLeadBeingUpdated}
