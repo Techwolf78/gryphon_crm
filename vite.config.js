@@ -6,7 +6,4 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   base: "/", // 👈 this is critical
   plugins: [react(), tailwindcss()],
-    optimizeDeps: {
-    exclude: ['xlsx-js-style'] 
-  }
 });
