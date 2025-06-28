@@ -225,7 +225,7 @@ function AddCollegeModal({ show, onClose }) {
         {/* Modal Header */}
         <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center">
           <h2 className="text-xl font-semibold text-white">
-            Add New College Lead
+            Add College/University
           </h2>
           <button
             onClick={handleClose}
@@ -241,7 +241,7 @@ function AddCollegeModal({ show, onClose }) {
             {/* College Name */}
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                College Name<span className="text-red-500 ml-1">*</span>
+                College/University Name<span className="text-red-500 ml-1">*</span>
               </label>
               <div className="relative">
                 <input

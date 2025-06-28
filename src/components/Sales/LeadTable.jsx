@@ -137,8 +137,7 @@ export default function LeadsTable({
             className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-2 rounded-xl mb-3`}
           >
             <div className="break-words">
-              College
-              <br />
+              College/University
               Name
             </div>
             <div className="break-words">City</div>
