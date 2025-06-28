@@ -75,8 +75,10 @@ function Sales() {
     console.log("Imported data:", importedData);
   };
 
- const computePhaseCounts = () => {
-  const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
+
+
+const computePhaseCounts = () => {
+  const user = users[currentUser?.uid];
   const counts = {
     hot: 0,
     warm: 0,
@@ -94,9 +96,9 @@ function Sales() {
     const phase = lead.phase || "hot";
     const isOwnLead = lead.assignedTo?.uid === currentUser?.uid;
 
-    let shouldInclude = false;
-
-    if (isSalesDept && isHigherRole) {
+    if (isSalesDept && isDirectorOrHead) {
+      counts[phase]++;
+    } else if (isSalesDept && isManager) {
       if (viewMyLeadsOnly) {
         shouldInclude = isOwnLead;
       } else {

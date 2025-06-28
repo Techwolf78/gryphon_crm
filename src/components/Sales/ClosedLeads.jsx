@@ -87,52 +87,85 @@ const getCumulativeTarget = useCallback(
   (fy, upTo) => {
     const quartersOrder = ["Q1", "Q2", "Q3", "Q4"];
     const idx = quartersOrder.indexOf(upTo);
-    if (idx === -1) return 0;
-
-    // Calculate base target (sum of targets up to the specified quarter)
-    const baseTarget = quartersOrder.slice(0, idx + 1).reduce((sum, q) => {
-      const rec = targets.find(
-        (t) => t.financial_year === fy && t.quarter === q
-      );
-      return sum + (rec?.target_amount || 0);
-    }, 0);
-
-    // If it's Q1, just return the base target (no previous quarter to carry deficit from)
-    if (idx === 0) return baseTarget;
-
-    // Calculate deficit from previous quarters
-    let carriedDeficit = 0;
-    for (let i = 0; i < idx; i++) {
-      const quarter = quartersOrder[i];
-      const range = getQuarterRange(quarter, fy);
-      if (!range) continue;
-
-      // Calculate achieved for this quarter
-      const quarterAchieved = Object.entries(leads)
-        .filter(([, lead]) => lead.phase === "closed")
-        .filter(
-          ([, lead]) =>
-            !viewMyLeadsOnly || lead.assignedTo?.uid === currentUser?.uid
-        )
-        .filter(([, lead]) => {
-          const d = new Date(lead.closedDate);
-          return d >= range[0] && d <= range[1];
-        })
-        .reduce((sum, [, lead]) => sum + (lead.totalCost || 0), 0);
-
-      // Get this quarter's target
-      const quarterTarget = targets.find(
-        (t) => t.financial_year === fy && t.quarter === quarter
-      )?.target_amount || 0;
-
-      // Add any deficit to carriedDeficit
-      const deficit = quarterTarget - quarterAchieved;
-      if (deficit > 0) {
-        carriedDeficit += deficit;
+    
+    // Special handling for "All Quarters" view
+    if (upTo === "all") {
+      let totalTarget = 0;
+      let carriedDeficit = 0;
+      
+      // Calculate quarter by quarter with deficit carry-forward
+      for (let i = 0; i < quartersOrder.length; i++) {
+        const quarter = quartersOrder[i];
+        const baseTarget = targets.find(
+          (t) => t.financial_year === fy && t.quarter === quarter
+        )?.target_amount || 0;
+        
+        // Current quarter target = base + carried deficit
+        const quarterTarget = baseTarget + carriedDeficit;
+        totalTarget += baseTarget; // Only add base targets for the full year
+        
+        // Calculate achieved for this quarter
+        const range = getQuarterRange(quarter, fy);
+        if (!range) continue;
+        
+        const quarterAchieved = Object.entries(leads)
+          .filter(([, lead]) => lead.phase === "closed")
+          .filter(
+            ([, lead]) =>
+              !viewMyLeadsOnly || lead.assignedTo?.uid === currentUser?.uid
+          )
+          .filter(([, lead]) => {
+            const d = new Date(lead.closedDate);
+            return d >= range[0] && d <= range[1];
+          })
+          .reduce((sum, [, lead]) => sum + (lead.totalCost || 0), 0);
+        
+        // Calculate new deficit to carry forward
+        carriedDeficit = Math.max(0, quarterTarget - quarterAchieved);
       }
+      
+      return totalTarget; // Return sum of base targets only for "All Quarters"
     }
 
-    return baseTarget + carriedDeficit;
+    if (idx === -1) return 0;
+
+    // Base target for current quarter
+    const currentQuarterTarget = targets.find(
+      (t) => t.financial_year === fy && t.quarter === upTo
+    )?.target_amount || 0;
+
+    // If Q1, just return base target (no previous quarter)
+    if (idx === 0) return currentQuarterTarget;
+
+    // Get previous quarter's deficit
+    const prevQuarter = quartersOrder[idx - 1];
+    const prevQuarterRange = getQuarterRange(prevQuarter, fy);
+    
+    if (!prevQuarterRange) return currentQuarterTarget;
+
+    // Calculate achieved for previous quarter
+    const prevQuarterAchieved = Object.entries(leads)
+      .filter(([, lead]) => lead.phase === "closed")
+      .filter(
+        ([, lead]) =>
+          !viewMyLeadsOnly || lead.assignedTo?.uid === currentUser?.uid
+      )
+      .filter(([, lead]) => {
+        const d = new Date(lead.closedDate);
+        return d >= prevQuarterRange[0] && d <= prevQuarterRange[1];
+      })
+      .reduce((sum, [, lead]) => sum + (lead.totalCost || 0), 0);
+
+    // Get previous quarter's target (base only, not cumulative)
+    const prevQuarterTarget = targets.find(
+      (t) => t.financial_year === fy && t.quarter === prevQuarter
+    )?.target_amount || 0;
+
+    // Calculate previous quarter's deficit (only if positive)
+    const prevQuarterDeficit = Math.max(0, prevQuarterTarget - prevQuarterAchieved);
+
+    // Current quarter target = base + previous quarter's deficit
+    return currentQuarterTarget + prevQuarterDeficit;
   },
   [targets, leads, viewMyLeadsOnly, currentUser?.uid, getQuarterRange]
 );
