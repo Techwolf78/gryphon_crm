@@ -70,33 +70,14 @@ function Sales() {
   };
 
 
-  const computePhaseCounts = () => {
-    const user = users[currentUser?.uid];
-    const counts = {
-      hot: 0,
-      warm: 0,
-      cold: 0,
-      closed: 0, // Changed from renewal to closed
-    };
-
-    if (!user) return counts;
-
-    const isSalesDept = user.department === "Sales";
-    const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
-    const isLowerRole = ["Assistant Manager", "Executive"].includes(user.role);
-
-    Object.values(leads).forEach((lead) => {
-      const phase = lead.phase || "hot";
-      const isOwnLead = lead.assignedTo?.uid === currentUser?.uid;
-
-      const shouldInclude =
-        isSalesDept && isHigherRole
-          ? viewMyLeadsOnly
-            ? isOwnLead
-            : true
-          : isSalesDept && isLowerRole
-          ? isOwnLead
-          : false;
+const computePhaseCounts = () => {
+  const user = users[currentUser?.uid];
+  const counts = {
+    hot: 0,
+    warm: 0,
+    cold: 0,
+    closed: 0,
+  };
 
   if (!user) return counts;
 
@@ -119,7 +100,6 @@ function Sales() {
     const phase = lead.phase || "hot";
 
     if (isSalesDept && isDirectorOrHead) {
-      // View all leads
       counts[phase]++;
     } else if (isSalesDept && isManager) {
       if (viewMyLeadsOnly) {
@@ -134,6 +114,7 @@ function Sales() {
 
   return counts;
 };
+
 
 
   const phaseCounts = computePhaseCounts();
