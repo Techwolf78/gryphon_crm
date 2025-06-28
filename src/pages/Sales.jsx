@@ -38,7 +38,7 @@ const tabColorMap = {
       "bg-green-50 text-green-600 hover:bg-green-100 border border-green-200", // Changed to success green
   },
 };
-
+ 
 function Sales() {
   const [activeTab, setActiveTab] = useState("hot");
   const [users, setUsers] = useState({});
@@ -63,42 +63,35 @@ function Sales() {
   const [expectedDate, setExpectedDate] = useState(""); // date string like "2025-06-25"
   const [filters, setFilters] = useState({});
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-
-  // Add this function to handle filter changes
-  const handleFilterChange = (newFilters) => {
-    setFilters(newFilters);
-  };
-
+ 
   // Add this function to handle CSV import
   const handleImportComplete = (importedData) => {
     // Implement your import logic here
     console.log("Imported data:", importedData);
   };
-
-
-
-const computePhaseCounts = () => {
-  const user = users[currentUser?.uid];
+ 
+ const computePhaseCounts = () => {
+  const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
   const counts = {
     hot: 0,
     warm: 0,
     cold: 0,
     closed: 0,
   };
-
+ 
   if (!user) return counts;
-
+ 
   const isSalesDept = user.department === "Sales";
   const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
   const isLowerRole = ["Assistant Manager", "Executive"].includes(user.role);
-
+ 
   Object.values(leads).forEach((lead) => {
     const phase = lead.phase || "hot";
     const isOwnLead = lead.assignedTo?.uid === currentUser?.uid;
-
-    if (isSalesDept && isDirectorOrHead) {
-      counts[phase]++;
-    } else if (isSalesDept && isManager) {
+ 
+    let shouldInclude = false;
+ 
+    if (isSalesDept && isHigherRole) {
       if (viewMyLeadsOnly) {
         shouldInclude = isOwnLead;
       } else {
@@ -118,17 +111,17 @@ const computePhaseCounts = () => {
     } else if (isSalesDept && isLowerRole) {
       shouldInclude = isOwnLead;
     }
-
+ 
     if (shouldInclude && counts[phase] !== undefined) {
       counts[phase]++;
     }
   });
-
+ 
   return counts;
 };
-
+ 
   const phaseCounts = computePhaseCounts();
-
+ 
   useEffect(() => {
     const auth = getAuth();
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -147,10 +140,10 @@ const computePhaseCounts = () => {
         setCurrentUser(null);
       }
     });
-
+ 
     return () => unsubscribe();
   }, [users]); // Add users as dependency
-
+ 
   useEffect(() => {
     const unsubLeads = onSnapshot(collection(db, "leads"), (snapshot) => {
       const data = {};
@@ -160,7 +153,7 @@ const computePhaseCounts = () => {
       setLeads(data);
       setLoading(false);
     });
-
+ 
     const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
       const data = {};
       snapshot.forEach((doc) => {
@@ -168,13 +161,13 @@ const computePhaseCounts = () => {
       });
       setUsers(data);
     });
-
+ 
     return () => {
       unsubLeads();
       unsubUsers();
     };
   }, []);
-
+ 
   // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(e) {
@@ -185,12 +178,12 @@ const computePhaseCounts = () => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
+ 
   const toggleDropdown = (id, e) => {
     e.stopPropagation();
     setDropdownOpenId((currentId) => (currentId === id ? null : id));
   };
-
+ 
   const updateLeadPhase = async (id, newPhase) => {
     try {
       await updateDoc(doc(db, "leads", id), { phase: newPhase });
@@ -198,34 +191,34 @@ const computePhaseCounts = () => {
       console.error("Phase update failed", err);
     }
   };
-
+ 
   // In Sales.jsx
   const handleSaveLead = async (updatedLead) => {
     if (!updatedLead?.id) return;
-
+ 
     // Convert date string back to timestamp if it exists
     if (updatedLead.createdAt && typeof updatedLead.createdAt === "string") {
       updatedLead.createdAt = new Date(updatedLead.createdAt).getTime();
     }
-
+ 
     const { ...dataToUpdate } = updatedLead;
-
+ 
     try {
       await updateDoc(doc(db, "leads", updatedLead.id), dataToUpdate);
-
+ 
       setShowDetailsModal(false);
       setSelectedLead(null);
     } catch (error) {
       console.error("Failed to update lead", error);
     }
   };
-
-
+ 
+ 
   const filteredLeads = Object.entries(leads).filter(([, lead]) => {
     const phaseMatch = (lead.phase || "hot") === activeTab;
     const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
     if (!user) return false;
-
+ 
     // Apply additional filters
     const matchesFilters =
       (!filters.city || lead.city?.includes(filters.city)) &&
@@ -239,11 +232,11 @@ const computePhaseCounts = () => {
       (!filters.phoneNo || lead.phoneNo?.includes(filters.phoneNo)) &&
       (!filters.email ||
         lead.email?.toLowerCase().includes(filters.email.toLowerCase()));
-
+ 
     const isSalesDept = user.department === "Sales";
     const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
     const isLowerRole = ["Assistant Manager", "Executive"].includes(user.role);
-
+ 
     if (isSalesDept && isHigherRole) {
   if (viewMyLeadsOnly) {
     // ✅ "My Leads" for any higher role
@@ -256,11 +249,11 @@ const computePhaseCounts = () => {
     const currentUserData = Object.values(users).find(
       (u) => u.uid === currentUser?.uid
     );
-
+ 
     if (!currentUserData) return false;
-
+ 
     const currentUserName = currentUserData.name; // 🔁 adjust if your field is fullName etc.
-
+ 
     // ✅ Custom logic only for Manager
     if (currentUserData.role === "Manager") {
       const subordinates = Object.values(users).filter(
@@ -268,61 +261,61 @@ const computePhaseCounts = () => {
           u.reportingManager === currentUserName &&
           ["Assistant Manager", "Executive"].includes(u.role)
       );
-
+ 
       const teamUids = subordinates.map((u) => u.uid);
-
+ 
       return (
         phaseMatch &&
         matchesFilters &&
         teamUids.includes(lead.assignedTo?.uid)
       );
     }
-
+ 
     // ✅ For Head/Director — full sales access
     return phaseMatch && matchesFilters;
   }
 }
-
+ 
     return false;
   });
-
+ 
   // Define the grid columns based on the fields we want to display
   // const gridColumns = "grid grid-cols-11 gap-4";
-
+ 
   useEffect(() => {
     if (!loading && Object.keys(leads).length > 0) {
       const now = new Date();
       const todayStr = now.toISOString().split("T")[0];
-
+ 
       const matchingLeads = Object.values(leads).filter((lead) => {
         if (lead.assignedTo?.uid !== currentUser?.uid) return false;
         if ((lead.phase || "hot") !== "hot") return false;
         if (!lead.followup) return false;
-
+ 
         const followupEntries = Object.values(lead.followup);
         if (followupEntries.length === 0) return false;
-
+ 
         const sortedFollowups = followupEntries.sort(
           (a, b) => b.timestamp - a.timestamp
         );
         const latest = sortedFollowups[0];
         if (latest.date !== todayStr) return false;
-
+ 
         const followUpDateTime = new Date(
           `${latest.date}T${convertTo24HrTime(latest.time)}`
         );
         return followUpDateTime > now;
       });
-
+ 
       if (matchingLeads.length > 0) {
         setTodayFollowUps(matchingLeads);
         setShowTodayFollowUpAlert(true);
-
+ 
         // ✅ Automatically hide after 4 seconds
         const timer = setTimeout(() => {
           setShowTodayFollowUpAlert(false);
         }, 4000);
-
+ 
         return () => clearTimeout(timer); // Cleanup
       }
     }
@@ -332,46 +325,46 @@ const computePhaseCounts = () => {
     if (!timeStr) return "00:00:00";
     const [time, modifier] = timeStr.split(" ");
     let [hours, minutes] = time.split(":").map(Number);
-
+ 
     if (modifier === "PM" && hours !== 12) hours += 12;
     if (modifier === "AM" && hours === 12) hours = 0;
-
+ 
     return `${hours.toString().padStart(2, "0")}:${minutes
       .toString()
       .padStart(2, "0")}:00`;
   }
-
+ 
   useEffect(() => {
     const interval = setInterval(() => {
       const now = new Date();
-
+ 
       const upcomingReminder = Object.values(leads).find((lead) => {
         if (lead.assignedTo?.uid !== currentUser?.uid) return false;
         if ((lead.phase || "hot") !== "hot") return false;
         if (!lead.followup) return false;
-
+ 
         const entries = Object.values(lead.followup);
         if (entries.length === 0) return false;
-
+ 
         const latest = entries.sort((a, b) => b.timestamp - a.timestamp)[0];
         const followUpTime = new Date(
           `${latest.date}T${convertTo24HrTime(latest.time)}`
         );
         const reminderTime = new Date(followUpTime.getTime() - 15 * 60 * 1000);
-
+ 
         const isToday =
           latest.date === now.toISOString().split("T")[0] &&
           reminderTime <= now &&
           followUpTime > now;
-
+ 
         const alreadyReminded = remindedLeadsRef.current.has(lead.id);
-
+ 
         return isToday && !alreadyReminded;
       });
-
+ 
       if (upcomingReminder) {
         remindedLeadsRef.current.add(upcomingReminder.id); // ✅ Track shown reminders
-
+ 
         setReminderPopup({
           leadId: upcomingReminder.id,
           college: upcomingReminder.businessName,
@@ -381,10 +374,10 @@ const computePhaseCounts = () => {
         });
       }
     }, 60000);
-
+ 
     return () => clearInterval(interval);
   }, [leads, currentUser]);
-
+ 
   return (
     <div className="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen font-sans ">
       <div className=" mx-auto">
@@ -396,7 +389,7 @@ const computePhaseCounts = () => {
             <p className="text-gray-600 mt-1">
               Manage your leads and follow-ups
             </p>
-
+ 
             <div className="flex items-center justify-between mt-2">
               {currentUser &&
                 (() => {
@@ -406,7 +399,7 @@ const computePhaseCounts = () => {
                   const isHigherRole = ["Director", "Head", "Manager"].includes(
                     role
                   );
-
+ 
                   return (
                     <div className="flex items-center gap-2">
                       <p
@@ -423,7 +416,7 @@ const computePhaseCounts = () => {
                             : "All Sales Leads"
                           : "My Leads Only"}
                       </p>
-
+ 
                       {isHigherRole && (
                         <div className="flex gap-2">
                           <button
@@ -451,7 +444,7 @@ const computePhaseCounts = () => {
                     </div>
                   );
                 })()}
-
+ 
               <LeadFilters
                 filteredLeads={filteredLeads}
                 handleImportComplete={handleImportComplete}
@@ -464,7 +457,7 @@ const computePhaseCounts = () => {
               />
             </div>
           </div>
-
+ 
           <button
             onClick={() => setShowModal(true)}
             className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-5 py-2.5 rounded-xl font-semibold hover:opacity-90 transition-all shadow-md flex items-center"
@@ -514,7 +507,7 @@ const computePhaseCounts = () => {
             </button>
           ))}
         </div>
-
+ 
         <LeadsTable
           loading={loading}
           activeTab={activeTab}
@@ -550,16 +543,16 @@ const computePhaseCounts = () => {
           currentUser={currentUser}
         />
       </div>
-
+ 
       <AddCollegeModal show={showModal} onClose={() => setShowModal(false)} />
-
+ 
       <LeadDetailsModal
         show={showDetailsModal}
         onClose={() => setShowDetailsModal(false)}
         lead={selectedLead}
         onSave={handleSaveLead}
       />
-
+ 
       {showClosureModal && selectedLead && (
         <TrainingForm
           show={showClosureModal}
@@ -573,7 +566,7 @@ const computePhaseCounts = () => {
           lead={selectedLead}
         />
       )}
-
+ 
       <FollowupAlerts
         todayFollowUps={todayFollowUps}
         showTodayFollowUpAlert={showTodayFollowUpAlert}
@@ -581,7 +574,7 @@ const computePhaseCounts = () => {
         reminderPopup={reminderPopup}
         setReminderPopup={setReminderPopup}
       />
-
+ 
       <style>{`
   @keyframes slideInRight {
     0% {
@@ -601,12 +594,12 @@ const computePhaseCounts = () => {
       opacity: 0;
     }
   }
-
+ 
   .animate-slideInRight {
     animation: slideInRight 4s ease-in-out forwards;
   }
 `}</style>
-
+ 
       <ExpectedDateModal
         show={showExpectedDateModal}
         onClose={() => {
@@ -625,5 +618,7 @@ const computePhaseCounts = () => {
     </div>
   );
 }
-
+ 
 export default Sales;
+ 
+ 
