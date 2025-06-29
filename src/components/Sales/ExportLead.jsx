@@ -30,19 +30,36 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
     };
   }, [menuOpen]);
 
-  // Helper to get latest follow-up string (date + remarks)
-  const getLatestFollowUp = (followupObj) => {
+  const getAllFollowUps = (followupObj) => {
     if (!followupObj || typeof followupObj !== "object") return "";
 
     const followupsArray = Object.values(followupObj);
     if (followupsArray.length === 0) return "";
 
+    // Sort by timestamp (newest first)
     followupsArray.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-    const latest = followupsArray[0];
 
-    return `${latest.formattedDate || latest.date || ""} - ${
-      latest.remarks || ""
-    }`;
+    // Format each follow-up with consistent date format and numbering
+    return followupsArray
+      .map((followup, index) => {
+        // Format date consistently
+        let dateStr = "";
+        try {
+          const date = followup.date?.seconds
+            ? new Date(followup.date.seconds * 1000)
+            : new Date(followup.date || followup.formattedDate);
+          dateStr = date.toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+          });
+        } catch {
+          dateStr = followup.formattedDate || followup.date || "";
+        }
+
+        return `${index + 1}. ${dateStr} - ${followup.remarks || ""}`;
+      })
+      .join(String.fromCharCode(10)); // Use ASCII 10 for Excel line breaks
   };
 
   const parseDate = (date) => {
@@ -64,31 +81,53 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
       return lead.phase && lead.phase.toLowerCase() !== "closed";
     });
 
-  // Group leads by phase and shape data
-  const groupByPhase = (leads) => {
-    const result = { hot: [], warm: [], cold: [] };
-    leads.forEach((item) => {
-      const lead = Array.isArray(item) ? item[1] : item;
-      if (!lead || !lead.phase) return;
+const groupByPhase = (leads) => {
+  const result = { hot: [], warm: [], cold: [] };
+  leads.forEach((item) => {
+    const lead = Array.isArray(item) ? item[1] : item;
+    if (!lead || !lead.phase) return;
 
-      const phase = lead.phase.toLowerCase();
-      if (["hot", "warm", "cold"].includes(phase)) {
-        result[phase].push({
-          "College Name": lead.businessName || "",
-          City: lead.city || "",
-          "Contact Name": lead.pocName || "",
-          "Phone No.": lead.phoneNo || "",
-          "Email ID": lead.email || "",
-          TCV: lead.tcv || "",
-          "Opened Date": parseDate(lead.createdAt),
-          "Expected Closure": parseDate(lead.expectedClosureDate),
-          "Follow-Ups": getLatestFollowUp(lead.followup),
-          "Assigned To": lead.assignedTo?.name || "",
-        });
-      }
-    });
-    return result;
-  };
+    const phase = lead.phase.toLowerCase();
+    if (["hot", "warm", "cold"].includes(phase)) {
+      result[phase].push({
+        // Institution Basic Info
+        "College Name": lead.businessName || "",
+        "Accreditation": lead.accreditation || "",
+        "Affiliation": lead.affiliation || "",
+        "Course Type": lead.courseType || "",
+        "Specializations": lead.specializations ? lead.specializations.join(", ") : "",
+        
+        // Location Details
+        "Address": lead.address || "",
+        "City": lead.city || "",
+        "State": lead.state || "",
+        
+        // Contact Information
+        "Contact Name": lead.pocName || "",
+        "Phone No.": lead.phoneNo || "",
+        "Email ID": lead.email || "",
+        "Contact Method": lead.contactMethod || "",
+        
+        // Academic Details
+        "Passing Year": lead.passingYear || "",
+        "Student Count": lead.studentCount || "",
+        "Per Student Cost": lead.perStudentCost || "",
+        
+        // Financial Information
+        "TCV": lead.tcv || "",
+        
+        // Timeline Information
+        "Opened Date": parseDate(lead.createdAt),
+        "Expected Closure": parseDate(lead.expectedClosureDate),
+        
+        // Management Information
+        "Assigned To": lead.assignedTo?.name || "",
+        "Meetings": getAllFollowUps(lead.followup)
+      });
+    }
+  });
+  return result;
+};
 
   const handleExport = (option) => {
     const leadsToExport =
@@ -116,9 +155,21 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
 
       const ws = XLSX.utils.aoa_to_sheet(sheetData);
 
-      // Set column widths to 20 chars wide
-      ws["!cols"] = headers.map(() => ({ wch: 20 }));
+      // With your custom column width configuration:
+      ws["!cols"] = headers.map((header) => {
+        // Wider columns for fields that typically need more space
+        if (["Address", "Specializations", "Meetings"].includes(header)) {
+          return { wch: 30 };
+        }
+        // Medium width for other text fields
+        if (["College Name", "Affiliation"].includes(header)) {
+          return { wch: 25 };
+        }
+        // Default width for others
+        return { wch: 15 };
+      });
 
+      // Then continue with the existing cell styling code:
       const range = XLSX.utils.decode_range(ws["!ref"]);
 
       for (let R = range.s.r; R <= range.e.r; ++R) {
@@ -151,6 +202,7 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
             } else {
               // Alternating row color & borders for data cells
               const isEven = R % 2 === 0;
+              const isFollowUpCell = headers[C] === "Meetings";
               cell.s = {
                 fill: {
                   fgColor: { rgb: isEven ? "F9F9F9" : "FFFFFF" },
@@ -163,8 +215,15 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
                 },
                 alignment: {
                   horizontal: "left",
-                  vertical: "center",
+                  vertical: "top", // Changed to top alignment
+                  wrapText: true, // Enable text wrapping
                 },
+                // Special formatting for follow-up cells
+                ...(isFollowUpCell && {
+                  font: {
+                    sz: 10, // Slightly smaller font for follow-ups
+                  },
+                }),
               };
             }
           }

@@ -18,8 +18,6 @@ const headerColorMap = {
   closed: "bg-green-50 text-green-800 border-b border-green-200",
 };
 
-
-
 export default function LeadsTable({
   loading,
   activeTab,
@@ -178,32 +176,41 @@ export default function LeadsTable({
                 <div
                   className={`${gridColumns} gap-4 p-5 rounded-xl bg-white shadow-sm hover:shadow-md transition-all duration-300 ${borderColorMap[activeTab]}`}
                 >
-                  {[
-                    "businessName",
-                    "city",
-                    "pocName",
-                    "phoneNo",
-                    "email",
-                    "tcv",
-                    "openedDate",
-                    "expectedClosureDate",
-                  ].map((field, i) => (
-                    <div
-                      key={i}
-                      className="text-sm text-gray-700 break-words whitespace-normal"
-                    >
-                      {(field === "openedDate" ||
-                        field === "expectedClosureDate") &&
-                      (lead[field] ||
-                        (field === "openedDate" && lead.createdAt))
-                        ? formatDate(
-                            field === "openedDate"
-                              ? lead.openedDate || lead.createdAt
-                              : lead[field]
-                          )
-                        : lead[field] || "-"}
-                    </div>
-                  ))}
+                  <div className="text-sm text-gray-700 break-words whitespace-normal">
+                    {lead.businessName || "-"}
+                  </div>
+
+                  <div className="text-sm text-gray-700 break-words whitespace-normal">
+                    {lead.city || "-"}
+                  </div>
+
+                  <div className="text-sm text-gray-700 break-words whitespace-normal">
+                    {lead.pocName || "-"}
+                  </div>
+
+                  <div className="text-sm text-gray-700 break-words whitespace-normal">
+                    {lead.phoneNo || "-"}
+                  </div>
+
+                  <div className="text-sm text-gray-700 break-words whitespace-normal">
+                    {lead.email || "-"}
+                  </div>
+
+                  <div className="text-sm text-gray-700 break-words whitespace-normal">
+                    {lead.tcv || "-"}
+                  </div>
+
+                  <div className="text-sm text-gray-700 break-words whitespace-normal">
+                    {(lead.openedDate || lead.createdAt)
+                      ? formatDate(lead.openedDate || lead.createdAt)
+                      : "-"}
+                  </div>
+
+                  <div className="text-sm text-gray-700 break-words whitespace-normal">
+                    {lead.expectedClosureDate
+                      ? formatDate(lead.expectedClosureDate)
+                      : "-"}
+                  </div>
 
                   <div className="text-sm text-gray-700 break-words whitespace-normal">
                     {getLatestFollowup(lead)}
@@ -215,7 +222,12 @@ export default function LeadsTable({
                       : lead.assignedTo?.name || "-"}
                   </div>
 
-                  <div className="flex justify-center items-center">
+                  <div className="flex justify-center items-center gap-2">
+                    {lead.contactMethod && (
+                      <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-0.5 rounded-full">
+                        {lead.contactMethod.toLowerCase()}
+                      </span>
+                    )}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -268,14 +280,14 @@ export default function LeadsTable({
         </div>
       </div>
 
-{selectedLeadForDetails && (
-  <LeadDetailsModal
-    selectedLead={selectedLeadForDetails}
-    onClose={() => setSelectedLeadForDetails(null)}
-    users={users}
-    activeTab={activeTab}
-  />
-)}
+      {selectedLeadForDetails && (
+        <LeadDetailsModal
+          selectedLead={selectedLeadForDetails}
+          onClose={() => setSelectedLeadForDetails(null)}
+          users={users}
+          activeTab={activeTab}
+        />
+      )}
     </>
   );
 }

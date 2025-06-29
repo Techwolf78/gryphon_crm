@@ -1,4 +1,3 @@
-
 const statusColorMap = {
   hot: {
     border: "border-red-500",
@@ -54,6 +53,26 @@ export default function LeadDetailsModal({
   if (!selectedLead) return null;
 
   const statusColors = statusColorMap[activeTab] || statusColorMap.hot;
+
+  // Function to render specializations as chips
+  const renderSpecializations = () => {
+    if (!selectedLead.specializations || selectedLead.specializations.length === 0) {
+      return "-";
+    }
+    
+    return (
+      <div className="flex flex-wrap gap-2 mt-1">
+        {selectedLead.specializations.map((spec, index) => (
+          <span 
+            key={index}
+            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+          >
+            {spec}
+          </span>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-52 animate-fadeIn">
@@ -181,11 +200,9 @@ export default function LeadDetailsModal({
                 <div className="space-y-4">
                   <div>
                     <p className="text-sm font-medium text-gray-500">
-                      Specialization
+                      Specialization(s)
                     </p>
-                    <p className="mt-1 text-gray-900">
-                      {selectedLead.specialization || "-"}
-                    </p>
+                    {renderSpecializations()}
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-500">
@@ -197,10 +214,26 @@ export default function LeadDetailsModal({
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-500">
-                      Closure Type
+                      Passing Year
                     </p>
                     <p className="mt-1 text-gray-900">
-                      {selectedLead.closureType || "-"}
+                      {selectedLead.passingYear || "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">
+                      Affiliation
+                    </p>
+                    <p className="mt-1 text-gray-900">
+                      {selectedLead.affiliation || "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">
+                      Accreditation
+                    </p>
+                    <p className="mt-1 text-gray-900">
+                      {selectedLead.accreditation || "-"}
                     </p>
                   </div>
                 </div>
