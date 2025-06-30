@@ -41,6 +41,7 @@
     "react-router-dom": "^7.6.2",
     "react-time-picker": "^7.0.0",
     "react-toastify": "^11.0.5",
+    "recharts": "^3.0.2",
     "tailwindcss": "^4.1.8",
     "xlsx": "^0.18.5",
     "xlsx-js-style": "^1.2.0"

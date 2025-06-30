@@ -623,7 +623,7 @@ export default function LeadDetailsModal({
                         d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
                       />
                     </svg>
-                    Latest Followup
+                    Latest Meeting
                   </span>
                 </h3>
                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">

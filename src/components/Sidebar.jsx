@@ -70,11 +70,6 @@ const Sidebar = ({ collapsed, onToggle }) => {
   if (!user) return null;
 
 const normalizedRole = normalizeRole(user.department) || normalizeRole(user.role);
-console.log('User data:', {
-  role: user.role,
-  department: user.department,
-  normalizedRole: normalizedRole
-});
 
   const isActive = (path) => {
     if (path === "/dashboard") {
@@ -94,7 +89,6 @@ console.log('User data:', {
 
   const links = [...commonLinks, ...(roleLinks[normalizedRole] || [])];
 
-  console.log("User role:", user.role, "Normalized:", normalizedRole);
 
   return (
     <aside

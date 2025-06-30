@@ -41,12 +41,11 @@ const Navbar = ({ onImageClick = () => {} }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleLogout = () => {
-    setIsDropdownOpen(false);
-    logout();
-    toast.success("Logged out successfully!");
-    navigate("/login");
-  };
+const handleLogout = () => {
+  setIsDropdownOpen(false);
+  logout();
+  navigate("/login", { state: { showLogoutToast: true } });
+};
 
   const navItemClass =
     "group flex items-center gap-2 relative transition text-white hover:text-white";

@@ -1,10 +1,22 @@
 import { useState, useEffect, useRef } from "react";
-import { FiFilter, FiX } from "react-icons/fi";
+import { 
+  FiFilter, 
+  FiX, 
+  FiChevronDown, 
+  FiChevronUp,
+  FiMapPin,
+  FiUsers,
+  FiCalendar,
+  FiUser,
+  FiMail,
+  FiPhone,
+  FiRefreshCw,
+  FiCheck
+} from "react-icons/fi";
 import ExportLead from "./ExportLead";
 import ImportLead from "./ImportLead";
-import { db } from "../../firebase"; // Firebase config
+import { db } from "../../firebase";
 import { collection, getDocs } from "firebase/firestore";
-
 
 function LeadFilters({
   filteredLeads,
@@ -15,10 +27,11 @@ function LeadFilters({
   setIsFilterOpen,
   users,
   leads,
-  activeTab, // Add this prop
+  activeTab,
 }) {
   const [localFilters, setLocalFilters] = useState(filters);
   const [allLeads, setAllLeads] = useState([]);
+  const [activeSection, setActiveSection] = useState(null);
   const filterPanelRef = useRef(null);
 
   // Fetch all leads from Firebase
@@ -109,6 +122,11 @@ function LeadFilters({
     setFilters({});
   };
 
+  // Toggle filter section
+  const toggleSection = (section) => {
+    setActiveSection(activeSection === section ? null : section);
+  };
+
   // Check if any filter is active
   const hasActiveFilters = Object.values(filters).some(
     (filter) =>
@@ -122,23 +140,23 @@ function LeadFilters({
       <ExportLead filteredLeads={filteredLeads} allLeads={allLeads} />
       <ImportLead 
         handleImportComplete={handleImportComplete} 
-        activeTab={activeTab} // Pass activeTab prop
+        activeTab={activeTab}
       />
 
       {/* Filter Button */}
       <div className="relative">
         <button
           onClick={() => setIsFilterOpen(!isFilterOpen)}
-          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-all ${
             isFilterOpen || hasActiveFilters
-              ? "bg-blue-100 border-blue-300 text-blue-800"
-              : "bg-gradient-to-r from-gray-50 to-white border-gray-300 text-gray-700 hover:from-gray-100"
+              ? "bg-blue-50 border-blue-200 text-blue-700 shadow-sm"
+              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50 shadow-sm"
           }`}
         >
           <FiFilter className="w-4 h-4" />
-          <span>Add Filters</span>
+          <span>Filters</span>
           {hasActiveFilters && (
-            <span className="bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+            <span className="bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
               {Object.values(filters).filter(Boolean).length}
             </span>
           )}
@@ -148,211 +166,285 @@ function LeadFilters({
         {isFilterOpen && (
           <div
             ref={filterPanelRef}
-            className="absolute top-full -left-80 mt-2 bg-white p-5 rounded-lg shadow-xl z-50 border border-gray-100 w-full min-w-[900px]"
+            className="absolute top-full right-0 mt-2 bg-white p-5 rounded-xl shadow-lg z-50 border border-gray-200 w-[340px]"
           >
             <div className="flex justify-between items-center mb-4">
-              <h3 className="font-semibold text-gray-900">Filter Leads</h3>
+              <div className="flex items-center gap-2">
+                <FiFilter className="w-5 h-5 text-blue-500" />
+                <h3 className="font-semibold text-gray-800 text-lg">Filters</h3>
+              </div>
               <button
                 onClick={() => setIsFilterOpen(false)}
-                className="text-white hover:text-red-100 transition-colors bg-red-500 rounded-full p-0.5 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-900"
+                className="text-gray-400 hover:text-gray-600 transition-colors rounded-full p-1 hover:bg-gray-100"
                 aria-label="Close filters"
               >
                 <FiX className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Filter Grid */}
-            <div
-              className="grid gap-4"
-              style={{ gridTemplateColumns: "1.5fr 3fr 1.5fr" }}
-            >
-              {/* Column 1 */}
-              <div className="space-y-4">
-                {/* City Filter */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    City
-                  </label>
-                  <select
-                    value={localFilters.city || ""}
-                    onChange={(e) =>
-                      setLocalFilters({ ...localFilters, city: e.target.value })
-                    }
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">All Cities</option>
-                    {filterOptions.cities.map((city) => (
-                      <option key={city} value={city}>
-                        {city}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Assigned To */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Assigned To
-                  </label>
-                  <select
-                    value={localFilters.assignedTo || ""}
-                    onChange={(e) =>
-                      setLocalFilters({
-                        ...localFilters,
-                        assignedTo: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">All Team Members</option>
-                    {filterOptions.assignedPersons.length === 0 ? (
-                      <option disabled>No users found</option>
-                    ) : (
-                      filterOptions.assignedPersons.map((user) => (
-                        <option key={user.uid} value={user.uid}>
-                          {user.displayName}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                </div>
-              </div>
-
-              {/* Column 2 */}
-              <div className="space-y-4">
-                {/* Date Range */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Date Range
-                  </label>
-                  <div className="flex gap-3">
-                    <div className="flex flex-col">
-                      <label className="text-xs text-gray-500 mb-1">From</label>
-                      <input
-                        type="date"
-                        value={localFilters.dateRange?.start || ""}
+            <div className="space-y-4">
+              {/* Location Section */}
+              <div className="border-b border-gray-100 pb-4">
+                <button
+                  onClick={() => toggleSection('location')}
+                  className="flex justify-between items-center w-full text-left font-medium text-gray-700"
+                >
+                  <div className="flex items-center gap-2">
+                    <FiMapPin className="w-4 h-4 text-blue-500" />
+                    <span>Location</span>
+                  </div>
+                  {activeSection === 'location' ? (
+                    <FiChevronUp className="w-5 h-5 text-gray-400" />
+                  ) : (
+                    <FiChevronDown className="w-5 h-5 text-gray-400" />
+                  )}
+                </button>
+                {activeSection === 'location' && (
+                  <div className="mt-3 space-y-3 pl-6">
+                    <div>
+                      <label className="flex items-center gap-2 text-sm font-medium text-gray-600 mb-1">
+                        <FiMapPin className="w-4 h-4 text-gray-400" />
+                        City
+                      </label>
+                      <select
+                        value={localFilters.city || ""}
                         onChange={(e) =>
-                          setLocalFilters({
-                            ...localFilters,
-                            dateRange: {
-                              ...localFilters.dateRange,
-                              start: e.target.value,
-                            },
-                          })
+                          setLocalFilters({ ...localFilters, city: e.target.value })
                         }
-                        className="px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                      />
-                    </div>
-                    <div className="flex flex-col">
-                      <label className="text-xs text-gray-500 mb-1">To</label>
-                      <input
-                        type="date"
-                        value={localFilters.dateRange?.end || ""}
-                        onChange={(e) =>
-                          setLocalFilters({
-                            ...localFilters,
-                            dateRange: {
-                              ...localFilters.dateRange,
-                              end: e.target.value,
-                            },
-                          })
-                        }
-                        className="px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                      />
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="">All Cities</option>
+                        {filterOptions.cities.map((city) => (
+                          <option key={city} value={city}>
+                            {city}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
-                </div>
-
-                {/* Contact Person (pocName) */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Contact Person
-                  </label>
-                  <select
-                    value={localFilters.pocName || ""}
-                    onChange={(e) =>
-                      setLocalFilters({
-                        ...localFilters,
-                        pocName: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">All Contacts</option>
-                    {filterOptions.pocNames.map((name) => (
-                      <option key={name} value={name}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                )}
               </div>
 
-              {/* Column 3 */}
-              <div className="space-y-4">
-                {/* Contact Method */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Contact Method
-                  </label>
-                  <select
-                    value={localFilters.contactMethod || ""}
-                    onChange={(e) =>
-                      setLocalFilters({
-                        ...localFilters,
-                        contactMethod: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">All Methods</option>
-                    {filterOptions.contactMethods.map((method) => (
-                      <option key={method} value={method}>
-                        {method}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              {/* Team Section */}
+              <div className="border-b border-gray-100 pb-4">
+                <button
+                  onClick={() => toggleSection('team')}
+                  className="flex justify-between items-center w-full text-left font-medium text-gray-700"
+                >
+                  <div className="flex items-center gap-2">
+                    <FiUsers className="w-4 h-4 text-blue-500" />
+                    <span>Team</span>
+                  </div>
+                  {activeSection === 'team' ? (
+                    <FiChevronUp className="w-5 h-5 text-gray-400" />
+                  ) : (
+                    <FiChevronDown className="w-5 h-5 text-gray-400" />
+                  )}
+                </button>
+                {activeSection === 'team' && (
+                  <div className="mt-3 space-y-3 pl-6">
+                    <div>
+                      <label className="flex items-center gap-2 text-sm font-medium text-gray-600 mb-1">
+                        <FiUser className="w-4 h-4 text-gray-400" />
+                        Assigned To
+                      </label>
+                      <select
+                        value={localFilters.assignedTo || ""}
+                        onChange={(e) =>
+                          setLocalFilters({
+                            ...localFilters,
+                            assignedTo: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="">All Team Members</option>
+                        {filterOptions.assignedPersons.length === 0 ? (
+                          <option disabled>No users found</option>
+                        ) : (
+                          filterOptions.assignedPersons.map((user) => (
+                            <option key={user.uid} value={user.uid}>
+                              {user.displayName}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
 
-                {/* Email */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Email
-                  </label>
-                  <select
-                    value={localFilters.email || ""}
-                    onChange={(e) =>
-                      setLocalFilters({
-                        ...localFilters,
-                        email: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">All Emails</option>
-                    {filterOptions.emails.map((email) => (
-                      <option key={email} value={email}>
-                        {email}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              {/* Date Section */}
+              <div className="border-b border-gray-100 pb-4">
+                <button
+                  onClick={() => toggleSection('date')}
+                  className="flex justify-between items-center w-full text-left font-medium text-gray-700"
+                >
+                  <div className="flex items-center gap-2">
+                    <FiCalendar className="w-4 h-4 text-blue-500" />
+                    <span>Date Range</span>
+                  </div>
+                  {activeSection === 'date' ? (
+                    <FiChevronUp className="w-5 h-5 text-gray-400" />
+                  ) : (
+                    <FiChevronDown className="w-5 h-5 text-gray-400" />
+                  )}
+                </button>
+                {activeSection === 'date' && (
+                  <div className="mt-3 space-y-3 pl-6">
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2 text-sm font-medium text-gray-600">
+                        <FiCalendar className="w-4 h-4 text-gray-400" />
+                        Date Range
+                      </label>
+                      <div className="flex flex-col gap-2">
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1 block">From</label>
+                          <input
+                            type="date"
+                            value={localFilters.dateRange?.start || ""}
+                            onChange={(e) =>
+                              setLocalFilters({
+                                ...localFilters,
+                                dateRange: {
+                                  ...localFilters.dateRange,
+                                  start: e.target.value,
+                                },
+                              })
+                            }
+                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1 block">To</label>
+                          <input
+                            type="date"
+                            value={localFilters.dateRange?.end || ""}
+                            onChange={(e) =>
+                              setLocalFilters({
+                                ...localFilters,
+                                dateRange: {
+                                  ...localFilters.dateRange,
+                                  end: e.target.value,
+                                },
+                              })
+                            }
+                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Contact Section */}
+              <div className="border-b border-gray-100 pb-4">
+                <button
+                  onClick={() => toggleSection('contact')}
+                  className="flex justify-between items-center w-full text-left font-medium text-gray-700"
+                >
+                  <div className="flex items-center gap-2">
+                    <FiUser className="w-4 h-4 text-blue-500" />
+                    <span>Contact Details</span>
+                  </div>
+                  {activeSection === 'contact' ? (
+                    <FiChevronUp className="w-5 h-5 text-gray-400" />
+                  ) : (
+                    <FiChevronDown className="w-5 h-5 text-gray-400" />
+                  )}
+                </button>
+                {activeSection === 'contact' && (
+                  <div className="mt-3 space-y-3 pl-6">
+                    <div>
+                      <label className="flex items-center gap-2 text-sm font-medium text-gray-600 mb-1">
+                        <FiUser className="w-4 h-4 text-gray-400" />
+                        Contact Person
+                      </label>
+                      <select
+                        value={localFilters.pocName || ""}
+                        onChange={(e) =>
+                          setLocalFilters({
+                            ...localFilters,
+                            pocName: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="">All Contacts</option>
+                        {filterOptions.pocNames.map((name) => (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="flex items-center gap-2 text-sm font-medium text-gray-600 mb-1">
+                        <FiMail className="w-4 h-4 text-gray-400" />
+                        Email
+                      </label>
+                      <select
+                        value={localFilters.email || ""}
+                        onChange={(e) =>
+                          setLocalFilters({
+                            ...localFilters,
+                            email: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="">All Emails</option>
+                        {filterOptions.emails.map((email) => (
+                          <option key={email} value={email}>
+                            {email}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="flex items-center gap-2 text-sm font-medium text-gray-600 mb-1">
+                        <FiPhone className="w-4 h-4 text-gray-400" />
+                        Contact Method
+                      </label>
+                      <select
+                        value={localFilters.contactMethod || ""}
+                        onChange={(e) =>
+                          setLocalFilters({
+                            ...localFilters,
+                            contactMethod: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="">All Methods</option>
+                        {filterOptions.contactMethods.map((method) => (
+                          <option key={method} value={method}>
+                            {method}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Buttons */}
-            <div className="flex justify-center gap-4 mt-6">
+            <div className="flex justify-between gap-3 mt-6">
               <button
                 onClick={resetFilters}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex-1"
               >
-                Clear All
+                <FiRefreshCw className="w-4 h-4" />
+                Reset
               </button>
               <button
                 onClick={applyFilters}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex-1 shadow-sm"
               >
-                Apply Filters
+                <FiCheck className="w-4 h-4" />
+                Apply
               </button>
             </div>
           </div>
