@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { FaPlus, FaTrash, FaDownload, FaEye, FaTimes, FaExclamationTriangle, FaCheckCircle } from "react-icons/fa";
 import * as XLSX from "xlsx-js-style";
 import { toast } from "react-toastify";
@@ -63,6 +63,41 @@ const StudentBreakdownSection = ({ formData, setFormData, studentFile, setStuden
   const [errorCells, setErrorCells] = useState({});
   const [hasFileErrors, setHasFileErrors] = useState(false);
   const [fileErrorMsg, setFileErrorMsg] = useState("");
+  const fileInputRef = useRef(null);
+ 
+   const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+ 
+    try {
+      const data = await readFile(file);
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+     
+      validateStudentData(jsonData);
+      setPreviewData(jsonData);
+      setStudentFile(file);
+     
+      // Reset file input to allow re-upload of same file
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (error) {
+      setHasFileErrors(true);
+      setFileErrorMsg("Error reading file. Please check the format.");
+      toast.error("Error reading file. Please check the format.");
+    }
+  };
+ 
+  const readFile = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  };
  
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -84,7 +119,7 @@ const StudentBreakdownSection = ({ formData, setFormData, studentFile, setStuden
     setFormData(prev => ({ ...prev, courses: updated }));
   };
  
-  const validateStudentData = (data) => {
+   const validateStudentData = (data) => {
     const errors = [];
     const cellErrors = {};
     const headerRow = data[0] || [];
@@ -192,7 +227,7 @@ const StudentBreakdownSection = ({ formData, setFormData, studentFile, setStuden
       });
     });
  
-    setValidationErrors(errors);
+     setValidationErrors(errors);
     setErrorCells(cellErrors);
     const hasErrors = errors.length > 0;
     setHasFileErrors(hasErrors);
@@ -217,32 +252,7 @@ const StudentBreakdownSection = ({ formData, setFormData, studentFile, setStuden
     return !hasErrors;
   };
  
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
  
-    setStudentFile(file);
-    setHasFileErrors(false);
-    setFileErrorMsg("");
- 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: "array" });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-       
-        validateStudentData(jsonData);
-        setPreviewData(jsonData);
-      } catch {
-        setHasFileErrors(true);
-        setFileErrorMsg("Error reading file. Please check the format.");
-        toast.error("Error reading file. Please check the format.");
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  };
  
   const handleFilePreview = () => {
     if (!studentFile) return;
@@ -399,10 +409,11 @@ const StudentBreakdownSection = ({ formData, setFormData, studentFile, setStuden
           })}
         </div>
  
-        <div className="space-y-1 mt-4">
+          <div className="space-y-1 mt-4">
           <label className="font-medium">Upload Student Excel File <span className="text-red-500">*</span></label>
           <div className="flex flex-wrap items-center gap-3 mt-2">
             <input
+              ref={fileInputRef}
               type="file"
               accept=".xlsx, .xls"
               className={`${fileInputClass} ${hasFileErrors ? 'border-red-500 text-red-600' : ''}`}
