@@ -135,50 +135,59 @@ function Sales() {
   const phaseCounts = useMemo(() => computePhaseCounts(), [computePhaseCounts]);
 
   // Filter leads with memoization
-  const filteredLeads = useMemo(() => {
-    return Object.entries(leads).filter(([, lead]) => {
-      const phaseMatch = (lead.phase || "hot") === activeTab;
-      const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
-      if (!user) return false;
+ const filteredLeads = useMemo(() => {
+  return Object.entries(leads).filter(([, lead]) => {
+    const phaseMatch = (lead.phase || "hot") === activeTab;
+    const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
+    if (!user) return false;
 
-      // Apply additional filters
-      const matchesFilters =
-        (!filters.city || lead.city?.includes(filters.city)) &&
-        (!filters.assignedTo || lead.assignedTo?.uid === filters.assignedTo) &&
-        (!filters.dateRange?.start ||
-          lead.createdAt >= new Date(filters.dateRange.start).getTime()) &&
-        (!filters.dateRange?.end ||
-          lead.createdAt <= new Date(filters.dateRange.end).getTime()) &&
-        (!filters.pocName ||
-          lead.pocName?.toLowerCase().includes(filters.pocName.toLowerCase())) &&
-        (!filters.phoneNo || lead.phoneNo?.includes(filters.phoneNo)) &&
-        (!filters.email ||
-          lead.email?.toLowerCase().includes(filters.email.toLowerCase()));
+    // Apply additional filters
+    const matchesFilters =
+      (!filters.city || lead.city?.includes(filters.city)) &&
+      (!filters.assignedTo || lead.assignedTo?.uid === filters.assignedTo) &&
+      (!filters.dateRange?.start ||
+        lead.createdAt >= new Date(filters.dateRange.start).getTime()) &&
+      (!filters.dateRange?.end ||
+        lead.createdAt <= new Date(filters.dateRange.end).getTime()) &&
+      (!filters.pocName ||
+        lead.pocName?.toLowerCase().includes(filters.pocName.toLowerCase())) &&
+      (!filters.phoneNo || lead.phoneNo?.includes(filters.phoneNo)) &&
+      (!filters.email ||
+        lead.email?.toLowerCase().includes(filters.email.toLowerCase()));
 
-      const isSalesDept = user.department === "Sales";
-      const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
+    const isSalesDept = user.department === "Sales";
+    const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
 
-      if (isSalesDept && isHigherRole) {
-        if (viewMyLeadsOnly) {
-          return phaseMatch && matchesFilters && lead.assignedTo?.uid === currentUser?.uid;
-        } else {
-          const currentUserData = Object.values(users).find((u) => u.uid === currentUser?.uid);
-          if (!currentUserData) return false;
+    if (isSalesDept && isHigherRole) {
+      if (viewMyLeadsOnly) {
+        return phaseMatch && matchesFilters && lead.assignedTo?.uid === currentUser?.uid;
+      } else {
+        const currentUserData = Object.values(users).find((u) => u.uid === currentUser?.uid);
+        if (!currentUserData) return false;
 
-          if (currentUserData.role === "Manager") {
-            const subordinates = Object.values(users).filter(
-              (u) => u.reportingManager === currentUserData.name &&
+        if (currentUserData.role === "Manager") {
+          const subordinates = Object.values(users).filter(
+            (u) =>
+              u.reportingManager === currentUserData.name &&
               ["Assistant Manager", "Executive"].includes(u.role)
-            );
-            const teamUids = subordinates.map((u) => u.uid);
-            return phaseMatch && matchesFilters && teamUids.includes(lead.assignedTo?.uid);
-          }
-          return phaseMatch && matchesFilters;
+          );
+          const teamUids = subordinates.map((u) => u.uid);
+          return phaseMatch && matchesFilters && teamUids.includes(lead.assignedTo?.uid);
         }
+        return phaseMatch && matchesFilters;
       }
-      return false;
-    });
-  }, [leads, activeTab, users, currentUser, viewMyLeadsOnly, filters]);
+    }
+
+    // Naya condition yahan add kiya hai:
+    if (isSalesDept && ["Assistant Manager", "Executive"].includes(user.role)) {
+      // Assistant Manager aur Executive ko sirf apni leads dikhegi
+      return phaseMatch && matchesFilters && lead.assignedTo?.uid === currentUser?.uid;
+    }
+
+    return false;
+  });
+}, [leads, activeTab, users, currentUser, viewMyLeadsOnly, filters]);
+
 
   // Auth state listener
   useEffect(() => {
