@@ -5,6 +5,7 @@ import ImportLead from "./ImportLead";
 import { db } from "../../firebase"; // Firebase config
 import { collection, getDocs } from "firebase/firestore";
 
+
 function LeadFilters({
   filteredLeads,
   handleImportComplete,
@@ -14,6 +15,7 @@ function LeadFilters({
   setIsFilterOpen,
   users,
   leads,
+  activeTab, // Add this prop
 }) {
   const [localFilters, setLocalFilters] = useState(filters);
   const [allLeads, setAllLeads] = useState([]);
@@ -118,7 +120,10 @@ function LeadFilters({
     <div className="flex items-center gap-3 px-4 relative">
       {/* Export & Import */}
       <ExportLead filteredLeads={filteredLeads} allLeads={allLeads} />
-      <ImportLead handleImportComplete={handleImportComplete} />
+      <ImportLead 
+        handleImportComplete={handleImportComplete} 
+        activeTab={activeTab} // Pass activeTab prop
+      />
 
       {/* Filter Button */}
       <div className="relative">
