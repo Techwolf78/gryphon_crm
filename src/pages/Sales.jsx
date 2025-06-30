@@ -153,8 +153,7 @@ const matchesFilters =
 (!filters.contactMethod || 
   lead.contactMethod?.toLowerCase() === filters.contactMethod.toLowerCase())
 
-      const isSalesDept = user.department === "Sales";
-      const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
+    
 
     const isSalesDept = user.department === "Sales";
     const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
