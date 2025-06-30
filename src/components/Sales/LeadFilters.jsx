@@ -275,7 +275,9 @@ function LeadFilters({
                   >
                     <option value="">All Contacts</option>
                     {filterOptions.pocNames.map((name) => (
-                      <option key={name} value={name}>{name}</option>
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -300,7 +302,9 @@ function LeadFilters({
                   >
                     <option value="">All Methods</option>
                     {filterOptions.contactMethods.map((method) => (
-                      <option key={method} value={method}>{method}</option>
+                      <option key={method} value={method}>
+                        {method}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -322,7 +326,9 @@ function LeadFilters({
                   >
                     <option value="">All Emails</option>
                     {filterOptions.emails.map((email) => (
-                      <option key={email} value={email}>{email}</option>
+                      <option key={email} value={email}>
+                        {email}
+                      </option>
                     ))}
                   </select>
                 </div>

@@ -34,6 +34,7 @@ const ImportLead = ({ handleImportComplete }) => {
     "phoneNo",
     "email",
     "tcv",
+    "contactMethod", // Added as required field
   ];
 
   // Close dropdown when clicking outside
@@ -105,6 +106,12 @@ const ImportLead = ({ handleImportComplete }) => {
     return digitsOnly.length >= 6;
   };
 
+  const validateContactMethod = (method) => {
+    if (!method) return false; // Contact method is required
+    const validMethods = ["Visit", "Call", "Email", "Meeting"]; // Add other valid methods if needed
+    return validMethods.includes(method);
+  };
+
   const validateAndUploadData = async (data) => {
     try {
       if (!data || data.length === 0) {
@@ -148,6 +155,13 @@ const ImportLead = ({ handleImportComplete }) => {
         if (lead.phoneNo && !validatePhoneNumber(lead.phoneNo)) {
           errors.phoneNo =
             "Phone number must contain only numbers (no letters or special characters)";
+          hasError = true;
+        }
+
+        // Contact method validation
+        if (lead.contactMethod && !validateContactMethod(lead.contactMethod)) {
+          errors.contactMethod =
+            "Contact method must be one of: Visit, Call, Email, Meeting";
           hasError = true;
         }
 
@@ -235,6 +249,7 @@ const ImportLead = ({ handleImportComplete }) => {
         phoneNo: leadData.phoneNo || "",
         email: leadData.email || "",
         tcv: leadData.tcv || "",
+        contactMethod: leadData.contactMethod || "Call", // Default to "Call" if not provided
         phase: "hot", // Default phase
         createdAt: serverTimestamp(), // Firestore server timestamp
         openedDate: currentDate.getTime(), // Current timestamp for "Opened Date"
@@ -414,6 +429,7 @@ const ImportLead = ({ handleImportComplete }) => {
         phoneNo: "1234567890",
         email: "john@example.com",
         tcv: "25000",
+        contactMethod: "Call", // Added contactMethod to sample
         expectedClosureDate: "2025-11-15", // Example of correct format
         followups: JSON.stringify({
           initial: {
@@ -439,6 +455,10 @@ const ImportLead = ({ handleImportComplete }) => {
           "4. expectedClosureDate must be in exact format yyyy-mm-dd (e.g. 2025-11-15)",
       },
       { instruction: "5. TCV should be numeric without currency symbols" },
+      {
+        instruction:
+          "6. contactMethod must be one of: Visit, Call, Email, Meeting",
+      },
       { instruction: "" },
       { instruction: "REQUIRED FIELDS (MUST INCLUDE):" },
       { instruction: "- businessName: College/Institution name" },
@@ -453,6 +473,7 @@ const ImportLead = ({ handleImportComplete }) => {
       },
       { instruction: "- email: Contact email address" },
       { instruction: "- tcv: Total Contract Value (numeric)" },
+      { instruction: "- contactMethod: How the lead was contacted" },
       { instruction: "" },
       { instruction: "OPTIONAL FIELDS:" },
       { instruction: "- openedDate: When lead was created (timestamp)" },
@@ -476,6 +497,7 @@ const ImportLead = ({ handleImportComplete }) => {
       "phoneNo",
       "email",
       "tcv",
+      "contactMethod", // Added to required fields
     ];
     const optionalFields = [
       "expectedClosureDate",

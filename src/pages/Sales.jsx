@@ -134,26 +134,27 @@ function Sales() {
 
   const phaseCounts = useMemo(() => computePhaseCounts(), [computePhaseCounts]);
 
-  // Filter leads with memoization
- const filteredLeads = useMemo(() => {
-  return Object.entries(leads).filter(([, lead]) => {
-    const phaseMatch = (lead.phase || "hot") === activeTab;
-    const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
-    if (!user) return false;
 
-    // Apply additional filters
-    const matchesFilters =
-      (!filters.city || lead.city?.includes(filters.city)) &&
-      (!filters.assignedTo || lead.assignedTo?.uid === filters.assignedTo) &&
-      (!filters.dateRange?.start ||
-        lead.createdAt >= new Date(filters.dateRange.start).getTime()) &&
-      (!filters.dateRange?.end ||
-        lead.createdAt <= new Date(filters.dateRange.end).getTime()) &&
-      (!filters.pocName ||
-        lead.pocName?.toLowerCase().includes(filters.pocName.toLowerCase())) &&
-      (!filters.phoneNo || lead.phoneNo?.includes(filters.phoneNo)) &&
-      (!filters.email ||
-        lead.email?.toLowerCase().includes(filters.email.toLowerCase()));
+  const filteredLeads = useMemo(() => {
+    return Object.entries(leads).filter(([, lead]) => {
+      const phaseMatch = (lead.phase || "hot") === activeTab;
+      const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
+      if (!user) return false;
+
+      // Apply additional filters
+const matchesFilters =
+  (!filters.city || lead.city?.includes(filters.city)) &&
+  (!filters.assignedTo || lead.assignedTo?.uid === filters.assignedTo) &&
+  (!filters.dateRange?.start || lead.createdAt >= new Date(filters.dateRange.start).getTime()) &&
+  (!filters.dateRange?.end || lead.createdAt <= new Date(filters.dateRange.end).getTime()) &&
+  (!filters.pocName || lead.pocName?.toLowerCase().includes(filters.pocName.toLowerCase())) &&
+  (!filters.phoneNo || lead.phoneNo?.includes(filters.phoneNo)) &&
+  (!filters.email || lead.email?.toLowerCase().includes(filters.email.toLowerCase())) &&
+(!filters.contactMethod || 
+  lead.contactMethod?.toLowerCase() === filters.contactMethod.toLowerCase())
+
+      const isSalesDept = user.department === "Sales";
+      const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
 
     const isSalesDept = user.department === "Sales";
     const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
