@@ -275,7 +275,9 @@ function LeadFilters({
                   >
                     <option value="">All Contacts</option>
                     {filterOptions.pocNames.map((name) => (
-                      <option key={name} value={name}>{name}</option>
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -288,23 +290,23 @@ function LeadFilters({
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Contact Method
                   </label>
-<select
-  value={localFilters.contactMethod || ""}
-  onChange={(e) =>
-    setLocalFilters({
-      ...localFilters,
-      contactMethod: e.target.value,
-    })
-  }
-  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
->
-  <option value="">All Methods</option>
-  {filterOptions.contactMethods.map((method) => (
-    <option key={method} value={method}>
-      {method}
-    </option>
-  ))}
-</select>
+                  <select
+                    value={localFilters.contactMethod || ""}
+                    onChange={(e) =>
+                      setLocalFilters({
+                        ...localFilters,
+                        contactMethod: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">All Methods</option>
+                    {filterOptions.contactMethods.map((method) => (
+                      <option key={method} value={method}>
+                        {method}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Email */}
@@ -324,7 +326,9 @@ function LeadFilters({
                   >
                     <option value="">All Emails</option>
                     {filterOptions.emails.map((email) => (
-                      <option key={email} value={email}>{email}</option>
+                      <option key={email} value={email}>
+                        {email}
+                      </option>
                     ))}
                   </select>
                 </div>
