@@ -393,19 +393,9 @@ export default function LeadDetailsModal({
         <div className="sticky bottom-0 bg-gradient-to-t from-white via-white to-transparent pt-8 pb-4 px-6 flex justify-end space-x-3 rounded-b-xl">
           <button
             onClick={onClose}
-            className="px-6 py-2.5 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 transition-all duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 hover:shadow-sm active:scale-95"
+          className={`px-6 py-2.5 rounded-xl text-white font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 ${statusColors.accent} hover:shadow-lg transition-all duration-200 active:scale-95 shadow-md hover:shadow-${statusColors.text.replace('text-', '')}/20`}
           >
             Close
-          </button>
-          <button
-            className={`px-6 py-2.5 rounded-xl text-white font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 ${statusColors.accent} hover:shadow-lg transition-all duration-200 active:scale-95 shadow-md hover:shadow-${statusColors.text.replace('text-', '')}/20`}
-          >
-            Take Action
-          </button>
-          <button
-            className={`px-6 py-2.5 rounded-xl border ${statusColors.border} ${statusColors.text} bg-white font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 hover:bg-opacity-10 ${statusColors.bg.replace('bg-', 'hover:bg-')} transition-all duration-200 active:scale-95`}
-          >
-            Edit Lead
           </button>
         </div>
       </div>

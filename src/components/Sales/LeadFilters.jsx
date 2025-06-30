@@ -62,10 +62,10 @@ function LeadFilters({
           .filter(Boolean)
       ),
     ],
-    phoneNumbers: [
+    contactMethods: [
       ...new Set(
         Object.values(leads)
-          .map((lead) => lead.phoneNo)
+          .map((lead) => lead.contactMethod)
           .filter(Boolean)
       ),
     ],
@@ -117,7 +117,7 @@ function LeadFilters({
   return (
     <div className="flex items-center gap-3 px-4 relative">
       {/* Export & Import */}
-<ExportLead filteredLeads={filteredLeads} allLeads={allLeads} />
+      <ExportLead filteredLeads={filteredLeads} allLeads={allLeads} />
       <ImportLead handleImportComplete={handleImportComplete} />
 
       {/* Filter Button */}
@@ -283,24 +283,24 @@ function LeadFilters({
 
               {/* Column 3 */}
               <div className="space-y-4">
-                {/* Phone Number */}
+                {/* Contact Method */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Phone Number
+                    Contact Method
                   </label>
                   <select
-                    value={localFilters.phoneNo || ""}
+                    value={localFilters.contactMethod || ""}
                     onChange={(e) =>
                       setLocalFilters({
                         ...localFilters,
-                        phoneNo: e.target.value,
+                        contactMethod: e.target.value,
                       })
                     }
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                   >
-                    <option value="">All Phone Numbers</option>
-                    {filterOptions.phoneNumbers.map((phone) => (
-                      <option key={phone} value={phone}>{phone}</option>
+                    <option value="">All Methods</option>
+                    {filterOptions.contactMethods.map((method) => (
+                      <option key={method} value={method}>{method}</option>
                     ))}
                   </select>
                 </div>
