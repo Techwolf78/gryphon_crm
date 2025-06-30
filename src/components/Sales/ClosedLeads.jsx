@@ -82,28 +82,27 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
         return null;
     }
   }, []);
-
-const getCumulativeTarget = useCallback(
-  (fy, upTo) => {
+const getCumulativeTarget = useCallback( 
+ (fy, upTo) => {
     const quartersOrder = ["Q1", "Q2", "Q3", "Q4"];
-    
+   
     // Agar all quarters view hai
     if (upTo === "all") {
       let totalTarget = 0;
       let carriedDeficit = 0;
-
+ 
       for (let i = 0; i < quartersOrder.length; i++) {
         const quarter = quartersOrder[i];
         const baseTarget = targets.find(
           (t) => t.financial_year === fy && t.quarter === quarter
         )?.target_amount || 0;
-
+ 
         const quarterTarget = baseTarget + carriedDeficit;
-
+ 
         // Calculate achieved for this quarter
         const range = getQuarterRange(quarter, fy);
         if (!range) continue;
-
+ 
         const quarterAchieved = Object.entries(leads)
           .filter(([, lead]) => lead.phase === "closed")
           .filter(
@@ -115,26 +114,26 @@ const getCumulativeTarget = useCallback(
             return d >= range[0] && d <= range[1];
           })
           .reduce((sum, [, lead]) => sum + (lead.totalCost || 0), 0);
-
+ 
         totalTarget += quarterTarget; // Add base + deficit target for this quarter
-
+ 
         // Update deficit to carry forward
         carriedDeficit = Math.max(0, quarterTarget - quarterAchieved);
       }
-
+ 
       return totalTarget;
     }
-
+ 
     // Agar specific quarter hai to same logic use karo jaise pehle hai
     const idx = quartersOrder.indexOf(upTo);
     if (idx === -1) return 0;
-
+ 
     const currentQuarterBaseTarget = targets.find(
       (t) => t.financial_year === fy && t.quarter === upTo
     )?.target_amount || 0;
-
+ 
     if (idx === 0) return currentQuarterBaseTarget;
-
+ 
     // Calculate deficit from previous quarters recursively
     let carriedDeficit = 0;
     for (let i = 0; i < idx; i++) {
@@ -142,10 +141,10 @@ const getCumulativeTarget = useCallback(
       const baseTarget = targets.find(
         (t) => t.financial_year === fy && t.quarter === quarter
       )?.target_amount || 0;
-
+ 
       const range = getQuarterRange(quarter, fy);
       if (!range) continue;
-
+ 
       const quarterAchieved = Object.entries(leads)
         .filter(([, lead]) => lead.phase === "closed")
         .filter(
@@ -157,15 +156,16 @@ const getCumulativeTarget = useCallback(
           return d >= range[0] && d <= range[1];
         })
         .reduce((sum, [, lead]) => sum + (lead.totalCost || 0), 0);
-
+ 
       const quarterTarget = baseTarget + carriedDeficit;
       carriedDeficit = Math.max(0, quarterTarget - quarterAchieved);
     }
-
+ 
     return currentQuarterBaseTarget + carriedDeficit;
   },
   [targets, leads, viewMyLeadsOnly, currentUser?.uid, getQuarterRange]
 );
+ 
 
   // Determine selected FY and quarter
   const today = new Date();
@@ -178,33 +178,61 @@ const getCumulativeTarget = useCallback(
     ? quarterFilter.split("_")[1]
     : getFinancialYearFromDate(today);
 
-  const filteredLeads = useMemo(() => {
-    return Object.entries(leads)
-      .filter(([, lead]) => lead.phase === "closed")
-      .filter(
-        ([, lead]) =>
-          !viewMyLeadsOnly || lead.assignedTo?.uid === currentUser?.uid
-      )
-      .filter(
-        ([, lead]) => filterType === "all" || lead.closureType === filterType
-      )
-      .filter(([, lead]) => {
-        if (activeQuarter === "all") return true;
-        const range = getQuarterRange(activeQuarter, selectedFY);
-        if (!range) return false;
-        const d = new Date(lead.closedDate);
-        return d >= range[0] && d <= range[1];
-      })
-      .sort(([, a], [, b]) => new Date(b.closedDate) - new Date(a.closedDate));
-  }, [
-    leads,
-    viewMyLeadsOnly,
-    currentUser?.uid,
-    filterType,
-    activeQuarter,
-    selectedFY,
-    getQuarterRange,
-  ]);
+const filteredLeads = useMemo(() => {
+  const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
+  if (!user) return [];
+
+  const isManager = ["Manager"].includes(user.role);
+  const isExecutiveOrAM = ["Executive", "Assistant Manager"].includes(user.role);
+  const isHead = ["Head", "Admin", "Director"].includes(user.role);
+
+  const teamUids = isManager
+    ? Object.values(users)
+        .filter(
+          (u) =>
+            u.reportingManager === user.name &&
+            ["Executive", "Assistant Manager"].includes(u.role)
+        )
+        .map((u) => u.uid)
+    : [];
+
+  return Object.entries(leads)
+    .filter(([, lead]) => {
+      // 🔥 Head/Admin in "My Team" mode = see all
+      if (!viewMyLeadsOnly && isHead) return true;
+
+      // 🧍 My Leads
+      if (viewMyLeadsOnly) {
+        return lead.assignedTo?.uid === currentUser?.uid;
+      } else {
+        if (isManager) return teamUids.includes(lead.assignedTo?.uid);
+        if (isExecutiveOrAM) return lead.assignedTo?.uid === currentUser?.uid;
+        return false;
+      }
+    })
+    .filter(
+      ([, lead]) => filterType === "all" || lead.closureType === filterType
+    )
+    .filter(([, lead]) => {
+      if (activeQuarter === "all") return true;
+      const range = getQuarterRange(activeQuarter, selectedFY);
+      if (!range) return false;
+      const d = new Date(lead.closedDate);
+      return d >= range[0] && d <= range[1];
+    })
+    .sort(([, a], [, b]) => new Date(b.closedDate) - new Date(a.closedDate));
+}, [
+  leads,
+  viewMyLeadsOnly,
+  currentUser?.uid,
+  filterType,
+  activeQuarter,
+  selectedFY,
+  getQuarterRange,
+  users,
+]);
+
+
 
   const startIdx = (currentPage - 1) * rowsPerPage;
   const currentRows = filteredLeads.slice(startIdx, startIdx + rowsPerPage);
