@@ -112,7 +112,7 @@ function LeadDetailsModal({ show, onClose, lead, onSave }) {
   const editableKeys = Object.keys(defaultLeadFields);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
+    <div className="fixed inset-0 z-54 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden transform transition-all">
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-5 flex justify-between items-center">
