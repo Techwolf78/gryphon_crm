@@ -134,7 +134,7 @@ function Sales() {
 
   const phaseCounts = useMemo(() => computePhaseCounts(), [computePhaseCounts]);
 
-  // Filter leads with memoization
+
   const filteredLeads = useMemo(() => {
     return Object.entries(leads).filter(([, lead]) => {
       const phaseMatch = (lead.phase || "hot") === activeTab;
@@ -156,27 +156,39 @@ const matchesFilters =
       const isSalesDept = user.department === "Sales";
       const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
 
-      if (isSalesDept && isHigherRole) {
-        if (viewMyLeadsOnly) {
-          return phaseMatch && matchesFilters && lead.assignedTo?.uid === currentUser?.uid;
-        } else {
-          const currentUserData = Object.values(users).find((u) => u.uid === currentUser?.uid);
-          if (!currentUserData) return false;
+    const isSalesDept = user.department === "Sales";
+    const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
 
-          if (currentUserData.role === "Manager") {
-            const subordinates = Object.values(users).filter(
-              (u) => u.reportingManager === currentUserData.name &&
+    if (isSalesDept && isHigherRole) {
+      if (viewMyLeadsOnly) {
+        return phaseMatch && matchesFilters && lead.assignedTo?.uid === currentUser?.uid;
+      } else {
+        const currentUserData = Object.values(users).find((u) => u.uid === currentUser?.uid);
+        if (!currentUserData) return false;
+
+        if (currentUserData.role === "Manager") {
+          const subordinates = Object.values(users).filter(
+            (u) =>
+              u.reportingManager === currentUserData.name &&
               ["Assistant Manager", "Executive"].includes(u.role)
-            );
-            const teamUids = subordinates.map((u) => u.uid);
-            return phaseMatch && matchesFilters && teamUids.includes(lead.assignedTo?.uid);
-          }
-          return phaseMatch && matchesFilters;
+          );
+          const teamUids = subordinates.map((u) => u.uid);
+          return phaseMatch && matchesFilters && teamUids.includes(lead.assignedTo?.uid);
         }
+        return phaseMatch && matchesFilters;
       }
-      return false;
-    });
-  }, [leads, activeTab, users, currentUser, viewMyLeadsOnly, filters]);
+    }
+
+    // Naya condition yahan add kiya hai:
+    if (isSalesDept && ["Assistant Manager", "Executive"].includes(user.role)) {
+      // Assistant Manager aur Executive ko sirf apni leads dikhegi
+      return phaseMatch && matchesFilters && lead.assignedTo?.uid === currentUser?.uid;
+    }
+
+    return false;
+  });
+}, [leads, activeTab, users, currentUser, viewMyLeadsOnly, filters]);
+
 
   // Auth state listener
   useEffect(() => {

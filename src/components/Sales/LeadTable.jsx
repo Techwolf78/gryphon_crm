@@ -254,11 +254,10 @@ export default function LeadsTable({
                         e.stopPropagation();
                         toggleDropdown(id, e);
                       }}
-                      className={`text-gray-500 hover:text-gray-700 focus:outline-none transition p-2 rounded-full hover:bg-gray-100 ${
-                        dropdownOpenId === id
+                      className={`text-gray-500 hover:text-gray-700 focus:outline-none transition p-2 rounded-full hover:bg-gray-100 ${dropdownOpenId === id
                           ? "bg-gray-200 text-gray-900 shadow-inner"
                           : ""
-                      }`}
+                        }`}
                       aria-expanded={dropdownOpenId === id}
                       aria-haspopup="true"
                       aria-label={
@@ -276,7 +275,6 @@ export default function LeadsTable({
                   </div>
                 </div>
 
-                {/* Dropdown Actions */}
                 {dropdownOpenId === id && (
                   <DropdownActions
                     leadId={id}
@@ -290,11 +288,13 @@ export default function LeadsTable({
                     activeTab={activeTab}
                     dropdownRef={dropdownRef}
                     users={users}
+                    currentUser={currentUser}
                     setShowExpectedDateModal={setShowExpectedDateModal}
                     setPendingPhaseChange={setPendingPhaseChange}
                     setLeadBeingUpdated={setLeadBeingUpdated}
                   />
                 )}
+
               </div>
             ))}
           </div>
