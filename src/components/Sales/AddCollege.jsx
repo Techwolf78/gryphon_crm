@@ -28,7 +28,6 @@ const courseSpecializations = {
   Others: ["Other"],
 };
 
-// Add options for affiliation and accreditation
 const affiliationOptions = [
   "UGC",
   "AICTE",
@@ -52,6 +51,7 @@ const accreditationOptions = [
 ];
 
 function AddCollegeModal({ show, onClose }) {
+  const [contactMethod, setContactMethod] = useState("Visit");
   const [businessName, setBusinessName] = useState("");
   const [address, setAddress] = useState("");
   const [pocName, setPocName] = useState("");
@@ -61,13 +61,12 @@ function AddCollegeModal({ show, onClose }) {
   const [city, setCity] = useState("");
   const [expectedClosureDate, setExpectedClosureDate] = useState("");
   const [courseType, setCourseType] = useState("");
-  const [specialization, setSpecialization] = useState("");
+  const [specializations, setSpecializations] = useState([]); // Changed to array
   const [studentCount, setStudentCount] = useState("");
   const [perStudentCost, setPerStudentCost] = useState("");
   const [tcv, setTcv] = useState(0);
   const [manualSpecialization, setManualSpecialization] = useState("");
   const [manualCourseType, setManualCourseType] = useState("");
-  // New fields
   const [passingYear, setPassingYear] = useState("");
   const [affiliation, setAffiliation] = useState("");
   const [accreditation, setAccreditation] = useState("");
@@ -90,22 +89,39 @@ function AddCollegeModal({ show, onClose }) {
     return "hot";
   };
 
-  // Generate year options dynamically
   const generateYearOptions = () => {
     const currentYear = new Date().getFullYear();
     const years = [];
-
-    // Create options for current year -5 to current year +5
     for (let i = -5; i <= 5; i++) {
       const startYear = currentYear + i;
       const endYear = startYear + 1;
       years.push(`${startYear}-${endYear}`);
     }
-
     return years;
   };
 
   const yearOptions = generateYearOptions();
+
+  const handleSpecializationChange = (e) => {
+    const value = e.target.value;
+    const isChecked = e.target.checked;
+    
+    if (value === "Other") {
+      // Handle "Other" checkbox separately
+      if (isChecked) {
+        setSpecializations(prev => [...prev, "Other"]);
+      } else {
+        setSpecializations(prev => prev.filter(item => item !== "Other"));
+        setManualSpecialization("");
+      }
+    } else {
+      if (isChecked) {
+        setSpecializations(prev => [...prev, value]);
+      } else {
+        setSpecializations(prev => prev.filter(item => item !== value));
+      }
+    }
+  };
 
   const handleClose = () => {
     setBusinessName("");
@@ -117,10 +133,12 @@ function AddCollegeModal({ show, onClose }) {
     setCity("");
     setExpectedClosureDate("");
     setCourseType("");
-    setSpecialization("");
+    setSpecializations([]);
     setStudentCount("");
     setPerStudentCost("");
     setTcv(0);
+    setManualSpecialization("");
+    setManualCourseType("");
     setPassingYear("");
     setAffiliation("");
     setAccreditation("");
@@ -152,10 +170,16 @@ function AddCollegeModal({ show, onClose }) {
         ? manualCourseType.trim()
         : courseType;
 
-    const finalSpecialization =
-      specialization === "Other" && manualSpecialization.trim()
-        ? manualSpecialization.trim()
-        : specialization;
+    // Process specializations
+    let finalSpecializations = [...specializations];
+    
+    // If "Other" is selected and manual specialization is provided
+    if (specializations.includes("Other") && manualSpecialization.trim()) {
+      // Remove "Other" and add the manual specialization
+      finalSpecializations = finalSpecializations
+        .filter(item => item !== "Other")
+        .concat(manualSpecialization.trim());
+    }
 
     const finalAffiliation =
       affiliation === "Other" && manualAffiliation.trim()
@@ -177,7 +201,7 @@ function AddCollegeModal({ show, onClose }) {
       city,
       expectedClosureDate: expectedClosureTimestamp,
       courseType: finalCourseType,
-      specialization: finalSpecialization,
+      specializations: finalSpecializations, // Now stored as array
       studentCount: parseInt(studentCount),
       perStudentCost: parseFloat(perStudentCost),
       tcv,
@@ -185,6 +209,7 @@ function AddCollegeModal({ show, onClose }) {
       passingYear: passingYear || null,
       affiliation: finalAffiliation || null,
       accreditation: finalAccreditation || null,
+      contactMethod,
       assignedTo: {
         uid: user.uid,
         name: user.displayName?.trim() || "No Name Provided",
@@ -214,8 +239,9 @@ function AddCollegeModal({ show, onClose }) {
     city &&
     ((courseType !== "Others" && courseType) ||
       (courseType === "Others" && manualCourseType.trim())) &&
-    ((specialization !== "Other" && specialization) ||
-      (specialization === "Other" && manualSpecialization.trim()));
+    specializations.length > 0 &&
+    (!specializations.includes("Other") || 
+     (specializations.includes("Other") && manualSpecialization.trim()));
 
   if (!show) return null;
 
@@ -522,7 +548,7 @@ function AddCollegeModal({ show, onClose }) {
                   value={courseType}
                   onChange={(e) => {
                     setCourseType(e.target.value);
-                    setSpecialization("");
+                    setSpecializations([]);
                     setManualSpecialization("");
                   }}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
@@ -607,59 +633,33 @@ function AddCollegeModal({ show, onClose }) {
               </div>
             )}
 
-            {/* Specialization */}
+            {/* Specialization - Now Multi-Select */}
             {courseType && (
               <div className="col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Specialization<span className="text-red-500 ml-1">*</span>
+                  Specialization(s)<span className="text-red-500 ml-1">*</span>
                 </label>
-                <div className="relative">
-                  <select
-                    value={specialization}
-                    onChange={(e) => {
-                      setSpecialization(e.target.value);
-                      setManualSpecialization("");
-                    }}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
-                  >
-                    <option value="">Select Specialization</option>
-                    {courseSpecializations[courseType].map((spec) => (
-                      <option key={spec} value={spec}>
-                        {spec}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                    <svg
-                      className="h-4 w-4"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                        clipRule="evenodd"
+                <div className="space-y-2">
+                  {courseSpecializations[courseType].map((spec) => (
+                    <div key={spec} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id={`spec-${spec}`}
+                        value={spec}
+                        checked={specializations.includes(spec)}
+                        onChange={handleSpecializationChange}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                       />
-                    </svg>
-                  </div>
-                  {!specialization && isFormValid && (
-                    <div className="absolute inset-y-0 right-7 pr-3 flex items-center pointer-events-none">
-                      <svg
-                        className="h-5 w-5 text-red-500"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
+                      <label
+                        htmlFor={`spec-${spec}`}
+                        className="ml-2 text-sm text-gray-700"
                       >
-                        <path
-                          fillRule="evenodd"
-                          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
+                        {spec}
+                      </label>
                     </div>
-                  )}
+                  ))}
                 </div>
-
-                {specialization === "Other" && (
+                {specializations.includes("Other") && (
                   <div className="mt-4">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Please specify Specialization
@@ -697,10 +697,15 @@ function AddCollegeModal({ show, onClose }) {
                     </div>
                     {!manualSpecialization.trim() && isFormValid && (
                       <p className="mt-1 text-sm text-red-600">
-                        This field is required
+                        This field is required when "Other" is selected
                       </p>
                     )}
                   </div>
+                )}
+                {specializations.length === 0 && isFormValid && (
+                  <p className="mt-1 text-sm text-red-600">
+                    Please select at least one specialization
+                  </p>
                 )}
               </div>
             )}
@@ -807,6 +812,35 @@ function AddCollegeModal({ show, onClose }) {
                   />
                 </div>
               )}
+            </div>
+
+            {/* Contact Method */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Contact Method<span className="text-red-500 ml-1">*</span>
+              </label>
+              <div className="flex items-center space-x-4">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    value="Visit"
+                    checked={contactMethod === "Visit"}
+                    onChange={(e) => setContactMethod(e.target.value)}
+                    className="form-radio text-blue-600"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">Visit</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    value="Call"
+                    checked={contactMethod === "Call"}
+                    onChange={(e) => setContactMethod(e.target.value)}
+                    className="form-radio text-blue-600"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">Call</span>
+                </label>
+              </div>
             </div>
 
             {/* Student Count, Per Student Cost, TCV */}

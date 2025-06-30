@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext, useCallback } from "react";
 import { FaTimes } from "react-icons/fa";
-import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
+import { collection, serverTimestamp, doc, updateDoc, writeBatch, setDoc, getDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
 import { AuthContext } from "../../../context/AuthContext";
 import CollegeInfoSection from "./CollegeInfoSection";
@@ -11,18 +11,18 @@ import PaymentInfoSection from "./PaymentInfoSection";
 import MOUUploadSection from "./MOUUploadSection";
 import { toast } from "react-toastify";
 import PropTypes from "prop-types";
-
-// Validation functions
+import * as XLSX from "xlsx-js-style";
+ 
 const validateCollegeCode = (value) => /^[A-Z]*$/.test(value);
 const validatePincode = (value) => /^[0-9]{0,6}$/.test(value);
 const validateGST = (value) =>
   /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(value);
-
+ 
 const TrainingForm = ({ show, onClose, lead, users }) => {
   const { currentUser } = useContext(AuthContext);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-
+ 
   const [formData, setFormData] = useState({
     projectCode: "",
     collegeName: lead?.businessName || "",
@@ -61,7 +61,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
     additionalNotes: "",
     splitTotal: 0,
   });
-
+ 
   const [collegeCodeError, setCollegeCodeError] = useState("");
   const [pincodeError, setPincodeError] = useState("");
   const [gstError, setGstError] = useState("");
@@ -71,7 +71,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
   const [mouFileError, setMouFileError] = useState("");
   const [contractStartDate, setContractStartDate] = useState("");
   const [contractEndDate, setContractEndDate] = useState("");
-
+ 
   useEffect(() => {
     if (lead) {
       setFormData((prev) => ({
@@ -91,7 +91,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
       setContractEndDate(lead.contractEndDate || "");
     }
   }, [lead]);
-
+ 
   useEffect(() => {
     const totalStudents = formData.courses.reduce(
       (sum, item) => sum + (parseInt(item.students) || 0),
@@ -103,7 +103,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
       totalCost: totalStudents * (parseFloat(prev.perStudentCost) || 0),
     }));
   }, [formData.courses, formData.perStudentCost]);
-
+ 
   useEffect(() => {
     const { collegeCode, course, year, deliveryType, passingYear } = formData;
     if (collegeCode && course && year && deliveryType && passingYear) {
@@ -120,11 +120,11 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
     formData.deliveryType,
     formData.passingYear,
   ]);
-
+ 
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;
     setHasUnsavedChanges(true);
-
+ 
     if (name === "collegeCode") {
       setCollegeCodeError(
         validateCollegeCode(value) ? "" : "Only uppercase letters (A-Z) allowed"
@@ -140,27 +140,51 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
     }
     setFormData((prev) => ({ ...prev, [name]: value }));
   }, []);
-
+ 
   const uploadFileToCloudinary = async (file, folderName) => {
     const url = "https://api.cloudinary.com/v1_1/da0ypp61n/raw/upload";
     const formData = new FormData();
     formData.append("file", file);
     formData.append("upload_preset", "react_profile_upload");
     formData.append("folder", folderName);
-
+ 
     const res = await fetch(url, { method: "POST", body: formData });
     const data = await res.json();
-
+ 
     if (!res.ok || !data.secure_url) {
       throw new Error(data.error?.message || "File upload failed");
     }
     return data.secure_url;
   };
-
+ 
+  const uploadStudentsToFirestore = async (studentList, formId) => {
+    const batch = writeBatch(db);
+    studentList.forEach((student) => {
+      const docRef = doc(collection(db, "trainingForms", formId, "students"));
+      batch.set(docRef, student);
+    });
+    await batch.commit();
+  };
+ 
+  const handleStudentFile = (file) => {
+    setStudentFile(file);
+ 
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(sheet);
+ 
+      setFormData((prev) => ({ ...prev, studentList: jsonData }));
+    };
+    reader.readAsArrayBuffer(file);
+  };
+ 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-
+ 
     if (!studentFile) {
       setStudentFileError("Please upload the Student Excel file.");
       setIsSubmitting(false);
@@ -176,15 +200,32 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
       setIsSubmitting(false);
       return;
     }
-
+ 
     try {
       const toastId = toast.loading("Submitting form and uploading files...");
-
+ 
       const [studentUrl, mouUrl] = await Promise.all([
         uploadFileToCloudinary(studentFile, "training-forms/student-files"),
         uploadFileToCloudinary(mouFile, "training-forms/mou-files"),
       ]);
-
+ 
+      const rawProjectCode = formData.projectCode;
+      const sanitizedProjectCode = rawProjectCode.replace(/\//g, "-");
+ 
+      const formRef = doc(db, "trainingForms", sanitizedProjectCode);
+      const existingDoc = await getDoc(formRef);
+ 
+      if (existingDoc.exists()) {
+        toast.update(toastId, {
+          render: "A form with this Project Code already exists!",
+          type: "error",
+          isLoading: false,
+          autoClose: 3000,
+        });
+        setIsSubmitting(false);
+        return;
+      }
+ 
       if (lead?.id) {
         const leadRef = doc(db, "leads", lead.id);
         await updateDoc(leadRef, {
@@ -196,10 +237,10 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
           contractEndDate,
         });
       }
-
+ 
       const assignedUser = users?.[lead?.assignedTo?.uid] || {};
-
-      await addDoc(collection(db, "trainingForms"), {
+ 
+      await setDoc(formRef, {
         ...formData,
         studentFileUrl: studentUrl,
         mouFileUrl: mouUrl,
@@ -212,14 +253,16 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
           name: lead?.assignedTo?.name || assignedUser?.name || "",
         },
       });
-
+ 
+      await uploadStudentsToFirestore(formData.studentList, sanitizedProjectCode);
+ 
       toast.update(toastId, {
         render: "Form submitted successfully!",
         type: "success",
         isLoading: false,
         autoClose: 3000,
       });
-
+ 
       setHasUnsavedChanges(false);
       setTimeout(onClose, 1000);
     } catch (err) {
@@ -229,7 +272,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
       setIsSubmitting(false);
     }
   };
-
+ 
   const handleClose = useCallback(() => {
     if (
       hasUnsavedChanges &&
@@ -239,9 +282,9 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
     }
     onClose();
   }, [hasUnsavedChanges, onClose]);
-
+ 
   if (!show || !lead) return null;
-
+ 
   return (
     <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center px-4 z-54">
       <div className="bg-white w-full max-w-7xl h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-fadeIn">
@@ -264,7 +307,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
             </button>
           </div>
         </div>
-
+ 
         <form className="flex-1 overflow-y-auto p-6 space-y-6" onSubmit={handleSubmit}>
           <CollegeInfoSection
             formData={formData}
@@ -279,7 +322,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
             formData={formData}
             setFormData={setFormData}
             studentFile={studentFile}
-            setStudentFile={setStudentFile}
+            setStudentFile={handleStudentFile}
             studentFileError={studentFileError}
           />
           <TopicBreakdownSection formData={formData} setFormData={setFormData} />
@@ -293,7 +336,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
             contractEndDate={contractEndDate}
             setContractEndDate={setContractEndDate}
           />
-
+ 
           <div className="pt-4 flex justify-end space-x-4">
             <button
               type="button"
@@ -316,12 +359,14 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
     </div>
   );
 };
-
+ 
 TrainingForm.propTypes = {
   show: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
   lead: PropTypes.object,
   users: PropTypes.object,
 };
-
+ 
 export default TrainingForm;
+ 
+ 
