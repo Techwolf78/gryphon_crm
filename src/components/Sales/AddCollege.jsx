@@ -40,8 +40,10 @@ const affiliationOptions = [
 ];
 
 const accreditationOptions = [
+  "A++",
   "A+",
   "A",
+  "B++",
   "B+",
   "B",
   "C",

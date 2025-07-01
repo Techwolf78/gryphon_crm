@@ -2,6 +2,8 @@ import React, { useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { FaEye, FaEyeSlash, FaEnvelope, FaLock } from "react-icons/fa";
+import { useLocation } from "react-router-dom";
+import { toast } from "react-toastify";
  
 export default function LoginPage() {
   const { login, user } = useContext(AuthContext);
@@ -25,6 +27,15 @@ export default function LoginPage() {
       setRememberMe(true);
     }
   }, []);
+
+  const location = useLocation();
+  useEffect(() => {
+    if (location.state?.showLogoutToast) {
+      toast.success("Logged out successfully!");
+      // Clear the state so the toast doesn't show again on refresh
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
  
   useEffect(() => {
     if (user) {

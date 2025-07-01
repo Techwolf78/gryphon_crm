@@ -1,8 +1,17 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { collection, doc, onSnapshot, updateDoc, query, where, orderBy, limit } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  onSnapshot,
+  updateDoc,
+  query,
+  where,
+  orderBy,
+  limit,
+} from "firebase/firestore";
 import { db } from "../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { debounce } from 'lodash';
+import { debounce } from "lodash";
 import FollowupAlerts from "../components/Sales/FollowupAlerts";
 import AddCollegeModal from "../components/Sales/AddCollege";
 import FollowUp from "../components/Sales/Followup";
@@ -26,15 +35,18 @@ const tabColorMap = {
   },
   warm: {
     active: "bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-lg",
-    inactive: "bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200",
+    inactive:
+      "bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200",
   },
   cold: {
     active: "bg-gradient-to-r from-cyan-400 to-cyan-500 text-white shadow-lg",
-    inactive: "bg-cyan-50 text-cyan-600 hover:bg-cyan-100 border border-cyan-200",
+    inactive:
+      "bg-cyan-50 text-cyan-600 hover:bg-cyan-100 border border-cyan-200",
   },
   closed: {
     active: "bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg",
-    inactive: "bg-green-50 text-green-600 hover:bg-green-100 border border-green-200",
+    inactive:
+      "bg-green-50 text-green-600 hover:bg-green-100 border border-green-200",
   },
 };
 
@@ -60,7 +72,7 @@ function Sales() {
   const [pendingPhaseChange, setPendingPhaseChange] = useState(null);
   const [leadBeingUpdated, setLeadBeingUpdated] = useState(null);
   const [expectedDate, setExpectedDate] = useState("");
-  
+
   // Filter state with debouncing
   const [rawFilters, setRawFilters] = useState({});
   const [filters, setFilters] = useState({});
@@ -68,7 +80,7 @@ function Sales() {
 
   // View mode state with localStorage persistence
   const [viewMyLeadsOnly, setViewMyLeadsOnly] = useState(() => {
-    const saved = localStorage.getItem('viewMyLeadsOnly');
+    const saved = localStorage.getItem("viewMyLeadsOnly");
     return saved !== null ? JSON.parse(saved) : null;
   });
   const [isViewModeLoading, setIsViewModeLoading] = useState(true);
@@ -76,7 +88,7 @@ function Sales() {
   // Persist view mode to localStorage
   useEffect(() => {
     if (viewMyLeadsOnly !== null) {
-      localStorage.setItem('viewMyLeadsOnly', JSON.stringify(viewMyLeadsOnly));
+      localStorage.setItem("viewMyLeadsOnly", JSON.stringify(viewMyLeadsOnly));
     }
   }, [viewMyLeadsOnly]);
 
@@ -111,8 +123,9 @@ function Sales() {
         } else {
           if (user.role === "Manager") {
             const subordinates = Object.values(users).filter(
-              (u) => u.reportingManager === user.name &&
-              ["Assistant Manager", "Executive"].includes(u.role)
+              (u) =>
+                u.reportingManager === user.name &&
+                ["Assistant Manager", "Executive"].includes(u.role)
             );
             const teamUids = subordinates.map((u) => u.uid);
             shouldInclude = teamUids.includes(lead.assignedTo?.uid);
@@ -134,7 +147,7 @@ function Sales() {
 
   const phaseCounts = useMemo(() => computePhaseCounts(), [computePhaseCounts]);
 
-  // Filter leads with memoization
+
   const filteredLeads = useMemo(() => {
     return Object.entries(leads).filter(([, lead]) => {
       const phaseMatch = (lead.phase || "hot") === activeTab;
@@ -150,35 +163,49 @@ function Sales() {
         (!filters.dateRange?.end ||
           lead.createdAt <= new Date(filters.dateRange.end).getTime()) &&
         (!filters.pocName ||
-          lead.pocName?.toLowerCase().includes(filters.pocName.toLowerCase())) &&
+          lead.pocName
+            ?.toLowerCase()
+            .includes(filters.pocName.toLowerCase())) &&
         (!filters.phoneNo || lead.phoneNo?.includes(filters.phoneNo)) &&
         (!filters.email ||
-          lead.email?.toLowerCase().includes(filters.email.toLowerCase()));
+          lead.email?.toLowerCase().includes(filters.email.toLowerCase())) &&
+        (!filters.contactMethod ||
+          lead.contactMethod?.toLowerCase() ===
+            filters.contactMethod.toLowerCase());
 
-      const isSalesDept = user.department === "Sales";
-      const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
+    const isSalesDept = user.department === "Sales";
+    const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
 
-      if (isSalesDept && isHigherRole) {
-        if (viewMyLeadsOnly) {
-          return phaseMatch && matchesFilters && lead.assignedTo?.uid === currentUser?.uid;
-        } else {
-          const currentUserData = Object.values(users).find((u) => u.uid === currentUser?.uid);
-          if (!currentUserData) return false;
+    if (isSalesDept && isHigherRole) {
+      if (viewMyLeadsOnly) {
+        return phaseMatch && matchesFilters && lead.assignedTo?.uid === currentUser?.uid;
+      } else {
+        const currentUserData = Object.values(users).find((u) => u.uid === currentUser?.uid);
+        if (!currentUserData) return false;
 
-          if (currentUserData.role === "Manager") {
-            const subordinates = Object.values(users).filter(
-              (u) => u.reportingManager === currentUserData.name &&
+        if (currentUserData.role === "Manager") {
+          const subordinates = Object.values(users).filter(
+            (u) =>
+              u.reportingManager === currentUserData.name &&
               ["Assistant Manager", "Executive"].includes(u.role)
-            );
-            const teamUids = subordinates.map((u) => u.uid);
-            return phaseMatch && matchesFilters && teamUids.includes(lead.assignedTo?.uid);
-          }
-          return phaseMatch && matchesFilters;
+          );
+          const teamUids = subordinates.map((u) => u.uid);
+          return phaseMatch && matchesFilters && teamUids.includes(lead.assignedTo?.uid);
         }
+        return phaseMatch && matchesFilters;
       }
-      return false;
-    });
-  }, [leads, activeTab, users, currentUser, viewMyLeadsOnly, filters]);
+    }
+
+    // Naya condition yahan add kiya hai:
+    if (isSalesDept && ["Assistant Manager", "Executive"].includes(user.role)) {
+      // Assistant Manager aur Executive ko sirf apni leads dikhegi
+      return phaseMatch && matchesFilters && lead.assignedTo?.uid === currentUser?.uid;
+    }
+
+    return false;
+  });
+}, [leads, activeTab, users, currentUser, viewMyLeadsOnly, filters]);
+
 
   // Auth state listener
   useEffect(() => {
@@ -188,7 +215,9 @@ function Sales() {
         setCurrentUser(user);
         const userData = Object.values(users).find((u) => u.uid === user.uid);
         if (userData) {
-          const isHigherRole = ["Director", "Head", "Manager"].includes(userData.role);
+          const isHigherRole = ["Director", "Head", "Manager"].includes(
+            userData.role
+          );
           // Only set initial value if no preference exists
           if (viewMyLeadsOnly === null) {
             setViewMyLeadsOnly(isHigherRole);
@@ -260,11 +289,15 @@ function Sales() {
         const followupEntries = Object.values(lead.followup);
         if (followupEntries.length === 0) return false;
 
-        const sortedFollowups = followupEntries.sort((a, b) => b.timestamp - a.timestamp);
+        const sortedFollowups = followupEntries.sort(
+          (a, b) => b.timestamp - a.timestamp
+        );
         const latest = sortedFollowups[0];
         if (latest.date !== todayStr) return false;
 
-        const followUpDateTime = new Date(`${latest.date}T${convertTo24HrTime(latest.time)}`);
+        const followUpDateTime = new Date(
+          `${latest.date}T${convertTo24HrTime(latest.time)}`
+        );
         return followUpDateTime > now;
       });
 
@@ -290,11 +323,15 @@ function Sales() {
         if (entries.length === 0) return false;
 
         const latest = entries.sort((a, b) => b.timestamp - a.timestamp)[0];
-        const followUpTime = new Date(`${latest.date}T${convertTo24HrTime(latest.time)}`);
+        const followUpTime = new Date(
+          `${latest.date}T${convertTo24HrTime(latest.time)}`
+        );
         const reminderTime = new Date(followUpTime.getTime() - 15 * 60 * 1000);
 
-        const isToday = latest.date === now.toISOString().split("T")[0] &&
-          reminderTime <= now && followUpTime > now;
+        const isToday =
+          latest.date === now.toISOString().split("T")[0] &&
+          reminderTime <= now &&
+          followUpTime > now;
         const alreadyReminded = remindedLeadsRef.current.has(lead.id);
 
         return isToday && !alreadyReminded;
@@ -324,7 +361,9 @@ function Sales() {
     if (modifier === "PM" && hours !== 12) hours += 12;
     if (modifier === "AM" && hours === 12) hours = 0;
 
-    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:00`;
+    return `${hours.toString().padStart(2, "0")}:${minutes
+      .toString()
+      .padStart(2, "0")}:00`;
   };
 
   const toggleDropdown = useCallback((id, e) => {
@@ -401,29 +440,45 @@ function Sales() {
       <div className="mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Sales Dashboard</h1>
-            <p className="text-gray-600 mt-1">Manage your leads and follow-ups</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+              Sales Dashboard
+            </h1>
+            <p className="text-gray-600 mt-1">
+              Manage your leads and follow-ups
+            </p>
 
             <div className="flex items-center justify-between mt-2">
-              {currentUser && (() => {
-                const role = Object.values(users).find((u) => u.uid === currentUser.uid)?.role;
-                const isHigherRole = ["Director", "Head", "Manager"].includes(role);
+              {currentUser &&
+                (() => {
+                  const role = Object.values(users).find(
+                    (u) => u.uid === currentUser.uid
+                  )?.role;
+                  const isHigherRole = ["Director", "Head", "Manager"].includes(
+                    role
+                  );
 
-                return isViewModeLoading ? (
-                  <div className="h-8 w-48 bg-gray-100 rounded-full animate-pulse"></div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <p className={`text-xs font-medium px-3 py-1 rounded-full ${
-                      isHigherRole ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"
-                    }`}>
-                      Viewing: {isHigherRole 
-                        ? viewMyLeadsOnly ? "My Leads Only" : "All Sales Leads" 
-                        : "My Leads Only"}
-                    </p>
-                    <ViewModeToggle isHigherRole={isHigherRole} />
-                  </div>
-                );
-              })()}
+                  return isViewModeLoading ? (
+                    <div className="h-8 w-48 bg-gray-100 rounded-full animate-pulse"></div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <p
+                        className={`text-xs font-medium px-3 py-1 rounded-full ${
+                          isHigherRole
+                            ? "bg-green-100 text-green-700"
+                            : "bg-blue-100 text-blue-700"
+                        }`}
+                      >
+                        Viewing:{" "}
+                        {isHigherRole
+                          ? viewMyLeadsOnly
+                            ? "My Leads Only"
+                            : "All Sales Leads"
+                          : "My Leads Only"}
+                      </p>
+                      <ViewModeToggle isHigherRole={isHigherRole} />
+                    </div>
+                  );
+                })()}
 
               <LeadFilters
                 filteredLeads={filteredLeads}
@@ -434,6 +489,7 @@ function Sales() {
                 setIsFilterOpen={setIsFilterOpen}
                 users={users}
                 leads={leads}
+                activeTab={activeTab}
               />
             </div>
           </div>
@@ -442,8 +498,17 @@ function Sales() {
             onClick={() => setShowModal(true)}
             className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-5 py-2.5 rounded-xl font-semibold hover:opacity-90 transition-all shadow-md flex items-center"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5 mr-2"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"
+                clipRule="evenodd"
+              />
             </svg>
             Add College
           </button>
@@ -455,8 +520,12 @@ function Sales() {
               key={key}
               onClick={() => handleTabChange(key)}
               className={`py-3.5 rounded-xl text-sm font-semibold transition-all duration-300 ease-out transform hover:scale-[1.02] ${
-                activeTab === key ? tabColorMap[key].active : tabColorMap[key].inactive
-              } ${activeTab === key ? "ring-2 ring-offset-2 ring-opacity-50" : ""} ${
+                activeTab === key
+                  ? tabColorMap[key].active
+                  : tabColorMap[key].inactive
+              } ${
+                activeTab === key ? "ring-2 ring-offset-2 ring-opacity-50" : ""
+              } ${
                 activeTab === key
                   ? key === "hot"
                     ? "ring-red-500"
@@ -468,7 +537,10 @@ function Sales() {
                   : ""
               }`}
             >
-              {tabLabels[key]} <span className="ml-1 text-xs font-bold">({phaseCounts[key]})</span>
+              {tabLabels[key]}{" "}
+              <span className="ml-1 text-xs font-bold">
+                ({phaseCounts[key]})
+              </span>
             </button>
           ))}
         </div>
