@@ -13,7 +13,7 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../firebase"; // Adjust path as needed
 import { getAuth } from "firebase/auth";
 
-const ImportLead = ({ handleImportComplete }) => {
+const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [importStatus, setImportStatus] = useState({
     loading: false,
@@ -240,7 +240,11 @@ const ImportLead = ({ handleImportComplete }) => {
   const uploadLeadToFirebase = async (leadData) => {
     try {
       const currentUser = auth.currentUser;
-      const currentDate = new Date(); // Get current date/time
+      const currentDate = new Date();
+
+      // Validate the activeTab is one of our allowed phases
+      const validPhases = ["hot", "warm", "cold"];
+      const leadPhase = validPhases.includes(activeTab) ? activeTab : "cold";
 
       const leadToUpload = {
         businessName: leadData.businessName || "",
@@ -249,10 +253,10 @@ const ImportLead = ({ handleImportComplete }) => {
         phoneNo: leadData.phoneNo || "",
         email: leadData.email || "",
         tcv: leadData.tcv || "",
-        contactMethod: leadData.contactMethod || "Call", // Default to "Call" if not provided
-        phase: "hot", // Default phase
-        createdAt: serverTimestamp(), // Firestore server timestamp
-        openedDate: currentDate.getTime(), // Current timestamp for "Opened Date"
+        contactMethod: leadData.contactMethod || "Call",
+        phase: leadPhase, // Use the validated phase from activeTab
+        createdAt: serverTimestamp(),
+        openedDate: currentDate.getTime(),
         assignedTo: currentUser
           ? {
               uid: currentUser.uid,
@@ -299,7 +303,6 @@ const ImportLead = ({ handleImportComplete }) => {
       return { success: false, error: error.message };
     }
   };
-
   const handleImportError = (message) => {
     setImportStatus({
       loading: false,
@@ -598,7 +601,9 @@ const ImportLead = ({ handleImportComplete }) => {
       {isDropdownOpen && (
         <div className="absolute right-0 mt-2 w-64 bg-white rounded-md shadow-lg z-10 border border-gray-200">
           <div className="px-3 py-2 border-b border-gray-10 bg-gray-50">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">IMPORT OPTIONS</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              IMPORT OPTIONS
+            </p>
           </div>
           <div className="py-1">
             <button

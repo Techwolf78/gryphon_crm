@@ -42,11 +42,17 @@ export const AuthProvider = ({ children }) => {
           );
           const querySnapshot = await getDocs(q);
 
-          if (!querySnapshot.empty) {
-            const userData = querySnapshot.docs[0].data();
-            setUser({ ...firebaseUser, role: userData.department || "guest" });
-            setPhotoURL(userData.photoURL || "");
-          } else {
+ // In onAuthStateChanged callback:
+if (!querySnapshot.empty) {
+  const userData = querySnapshot.docs[0].data();
+  setUser({ 
+    ...firebaseUser, 
+    role: userData.role || "guest",
+    department: userData.department || "guest",
+    reportingManager: userData.reportingManager || null
+  });
+  setPhotoURL(userData.photoURL || "");
+} else {
             setUser({ ...firebaseUser, role: "guest" });
             setPhotoURL("");
           }
@@ -73,11 +79,17 @@ export const AuthProvider = ({ children }) => {
       const q = query(collection(db, "users"), where("email", "==", userCred.user.email));
       const querySnapshot = await getDocs(q);
 
-      if (!querySnapshot.empty) {
-        const userData = querySnapshot.docs[0].data();
-        setUser({ ...userCred.user, role: userData.department || "guest" });
-        setPhotoURL(userData.photoURL || "");
-      } else {
+// In login function:
+if (!querySnapshot.empty) {
+  const userData = querySnapshot.docs[0].data();
+  setUser({ 
+    ...userCred.user, 
+    role: userData.role || "guest",
+    department: userData.department || "guest",
+    reportingManager: userData.reportingManager || null
+  });
+  setPhotoURL(userData.photoURL || "");
+} else {
         setUser({ ...userCred.user, role: "guest" });
         setPhotoURL("");
       }

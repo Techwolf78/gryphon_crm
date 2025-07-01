@@ -82,32 +82,27 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
         return null;
     }
   }, []);
-
-const getCumulativeTarget = useCallback(
-  (fy, upTo) => {
+const getCumulativeTarget = useCallback( 
+ (fy, upTo) => {
     const quartersOrder = ["Q1", "Q2", "Q3", "Q4"];
-    const idx = quartersOrder.indexOf(upTo);
-    
-    // Special handling for "All Quarters" view
+   
+    // Agar all quarters view hai
     if (upTo === "all") {
       let totalTarget = 0;
       let carriedDeficit = 0;
-      
-      // Calculate quarter by quarter with deficit carry-forward
+ 
       for (let i = 0; i < quartersOrder.length; i++) {
         const quarter = quartersOrder[i];
         const baseTarget = targets.find(
           (t) => t.financial_year === fy && t.quarter === quarter
         )?.target_amount || 0;
-        
-        // Current quarter target = base + carried deficit
+ 
         const quarterTarget = baseTarget + carriedDeficit;
-        totalTarget += baseTarget; // Only add base targets for the full year
-        
+ 
         // Calculate achieved for this quarter
         const range = getQuarterRange(quarter, fy);
         if (!range) continue;
-        
+ 
         const quarterAchieved = Object.entries(leads)
           .filter(([, lead]) => lead.phase === "closed")
           .filter(
@@ -119,56 +114,58 @@ const getCumulativeTarget = useCallback(
             return d >= range[0] && d <= range[1];
           })
           .reduce((sum, [, lead]) => sum + (lead.totalCost || 0), 0);
-        
-        // Calculate new deficit to carry forward
+ 
+        totalTarget += quarterTarget; // Add base + deficit target for this quarter
+ 
+        // Update deficit to carry forward
         carriedDeficit = Math.max(0, quarterTarget - quarterAchieved);
       }
-      
-      return totalTarget; // Return sum of base targets only for "All Quarters"
+ 
+      return totalTarget;
     }
-
+ 
+    // Agar specific quarter hai to same logic use karo jaise pehle hai
+    const idx = quartersOrder.indexOf(upTo);
     if (idx === -1) return 0;
-
-    // Base target for current quarter
-    const currentQuarterTarget = targets.find(
+ 
+    const currentQuarterBaseTarget = targets.find(
       (t) => t.financial_year === fy && t.quarter === upTo
     )?.target_amount || 0;
-
-    // If Q1, just return base target (no previous quarter)
-    if (idx === 0) return currentQuarterTarget;
-
-    // Get previous quarter's deficit
-    const prevQuarter = quartersOrder[idx - 1];
-    const prevQuarterRange = getQuarterRange(prevQuarter, fy);
-    
-    if (!prevQuarterRange) return currentQuarterTarget;
-
-    // Calculate achieved for previous quarter
-    const prevQuarterAchieved = Object.entries(leads)
-      .filter(([, lead]) => lead.phase === "closed")
-      .filter(
-        ([, lead]) =>
-          !viewMyLeadsOnly || lead.assignedTo?.uid === currentUser?.uid
-      )
-      .filter(([, lead]) => {
-        const d = new Date(lead.closedDate);
-        return d >= prevQuarterRange[0] && d <= prevQuarterRange[1];
-      })
-      .reduce((sum, [, lead]) => sum + (lead.totalCost || 0), 0);
-
-    // Get previous quarter's target (base only, not cumulative)
-    const prevQuarterTarget = targets.find(
-      (t) => t.financial_year === fy && t.quarter === prevQuarter
-    )?.target_amount || 0;
-
-    // Calculate previous quarter's deficit (only if positive)
-    const prevQuarterDeficit = Math.max(0, prevQuarterTarget - prevQuarterAchieved);
-
-    // Current quarter target = base + previous quarter's deficit
-    return currentQuarterTarget + prevQuarterDeficit;
+ 
+    if (idx === 0) return currentQuarterBaseTarget;
+ 
+    // Calculate deficit from previous quarters recursively
+    let carriedDeficit = 0;
+    for (let i = 0; i < idx; i++) {
+      const quarter = quartersOrder[i];
+      const baseTarget = targets.find(
+        (t) => t.financial_year === fy && t.quarter === quarter
+      )?.target_amount || 0;
+ 
+      const range = getQuarterRange(quarter, fy);
+      if (!range) continue;
+ 
+      const quarterAchieved = Object.entries(leads)
+        .filter(([, lead]) => lead.phase === "closed")
+        .filter(
+          ([, lead]) =>
+            !viewMyLeadsOnly || lead.assignedTo?.uid === currentUser?.uid
+        )
+        .filter(([, lead]) => {
+          const d = new Date(lead.closedDate);
+          return d >= range[0] && d <= range[1];
+        })
+        .reduce((sum, [, lead]) => sum + (lead.totalCost || 0), 0);
+ 
+      const quarterTarget = baseTarget + carriedDeficit;
+      carriedDeficit = Math.max(0, quarterTarget - quarterAchieved);
+    }
+ 
+    return currentQuarterBaseTarget + carriedDeficit;
   },
   [targets, leads, viewMyLeadsOnly, currentUser?.uid, getQuarterRange]
 );
+ 
 
   // Determine selected FY and quarter
   const today = new Date();
@@ -181,33 +178,84 @@ const getCumulativeTarget = useCallback(
     ? quarterFilter.split("_")[1]
     : getFinancialYearFromDate(today);
 
-  const filteredLeads = useMemo(() => {
-    return Object.entries(leads)
-      .filter(([, lead]) => lead.phase === "closed")
-      .filter(
-        ([, lead]) =>
-          !viewMyLeadsOnly || lead.assignedTo?.uid === currentUser?.uid
-      )
-      .filter(
-        ([, lead]) => filterType === "all" || lead.closureType === filterType
-      )
-      .filter(([, lead]) => {
-        if (activeQuarter === "all") return true;
-        const range = getQuarterRange(activeQuarter, selectedFY);
-        if (!range) return false;
-        const d = new Date(lead.closedDate);
-        return d >= range[0] && d <= range[1];
-      })
-      .sort(([, a], [, b]) => new Date(b.closedDate) - new Date(a.closedDate));
-  }, [
-    leads,
-    viewMyLeadsOnly,
-    currentUser?.uid,
-    filterType,
-    activeQuarter,
-    selectedFY,
-    getQuarterRange,
-  ]);
+// Yeh filter section main focus hai
+const getQuarterFromDate = (date) => {
+  const month = date.getMonth() + 1;
+  if (month >= 4 && month <= 6) return "Q1";
+  if (month >= 7 && month <= 9) return "Q2";
+  if (month >= 10 && month <= 12) return "Q3";
+  return "Q4";  // Jan, Feb, Mar belong to Q4
+};
+
+const filteredLeads = useMemo(() => {
+  const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
+  if (!user) return [];
+
+  const isManager = ["Manager"].includes(user.role);
+  const isExecutiveOrAM = ["Executive", "Assistant Manager"].includes(user.role);
+  const isHead = ["Head", "Admin", "Director"].includes(user.role);
+
+  const teamUids = isManager
+    ? Object.values(users)
+        .filter(
+          (u) =>
+            u.reportingManager === user.name &&
+            ["Executive", "Assistant Manager"].includes(u.role)
+        )
+        .map((u) => u.uid)
+    : [];
+
+  return Object.entries(leads)
+    .filter(([, lead]) => {
+      // Ensure we're checking the "phase" and "closureType"
+      if (lead.phase === "closed" && (lead.closureType === "new" || lead.closureType === "renewal")) {
+        
+        // Renewals logic: Check if contractEndDate is within the next 3 months
+        const contractEndDate = new Date(lead.contractEndDate);  // Use contract end date instead of closed date
+        const currentDate = new Date();
+        const threeMonthsLater = new Date();
+        threeMonthsLater.setMonth(currentDate.getMonth() + 3);
+
+        // If contractEndDate is less than 3 months from now, set closureType to "renewal"
+        if (contractEndDate <= threeMonthsLater && lead.closureType !== "renewal") {
+          lead.closureType = "renewal"; // Manually set closureType to "renewal"
+        }
+      }
+
+      // Now check if it's "My Leads" mode or other filters
+      if (!viewMyLeadsOnly && isHead) return true;
+
+      if (viewMyLeadsOnly) {
+        return lead.assignedTo?.uid === currentUser?.uid;
+      } else {
+        if (isManager) return teamUids.includes(lead.assignedTo?.uid);
+        if (isExecutiveOrAM) return lead.assignedTo?.uid === currentUser?.uid;
+        return false;
+      }
+    })
+    .filter(
+      ([, lead]) => filterType === "all" || lead.closureType === filterType
+    )
+    .filter(([, lead]) => {
+      if (activeQuarter === "all") return true;
+      
+      // Check if the lead's closed date is in the selected quarter using getQuarterFromDate
+      const leadQuarter = getQuarterFromDate(new Date(lead.closedDate));  // Use closed date for quarter calculation
+      return leadQuarter === activeQuarter;
+    })
+    .sort(([, a], [, b]) => new Date(b.closedDate) - new Date(a.closedDate)); // Sort by closedDate
+}, [
+  leads,
+  viewMyLeadsOnly,
+  currentUser?.uid,
+  filterType,
+  activeQuarter,
+  selectedFY,
+  getQuarterRange,
+  users,
+]);
+
+
 
   const startIdx = (currentPage - 1) * rowsPerPage;
   const currentRows = filteredLeads.slice(startIdx, startIdx + rowsPerPage);
