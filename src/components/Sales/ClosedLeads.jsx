@@ -178,6 +178,15 @@ const getCumulativeTarget = useCallback(
     ? quarterFilter.split("_")[1]
     : getFinancialYearFromDate(today);
 
+// Yeh filter section main focus hai
+const getQuarterFromDate = (date) => {
+  const month = date.getMonth() + 1;
+  if (month >= 4 && month <= 6) return "Q1";
+  if (month >= 7 && month <= 9) return "Q2";
+  if (month >= 10 && month <= 12) return "Q3";
+  return "Q4";  // Jan, Feb, Mar belong to Q4
+};
+
 const filteredLeads = useMemo(() => {
   const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
   if (!user) return [];
@@ -198,10 +207,24 @@ const filteredLeads = useMemo(() => {
 
   return Object.entries(leads)
     .filter(([, lead]) => {
-      // 🔥 Head/Admin in "My Team" mode = see all
+      // Ensure we're checking the "phase" and "closureType"
+      if (lead.phase === "closed" && (lead.closureType === "new" || lead.closureType === "renewal")) {
+        
+        // Renewals logic: Check if contractEndDate is within the next 3 months
+        const contractEndDate = new Date(lead.contractEndDate);  // Use contract end date instead of closed date
+        const currentDate = new Date();
+        const threeMonthsLater = new Date();
+        threeMonthsLater.setMonth(currentDate.getMonth() + 3);
+
+        // If contractEndDate is less than 3 months from now, set closureType to "renewal"
+        if (contractEndDate <= threeMonthsLater && lead.closureType !== "renewal") {
+          lead.closureType = "renewal"; // Manually set closureType to "renewal"
+        }
+      }
+
+      // Now check if it's "My Leads" mode or other filters
       if (!viewMyLeadsOnly && isHead) return true;
 
-      // 🧍 My Leads
       if (viewMyLeadsOnly) {
         return lead.assignedTo?.uid === currentUser?.uid;
       } else {
@@ -215,12 +238,12 @@ const filteredLeads = useMemo(() => {
     )
     .filter(([, lead]) => {
       if (activeQuarter === "all") return true;
-      const range = getQuarterRange(activeQuarter, selectedFY);
-      if (!range) return false;
-      const d = new Date(lead.closedDate);
-      return d >= range[0] && d <= range[1];
+      
+      // Check if the lead's closed date is in the selected quarter using getQuarterFromDate
+      const leadQuarter = getQuarterFromDate(new Date(lead.closedDate));  // Use closed date for quarter calculation
+      return leadQuarter === activeQuarter;
     })
-    .sort(([, a], [, b]) => new Date(b.closedDate) - new Date(a.closedDate));
+    .sort(([, a], [, b]) => new Date(b.closedDate) - new Date(a.closedDate)); // Sort by closedDate
 }, [
   leads,
   viewMyLeadsOnly,
