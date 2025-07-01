@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from "react";
 import { FaPlus, FaTrash, FaDownload, FaEye, FaTimes, FaExclamationTriangle, FaCheckCircle } from "react-icons/fa";
 import * as XLSX from "xlsx-js-style";
@@ -19,7 +20,7 @@ const courseYears = {
   MSC: ["1st", "2nd"],
   Others: ["1st", "2nd"]
 };
- 
+
 const deliveryTypes = [
   { value: "TP", label: "TP - Training Placement" },
   { value: "OT", label: "OT - Only Training" },
@@ -27,7 +28,7 @@ const deliveryTypes = [
   { value: "DM", label: "DM - Digital Marketing" },
   { value: "SNS", label: "SNS - SNS" }
 ];
- 
+
 const courseSpecializations = {
   Engineering: ["CS", "IT", "ENTC", "CS-Cyber Security", "Mechanical", "Civil", "Electrical", "Chemical", "CS-AI-ML", "CS-AI-DS", "Other"],
   MBA: ["Marketing", "Finance", "HR", "Operations", "Other"],
@@ -39,12 +40,12 @@ const courseSpecializations = {
   MSC: ["Physics", "Chemistry", "Mathematics", "CS", "Other"],
   Others: ["Other"]
 };
+
  
 const generatePassingYears = () => {
   const currentYear = new Date().getFullYear();
   return Array.from({ length: 16 }, (_, i) => `${currentYear - 5 + i}-${currentYear - 4 + i}`);
 };
- 
 const calculateColumnWidths = (data) => {
   const colWidths = [];
   data.forEach((row) => {
@@ -102,21 +103,22 @@ const StudentBreakdownSection = ({ formData, setFormData, studentFile, setStuden
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
- 
+
   const updateCourseDetail = (index, field, value) => {
     const updated = [...formData.courses];
     updated[index][field] = value;
     setFormData(prev => ({ ...prev, courses: updated }));
   };
- 
+
   const addCourseField = () => {
     setFormData(prev => ({ ...prev, courses: [...prev.courses, { specialization: "", othersSpecText: "", students: "" }] }));
   };
- 
+
   const removeCourseField = (index) => {
     const updated = [...formData.courses];
     updated.splice(index, 1);
     setFormData(prev => ({ ...prev, courses: updated }));
+
   };
  
    const validateStudentData = (data) => {
@@ -325,6 +327,7 @@ const StudentBreakdownSection = ({ formData, setFormData, studentFile, setStuden
     <section>
       <div className="p-5 bg-white shadow-lg rounded-xl border border-gray-200 space-y-4">
         <h3 className="text-2xl font-semibold text-blue-700 border-b-2 border-blue-500 pb-2">Student Breakdown</h3>
+
  
         <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
           <div className="space-y-1">
@@ -334,14 +337,14 @@ const StudentBreakdownSection = ({ formData, setFormData, studentFile, setStuden
               {courseOptions.map(course => <option key={course} value={course}>{course}</option>)}
             </select>
           </div>
- 
+
           {isOtherCourse && (
             <div className="space-y-1">
               <label className="font-medium">Other Course <span className="text-red-500">*</span></label>
               <input type="text" className={inputClass} value={formData.otherCourseText || ""} onChange={(e) => handleChange("otherCourseText", e.target.value)} required />
             </div>
           )}
- 
+
           <div className="space-y-1">
             <label className="font-medium">Year <span className="text-red-500">*</span></label>
             <select className={selectClass} value={formData.year} onChange={(e) => handleChange("year", e.target.value)} required>
@@ -349,7 +352,7 @@ const StudentBreakdownSection = ({ formData, setFormData, studentFile, setStuden
               {(courseYears[formData.course] || []).map(year => <option key={year} value={year}>{year}</option>)}
             </select>
           </div>
- 
+
           <div className="space-y-1">
             <label className="font-medium">Delivery Type <span className="text-red-500">*</span></label>
             <select className={selectClass} value={formData.deliveryType} onChange={(e) => handleChange("deliveryType", e.target.value)} required>
@@ -357,7 +360,7 @@ const StudentBreakdownSection = ({ formData, setFormData, studentFile, setStuden
               {deliveryTypes.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
             </select>
           </div>
- 
+
           <div className="space-y-1">
             <label className="font-medium">Passing Year <span className="text-red-500">*</span></label>
             <select className={selectClass} value={formData.passingYear} onChange={(e) => handleChange("passingYear", e.target.value)} required>
@@ -366,7 +369,7 @@ const StudentBreakdownSection = ({ formData, setFormData, studentFile, setStuden
             </select>
           </div>
         </div>
- 
+
         <div className="space-y-4">
           {(formData.courses || []).map((item, index) => {
             const isOthersSpec = item.specialization === "Other";
@@ -379,28 +382,36 @@ const StudentBreakdownSection = ({ formData, setFormData, studentFile, setStuden
                     {currentSpecializations.map(spec => <option key={spec} value={spec}>{spec}</option>)}
                   </select>
                 </div>
- 
+
                 {isOthersSpec && (
                   <div className="space-y-1">
                     <label className="font-medium">Other Specialization <span className="text-red-500">*</span></label>
                     <input type="text" className={inputClass} value={item.othersSpecText || ""} onChange={(e) => updateCourseDetail(index, "othersSpecText", e.target.value)} required />
                   </div>
                 )}
- 
+
                 <div className="space-y-1">
                   <label className="font-medium">No. of Students <span className="text-red-500">*</span></label>
-                  <input type="number" className={inputClass} value={item.students} disabled={isOthersSpec && !item.othersSpecText} onChange={(e) => updateCourseDetail(index, "students", e.target.value)} required />
+                  <input 
+                    type="number" 
+                    className={inputClass} 
+                    value={item.students} 
+                    min="1"
+                    onChange={(e) => updateCourseDetail(index, "students", Math.max(1, e.target.value))} 
+                    required 
+                  />
                 </div>
- 
+
                 <div className="flex items-end gap-2">
                   {index === formData.courses.length - 1 && (
+
                     <button type="button" onClick={addCourseField} className="flex items-center gap-2 text-blue-600 font-medium cursor-pointer">
                       <FaPlus /> Add
                     </button>
                   )}
                   {formData.courses.length > 1 && (
+
                     <button type="button" onClick={() => removeCourseField(index)} className="flex items-center gap-2 text-red-600 font-medium cursor-pointer">
-                      <FaTrash /> Remove
                     </button>
                   )}
                 </div>
@@ -408,7 +419,7 @@ const StudentBreakdownSection = ({ formData, setFormData, studentFile, setStuden
             );
           })}
         </div>
- 
+
           <div className="space-y-1 mt-4">
           <label className="font-medium">Upload Student Excel File <span className="text-red-500">*</span></label>
           <div className="flex flex-wrap items-center gap-3 mt-2">
@@ -506,6 +517,7 @@ const StudentBreakdownSection = ({ formData, setFormData, studentFile, setStuden
     </section>
   );
 };
+
  
 export default StudentBreakdownSection;
  
