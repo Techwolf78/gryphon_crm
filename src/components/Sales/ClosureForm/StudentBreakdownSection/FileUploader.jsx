@@ -1,7 +1,6 @@
 import React, { useState, useRef } from "react";
 import { FaDownload, FaEye, FaTimes, FaExclamationTriangle, FaCheckCircle, FaSpinner, FaFileExcel } from "react-icons/fa";
 import * as XLSX from "xlsx-js-style";
-
 const FileUploader = ({
     onFileUpload,
     onFileClear,
@@ -17,11 +16,7 @@ const FileUploader = ({
     const [fileErrorMsg, setFileErrorMsg] = useState("");
     const [previewData, setPreviewData] = useState([]);
     const [showPreview, setShowPreview] = useState(false);
-     const [inputKey, setInputKey] = useState(Date.now());
-
     const fileInputRef = useRef(null);
-    
-
     const readFile = (file) => {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -33,7 +28,6 @@ const FileUploader = ({
             reader.readAsArrayBuffer(file);
         });
     };
-
     const calculateColumnWidths = (data) => {
         const colWidths = [];
         data.forEach((row) => {
@@ -44,30 +38,24 @@ const FileUploader = ({
         });
         return colWidths.map((width) => ({ wch: width }));
     };
-
     const handleFileChange = async (e) => {
         const file = e.target.files[0];
-
         if (!file) {
             clearFile();
             return;
         }
-
         if (file.size > 5 * 1024 * 1024) {
             setHasFileErrors(true);
             setFileErrorMsg("File size exceeds 5MB limit");
             return;
         }
-
         setIsProcessing(true);
         setFileName(file.name);
-
         try {
             const data = await readFile(file);
             const workbook = XLSX.read(data, { type: "array" });
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
             const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
             validateStudentData(jsonData);
             setPreviewData(jsonData);
             onFileUpload(file);
@@ -79,7 +67,6 @@ const FileUploader = ({
             setIsProcessing(false);
         }
     };
-
     const clearFile = () => {
         setFileName("");
         setPreviewData([]);
@@ -87,19 +74,15 @@ const FileUploader = ({
         setErrorCells({});
         setHasFileErrors(false);
         setFileErrorMsg("");
-         setInputKey(Date.now());  
         onFileClear();
-       
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
     };
-
     const validateStudentData = (data) => {
         const errors = [];
         const cellErrors = {};
         const headerRow = data[0] || [];
-
         const columnRules = {
             "SN": { type: "number" },
             "FULL NAME OF STUDENT": { type: "string" },
@@ -126,17 +109,13 @@ const FileUploader = ({
             "PASSING YEAR": { type: "year" },
             "OVERALL MARKS %": { type: "number", min: 0, max: 100 }
         };
-
         data.slice(1).forEach((row, rowIndex) => {
             const rowNum = rowIndex + 2;
-
             Object.entries(columnRules).forEach(([colName, rules]) => {
                 const colIndex = headerRow.indexOf(colName);
                 if (colIndex === -1) return;
-
                 const cellValue = row[colIndex];
                 if (cellValue === undefined || cellValue === "") return;
-
                 switch (rules.type) {
                     case "number":
                         if (isNaN(Number(cellValue))) {
@@ -150,7 +129,6 @@ const FileUploader = ({
                             cellErrors[`${rowIndex}-${colIndex}`] = `Maximum ${rules.max}`;
                         }
                         break;
-
                     case "year":
                         if (isNaN(Number(cellValue))) {
                             errors.push(`Row ${rowNum}: ${colName} must be a valid year`);
@@ -164,14 +142,12 @@ const FileUploader = ({
                             }
                         }
                         break;
-
                     case "string":
                         if (typeof cellValue !== "string") {
                             errors.push(`Row ${rowNum}: ${colName} must be text`);
                             cellErrors[`${rowIndex}-${colIndex}`] = "Must be text";
                         }
                         break;
-
                     case "email":
                         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                         if (!emailRegex.test(cellValue)) {
@@ -179,7 +155,6 @@ const FileUploader = ({
                             cellErrors[`${rowIndex}-${colIndex}`] = "Invalid email format";
                         }
                         break;
-
                     case "phone":
                         const phoneRegex = /^[0-9]{10}$/;
                         if (!phoneRegex.test(String(cellValue))) {
@@ -187,7 +162,6 @@ const FileUploader = ({
                             cellErrors[`${rowIndex}-${colIndex}`] = "Must be 10 digits";
                         }
                         break;
-
                     case "date":
                         if (isNaN(Date.parse(cellValue))) {
                             errors.push(`Row ${rowNum}: Invalid date format in ${colName} (use DD-MMM-YY)`);
@@ -197,21 +171,17 @@ const FileUploader = ({
                 }
             });
         });
-
         setValidationErrors(errors);
         setErrorCells(cellErrors);
         const hasErrors = errors.length > 0;
         setHasFileErrors(hasErrors);
-
         if (hasErrors) {
             setFileErrorMsg(`File contains ${errors.length} validation error(s). Please check and correct them.`);
         } else {
             setFileErrorMsg("");
         }
-
         return !hasErrors;
     };
-
     const generateSampleFile = () => {
         const workbook = XLSX.utils.book_new();
         const header = [
@@ -221,17 +191,14 @@ const FileUploader = ({
             "GRADUATION COURSE", "GRADUATION SPECIALIZATION", "GRADUATION PASSING YR", "GRADUATION OVERALL MARKS %",
             "COURSE", "SPECIALIZATION", "PASSING YEAR", "OVERALL MARKS %"
         ];
-
         const data = [
             header,
             [1, "Ajay Pawar", "MIT", "XYZ@GMAIL.COM", "9999999999", "24-May-02", "MALE", "PUNE", 2018, 76, 2020, 87, "", "", "", "", "BE", "COMPUTER SCIENCE", 2024, 77, "MBA", "BUSINESS ANALYTICS", 2026, 85],
             [2, "Deep Mahire", "Symbiosis", "ABC@GMAIL.COM", "8888888888", "26-Jun-04", "FEMALE", "SHIRDI", 2020, 57, 2020, 64, "DIPLOMA", "MECHANICAL", 2023, 73, "BTECH", "MECHANICAL", 2026, 66, "MBA", "IT", 2027, 75],
             [3, "Sakshi Patil", "CEOP", "IJK@GMAIL.COM", "7777777777", "22-Sep-03", "FEMALE", "BALLARI", 2020, 62, 2022, "", "", "", "", "", "BE", "ELECTRICAL & ELECTRONICS", 2026, 89, "", "", "", ""]
         ];
-
         const worksheet = XLSX.utils.aoa_to_sheet(data);
         worksheet["!cols"] = calculateColumnWidths(data);
-
         header.forEach((_, index) => {
             const cellAddress = XLSX.utils.encode_cell({ r: 0, c: index });
             worksheet[cellAddress].s = {
@@ -248,7 +215,6 @@ const FileUploader = ({
                 alignment: { horizontal: "center", vertical: "center" }
             };
         });
-
         const range = XLSX.utils.decode_range(worksheet["!ref"]);
         for (let R = 1; R <= range.e.r; ++R) {
             for (let C = 0; C <= range.e.c; ++C) {
@@ -265,100 +231,64 @@ const FileUploader = ({
                 };
             }
         }
-
         XLSX.utils.book_append_sheet(workbook, worksheet, "Sample");
         XLSX.writeFile(workbook, "Sample_Student_File.xlsx");
     };
-
     return (
         <div className="space-y-2 mt-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-                Upload Student Excel File {required && <span className="text-red-500">*</span>}
-            </label>
+           
+      
+     <div className="flex flex-wrap gap-2 mt-2">
+  {/* Upload Student Excel */}
+  <label className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-md cursor-pointer hover:bg-blue-700 transition">
+    <FaFileExcel />
+    Upload Student Excel
+    <input
+      ref={fileInputRef}
+      type="file"
+      accept=".xlsx, .xls"
+      className="hidden"
+      onChange={handleFileChange}
+      required={required}
+    />
+  </label>
 
-            <div className="flex flex-wrap items-center gap-3">
+  {/* Download Sample */}
+  <button
+    onClick={generateSampleFile}
+    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+  >
+    <FaDownload className="text-blue-600" />
+    Download Sample
+  </button>
 
-                {/* File Upload Box */}
-                <div className={`relative flex items-center border-2 rounded-lg transition-colors px-3 py-2 ${hasFileErrors ? 'border-red-500 bg-red-50' :
-                    fileName ? 'border-green-500 bg-green-50' : 'border-gray-300'
-                    }`}>
-                    <FaFileExcel className={`mr-2 ${hasFileErrors ? 'text-red-500' : 'text-green-600'}`} size={18} />
+  {/* Preview */}
+  {fileName && (
+    <button
+      onClick={() => setShowPreview(true)}
+      className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md ${hasFileErrors
+          ? 'bg-red-100 text-red-700 hover:bg-red-200'
+          : 'bg-green-100 text-green-700 hover:bg-green-200'
+        }`}
+    >
+      <FaEye />
+      Preview
+    </button>
+  )}
+</div>
 
-                    <div className="flex-1 min-w-0">
-                        {fileName ? (
-                            <p className="text-sm font-medium truncate">
-                                <span className={hasFileErrors ? 'text-red-600' : 'text-green-700'}>
-                                    {fileName}
-                                </span>
-                                <span className="text-xs text-gray-500 ml-2">
-                                    ({Math.round(fileInputRef.current?.files[0]?.size / 1024)} KB)
-                                </span>
-                            </p>
-                        ) : (
-                            <p className="text-sm text-gray-500">No file selected</p>
-                        )}
-                    </div>
-
-                    <label className="ml-2 px-3 py-1 bg-blue-600 text-white text-sm rounded-md cursor-pointer hover:bg-blue-700 transition-colors">
-                        Choose File
-                        <input
-                            key={inputKey}
-                            ref={fileInputRef}
-                            type="file"
-                            accept=".xlsx, .xls"
-                            className="hidden"
-                            onChange={handleFileChange}
-                            required={required}
-                        />
-                    </label>
-
-                    {fileName && (
-                        <button
-                            onClick={clearFile}
-                            className="ml-2 p-1 text-gray-500 hover:text-red-600 transition-colors"
-                            title="Remove file"
-                        >
-                            <FaTimes />
-                        </button>
-                    )}
-                </div>
-
-                {/* Download & Preview Buttons */}
-                <button
-                    onClick={generateSampleFile}
-                    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
-                >
-                    <FaDownload className="text-blue-600" />
-                    Download Sample
-                </button>
-
-                {fileName && (
-                    <button
-                        onClick={() => setShowPreview(true)}
-                        className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md ${hasFileErrors ?
-                            'bg-red-100 text-red-700 hover:bg-red-200' :
-                            'bg-green-100 text-green-700 hover:bg-green-200'
-                            }`}
-                    >
-                        {hasFileErrors ? <FaEye /> : <FaCheckCircle />}
-                        Preview File
-                    </button>
-                )}
-            </div>
             {isProcessing && (
                 <div className="flex items-center gap-2 text-sm text-blue-600">
                     <FaSpinner className="animate-spin" />
                     Processing file...
                 </div>
             )}
-
             {fileError && (
                 <div className="flex items-start gap-2 text-sm text-red-600">
                     <FaExclamationTriangle className="mt-0.5 flex-shrink-0" />
                     <span>{fileError}</span>
                 </div>
             )}
-
             {hasFileErrors && (
                 <div className="p-3 bg-red-50 rounded">
                     <div className="flex items-center gap-2 text-red-700 font-medium">
@@ -378,14 +308,12 @@ const FileUploader = ({
                 </div>
             )}
             {showPreview && (
-                <div className="fixed inset-0 backdrop-blur-md bg-opacity-50 flex items-center justify-center z-50">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white max-h-[80vh] max-w-6xl overflow-auto p-6 rounded-lg shadow-lg relative">
                         <button className="absolute top-3 right-3 text-red-600 hover:text-red-800" onClick={() => setShowPreview(false)}>
                             <FaTimes size={20} />
                         </button>
-
                         <h2 className="text-xl font-bold mb-4">Student File Preview</h2>
-
                         {/* Validation Errors Section - Exactly like your screenshot */}
                         {validationErrors.length > 0 && (
                             <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500">
@@ -400,7 +328,6 @@ const FileUploader = ({
                                 </ul>
                             </div>
                         )}
-
                         {/* Table Preview with only error cells highlighted */}
                         <div className="overflow-auto">
                             <table className="table-auto border-collapse w-full text-sm">
@@ -417,7 +344,6 @@ const FileUploader = ({
                                             {row.map((cell, colIndex) => {
                                                 const cellKey = `${rowIndex}-${colIndex}`;
                                                 const hasError = errorCells[cellKey];
-
                                                 return (
                                                     <td
                                                         key={colIndex}
@@ -439,5 +365,4 @@ const FileUploader = ({
         </div>
     );
 };
-
 export default FileUploader;
