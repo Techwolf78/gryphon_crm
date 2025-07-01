@@ -1,6 +1,7 @@
 import React, { useState, useRef } from "react";
 import { FaDownload, FaEye, FaTimes, FaExclamationTriangle, FaCheckCircle, FaSpinner, FaFileExcel } from "react-icons/fa";
 import * as XLSX from "xlsx-js-style";
+
 const FileUploader = ({
     onFileUpload,
     onFileClear,
@@ -17,17 +18,16 @@ const FileUploader = ({
     const [previewData, setPreviewData] = useState([]);
     const [showPreview, setShowPreview] = useState(false);
     const fileInputRef = useRef(null);
+
     const readFile = (file) => {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = (e) => resolve(e.target.result);
-            reader.onerror = (error) => {
-                console.error("File reading error:", error);
-                reject(error);
-            };
+            reader.onerror = (error) => reject(error);
             reader.readAsArrayBuffer(file);
         });
     };
+
     const calculateColumnWidths = (data) => {
         const colWidths = [];
         data.forEach((row) => {
@@ -38,51 +38,31 @@ const FileUploader = ({
         });
         return colWidths.map((width) => ({ wch: width }));
     };
-    const handleFileChange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) {
-            clearFile();
-            return;
-        }
-        if (file.size > 5 * 1024 * 1024) {
-            setHasFileErrors(true);
-            setFileErrorMsg("File size exceeds 5MB limit");
-            return;
-        }
-        setIsProcessing(true);
-        setFileName(file.name);
-        try {
-            const data = await readFile(file);
-            const workbook = XLSX.read(data, { type: "array" });
-            const sheet = workbook.Sheets[workbook.SheetNames[0]];
-            const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-            validateStudentData(jsonData);
-            setPreviewData(jsonData);
-            onFileUpload(file);
-        } catch (error) {
-            setHasFileErrors(true);
-            setFileErrorMsg("Error reading file. Please check the format.");
-            console.error("File processing error:", error);
-        } finally {
-            setIsProcessing(false);
-        }
-    };
-    const clearFile = () => {
-        setFileName("");
-        setPreviewData([]);
-        setValidationErrors([]);
-        setErrorCells({});
-        setHasFileErrors(false);
-        setFileErrorMsg("");
-        onFileClear();
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-        }
-    };
+
     const validateStudentData = (data) => {
         const errors = [];
         const cellErrors = {};
+
+        const expectedHeader = [
+            "SN", "FULL NAME OF STUDENT", "CURRENT COLLEGE NAME", "EMAIL ID", "MOBILE NO.", "BIRTH DATE", "GENDER",
+            "HOMETOWN", "10th PASSING YR", "10th OVERALL MARKS %", "12th PASSING YR", "12th OVERALL MARKS %",
+            "DIPLOMA COURSE", "DIPLOMA SPECIALIZATION", "DIPLOMA PASSING YR", "DIPLOMA OVERALL MARKS %",
+            "GRADUATION COURSE", "GRADUATION SPECIALIZATION", "GRADUATION PASSING YR", "GRADUATION OVERALL MARKS %",
+            "COURSE", "SPECIALIZATION", "PASSING YEAR", "OVERALL MARKS %"
+        ];
+
         const headerRow = data[0] || [];
+        const headerMismatch = expectedHeader.some((expected, index) => expected !== headerRow[index]);
+
+        if (headerMismatch || headerRow.length !== expectedHeader.length) {
+            errors.push("Header mismatch! Please use the correct sample file format.");
+            setValidationErrors(errors);
+            setErrorCells({});
+            setHasFileErrors(true);
+            setFileErrorMsg("Header mismatch! Please use the correct sample file format.");
+            return false;
+        }
+
         const columnRules = {
             "SN": { type: "number" },
             "FULL NAME OF STUDENT": { type: "string" },
@@ -109,6 +89,7 @@ const FileUploader = ({
             "PASSING YEAR": { type: "year" },
             "OVERALL MARKS %": { type: "number", min: 0, max: 100 }
         };
+
         data.slice(1).forEach((row, rowIndex) => {
             const rowNum = rowIndex + 2;
             Object.entries(columnRules).forEach(([colName, rules]) => {
@@ -116,6 +97,7 @@ const FileUploader = ({
                 if (colIndex === -1) return;
                 const cellValue = row[colIndex];
                 if (cellValue === undefined || cellValue === "") return;
+
                 switch (rules.type) {
                     case "number":
                         if (isNaN(Number(cellValue))) {
@@ -171,19 +153,58 @@ const FileUploader = ({
                 }
             });
         });
+
         setValidationErrors(errors);
         setErrorCells(cellErrors);
         const hasErrors = errors.length > 0;
         setHasFileErrors(hasErrors);
-        if (hasErrors) {
-            setFileErrorMsg(`File contains ${errors.length} validation error(s). Please check and correct them.`);
-        } else {
-            setFileErrorMsg("");
-        }
+        setFileErrorMsg(hasErrors ? `File contains ${errors.length} validation error(s). Please check and correct them.` : "");
         return !hasErrors;
     };
+
+    const handleFileChange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return clearFile();
+
+        if (file.size > 5 * 1024 * 1024) {
+            setHasFileErrors(true);
+            setFileErrorMsg("File size exceeds 5MB limit");
+            return;
+        }
+
+        setIsProcessing(true);
+        setFileName(file.name);
+
+        try {
+            const data = await readFile(file);
+            const workbook = XLSX.read(data, { type: "array" });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+            validateStudentData(jsonData);
+            setPreviewData(jsonData);
+            onFileUpload(file);
+        } catch (error) {
+            setHasFileErrors(true);
+            setFileErrorMsg("Error reading file. Please check the format.");
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const clearFile = () => {
+        setFileName("");
+        setPreviewData([]);
+        setValidationErrors([]);
+        setErrorCells({});
+        setHasFileErrors(false);
+        setFileErrorMsg("");
+        onFileClear();
+        if (fileInputRef.current) fileInputRef.current.value = "";
+    };
+
     const generateSampleFile = () => {
         const workbook = XLSX.utils.book_new();
+
         const header = [
             "SN", "FULL NAME OF STUDENT", "CURRENT COLLEGE NAME", "EMAIL ID", "MOBILE NO.", "BIRTH DATE", "GENDER",
             "HOMETOWN", "10th PASSING YR", "10th OVERALL MARKS %", "12th PASSING YR", "12th OVERALL MARKS %",
@@ -191,14 +212,17 @@ const FileUploader = ({
             "GRADUATION COURSE", "GRADUATION SPECIALIZATION", "GRADUATION PASSING YR", "GRADUATION OVERALL MARKS %",
             "COURSE", "SPECIALIZATION", "PASSING YEAR", "OVERALL MARKS %"
         ];
+
         const data = [
             header,
             [1, "Ajay Pawar", "MIT", "XYZ@GMAIL.COM", "9999999999", "24-May-02", "MALE", "PUNE", 2018, 76, 2020, 87, "", "", "", "", "BE", "COMPUTER SCIENCE", 2024, 77, "MBA", "BUSINESS ANALYTICS", 2026, 85],
             [2, "Deep Mahire", "Symbiosis", "ABC@GMAIL.COM", "8888888888", "26-Jun-04", "FEMALE", "SHIRDI", 2020, 57, 2020, 64, "DIPLOMA", "MECHANICAL", 2023, 73, "BTECH", "MECHANICAL", 2026, 66, "MBA", "IT", 2027, 75],
             [3, "Sakshi Patil", "CEOP", "IJK@GMAIL.COM", "7777777777", "22-Sep-03", "FEMALE", "BALLARI", 2020, 62, 2022, "", "", "", "", "", "BE", "ELECTRICAL & ELECTRONICS", 2026, 89, "", "", "", ""]
         ];
+
         const worksheet = XLSX.utils.aoa_to_sheet(data);
         worksheet["!cols"] = calculateColumnWidths(data);
+
         header.forEach((_, index) => {
             const cellAddress = XLSX.utils.encode_cell({ r: 0, c: index });
             worksheet[cellAddress].s = {
@@ -215,6 +239,7 @@ const FileUploader = ({
                 alignment: { horizontal: "center", vertical: "center" }
             };
         });
+
         const range = XLSX.utils.decode_range(worksheet["!ref"]);
         for (let R = 1; R <= range.e.r; ++R) {
             for (let C = 0; C <= range.e.c; ++C) {
@@ -231,52 +256,54 @@ const FileUploader = ({
                 };
             }
         }
+
         XLSX.utils.book_append_sheet(workbook, worksheet, "Sample");
         XLSX.writeFile(workbook, "Sample_Student_File.xlsx");
     };
+
+
     return (
         <div className="space-y-2 mt-4">
-           
-      
-     <div className="flex flex-wrap gap-2 mt-2">
-  {/* Upload Student Excel */}
-  <label className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-md cursor-pointer hover:bg-blue-700 transition">
-    <FaFileExcel />
-    Upload Student Excel
-    <input
-      ref={fileInputRef}
-      type="file"
-      accept=".xlsx, .xls"
-      className="hidden"
-      onChange={handleFileChange}
-      required={required}
-    />
-  </label>
+            {/* Buttons */}
+            <div className="flex flex-wrap gap-2 mt-2">
+                <label className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-md cursor-pointer hover:bg-blue-700 transition">
+                    <FaFileExcel />
+                    Upload Student Excel
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".xlsx, .xls"
+                        className="hidden"
+                        onChange={handleFileChange}
+                        required={required}
+                    />
+                </label>
+                <button onClick={generateSampleFile} className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">
+                    <FaDownload className="text-blue-600" />
+                    Download Sample
+                </button>
+                {fileName && (
+                    <button onClick={() => setShowPreview(true)} className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md ${hasFileErrors ? "bg-red-100 text-red-700 hover:bg-red-200" : "bg-green-100 text-green-700 hover:bg-green-200"}`}>
+                        <FaEye />
+                        Preview
+                    </button>
+                )}
+            </div>
 
-  {/* Download Sample */}
-  <button
-    onClick={generateSampleFile}
-    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
-  >
-    <FaDownload className="text-blue-600" />
-    Download Sample
-  </button>
+            {fileName && (
+                <div className="text-sm text-gray-700 flex items-center gap-4 mt-1">
+                    <div><strong>File:</strong> {fileName}</div>
+                    <div>
+                        <strong>Size:</strong>{" "}
+                        {(
+                            (fileInputRef.current?.files?.[0]?.size || 0) / 1024
+                        ).toFixed(2)}{" "}
+                        KB
+                    </div>
+                </div>
+            )}
 
-  {/* Preview */}
-  {fileName && (
-    <button
-      onClick={() => setShowPreview(true)}
-      className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md ${hasFileErrors
-          ? 'bg-red-100 text-red-700 hover:bg-red-200'
-          : 'bg-green-100 text-green-700 hover:bg-green-200'
-        }`}
-    >
-      <FaEye />
-      Preview
-    </button>
-  )}
-</div>
-
+            {/* Status */}
             {isProcessing && (
                 <div className="flex items-center gap-2 text-sm text-blue-600">
                     <FaSpinner className="animate-spin" />
@@ -289,24 +316,9 @@ const FileUploader = ({
                     <span>{fileError}</span>
                 </div>
             )}
-            {hasFileErrors && (
-                <div className="p-3 bg-red-50 rounded">
-                    <div className="flex items-center gap-2 text-red-700 font-medium">
-                        <FaExclamationTriangle />
-                        <span>{fileErrorMsg}</span>
-                    </div>
-                    {validationErrors.length > 0 && (
-                        <ul className="mt-1 ml-5 list-disc text-sm text-red-600">
-                            {validationErrors.slice(0, 3).map((error, i) => (
-                                <li key={i} className="truncate">{error}</li>
-                            ))}
-                            {validationErrors.length > 3 && (
-                                <li className="text-gray-500">+ {validationErrors.length - 3} more errors...</li>
-                            )}
-                        </ul>
-                    )}
-                </div>
-            )}
+        
+
+            {/* Preview Modal */}
             {showPreview && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white max-h-[80vh] max-w-6xl overflow-auto p-6 rounded-lg shadow-lg relative">
@@ -314,7 +326,6 @@ const FileUploader = ({
                             <FaTimes size={20} />
                         </button>
                         <h2 className="text-xl font-bold mb-4">Student File Preview</h2>
-                        {/* Validation Errors Section - Exactly like your screenshot */}
                         {validationErrors.length > 0 && (
                             <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500">
                                 <div className="flex items-center gap-2 text-red-700 font-bold">
@@ -328,7 +339,6 @@ const FileUploader = ({
                                 </ul>
                             </div>
                         )}
-                        {/* Table Preview with only error cells highlighted */}
                         <div className="overflow-auto">
                             <table className="table-auto border-collapse w-full text-sm">
                                 <thead>
@@ -345,11 +355,7 @@ const FileUploader = ({
                                                 const cellKey = `${rowIndex}-${colIndex}`;
                                                 const hasError = errorCells[cellKey];
                                                 return (
-                                                    <td
-                                                        key={colIndex}
-                                                        className={`border px-3 py-2 text-center ${hasError ? "bg-red-100 border-red-500" : ""
-                                                            }`}
-                                                    >
+                                                    <td key={colIndex} className={`border px-3 py-2 text-center ${hasError ? "bg-red-100 border-red-500" : ""}`}>
                                                         {cell || ""}
                                                     </td>
                                                 );
@@ -365,4 +371,5 @@ const FileUploader = ({
         </div>
     );
 };
+
 export default FileUploader;
