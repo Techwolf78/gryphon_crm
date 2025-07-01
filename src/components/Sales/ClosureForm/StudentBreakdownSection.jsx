@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { FaPlus, FaTrash } from "react-icons/fa";
-import FileUploader from "./FileUploader";
+import FileUploader from "../ClosureForm/StudentBreakdownSection/FileUploader";
 
 const inputClass = "w-full px-3 py-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white";
 const selectClass = "w-full px-3 py-2 border rounded-lg border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500";
@@ -173,7 +173,7 @@ const StudentBreakdownSection = ({ formData, setFormData, studentFile, setStuden
         <FileUploader 
           onFileUpload={(file) => setStudentFile(file)}
           onFileClear={() => setStudentFile(null)}
-          fileError={studentFileError}
+          // fileError={studentFileError}
           initialFileName={studentFile?.name || ""}
           required
         />

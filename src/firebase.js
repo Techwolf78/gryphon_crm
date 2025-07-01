@@ -4,21 +4,13 @@ import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth"
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-
-  apiKey: "AIzaSyAECXwT5YZahSIRP5Ro7BZr33eVX1a6vjY",
-
-  authDomain: "gryphoncrm-209a6.firebaseapp.com",
-
-  projectId: "gryphoncrm-209a6",
-
-  storageBucket: "gryphoncrm-209a6.firebasestorage.app",
-
-  messagingSenderId: "938143262596",
-
-  appId: "1:938143262596:web:4a98bb9569b1cc1d249fd1",
-
-  measurementId: "G-Q8PWZV0R70"
-
+  apiKey: "AIzaSyD9SBw0ZckY3ht0CwH39C5pPRWwkR2zR4M",
+  authDomain: "authencation-39485.firebaseapp.com",
+  projectId: "authencation-39485",
+  storageBucket: "authencation-39485.appspot.com",
+  messagingSenderId: "366538675183",
+  appId: "1:366538675183:web:8504a18fce2d563c491c1a",
+  measurementId: "G-0V7B973Q8T",
 };
 
 // Primary Firebase app initialization
