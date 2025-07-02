@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { FaPlus, FaTrash } from "react-icons/fa";
-import FileUploader from "../ClosureForm/StudentBreakdownSection/FileUploader";
+import FileUploader from "../ClosureForm/FileUploader";
  
 const inputClass = "w-full px-3 py-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white";
 const selectClass = "w-full px-3 py-2 border rounded-lg border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500";
