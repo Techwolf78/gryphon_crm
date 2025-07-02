@@ -8,9 +8,9 @@ import {
   FiInfo,
 } from "react-icons/fi";
 import Papa from "papaparse";
-import * as XLSX from "xlsx-js-style"; // styling supported version
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "../../firebase"; // Adjust path as needed
+import * as XLSX from "xlsx-js-style";
+import { collection, addDoc, serverTimestamp, writeBatch, doc } from "firebase/firestore";
+import { db } from "../../firebase";
 import { getAuth } from "firebase/auth";
 
 const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
@@ -34,7 +34,7 @@ const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
     "phoneNo",
     "email",
     "tcv",
-    "contactMethod", // Added as required field
+    "contactMethod",
   ];
 
   // Close dropdown when clicking outside
@@ -80,35 +80,25 @@ const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
   };
 
   const validateDate = (dateString) => {
-    if (!dateString) return true; // Skip validation if empty
-
-    // Check format exactly matches yyyy-mm-dd
+    if (!dateString) return true;
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!dateRegex.test(dateString)) {
       return false;
     }
-
-    // Check if it's a valid date
     const date = new Date(dateString);
     return !isNaN(date.getTime());
   };
 
   const validatePhoneNumber = (phone) => {
-    if (!phone) return false; // Phone is required (already checked by required fields)
-
-    // Convert to string if it's not already
+    if (!phone) return false;
     const phoneStr = String(phone);
-
-    // Remove all non-digit characters
     const digitsOnly = phoneStr.replace(/\D/g, "");
-
-    // Check if we have at least 6 digits (minimum reasonable phone number length)
     return digitsOnly.length >= 6;
   };
 
   const validateContactMethod = (method) => {
-    if (!method) return false; // Contact method is required
-    const validMethods = ["Visit", "Call", "Email", "Meeting"]; // Add other valid methods if needed
+    if (!method) return false;
+    const validMethods = ["Visit", "Call", "Email", "Meeting"];
     return validMethods.includes(method);
   };
 
@@ -118,7 +108,6 @@ const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
         throw new Error("File is empty");
       }
 
-      // Validate required fields
       const sampleKeys = Object.keys(data[0] || {});
       const missingFields = requiredFields.filter(
         (f) => !sampleKeys.includes(f)
@@ -128,7 +117,6 @@ const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
         throw new Error(`Missing required fields: ${missingFields.join(", ")}`);
       }
 
-      // Validate each record and collect errors
       const validatedLeads = [];
       const errorLeads = [];
 
@@ -136,7 +124,6 @@ const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
         const errors = {};
         let hasError = false;
 
-        // Check required fields
         requiredFields.forEach((field) => {
           if (!lead[field] || String(lead[field]).trim() === "") {
             errors[field] = "This field is required";
@@ -144,28 +131,24 @@ const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
           }
         });
 
-        // Special validation for city
         if (lead.city && !validateCity(lead.city)) {
           errors.city =
             "City must contain only letters (no numbers or special characters)";
           hasError = true;
         }
 
-        // Phone number validation
         if (lead.phoneNo && !validatePhoneNumber(lead.phoneNo)) {
           errors.phoneNo =
             "Phone number must contain only numbers (no letters or special characters)";
           hasError = true;
         }
 
-        // Contact method validation
         if (lead.contactMethod && !validateContactMethod(lead.contactMethod)) {
           errors.contactMethod =
             "Contact method must be one of: Visit, Call, Email, Meeting";
           hasError = true;
         }
 
-        // Check expectedClosureDate format if present
         if (
           lead.expectedClosureDate &&
           !validateDate(lead.expectedClosureDate)
@@ -187,7 +170,7 @@ const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
       });
 
       if (validatedLeads.length === 0 && errorLeads.length > 0) {
-        setErrorData(errorLeads); // Make sure to set error data first
+        setErrorData(errorLeads);
         throw new Error(
           "All records have validation errors. Download error file to see details."
         );
@@ -200,29 +183,74 @@ const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
         );
       }
 
-      // Upload to Firebase
       setImportStatus((prev) => ({ ...prev, loading: true }));
 
-      const batchResults = await Promise.allSettled(
-        validatedLeads.map((lead) => uploadLeadToFirebase(lead))
-      );
+      // Use batch write for better performance
+      const batch = writeBatch(db);
+      const currentUser = auth.currentUser;
+      const currentDate = new Date();
+      const validPhases = ["hot", "warm", "cold"];
+      const leadPhase = validPhases.includes(activeTab) ? activeTab : "cold";
 
-      const successfulImports = batchResults.filter(
-        (r) => r.status === "fulfilled"
-      );
-      const failedImports = batchResults.filter((r) => r.status === "rejected");
+      validatedLeads.forEach((lead) => {
+        const docRef = doc(collection(db, 'leads'));
+        const leadToUpload = {
+          businessName: lead.businessName || "",
+          city: lead.city || "",
+          pocName: lead.pocName || "",
+          phoneNo: String(lead.phoneNo || ""),
+          email: lead.email || "",
+          tcv: Number(lead.tcv) || 0,
+          contactMethod: lead.contactMethod || "Call",
+          phase: leadPhase,
+          createdAt: new Date().getTime(), // Add this line
+          openedDate: currentDate.getTime(),
+          assignedTo: {
+            uid: currentUser?.uid || "imported-unknown-uid",
+            name: currentUser?.displayName || "Imported Lead",
+            email: currentUser?.email || "no-email@imported.com"
+          },
+          firestoreTimestamp: serverTimestamp(),
+          lastUpdatedAt: serverTimestamp(),
+          lastUpdatedBy: 'import-process',
+          // Add optional fields
+          ...(lead.expectedClosureDate && {
+            expectedClosureDate: new Date(lead.expectedClosureDate).getTime()
+          }),
+          ...(lead.notes && { notes: lead.notes }),
+          ...(lead.followups && { 
+            followup: typeof lead.followups === "string" 
+              ? JSON.parse(lead.followups) 
+              : lead.followups 
+          }),
+          // Add any other fields from your manual form
+          affiliation: lead.affiliation || null,
+          accreditation: lead.accreditation || null,
+          courseType: lead.courseType || null,
+          specializations: lead.specializations || [],
+          studentCount: lead.studentCount ? Number(lead.studentCount) : null,
+          perStudentCost: lead.perStudentCost ? Number(lead.perStudentCost) : null,
+          passingYear: lead.passingYear || null,
+          address: lead.address || "",
+          state: lead.state || "",
+          // Ensure these fields match your dashboard expectations
+          totalCost: lead.totalCost ? Number(lead.totalCost) : 0,
+          closedDate: lead.closedDate ? new Date(lead.closedDate).getTime() : null,
+          closureType: lead.closureType || null
+        };
+
+        batch.set(docRef, leadToUpload);
+      });
+
+      await batch.commit();
 
       setImportStatus({
         loading: false,
         success: true,
-        error:
-          failedImports.length > 0
-            ? `${failedImports.length} records failed to import`
-            : null,
-        count: successfulImports.length,
+        error: null,
+        count: validatedLeads.length,
       });
 
-      // Refresh table data if provided
       if (handleImportComplete) {
         handleImportComplete();
       }
@@ -232,77 +260,11 @@ const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
   };
 
   const validateCity = (city) => {
-    if (!city) return false; // City is required
-    const cityRegex = /^[A-Za-z\s]+$/; // Only letters and spaces allowed
+    if (!city) return false;
+    const cityRegex = /^[A-Za-z\s]+$/;
     return cityRegex.test(city);
   };
 
-  const uploadLeadToFirebase = async (leadData) => {
-    try {
-      const currentUser = auth.currentUser;
-      const currentDate = new Date();
-
-      // Validate the activeTab is one of our allowed phases
-      const validPhases = ["hot", "warm", "cold"];
-      const leadPhase = validPhases.includes(activeTab) ? activeTab : "cold";
-
-      const leadToUpload = {
-        businessName: leadData.businessName || "",
-        city: leadData.city || "",
-        pocName: leadData.pocName || "",
-        phoneNo: leadData.phoneNo || "",
-        email: leadData.email || "",
-        tcv: leadData.tcv || "",
-        contactMethod: leadData.contactMethod || "Call",
-        phase: leadPhase, // Use the validated phase from activeTab
-        createdAt: serverTimestamp(),
-        openedDate: currentDate.getTime(),
-        assignedTo: currentUser
-          ? {
-              uid: currentUser.uid,
-              name: currentUser.displayName || "Current User",
-            }
-          : null,
-      };
-
-      // Add optional fields
-      if (leadData.expectedClosureDate) {
-        leadToUpload.expectedClosureDate = new Date(
-          leadData.expectedClosureDate
-        ).getTime();
-      }
-
-      if (leadData.notes) {
-        leadToUpload.notes = leadData.notes;
-      }
-
-      if (leadData.followups) {
-        try {
-          leadToUpload.followup =
-            typeof leadData.followups === "string"
-              ? JSON.parse(leadData.followups)
-              : leadData.followups;
-        } catch {
-          leadToUpload.followup = {
-            initial: {
-              date: currentDate.toISOString().split("T")[0], // Use current date
-              time: "12:00 PM",
-              remarks: leadData.notes || "Initial contact",
-              timestamp: Date.now(),
-            },
-          };
-        }
-      }
-
-      // Add to Firestore
-      await addDoc(collection(db, "leads"), leadToUpload);
-
-      return { success: true };
-    } catch (error) {
-      console.error("Error uploading lead:", error);
-      return { success: false, error: error.message };
-    }
-  };
   const handleImportError = (message) => {
     setImportStatus({
       loading: false,
@@ -310,8 +272,6 @@ const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
       error: message,
       count: 0,
     });
-
-    // Don't clear errorData here - we want to keep it for downloading
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -319,7 +279,7 @@ const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
 
   const resetState = () => {
     setImportStatus({ loading: false, success: false, error: null, count: 0 });
-    setErrorData(null); // Clear error data when resetting
+    setErrorData(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -432,8 +392,8 @@ const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
         phoneNo: "1234567890",
         email: "john@example.com",
         tcv: "25000",
-        contactMethod: "Call", // Added contactMethod to sample
-        expectedClosureDate: "2025-11-15", // Example of correct format
+        contactMethod: "Call",
+        expectedClosureDate: "2025-11-15",
         followups: JSON.stringify({
           initial: {
             date: new Date().toISOString().split("T")[0],
@@ -442,6 +402,19 @@ const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
             timestamp: Date.now(),
           },
         }),
+        // Additional fields that match your manual form
+        affiliation: "Private",
+        accreditation: "A",
+        courseType: "MBA",
+        specializations: ["Marketing", "Finance"],
+        studentCount: "500",
+        perStudentCost: "5000",
+        passingYear: "2024-2025",
+        address: "123 College Street",
+        state: "New York",
+        totalCost: "2500000",
+        closedDate: "2025-06-15",
+        closureType: "new"
       },
     ];
 
@@ -455,9 +428,9 @@ const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
       { instruction: "3. Do not modify column headers" },
       {
         instruction:
-          "4. expectedClosureDate must be in exact format yyyy-mm-dd (e.g. 2025-11-15)",
+          "4. Dates must be in exact format yyyy-mm-dd (e.g. 2025-11-15)",
       },
-      { instruction: "5. TCV should be numeric without currency symbols" },
+      { instruction: "5. Numeric fields should not contain currency symbols" },
       {
         instruction:
           "6. contactMethod must be one of: Visit, Call, Email, Meeting",
@@ -465,30 +438,21 @@ const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
       { instruction: "" },
       { instruction: "REQUIRED FIELDS (MUST INCLUDE):" },
       { instruction: "- businessName: College/Institution name" },
-      {
-        instruction:
-          "- city: Location of the institution (letters only, no numbers or special characters)",
-      },
+      { instruction: "- city: Location of the institution" },
       { instruction: "- pocName: Contact person's name" },
-      {
-        instruction:
-          "- phoneNo: Contact phone number (digits only, no spaces or special characters)",
-      },
+      { instruction: "- phoneNo: Contact phone number" },
       { instruction: "- email: Contact email address" },
       { instruction: "- tcv: Total Contract Value (numeric)" },
       { instruction: "- contactMethod: How the lead was contacted" },
       { instruction: "" },
-      { instruction: "OPTIONAL FIELDS:" },
-      { instruction: "- openedDate: When lead was created (timestamp)" },
-      {
-        instruction:
-          "- expectedClosureDate: Expected deal closure date (must be yyyy-mm-dd)",
-      },
+      { instruction: "RECOMMENDED FIELDS:" },
+      { instruction: "- expectedClosureDate: Expected deal closure date" },
       { instruction: "- followups: JSON string of followup history" },
-      {
-        instruction:
-          "- assignedTo: JSON string with uid and name of assigned user",
-      },
+      { instruction: "- studentCount: Number of students (numeric)" },
+      { instruction: "- perStudentCost: Cost per student (numeric)" },
+      { instruction: "- totalCost: Total deal value (numeric)" },
+      { instruction: "- closedDate: When deal was closed (yyyy-mm-dd)" },
+      { instruction: "- closureType: 'new' or 'renewal'" },
     ];
 
     const workbook = XLSX.utils.book_new();
@@ -500,13 +464,23 @@ const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
       "phoneNo",
       "email",
       "tcv",
-      "contactMethod", // Added to required fields
+      "contactMethod",
     ];
     const optionalFields = [
       "expectedClosureDate",
       "followups",
-      "openedDate",
-      "assignedTo",
+      "affiliation",
+      "accreditation",
+      "courseType",
+      "specializations",
+      "studentCount",
+      "perStudentCost",
+      "passingYear",
+      "address",
+      "state",
+      "totalCost",
+      "closedDate",
+      "closureType"
     ];
 
     // Generate styled worksheet from JSON
@@ -516,7 +490,7 @@ const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
 
     // Apply styled headers
     headerKeys.forEach((key, colIndex) => {
-      const cellAddress = XLSX.utils.encode_cell({ r: 1, c: colIndex }); // Row 2 for headers (0-indexed)
+      const cellAddress = XLSX.utils.encode_cell({ r: 1, c: colIndex });
       ws[cellAddress] = {
         v: key,
         t: "s",

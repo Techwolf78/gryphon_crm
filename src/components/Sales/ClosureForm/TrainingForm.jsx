@@ -11,7 +11,7 @@ import PaymentInfoSection from "./PaymentInfoSection";
 import MOUUploadSection from "./MOUUploadSection";
 import { toast } from "react-toastify";
 import PropTypes from "prop-types";
-import syncLogo from "../../../assets/SYNC logo png .png";
+import syncLogo from "../../../assets/SYNC-logo.png";
 import * as XLSX from "xlsx-js-style";
 
 const validateCollegeCode = (value) => /^[A-Z]*$/.test(value);
