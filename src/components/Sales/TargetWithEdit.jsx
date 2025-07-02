@@ -22,11 +22,6 @@ const TargetWithEdit = ({
   const userRole = userObj?.role;
   const canEdit = ["Director", "Head"].includes(userRole);
 
-
-console.log("users:", users);
-console.log("currentUser.uid:", currentUser?.uid);
-console.log("userRole:", userRole);
-console.log("canEdit:", canEdit);
   useEffect(() => {
     setEditValue(value.toString());
   }, [value]);
