@@ -18,10 +18,15 @@ const TargetWithEdit = ({
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState(null);
 
-  // Check if user has permission to edit
-  const userRole = users[currentUser?.uid]?.role;
-  const canEdit = ["Director", "Head", "Manager"].includes(userRole);
+  const userObj = Object.values(users).find(u => u.uid === currentUser?.uid);
+  const userRole = userObj?.role;
+  const canEdit = ["Director", "Head"].includes(userRole);
 
+
+console.log("users:", users);
+console.log("currentUser.uid:", currentUser?.uid);
+console.log("userRole:", userRole);
+console.log("canEdit:", canEdit);
   useEffect(() => {
     setEditValue(value.toString());
   }, [value]);
