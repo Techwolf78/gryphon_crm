@@ -3,6 +3,7 @@ import { db } from "../firebase";
 import { collection, getDocs } from "firebase/firestore";
 import TrainingDetailModal from "../components/Learning/TrainingDetailModal";
 import FilePreviewModal from "../components/Learning/FilePreviewModal";
+import AddJD from "./AddJD"; // ✅ since it's in same folder
 
 function Placement() {
   const [trainingData, setTrainingData] = useState([]);
@@ -12,6 +13,7 @@ function Placement() {
     fileUrl: "",
     type: "",
   });
+  const [showJDForm, setShowJDForm] = useState(false);
 
   const fetchTrainingData = async () => {
     try {
@@ -32,16 +34,23 @@ function Placement() {
 
   const openFilePreview = (fileUrl, type) => {
     if (!fileUrl) return alert("File not available.");
-    setFileModalData({
-      show: true,
-      fileUrl,
-      type,
-    });
+    setFileModalData({ show: true, fileUrl, type });
   };
 
   return (
     <div className="p-6">
-      <h2 className="text-2xl font-bold mb-6 text-blue-800">Training & Closure Details (Placement View)</h2>
+      <h2 className="text-2xl font-bold mb-6 text-blue-800">
+        Training & Closure Details (Placement View)
+      </h2>
+
+      <div className="mb-4">
+        <button
+          onClick={() => setShowJDForm(true)}
+          className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition"
+        >
+          Add
+        </button>
+      </div>
 
       {trainingData.length === 0 ? (
         <p>No training data found.</p>
@@ -97,19 +106,22 @@ function Placement() {
         </div>
       )}
 
+      {/* Modals */}
       {selectedTraining && (
         <TrainingDetailModal
           training={selectedTraining}
           onClose={() => setSelectedTraining(null)}
         />
       )}
-
       {fileModalData.show && (
         <FilePreviewModal
           fileUrl={fileModalData.fileUrl}
           type={fileModalData.type}
           onClose={() => setFileModalData({ show: false, fileUrl: "", type: "" })}
         />
+      )}
+      {showJDForm && (
+        <AddJD show={showJDForm} onClose={() => setShowJDForm(false)} />
       )}
     </div>
   );
