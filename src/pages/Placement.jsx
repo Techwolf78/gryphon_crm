@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { db } from "../firebase";
 import { collection, getDocs } from "firebase/firestore";
-import TrainingDetailModal from "../components/Learning/TrainingDetailModal";
-import FilePreviewModal from "../components/Learning/FilePreviewModal";
+import TrainingDetailModal from "../components/Learning/TrainingTables/TrainingDetailModal";
+import FilePreviewModal from "../components/Learning/TrainingTables/FilePreviewModal";
 
 function Placement() {
   const [trainingData, setTrainingData] = useState([]);

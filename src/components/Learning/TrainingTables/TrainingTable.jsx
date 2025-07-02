@@ -82,15 +82,7 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
                 >
                   View MOU
                 </button>
-                <button
-                  onClick={() => {
-                    onManageStudents(item);
-                    setMenuOpenId(null);
-                  }}
-                  className="w-full px-4 py-2 hover:bg-gray-100 text-left"
-                >
-                  Manage Students
-                </button>
+             
               </div>
             )}
           </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext, useCallback } from "react";
-import { FaTimes } from "react-icons/fa";
+import { FaTimes, FaUpload, FaCalendarAlt, FaFileExcel } from "react-icons/fa";
 import { collection, serverTimestamp, doc, updateDoc, writeBatch, setDoc, getDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
 import { AuthContext } from "../../../context/AuthContext";
@@ -72,6 +72,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
   const [mouFileError, setMouFileError] = useState("");
   const [contractStartDate, setContractStartDate] = useState("");
   const [contractEndDate, setContractEndDate] = useState("");
+  const [closedDate, setClosedDate] = useState("");
 
   useEffect(() => {
     if (lead) {
@@ -90,6 +91,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
       }));
       setContractStartDate(lead.contractStartDate || "");
       setContractEndDate(lead.contractEndDate || "");
+      setClosedDate(lead.closedDate || "");
     }
   }, [lead]);
 
@@ -182,7 +184,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
     reader.readAsArrayBuffer(file);
   };
 
-  const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
 
@@ -198,6 +200,11 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
     }
     if (!contractStartDate || !contractEndDate) {
       toast.error("Please select both Contract Start Date and End Date.");
+      setIsSubmitting(false);
+      return;
+    }
+    if (!closedDate) {
+      toast.error("Please select Closed Date.");
       setIsSubmitting(false);
       return;
     }
@@ -232,7 +239,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
         await updateDoc(leadRef, {
           phase: "closed",
           closureType: "new",
-          closedDate: new Date().toISOString(),
+          closedDate: closedDate,
           totalCost: formData.totalCost,
           contractStartDate,
           contractEndDate,
@@ -240,13 +247,15 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
       }
 
       const assignedUser = users?.[lead?.assignedTo?.uid] || {};
+      const { studentList, ...formDataWithoutStudents } = formData;
 
       await setDoc(formRef, {
-        ...formData,
+        ...formDataWithoutStudents,
         studentFileUrl: studentUrl,
         mouFileUrl: mouUrl,
         contractStartDate,
         contractEndDate,
+        closedDate,
         createdAt: serverTimestamp(),
         createdBy: {
           email: lead?.assignedTo?.email || assignedUser?.email || "Unknown",
@@ -255,7 +264,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
         },
       });
 
-      await uploadStudentsToFirestore(formData.studentList, sanitizedProjectCode);
+      await uploadStudentsToFirestore(studentList, sanitizedProjectCode);
 
       toast.update(toastId, {
         render: "Form submitted successfully!",
@@ -286,9 +295,10 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
 
   if (!show || !lead) return null;
 
-  return (
+   return (
     <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center px-4 z-54">
       <div className="bg-white w-full max-w-7xl h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col relative animate-fadeIn">
+        {/* Header */}
         <div className="flex justify-between items-center px-6 py-4 border-b bg-blue-100">
           <h2 className="text-2xl font-bold text-blue-800">Client Onboarding Form</h2>
           <div className="flex items-center space-x-3 w-[450px]">
@@ -336,6 +346,8 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
             setContractStartDate={setContractStartDate}
             contractEndDate={contractEndDate}
             setContractEndDate={setContractEndDate}
+            closedDate={closedDate}
+            setClosedDate={setClosedDate}
           />
 
           <div className="pt-4 flex justify-end space-x-4">
@@ -369,8 +381,6 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
             </div>
           </div>
         )}
-
-
       </div>
     </div>
   );
