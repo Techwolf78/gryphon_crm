@@ -32,7 +32,7 @@ const NewUser = ({ onUserAdded }) => {
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState("User");
+const [role, setRole] = useState("Executive"); // or any other role from your roles array
   const [department, setDepartment] = useState("Sales");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
