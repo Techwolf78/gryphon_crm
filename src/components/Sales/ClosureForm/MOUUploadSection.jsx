@@ -4,8 +4,6 @@ const MOUUploadSection = ({
   mouFile,
   setMouFile,
   mouFileError,
-  closedDate,
-  setClosedDate,
   contractStartDate,
   setContractStartDate,
   contractEndDate,
@@ -22,7 +20,7 @@ const MOUUploadSection = ({
         <h3 className="font-semibold text-2xl text-gray-800">MOU Upload</h3>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* File Upload */}
         <div className="space-y-2">
           <label className="block text-sm font-medium text-gray-700">
@@ -47,26 +45,6 @@ const MOUUploadSection = ({
           {mouFileError && (
             <p className="text-red-500 text-xs mt-1">{mouFileError}</p>
           )}
-        </div>
-
-        {/* Closed Date */}
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700">
-            Closed Date <span className="text-red-500">*</span>
-          </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <input
-              type="date"
-              className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-700"
-              value={closedDate}
-              onChange={(e) => setClosedDate(e.target.value)}
-            />
-          </div>
         </div>
 
         {/* Contract Start Date */}

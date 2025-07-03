@@ -7,6 +7,8 @@ import {
   FiFilter,
   FiChevronDown,
   FiChevronUp,
+  FiChevronLeft,
+  FiChevronRight,
   FiThermometer,
   FiCalendar,
   FiRefreshCw,
@@ -341,41 +343,30 @@ const SalesDashboard = () => {
   const [isUserFilterOpen, setIsUserFilterOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
-  // First, update your dashboardData state to include previous quarter data
   const [dashboardData, setDashboardData] = useState({
     revenue: 0,
-    revenuePrevQuarter: 0, // Add this
-    growth: 0, // This will be calculated
+    revenuePrevQuarter: 0,
+    growth: 0,
     hotLeads: 0,
-    hotLeadsPrevQuarter: 0, // Add this
+    hotLeadsPrevQuarter: 0,
     warmLeads: 0,
-    warmLeadsPrevQuarter: 0, // Add this
+    warmLeadsPrevQuarter: 0,
     coldLeads: 0,
-    coldLeadsPrevQuarter: 0, // Add this
+    coldLeadsPrevQuarter: 0,
     projectedTCV: 0,
-    projectedTCVPrevQuarter: 0, // Add this
+    projectedTCVPrevQuarter: 0,
     chartData: [],
     leadSources: [],
     teamPerformance: [],
     recentActivity: [],
   });
-
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState("Team");
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [currentPeriodInfo, setCurrentPeriodInfo] = useState("");
-
-  console.log("Current state:", {
-    timePeriod,
-    selectedUser,
-    selectedUserId,
-    users: users.map((u) => ({ id: u.id, name: u.name })),
-    dashboardData: {
-      revenue: dashboardData.revenue,
-      hotLeads: dashboardData.hotLeads,
-      warmLeads: dashboardData.warmLeads,
-      coldLeads: dashboardData.coldLeads,
-    },
+  const [currentDateRange, setCurrentDateRange] = useState({
+    start: new Date(),
+    end: new Date(),
   });
 
   const getCurrentQuarter = () => {
@@ -399,7 +390,7 @@ const SalesDashboard = () => {
     const month = now.getMonth();
     const day = now.getDate();
 
-    let start, end, info;
+    let start, end;
 
     switch (period) {
       case "week":
@@ -407,34 +398,26 @@ const SalesDashboard = () => {
         start.setDate(day - now.getDay());
         end = new Date(start);
         end.setDate(start.getDate() + 6);
-        info = `Week of ${start.toLocaleDateString()} to ${end.toLocaleDateString()}`;
         break;
 
       case "month":
         start = new Date(year, month, 1);
         end = new Date(year, month + 1, 0);
-        info = `Month: ${start.toLocaleDateString("default", {
-          month: "long",
-        })} ${year}`;
         break;
 
       case "quarter":
         if (month >= 3 && month <= 5) {
           start = new Date(year, 3, 1);
           end = new Date(year, 5, 30);
-          info = `Q1 (Apr-Jun) ${year}`;
         } else if (month >= 6 && month <= 8) {
           start = new Date(year, 6, 1);
           end = new Date(year, 8, 30);
-          info = `Q2 (Jul-Sep) ${year}`;
         } else if (month >= 9 && month <= 11) {
           start = new Date(year, 9, 1);
           end = new Date(year, 11, 31);
-          info = `Q3 (Oct-Dec) ${year}`;
         } else {
           start = new Date(year, 0, 1);
           end = new Date(year, 2, 31);
-          info = `Q4 (Jan-Mar) ${year}`;
         }
         break;
 
@@ -442,11 +425,9 @@ const SalesDashboard = () => {
         if (month < 3) {
           start = new Date(year - 1, 3, 1);
           end = new Date(year, 2, 31);
-          info = `Fiscal Year ${year - 1}-${year}`;
         } else {
           start = new Date(year, 3, 1);
           end = new Date(year + 1, 2, 31);
-          info = `Fiscal Year ${year}-${year + 1}`;
         }
         break;
 
@@ -454,14 +435,350 @@ const SalesDashboard = () => {
         return getDateRange("quarter");
     }
 
-    setCurrentPeriodInfo(info);
     return { start, end };
+  };
+
+  const getNextDateRange = (period, currentStart) => {
+    const start = new Date(currentStart);
+    let newStart, newEnd;
+
+    switch (period) {
+      case "week":
+        newStart = new Date(start);
+        newStart.setDate(start.getDate() + 7);
+        newEnd = new Date(newStart);
+        newEnd.setDate(newStart.getDate() + 6);
+        break;
+
+      case "month":
+        newStart = new Date(start.getFullYear(), start.getMonth() + 1, 1);
+        newEnd = new Date(newStart.getFullYear(), newStart.getMonth() + 1, 0);
+        break;
+
+      case "quarter":
+        const quarterMonth = start.getMonth();
+        if (quarterMonth >= 0 && quarterMonth <= 2) {
+          newStart = new Date(start.getFullYear(), 3, 1);
+          newEnd = new Date(start.getFullYear(), 5, 30);
+        } else if (quarterMonth >= 3 && quarterMonth <= 5) {
+          newStart = new Date(start.getFullYear(), 6, 1);
+          newEnd = new Date(start.getFullYear(), 8, 30);
+        } else if (quarterMonth >= 6 && quarterMonth <= 8) {
+          newStart = new Date(start.getFullYear(), 9, 1);
+          newEnd = new Date(start.getFullYear(), 11, 31);
+        } else {
+          newStart = new Date(start.getFullYear() + 1, 0, 1);
+          newEnd = new Date(start.getFullYear() + 1, 2, 31);
+        }
+        break;
+
+      case "year":
+        newStart = new Date(start.getFullYear() + 1, 3, 1);
+        newEnd = new Date(start.getFullYear() + 2, 2, 31);
+        break;
+
+      default:
+        return getDateRange(period);
+    }
+
+    return { start: newStart, end: newEnd };
+  };
+
+  const getPrevDateRange = (period, currentStart) => {
+    const start = new Date(currentStart);
+    let newStart, newEnd;
+
+    switch (period) {
+      case "week":
+        newStart = new Date(start);
+        newStart.setDate(start.getDate() - 7);
+        newEnd = new Date(newStart);
+        newEnd.setDate(newStart.getDate() + 6);
+        break;
+
+      case "month":
+        newStart = new Date(start.getFullYear(), start.getMonth() - 1, 1);
+        newEnd = new Date(newStart.getFullYear(), newStart.getMonth() + 1, 0);
+        break;
+
+      case "quarter":
+        const quarterMonth = start.getMonth();
+        if (quarterMonth >= 0 && quarterMonth <= 2) {
+          newStart = new Date(start.getFullYear() - 1, 9, 1);
+          newEnd = new Date(start.getFullYear() - 1, 11, 31);
+        } else if (quarterMonth >= 3 && quarterMonth <= 5) {
+          newStart = new Date(start.getFullYear(), 0, 1);
+          newEnd = new Date(start.getFullYear(), 2, 31);
+        } else if (quarterMonth >= 6 && quarterMonth <= 8) {
+          newStart = new Date(start.getFullYear(), 3, 1);
+          newEnd = new Date(start.getFullYear(), 5, 30);
+        } else {
+          newStart = new Date(start.getFullYear(), 6, 1);
+          newEnd = new Date(start.getFullYear(), 8, 30);
+        }
+        break;
+
+      case "year":
+        newStart = new Date(start.getFullYear() - 1, 3, 1);
+        newEnd = new Date(start.getFullYear(), 2, 31);
+        break;
+
+      default:
+        return getDateRange(period);
+    }
+
+    return { start: newStart, end: newEnd };
+  };
+
+  const getPreviousQuarterDateRange = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    
+    let start, end;
+    
+    if (month >= 3 && month <= 5) {
+      start = new Date(year - 1, 0, 1);
+      end = new Date(year - 1, 2, 31);
+    } else if (month >= 6 && month <= 8) {
+      start = new Date(year, 3, 1);
+      end = new Date(year, 5, 30);
+    } else if (month >= 9 && month <= 11) {
+      start = new Date(year, 6, 1);
+      end = new Date(year, 8, 30);
+    } else {
+      start = new Date(year, 9, 1);
+      end = new Date(year, 11, 31);
+    }
+    
+    return { start, end };
+  };
+
+  const updatePeriodInfo = (range) => {
+    const { start, end } = range;
+    let info = "";
+
+    switch (timePeriod) {
+      case "week":
+        info = `Week of ${start.toLocaleDateString()} to ${end.toLocaleDateString()}`;
+        break;
+      case "month":
+        info = `Month: ${start.toLocaleDateString("default", { month: "long" })} ${start.getFullYear()}`;
+        break;
+      case "quarter":
+        const quarter = Math.floor(start.getMonth() / 3) + 1;
+        const quarterMonths = [
+          "Jan-Mar", "Apr-Jun", "Jul-Sep", "Oct-Dec"
+        ][quarter - 1];
+        info = `Q${quarter} (${quarterMonths}) ${start.getFullYear()}`;
+        break;
+      case "year":
+        info = `Fiscal Year ${start.getFullYear()}-${end.getFullYear()}`;
+        break;
+      default:
+        info = getCurrentQuarter();
+    }
+
+    setCurrentPeriodInfo(info);
+  };
+
+  const processLeadsData = (snapshot) => {
+    let revenue = 0;
+    let hotLeads = 0;
+    let warmLeads = 0;
+    let coldLeads = 0;
+    let projectedTCV = 0;
+    const leadSources = { hot: 0, warm: 0, cold: 0 };
+    const teamPerformance = {};
+    const recentActivity = [];
+    const revenueByDate = {};
+
+    snapshot.forEach((doc) => {
+      const lead = doc.data();
+      
+      if (lead.phase === "hot") {
+        hotLeads++;
+        leadSources.hot++;
+      } else if (lead.phase === "warm") {
+        warmLeads++;
+        leadSources.warm++;
+      } else if (lead.phase === "cold") {
+        coldLeads++;
+        leadSources.cold++;
+      }
+
+      if (lead.phase === "closed" && lead.totalCost) {
+        revenue += lead.totalCost;
+
+        if (lead.closedDate) {
+          try {
+            const closedDate = new Date(lead.closedDate);
+            if (Number.isNaN(closedDate.getTime()))
+              throw new Error("Invalid date");
+
+            let dateKey;
+            if (timePeriod === "week") {
+              dateKey = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
+                closedDate.getDay()
+              ];
+            } else if (timePeriod === "month") {
+              const firstDay = new Date(
+                closedDate.getFullYear(),
+                closedDate.getMonth(),
+                1
+              );
+              const pastDaysOfMonth = closedDate.getDate() - 1;
+              dateKey = `Week ${
+                Math.floor((firstDay.getDay() + pastDaysOfMonth) / 7) + 1
+              }`;
+            } else if (timePeriod === "quarter") {
+              dateKey = [
+                "Jan",
+                "Feb",
+                "Mar",
+                "Apr",
+                "May",
+                "Jun",
+                "Jul",
+                "Aug",
+                "Sep",
+                "Oct",
+                "Nov",
+                "Dec",
+              ][closedDate.getMonth()];
+            } else {
+              dateKey = [
+                "Apr",
+                "May",
+                "Jun",
+                "Jul",
+                "Aug",
+                "Sep",
+                "Oct",
+                "Nov",
+                "Dec",
+                "Jan",
+                "Feb",
+                "Mar",
+              ][closedDate.getMonth()];
+            }
+
+            if (!revenueByDate[dateKey]) {
+              revenueByDate[dateKey] = { revenue: 0, dealCount: 0 };
+            }
+            revenueByDate[dateKey].revenue += lead.totalCost;
+            revenueByDate[dateKey].dealCount += 1;
+          } catch (e) {
+            console.error("Error processing closed date:", e);
+          }
+        }
+      }
+
+      if (lead.tcv) {
+        projectedTCV += lead.tcv;
+      }
+
+      if (lead.assignedTo && lead.assignedTo.uid) {
+        const user = users.find((u) => u.uid === lead.assignedTo.uid);
+        const memberId = user ? user.id : lead.assignedTo.uid;
+        const memberName = lead.assignedTo.name;
+
+        if (!teamPerformance[memberId]) {
+          teamPerformance[memberId] = {
+            name: memberName,
+            value: 0,
+            role: lead.assignedTo.role || "Sales Rep",
+          };
+        }
+        teamPerformance[memberId].value++;
+      }
+
+      recentActivity.push({
+        id: doc.id,
+        action: lead.phase === "closed" ? "Closed deal" : "New lead",
+        amount: lead.phase === "closed" ? lead.totalCost : null,
+        company: lead.businessName,
+        user: lead.assignedTo?.name || "Unassigned",
+        time: new Date(lead.createdAt).toLocaleDateString(),
+      });
+    });
+
+    const chartData = [];
+    const timePoints =
+      timePeriod === "week"
+        ? 7
+        : timePeriod === "month"
+        ? 4
+        : timePeriod === "quarter"
+        ? 3
+        : 12;
+
+    for (let i = 0; i < timePoints; i++) {
+      let dateKey;
+      if (timePeriod === "week") {
+        dateKey = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][i];
+      } else if (timePeriod === "month") {
+        dateKey = `Week ${i + 1}`;
+      } else if (timePeriod === "quarter") {
+        const quarterMonths =
+          timePeriod === "quarter"
+            ? ["Apr", "May", "Jun"]
+            : timePeriod === "quarter"
+            ? ["Jul", "Aug", "Sep"]
+            : timePeriod === "quarter"
+            ? ["Oct", "Nov", "Dec"]
+            : ["Jan", "Feb", "Mar"];
+        dateKey = quarterMonths[i];
+      } else {
+        dateKey = [
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec",
+          "Jan",
+          "Feb",
+          "Mar",
+        ][i];
+      }
+
+      chartData.push({
+        name: dateKey,
+        revenue: revenueByDate[dateKey]?.revenue || 0,
+        dealCount: revenueByDate[dateKey]?.dealCount || 0,
+        leads: Math.floor(
+          ((hotLeads + warmLeads + coldLeads) * (0.7 + Math.random() * 0.6)) /
+            timePoints
+        ),
+      });
+    }
+
+    return {
+      revenue,
+      hotLeads,
+      warmLeads,
+      coldLeads,
+      projectedTCV,
+      chartData,
+      leadSources: [
+        { name: "Hot", value: leadSources.hot },
+        { name: "Warm", value: leadSources.warm },
+        { name: "Cold", value: leadSources.cold },
+      ],
+      teamPerformance: Object.values(teamPerformance).sort((a, b) => b.value - a.value),
+      recentActivity: recentActivity
+        .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
+        .slice(0, 5),
+    };
   };
 
   const fetchSalesUsers = async () => {
     setIsLoadingUsers(true);
     try {
-      console.log("Fetching sales users...");
       const usersRef = collection(db, "users");
       const usersQuery = query(usersRef, where("department", "==", "Sales"));
       const usersSnapshot = await getDocs(usersQuery);
@@ -471,20 +788,6 @@ const SalesDashboard = () => {
         ...doc.data(),
       }));
 
-      console.log(
-        "User IDs:",
-        usersData.map((u) => ({
-          id: u.id,
-          name: u.name,
-          idLength: u.id.length,
-          idType: typeof u.id,
-        }))
-      );
-
-      console.log(
-        "Fetched users:",
-        usersData.map((u) => ({ id: u.id, name: u.name }))
-      );
       setUsers(usersData);
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -493,276 +796,82 @@ const SalesDashboard = () => {
     }
   };
 
-  const fetchDashboardData = async () => {
+  const fetchDataForRange = async (range) => {
     setIsLoading(true);
     try {
-      console.log("Fetching dashboard data with params:", {
-        timePeriod,
-        selectedUserId,
-        selectedUser,
-      });
+      const { start, end } = range;
+      const currentStart = start.getTime();
+      const currentEnd = end.getTime();
 
-      const dateRange = getDateRange(timePeriod);
-      const startTimestamp = dateRange.start.getTime();
-      const endTimestamp = dateRange.end.getTime();
-
-      // In fetchDashboardData():
-      let leadsQuery;
+      // Fetch current period data
+      let currentLeadsQuery;
       const leadsRef = collection(db, "leads");
 
       let baseQuery = query(
         leadsRef,
-        where("createdAt", ">=", startTimestamp),
-        where("createdAt", "<=", endTimestamp)
+        where("createdAt", ">=", currentStart),
+        where("createdAt", "<=", currentEnd)
       );
 
       if (selectedUserId) {
         const selectedUserObj = users.find((u) => u.id === selectedUserId);
-        console.log("User details for filter:", selectedUserObj);
-        leadsQuery = query(
+        currentLeadsQuery = query(
           baseQuery,
           where("assignedTo.uid", "==", selectedUserObj.uid)
         );
       } else {
-        // Explicitly set leadsQuery for team view
-        leadsQuery = baseQuery;
-        console.log("Showing team data - no user filter applied");
+        currentLeadsQuery = baseQuery;
       }
 
-      const leadsSnapshot = await getDocs(leadsQuery);
-      console.log("Query results count:", leadsSnapshot.size);
+      const currentSnapshot = await getDocs(currentLeadsQuery);
+      const currentData = processLeadsData(currentSnapshot);
 
-      let revenue = 0;
-      let hotLeads = 0;
-      let warmLeads = 0;
-      let coldLeads = 0;
-      let projectedTCV = 0;
-      const leadSources = { hot: 0, warm: 0, cold: 0 };
-      const teamPerformance = {};
-      const recentActivity = [];
-      const revenueByDate = {};
+      // Fetch previous quarter data for comparison
+      const prevQuarterDateRange = getPreviousQuarterDateRange();
+      const prevStart = prevQuarterDateRange.start.getTime();
+      const prevEnd = prevQuarterDateRange.end.getTime();
 
-      leadsSnapshot.forEach((doc) => {
-        const lead = doc.data();
-        console.log("Lead assignment details:", {
-          leadId: doc.id,
-          assignedToId: lead.assignedTo?.uid,
-          assignedToName: lead.assignedTo?.name,
-          matchesSelectedUser: lead.assignedTo?.uid === selectedUserId,
-        });
+      let prevLeadsQuery = query(
+        leadsRef,
+        where("createdAt", ">=", prevStart),
+        where("createdAt", "<=", prevEnd)
+      );
 
-        if (lead.phase === "hot") {
-          hotLeads++;
-          leadSources.hot++;
-        } else if (lead.phase === "warm") {
-          warmLeads++;
-          leadSources.warm++;
-        } else if (lead.phase === "cold") {
-          coldLeads++;
-          leadSources.cold++;
-        }
-
-        if (lead.phase === "closed" && lead.totalCost) {
-          revenue += lead.totalCost;
-
-          if (lead.closedDate) {
-            try {
-              const closedDate = new Date(lead.closedDate);
-              if (Number.isNaN(closedDate.getTime()))
-                throw new Error("Invalid date");
-
-              let dateKey;
-              if (timePeriod === "week") {
-                dateKey = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
-                  closedDate.getDay()
-                ];
-              } else if (timePeriod === "month") {
-                const firstDay = new Date(
-                  closedDate.getFullYear(),
-                  closedDate.getMonth(),
-                  1
-                );
-                const pastDaysOfMonth = closedDate.getDate() - 1;
-                dateKey = `Week ${
-                  Math.floor((firstDay.getDay() + pastDaysOfMonth) / 7) + 1
-                }`;
-              } else if (timePeriod === "quarter") {
-                dateKey = [
-                  "Jan",
-                  "Feb",
-                  "Mar",
-                  "Apr",
-                  "May",
-                  "Jun",
-                  "Jul",
-                  "Aug",
-                  "Sep",
-                  "Oct",
-                  "Nov",
-                  "Dec",
-                ][closedDate.getMonth()];
-              } else {
-                dateKey = [
-                  "Apr",
-                  "May",
-                  "Jun",
-                  "Jul",
-                  "Aug",
-                  "Sep",
-                  "Oct",
-                  "Nov",
-                  "Dec",
-                  "Jan",
-                  "Feb",
-                  "Mar",
-                ][closedDate.getMonth()];
-              }
-
-              if (!revenueByDate[dateKey]) {
-                revenueByDate[dateKey] = { revenue: 0, dealCount: 0 };
-              }
-              revenueByDate[dateKey].revenue += lead.totalCost;
-              revenueByDate[dateKey].dealCount += 1;
-            } catch (e) {
-              console.error("Error processing closed date:", e);
-            }
-          }
-        }
-
-        if (lead.tcv) {
-          projectedTCV += lead.tcv;
-        }
-
-        // In the lead processing loop:
-        if (lead.assignedTo && lead.assignedTo.uid) {
-          // Find the user in our users list to get consistent ID
-          const user = users.find((u) => u.uid === lead.assignedTo.uid);
-          const memberId = user ? user.id : lead.assignedTo.uid;
-          const memberName = lead.assignedTo.name;
-
-          if (!teamPerformance[memberId]) {
-            teamPerformance[memberId] = {
-              name: memberName,
-              value: 0,
-              role: lead.assignedTo.role || "Sales Rep",
-            };
-          }
-          teamPerformance[memberId].value++;
-        }
-
-        recentActivity.push({
-          id: doc.id,
-          action: lead.phase === "closed" ? "Closed deal" : "New lead",
-          amount: lead.phase === "closed" ? lead.totalCost : null,
-          company: lead.businessName,
-          user: lead.assignedTo?.name || "Unassigned",
-          time: new Date(lead.createdAt).toLocaleDateString(),
-        });
-      });
-
-      const chartData = [];
-      const timePoints =
-        timePeriod === "week"
-          ? 7
-          : timePeriod === "month"
-          ? 4
-          : timePeriod === "quarter"
-          ? 3
-          : 12;
-
-      for (let i = 0; i < timePoints; i++) {
-        let dateKey;
-        if (timePeriod === "week") {
-          dateKey = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][i];
-        } else if (timePeriod === "month") {
-          dateKey = `Week ${i + 1}`;
-        } else if (timePeriod === "quarter") {
-          const quarterMonths =
-            dateRange.start.getMonth() === 3
-              ? ["Apr", "May", "Jun"]
-              : dateRange.start.getMonth() === 6
-              ? ["Jul", "Aug", "Sep"]
-              : dateRange.start.getMonth() === 9
-              ? ["Oct", "Nov", "Dec"]
-              : ["Jan", "Feb", "Mar"];
-          dateKey = quarterMonths[i];
-        } else {
-          dateKey = [
-            "Apr",
-            "May",
-            "Jun",
-            "Jul",
-            "Aug",
-            "Sep",
-            "Oct",
-            "Nov",
-            "Dec",
-            "Jan",
-            "Feb",
-            "Mar",
-          ][i];
-        }
-
-        chartData.push({
-          name: dateKey,
-          revenue: revenueByDate[dateKey]?.revenue || 0,
-          dealCount: revenueByDate[dateKey]?.dealCount || 0,
-          leads: Math.floor(
-            ((hotLeads + warmLeads + coldLeads) * (0.7 + Math.random() * 0.6)) /
-              timePoints
-          ),
-        });
+      if (selectedUserId) {
+        const selectedUserObj = users.find((u) => u.id === selectedUserId);
+        prevLeadsQuery = query(
+          prevLeadsQuery,
+          where("assignedTo.uid", "==", selectedUserObj.uid)
+        );
       }
 
-      const growth = Math.floor(Math.random() * 20) + 5;
+      const prevSnapshot = await getDocs(prevLeadsQuery);
+      const prevData = processLeadsData(prevSnapshot);
 
-      // With this:
-      const teamPerformanceData = selectedUserId
-        ? [
-            {
-              name: selectedUser,
-              value: leadsSnapshot.size,
-              role:
-                users.find((u) => u.id === selectedUserId)?.role || "Sales Rep",
-            },
-          ]
-        : users
-            .filter(
-              (user) => teamPerformance[user.id] || teamPerformance[user.uid]
-            )
-            .map((user) => ({
-              name: user.name,
-              value:
-                teamPerformance[user.id]?.value ||
-                teamPerformance[user.uid]?.value ||
-                0,
-              role: user.role || "Sales Rep",
-            }))
-            .sort((a, b) => b.value - a.value);
-
-      const newDashboardData = {
-        revenue,
-        growth,
-        hotLeads,
-        warmLeads,
-        coldLeads,
-        projectedTCV,
-        chartData,
-        leadSources: [
-          { name: "Hot", value: leadSources.hot },
-          { name: "Warm", value: leadSources.warm },
-          { name: "Cold", value: leadSources.cold },
-        ],
-        teamPerformance: teamPerformanceData,
-        recentActivity: recentActivity
-          .sort(
-            (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()
-          )
-          .slice(0, 5),
+      // Calculate growth percentages
+      const calculateGrowth = (current, previous) => {
+        if (previous === 0) return current === 0 ? 0 : 100;
+        return ((current - previous) / previous) * 100;
       };
 
-      console.log("Updating dashboard data:", newDashboardData);
-      setDashboardData(newDashboardData);
+      const growth = {
+        revenue: calculateGrowth(currentData.revenue, prevData.revenue),
+        hotLeads: calculateGrowth(currentData.hotLeads, prevData.hotLeads),
+        warmLeads: calculateGrowth(currentData.warmLeads, prevData.warmLeads),
+        coldLeads: calculateGrowth(currentData.coldLeads, prevData.coldLeads),
+        projectedTCV: calculateGrowth(currentData.projectedTCV, prevData.projectedTCV),
+      };
+
+      setDashboardData({
+        ...currentData,
+        revenuePrevQuarter: prevData.revenue,
+        hotLeadsPrevQuarter: prevData.hotLeads,
+        warmLeadsPrevQuarter: prevData.warmLeads,
+        coldLeadsPrevQuarter: prevData.coldLeads,
+        projectedTCVPrevQuarter: prevData.projectedTCV,
+        growth: growth.revenue,
+      });
+
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
     } finally {
@@ -770,39 +879,52 @@ const SalesDashboard = () => {
     }
   };
 
-  useEffect(() => {
-    console.log("Initial data fetch");
-    fetchSalesUsers();
-    fetchDashboardData();
-  }, []);
+  const handleNextPeriod = () => {
+    const newRange = getNextDateRange(timePeriod, currentDateRange.start);
+    setCurrentDateRange(newRange);
+    updatePeriodInfo(newRange);
+    fetchDataForRange(newRange);
+  };
 
-  useEffect(() => {
-    console.log("Effect triggered with:", {
-      timePeriod,
-      selectedUserId,
-      selectedUser,
-    });
-    fetchDashboardData();
-  }, [timePeriod, selectedUserId]);
+  const handlePrevPeriod = () => {
+    const newRange = getPrevDateRange(timePeriod, currentDateRange.start);
+    setCurrentDateRange(newRange);
+    updatePeriodInfo(newRange);
+    fetchDataForRange(newRange);
+  };
 
   const handleUserSelect = (user) => {
-    console.log("User selected:", user);
     if (user === "Team") {
       setSelectedUser("Team");
       setSelectedUserId(null);
-      console.log("Reset to team view");
     } else {
       setSelectedUser(user.name);
       setSelectedUserId(user.id);
-      console.log("Set user filter to:", user.name, user.id);
     }
     setIsUserFilterOpen(false);
   };
 
   const handleRefresh = () => {
-    console.log("Manual refresh triggered");
-    fetchDashboardData();
+    const newRange = getDateRange(timePeriod);
+    setCurrentDateRange(newRange);
+    updatePeriodInfo(newRange);
+    fetchDataForRange(newRange);
   };
+
+  useEffect(() => {
+    fetchSalesUsers();
+    const initialRange = getDateRange(timePeriod);
+    setCurrentDateRange(initialRange);
+    updatePeriodInfo(initialRange);
+    fetchDataForRange(initialRange);
+  }, []);
+
+  useEffect(() => {
+    const newRange = getDateRange(timePeriod);
+    setCurrentDateRange(newRange);
+    updatePeriodInfo(newRange);
+    fetchDataForRange(newRange);
+  }, [timePeriod]);
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -817,7 +939,21 @@ const SalesDashboard = () => {
             </p>
             <div className="mt-2 flex items-center text-sm text-gray-500">
               <FiCalendar className="mr-1" />
-              <span>{currentPeriodInfo || getCurrentQuarter()}</span>
+              <button 
+                onClick={handlePrevPeriod}
+                className="p-1 rounded-full hover:bg-gray-200"
+                disabled={isLoading}
+              >
+                <FiChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="mx-1">{currentPeriodInfo || getCurrentQuarter()}</span>
+              <button 
+                onClick={handleNextPeriod}
+                className="p-1 rounded-full hover:bg-gray-200"
+                disabled={isLoading}
+              >
+                <FiChevronRight className="h-4 w-4" />
+              </button>
               <span className="mx-2">|</span>
               <span>Today: {new Date().toLocaleDateString()}</span>
             </div>
@@ -946,30 +1082,32 @@ const SalesDashboard = () => {
             {
               title: selectedUserId ? "Your Hot Leads" : "Team Hot Leads",
               value: dashboardData.hotLeads.toLocaleString(),
-              change: 8.5,
+              change: ((dashboardData.hotLeads - dashboardData.hotLeadsPrevQuarter) / 
+                      (dashboardData.hotLeadsPrevQuarter || 1)) * 100,
               icon: <FiThermometer className="text-white" size={20} />,
               color: "bg-red-600",
             },
             {
               title: selectedUserId ? "Your Warm Leads" : "Team Warm Leads",
               value: dashboardData.warmLeads.toLocaleString(),
-              change: 12.2,
+              change: ((dashboardData.warmLeads - dashboardData.warmLeadsPrevQuarter) / 
+                      (dashboardData.warmLeadsPrevQuarter || 1)) * 100,
               icon: <FiThermometer className="text-white" size={20} />,
               color: "bg-amber-500",
             },
             {
               title: selectedUserId ? "Your Cold Leads" : "Team Cold Leads",
               value: dashboardData.coldLeads.toLocaleString(),
-              change: -2.3,
+              change: ((dashboardData.coldLeads - dashboardData.coldLeadsPrevQuarter) / 
+                      (dashboardData.coldLeadsPrevQuarter || 1)) * 100,
               icon: <FiThermometer className="text-white" size={20} />,
               color: "bg-blue-600",
             },
             {
-              title: selectedUserId
-                ? "Your Projected TCV"
-                : "Team Projected TCV",
+              title: selectedUserId ? "Your Projected TCV" : "Team Projected TCV",
               value: `₹${dashboardData.projectedTCV.toLocaleString()}`,
-              change: 18.7,
+              change: ((dashboardData.projectedTCV - dashboardData.projectedTCVPrevQuarter) / 
+                      (dashboardData.projectedTCVPrevQuarter || 1)) * 100,
               icon: <FiTrendingUp className="text-white" size={20} />,
               color: "bg-green-600",
             },
@@ -992,14 +1130,16 @@ const SalesDashboard = () => {
               <div className="mt-4 flex items-center">
                 <span
                   className={`text-xs font-medium px-2 py-1 rounded-full ${
-                    metric.change >= 0
+                    metric.change >= 0 || isNaN(metric.change)
                       ? "bg-green-100 text-green-800"
                       : "bg-red-100 text-red-800"
                   }`}
                 >
-                  {metric.change >= 0 ? "↑" : "↓"} {Math.abs(metric.change)}%
+                  {isNaN(metric.change) ? "↑ 0%" : 
+                   metric.change >= 0 ? `↑ ${Math.abs(metric.change).toFixed(1)}%` : 
+                   `↓ ${Math.abs(metric.change).toFixed(1)}%`}
                 </span>
-                <span className="text-xs opacity-80 ml-2">vs quarter</span>
+                <span className="text-xs opacity-80 ml-2">vs last quarter</span>
               </div>
             </div>
           ))}
