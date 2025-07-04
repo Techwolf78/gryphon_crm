@@ -1,6 +1,7 @@
 import React, { useContext } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
+import logo from "../assets/SYNC-logo.png"; // Adjust the path as necessary
 import {
   FiHome,
   FiUsers,
@@ -99,22 +100,26 @@ const normalizedRole = normalizeRole(user.department) || normalizeRole(user.role
       transition-all duration-300 ease-in-out
     `}
     >
-      <div className="px-6 py-6 text-2xl font-bold border-b border-gray-200 flex items-center justify-between">
-        {!collapsed && (
-          <span className="whitespace-nowrap text-gray-800">SYNC</span>
-        )}
-        <button
-          onClick={onToggle}
-          className="text-gray-500 hover:text-blue-600 focus:outline-none"
-          aria-label="Toggle Sidebar"
-        >
-          {collapsed ? (
-            <FiChevronRight size={24} />
-          ) : (
-            <FiChevronLeft size={24} />
-          )}
-        </button>
-      </div>
+<div className="px-6 py-6 text-2xl font-bold border-b border-gray-200 flex items-center justify-between">
+  {!collapsed && (
+    <img 
+      src= {logo}
+      alt="SRC Logo"
+      className="h-8" // Adjust height as needed
+    />
+  )}
+  <button
+    onClick={onToggle}
+    className="text-gray-500 hover:text-blue-600 focus:outline-none"
+    aria-label="Toggle Sidebar"
+  >
+    {collapsed ? (
+      <FiChevronRight size={24} />
+    ) : (
+      <FiChevronLeft size={24} />
+    )}
+  </button>
+</div>
 
       <nav className="flex-grow px-4 py-6 space-y-3 overflow-y-auto">
         {links.map(({ label, path, icon, skipRedirect }) => (

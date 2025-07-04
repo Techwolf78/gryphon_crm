@@ -63,18 +63,7 @@ const handleLogout = () => {
       <div className="flex items-center space-x-6">
         {isHome && !user && (
           <>
-            <a href="#features" className="relative group text-white">
-              <span className="relative inline-block transition duration-300 group-hover:text-yellow-400">
-                Features
-                <span className="absolute left-0 -bottom-1 w-full h-0.5 bg-yellow-400 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-center duration-300"></span>
-              </span>
-            </a>
-            <a href="#faq" className="relative group text-white">
-              <span className="relative inline-block transition duration-300 group-hover:text-yellow-400">
-                FAQ
-                <span className="absolute left-0 -bottom-1 w-full h-0.5 bg-yellow-400 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-center duration-300"></span>
-              </span>
-            </a>
+           
             <Link to="/login" className="relative group text-white transition">
               <span className="relative inline-block transition duration-300 group-hover:text-yellow-400">
                 Login
