@@ -20,6 +20,8 @@ import {
   FaLock,
   FaUserTag,
   FaBuilding,
+  FaEye,
+  FaEyeSlash,
 } from "react-icons/fa";
 import emailjs from "@emailjs/browser";
 import { ToastContainer, toast } from "react-toastify";
@@ -28,13 +30,19 @@ import "react-toastify/dist/ReactToastify.css";
 const departments = ["Sales", "Placement", "L & D", "DM", "Admin"];
 const roles = ["Director", "Head", "Manager", "Assistant Manager", "Executive"];
 
+// Validation constants
+const MIN_PASSWORD_LENGTH = 8;
+const PASSWORD_COMPLEXITY_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const NewUser = ({ onUserAdded }) => {
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-const [role, setRole] = useState("Executive"); // or any other role from your roles array
+  const [role, setRole] = useState("Executive");
   const [department, setDepartment] = useState("Sales");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [reportingManagers, setReportingManagers] = useState([]);
@@ -62,6 +70,7 @@ const [role, setRole] = useState("Executive"); // or any other role from your ro
           setReportingManagers(managers);
         } catch (err) {
           console.error("Error fetching managers:", err);
+          toast.error("Failed to load reporting managers");
         }
       } else {
         setReportingManagers([]);
@@ -75,9 +84,10 @@ const [role, setRole] = useState("Executive"); // or any other role from your ro
   const resetForm = () => {
     setName("");
     setEmail("");
-    setRole("User");
+    setRole("Executive");
     setDepartment("Sales");
     setPassword("");
+    setShowPassword(false);
     setError("");
     setSelectedReportingManager("");
     setReportingManagers([]);
@@ -107,8 +117,27 @@ const [role, setRole] = useState("Executive"); // or any other role from your ro
     setError("");
     setLoading(true);
 
+    // Validation checks
     if (!name || !email || !password) {
-      setError("Name, email, and password are required.");
+      setError("All fields are required.");
+      setLoading(false);
+      return;
+    }
+
+    if (!EMAIL_REGEX.test(email)) {
+      setError("Please enter a valid email address.");
+      setLoading(false);
+      return;
+    }
+
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters long.`);
+      setLoading(false);
+      return;
+    }
+
+    if (!PASSWORD_COMPLEXITY_REGEX.test(password)) {
+      setError("Password must contain at least one uppercase letter, one lowercase letter, and one number.");
       setLoading(false);
       return;
     }
@@ -121,6 +150,7 @@ const [role, setRole] = useState("Executive"); // or any other role from your ro
 
     if (
       (role === "Assistant Manager" || role === "Executive") &&
+      department === "Sales" &&
       !selectedReportingManager
     ) {
       setError("Please select a Reporting Manager.");
@@ -129,13 +159,17 @@ const [role, setRole] = useState("Executive"); // or any other role from your ro
     }
 
     try {
+      // Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
         secondaryAuth,
         email,
         password
       );
+      
+      // Update user profile with display name
       await updateProfile(userCredential.user, { displayName: name });
 
+      // Save user data to Firestore
       await addDoc(collection(db, "users"), {
         uid: userCredential.user.uid,
         name,
@@ -149,10 +183,11 @@ const [role, setRole] = useState("Executive"); // or any other role from your ro
         createdAt: serverTimestamp(),
       });
 
+      // Send welcome email
       try {
         await emailjs.send(
-          "service_pskknsn",
-          "template_hu6vhxf",
+          "service_0khg6af",
+          "template_sehqgo2",
           {
             name,
             email,
@@ -162,34 +197,37 @@ const [role, setRole] = useState("Executive"); // or any other role from your ro
             reportingManager:
               role === "Assistant Manager" || role === "Executive"
                 ? selectedReportingManager
-                : "N/A",
+                : "Not Applicable",
           },
-          "zEVWxxT-QvGIrhvTV"
+          "CXYkFqg_8EWTsrN8M"
         );
       } catch (emailErr) {
         console.error("EmailJS Error:", emailErr);
         toast.warning("User added, but email not sent.");
       }
 
+      // Sign out from secondary auth
       await signOut(secondaryAuth);
 
+      // Reset form and show success
       resetForm();
       setShowForm(false);
       if (onUserAdded) onUserAdded();
       toast.success(`${name} (${role}, ${department}) added successfully!`);
     } catch (err) {
       console.error("Error adding user:", err);
+      setError(err.message || "Failed to add user");
       toast.error(err.message || "Failed to add user");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (
     <div>
       <button
         onClick={() => setShowForm(true)}
-        className="w-full py-3 px-4 rounded-full font-semibold shadow transition-all duration-300 text-[#4F39F6] bg-[#DBEAFE]  flex items-center justify-center gap-2"
+        className="w-full py-3 px-4 rounded-full font-semibold shadow transition-all duration-300 text-[#4F39F6] bg-[#DBEAFE] flex items-center justify-center gap-2 hover:bg-[#E0E7FF]"
       >
         <AiOutlineUserAdd className="text-2xl" />
         Add User
@@ -217,7 +255,7 @@ const [role, setRole] = useState("Executive"); // or any other role from your ro
               setShowForm(false);
               resetForm();
             }}
-            className="text-2xl font-bold text-gray-600 hover:text-red-500"
+            className="text-2xl font-bold text-gray-600 hover:text-red-500 transition-colors"
           >
             &times;
           </button>
@@ -227,8 +265,11 @@ const [role, setRole] = useState("Executive"); // or any other role from your ro
           onSubmit={handleSubmit}
           className="p-6 space-y-6 overflow-y-auto h-[calc(100%-64px)] custom-scrollbar"
         >
-          {/* Name */}
-          <div>
+          {/* Name Field */}
+          <div className="space-y-1">
+            <label htmlFor="nameInput" className="block text-sm font-medium text-gray-700">
+              Full Name
+            </label>
             <div className="flex items-center border border-gray-300 bg-white/50 backdrop-blur rounded-xl px-3 py-2 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 transition">
               <FaUser className="text-gray-400 mr-3" size={20} />
               <input
@@ -236,90 +277,69 @@ const [role, setRole] = useState("Executive"); // or any other role from your ro
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="flex-grow focus:outline-none bg-transparent text-black"
+                className="flex-grow focus:outline-none bg-transparent text-black placeholder-gray-400"
                 placeholder="Enter full name"
                 required
               />
             </div>
           </div>
 
-          {/* Email */}
-          <div>
+          {/* Email Field */}
+          <div className="space-y-1">
+            <label htmlFor="emailInput" className="block text-sm font-medium text-gray-700">
+              Email Address
+            </label>
             <div className="flex items-center border border-gray-300 bg-white/50 backdrop-blur rounded-xl px-3 py-2 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 transition">
               <FaEnvelope className="text-gray-400 mr-3" size={20} />
               <input
+                id="emailInput"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="flex-grow focus:outline-none bg-transparent text-black"
-                placeholder="Enter email"
+                className="flex-grow focus:outline-none bg-transparent text-black placeholder-gray-400"
+                placeholder="Enter email address"
                 required
               />
             </div>
           </div>
 
-          {/* Password */}
-          <div>
+          {/* Password Field */}
+          <div className="space-y-1">
+            <label htmlFor="passwordInput" className="block text-sm font-medium text-gray-700">
+              Password
+            </label>
             <div className="flex items-center border border-gray-300 bg-white/50 backdrop-blur rounded-xl px-3 py-2 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 transition">
               <FaLock className="text-gray-400 mr-3" size={20} />
               <input
-                type="password"
+                id="passwordInput"
+                type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                minLength={6}
-                className="flex-grow focus:outline-none bg-transparent text-black"
-                placeholder="Enter password"
+                className="flex-grow focus:outline-none bg-transparent text-black placeholder-gray-400"
+                placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
                 required
               />
-            </div>
-          </div>
-
-          {/* Role */}
-          <div>
-            <div className="flex items-center border border-gray-300 bg-white/50 backdrop-blur rounded-xl px-3 py-2 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 transition">
-              <FaUserTag className="text-gray-400 mr-3" size={20} />
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="flex-grow bg-transparent focus:outline-none text-black"
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="ml-2 text-gray-500 hover:text-gray-700 transition-colors"
               >
-                {roles.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
+                {showPassword ? <FaEyeSlash size={18} /> : <FaEye size={18} />}
+              </button>
             </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Must contain uppercase, lowercase, and number
+            </p>
           </div>
-
-          {/* Reporting Manager Dropdown (only for Assistant Manager & Executive in Sales) */}
-{(role === "Assistant Manager" || role === "Executive") && department === "Sales" && (
-  <div>
-    <div className="flex items-center border border-gray-300 bg-white/50 backdrop-blur rounded-xl px-3 py-2 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 transition">
-      <FaUser className="text-gray-400 mr-3" size={20} />
-      <select
-        value={selectedReportingManager}
-        onChange={(e) => setSelectedReportingManager(e.target.value)}
-        className="flex-grow bg-transparent focus:outline-none text-black"
-        required
-      >
-        <option value="">Select Reporting Manager</option>
-        {reportingManagers.map((manager) => (
-          <option key={manager.id} value={manager.name}>
-            {manager.name}
-          </option>
-        ))}
-      </select>
-    </div>
-  </div>
-)}
-
-
-          {/* Department */}
-          <div>
+                    {/* Department Field */}
+          <div className="space-y-1">
+            <label htmlFor="departmentSelect" className="block text-sm font-medium text-gray-700">
+              Department
+            </label>
             <div className="flex items-center border border-gray-300 bg-white/50 backdrop-blur rounded-xl px-3 py-2 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 transition">
               <FaBuilding className="text-gray-400 mr-3" size={20} />
               <select
+                id="departmentSelect"
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
                 className="flex-grow bg-transparent focus:outline-none text-black"
@@ -333,12 +353,64 @@ const [role, setRole] = useState("Executive"); // or any other role from your ro
             </div>
           </div>
 
-          
+          {/* Role Field */}
+          <div className="space-y-1">
+            <label htmlFor="roleSelect" className="block text-sm font-medium text-gray-700">
+              Role
+            </label>
+            <div className="flex items-center border border-gray-300 bg-white/50 backdrop-blur rounded-xl px-3 py-2 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 transition">
+              <FaUserTag className="text-gray-400 mr-3" size={20} />
+              <select
+                id="roleSelect"
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                className="flex-grow bg-transparent focus:outline-none text-black"
+              >
+                {roles.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+
+
+          {/* Reporting Manager Field (conditional) */}
+          {(role === "Assistant Manager" || role === "Executive") && department === "Sales" && (
+            <div className="space-y-1">
+              <label htmlFor="managerSelect" className="block text-sm font-medium text-gray-700">
+                Reporting Manager
+              </label>
+              <div className="flex items-center border border-gray-300 bg-white/50 backdrop-blur rounded-xl px-3 py-2 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 transition">
+                <FaUser className="text-gray-400 mr-3" size={20} />
+                <select
+                  id="managerSelect"
+                  value={selectedReportingManager}
+                  onChange={(e) => setSelectedReportingManager(e.target.value)}
+                  className="flex-grow bg-transparent focus:outline-none text-black"
+                  required
+                >
+                  <option value="">Select Reporting Manager</option>
+                  {reportingManagers.map((manager) => (
+                    <option key={manager.id} value={manager.name}>
+                      {manager.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
 
           {/* Error Message */}
-          {error && <p className="text-red-500 text-sm font-medium">{error}</p>}
+          {error && (
+            <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm font-medium">
+              {error}
+            </div>
+          )}
 
-          {/* Buttons */}
+          {/* Form Buttons */}
           <div className="flex justify-end space-x-3 pt-4">
             <button
               type="button"
@@ -347,19 +419,19 @@ const [role, setRole] = useState("Executive"); // or any other role from your ro
                 resetForm();
               }}
               disabled={loading}
-              className="px-4 py-2 bg-red-200 rounded-full border border-gray-300 text-gray-700 hover:bg-red-500 hover:text-white transition duration-200"
+              className="px-4 py-2 bg-gray-100 rounded-full border border-gray-300 text-gray-700 hover:bg-red-100 hover:text-red-700 transition duration-200 disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 rounded-full bg-green-200 border border-gray-300 text-gray-700 hover:bg-green-500 hover:text-white duration-300 ease-in-out disabled:opacity-50"
+              className="px-6 py-2 rounded-full bg-indigo-100 border border-indigo-200 text-indigo-700 hover:bg-indigo-500 hover:text-white duration-300 ease-in-out disabled:opacity-50 flex items-center justify-center min-w-[120px]"
             >
               {loading ? (
-                <span className="flex items-center gap-2">
+                <>
                   <svg
-                    className="animate-spin h-5 w-5"
+                    className="animate-spin h-5 w-5 mr-2"
                     viewBox="0 0 24 24"
                     fill="none"
                   >
@@ -368,17 +440,17 @@ const [role, setRole] = useState("Executive"); // or any other role from your ro
                       cx="12"
                       cy="12"
                       r="10"
-                      stroke="white"
+                      stroke="currentColor"
                       strokeWidth="4"
                     />
                     <path
                       className="opacity-75"
-                      fill="white"
+                      fill="currentColor"
                       d="M4 12a8 8 0 018-8v8z"
                     />
                   </svg>
                   Adding...
-                </span>
+                </>
               ) : (
                 "Add User"
               )}
@@ -387,7 +459,18 @@ const [role, setRole] = useState("Executive"); // or any other role from your ro
         </form>
       </div>
 
-      <ToastContainer position="top-right" autoClose={3000} />
+      <ToastContainer 
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     </div>
   );
 };
