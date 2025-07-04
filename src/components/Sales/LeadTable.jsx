@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from "react";
 import { FaEllipsisV, FaTimes } from "react-icons/fa";
 import DropdownActions from "./DropdownAction";
-import ClosedLeads from "./ClosedLeads";
+import ClosedLeads from "../Sales/Closed/ClosedLeads";
 import LeadDetailsModal from "./LeadDetailsModal";
 
 const borderColorMap = {
@@ -76,9 +76,8 @@ export default function LeadsTable({
     );
     if (entries.length === 0) return "-";
     const latest = entries[entries.length - 1][1];
-    return `${latest.date || "-"} ${latest.time || ""} - ${
-      latest.remarks || ""
-    }`;
+    return `${latest.date || "-"} ${latest.time || ""} - ${latest.remarks || ""
+      }`;
   }, []);
 
   // Loading state
@@ -255,8 +254,8 @@ export default function LeadsTable({
                         toggleDropdown(id, e);
                       }}
                       className={`text-gray-500 hover:text-gray-700 focus:outline-none transition p-2 rounded-full hover:bg-gray-100 ${dropdownOpenId === id
-                          ? "bg-gray-200 text-gray-900 shadow-inner"
-                          : ""
+                        ? "bg-gray-200 text-gray-900 shadow-inner"
+                        : ""
                         }`}
                       aria-expanded={dropdownOpenId === id}
                       aria-haspopup="true"
