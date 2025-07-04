@@ -218,6 +218,7 @@ const FileUploader = ({
             [1, "Ajay Pawar", "MIT", "XYZ@GMAIL.COM", "9999999999", "24-May-02", "MALE", "PUNE", 2018, 76, 2020, 87, "", "", "", "", "BE", "COMPUTER SCIENCE", 2024, 77, "MBA", "BUSINESS ANALYTICS", 2026, 85],
             [2, "Deep Mahire", "Symbiosis", "ABC@GMAIL.COM", "8888888888", "26-Jun-04", "MALE", "SHIRDI", 2020, 57, 2020, 64, "", "", "", "", "BTECH", "MECHANICAL", 2026, 66, "MBA", "IT", 2027, 75],
             [3, "Sakshi Patil", "CEOP", "IJK@GMAIL.COM", "7777777777", "22-Sep-03", "FEMALE", "BALLARI", 2020, "80", "", "", "DIPLOMA", "COMPUTER SCIENCE", "2021", "85", "BE", "ELECTRICAL & ELECTRONICS", 2026, 89, "", "", "", ""]
+
         ];
 
         const worksheet = XLSX.utils.aoa_to_sheet(data);
