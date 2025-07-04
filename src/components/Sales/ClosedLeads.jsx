@@ -178,6 +178,15 @@ const getCumulativeTarget = useCallback(
     ? quarterFilter.split("_")[1]
     : getFinancialYearFromDate(today);
 
+// Yeh filter section main focus hai
+const getQuarterFromDate = (date) => {
+  const month = date.getMonth() + 1;
+  if (month >= 4 && month <= 6) return "Q1";
+  if (month >= 7 && month <= 9) return "Q2";
+  if (month >= 10 && month <= 12) return "Q3";
+  return "Q4";  // Jan, Feb, Mar belong to Q4
+};
+
 const filteredLeads = useMemo(() => {
   const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
   if (!user) return [];
@@ -198,10 +207,24 @@ const filteredLeads = useMemo(() => {
 
   return Object.entries(leads)
     .filter(([, lead]) => {
-      // 🔥 Head/Admin in "My Team" mode = see all
+      // Ensure we're checking the "phase" and "closureType"
+      if (lead.phase === "closed" && (lead.closureType === "new" || lead.closureType === "renewal")) {
+        
+        // Renewals logic: Check if contractEndDate is within the next 3 months
+        const contractEndDate = new Date(lead.contractEndDate);  // Use contract end date instead of closed date
+        const currentDate = new Date();
+        const threeMonthsLater = new Date();
+        threeMonthsLater.setMonth(currentDate.getMonth() + 3);
+
+        // If contractEndDate is less than 3 months from now, set closureType to "renewal"
+        if (contractEndDate <= threeMonthsLater && lead.closureType !== "renewal") {
+          lead.closureType = "renewal"; // Manually set closureType to "renewal"
+        }
+      }
+
+      // Now check if it's "My Leads" mode or other filters
       if (!viewMyLeadsOnly && isHead) return true;
 
-      // 🧍 My Leads
       if (viewMyLeadsOnly) {
         return lead.assignedTo?.uid === currentUser?.uid;
       } else {
@@ -215,12 +238,12 @@ const filteredLeads = useMemo(() => {
     )
     .filter(([, lead]) => {
       if (activeQuarter === "all") return true;
-      const range = getQuarterRange(activeQuarter, selectedFY);
-      if (!range) return false;
-      const d = new Date(lead.closedDate);
-      return d >= range[0] && d <= range[1];
+      
+      // Check if the lead's closed date is in the selected quarter using getQuarterFromDate
+      const leadQuarter = getQuarterFromDate(new Date(lead.closedDate));  // Use closed date for quarter calculation
+      return leadQuarter === activeQuarter;
     })
-    .sort(([, a], [, b]) => new Date(b.closedDate) - new Date(a.closedDate));
+    .sort(([, a], [, b]) => new Date(b.closedDate) - new Date(a.closedDate)); // Sort by closedDate
 }, [
   leads,
   viewMyLeadsOnly,
@@ -434,7 +457,8 @@ const quarterTarget = useMemo(
                 "Institution",
                 "Location",
                 "Closed Date",
-                "Amount",
+                "Actual TCV",
+                "Projected TCV",
                 "Owner",
               ].map((h) => (
                 <th
@@ -446,83 +470,82 @@ const quarterTarget = useMemo(
               ))}
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {currentRows.length > 0 ? (
-              currentRows.map(([id, lead]) => (
-                <tr key={id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-medium flex-shrink-0">
-                        {lead.businessName?.charAt(0)?.toUpperCase() || "?"}
-                      </div>
-                      <div className="ml-4">
-                        <div className="font-medium text-gray-900 truncate max-w-xs">
-                          {lead.businessName || "-"}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {lead.closureType === "new" ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              New
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                              Renewal
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {lead.city || "-"}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {lead.state || ""}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {formatDate(lead.closedDate)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
-                    {formatCurrency(lead.totalCost)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-xs font-medium flex-shrink-0">
-                        {lead.assignedTo?.name
-                          ?.split(" ")
-                          .map((n) => n[0])
-                          .join("")
-                          .toUpperCase() || "?"}
-                      </div>
-                      <div className="ml-3 text-sm font-medium text-gray-900 truncate max-w-xs">
-                        {lead.assignedTo?.name || "-"}
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="5" className="py-12 text-center">
-                  <FiFilter className="mx-auto h-12 w-12 text-gray-400" />
-                  <h3 className="mt-2 font-medium text-gray-900">
-                    No closed deals found
-                  </h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    {filterType === "all"
-                      ? `There are currently no ${
-                          viewMyLeadsOnly ? "your" : "team"
-                        } closed deals.`
-                      : `No ${filterType} ${
-                          viewMyLeadsOnly ? "your" : "team"
-                        } closed deals found.`}
-                  </p>
-                </td>
-              </tr>
-            )}
-          </tbody>
+         <tbody className="bg-white divide-y divide-gray-200">
+  {currentRows.length > 0 ? (
+    currentRows.map(([id, lead]) => (
+      <tr key={id} className="hover:bg-gray-50 transition-colors">
+        <td className="px-6 py-4 whitespace-nowrap">
+          <div className="flex items-center">
+            <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-medium flex-shrink-0">
+              {lead.businessName?.charAt(0)?.toUpperCase() || "?"}
+            </div>
+            <div className="ml-4">
+              <div className="font-medium text-gray-900 truncate max-w-xs">
+                {lead.businessName || "-"}
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                {lead.closureType === "new" ? (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    New
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    Renewal
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap">
+          <div className="text-sm text-gray-900">
+            {lead.city || "-"}
+          </div>
+          <div className="text-xs text-gray-500">
+            {lead.state || ""}
+          </div>
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+          {formatDate(lead.closedDate)}
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
+          {formatCurrency(lead.totalCost)}
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
+          {formatCurrency(lead.tcv)} 
+          {/* 🔥 Yaha pe agar tumhara field ka naam `projectedTCV` nahi hai to change karo */}
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap">
+          <div className="flex items-center">
+            <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-xs font-medium flex-shrink-0">
+              {lead.assignedTo?.name
+                ?.split(" ")
+                .map((n) => n[0])
+                .join("")
+                .toUpperCase() || "?"}
+            </div>
+            <div className="ml-3 text-sm font-medium text-gray-900 truncate max-w-xs">
+              {lead.assignedTo?.name || "-"}
+            </div>
+          </div>
+        </td>
+      </tr>
+    ))
+  ) : (
+    <tr>
+      <td colSpan="6" className="py-12 text-center">
+        <FiFilter className="mx-auto h-12 w-12 text-gray-400" />
+        <h3 className="mt-2 font-medium text-gray-900">No closed deals found</h3>
+        <p className="mt-1 text-sm text-gray-500">
+          {filterType === "all"
+            ? `There are currently no ${viewMyLeadsOnly ? "your" : "team"} closed deals.`
+            : `No ${filterType} ${viewMyLeadsOnly ? "your" : "team"} closed deals found.`}
+        </p>
+      </td>
+    </tr>
+  )}
+</tbody>
+
         </table>
       </div>
 
