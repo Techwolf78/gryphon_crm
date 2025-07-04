@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import stateCityData from "../Sales/stateCityData";
+import { universityOptions } from "../Sales/universityData"; // Import the university data
 import { auth, db } from "../../firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { XIcon } from "@heroicons/react/outline";
@@ -18,8 +19,24 @@ const courseSpecializations = {
     "CS-AI-DS",
     "Other",
   ],
-  MBA: ["Marketing", "Finance", "HR", "Operations", "Other"],
-  BBA: ["International Business", "General", "Finance", "Other"],
+  MBA: [
+    "Marketing",
+    "Finance",
+    "HR",
+    "Operations",
+    "Supply Chain",
+    "Business Analyst",
+    "Other",
+  ],
+  BBA: [
+    "Marketing",
+    "Finance",
+    "HR",
+    "Operations",
+    "Supply Chain",
+    "Business Analyst",
+    "Other",
+  ],
   BCA: ["Computer Applications", "Other"],
   MCA: ["Computer Science", "Other"],
   Diploma: ["Mechanical", "Civil", "Electrical", "Computer", "Other"],
@@ -27,17 +44,6 @@ const courseSpecializations = {
   MSC: ["Physics", "Chemistry", "Mathematics", "CS", "Other"],
   Others: ["Other"],
 };
-
-const affiliationOptions = [
-  "UGC",
-  "AICTE",
-  "NAAC",
-  "NBA",
-  "State University",
-  "Private",
-  "Autonomous",
-  "Other",
-];
 
 const accreditationOptions = [
   "A++",
@@ -47,6 +53,7 @@ const accreditationOptions = [
   "B+",
   "B",
   "C",
+  "D",
   "Not Accredited",
   "Applied For",
   "Other",
@@ -107,20 +114,20 @@ function AddCollegeModal({ show, onClose }) {
   const handleSpecializationChange = (e) => {
     const value = e.target.value;
     const isChecked = e.target.checked;
-    
+
     if (value === "Other") {
       // Handle "Other" checkbox separately
       if (isChecked) {
-        setSpecializations(prev => [...prev, "Other"]);
+        setSpecializations((prev) => [...prev, "Other"]);
       } else {
-        setSpecializations(prev => prev.filter(item => item !== "Other"));
+        setSpecializations((prev) => prev.filter((item) => item !== "Other"));
         setManualSpecialization("");
       }
     } else {
       if (isChecked) {
-        setSpecializations(prev => [...prev, value]);
+        setSpecializations((prev) => [...prev, value]);
       } else {
-        setSpecializations(prev => prev.filter(item => item !== value));
+        setSpecializations((prev) => prev.filter((item) => item !== value));
       }
     }
   };
@@ -174,12 +181,12 @@ function AddCollegeModal({ show, onClose }) {
 
     // Process specializations
     let finalSpecializations = [...specializations];
-    
+
     // If "Other" is selected and manual specialization is provided
     if (specializations.includes("Other") && manualSpecialization.trim()) {
       // Remove "Other" and add the manual specialization
       finalSpecializations = finalSpecializations
-        .filter(item => item !== "Other")
+        .filter((item) => item !== "Other")
         .concat(manualSpecialization.trim());
     }
 
@@ -242,8 +249,11 @@ function AddCollegeModal({ show, onClose }) {
     ((courseType !== "Others" && courseType) ||
       (courseType === "Others" && manualCourseType.trim())) &&
     specializations.length > 0 &&
-    (!specializations.includes("Other") || 
-     (specializations.includes("Other") && manualSpecialization.trim()));
+    (!specializations.includes("Other") ||
+      (specializations.includes("Other") && manualSpecialization.trim())) &&
+    // Add university validation
+    (affiliation !== "Other" ||
+      (affiliation === "Other" && manualAffiliation.trim()));
 
   if (!show) return null;
 
@@ -269,7 +279,8 @@ function AddCollegeModal({ show, onClose }) {
             {/* College Name */}
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                College/University Name<span className="text-red-500 ml-1">*</span>
+                College/University Name
+                <span className="text-red-500 ml-1">*</span>
               </label>
               <div className="relative">
                 <input
@@ -311,81 +322,7 @@ function AddCollegeModal({ show, onClose }) {
               />
             </div>
 
-            {/* POC Name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                POC Name<span className="text-red-500 ml-1">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={pocName}
-                  onChange={(e) => setPocName(e.target.value)}
-                  placeholder="e.g. John Doe"
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                />
-                {!pocName.trim() && isFormValid && (
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                    <svg
-                      className="h-5 w-5 text-red-500"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Phone Number */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Phone No.<span className="text-red-500 ml-1">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={phoneNo}
-                  onChange={(e) => setPhoneNo(e.target.value)}
-                  placeholder="e.g. +91 9876543210"
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                />
-                {!phoneNo.trim() && isFormValid && (
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                    <svg
-                      className="h-5 w-5 text-red-500"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Email */}
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="e.g. contact@college.com"
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-              />
-            </div>
+            
 
             {/* State */}
             <div>
@@ -489,6 +426,82 @@ function AddCollegeModal({ show, onClose }) {
                 </div>
               </div>
             )}
+
+            {/* POC Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                POC Name<span className="text-red-500 ml-1">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={pocName}
+                  onChange={(e) => setPocName(e.target.value)}
+                  placeholder="e.g. John Doe"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                />
+                {!pocName.trim() && isFormValid && (
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <svg
+                      className="h-5 w-5 text-red-500"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Phone Number */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Phone No.<span className="text-red-500 ml-1">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={phoneNo}
+                  onChange={(e) => setPhoneNo(e.target.value)}
+                  placeholder="e.g. +91 9876543210"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                />
+                {!phoneNo.trim() && isFormValid && (
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <svg
+                      className="h-5 w-5 text-red-500"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Email */}
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Email
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="e.g. contact@college.com"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+              />
+            </div>
 
             {/* Expected Closure Date */}
             <div>
@@ -635,13 +648,21 @@ function AddCollegeModal({ show, onClose }) {
               </div>
             )}
 
-            {/* Specialization - Now Multi-Select */}
+            {/* Specialization - Multi-Select Checkboxes */}
             {courseType && (
               <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Specialization(s)<span className="text-red-500 ml-1">*</span>
-                </label>
-                <div className="space-y-2">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Specialization(s)
+                    <span className="text-red-500 ml-1">*</span>
+                  </label>
+                  <span className="text-xs text-gray-500">
+                    (Select multiple options)
+                  </span>
+                </div>
+
+                {/* Checkbox Grid */}
+                <div className="flex flex-wrap gap-4 p-2 border border-gray-200 rounded-lg bg-gray-50">
                   {courseSpecializations[courseType].map((spec) => (
                     <div key={spec} className="flex items-center">
                       <input
@@ -661,49 +682,25 @@ function AddCollegeModal({ show, onClose }) {
                     </div>
                   ))}
                 </div>
+
+                {/* Other Specialization Input */}
                 {specializations.includes("Other") && (
                   <div className="mt-4">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Please specify Specialization
                       <span className="text-red-500 ml-1">*</span>
                     </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={manualSpecialization}
-                        onChange={(e) =>
-                          setManualSpecialization(e.target.value)
-                        }
-                        placeholder="Enter custom specialization"
-                        className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                          !manualSpecialization.trim() && isFormValid
-                            ? "border-red-500"
-                            : "border-gray-300"
-                        }`}
-                      />
-                      {!manualSpecialization.trim() && isFormValid && (
-                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                          <svg
-                            className="h-5 w-5 text-red-500"
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                        </div>
-                      )}
-                    </div>
-                    {!manualSpecialization.trim() && isFormValid && (
-                      <p className="mt-1 text-sm text-red-600">
-                        This field is required when "Other" is selected
-                      </p>
-                    )}
+                    <input
+                      type="text"
+                      value={manualSpecialization}
+                      onChange={(e) => setManualSpecialization(e.target.value)}
+                      placeholder="Enter custom specialization"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
                   </div>
                 )}
+
+                {/* Validation Messages */}
                 {specializations.length === 0 && isFormValid && (
                   <p className="mt-1 text-sm text-red-600">
                     Please select at least one specialization
@@ -715,7 +712,7 @@ function AddCollegeModal({ show, onClose }) {
             {/* Accreditation */}
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Accreditation
+                NAAC Accrediation
               </label>
               <div className="relative">
                 <select
@@ -767,7 +764,7 @@ function AddCollegeModal({ show, onClose }) {
             {/* Affiliation */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Affiliation
+                University Affiliation
               </label>
               <div className="relative">
                 <select
@@ -778,10 +775,10 @@ function AddCollegeModal({ show, onClose }) {
                   }}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
                 >
-                  <option value="">Select Affiliation</option>
-                  {affiliationOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
+                  <option value="">Select University</option>
+                  {universityOptions.map((university) => (
+                    <option key={university} value={university}>
+                      {university}
                     </option>
                   ))}
                 </select>
@@ -803,15 +800,52 @@ function AddCollegeModal({ show, onClose }) {
               {affiliation === "Other" && (
                 <div className="mt-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Please specify Affiliation
+                    Please specify University Name
+                    {affiliation === "Other" &&
+                      !manualAffiliation.trim() &&
+                      isFormValid && (
+                        <span className="text-red-500 ml-1">*</span>
+                      )}
                   </label>
-                  <input
-                    type="text"
-                    value={manualAffiliation}
-                    onChange={(e) => setManualAffiliation(e.target.value)}
-                    placeholder="Enter custom affiliation"
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={manualAffiliation}
+                      onChange={(e) => setManualAffiliation(e.target.value)}
+                      placeholder="Enter university name"
+                      className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        affiliation === "Other" &&
+                        !manualAffiliation.trim() &&
+                        isFormValid
+                          ? "border-red-500"
+                          : "border-gray-300"
+                      }`}
+                    />
+                    {affiliation === "Other" &&
+                      !manualAffiliation.trim() &&
+                      isFormValid && (
+                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                          <svg
+                            className="h-5 w-5 text-red-500"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        </div>
+                      )}
+                  </div>
+                  {affiliation === "Other" &&
+                    !manualAffiliation.trim() &&
+                    isFormValid && (
+                      <p className="mt-1 text-sm text-red-600">
+                        Please specify the university name
+                      </p>
+                    )}
                 </div>
               )}
             </div>

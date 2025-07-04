@@ -1,28 +1,28 @@
 import React, { useEffect, useState } from "react";
 import * as XLSX from "xlsx-js-style";
 import { doc, updateDoc, getDoc } from "firebase/firestore";
-import { db } from "../../firebase";
+import { db } from "../../../firebase";
 import { FaPencilAlt } from "react-icons/fa";
- 
+
 function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
   const [studentData, setStudentData] = useState([]);
   const [headers, setHeaders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [editRowIndex, setEditRowIndex] = useState(null);
   const [editedRowData, setEditedRowData] = useState({});
- 
+
   useEffect(() => {
     if (type === "student") {
       fetchStudentData();
     }
   }, [fileUrl]);
- 
+
   const fetchStudentData = async () => {
     setLoading(true);
     try {
       const docRef = doc(db, "trainingForms", trainingId);
       const docSnap = await getDoc(docRef);
- 
+
       if (docSnap.exists() && docSnap.data().studentDataJson) {
         const data = docSnap.data().studentDataJson;
         setHeaders(Object.keys(data[0] || {}));
@@ -36,7 +36,7 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
           const workbook = XLSX.read(data, { type: "array" });
           const worksheet = workbook.Sheets[workbook.SheetNames[0]];
           const jsonDataRaw = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
- 
+
           const headersRow = jsonDataRaw[0];
           const formattedData = jsonDataRaw.slice(1).map((row) => {
             const obj = {};
@@ -45,7 +45,7 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
             });
             return obj;
           });
- 
+
           setHeaders(headersRow);
           setStudentData(formattedData);
         };
@@ -58,19 +58,19 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
       setLoading(false);
     }
   };
- 
+
   const startEditing = (rowIndex) => {
     setEditRowIndex(rowIndex);
     setEditedRowData({ ...studentData[rowIndex] });
   };
- 
+
   const handleEditChange = (key, value) => {
     setEditedRowData((prev) => ({
       ...prev,
       [key]: value,
     }));
   };
- 
+
   const saveChanges = async () => {
     const updatedData = [...studentData];
     updatedData[editRowIndex] = editedRowData;
@@ -78,21 +78,17 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
     setEditRowIndex(null);
     await saveToFirestore(updatedData);
   };
- 
+
   const saveToFirestore = async (data) => {
     try {
       const cleanData = data.map((obj) => {
         const cleaned = {};
         for (let key in obj) {
-          if (Array.isArray(obj[key])) {
-            cleaned[key] = obj[key].join(", ");
-          } else {
-            cleaned[key] = obj[key];
-          }
+          cleaned[key] = Array.isArray(obj[key]) ? obj[key].join(", ") : obj[key];
         }
         return cleaned;
       });
- 
+
       const docRef = doc(db, "trainingForms", trainingId);
       await updateDoc(docRef, { studentDataJson: cleanData });
       alert("Student data saved successfully.");
@@ -101,11 +97,11 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
       alert("Error saving data.");
     }
   };
- 
+
   return (
     <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-54">
       <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-7xl max-h-[90vh] flex flex-col">
- 
+        
         {/* Header */}
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-blue-800">
@@ -118,28 +114,30 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
             ✕
           </button>
         </div>
- 
+
         {/* Content */}
         <div className="flex-1 overflow-auto">
           {type === "student" ? (
             loading ? (
               <p className="text-center text-gray-500">Loading student data...</p>
             ) : studentData.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm text-left">
-                  <thead>
-                    <tr className="bg-gray-50">
+              <div className="overflow-auto border border-gray-300 rounded-lg shadow">
+                <table className="min-w-[1000px] text-sm text-left border-collapse">
+                  <thead className="sticky top-0 bg-gray-100 z-10 shadow-sm">
+                    <tr>
                       {headers.map((header, idx) => (
-                        <th key={idx} className="p-3">{header}</th>
+                        <th key={idx} className="px-4 py-2 border-b text-gray-700 font-medium whitespace-nowrap bg-gray-100">
+                          {header}
+                        </th>
                       ))}
-                      <th className="p-3">Actions</th>
+                      <th className="px-4 py-2 border-b bg-gray-100">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {studentData.map((row, rowIndex) => (
-                      <tr key={rowIndex} className="hover:bg-gray-50">
+                      <tr key={rowIndex} className="odd:bg-white even:bg-gray-50 hover:bg-blue-50 transition">
                         {headers.map((header, idx) => (
-                          <td key={idx} className="p-2">
+                          <td key={idx} className="px-4 py-2 border-b whitespace-nowrap">
                             {editRowIndex === rowIndex ? (
                               <input
                                 type="text"
@@ -152,7 +150,7 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
                             )}
                           </td>
                         ))}
-                        <td className="p-2">
+                        <td className="px-4 py-2 border-b">
                           <button
                             onClick={() => startEditing(rowIndex)}
                             className="text-gray-600 hover:text-blue-800"
@@ -169,10 +167,25 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
               <p className="text-center text-gray-500">No student data available.</p>
             )
           ) : (
-            <iframe src={fileUrl} title="MOU File" className="w-full h-[70vh] rounded-xl shadow" />
+            (fileUrl?.endsWith(".pdf") || fileUrl?.includes("/raw/upload/")) ? (
+              <iframe
+                src={`https://docs.google.com/gview?url=${encodeURIComponent(fileUrl)}&embedded=true`}
+                title="MOU File"
+                className="w-full h-[70vh] rounded-xl shadow"
+              />
+            ) : (
+              <a
+                href={fileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 underline"
+              >
+                View File
+              </a>
+            )
           )}
         </div>
- 
+
         {/* Save Changes Button */}
         {type === "student" && editRowIndex !== null && (
           <div className="pt-4">
@@ -188,7 +201,5 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
     </div>
   );
 }
- 
+
 export default FilePreviewModal;
- 
- 
