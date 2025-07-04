@@ -4,6 +4,7 @@ import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth"
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
+
   apiKey: "AIzaSyAN10Fly6y1Xss16n5OubDsu_fT3DOGPQU",
   authDomain: "gryphon-crm.firebaseapp.com",
   projectId: "gryphon-crm",
