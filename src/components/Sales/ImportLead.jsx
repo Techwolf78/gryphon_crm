@@ -9,11 +9,16 @@ import {
 } from "react-icons/fi";
 import Papa from "papaparse";
 import * as XLSX from "xlsx-js-style";
-import { collection, addDoc, serverTimestamp, writeBatch, doc } from "firebase/firestore";
+import {
+  collection,
+  serverTimestamp,
+  writeBatch,
+  doc,
+} from "firebase/firestore";
 import { db } from "../../firebase";
 import { getAuth } from "firebase/auth";
 
-const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
+const ImportLead = ({ handleImportComplete }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [importStatus, setImportStatus] = useState({
     loading: false,
@@ -35,6 +40,7 @@ const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
     "email",
     "tcv",
     "contactMethod",
+    "phase", // Added phase as a required field
   ];
 
   // Close dropdown when clicking outside
@@ -61,7 +67,6 @@ const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
 
   const processExcel = (file) => {
     const reader = new FileReader();
-
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target.result);
@@ -71,7 +76,7 @@ const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
         const jsonData = XLSX.utils.sheet_to_json(worksheet);
         validateAndUploadData(jsonData);
       } catch (error) {
-        handleImportError("Error processing Excel file");
+        handleImportError(error.message || "Error processing Excel file");
       }
     };
 
@@ -100,6 +105,12 @@ const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
     if (!method) return false;
     const validMethods = ["Visit", "Call", "Email", "Meeting"];
     return validMethods.includes(method);
+  };
+
+  const validatePhase = (phase) => {
+    if (!phase) return false;
+    const validPhases = ["hot", "warm", "cold"];
+    return validPhases.includes(phase.toLowerCase());
   };
 
   const validateAndUploadData = async (data) => {
@@ -149,6 +160,30 @@ const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
           hasError = true;
         }
 
+        if (lead.phase && !validatePhase(lead.phase)) {
+          errors.phase = "Phase must be one of: hot, warm, cold";
+          hasError = true;
+        }
+
+        if (lead.specializations) {
+          const specArray =
+            typeof lead.specializations === "string"
+              ? lead.specializations.split(",").map((s) => s.trim())
+              : Array.isArray(lead.specializations)
+              ? lead.specializations
+              : [];
+
+          const hasInvalidSpecs = specArray.some(
+            (spec) => !isNaN(spec) && spec.trim() !== "" // Check if it's a number
+          );
+
+          if (hasInvalidSpecs) {
+            errors.specializations =
+              "Specializations should be text values (e.g. 'CS,IT')";
+            hasError = true;
+          }
+        }
+
         if (
           lead.expectedClosureDate &&
           !validateDate(lead.expectedClosureDate)
@@ -165,7 +200,10 @@ const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
             __errors: errors,
           });
         } else {
-          validatedLeads.push(lead);
+          validatedLeads.push({
+            ...lead,
+            phase: lead.phase.toLowerCase(), // Ensure phase is lowercase
+          });
         }
       });
 
@@ -189,11 +227,9 @@ const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
       const batch = writeBatch(db);
       const currentUser = auth.currentUser;
       const currentDate = new Date();
-      const validPhases = ["hot", "warm", "cold"];
-      const leadPhase = validPhases.includes(activeTab) ? activeTab : "cold";
 
       validatedLeads.forEach((lead) => {
-        const docRef = doc(collection(db, 'leads'));
+        const docRef = doc(collection(db, "leads"));
         const leadToUpload = {
           businessName: lead.businessName || "",
           city: lead.city || "",
@@ -202,41 +238,49 @@ const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
           email: lead.email || "",
           tcv: Number(lead.tcv) || 0,
           contactMethod: lead.contactMethod || "Call",
-          phase: leadPhase,
-          createdAt: new Date().getTime(), // Add this line
+          phase: lead.phase || "cold", // Use phase from the file
+          createdAt: new Date().getTime(),
           openedDate: currentDate.getTime(),
           assignedTo: {
             uid: currentUser?.uid || "imported-unknown-uid",
             name: currentUser?.displayName || "Imported Lead",
-            email: currentUser?.email || "no-email@imported.com"
+            email: currentUser?.email || "no-email@imported.com",
           },
           firestoreTimestamp: serverTimestamp(),
           lastUpdatedAt: serverTimestamp(),
-          lastUpdatedBy: 'import-process',
+          lastUpdatedBy: "import-process",
           // Add optional fields
           ...(lead.expectedClosureDate && {
-            expectedClosureDate: new Date(lead.expectedClosureDate).getTime()
+            expectedClosureDate: new Date(lead.expectedClosureDate).getTime(),
           }),
           ...(lead.notes && { notes: lead.notes }),
-          ...(lead.followups && { 
-            followup: typeof lead.followups === "string" 
-              ? JSON.parse(lead.followups) 
-              : lead.followups 
+          ...(lead.followups && {
+            followup:
+              typeof lead.followups === "string"
+                ? JSON.parse(lead.followups)
+                : lead.followups,
           }),
           // Add any other fields from your manual form
           affiliation: lead.affiliation || null,
           accreditation: lead.accreditation || null,
           courseType: lead.courseType || null,
-          specializations: lead.specializations || [],
+          specializations: lead.specializations
+            ? typeof lead.specializations === "string"
+              ? lead.specializations
+                  .split(",")
+                  .map((item) => item.trim())
+                  .filter((item) => item && isNaN(item)) // Filter out numeric values
+              : Array.isArray(lead.specializations)
+              ? lead.specializations.filter((item) => isNaN(item))
+              : []
+            : [],
           studentCount: lead.studentCount ? Number(lead.studentCount) : null,
-          perStudentCost: lead.perStudentCost ? Number(lead.perStudentCost) : null,
+          perStudentCost: lead.perStudentCost
+            ? Number(lead.perStudentCost)
+            : null,
           passingYear: lead.passingYear || null,
           address: lead.address || "",
           state: lead.state || "",
-          // Ensure these fields match your dashboard expectations
-          totalCost: lead.totalCost ? Number(lead.totalCost) : 0,
-          closedDate: lead.closedDate ? new Date(lead.closedDate).getTime() : null,
-          closureType: lead.closureType || null
         };
 
         batch.set(docRef, leadToUpload);
@@ -384,15 +428,48 @@ const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
   };
 
   const downloadSampleFile = () => {
+    // Define user-friendly header names
+    const headerDisplayNames = {
+      businessName: "College Name",
+      city: "City",
+      pocName: "Contact Person",
+      phoneNo: "Phone Number",
+      email: "Email Address",
+      studentCount: "Student Count",
+      perStudentCost: "Per Student Cost",
+      tcv: "Total Contract Value",
+      contactMethod: "Contact Method",
+      phase: "Lead Phase",
+      affiliation: "Affiliation",
+      accreditation: "Accreditation",
+      courseType: "Course Type",
+      specializations: "Specializations",
+      passingYear: "Passing Year",
+      address: "Address",
+      state: "State",
+      expectedClosureDate: "Expected Closure Date",
+      followups: "Follow-ups",
+    };
+
     const sampleData = [
       {
         businessName: "ABC College",
-        city: "New York",
-        pocName: "John Doe",
+        address: "123 College Street",
+        state: "Maharashtra",
+        city: "Pune",
+        pocName: "Ramesh Rawet",
         phoneNo: "1234567890",
         email: "john@example.com",
-        tcv: "25000",
+        passingYear: "2024-2025",
+        courseType: "MBA",
+        specializations: "Marketing, Finance",
+        accreditation: "A",
+        affiliation: "University of Mumbai",
         contactMethod: "Call",
+        studentCount: "50",
+        perStudentCost: "5000",
+        tcv: "250000",
+        phase: "hot",
         expectedClosureDate: "2025-11-15",
         followups: JSON.stringify({
           initial: {
@@ -402,136 +479,214 @@ const ImportLead = ({ handleImportComplete, activeTab = "hot" }) => {
             timestamp: Date.now(),
           },
         }),
-        // Additional fields that match your manual form
-        affiliation: "Private",
-        accreditation: "A",
-        courseType: "MBA",
-        specializations: ["Marketing", "Finance"],
-        studentCount: "500",
-        perStudentCost: "5000",
-        passingYear: "2024-2025",
-        address: "123 College Street",
-        state: "New York",
-        totalCost: "2500000",
-        closedDate: "2025-06-15",
-        closureType: "new"
       },
     ];
 
+    // Enhanced instructions with styling metadata
     const instructions = [
-      { instruction: "FILE REQUIREMENTS:" },
+      { instruction: "LEADS IMPORT GUIDE", type: "header" },
+      { instruction: "File Requirements", type: "section" },
       {
         instruction:
-          "1. Required fields (highlighted in green) must be filled for all records",
+          "• Required fields (highlighted in green) must be filled for all records",
+        type: "item",
       },
-      { instruction: "2. Optional fields are highlighted in yellow" },
-      { instruction: "3. Do not modify column headers" },
+      {
+        instruction: "• Optional fields are highlighted in yellow",
+        type: "item",
+      },
+      { instruction: "• Do not modify column headers", type: "item" },
       {
         instruction:
-          "4. Dates must be in exact format yyyy-mm-dd (e.g. 2025-11-15)",
+          "• Dates must be in exact format yyyy-mm-dd (e.g. 2025-11-15)",
+        type: "item",
       },
-      { instruction: "5. Numeric fields should not contain currency symbols" },
+      {
+        instruction: "• Numeric fields should not contain currency symbols",
+        type: "item",
+      },
+      {
+        instruction: "• Specializations must be text values only (no numbers)",
+        type: "item",
+        highlight: true,
+      },
+      { type: "spacer" },
+      { instruction: "Field Specifications", type: "section" },
+      { instruction: "Required Fields:", type: "subsection" },
+      { instruction: "businessName: College/Institution name", type: "field" },
+      {
+        instruction: "city: Location (letters only, no numbers/special chars)",
+        type: "field",
+      },
+      { instruction: "pocName: Contact person's full name", type: "field" },
+      { instruction: "phoneNo: 10-digit number (no symbols)", type: "field" },
+      { instruction: "email: Valid email address format", type: "field" },
+      {
+        instruction: "tcv: Numeric value only (no currency symbols)",
+        type: "field",
+      },
+      {
+        instruction: "contactMethod: One of [Visit, Call, Email, Meeting]",
+        type: "field",
+      },
+      { instruction: "phase: One of [hot, warm, cold]", type: "field" },
+      { type: "spacer" },
+      { instruction: "Special Fields:", type: "subsection" },
       {
         instruction:
-          "6. contactMethod must be one of: Visit, Call, Email, Meeting",
+          "specializations: Comma-separated text values (e.g. 'CS,IT') - numbers not allowed",
+        type: "field",
+        highlight: true,
       },
-      { instruction: "" },
-      { instruction: "REQUIRED FIELDS (MUST INCLUDE):" },
-      { instruction: "- businessName: College/Institution name" },
-      { instruction: "- city: Location of the institution" },
-      { instruction: "- pocName: Contact person's name" },
-      { instruction: "- phoneNo: Contact phone number" },
-      { instruction: "- email: Contact email address" },
-      { instruction: "- tcv: Total Contract Value (numeric)" },
-      { instruction: "- contactMethod: How the lead was contacted" },
-      { instruction: "" },
-      { instruction: "RECOMMENDED FIELDS:" },
-      { instruction: "- expectedClosureDate: Expected deal closure date" },
-      { instruction: "- followups: JSON string of followup history" },
-      { instruction: "- studentCount: Number of students (numeric)" },
-      { instruction: "- perStudentCost: Cost per student (numeric)" },
-      { instruction: "- totalCost: Total deal value (numeric)" },
-      { instruction: "- closedDate: When deal was closed (yyyy-mm-dd)" },
-      { instruction: "- closureType: 'new' or 'renewal'" },
+      {
+        instruction: "followups: Must be valid JSON string (see sample)",
+        type: "field",
+      },
+      { instruction: "dates: Must be in yyyy-mm-dd format", type: "field" },
+      {
+        instruction: "numeric fields: Enter numbers only (no text/symbols)",
+        type: "field",
+      },
+      { instruction: "Field Mappings:", type: "section" },
+      ...Object.entries(headerDisplayNames).map(([key, displayName]) => ({
+        instruction: `${displayName} (stored as: ${key})`,
+        type: "field",
+      })),
     ];
 
     const workbook = XLSX.utils.book_new();
 
-    const requiredFields = [
-      "businessName",
-      "city",
-      "pocName",
-      "phoneNo",
-      "email",
-      "tcv",
-      "contactMethod",
-    ];
-    const optionalFields = [
-      "expectedClosureDate",
-      "followups",
-      "affiliation",
-      "accreditation",
-      "courseType",
-      "specializations",
-      "studentCount",
-      "perStudentCost",
-      "passingYear",
-      "address",
-      "state",
-      "totalCost",
-      "closedDate",
-      "closureType"
-    ];
-
-    // Generate styled worksheet from JSON
+    // ===== Sample Data Sheet =====
     const ws = XLSX.utils.json_to_sheet(sampleData, { origin: "A2" });
 
+    // Apply styles to headers
     const headerKeys = Object.keys(sampleData[0]);
-
-    // Apply styled headers
     headerKeys.forEach((key, colIndex) => {
       const cellAddress = XLSX.utils.encode_cell({ r: 1, c: colIndex });
-      ws[cellAddress] = {
-        v: key,
-        t: "s",
-        s: {
-          fill: {
-            patternType: "solid",
-            fgColor: {
-              rgb: requiredFields.includes(key) ? "E6FFE6" : "FFFFE0",
-            },
+      if (headerDisplayNames[key]) {
+        ws[cellAddress].v = headerDisplayNames[key]; // Show display name
+      }
+
+      // Apply styling
+      ws[cellAddress].s = {
+        fill: {
+          patternType: "solid",
+          fgColor: {
+            rgb: requiredFields.includes(key) ? "E6FFE6" : "FFFFE0",
           },
-          font: { bold: true },
-          alignment: { horizontal: "center" },
-          border: {
-            top: { style: "thin", color: { rgb: "000000" } },
-            bottom: { style: "thin", color: { rgb: "000000" } },
-            left: { style: "thin", color: { rgb: "000000" } },
-            right: { style: "thin", color: { rgb: "000000" } },
-          },
+        },
+        font: {
+          bold: true,
+          color: { rgb: requiredFields.includes(key) ? "006600" : "666600" },
+        },
+        alignment: {
+          horizontal: "center",
+          vertical: "center",
+          wrapText: true,
+        },
+        border: {
+          top: { style: "thin", color: { rgb: "000000" } },
+          bottom: { style: "thin", color: { rgb: "000000" } },
+          left: { style: "thin", color: { rgb: "000000" } },
+          right: { style: "thin", color: { rgb: "000000" } },
         },
       };
     });
 
     // Auto-size columns
-    const maxColWidths = headerKeys.map((key) => {
-      const header = key.length;
-      const maxData = sampleData.reduce((max, row) => {
-        const value = row[key];
-        const length = value ? String(value).length : 0;
-        return Math.max(max, length);
+    ws["!cols"] = headerKeys.map((key) => {
+      const displayName = headerDisplayNames[key] || key;
+      const headerLength = displayName.length;
+      const maxDataLength = sampleData.reduce((max, row) => {
+        const value = row[key] ? String(row[key]).length : 0;
+        return Math.max(max, value);
       }, 0);
-      return { wch: Math.max(header, maxData) + 2 };
+      return { wch: Math.max(headerLength, maxDataLength) + 2 };
     });
-
-    ws["!cols"] = maxColWidths;
+    // Add sample data sheet
     XLSX.utils.book_append_sheet(workbook, ws, "Leads Data");
 
-    // Add instructions sheet
-    const instructionSheet = XLSX.utils.json_to_sheet(instructions);
-    XLSX.utils.book_append_sheet(workbook, instructionSheet, "Instructions");
+    // ===== Instructions Sheet =====
+    const instructionWs = XLSX.utils.json_to_sheet(
+      instructions.map((item) => ({ Instruction: item.instruction || " " })),
+      { skipHeader: true }
+    );
 
-    // Export file
+    // Apply styles to each row based on type
+    instructions.forEach((item, index) => {
+      const cellAddress = XLSX.utils.encode_cell({ r: index, c: 0 });
+
+      let style = {
+        font: { name: "Calibri", sz: 11, color: { rgb: "000000" } },
+        alignment: { wrapText: true, vertical: "top" },
+      };
+
+      switch (item.type) {
+        case "header":
+          style = {
+            ...style,
+            font: { bold: true, sz: 16, color: { rgb: "FFFFFF" } },
+            fill: { fgColor: { rgb: "2A5885" } }, // Dark blue background
+            alignment: { horizontal: "center", vertical: "center" },
+          };
+          break;
+        case "section":
+          style = {
+            ...style,
+            font: { bold: true, sz: 14, color: { rgb: "2A5885" } },
+            fill: { fgColor: { rgb: "D6E7FF" } }, // Light blue background
+            alignment: { horizontal: "left" },
+          };
+          break;
+        case "subsection":
+          style = {
+            ...style,
+            font: { bold: true, sz: 12, color: { rgb: "3D7EBB" } },
+            fill: { fgColor: { rgb: "FFFFFF" } },
+          };
+          break;
+        case "field":
+          style = {
+            ...style,
+            font: { sz: 11 },
+            fill: { fgColor: { rgb: item.highlight ? "FFF2E6" : "FFFFFF" } }, // Orange highlight if needed
+          };
+          break;
+        case "item":
+          style = {
+            ...style,
+            font: { sz: 11 },
+            fill: { fgColor: { rgb: "FFFFFF" } },
+          };
+          break;
+        case "spacer":
+          style = {
+            ...style,
+            font: { sz: 4 },
+            fill: { fgColor: { rgb: "FFFFFF" } },
+          };
+          break;
+      }
+
+      instructionWs[cellAddress].s = style;
+    });
+
+    // Set column width and row heights
+    instructionWs["!cols"] = [{ wch: 100 }]; // Wide column for instructions
+    instructionWs["!rows"] = instructions.map((item) =>
+      item.type === "header"
+        ? { hpx: 30 }
+        : item.type === "section"
+        ? { hpx: 24 }
+        : item.type === "spacer"
+        ? { hpx: 8 }
+        : { hpx: 18 }
+    );
+
+    // Add instructions sheet
+    XLSX.utils.book_append_sheet(workbook, instructionWs, "Instructions");
+
+    // ===== Export File =====
     XLSX.writeFile(workbook, "Leads_Import_Template.xlsx");
     setIsDropdownOpen(false);
   };

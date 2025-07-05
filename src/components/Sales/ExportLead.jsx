@@ -81,53 +81,41 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
       return lead.phase && lead.phase.toLowerCase() !== "closed";
     });
 
-const groupByPhase = (leads) => {
-  const result = { hot: [], warm: [], cold: [] };
-  leads.forEach((item) => {
-    const lead = Array.isArray(item) ? item[1] : item;
-    if (!lead || !lead.phase) return;
+  const groupByPhase = (leads) => {
+    const result = { hot: [], warm: [], cold: [] };
+    leads.forEach((item) => {
+      const lead = Array.isArray(item) ? item[1] : item;
+      if (!lead || !lead.phase) return;
 
-    const phase = lead.phase.toLowerCase();
-    if (["hot", "warm", "cold"].includes(phase)) {
-      result[phase].push({
-        // Institution Basic Info
-        "College Name": lead.businessName || "",
-        "Accreditation": lead.accreditation || "",
-        "Affiliation": lead.affiliation || "",
-        "Course Type": lead.courseType || "",
-        "Specializations": lead.specializations ? lead.specializations.join(", ") : "",
-        
-        // Location Details
-        "Address": lead.address || "",
-        "City": lead.city || "",
-        "State": lead.state || "",
-        
-        // Contact Information
-        "Contact Name": lead.pocName || "",
-        "Phone No.": lead.phoneNo || "",
-        "Email ID": lead.email || "",
-        "Contact Method": lead.contactMethod || "",
-        
-        // Academic Details
-        "Passing Year": lead.passingYear || "",
-        "Student Count": lead.studentCount || "",
-        "Per Student Cost": lead.perStudentCost || "",
-        
-        // Financial Information
-        "TCV": lead.tcv || "",
-        
-        // Timeline Information
-        "Opened Date": parseDate(lead.createdAt),
-        "Expected Closure": parseDate(lead.expectedClosureDate),
-        
-        // Management Information
-        "Assigned To": lead.assignedTo?.name || "",
-        "Meetings": getAllFollowUps(lead.followup)
-      });
-    }
-  });
-  return result;
-};
+      const phase = lead.phase.toLowerCase();
+      if (["hot", "warm", "cold"].includes(phase)) {
+        result[phase].push({
+          // Institution Basic Info
+          "College Name": lead.businessName || "",
+          Address: lead.address || "",
+          State: lead.state || "",
+          City: lead.city || "",
+          "Contact Name": lead.pocName || "",
+          "Phone No.": lead.phoneNo || "",
+          "Email ID": lead.email || "",
+          "Passing Year": lead.passingYear || "",
+          "Course Type": lead.courseType || "",
+          Specializations: lead.specializations
+            ? lead.specializations.join(", ")
+            : "",
+          Accreditation: lead.accreditation || "",
+          Affiliation: lead.affiliation || "",
+          "Contact Method": lead.contactMethod || "",
+          "Student Count": lead.studentCount || "",
+          "Per Student Cost": lead.perStudentCost || "",
+          TCV: lead.tcv || "",
+          "Expected Closure": parseDate(lead.expectedClosureDate),
+          Meetings: getAllFollowUps(lead.followup),
+        });
+      }
+    });
+    return result;
+  };
 
   const handleExport = (option) => {
     const leadsToExport =

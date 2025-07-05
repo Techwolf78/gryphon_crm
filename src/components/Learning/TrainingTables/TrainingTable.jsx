@@ -123,7 +123,7 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
                 <MdOutlineAttachMoney className="mr-2 text-blue-500 flex-shrink-0" />
               )}
               <div>
-                {isMobile && <div className="text-xs text-gray-500 mb-1">Per Student</div>}
+                {isMobile && <div className="text-xs text-gray-500 mb-1">Per Student </div>}
                 <div className="font-medium text-gray-800">
                   {formatCurrency(item.perStudentCost)}
                 </div>
@@ -187,18 +187,7 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
                       <FaFileContract className="mr-2 text-blue-500" />
                       View MOU
                     </button>
-                    <div className="border-t border-gray-200">
-                      <button
-                        onClick={() => {
-                          onManageStudents(item);
-                          setMenuOpenId(null);
-                        }}
-                        className="w-full px-4 py-3 text-left flex items-center hover:bg-blue-50 text-gray-700 transition"
-                      >
-                        <FaUsers className="mr-2 text-blue-500" />
-                        Manage Students
-                      </button>
-                    </div>
+                   
                   </div>
                 )}
               </div>
