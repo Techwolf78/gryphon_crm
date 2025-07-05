@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect } from "react";
+import { useContext, useState, useEffect } from "react";
 import { AuthContext } from "../context/AuthContext";
 import {
   doc,
@@ -39,7 +39,11 @@ export default function UpdateProfile({ onClose }) {
   const navigate = useNavigate();
 
   const handleBack = () => {
-    navigate(-1); // Go back to previous page in history
+    if (onClose) {
+      onClose();
+    } else {
+      navigate(-1);
+    }
   };
 
   const formatDisplayName = (email) => {
@@ -113,7 +117,7 @@ export default function UpdateProfile({ onClose }) {
       };
       fetchUserData();
     }
-  }, [user]);
+  }, [user, setPhotoURL]);
 
   const handleSaveImage = async (imageUrl) => {
     if (!user || !imageUrl) return;
@@ -166,7 +170,7 @@ export default function UpdateProfile({ onClose }) {
         <div className="bg-gradient-to-r from-blue-600 to-blue-800 p-6 text-white">
           <div className="flex items-center justify-between">
             <button
-              onClick={handleBack} // Changed from onClose to handleBack
+              onClick={handleBack}
               className="flex items-center text-blue-100 hover:text-white transition-colors"
             >
               <FaArrowLeft className="mr-2" />

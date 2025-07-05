@@ -12,6 +12,7 @@ const DashboardLayout = () => {
       <Sidebar
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        user={user}
       />
       <main
         className={`flex-grow transition-all duration-300 ease-in-out min-h-screen ${
