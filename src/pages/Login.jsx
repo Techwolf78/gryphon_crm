@@ -180,7 +180,7 @@ export default function LoginPage() {
   );
 
   return (
-    <div className=" flex items-center justify-center bg-gray-50 font-sans p-4">
+    <div className=" flex items-center justify-center bg-gray-50 font-sans  min-h-screen">
       {showContactModal && <ContactModal />}
       <div className="w-full max-w-5xl bg-white rounded-xl shadow-lg overflow-hidden flex flex-col md:flex-row">
         {/* Left Side - Branding */}
