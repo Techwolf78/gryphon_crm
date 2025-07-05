@@ -3,8 +3,8 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-
   apiKey: "AIzaSyAN10Fly6y1Xss16n5OubDsu_fT3DOGPQU",
   authDomain: "gryphon-crm.firebaseapp.com",
   projectId: "gryphon-crm",

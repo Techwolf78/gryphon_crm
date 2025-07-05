@@ -1,7 +1,7 @@
 import React, { useContext } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
-import logo from "../assets/SYNC-logo.png"; // Adjust the path as necessary
+import logo from "../assets/sync-black.png"; // Adjust the path as necessary
 import {
   FiHome,
   FiUsers,
