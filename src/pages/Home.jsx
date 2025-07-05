@@ -4,7 +4,7 @@ import { AuthContext } from "../context/AuthContext";
 import { motion } from "framer-motion";
 import bgImage from "../../public/home/bg.avif";
 import { FaArrowRight } from "react-icons/fa";
-import logo from "../../src/assets/SYNC-logo.png";
+import logo from "../../src/assets/sync-black.png"; // Updated logo path
 import emgageLogo from "../../src/assets/emgage.png";
 
 const Home = () => {

@@ -41,17 +41,17 @@ const Navbar = ({ onImageClick = () => {} }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-const handleLogout = () => {
-  setIsDropdownOpen(false);
-  logout();
-  navigate("/login", { state: { showLogoutToast: true } });
-};
+  const handleLogout = () => {
+    setIsDropdownOpen(false);
+    logout();
+    navigate("/login", { state: { showLogoutToast: true } });
+  };
 
   const navItemClass =
     "group flex items-center gap-2 relative transition text-white hover:text-white";
 
   return (
-<nav className="bg-blue-900 text-white px-6 py-4 flex justify-between items-center sticky top-0 z-52">
+    <nav className="bg-blue-900 text-white px-6 py-4 flex justify-between items-center sticky top-0 z-52">
       <Link to="/" className="flex items-center">
         <img
           src="https://res.cloudinary.com/dcjmaapvi/image/upload/v1740489025/ga-hori_ylcnm3.png"
@@ -63,7 +63,6 @@ const handleLogout = () => {
       <div className="flex items-center space-x-6">
         {isHome && !user && (
           <>
-           
             <Link to="/login" className="relative group text-white transition">
               <span className="relative inline-block transition duration-300 group-hover:text-yellow-400">
                 Login
@@ -112,16 +111,11 @@ const handleLogout = () => {
                 onClick={() => setIsDropdownOpen((prev) => !prev)}
                 className="flex items-center gap-2 px-4 py-2 rounded hover:bg-blue-800 transition"
               >
-                {photoURL ? (
-                  <img
-                    src={photoURL}
-                    alt="Profile"
-                    className="h-9 w-9 rounded-full object-cover object-top border-2 border-yellow-400"
-                    // Remove onClick from image since we want the parent button to handle all clicks
-                  />
-                ) : (
-                  <FaUserCircle className="text-2xl text-yellow-400" />
-                )}
+                <img
+                  src={photoURL || "/home/profile1.png"} // fallback to default if empty
+                  alt="Profile"
+                  className="h-9 w-9 rounded-full object-cover object-top border-2 border-yellow-400"
+                />
                 <span className="font-medium">
                   {formatDisplayName(user.email)}
                 </span>
@@ -134,8 +128,9 @@ const handleLogout = () => {
                     className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 transition"
                     onClick={() => setIsDropdownOpen(false)}
                   >
-                    <FaUserEdit /> Update Profile
+                    <FaUserEdit /> View Profile
                   </Link>
+
                   <button
                     onClick={handleLogout}
                     className="w-full flex items-center gap-2 px-4 py-2 hover:bg-red-100 text-red-600 transition"
