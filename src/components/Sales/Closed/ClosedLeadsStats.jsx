@@ -30,6 +30,17 @@ const ClosedLeadsStats = ({
 
   const [selectedTeamUserId, setSelectedTeamUserId] = useState("all");
 
+  let targetUser;
+  if (viewMyLeadsOnly) {
+    targetUser = userObj;
+  } else if (selectedTeamUserId !== "all") {
+    targetUser = teamMembers.find((u) => u.uid === selectedTeamUserId);
+  } else {
+    targetUser = userObj;
+  }
+
+  const targetUid = targetUser?.uid;
+
   const getQuarter = (date) => {
     const m = date.getMonth() + 1;
     if (m >= 4 && m <= 6) return "Q1";
@@ -47,21 +58,6 @@ const ClosedLeadsStats = ({
       })
       .reduce((sum, l) => sum + (l.totalCost || 0), 0);
   };
-
-  let targetUser;
-  if (viewMyLeadsOnly) {
-    targetUser = userObj;
-  } else if (selectedTeamUserId !== "all") {
-    targetUser = teamMembers.find((u) => u.uid === selectedTeamUserId);
-  } else {
-    targetUser = userObj;
-  }
-
-  const targetUid = targetUser?.uid;
-
-  const achievedValue = useMemo(() => {
-    return getAchievedAmount(targetUid, activeQuarter);
-  }, [leads, targetUid, activeQuarter]);
 
   const getQuarterTargetWithCarryForward = (uid) => {
     let deficit = 0;
@@ -89,19 +85,144 @@ const ClosedLeadsStats = ({
     return { adjustedTarget: 0, achieved: 0, deficit: 0 };
   };
 
-  const displayQuarterTarget = getQuarterTargetWithCarryForward(targetUid);
+  const getTotalAchievedAmount = (uids, quarter) => {
+    return uids.reduce((sum, uid) => sum + getAchievedAmount(uid, quarter), 0);
+  };
 
-  const annualTarget = useMemo(() => {
-    return ["Q1", "Q2", "Q3", "Q4"].reduce((total, q) => {
+  const getCombinedQuarterTarget = (uids) => {
+    let totalAdjustedTarget = 0;
+    let totalAchieved = 0;
+    let totalDeficit = 0;
+
+    uids.forEach((uid) => {
+      const quarterData = getQuarterTargetWithCarryForward(uid);
+      totalAdjustedTarget += quarterData.adjustedTarget;
+      totalAchieved += quarterData.achieved;
+      totalDeficit += quarterData.deficit;
+    });
+
+    return { adjustedTarget: totalAdjustedTarget, achieved: totalAchieved, deficit: totalDeficit };
+  };
+
+  const isHeadViewingManager =
+    isHead && selectedTeamUserId !== "all" && targetUser?.role === "Manager";
+
+  let allUids = [];
+  if (isHeadViewingManager) {
+    const managerTeamMembers = Object.values(users).filter(
+      (u) =>
+        ["Assistant Manager", "Executive"].includes(u.role) &&
+        u.reportingManager === targetUser?.name
+    );
+    const allManagerTeam = [targetUser, ...managerTeamMembers];
+    allUids = allManagerTeam.map((u) => u.uid);
+  }
+
+  // Calculate aggregate values for "All Team Members"
+  const allTeamMembers = [userObj, ...teamMembers];
+  const uniqueTeamMembers = allTeamMembers.filter(
+    (member, index, self) => index === self.findIndex((m) => m.uid === member.uid)
+  );
+
+const aggregateValues = useMemo(() => {
+  if (selectedTeamUserId !== "all" || viewMyLeadsOnly) {
+    return null;
+  }
+
+  let allUids = [];
+
+  if (isHead) {
+    // Head ka "All Team Members" logic
+    let managers = teamMembers.filter((u) => u.role === "Manager");
+
+    managers.forEach((manager) => {
+      allUids.push(manager.uid);
+
+      const subordinates = Object.values(users).filter(
+        (u) =>
+          ["Assistant Manager", "Executive"].includes(u.role) &&
+          u.reportingManager === manager.name
+      );
+
+      subordinates.forEach((sub) => {
+        allUids.push(sub.uid);
+      });
+    });
+  } else if (isManager) {
+    // Manager ka "All Team Members" logic
+    allUids.push(userObj.uid);
+
+    const subordinates = Object.values(users).filter(
+      (u) =>
+        ["Assistant Manager", "Executive"].includes(u.role) &&
+        u.reportingManager === userObj.name
+    );
+
+    subordinates.forEach((sub) => {
+      allUids.push(sub.uid);
+    });
+  }
+
+  let totalAchieved = 0;
+  let totalAnnualTarget = 0;
+  let totalDeficit = 0;
+
+  allUids.forEach((uid) => {
+    const userTotalAchieved = ["Q1", "Q2", "Q3", "Q4"].reduce((total, q) => {
+      return total + getAchievedAmount(uid, q);
+    }, 0);
+
+    const memberAnnualTarget = ["Q1", "Q2", "Q3", "Q4"].reduce((total, q) => {
       const t = targets.find(
         (t) =>
           t.financial_year === selectedFY &&
           t.quarter === q &&
-          t.assignedTo === targetUid
+          t.assignedTo === uid
       );
       return total + (t ? t.target_amount : 0);
     }, 0);
-  }, [targets, selectedFY, targetUid]);
+
+    const userDeficit = Math.max(memberAnnualTarget - userTotalAchieved, 0);
+
+    totalAchieved += userTotalAchieved;
+    totalAnnualTarget += memberAnnualTarget;
+    totalDeficit += userDeficit;
+  });
+
+  return {
+    adjustedTarget: totalAnnualTarget,
+    achieved: totalAchieved,
+    deficit: totalDeficit,
+    annualTarget: totalAnnualTarget,
+  };
+}, [selectedTeamUserId, viewMyLeadsOnly, targets, selectedFY, activeQuarter, leads, users]);
+
+
+
+  // Display targets and achieved values
+  const displayQuarterTarget = isHeadViewingManager
+    ? getCombinedQuarterTarget(allUids)
+    : selectedTeamUserId === "all" && !viewMyLeadsOnly && aggregateValues
+    ? aggregateValues
+    : getQuarterTargetWithCarryForward(targetUid);
+
+  const achievedValue = isHeadViewingManager
+    ? getTotalAchievedAmount(allUids, activeQuarter)
+    : selectedTeamUserId === "all" && !viewMyLeadsOnly && aggregateValues
+    ? aggregateValues.achieved
+    : getAchievedAmount(targetUid, activeQuarter);
+
+  const annualTarget = selectedTeamUserId === "all" && !viewMyLeadsOnly && aggregateValues
+    ? aggregateValues.annualTarget
+    : ["Q1", "Q2", "Q3", "Q4"].reduce((total, q) => {
+        const t = targets.find(
+          (t) =>
+            t.financial_year === selectedFY &&
+            t.quarter === q &&
+            t.assignedTo === targetUid
+        );
+        return total + (t ? t.target_amount : 0);
+      }, 0);
 
   const displayDeficit = displayQuarterTarget.deficit;
   const achievementPercentage =
@@ -109,12 +230,13 @@ const ClosedLeadsStats = ({
       ? Math.min(Math.round((achievedValue / displayQuarterTarget.adjustedTarget) * 100), 100)
       : 0;
 
-  // Calculate completion status
   const completionStatus = achievementPercentage >= 100 ? "Ahead" : "Behind";
   const statusColor = achievementPercentage >= 100 ? "text-green-600" : "text-red-600";
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden transition-all duration-300 hover:shadow-xl">
+    // ... your existing UI (cards) as is, no change needed ...
+    <>
+         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden transition-all duration-300 hover:shadow-xl">
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
         <div>
@@ -127,7 +249,7 @@ const ClosedLeadsStats = ({
               {activeQuarter}
             </span>
             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 shadow-sm">
-              {targetUser?.name}
+              {selectedTeamUserId === "all" && !viewMyLeadsOnly ? "All Team Members" : targetUser?.name}
             </span>
             <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${statusColor} bg-opacity-20`}>
               {completionStatus} {achievementPercentage}%
@@ -206,15 +328,21 @@ const ClosedLeadsStats = ({
             </div>
             <h3 className="text-lg font-medium text-gray-700 mb-1">Annual Target</h3>
             <div className="min-h-[48px] flex items-center justify-center mb-3">
-              <TargetWithEdit
-                value={annualTarget}
-                fy={selectedFY}
-                currentUser={currentUser}
-                targetUser={!viewMyLeadsOnly && selectedTeamUserId !== "all" ? targetUser : null}
-                users={users}
-                onUpdate={handleTargetUpdate}
-                viewMyLeadsOnly={viewMyLeadsOnly}
-              />
+              {selectedTeamUserId === "all" && !viewMyLeadsOnly ? (
+                <p className="text-2xl font-bold text-gray-900">
+                  {formatCurrency(annualTarget)}
+                </p>
+              ) : (
+                <TargetWithEdit
+                  value={annualTarget}
+                  fy={selectedFY}
+                  currentUser={currentUser}
+                  targetUser={!viewMyLeadsOnly && selectedTeamUserId !== "all" ? targetUser : null}
+                  users={users}
+                  onUpdate={handleTargetUpdate}
+                  viewMyLeadsOnly={viewMyLeadsOnly}
+                />
+              )}
             </div>
             <div className="w-full max-w-xs bg-gray-50 rounded-lg p-3 border border-gray-200">
               <div className="flex justify-between items-center">
@@ -273,6 +401,7 @@ const ClosedLeadsStats = ({
         </div>
       </div>
     </div>
+    </>
   );
 };
 
