@@ -180,7 +180,7 @@ export default function LoginPage() {
   );
 
   return (
-    <div className=" flex items-center justify-center bg-gray-50 font-sans  min-h-screen">
+    <div className=" flex items-center justify-center bg-gray-50 font-sans  h-[80vh]">
       {showContactModal && <ContactModal />}
       <div className="w-full max-w-5xl bg-white rounded-xl shadow-lg overflow-hidden flex flex-col md:flex-row">
         {/* Left Side - Branding */}
@@ -190,9 +190,7 @@ export default function LoginPage() {
           <div className="absolute -bottom-40 -right-40 w-80 h-80 rounded-full bg-white/10"></div>
 
           <div className="relative z-10 max-w-md mx-auto md:mx-0">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">
-              SYNC
-            </h1>
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">SYNC</h1>
             <p className="text-sm md:text-base leading-relaxed opacity-90">
               Manage corporate relationships, track sales, and streamline your
               business processes all in one integrated platform.
