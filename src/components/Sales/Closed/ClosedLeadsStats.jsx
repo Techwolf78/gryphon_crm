@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import PropTypes from "prop-types";
 import TargetWithEdit from "./TargetWithEdit";
 
@@ -11,7 +11,6 @@ const ClosedLeadsStats = ({
   activeQuarter,
   formatCurrency,
   viewMyLeadsOnly,
-  achievedValue,
   handleTargetUpdate,
 }) => {
   const userObj = Object.values(users).find((u) => u.uid === currentUser?.uid);
@@ -41,7 +40,7 @@ const ClosedLeadsStats = ({
 
   const getAchievedAmount = (uid, quarter) => {
     return Object.values(leads)
-      .filter((l) => l.assignedTo === uid && l.phase === "closed")
+      .filter((l) => l.assignedTo?.uid === uid && l.phase === "closed")
       .filter((l) => {
         const closedQuarter = getQuarter(new Date(l.closedDate));
         return closedQuarter === quarter;
@@ -49,9 +48,23 @@ const ClosedLeadsStats = ({
       .reduce((sum, l) => sum + (l.totalCost || 0), 0);
   };
 
-  const getCarryForwardTarget = (uid) => {
-    let previousDeficit = 0;
-    let finalTarget = 0;
+  let targetUser;
+  if (viewMyLeadsOnly) {
+    targetUser = userObj;
+  } else if (selectedTeamUserId !== "all") {
+    targetUser = teamMembers.find((u) => u.uid === selectedTeamUserId);
+  } else {
+    targetUser = userObj;
+  }
+
+  const targetUid = targetUser?.uid;
+
+  const achievedValue = useMemo(() => {
+    return getAchievedAmount(targetUid, activeQuarter);
+  }, [leads, targetUid, activeQuarter]);
+
+  const getQuarterTargetWithCarryForward = (uid) => {
+    let deficit = 0;
     const quarters = ["Q1", "Q2", "Q3", "Q4"];
 
     for (const q of quarters) {
@@ -61,137 +74,141 @@ const ClosedLeadsStats = ({
           t.quarter === q &&
           t.assignedTo === uid
       );
-      const quarterTarget = t ? t.target_amount : 0;
-      const adjustedTarget = quarterTarget + previousDeficit;
+      const baseTarget = t ? t.target_amount : 0;
 
-      const quarterAchieved = getAchievedAmount(uid, q);
-      const deficit = Math.max(adjustedTarget - quarterAchieved, 0);
+      const adjustedTarget = baseTarget + deficit;
+      const achieved = getAchievedAmount(uid, q);
+
+      deficit = Math.max(adjustedTarget - achieved, 0);
 
       if (q === activeQuarter) {
-        finalTarget = adjustedTarget;
-        break;
+        return { adjustedTarget, achieved, deficit };
       }
-
-      previousDeficit = deficit;
     }
 
-    return finalTarget;
+    return { adjustedTarget: 0, achieved: 0, deficit: 0 };
   };
 
-  // Determine targetUser correctly
-  let targetUser;
-  if (viewMyLeadsOnly) {
-    targetUser = userObj;
-  } else if (selectedTeamUserId !== "all") {
-    targetUser = teamMembers.find((u) => u.uid === selectedTeamUserId);
-  } else {
-    targetUser = null;
-  }
+  const displayQuarterTarget = getQuarterTargetWithCarryForward(targetUid);
 
-  const targetUid = targetUser ? targetUser.uid : currentUser.uid;
-  const displayTarget = getCarryForwardTarget(targetUid);
-  const displayDeficit = displayTarget - achievedValue;
+  const annualTarget = useMemo(() => {
+    return ["Q1", "Q2", "Q3", "Q4"].reduce((total, q) => {
+      const t = targets.find(
+        (t) =>
+          t.financial_year === selectedFY &&
+          t.quarter === q &&
+          t.assignedTo === targetUid
+      );
+      return total + (t ? t.target_amount : 0);
+    }, 0);
+  }, [targets, selectedFY, targetUid]);
 
-  // Percentage calculation
-  const achievementPercentage = displayTarget > 0
-    ? Math.min(Math.round((achievedValue / displayTarget) * 100), 100)
-    : 0;
+  const displayDeficit = displayQuarterTarget.deficit;
+  const achievementPercentage =
+    displayQuarterTarget.adjustedTarget > 0
+      ? Math.min(Math.round((achievedValue / displayQuarterTarget.adjustedTarget) * 100), 100)
+      : 0;
+
+  // Calculate completion status
+  const completionStatus = achievementPercentage >= 100 ? "Ahead" : "Behind";
+  const statusColor = achievementPercentage >= 100 ? "text-green-600" : "text-red-600";
 
   return (
-    <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-      {/* Header with Team Selector */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 border-b border-gray-200 bg-gray-50">
+    <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden transition-all duration-300 hover:shadow-xl">
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
         <div>
-          <h2 className="text-xl font-bold text-gray-800">Performance Dashboard</h2>
-          <p className="text-sm text-gray-600">
-            {selectedFY} • {activeQuarter} • {targetUser?.name || userObj?.name}
-          </p>
+          <h2 className="text-2xl font-bold text-gray-800">Sales Performance Dashboard</h2>
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 shadow-sm">
+              {selectedFY}
+            </span>
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 shadow-sm">
+              {activeQuarter}
+            </span>
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 shadow-sm">
+              {targetUser?.name}
+            </span>
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${statusColor} bg-opacity-20`}>
+              {completionStatus} {achievementPercentage}%
+            </span>
+          </div>
         </div>
-        
+
         {!viewMyLeadsOnly && teamMembers.length > 0 && (
           <div className="mt-3 sm:mt-0 w-full sm:w-auto">
-            <label className="block text-sm font-medium text-gray-700 mb-1">View Team Member</label>
-            <select
-              value={selectedTeamUserId}
-              onChange={(e) => setSelectedTeamUserId(e.target.value)}
-              className="w-full sm:w-64 px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-            >
-              <option value="all">All Team Members</option>
-              {teamMembers.map((u) => (
-                <option key={u.uid} value={u.uid}>
-                  {u.name} ({u.role})
-                </option>
-              ))}
-            </select>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Team Member</label>
+            <div className="relative">
+              <select
+                value={selectedTeamUserId}
+                onChange={(e) => setSelectedTeamUserId(e.target.value)}
+                className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white shadow-sm"
+              >
+                <option value="all">All Team Members</option>
+                {teamMembers.map((u) => (
+                  <option key={u.uid} value={u.uid}>
+                    {u.name} ({u.role})
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </div>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Main Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-0 divide-y md:divide-y-0 md:divide-x divide-gray-200">
-        {/* Achieved */}
-        <div className="p-8">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-gray-100">
+        {/* Achieved Card */}
+        <div className="p-6 hover:bg-gray-50 transition-colors duration-200">
           <div className="flex flex-col items-center">
-            <div className="flex items-center justify-center w-20 h-20 rounded-full bg-green-50 mb-4">
-              <svg
-                className="w-10 h-10 text-green-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 13l4 4L19 7"
-                />
+            <div className="flex items-center justify-center w-14 h-14 rounded-full bg-green-50 mb-4 shadow-inner border border-green-100">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <p className="text-lg font-medium text-gray-500 mb-2">Achieved</p>
-            <p className="text-4xl font-bold text-green-600 mb-4">
+            <h3 className="text-lg font-medium text-gray-700 mb-1">Achieved</h3>
+            <p className="text-3xl font-bold text-gray-900 mb-4">
               {formatCurrency(achievedValue)}
             </p>
-            {displayTarget > 0 && (
+            {displayQuarterTarget.adjustedTarget > 0 && (
               <div className="w-full max-w-xs">
                 <div className="flex justify-between text-sm text-gray-600 mb-1">
                   <span>Progress</span>
-                  <span>{achievementPercentage}%</span>
+                  <span className="font-medium">{achievementPercentage}%</span>
                 </div>
-                <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+                <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
                   <div
-                    className="h-full bg-green-500"
+                    className="bg-gradient-to-r from-green-400 to-green-600 h-2.5 rounded-full transition-all duration-500 ease-out"
                     style={{ width: `${achievementPercentage}%` }}
                   ></div>
+                </div>
+                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <span>0%</span>
+                  <span>100%</span>
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* Target */}
-        <div className="p-8">
+        {/* Target Card */}
+        <div className="p-6 hover:bg-gray-50 transition-colors duration-200">
           <div className="flex flex-col items-center">
-            <div className="flex items-center justify-center w-20 h-20 rounded-full bg-blue-50 mb-4">
-              <svg
-                className="w-10 h-10 text-blue-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                />
+            <div className="flex items-center justify-center w-14 h-14 rounded-full bg-blue-50 mb-4 shadow-inner border border-blue-100">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
             </div>
-            <p className="text-lg font-medium text-gray-500 mb-2">Target</p>
-            <div className="min-h-[48px] flex items-center justify-center mb-4">
+            <h3 className="text-lg font-medium text-gray-700 mb-1">Annual Target</h3>
+            <div className="min-h-[48px] flex items-center justify-center mb-3">
               <TargetWithEdit
-                value={displayTarget}
+                value={annualTarget}
                 fy={selectedFY}
-                quarter={activeQuarter}
                 currentUser={currentUser}
                 targetUser={!viewMyLeadsOnly && selectedTeamUserId !== "all" ? targetUser : null}
                 users={users}
@@ -199,48 +216,58 @@ const ClosedLeadsStats = ({
                 viewMyLeadsOnly={viewMyLeadsOnly}
               />
             </div>
-            <div className="text-sm text-gray-600">
-              {displayTarget > 0 && (
-                <p>Quarterly: {formatCurrency(Math.floor(displayTarget / 4))}</p>
-              )}
+            <div className="w-full max-w-xs bg-gray-50 rounded-lg p-3 border border-gray-200">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Quarter Target:</span>
+                <span className="text-sm font-semibold text-gray-800">
+                  {formatCurrency(displayQuarterTarget.adjustedTarget)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center mt-1">
+                <span className="text-sm text-gray-600">Achieved:</span>
+                <span className="text-sm font-semibold text-green-600">
+                  {formatCurrency(achievedValue)}
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Deficit */}
-        <div className="p-8">
+        {/* Deficit Card */}
+        <div className="p-6 hover:bg-gray-50 transition-colors duration-200">
           <div className="flex flex-col items-center">
-            <div className="flex items-center justify-center w-20 h-20 rounded-full bg-red-50 mb-4">
-              <svg
-                className="w-10 h-10 text-red-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
+            <div className={`flex items-center justify-center w-14 h-14 rounded-full mb-4 shadow-inner border ${displayDeficit > 0 ? 'bg-red-50 border-red-100' : 'bg-green-50 border-green-100'}`}>
+              {displayDeficit > 0 ? (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                </svg>
+              )}
             </div>
-            <p className="text-lg font-medium text-gray-500 mb-2">Deficit</p>
-            <p className="text-4xl font-bold mb-4" style={{ 
-              color: displayDeficit > 0 ? '#DC2626' : '#10B981'
-            }}>
+            <h3 className="text-lg font-medium text-gray-700 mb-1">
+              {displayDeficit > 0 ? "Deficit" : "Surplus"}
+            </h3>
+            <p
+              className="text-3xl font-bold mb-2"
+              style={{
+                color: displayDeficit > 0 ? "#DC2626" : "#10B981",
+              }}
+            >
               {formatCurrency(Math.abs(displayDeficit))}
             </p>
-            {displayTarget > 0 && (
-              <p className="text-lg" style={{ 
-                color: displayDeficit > 0 ? '#DC2626' : '#10B981'
-              }}>
-                {displayDeficit > 0 ? (
-                  <span>Remaining to target</span>
-                ) : (
-                  <span>Above target</span>
-                )}
-              </p>
+            {displayQuarterTarget.adjustedTarget > 0 && (
+              <div className={`w-full max-w-xs p-3 rounded-lg ${displayDeficit > 0 ? 'bg-red-50 border-red-100' : 'bg-green-50 border-green-100'} border`}>
+                <p className={`text-sm text-center font-medium ${displayDeficit > 0 ? 'text-red-700' : 'text-green-700'}`}>
+                  {displayDeficit > 0 ? (
+                    <span>You need <span className="font-bold">{Math.round((displayDeficit/displayQuarterTarget.adjustedTarget)*100)}%</span> more to reach target</span>
+                  ) : (
+                    <span>You're <span className="font-bold">{Math.round((Math.abs(displayDeficit)/displayQuarterTarget.adjustedTarget)*100)}%</span> above target</span>
+                  )}
+                </p>
+              </div>
             )}
           </div>
         </div>
@@ -258,7 +285,6 @@ ClosedLeadsStats.propTypes = {
   activeQuarter: PropTypes.string.isRequired,
   formatCurrency: PropTypes.func.isRequired,
   viewMyLeadsOnly: PropTypes.bool.isRequired,
-  achievedValue: PropTypes.number.isRequired,
   handleTargetUpdate: PropTypes.func.isRequired,
 };
 
