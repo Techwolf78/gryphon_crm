@@ -70,7 +70,7 @@ const StudentBreakdownSection = ({ formData, setFormData, studentFile, setStuden
   return (
     <section>
       <div className="p-5 bg-white shadow-lg rounded-xl border border-gray-200 space-y-4">
-        <h3 className="text-2xl font-semibold text-blue-700 border-b-2 border-blue-500 pb-2">Student Breakdown</h3>
+        <h3 className="text-2xl font-semibold text-blue-700 border-b border-blue-500 pb-2">Student Breakdown</h3>
  
         <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
           <div className="space-y-1">
