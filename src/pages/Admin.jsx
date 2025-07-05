@@ -1,3 +1,46 @@
+const UserAvatar = ({ photoURL, name, size = 8 }) => {
+  const initials = name
+    ? name
+        .split(" ")
+        .slice(0, 2) // Only use first two names
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+    : "?";
+
+  const sizeClasses = {
+    8: "w-8 h-8 text-xs",
+    10: "w-10 h-10 text-sm",
+    12: "w-12 h-12 text-base",
+    32: "w-8 h-8 text-xs", // Default for table
+    40: "w-10 h-10 text-sm", // For modal
+  };
+
+  return (
+    <div
+      className={`flex items-center justify-center rounded-full bg-gray-200 text-gray-600 font-medium ${
+        sizeClasses[size] || sizeClasses[8]
+      }`}
+    >
+      {photoURL ? (
+        <img
+          src={photoURL}
+          alt={name}
+          className="w-full h-full rounded-full object-cover"
+          onError={(e) => {
+            e.target.style.display = "none";
+            e.target.nextSibling.style.display = "block";
+          }}
+        />
+      ) : (
+        <span className="text-xs">{initials}</span>
+      )}
+      {/* Fallback if image fails to load */}
+      <span className="hidden text-xs">{initials}</span>
+    </div>
+  );
+};
+
 import React, { useEffect, useState } from "react";
 import {
   FaSearch,
@@ -7,7 +50,6 @@ import {
   FaSyncAlt,
   FaTrash,
 } from "react-icons/fa";
-
 import {
   collection,
   getDocs,
@@ -16,6 +58,7 @@ import {
   query,
   orderBy,
   limit,
+  getDoc, // Moved here
 } from "firebase/firestore";
 import { db } from "../firebase";
 import NewUser from "../components/Admin/NewUser";
@@ -47,39 +90,60 @@ const Admin = () => {
     handleRefresh();
   }, []);
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    try {
-      const usersSnap = await getDocs(collection(db, "users"));
-      const logsSnap = await getDocs(
-        query(collection(db, "audit_logs"), orderBy("date", "desc"), limit(50))
-      );
+const handleRefresh = async () => {
+  setRefreshing(true);
+  try {
+    const usersSnap = await getDocs(collection(db, "users"));
+    const logsSnap = await getDocs(
+      query(collection(db, "audit_logs"), orderBy("date", "desc"), limit(50))
+    );
 
-      const userData = usersSnap.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      const logData = logsSnap.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+    // Fetch profile pictures for each user
+    const userData = await Promise.all(
+      usersSnap.docs.map(async (userDoc) => {
+        try {
+          const userProfile = await getDoc(doc(db, "userprofile", userDoc.data().uid));
+  
+          return {
+            id: userDoc.id,
+            ...userDoc.data(),
+            profilePicUrl: userProfile.exists() 
+              ? userProfile.data().profilePicUrl 
+              : null,
+          };
+        } catch (error) {
+          console.error(`Error fetching profile for user ${userDoc.id}:`, error);
+          return {
+            id: userDoc.id,
+            ...userDoc.data(),
+            profilePicUrl: null,
+          };
+        }
+      })
+    );
 
-      setUsers(userData);
-      setLogs(logData);
+    const logData = logsSnap.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
 
-      sessionStorage.setItem("userList", JSON.stringify(userData));
-      sessionStorage.setItem("auditLogs", JSON.stringify(logData));
-    } catch (error) {
-      console.error("Refresh error:", error);
-    }
-    setRefreshing(false);
-  };
+    setUsers(userData);
+    setLogs(logData);
+
+    sessionStorage.setItem("userList", JSON.stringify(userData));
+    sessionStorage.setItem("auditLogs", JSON.stringify(logData));
+  } catch (error) {
+    console.error("Refresh error:", error);
+  }
+  setRefreshing(false);
+};
 
   const handleDeleteUserConfirm = async () => {
     if (!deleteUser) return;
     setLoadingDelete(true);
     try {
       await deleteDoc(doc(db, "users", deleteUser.id));
+      await deleteDoc(doc(db, "userprofile", deleteUser.id)); // Also delete profile
       const updatedUsers = users.filter((u) => u.id !== deleteUser.id);
       setUsers(updatedUsers);
       sessionStorage.setItem("userList", JSON.stringify(updatedUsers));
@@ -211,18 +275,37 @@ const Admin = () => {
                 <th className="p-3 whitespace-normal break-words">Name</th>
                 <th className="p-3 whitespace-normal break-words">Email</th>
                 <th className="p-3 whitespace-normal break-words">Role</th>
-                <th className="p-3 whitespace-normal break-words">Department</th>
-                <th className="p-3 whitespace-normal break-words text-right">Actions</th>
+                <th className="p-3 whitespace-normal break-words">
+                  Department
+                </th>
+                <th className="p-3 whitespace-normal break-words text-right">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {paginatedUsers.length ? (
                 paginatedUsers.map((u) => (
                   <tr key={u.id} className="hover:bg-gray-50">
-                    <td className="p-3 whitespace-normal break-words">{u.name}</td>
-                    <td className="p-3 whitespace-normal break-words">{u.email}</td>
-                    <td className="p-3 whitespace-normal break-words">{u.role}</td>
-                    <td className="p-3 whitespace-normal break-words">{u.department}</td>
+                    <td className="p-3 whitespace-normal break-words">
+                      <div className="flex items-center gap-3">
+                        <UserAvatar
+                          photoURL={u.profilePicUrl}
+                          name={u.name}
+                          size={32}
+                        />
+                        <span>{u.name}</span>
+                      </div>
+                    </td>
+                    <td className="p-3 whitespace-normal break-words">
+                      {u.email}
+                    </td>
+                    <td className="p-3 whitespace-normal break-words">
+                      {u.role}
+                    </td>
+                    <td className="p-3 whitespace-normal break-words">
+                      {u.department}
+                    </td>
                     <td className="p-3 whitespace-normal break-words text-right">
                       <button
                         onClick={() => setDeleteUser(u)}
@@ -268,7 +351,14 @@ const Admin = () => {
       {deleteUser && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-xl shadow-lg max-w-md w-full">
-            <h3 className="text-lg font-semibold mb-4">Confirm Deletion</h3>
+            <div className="flex items-center gap-3 mb-4">
+              <UserAvatar
+                photoURL={deleteUser.profilePicUrl}
+                name={deleteUser.name}
+                size={40}
+              />
+              <h3 className="text-lg font-semibold">Confirm Deletion</h3>
+            </div>
             <p className="mb-6">
               Are you sure you want to delete <strong>{deleteUser.name}</strong>
               ?
