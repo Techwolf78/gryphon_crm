@@ -10,7 +10,7 @@ const ClosedLeadsStats = ({
   selectedFY,
   activeQuarter,
   formatCurrency,
-  viewMyLeadsOnly,
+  viewMyLeadsOnly, 
   handleTargetUpdate,
 }) => {
   const userObj = Object.values(users).find((u) => u.uid === currentUser?.uid);
@@ -163,40 +163,38 @@ const aggregateValues = useMemo(() => {
     });
   }
 
+  // Combine all
+  let totalAdjustedTarget = 0;
   let totalAchieved = 0;
-  let totalAnnualTarget = 0;
   let totalDeficit = 0;
+  let totalAnnualTarget = 0;
 
   allUids.forEach((uid) => {
-    const userTotalAchieved = ["Q1", "Q2", "Q3", "Q4"].reduce((total, q) => {
-      return total + getAchievedAmount(uid, q);
-    }, 0);
+    const quarterData = getQuarterTargetWithCarryForward(uid);
+    totalAdjustedTarget += quarterData.adjustedTarget;
+    totalAchieved += quarterData.achieved;
+    totalDeficit += quarterData.deficit;
 
-    const memberAnnualTarget = ["Q1", "Q2", "Q3", "Q4"].reduce((total, q) => {
-      const t = targets.find(
-        (t) =>
-          t.financial_year === selectedFY &&
-          t.quarter === q &&
-          t.assignedTo === uid
-      );
-      return total + (t ? t.target_amount : 0);
-    }, 0);
+const memberAnnualTarget = ["Q1", "Q2", "Q3", "Q4"].reduce((total, q) => {
+  const t = targets.find(
+    (t) =>
+      t.financial_year === selectedFY &&
+      t.quarter === q &&
+      t.assignedTo === uid
+  );
+  return total + (t ? t.target_amount : 0);
+}, 0);
 
-    const userDeficit = Math.max(memberAnnualTarget - userTotalAchieved, 0);
-
-    totalAchieved += userTotalAchieved;
     totalAnnualTarget += memberAnnualTarget;
-    totalDeficit += userDeficit;
   });
 
   return {
-    adjustedTarget: totalAnnualTarget,
+    adjustedTarget: totalAdjustedTarget,
     achieved: totalAchieved,
     deficit: totalDeficit,
     annualTarget: totalAnnualTarget,
   };
 }, [selectedTeamUserId, viewMyLeadsOnly, targets, selectedFY, activeQuarter, leads, users]);
-
 
 
   // Display targets and achieved values

@@ -84,7 +84,7 @@ export default function LoginPage() {
       if (password.length < 8) passwordErrors.push("At least 8 characters");
       if (!/[A-Z]/.test(password)) passwordErrors.push("One uppercase letter");
       if (!/\d/.test(password)) passwordErrors.push("One number");
-      if (!/[!@#$%^&*()_+\-=[\]{};':\"\\|,.<>/?]/.test(password)) {
+      if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
         passwordErrors.push("One special character");
       }
     }
