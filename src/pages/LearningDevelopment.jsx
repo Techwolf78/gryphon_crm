@@ -91,12 +91,6 @@ function LearningDevelopment() {
         <h1 className="text-3xl font-bold text-blue-800">
           Training Onboarding Submissions
         </h1>
-        <button
-          onClick={handleRefresh}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
-        >
-          Refresh Data
-        </button>
       </div>
 
       {error && (
