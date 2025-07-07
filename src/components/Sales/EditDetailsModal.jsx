@@ -1,24 +1,29 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { FiX, FiInfo } from "react-icons/fi";
 
 function LeadDetailsModal({ show, onClose, lead, onSave }) {
-  const defaultLeadFields = {
-    businessName: "",
-    city: "",
-    pocName: "",
-    phoneNo: "",
-    email: "",
-    createdAt: "",
-    phase: "",
-    expectedClosureDate: "",
-  };
+  const defaultLeadFields = useMemo(
+    () => ({
+      businessName: "",
+      city: "",
+      pocName: "",
+      phoneNo: "",
+      email: "",
+      createdAt: "",
+      phase: "",
+      expectedClosureDate: "",
+    }),
+    []
+  );
 
   // Function to determine phase based on expectedClosureDate
   const getLeadPhase = (expectedDateInput) => {
     if (!expectedDateInput) return "hot";
     const now = new Date();
     const expectedDate = new Date(expectedDateInput);
-    const diffInDays = Math.ceil((expectedDate - now) / (1000 * 60 * 60 * 24));
+    const diffInDays = Math.ceil(
+      (expectedDate - now) / (1000 * 60 * 60 * 24)
+    );
     if (diffInDays > 45) return "cold";
     if (diffInDays > 30) return "warm";
     return "hot";
@@ -31,7 +36,7 @@ function LeadDetailsModal({ show, onClose, lead, onSave }) {
     if (lead) {
       setFormData({ ...defaultLeadFields, ...lead });
     }
-  }, [lead]);
+  }, [lead, defaultLeadFields]);
 
   if (!show || !lead) return null;
 
@@ -176,7 +181,6 @@ function LeadDetailsModal({ show, onClose, lead, onSave }) {
     ${key === "phase" ? "bg-gray-100 text-gray-500 cursor-not-allowed" : ""}`}
                     disabled={key === "phase"}
                   />
-
                 </div>
               );
             })}

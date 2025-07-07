@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import * as XLSX from "xlsx-js-style";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
+
 import { FaPencilAlt, FaTimes, FaCheck, FaFilePdf, FaExternalLinkAlt } from "react-icons/fa";
 import { collection, getDocs } from "firebase/firestore";
 import { FiDownload } from "react-icons/fi";
@@ -12,20 +13,34 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
   const [loading, setLoading] = useState(false);
   const [editRowIndex, setEditRowIndex] = useState(null);
   const [editedRowData, setEditedRowData] = useState({});
+  const [error, setError] = useState(null); // Add this line
+
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (type === "student" && trainingId) {
       fetchStudentData();
     }
+
   }, [trainingId, type]);
 
   const fetchStudentData = async () => {
     setLoading(true);
+    setError(null);
+
     try {
       const studentsRef = collection(db, "trainingForms", trainingId, "students");
       const snapshot = await getDocs(studentsRef);
-      const students = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const students = snapshot.docs.map(doc => {
+        const data = doc.data();
+        // Convert Firestore Timestamps to readable strings
+        Object.keys(data).forEach(key => {
+          if (data[key] && typeof data[key] === 'object' && 'seconds' in data[key] && 'nanoseconds' in data[key]) {
+            data[key] = new Date(data[key].seconds * 1000).toLocaleString();
+          }
+        });
+        return { id: doc.id, ...data };
+      });
 
       if (students.length > 0) {
         setHeaders(Object.keys(students[0]).filter(key => key !== 'id'));
@@ -56,6 +71,7 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
   };
 
   const saveChanges = async () => {
+
     setIsSaving(true);
     try {
       const updatedData = [...studentData];
@@ -71,11 +87,17 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
   };
 
   const saveToFirestore = async (data) => {
+    if (!trainingId) {
+      setError("No training ID provided - cannot save to database");
+      return;
+    }
+
     try {
       const batchUpdates = data.map(student => {
         const studentDocRef = doc(db, "trainingForms", trainingId, "students", student.id);
         return setDoc(studentDocRef, student);
       });
+
       await Promise.all(batchUpdates);
     } catch (err) {
       console.error("Failed to save student data:", err);
@@ -83,11 +105,12 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
     }
   };
 
+
   const exportToExcel = () => {
     const ws = XLSX.utils.json_to_sheet(studentData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Student Data");
-    
+
     // Apply some basic styling
     if (ws["!ref"]) {
       const range = XLSX.utils.decode_range(ws["!ref"]);
@@ -99,7 +122,7 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
         };
       }
     }
-    
+
     XLSX.writeFile(wb, `StudentData_${trainingId}.xlsx`);
   };
 
@@ -140,6 +163,13 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
 
         {/* Content */}
         <div className="flex-1 overflow-auto p-4">
+          {/* Error display - added here */}
+          {error && (
+            <div className="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg">
+              {error}
+            </div>
+          )}
+
           {type === "student" ? (
             loading ? (
               <div className="flex justify-center items-center h-64">
@@ -151,8 +181,8 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
                   <thead className="sticky top-0 bg-gray-50 z-10">
                     <tr className="border-b">
                       {headers.map((header, idx) => (
-                        <th 
-                          key={idx} 
+                        <th
+                          key={idx}
                           className="px-4 py-3 font-medium text-gray-700 whitespace-nowrap"
                         >
                           {header.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
@@ -163,25 +193,32 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {studentData.map((row, rowIndex) => (
-                      <tr 
-                        key={row.id || rowIndex} 
+                      <tr
+                        key={row.id || rowIndex}
                         className="hover:bg-blue-50/50 transition-colors"
                       >
                         {headers.map((header, idx) => (
-                          <td 
-                            key={idx} 
+                          <td
+                            key={idx}
                             className="px-4 py-3 whitespace-nowrap"
                           >
                             {editRowIndex === rowIndex ? (
                               <input
-                                type="text"
+                                type={typeof row[header] === 'string' && row[header].match(/^\d{1,2}\/\d{1,2}\/\d{4}/) ? "date" : "text"}
                                 value={editedRowData[header] || ""}
                                 onChange={(e) => handleEditChange(header, e.target.value)}
                                 className="w-full border rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                               />
                             ) : (
                               <span className={!row[header] ? "text-gray-400 italic" : ""}>
-                                {row[header] || "N/A"}
+                                {(() => {
+                                  const value = row[header];
+                                  if (!value) return "N/A";
+                                  if (typeof value === 'object') {
+                                    return JSON.stringify(value); // fallback for unexpected objects
+                                  }
+                                  return value;
+                                })()}
                               </span>
                             )}
                           </td>
@@ -191,6 +228,7 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
                             <div className="flex space-x-2">
                               <button
                                 onClick={saveChanges}
+
                                 disabled={isSaving}
                                 className="p-1.5 text-green-600 hover:bg-green-50 rounded"
                                 aria-label="Save changes"
@@ -208,6 +246,7 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
                           ) : (
                             <button
                               onClick={() => startEditing(rowIndex)}
+
                               className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
                               aria-label="Edit row"
                             >
@@ -221,17 +260,20 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
                 </table>
               </div>
             ) : (
+
               <div className="flex flex-col items-center justify-center h-64 text-gray-500">
                 <p className="mb-4">No student data available</p>
                 <button
                   onClick={fetchStudentData}
                   className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
                 >
+
                   Refresh Data
                 </button>
               </div>
             )
           ) : (
+
             <div className="flex flex-col items-center justify-center h-full">
               {fileUrl?.endsWith(".pdf") || fileUrl?.includes("/raw/upload/") ? (
                 <>
@@ -292,5 +334,6 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
     </div>
   );
 }
+
 
 export default FilePreviewModal;

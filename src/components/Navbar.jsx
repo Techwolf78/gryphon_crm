@@ -6,31 +6,103 @@ import {
   FaTachometerAlt,
   FaSignOutAlt,
   FaUserEdit,
-  FaUserCircle,
+  FaSpinner,
 } from "react-icons/fa";
 import { toast } from "react-toastify";
+import {
+  doc,
+  getDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+  onSnapshot,
+} from "firebase/firestore";
+import { db } from "../firebase";
 
 const Navbar = ({ onImageClick = () => {} }) => {
-  const { user, logout, photoURL } = useContext(AuthContext);
+  const { user, logout, photoURL, setPhotoURL } = useContext(AuthContext);
   const location = useLocation();
   const navigate = useNavigate();
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [profilePic, setProfilePic] = useState("");
+  const [loadingProfilePic, setLoadingProfilePic] = useState(true);
   const dropdownRef = useRef();
 
   const isHome = location.pathname === "/";
   const isLogin = location.pathname === "/login";
   const isDashboard = location.pathname === "/dashboard";
 
-  const formatDisplayName = (email) => {
-    const domain = "@gryphonacademy.co.in";
-    if (email.endsWith(domain)) {
-      const namePart = email.split("@")[0];
-      return namePart.charAt(0).toUpperCase() + namePart.slice(1);
-    }
-    return email;
-  };
+  useEffect(() => {
+    let unsubscribeProfile = () => {};
+    let unsubscribeUser = () => {};
 
+    const fetchProfilePicture = async () => {
+      if (user) {
+        try {
+          setLoadingProfilePic(true);
+
+          // Set up real-time listener for userprofile collection
+          const profileRef = doc(db, "userprofile", user.uid);
+          unsubscribeProfile = onSnapshot(profileRef, (doc) => {
+            if (doc.exists()) {
+              const profileData = doc.data();
+              if (profileData.profilePicUrl) {
+                setProfilePic(profileData.profilePicUrl);
+                setPhotoURL(profileData.profilePicUrl);
+                return;
+              }
+            }
+
+            // Fallback to users collection if not found in userprofile
+            const usersQuery = query(
+              collection(db, "users"),
+              where("uid", "==", user.uid)
+            );
+            getDocs(usersQuery).then((usersSnapshot) => {
+              if (!usersSnapshot.empty) {
+                const userData = usersSnapshot.docs[0].data();
+                if (userData.profilePicUrl) {
+                  setProfilePic(userData.profilePicUrl);
+                  setPhotoURL(userData.profilePicUrl);
+                }
+              }
+            });
+          });
+
+          // Also set up listener for users collection as fallback
+          const usersQuery = query(
+            collection(db, "users"),
+            where("uid", "==", user.uid)
+          );
+          unsubscribeUser = onSnapshot(usersQuery, (usersSnapshot) => {
+            if (!usersSnapshot.empty) {
+              const userData = usersSnapshot.docs[0].data();
+              if (userData.profilePicUrl) {
+                setProfilePic(userData.profilePicUrl);
+                setPhotoURL(userData.profilePicUrl);
+              }
+            }
+          });
+        } catch (error) {
+          console.error("Error setting up profile picture listeners:", error);
+          toast.error("Failed to load profile picture");
+        } finally {
+          setLoadingProfilePic(false);
+        }
+      }
+    };
+
+    fetchProfilePicture();
+
+    return () => {
+      unsubscribeProfile();
+      unsubscribeUser();
+    };
+  }, [user, setPhotoURL]);
+
+  // Rest of your component remains the same...
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -40,6 +112,15 @@ const Navbar = ({ onImageClick = () => {} }) => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  const formatDisplayName = (email) => {
+    const domain = "@gryphonacademy.co.in";
+    if (email.endsWith(domain)) {
+      const namePart = email.split("@")[0];
+      return namePart.charAt(0).toUpperCase() + namePart.slice(1);
+    }
+    return email;
+  };
 
   const handleLogout = () => {
     setIsDropdownOpen(false);
@@ -111,11 +192,16 @@ const Navbar = ({ onImageClick = () => {} }) => {
                 onClick={() => setIsDropdownOpen((prev) => !prev)}
                 className="flex items-center gap-2 px-4 py-2 rounded hover:bg-blue-800 transition"
               >
-                <img
-                  src={photoURL || "/home/profile1.png"} // fallback to default if empty
-                  alt="Profile"
-                  className="h-9 w-9 rounded-full object-cover object-top border-2 border-yellow-400"
-                />
+                {loadingProfilePic ? (
+                  <FaSpinner className="h-9 w-9 text-yellow-400 animate-spin" />
+                ) : (
+                  <img
+                    src={profilePic || photoURL || "/home/profile1.png"}
+                    alt="Profile"
+                    className="h-9 w-9 rounded-full object-cover object-top border-2 bg-white"
+                    onClick={onImageClick}
+                  />
+                )}
                 <span className="font-medium">
                   {formatDisplayName(user.email)}
                 </span>

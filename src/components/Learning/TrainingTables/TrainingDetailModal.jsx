@@ -1,7 +1,8 @@
 import React, { useRef, useEffect } from "react";
-import { FaTimes, FaCalendarAlt, FaFileExcel, FaFilePdf } from "react-icons/fa";
+import { FaTimes, FaCalendarAlt, FaFileExcel, FaFilePdf, FaMapMarkerAlt } from "react-icons/fa";
 import { IoIosSchool, IoMdBusiness } from "react-icons/io";
 import { MdPayment, MdPeople, MdEmail, MdPhone } from "react-icons/md";
+import { RiMoneyDollarCircleLine } from "react-icons/ri";
 
 const TrainingDetailModal = ({ training, onClose }) => {
   const modalRef = useRef();
@@ -38,42 +39,55 @@ const TrainingDetailModal = ({ training, onClose }) => {
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex justify-center items-center z-54 p-4 animate-fadeIn">
       <div 
         ref={modalRef} 
-        className="bg-white rounded-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden shadow-2xl border border-gray-100 animate-slideUp"
+        className="bg-white rounded-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden shadow-2xl border border-gray-100 animate-slideUp transform transition-all duration-300"
       >
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-5 flex justify-between items-center sticky top-0 z-10">
-          <div>
-            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-              <IoIosSchool className="text-blue-100" />
-              Training Program Details
-            </h2>
-            <p className="text-blue-100/90 text-sm mt-1">{training?.projectCode || 'No project code'}</p>
+          <div className="flex items-center space-x-3">
+            <div className="p-2 rounded-lg bg-white/10 backdrop-blur-sm">
+              <IoIosSchool className="text-white text-2xl" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-white">
+                Training Program Details
+              </h2>
+              <div className="flex items-center space-x-2 mt-1">
+                <span className="text-blue-100/90 text-sm bg-white/10 px-2 py-0.5 rounded-full">
+                  {training?.projectCode || 'No project code'}
+                </span>
+                <span className="text-blue-100/70 text-xs flex items-center">
+                  <FaMapMarkerAlt className="mr-1" />
+                  {training?.city || 'Location not specified'}
+                </span>
+              </div>
+            </div>
           </div>
           <button 
             onClick={onClose} 
-            className="text-white/90 hover:text-white transition-all p-1 rounded-full hover:bg-white/10"
+            className="text-white/90 hover:text-white transition-all p-2 rounded-full hover:bg-white/20 flex items-center justify-center"
             aria-label="Close modal"
           >
-            <FaTimes size={22} />
+            <FaTimes size={20} />
           </button>
         </div>
 
         {/* Content */}
-        <div className="overflow-y-auto h-[calc(95vh-72px)] p-6 space-y-8">
+        <div className="overflow-y-auto h-[calc(95vh-72px)] p-6 space-y-6">
           {/* 1. Institution Section */}
           <ModernSection 
             title="Institution Details" 
             icon={<IoMdBusiness className="text-blue-500" />}
-            className="bg-blue-50/50"
+            badge={`${training?.collegeCode || 'No Code'}`}
+            className="bg-gradient-to-br from-blue-50 to-blue-50/70"
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              <DetailCard label="College Name" value={training?.collegeName} />
-              <DetailCard label="College Code" value={training?.collegeCode} />
-              <DetailCard label="GST Number" value={training?.gstNumber} />
-              <DetailCard label="Address" value={training?.address} fullWidth />
-              <DetailCard label="City" value={training?.city} />
-              <DetailCard label="State" value={training?.state} />
-              <DetailCard label="Pincode" value={training?.pincode} />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <DetailCard label="College Name" value={training?.collegeName} iconColor="text-blue-400" />
+              <DetailCard label="College Code" value={training?.collegeCode} iconColor="text-blue-400" />
+              <DetailCard label="GST Number" value={training?.gstNumber} iconColor="text-blue-400" />
+              <DetailCard label="Address" value={training?.address} fullWidth iconColor="text-blue-400" />
+              <DetailCard label="City" value={training?.city} iconColor="text-blue-400" />
+              <DetailCard label="State" value={training?.state} iconColor="text-blue-400" />
+              <DetailCard label="Pincode" value={training?.pincode} iconColor="text-blue-400" />
             </div>
           </ModernSection>
 
@@ -81,47 +95,32 @@ const TrainingDetailModal = ({ training, onClose }) => {
           <ModernSection 
             title="Contact Information" 
             icon={<MdPeople className="text-purple-500" />}
-            className="bg-purple-50/50"
+            className="bg-gradient-to-br from-purple-50 to-purple-50/70"
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              <DetailCard 
-                label="TPO Name" 
-                value={training?.tpoName} 
-                icon={<MdPeople className="text-gray-400" />}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <ContactCard 
+                type="TPO" 
+                name={training?.tpoName} 
+                email={training?.tpoEmail} 
+                phone={training?.tpoPhone} 
+                color="bg-purple-100"
+                iconColor="text-purple-500"
               />
-              <DetailCard 
-                label="TPO Email" 
-                value={training?.tpoEmail} 
-                icon={<MdEmail className="text-gray-400" />}
+              <ContactCard 
+                type="Training Coordinator" 
+                name={training?.trainingName} 
+                email={training?.trainingEmail} 
+                phone={training?.trainingPhone} 
+                color="bg-blue-100"
+                iconColor="text-blue-500"
               />
-              <DetailCard 
-                label="TPO Phone" 
-                value={training?.tpoPhone} 
-                icon={<MdPhone className="text-gray-400" />}
-              />
-              <DetailCard 
-                label="Training Coordinator" 
-                value={training?.trainingName} 
-              />
-              <DetailCard 
-                label="Training Email" 
-                value={training?.trainingEmail} 
-              />
-              <DetailCard 
-                label="Training Phone" 
-                value={training?.trainingPhone} 
-              />
-              <DetailCard 
-                label="Account Contact" 
-                value={training?.accountName} 
-              />
-              <DetailCard 
-                label="Account Email" 
-                value={training?.accountEmail} 
-              />
-              <DetailCard 
-                label="Account Phone" 
-                value={training?.accountPhone} 
+              <ContactCard 
+                type="Account Contact" 
+                name={training?.accountName} 
+                email={training?.accountEmail} 
+                phone={training?.accountPhone} 
+                color="bg-amber-100"
+                iconColor="text-amber-500"
               />
             </div>
           </ModernSection>
@@ -130,22 +129,24 @@ const TrainingDetailModal = ({ training, onClose }) => {
           <ModernSection 
             title="Program Details" 
             icon={<IoIosSchool className="text-green-500" />}
-            className="bg-green-50/50"
+            badge={`${training?.studentCount || '0'} Students`}
+            className="bg-gradient-to-br from-green-50 to-green-50/70"
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-              <DetailCard label="Course" value={training?.course} />
-              <DetailCard label="Year" value={training?.year} />
-              <DetailCard label="Delivery Type" value={training?.deliveryType} />
-              <DetailCard label="Passing Year" value={training?.passingYear} />
-              <DetailCard label="Specialization" value={training?.specialization} />
-              <DetailCard label="Total Students" value={training?.studentCount} />
-              <DetailCard label="Total Hours" value={training?.totalHours} />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <DetailCard label="Course" value={training?.course} iconColor="text-green-400" />
+              <DetailCard label="Year" value={training?.year} iconColor="text-green-400" />
+              <DetailCard label="Delivery Type" value={training?.deliveryType} iconColor="text-green-400" />
+              <DetailCard label="Passing Year" value={training?.passingYear} iconColor="text-green-400" />
+              <DetailCard label="Specialization" value={training?.specialization} iconColor="text-green-400" />
+              <DetailCard label="Total Students" value={training?.studentCount} iconColor="text-green-400" />
+              <DetailCard label="Total Hours" value={training?.totalHours} iconColor="text-green-400" />
               <DetailCard 
                 label="Student Data" 
                 value={training?.studentFileUrl ? "Uploaded" : "Not uploaded"} 
                 icon={training?.studentFileUrl ? 
                   <FaFileExcel className="text-green-500" /> : 
                   <FaFileExcel className="text-gray-400" />}
+                status={training?.studentFileUrl ? "success" : "neutral"}
               />
             </div>
 
@@ -155,7 +156,7 @@ const TrainingDetailModal = ({ training, onClose }) => {
                   <FaCalendarAlt className="text-amber-500" />
                   Topics Breakdown
                 </h4>
-                <div className="border rounded-lg overflow-hidden">
+                <div className="border rounded-xl overflow-hidden border-gray-200">
                   <table className="w-full">
                     <thead className="bg-gray-50">
                       <tr>
@@ -165,7 +166,7 @@ const TrainingDetailModal = ({ training, onClose }) => {
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {training.topics.map((topic, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
+                        <tr key={index} className="hover:bg-gray-50 transition-colors">
                           <td className="px-4 py-3">{topic.topic || 'N/A'}</td>
                           <td className="px-4 py-3 font-medium">{topic.hours || 'N/A'}</td>
                         </tr>
@@ -180,31 +181,37 @@ const TrainingDetailModal = ({ training, onClose }) => {
           {/* 4. Financials */}
           <ModernSection 
             title="Financial Information" 
-            icon={<MdPayment className="text-amber-500" />}
-            className="bg-amber-50/50"
+            icon={<RiMoneyDollarCircleLine className="text-amber-500" />}
+            badge={formatCurrency(training?.totalCost)}
+            className="bg-gradient-to-br from-amber-50 to-amber-50/70"
           >
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <DetailCard 
                 label="Total Students" 
                 value={training?.studentCount} 
+                iconColor="text-amber-400"
               />
               <DetailCard 
                 label="Cost per Student" 
                 value={formatCurrency(training?.perStudentCost)} 
+                iconColor="text-amber-400"
               />
               <DetailCard 
                 label="Total Amount" 
                 value={formatCurrency(training?.totalCost)} 
                 highlight
+                iconColor="text-amber-400"
               />
               <DetailCard 
                 label="Payment Type" 
                 value={training?.paymentType} 
+                iconColor="text-amber-400"
               />
               <DetailCard 
                 label="Payment Status" 
                 value={training?.paymentReceived ? "Completed" : "Pending"} 
                 status={training?.paymentReceived ? "success" : "warning"}
+                iconColor="text-amber-400"
               />
             </div>
           </ModernSection>
@@ -213,15 +220,17 @@ const TrainingDetailModal = ({ training, onClose }) => {
           <ModernSection 
             title="Contract Details" 
             icon={<FaFilePdf className="text-red-500" />}
-            className="bg-red-50/50"
+            badge={training?.mouFileUrl ? "MOU Uploaded" : "No MOU"}
+            className="bg-gradient-to-br from-red-50 to-red-50/70"
           >
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <DetailCard 
                 label="MOU Status" 
                 value={training?.mouFileUrl ? "Uploaded" : "Not uploaded"} 
                 icon={training?.mouFileUrl ? 
                   <FaFilePdf className="text-red-500" /> : 
                   <FaFilePdf className="text-gray-400" />}
+                status={training?.mouFileUrl ? "success" : "neutral"}
               />
               <DetailCard 
                 label="Contract Start" 
@@ -241,12 +250,19 @@ const TrainingDetailModal = ({ training, onClose }) => {
   );
 };
 
-// Modern Section Component
-const ModernSection = ({ title, icon, children, className = "" }) => (
-  <div className={`rounded-xl overflow-hidden border border-gray-200 ${className}`}>
-    <div className="px-5 py-4 flex items-center border-b border-gray-200">
-      <span className="text-xl mr-2">{icon}</span>
-      <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
+// Modern Section Component with enhanced design
+const ModernSection = ({ title, icon, children, className = "", badge }) => (
+  <div className={`rounded-xl overflow-hidden border border-gray-200 shadow-sm ${className}`}>
+    <div className="px-5 py-4 flex items-center justify-between border-b border-gray-200 bg-white/50 backdrop-blur-sm">
+      <div className="flex items-center">
+        <span className="text-xl mr-3 p-2 rounded-lg bg-white shadow-sm">{icon}</span>
+        <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
+      </div>
+      {badge && (
+        <span className="text-xs font-medium px-3 py-1 rounded-full bg-white shadow-sm border border-gray-200">
+          {badge}
+        </span>
+      )}
     </div>
     <div className="p-5">
       {children}
@@ -254,19 +270,25 @@ const ModernSection = ({ title, icon, children, className = "" }) => (
   </div>
 );
 
-// Enhanced Detail Card
-const DetailCard = ({ label, value, icon, fullWidth = false, highlight = false, status = "" }) => {
+// Enhanced Detail Card with better styling
+const DetailCard = ({ label, value, icon, fullWidth = false, highlight = false, status = "neutral", iconColor = "text-gray-400" }) => {
   let statusClasses = "";
-  if (status === "success") statusClasses = "text-green-600 bg-green-50";
-  if (status === "warning") statusClasses = "text-amber-600 bg-amber-50";
+  if (status === "success") statusClasses = "text-green-700 bg-green-100/50 border-green-200";
+  if (status === "warning") statusClasses = "text-amber-700 bg-amber-100/50 border-amber-200";
+  if (status === "neutral") statusClasses = "text-gray-700 bg-gray-100/50 border-gray-200";
   
   return (
     <div className={`${fullWidth ? "col-span-full" : ""}`}>
-      <div className="flex items-start">
-        {icon && <span className="mr-2 mt-1">{icon}</span>}
-        <div>
+      <div className="flex items-start space-x-3">
+        {icon ? (
+          <span className={`mt-1 ${iconColor}`}>{icon}</span>
+        ) : (
+          <div className={`w-2 h-2 rounded-full mt-2 ${iconColor} opacity-70`}></div>
+        )}
+        <div className="flex-1">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">{label}</p>
-          <p className={`mt-1 text-sm font-medium ${highlight ? "text-blue-600" : "text-gray-800"} ${statusClasses} px-2 py-1 rounded`}>
+          <p className={`mt-1 text-sm font-medium ${highlight ? "text-blue-600 font-semibold" : "text-gray-800"} 
+            ${status && status !== "neutral" ? `${statusClasses} px-3 py-1.5 rounded-lg border text-sm` : ""}`}>
             {value || 'Not specified'}
           </p>
         </div>
@@ -274,5 +296,33 @@ const DetailCard = ({ label, value, icon, fullWidth = false, highlight = false, 
     </div>
   );
 };
+
+// New Contact Card component for better contact display
+const ContactCard = ({ type, name, email, phone, color, iconColor }) => (
+  <div className={`rounded-lg border border-gray-200 p-4 ${color}/20 backdrop-blur-sm`}>
+    <div className="flex items-center space-x-3 mb-3">
+      <div className={`p-2 rounded-lg ${color} ${iconColor}`}>
+        {type === 'TPO' && <MdPeople size={18} />}
+        {type === 'Training Coordinator' && <IoIosSchool size={18} />}
+        {type === 'Account Contact' && <MdPayment size={18} />}
+      </div>
+      <h4 className="font-medium text-gray-800">{type}</h4>
+    </div>
+    <div className="space-y-2">
+      <div className="flex items-center text-sm">
+        <span className="text-gray-500 w-20">Name:</span>
+        <span className="font-medium">{name || 'Not specified'}</span>
+      </div>
+      <div className="flex items-center text-sm">
+        <span className="text-gray-500 w-20">Email:</span>
+        <span className="font-medium">{email || 'Not specified'}</span>
+      </div>
+      <div className="flex items-center text-sm">
+        <span className="text-gray-500 w-20">Phone:</span>
+        <span className="font-medium">{phone || 'Not specified'}</span>
+      </div>
+    </div>
+  </div>
+);
 
 export default TrainingDetailModal;
