@@ -299,18 +299,28 @@ LeadDistribution.defaultProps = {
 const CustomTooltip = ({ active, payload, label, timePeriod }) => {
   if (active && payload && payload.length) {
     const dataPoint = payload[0].payload;
+    let timeLabel = "";
+    
+    switch(timePeriod) {
+      case "week":
+        timeLabel = `Day: ${label}`;
+        break;
+      case "month":
+        timeLabel = `Week: ${label}`;
+        break;
+      case "quarter":
+        timeLabel = `Month: ${label}`;
+        break;
+      case "year":
+        timeLabel = `Month: ${label}`;
+        break;
+      default:
+        timeLabel = `Period: ${label}`;
+    }
+    
     return (
       <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
-        <p className="font-medium text-gray-900">{label}</p>
-        <p className="text-sm text-gray-600">
-          {timePeriod === "week"
-            ? "Day"
-            : timePeriod === "month"
-            ? "Week"
-            : timePeriod === "quarter"
-            ? "Month"
-            : "Month"}
-        </p>
+        <p className="font-medium text-gray-900">{timeLabel}</p>
         <p className="text-sm" style={{ color: payload[0].color }}>
           Revenue: ₹{payload[0].value.toLocaleString()}
         </p>
@@ -378,12 +388,6 @@ const SalesDashboard = () => {
     return "Q4 (Jan-Mar)";
   };
 
-  const getFiscalYear = () => {
-    const now = new Date();
-    const year = now.getFullYear();
-    return now.getMonth() < 3 ? `${year - 1}-${year}` : `${year}-${year + 1}`;
-  };
-
   const getDateRange = (period) => {
     const now = new Date();
     const year = now.getFullYear();
@@ -421,15 +425,15 @@ const SalesDashboard = () => {
         }
         break;
 
-      case "year":
-        if (month < 3) {
-          start = new Date(year - 1, 3, 1);
-          end = new Date(year, 2, 31);
-        } else {
-          start = new Date(year, 3, 1);
-          end = new Date(year + 1, 2, 31);
-        }
-        break;
+   case "year":
+  if (month < 3) {
+    start = new Date(year - 1, 3, 1); // April 1 of previous year
+    end = new Date(year, 2, 31);     // March 31 of current year
+  } else {
+    start = new Date(year, 3, 1);    // April 1 of current year
+    end = new Date(year + 1, 2, 31); // March 31 of next year
+  }
+  break;
 
       default:
         return getDateRange("quarter");
@@ -553,34 +557,33 @@ const SalesDashboard = () => {
     
     return { start, end };
   };
+const updatePeriodInfo = (range) => {
+  const { start, end } = range;
+  let info = "";
 
-  const updatePeriodInfo = (range) => {
-    const { start, end } = range;
-    let info = "";
+  switch (timePeriod) {
+    case "week":
+      info = `Current Week: ${start.toLocaleDateString()} to ${end.toLocaleDateString()}`;
+      break;
+    case "month":
+      info = `Current Month: ${start.toLocaleDateString("default", { month: "long" })} ${start.getFullYear()}`;
+      break;
+    case "quarter":
+      const quarter = Math.floor(start.getMonth() / 3) + 1;
+      const quarterMonths = [
+        "Jan-Mar", "Apr-Jun", "Jul-Sep", "Oct-Dec"
+      ][quarter - 1];
+      info = `Current Quarter: Q${quarter} (${quarterMonths}) ${start.getFullYear()}`;
+      break;
+    case "year":
+  info = `Current Fiscal Year: ${start.getFullYear()}-${end.getFullYear()}`;
+  break;
+    default:
+      info = `Current Quarter: ${getCurrentQuarter()}`;
+  }
 
-    switch (timePeriod) {
-      case "week":
-        info = `Week of ${start.toLocaleDateString()} to ${end.toLocaleDateString()}`;
-        break;
-      case "month":
-        info = `Month: ${start.toLocaleDateString("default", { month: "long" })} ${start.getFullYear()}`;
-        break;
-      case "quarter":
-        const quarter = Math.floor(start.getMonth() / 3) + 1;
-        const quarterMonths = [
-          "Jan-Mar", "Apr-Jun", "Jul-Sep", "Oct-Dec"
-        ][quarter - 1];
-        info = `Q${quarter} (${quarterMonths}) ${start.getFullYear()}`;
-        break;
-      case "year":
-        info = `Fiscal Year ${start.getFullYear()}-${end.getFullYear()}`;
-        break;
-      default:
-        info = getCurrentQuarter();
-    }
-
-    setCurrentPeriodInfo(info);
-  };
+  setCurrentPeriodInfo(info);
+};
 
   const processLeadsData = (snapshot) => {
     let revenue = 0;
@@ -592,6 +595,15 @@ const SalesDashboard = () => {
     const teamPerformance = {};
     const recentActivity = [];
     const revenueByDate = {};
+    const chartData = [];
+    const timePoints =
+    timePeriod === "week"
+      ? 7
+      : timePeriod === "month"
+      ? 4
+      : timePeriod === "quarter"
+      ? 3
+      : 12;
 
     snapshot.forEach((doc) => {
       const lead = doc.data();
@@ -610,68 +622,50 @@ const SalesDashboard = () => {
       if (lead.phase === "closed" && lead.totalCost) {
         revenue += lead.totalCost;
 
-        if (lead.closedDate) {
-          try {
-            const closedDate = new Date(lead.closedDate);
-            if (Number.isNaN(closedDate.getTime()))
-              throw new Error("Invalid date");
+       if (lead.closedDate) {
+  try {
+    const closedDate = new Date(lead.closedDate);
+    if (Number.isNaN(closedDate.getTime()))
+      throw new Error("Invalid date");
 
-            let dateKey;
-            if (timePeriod === "week") {
-              dateKey = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
-                closedDate.getDay()
-              ];
-            } else if (timePeriod === "month") {
-              const firstDay = new Date(
-                closedDate.getFullYear(),
-                closedDate.getMonth(),
-                1
-              );
-              const pastDaysOfMonth = closedDate.getDate() - 1;
-              dateKey = `Week ${
-                Math.floor((firstDay.getDay() + pastDaysOfMonth) / 7) + 1
-              }`;
-            } else if (timePeriod === "quarter") {
-              dateKey = [
-                "Jan",
-                "Feb",
-                "Mar",
-                "Apr",
-                "May",
-                "Jun",
-                "Jul",
-                "Aug",
-                "Sep",
-                "Oct",
-                "Nov",
-                "Dec",
-              ][closedDate.getMonth()];
-            } else {
-              dateKey = [
-                "Apr",
-                "May",
-                "Jun",
-                "Jul",
-                "Aug",
-                "Sep",
-                "Oct",
-                "Nov",
-                "Dec",
-                "Jan",
-                "Feb",
-                "Mar",
-              ][closedDate.getMonth()];
-            }
+    let dateKey;
+    if (timePeriod === "week") {
+      dateKey = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
+        closedDate.getDay()
+      ];
+    } else if (timePeriod === "month") {
+      const firstDay = new Date(
+        closedDate.getFullYear(),
+        closedDate.getMonth(),
+        1
+      );
+      const pastDaysOfMonth = closedDate.getDate() - 1;
+      dateKey = `Week ${
+        Math.floor((firstDay.getDay() + pastDaysOfMonth) / 7) + 1
+      }`;
+    } else if (timePeriod === "quarter") {
+      dateKey = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+      ][closedDate.getMonth()];
+    } else {
+      // For fiscal year view (April-March)
+      const month = closedDate.getMonth();
+      dateKey = [
+        "Apr", "May", "Jun", "Jul", "Aug", "Sep",
+        "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"
+      ][month < 3 ? month + 9 : month - 3];
+    }
 
-            if (!revenueByDate[dateKey]) {
-              revenueByDate[dateKey] = { revenue: 0, dealCount: 0 };
-            }
-            revenueByDate[dateKey].revenue += lead.totalCost;
-            revenueByDate[dateKey].dealCount += 1;
-          } catch (e) {
-            console.error("Error processing closed date:", e);
-          }
-        }
+    if (!revenueByDate[dateKey]) {
+      revenueByDate[dateKey] = { revenue: 0, dealCount: 0 };
+    }
+    revenueByDate[dateKey].revenue += lead.totalCost;
+    revenueByDate[dateKey].dealCount += 1;
+  } catch (e) {
+    console.error("Error processing closed date:", e);
+  }
+}
       }
 
       if (lead.tcv) {
@@ -702,61 +696,62 @@ const SalesDashboard = () => {
         time: new Date(lead.createdAt).toLocaleDateString(),
       });
     });
-
-    const chartData = [];
-    const timePoints =
-      timePeriod === "week"
-        ? 7
-        : timePeriod === "month"
-        ? 4
-        : timePeriod === "quarter"
-        ? 3
-        : 12;
-
-    for (let i = 0; i < timePoints; i++) {
-      let dateKey;
-      if (timePeriod === "week") {
-        dateKey = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][i];
-      } else if (timePeriod === "month") {
-        dateKey = `Week ${i + 1}`;
-      } else if (timePeriod === "quarter") {
-        const quarterMonths =
-          timePeriod === "quarter"
-            ? ["Apr", "May", "Jun"]
-            : timePeriod === "quarter"
-            ? ["Jul", "Aug", "Sep"]
-            : timePeriod === "quarter"
-            ? ["Oct", "Nov", "Dec"]
-            : ["Jan", "Feb", "Mar"];
-        dateKey = quarterMonths[i];
-      } else {
-        dateKey = [
-          "Apr",
-          "May",
-          "Jun",
-          "Jul",
-          "Aug",
-          "Sep",
-          "Oct",
-          "Nov",
-          "Dec",
-          "Jan",
-          "Feb",
-          "Mar",
-        ][i];
-      }
-
-      chartData.push({
-        name: dateKey,
-        revenue: revenueByDate[dateKey]?.revenue || 0,
-        dealCount: revenueByDate[dateKey]?.dealCount || 0,
-        leads: Math.floor(
-          ((hotLeads + warmLeads + coldLeads) * (0.7 + Math.random() * 0.6)) /
-            timePoints
-        ),
-      });
+// Update this part in the processLeadsData function
+for (let i = 0; i < timePoints; i++) {
+  let dateKey;
+  if (timePeriod === "week") {
+    dateKey = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][i];
+  } else if (timePeriod === "month") {
+    dateKey = `Week ${i + 1}`;
+  } else if (timePeriod === "quarter") {
+    // Show actual month names for current quarter
+    const now = new Date();
+    const quarterMonth = now.getMonth();
+    if (quarterMonth >= 3 && quarterMonth <= 5) {
+      dateKey = ["Apr", "May", "Jun"][i];
+    } else if (quarterMonth >= 6 && quarterMonth <= 8) {
+      dateKey = ["Jul", "Aug", "Sep"][i];
+    } else if (quarterMonth >= 9 && quarterMonth <= 11) {
+      dateKey = ["Oct", "Nov", "Dec"][i];
+    } else {
+      dateKey = ["Jan", "Feb", "Mar"][i];
     }
+  } else {
+    // For year view - show all 12 months in fiscal year order (April-March)
+    const fiscalMonths = [
+      "Apr", "May", "Jun", "Jul", "Aug", "Sep",
+      "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"
+    ];
+    dateKey = fiscalMonths[i];
+  }
 
+  // Calculate current month highlight
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  let isCurrentMonth = false;
+  
+  if (timePeriod === "year") {
+    // Fiscal year runs April (3) to March (2)
+    // Map calendar months to fiscal months:
+    // Apr(3)=0, May(4)=1, ..., Mar(2)=11
+    const fiscalMonthIndex = currentMonth < 3 ? currentMonth + 9 : currentMonth - 3;
+    isCurrentMonth = i === fiscalMonthIndex;
+  } else if (timePeriod === "quarter") {
+    // For quarter view, highlight current month in the quarter
+    const quarterStartMonth = Math.floor(currentMonth / 3) * 3;
+    isCurrentMonth = (currentMonth - quarterStartMonth) === i;
+  }
+
+  chartData.push({
+    name: dateKey,
+    revenue: revenueByDate[dateKey]?.revenue || 0,
+    dealCount: revenueByDate[dateKey]?.dealCount || 0,
+    leads: Math.floor(
+      ((hotLeads + warmLeads + coldLeads) * (0.7 + Math.random() * 0.6)) / timePoints
+    ),
+    currentMonth: isCurrentMonth
+  });
+}
     return {
       revenue,
       hotLeads,
@@ -1029,30 +1024,27 @@ const SalesDashboard = () => {
 
               {isFilterOpen && (
                 <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
-                  <div className="p-3">
-                    <h3 className="text-sm font-medium text-gray-700 mb-2">
-                      Time Period
-                    </h3>
-                    <div className="space-y-1">
-                      {["week", "month", "quarter", "year"].map((period) => (
-                        <button
-                          type="button"
-                          key={period}
-                          onClick={() => {
-                            setTimePeriod(period);
-                            setIsFilterOpen(false);
-                          }}
-                          className={`w-full text-left px-3 py-1.5 text-sm rounded-md transition-colors ${
-                            timePeriod === period
-                              ? "bg-indigo-100 text-indigo-700"
-                              : "text-gray-700 hover:bg-gray-100"
-                          }`}
-                        >
-                          {period.charAt(0).toUpperCase() + period.slice(1)}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+    <div className="flex space-x-2">
+  {[
+    { value: "week", label: "This Week" },
+    { value: "month", label: "This Month" },
+    { value: "quarter", label: "Current Qtr" },
+    { value: "year", label: "This Year" }
+  ].map((period) => (
+    <button
+      type="button"
+      key={period.value}
+      onClick={() => setTimePeriod(period.value)}
+      className={`text-xs px-3 py-1 rounded-full ${
+        timePeriod === period.value
+          ? "bg-indigo-600 text-white"
+          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+      }`}
+    >
+      {period.label}
+    </button>
+  ))}
+</div>
                 </div>
               )}
             </div>
