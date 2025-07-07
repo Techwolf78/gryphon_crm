@@ -79,15 +79,28 @@ const filteredLeads = useMemo(() => {
   if (!currentUser) return [];
 
   return Object.entries(leads)
-    .filter(([, lead]) => lead.phase === "closed")
     .filter(([, lead]) => {
       if (viewMyLeadsOnly) {
+        // ✅ My Leads tab
         return lead.assignedTo?.uid === currentUser.uid;
       } else {
-        return (
-          lead.assignedTo?.uid !== currentUser.uid &&
-          isUserInTeam(lead.assignedTo?.uid)
-        );
+        // ✅ My Team tab
+        if (currentRole === "Head") {
+          // Head ke liye: sirf team members ki leads, khud ki nahi
+          return isUserInTeam(lead.assignedTo?.uid);
+        } else if (currentRole === "Manager") {
+          // Manager ke liye: team members + khud ki leads
+          return (
+            isUserInTeam(lead.assignedTo?.uid) ||
+            lead.assignedTo?.uid === currentUser.uid
+          );
+        } else {
+          // Baaki koi role: default same as manager
+          return (
+            isUserInTeam(lead.assignedTo?.uid) ||
+            lead.assignedTo?.uid === currentUser.uid
+          );
+        }
       }
     })
     .filter(([, lead]) => {
@@ -100,7 +113,8 @@ const filteredLeads = useMemo(() => {
       return closedQuarter === selectedQuarter;
     })
     .sort(([, a], [, b]) => new Date(b.closedDate) - new Date(a.closedDate));
-}, [leads, currentUser, filterType, selectedQuarter, viewMyLeadsOnly, users]);
+}, [leads, currentUser, currentRole, filterType, selectedQuarter, viewMyLeadsOnly, users]);
+
 
 
   const startIdx = (currentPage - 1) * rowsPerPage;
