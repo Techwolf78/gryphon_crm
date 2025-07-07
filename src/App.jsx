@@ -19,6 +19,7 @@ import LearningDevelopment from "./pages/LearningDevelopment";
 import DigitalMarketing from "./pages/Marketing";
 import Footer from "./pages/footer";
 import UpdateProfile from "./components/UpdateProfile";
+import Help from "./pages/Help";
 
 const AppContent = () => {
   const location = useLocation();
@@ -39,10 +40,12 @@ const AppContent = () => {
           }
         >
           <Route index element={<Dashboard />} /> {/* /dashboard */}
+       
           <Route path="profile" element={<UpdateProfile />} />
           <Route path="admin" element={<Admin />} />
           <Route path="sales" element={<Sales />} />
           <Route path="placement" element={<Placement />} />
+             <Route path="help" element={<Help />} />
           <Route
             path="learning-development"
             element={<LearningDevelopment />}
@@ -58,7 +61,7 @@ const AppContent = () => {
 
 const App = () => (
   <AuthProvider>
-    <Router >
+    <Router>
       <AppContent />
     </Router>
   </AuthProvider>

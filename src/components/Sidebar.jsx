@@ -1,7 +1,7 @@
 import React, { useContext } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
-import logo from "../assets/sync-black.png"; // Adjust the path as necessary
+import logo from "../assets/sync-black.png";
 import {
   FiHome,
   FiUsers,
@@ -11,6 +11,7 @@ import {
   FiTrendingUp,
   FiChevronLeft,
   FiChevronRight,
+  FiHelpCircle,
 } from "react-icons/fi";
 
 // Role-based links
@@ -42,6 +43,7 @@ const roleLinks = {
   ],
 };
 
+// Normalize roles
 const normalizeRole = (roleOrDepartment) => {
   if (!roleOrDepartment) return "";
 
@@ -70,7 +72,8 @@ const Sidebar = ({ collapsed, onToggle }) => {
 
   if (!user) return null;
 
-const normalizedRole = normalizeRole(user.department) || normalizeRole(user.role);
+  const normalizedRole =
+    normalizeRole(user.department) || normalizeRole(user.role);
 
   const isActive = (path) => {
     if (path === "/dashboard") {
@@ -79,48 +82,50 @@ const normalizedRole = normalizeRole(user.department) || normalizeRole(user.role
     return location.pathname.startsWith(path);
   };
 
-  const commonLinks = [
+  const links = [
     {
       label: "Dashboard",
       path: "/dashboard",
       icon: <FiHome />,
       skipRedirect: true,
     },
+    ...(roleLinks[normalizedRole] || []),
+    {
+      label: "Help",
+      path: "/dashboard/help",
+      icon: <FiHelpCircle />,
+      skipRedirect: true,
+    },
   ];
-
-  const links = [...commonLinks, ...(roleLinks[normalizedRole] || [])];
-
 
   return (
     <aside
       className={`
-      ${collapsed ? "w-20" : "w-[168px]"}
-      bg-white border-r border-gray-200 flex flex-col
-      fixed h-full z-50
-      transition-all duration-300 ease-in-out
-    `}
+        ${collapsed ? "w-20" : "w-[168px]"}
+        bg-white border-r border-gray-200 flex flex-col
+        fixed h-full z-50
+        transition-all duration-300 ease-in-out
+      `}
     >
-<div className="px-6 py-6 text-2xl font-bold border-b border-gray-200 flex items-center justify-between">
-  {!collapsed && (
-    <img 
-      src= {logo}
-      alt="SRC Logo"
-      className="h-8" // Adjust height as needed
-    />
-  )}
-  <button
-    onClick={onToggle}
-    className="text-gray-500 hover:text-blue-600 focus:outline-none"
-    aria-label="Toggle Sidebar"
-  >
-    {collapsed ? (
-      <FiChevronRight size={24} />
-    ) : (
-      <FiChevronLeft size={24} />
-    )}
-  </button>
-</div>
+      {/* Header */}
+      <div className="px-6 py-6 text-2xl font-bold border-b border-gray-200 flex items-center justify-between">
+        {!collapsed && (
+          <img
+            src={logo}
+            alt="SRC Logo"
+            className="h-8"
+          />
+        )}
+        <button
+          onClick={onToggle}
+          className="text-gray-500 hover:text-blue-600 focus:outline-none"
+          aria-label="Toggle Sidebar"
+        >
+          {collapsed ? <FiChevronRight size={24} /> : <FiChevronLeft size={24} />}
+        </button>
+      </div>
 
+      {/* Links */}
       <nav className="flex-grow px-4 py-6 space-y-3 overflow-y-auto">
         {links.map(({ label, path, icon, skipRedirect }) => (
           <Link
