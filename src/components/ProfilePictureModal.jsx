@@ -21,6 +21,12 @@ const ProfilePictureModal = ({
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
+  // Updated avatars array with only male and female options
+  const genderAvatars = [
+    "https://res.cloudinary.com/dcjmaapvi/image/upload/v1751887096/profile5_xv4l7y.jpg", // male
+    "https://res.cloudinary.com/dcjmaapvi/image/upload/v1751887096/profile2_ghwny2.jpg"  // female
+  ];
+
   const handleUpload = async (file) => {
     const MAX_SIZE_MB = 10;
     const ALLOWED_TYPES = [
@@ -235,17 +241,17 @@ const ProfilePictureModal = ({
             />
           </div>
 
-          {/* Avatar Selection */}
+          {/* Avatar Selection - Updated to show only male and female avatars */}
           <div className="mb-6">
             <h4 className="text-sm font-medium text-gray-700 mb-3">
               Or select an avatar:
             </h4>
-            <div className="grid grid-cols-5 gap-3">
-              {avatars.map((img, idx) => (
+            <div className="flex justify-center gap-6">
+              {genderAvatars.map((img, idx) => (
                 <button
                   key={idx}
                   onClick={() => !uploading && setSelectedImage(img)}
-                  className={`aspect-square rounded-full overflow-hidden transition-all ${
+                  className={`aspect-square w-20 h-20 rounded-full overflow-hidden transition-all ${
                     selectedImage === img
                       ? "ring-2 ring-blue-500 scale-105"
                       : "hover:ring-1 hover:ring-gray-300"
@@ -254,7 +260,7 @@ const ProfilePictureModal = ({
                 >
                   <img
                     src={img}
-                    alt={`Avatar ${idx + 1}`}
+                    alt={idx === 0 ? "Male avatar" : "Female avatar"}
                     className="h-full w-full object-cover"
                   />
                 </button>
