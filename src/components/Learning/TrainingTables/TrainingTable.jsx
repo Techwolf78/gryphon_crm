@@ -34,7 +34,7 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
+    <div className="bg-white rounded-xl min-h-screen shadow-lg overflow-hidden border border-gray-100">
       {/* Header Row - Desktop */}
       {!isMobile && (
         <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-4 bg-gradient-to-r from-blue-50 to-blue-100 text-gray-700 font-semibold text-sm uppercase tracking-wider">

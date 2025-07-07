@@ -38,7 +38,7 @@ const MOUUploadSection = ({
             Signed MOU <span className="text-red-500">*</span>
           </label>
           <div className="flex gap-2">
-            <label className="h-[42px] flex-1 flex items-center justify-center w-full p-2 border border-gray-200 rounded-lg cursor-pointer bg-blue-700 hover:border-blue-300 hover:bg-blue-50 transition-colors">
+            <label className="h-[42px] flex-1 flex items-center justify-center w-full p-2 border border-gray-200 rounded-lg cursor-pointer bg-blue-700 hover:border-blue-300  transition-colors">
               <div className="flex items-center justify-center gap-2 w-full">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
