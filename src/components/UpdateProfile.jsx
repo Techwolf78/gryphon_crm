@@ -14,24 +14,25 @@ import {
 import { db } from "../firebase";
 import { toast } from "react-toastify";
 import { FaUserCircle, FaEdit, FaSpinner, FaArrowLeft } from "react-icons/fa";
-import defaultAvatar from "/home/profile1.png";
+import defaultAvatar from "../../public/home/profile5.jpg";
 import ProfilePictureModal from "./ProfilePictureModal";
 import { useNavigate } from "react-router-dom";
 
 const avatars = [
-  "/home/profile2.jpg",
-  "/home/profile3.jpg",
-  "/home/profile4.jpg",
-  "/home/profile5.jpg",
-  "/home/profile6.png",
-  "/home/profile7.jpg",
-  "/home/profile10.jpg",
+  "../../public/home/profile1.png",
+  "../../public/home/profile2.jpg",
+  "../../public/home/profile3.jpg",
+  "../../public/home/profile4.jpg",
+  "../../public/home/profile6.png",
+  "../../public/home/profile7.jpg",
+  "../../public/home/profile10.jpg",
 ];
 
 export default function UpdateProfile({ onClose }) {
   const { user, setPhotoURL, photoURL } = useContext(AuthContext);
   const [currentImage, setCurrentImage] = useState("");
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false); // New state for upload progress
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [profileData, setProfileData] = useState(null);
   const [userDetails, setUserDetails] = useState(null);
@@ -123,6 +124,7 @@ export default function UpdateProfile({ onClose }) {
     if (!user || !imageUrl) return;
 
     try {
+      setUploading(true); // Start upload
       const userProfileRef = doc(db, "userprofile", user.uid);
       await setDoc(
         userProfileRef,
@@ -138,6 +140,9 @@ export default function UpdateProfile({ onClose }) {
     } catch (error) {
       console.error("Error updating profile:", error);
       toast.error("Failed to update profile picture");
+    } finally {
+      setUploading(false); // End upload
+      setShowUpdateModal(false);
     }
   };
 
@@ -160,6 +165,7 @@ export default function UpdateProfile({ onClose }) {
         onSave={handleSaveImage}
         avatars={avatars}
         defaultIcon={defaultAvatar}
+        uploading={uploading}
       />
     );
   }
@@ -195,11 +201,22 @@ export default function UpdateProfile({ onClose }) {
                   ) : (
                     <FaUserCircle className="h-full w-full text-gray-300" />
                   )}
+                  {/* Uploading overlay */}
+                  {uploading && (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-full">
+                      <FaSpinner className="text-white text-3xl animate-spin" />
+                    </div>
+                  )}
                 </div>
                 <button
-                  onClick={() => setShowUpdateModal(true)}
-                  className="absolute bottom-4 right-4 bg-white p-3 rounded-full shadow-md text-blue-600 hover:text-blue-800 hover:bg-gray-50 transition-all transform hover:scale-105"
-                  title="Edit profile picture"
+                  onClick={() => !uploading && setShowUpdateModal(true)}
+                  disabled={uploading}
+                  className={`absolute bottom-4 right-4 p-3 rounded-full shadow-md transition-all transform ${
+                    uploading
+                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      : "bg-white text-blue-600 hover:text-blue-800 hover:bg-gray-50 hover:scale-105"
+                  }`}
+                  title={uploading ? "Uploading..." : "Edit profile picture"}
                 >
                   <FaEdit className="text-lg" />
                 </button>
