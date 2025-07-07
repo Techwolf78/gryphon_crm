@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { FiDownload, FiChevronDown, FiFilter, FiDatabase, FiInfo } from "react-icons/fi";
+import { FiDownload, FiChevronDown, FiFilter, FiDatabase, FiInfo, FiEye } from "react-icons/fi";
 import * as XLSX from "xlsx-js-style";
 import { saveAs } from "file-saver";
 
-const ExportPlacementData = ({ companies }) => {
+const ExportPlacementData = ({ companies, filteredCompanies }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -104,13 +104,13 @@ const ExportPlacementData = ({ companies }) => {
     return sortedGrouped;
   };
 
-  const handleExport = () => {
-    if (!companies || companies.length === 0) {
+  const exportToExcel = (data, fileNamePrefix) => {
+    if (!data || data.length === 0) {
       alert("No data to export");
       return;
     }
 
-    const groupedData = groupByDate(companies);
+    const groupedData = groupByDate(data);
     const wb = XLSX.utils.book_new();
 
     Object.entries(groupedData).forEach(([date, data]) => {
@@ -200,11 +200,19 @@ const ExportPlacementData = ({ companies }) => {
       XLSX.utils.book_append_sheet(wb, ws, sheetName);
     });
 
-    const fileName = `Placement_Data_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const fileName = `${fileNamePrefix}_${new Date().toISOString().split('T')[0]}.xlsx`;
     const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
     saveAs(new Blob([wbout], { type: "application/octet-stream" }), fileName);
 
     setMenuOpen(false);
+  };
+
+  const handleExportAll = () => {
+    exportToExcel(companies, "All_Placement_Data");
+  };
+
+  const handleExportCurrent = () => {
+    exportToExcel(filteredCompanies, "Current_Viewing_Data");
   };
 
   return (
@@ -231,11 +239,18 @@ const ExportPlacementData = ({ companies }) => {
           </div>
           <div className="py-1">
             <button
-              onClick={handleExport}
+              onClick={handleExportAll}
               className="flex items-center w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-150"
             >
               <FiDatabase className="w-4 h-4 mr-3 text-blue-500" />
               All Placement Data
+            </button>
+            <button
+              onClick={handleExportCurrent}
+              className="flex items-center w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-150"
+            >
+              <FiEye className="w-4 h-4 mr-3 text-blue-500" />
+              Current Viewing Data
             </button>
           </div>
           <div className="px-2 py-1 bg-gray-50 text-xs text-gray-500 flex items-center gap-1 whitespace-nowrap">

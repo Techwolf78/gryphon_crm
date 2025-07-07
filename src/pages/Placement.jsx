@@ -67,13 +67,13 @@ function Placement() {
   };
 
   return (
-    <div className="p-6">
-      <h2 className="text-2xl font-bold mb-6 text-blue-800">
+    <div className="p-2">
+      <h2 className="text-2xl font-bold mb-1 text-blue-800">
         Placement Management
       </h2>
 
       {/* Tabs */}
-      <div className="flex mb-6 border-b">
+      <div className="flex mb-3 border-b">
         <button
           className={`px-4 py-2 font-medium ${!selectedLead ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
           onClick={() => setSelectedLead(null)}
@@ -84,7 +84,7 @@ function Placement() {
           className={`px-4 py-2 font-medium ${selectedLead !== null ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
           onClick={() => leads.length > 0 && setSelectedLead(leads[0])}
         >
-          Placement Leads
+          Placement Stats
         </button>
       </div>
 

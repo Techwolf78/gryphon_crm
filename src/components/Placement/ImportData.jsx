@@ -18,18 +18,28 @@ const ImportData = ({ show, onClose, handleImportComplete }) => {
   const dropdownRef = useRef(null);
   const auth = getAuth();
 
-  // Required fields from your Add JD form
   const requiredFields = [
     "companyName",
     "course",
-    "specialization",
     "jobType",
     "jobDesignation",
     "jobLocation",
-    "status" // Added status as required field
+    "status"
   ];
 
-  // Close dropdown when clicking outside
+  const statusMapping = {
+    "ongoing": "ongoing",
+    "onhold": "onhold",
+    "complete": "complete",
+    "cancel": "cancel",
+    "noapplications": "noapplications",
+    "Ongoing(5)": "ongoing",
+    "Onhold(0)": "onhold",
+    "Complete(0)": "complete",
+    "Cancel(0)": "cancel",
+    "Noapplications(0)": "noapplications"
+  };
+
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -62,17 +72,39 @@ const ImportData = ({ show, onClose, handleImportComplete }) => {
   };
 
   const validateStatus = (status) => {
-    const validStatuses = ["ongoing", "onhold", "complete", "cancel", "noapplications"];
-    return validStatuses.includes(status.toLowerCase());
+    if (!status) return false;
+    const normalizedStatus = status.toLowerCase().replace(/\s*\(\d+\)\s*$/, '');
+    return Object.keys(statusMapping).includes(normalizedStatus);
   };
 
   const validateDate = (dateString) => {
     if (!dateString) return true;
+    if (typeof dateString === 'object' && dateString instanceof Date) return true;
+    if (typeof dateString === 'number') return true;
+    
     const dateRegex = /^\d{2}\/\d{2}\/\d{4}$/;
     if (!dateRegex.test(dateString)) return false;
+    
     const [day, month, year] = dateString.split('/').map(Number);
     const date = new Date(year, month - 1, day);
     return !isNaN(date.getTime());
+  };
+
+  const formatDate = (dateValue) => {
+    if (!dateValue) return "";
+    if (typeof dateValue === 'string') return dateValue;
+    
+    try {
+      const date = new Date(dateValue);
+      if (isNaN(date.getTime())) return "";
+      
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch (e) {
+      return "";
+    }
   };
 
   const validateAndUploadData = async (data) => {
@@ -81,7 +113,6 @@ const ImportData = ({ show, onClose, handleImportComplete }) => {
         throw new Error("File is empty");
       }
 
-      // Validate required fields
       const sampleKeys = Object.keys(data[0] || {});
       const missingFields = requiredFields.filter(f => !sampleKeys.includes(f));
 
@@ -89,7 +120,6 @@ const ImportData = ({ show, onClose, handleImportComplete }) => {
         throw new Error(`Missing required fields: ${missingFields.join(", ")}`);
       }
 
-      // Validate each record
       const validatedData = [];
       const errorData = [];
 
@@ -97,7 +127,6 @@ const ImportData = ({ show, onClose, handleImportComplete }) => {
         const errors = {};
         let hasError = false;
 
-        // Check required fields
         requiredFields.forEach(field => {
           if (!item[field] || String(item[field]).trim() === "") {
             errors[field] = "This field is required";
@@ -105,15 +134,18 @@ const ImportData = ({ show, onClose, handleImportComplete }) => {
           }
         });
 
-        // Validate status
         if (item.status && !validateStatus(item.status)) {
-          errors.status = "Status must be one of: ongoing, onhold, complete, cancel, noapplications";
+          errors.status = "Invalid status value";
           hasError = true;
         }
 
-        // Validate dates if present
         if (item.joiningPeriod && !validateDate(item.joiningPeriod)) {
           errors.joiningPeriod = "Date must be in format dd/mm/yyyy";
+          hasError = true;
+        }
+
+        if (item.companyOpenDate && !validateDate(item.companyOpenDate)) {
+          errors.companyOpenDate = "Date must be in format dd/mm/yyyy";
           hasError = true;
         }
 
@@ -138,7 +170,6 @@ const ImportData = ({ show, onClose, handleImportComplete }) => {
         throw new Error(`${errorData.length} records have validation errors. Download error file to see details.`);
       }
 
-      // Upload to Firebase
       setImportStatus(prev => ({ ...prev, loading: true }));
 
       const batchResults = await Promise.allSettled(
@@ -167,7 +198,8 @@ const ImportData = ({ show, onClose, handleImportComplete }) => {
     try {
       const currentUser = auth.currentUser;
       
-      // Map Excel columns to your Add JD form fields
+      const normalizedStatus = statusMapping[data.status.toLowerCase().replace(/\s*\(\d+\)\s*$/, '')] || "ongoing";
+      
       const companyData = {
         companyName: data.companyName || "",
         companyWebsite: data.companyWebsite || "",
@@ -175,6 +207,7 @@ const ImportData = ({ show, onClose, handleImportComplete }) => {
         specialization: data.specialization || "",
         passingYear: data.passingYear || "",
         marksCriteria: data.marksCriteria || "",
+        backlogCriteria: data.backlogCriteria || "",
         otherCriteria: data.otherCriteria || "",
         jobType: data.jobType || "",
         jobDesignation: data.jobDesignation || "",
@@ -183,12 +216,13 @@ const ImportData = ({ show, onClose, handleImportComplete }) => {
         internshipDuration: data.internshipDuration || "",
         stipend: data.stipend || "",
         modeOfInterview: data.modeOfInterview || "Online",
-        joiningPeriod: data.joiningPeriod || "",
+        joiningPeriod: formatDate(data.joiningPeriod) || "",
+        companyOpenDate: formatDate(data.companyOpenDate) || "",
         modeOfWork: data.modeOfWork || "",
         jobDescription: data.jobDescription || "",
         source: data.source || "",
         coordinator: data.coordinator || "",
-        status: data.status ? data.status.toLowerCase() : "ongoing", // Ensure lowercase
+        status: normalizedStatus,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         assignedTo: currentUser ? {
@@ -197,9 +231,7 @@ const ImportData = ({ show, onClose, handleImportComplete }) => {
         } : null
       };
 
-      // Add to Firestore
       await addDoc(collection(db, "companies"), companyData);
-
       return { success: true };
     } catch (error) {
       console.error("Error uploading company data:", error);
@@ -251,7 +283,14 @@ const ImportData = ({ show, onClose, handleImportComplete }) => {
       return cleanItem;
     }));
 
-    XLSX.utils.book_append_sheet(workbook, ws, "Errors");
+    const errorMessages = errorData.map(item => ({
+      "Row Number": item.__rowNumber,
+      ...item.__errors
+    }));
+    const errorWs = XLSX.utils.json_to_sheet(errorMessages);
+    
+    XLSX.utils.book_append_sheet(workbook, ws, "Original Data");
+    XLSX.utils.book_append_sheet(workbook, errorWs, "Error Details");
     XLSX.writeFile(workbook, "Import_Errors.xlsx");
   };
 
@@ -263,6 +302,7 @@ const ImportData = ({ show, onClose, handleImportComplete }) => {
       specialization: "CS/IT",
       passingYear: "2025",
       marksCriteria: "60% & Above Throughout",
+      backlogCriteria: "No Active Backlog",
       otherCriteria: "",
       jobType: "Full Time",
       jobDesignation: "Software Engineer",
@@ -272,17 +312,17 @@ const ImportData = ({ show, onClose, handleImportComplete }) => {
       stipend: "",
       modeOfInterview: "Online",
       joiningPeriod: "15/08/2025",
+      companyOpenDate: "10/07/2025",
       modeOfWork: "Hybrid",
       jobDescription: "Develop and maintain software applications",
       source: "Company Website",
       coordinator: "John Doe",
-      status: "ongoing" // Added status field
+      status: "Ongoing(5)"
     }];
 
     const workbook = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(sampleData);
 
-    // Apply styles to headers
     const headerKeys = Object.keys(sampleData[0]);
     headerKeys.forEach((key, colIndex) => {
       const cellAddress = XLSX.utils.encode_cell({ r: 0, c: colIndex });
@@ -305,7 +345,20 @@ const ImportData = ({ show, onClose, handleImportComplete }) => {
       };
     });
 
+    const instructions = [
+      ["INSTRUCTIONS FOR IMPORTING DATA"],
+      [""],
+      ["1. Required fields are highlighted in green"],
+      ["2. Status must be one of: Ongoing(5), Onhold(0), Complete(0), Cancel(0), Noapplications(0)"],
+      ["3. Dates must be in dd/mm/yyyy format or Excel date format"],
+      ["4. Salary should be in LPA (just the number)"],
+      ["5. Stipend should be in monthly amount (just the number)"],
+      ["6. For empty fields, leave the cell blank"]
+    ];
+    
+    const instructionWs = XLSX.utils.aoa_to_sheet(instructions);
     XLSX.utils.book_append_sheet(workbook, ws, "Sample Data");
+    XLSX.utils.book_append_sheet(workbook, instructionWs, "Instructions");
     XLSX.writeFile(workbook, "JD_Import_Template.xlsx");
     setIsDropdownOpen(false);
   };
@@ -313,11 +366,13 @@ const ImportData = ({ show, onClose, handleImportComplete }) => {
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 flex items-start justify-center bg-black bg-opacity-50 z-50 pt-16">
+    <div className="fixed inset-0 flex items-start justify-center bg-black bg-transparent z-54 pt-16">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl">
         <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white px-6 py-4 flex justify-between items-center">
           <h2 className="text-lg font-semibold">Import JD Data</h2>
-          <button onClick={onClose}><XIcon className="h-5 w-5 text-white" /></button>
+          <button onClick={onClose} className="text-white hover:text-gray-200">
+            <FiX className="h-5 w-5" />
+          </button>
         </div>
 
         <div className="p-6">
@@ -441,9 +496,11 @@ const ImportData = ({ show, onClose, handleImportComplete }) => {
             <ul className="text-sm text-gray-600 list-disc pl-5 space-y-1">
               <li>Download the sample file to see the required format</li>
               <li>Required fields are highlighted in green</li>
-              <li>Status must be one of: ongoing, onhold, complete, cancel, noapplications</li>
-              <li>Dates must be in dd/mm/yyyy format</li>
+              <li>Status must be one of: Ongoing(5), Onhold(0), Complete(0), Cancel(0), Noapplications(0)</li>
+              <li>Dates must be in dd/mm/yyyy format or Excel date format</li>
               <li>Salary should be in LPA (just the number)</li>
+              <li>Stipend should be in monthly amount (just the number)</li>
+              <li>For empty fields, leave the cell blank</li>
             </ul>
           </div>
         </div>
@@ -451,7 +508,7 @@ const ImportData = ({ show, onClose, handleImportComplete }) => {
         <div className="sticky bottom-0 flex justify-end px-6 py-4 bg-gray-100 border-t">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400"
+            className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400 text-gray-800"
           >
             Close
           </button>
