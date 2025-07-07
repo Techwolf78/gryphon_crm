@@ -1,55 +1,17 @@
-const UserAvatar = ({ photoURL, name, size = 8 }) => {
-  const initials = name
-    ? name
-        .split(" ")
-        .slice(0, 2) // Only use first two names
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-    : "?";
-
-  const sizeClasses = {
-    8: "w-8 h-8 text-xs",
-    10: "w-10 h-10 text-sm",
-    12: "w-12 h-12 text-base",
-    32: "w-8 h-8 text-xs", // Default for table
-    40: "w-10 h-10 text-sm", // For modal
-  };
-
-  return (
-    <div
-      className={`flex items-center justify-center rounded-full bg-gray-200 text-gray-600 font-medium ${
-        sizeClasses[size] || sizeClasses[8]
-      }`}
-    >
-      {photoURL ? (
-        <img
-          src={photoURL}
-          alt={name}
-          className="w-full h-full rounded-full object-cover"
-          onError={(e) => {
-            e.target.style.display = "none";
-            e.target.nextSibling.style.display = "block";
-          }}
-        />
-      ) : (
-        <span className="text-xs">{initials}</span>
-      )}
-      {/* Fallback if image fails to load */}
-      <span className="hidden text-xs">{initials}</span>
-    </div>
-  );
-};
-
 import React, { useEffect, useState } from "react";
 import {
-  FaSearch,
-  FaUserShield,
-  FaBuilding,
-  FaPlus,
-  FaSyncAlt,
-  FaTrash,
-} from "react-icons/fa";
+  FiSearch,
+  FiUser,
+  FiUsers,
+  FiHome,
+  FiPlus,
+  FiRefreshCw,
+  FiTrash2,
+  FiAlertCircle,
+  FiCalendar,
+  FiActivity,
+  FiClock
+} from "react-icons/fi";
 import {
   collection,
   getDocs,
@@ -58,12 +20,14 @@ import {
   query,
   orderBy,
   limit,
-  getDoc, // Moved here
+  getDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import { motion } from "framer-motion";
 import NewUser from "../components/Admin/NewUser";
 import AuditLogs from "../components/Admin/AuditLogs";
 import LoginAnalytics from "../components/Admin/LoginAnalytics";
+import UserAvatar from "../components/Admin/UserAvatar";
 
 const Admin = () => {
   const [users, setUsers] = useState([]);
@@ -75,7 +39,7 @@ const Admin = () => {
   const [roleFilter, setRoleFilter] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
+  const itemsPerPage = 10;
 
   useEffect(() => {
     const cachedLogs = sessionStorage.getItem("auditLogs");
@@ -93,23 +57,19 @@ const Admin = () => {
 const handleRefresh = async () => {
   setRefreshing(true);
   try {
-    const usersSnap = await getDocs(collection(db, "users"));
-    const logsSnap = await getDocs(
-      query(collection(db, "audit_logs"), orderBy("date", "desc"), limit(50))
-    );
+    const [usersSnap, logsSnap] = await Promise.all([
+      getDocs(collection(db, "users")),
+      getDocs(query(collection(db, "audit_logs"), orderBy("date", "desc"), limit(50)))
+    ]);
 
-    // Fetch profile pictures for each user
     const userData = await Promise.all(
       usersSnap.docs.map(async (userDoc) => {
         try {
           const userProfile = await getDoc(doc(db, "userprofile", userDoc.data().uid));
-  
           return {
             id: userDoc.id,
             ...userDoc.data(),
-            profilePicUrl: userProfile.exists() 
-              ? userProfile.data().profilePicUrl 
-              : null,
+            profilePicUrl: userProfile.exists() ? userProfile.data().profilePicUrl : null,
           };
         } catch (error) {
           console.error(`Error fetching profile for user ${userDoc.id}:`, error);
@@ -142,20 +102,19 @@ const handleRefresh = async () => {
     if (!deleteUser) return;
     setLoadingDelete(true);
     try {
-      await deleteDoc(doc(db, "users", deleteUser.id));
-      await deleteDoc(doc(db, "userprofile", deleteUser.id)); // Also delete profile
+      await Promise.all([
+        deleteDoc(doc(db, "users", deleteUser.id)),
+        deleteDoc(doc(db, "userprofile", deleteUser.id))
+      ]);
       const updatedUsers = users.filter((u) => u.id !== deleteUser.id);
       setUsers(updatedUsers);
       sessionStorage.setItem("userList", JSON.stringify(updatedUsers));
       setDeleteUser(null);
     } catch (error) {
       console.error("Error deleting user:", error);
-      alert("Failed to delete user. Please try again.");
     }
     setLoadingDelete(false);
   };
-
-  const handleCancelDelete = () => setDeleteUser(null);
 
   const filteredUsers = users.filter((u) => {
     return (
@@ -173,212 +132,293 @@ const handleRefresh = async () => {
     currentPage * itemsPerPage
   );
 
+  const todayLogins = logs.filter((log) => {
+    if (log.action !== "Logged in") return false;
+    const today = new Date();
+    const logDate = log.date?.toDate ? log.date.toDate() : new Date(log.date);
+    return (
+      logDate.getDate() === today.getDate() &&
+      logDate.getMonth() === today.getMonth() &&
+      logDate.getFullYear() === today.getFullYear()
+    );
+  }).length;
+
   return (
-    <div className="mx-auto space-y-10">
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <h1 className="text-4xl font-extrabold text-blue-900 tracking-tight">
-          Admin Dashboard
-        </h1>
-      </header>
+    <div className="space-y-8">
+      {/* Header */}
+      <motion.header 
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+      >
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+          <p className="text-gray-500 mt-1">Manage users and view system analytics</p>
+        </div>
+        <NewUser onUserAdded={handleRefresh} />
+      </motion.header>
 
-      <section className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        <div className="bg-gradient-to-br from-blue-100 to-blue-300 p-6 rounded-2xl shadow-lg text-blue-900">
-          <h3 className="uppercase text-sm font-semibold">Total Users</h3>
-          <p className="text-4xl font-bold">{users.length}</p>
-        </div>
-        <div className="bg-gradient-to-br from-green-100 to-green-300 p-6 rounded-2xl shadow-lg text-green-900">
-          <h3 className="uppercase text-sm font-semibold">Logins Today</h3>
-          <p className="text-4xl font-bold">
-            {
-              logs.filter((log) => {
-                const today = new Date();
-                const logDate = log.date?.toDate
-                  ? log.date.toDate()
-                  : new Date(log.date);
-                return (
-                  log.action === "Logged in" &&
-                  logDate.getDate() === today.getDate() &&
-                  logDate.getMonth() === today.getMonth() &&
-                  logDate.getFullYear() === today.getFullYear()
-                );
-              }).length
-            }
-          </p>
-        </div>
-        <div className="flex items-center justify-end">
-          <NewUser onUserAdded={handleRefresh} />
-        </div>
-      </section>
-
-      <section className="space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <h2 className="text-2xl font-semibold text-gray-800">
-            User Management
-          </h2>
-          <div className="flex flex-wrap gap-2 w-full md:w-auto">
-            <div className="relative flex-1 min-w-[150px]">
-              <FaSearch className="absolute left-3 top-3 text-gray-500" />
-              <input
-                type="text"
-                placeholder="Search by name"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-10 w-full px-4 py-2 text-sm shadow rounded"
-              />
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <motion.div 
+          whileHover={{ y: -2 }}
+          className="bg-white rounded-xl shadow-sm border border-gray-100 p-6"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-500">Total Users</p>
+              <p className="text-3xl font-bold text-gray-900 mt-1">{users.length}</p>
             </div>
-            <div className="relative flex-1 min-w-[150px]">
-              <FaUserShield className="absolute left-3 top-3 text-gray-500" />
-              <select
-                className="pl-10 pr-4 py-2 w-full text-sm shadow rounded"
-                value={roleFilter}
-                onChange={(e) => setRoleFilter(e.target.value)}
-              >
-                <option value="">All Roles</option>
-                {[...new Set(users.map((u) => u.role))].map((role) => (
-                  <option key={role} value={role}>
-                    {role}
-                  </option>
-                ))}
-              </select>
+            <div className="p-3 rounded-full bg-indigo-50 text-indigo-600">
+              <FiUsers className="w-6 h-6" />
             </div>
-            <div className="relative flex-1 min-w-[150px]">
-              <FaBuilding className="absolute left-3 top-3 text-gray-500" />
-              <select
-                className="pl-10 pr-4 py-2 w-full text-sm shadow rounded"
-                value={departmentFilter}
-                onChange={(e) => setDepartmentFilter(e.target.value)}
-              >
-                <option value="">All Departments</option>
-                {[...new Set(users.map((u) => u.department))].map((dep) => (
-                  <option key={dep} value={dep}>
-                    {dep}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button
-              onClick={handleRefresh}
-              className={`p-2 bg-[#DBEAFE] text-[#4F39F6] rounded-full ${
-                refreshing ? "animate-spin" : ""
-              }`}
-              title="Refresh"
-            >
-              <FaSyncAlt size={20} />
-            </button>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="overflow-x-auto bg-white rounded-xl shadow border">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-blue-50 text-gray-600">
-              <tr>
-                <th className="p-3 whitespace-normal break-words">Name</th>
-                <th className="p-3 whitespace-normal break-words">Email</th>
-                <th className="p-3 whitespace-normal break-words">Role</th>
-                <th className="p-3 whitespace-normal break-words">
-                  Department
-                </th>
-                <th className="p-3 whitespace-normal break-words text-right">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {paginatedUsers.length ? (
-                paginatedUsers.map((u) => (
-                  <tr key={u.id} className="hover:bg-gray-50">
-                    <td className="p-3 whitespace-normal break-words">
-                      <div className="flex items-center gap-3">
-                        <UserAvatar
-                          photoURL={u.profilePicUrl}
-                          name={u.name}
-                          size={32}
-                        />
-                        <span>{u.name}</span>
-                      </div>
-                    </td>
-                    <td className="p-3 whitespace-normal break-words">
-                      {u.email}
-                    </td>
-                    <td className="p-3 whitespace-normal break-words">
-                      {u.role}
-                    </td>
-                    <td className="p-3 whitespace-normal break-words">
-                      {u.department}
-                    </td>
-                    <td className="p-3 whitespace-normal break-words text-right">
-                      <button
-                        onClick={() => setDeleteUser(u)}
-                        className="text-red-600 hover:text-red-800"
-                        title="Delete"
-                      >
-                        <FaTrash />
-                      </button>
+        <motion.div 
+          whileHover={{ y: -2 }}
+          className="bg-white rounded-xl shadow-sm border border-gray-100 p-6"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-500">Today's Logins</p>
+              <p className="text-3xl font-bold text-gray-900 mt-1">{todayLogins}</p>
+            </div>
+            <div className="p-3 rounded-full bg-green-50 text-green-600">
+              <FiActivity className="w-6 h-6" />
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div 
+          whileHover={{ y: -2 }}
+          className="bg-white rounded-xl shadow-sm border border-gray-100 p-6"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-500">Recent Activity</p>
+              <p className="text-3xl font-bold text-gray-900 mt-1">{logs.length}</p>
+            </div>
+            <div className="p-3 rounded-full bg-blue-50 text-blue-600">
+              <FiClock className="w-6 h-6" />
+            </div>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* User Management Section */}
+      <motion.section
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
+      >
+        <div className="p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <FiUser className="text-indigo-500" />
+                User Management
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                View and manage system users
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search users..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="flex items-center bg-gray-50 rounded-lg p-1">
+                <select
+                  value={roleFilter}
+                  onChange={(e) => setRoleFilter(e.target.value)}
+                  className="px-3 py-1 text-sm bg-transparent border-none focus:ring-0"
+                >
+                  <option value="">All Roles</option>
+                  {[...new Set(users.map((u) => u.role))].map((role) => (
+                    <option key={role} value={role}>{role}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center bg-gray-50 rounded-lg p-1">
+                <select
+                  value={departmentFilter}
+                  onChange={(e) => setDepartmentFilter(e.target.value)}
+                  className="px-3 py-1 text-sm bg-transparent border-none focus:ring-0"
+                >
+                  <option value="">All Depts</option>
+                  {[...new Set(users.map((u) => u.department))].map((dep) => (
+                    <option key={dep} value={dep}>{dep}</option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-gray-50 rounded-lg transition-colors"
+                aria-label="Refresh data"
+              >
+                <FiRefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                <tr>
+                  <th className="px-6 py-3 font-medium">User</th>
+                  <th className="px-6 py-3 font-medium">Email</th>
+                  <th className="px-6 py-3 font-medium">Role</th>
+                  <th className="px-6 py-3 font-medium">Department</th>
+                  <th className="px-6 py-3 font-medium text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {paginatedUsers.length > 0 ? (
+                  paginatedUsers.map((user) => (
+                    <tr key={user.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-3">
+                          <UserAvatar photoURL={user.profilePicUrl} name={user.name} size={8} />
+                          <span className="font-medium text-gray-900">{user.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-500">{user.email}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="px-2 py-1 text-xs rounded-full bg-indigo-50 text-indigo-700">
+                          {user.role}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-500">{user.department}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <button
+                          onClick={() => setDeleteUser(user)}
+                          className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-50"
+                          aria-label={`Delete user ${user.name}`}
+                        >
+                          <FiTrash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                      No users found matching your criteria
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="5" className="text-center py-4 text-gray-500">
-                    No users found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                )}
+              </tbody>
+            </table>
+          </div>
 
-        <div className="flex justify-end gap-2 pt-4 flex-wrap">
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-            <button
-              key={page}
-              onClick={() => setCurrentPage(page)}
-              className={`px-3 py-1 rounded border ${
-                page === currentPage
-                  ? "bg-blue-600 text-white"
-                  : "bg-white text-blue-600"
-              }`}
-            >
-              {page}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <LoginAnalytics logs={logs} />
-      <AuditLogs logs={logs} />
-
-      {deleteUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-xl shadow-lg max-w-md w-full">
-            <div className="flex items-center gap-3 mb-4">
-              <UserAvatar
-                photoURL={deleteUser.profilePicUrl}
-                name={deleteUser.name}
-                size={40}
-              />
-              <h3 className="text-lg font-semibold">Confirm Deletion</h3>
+          {totalPages > 1 && (
+            <div className="flex justify-between items-center mt-6">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-4 py-2 text-sm border rounded-lg disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <div className="flex gap-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`w-10 h-10 text-sm rounded-lg ${
+                        currentPage === pageNum
+                          ? "bg-indigo-600 text-white"
+                          : "hover:bg-gray-100"
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-4 py-2 text-sm border rounded-lg disabled:opacity-50"
+              >
+                Next
+              </button>
             </div>
-            <p className="mb-6">
-              Are you sure you want to delete <strong>{deleteUser.name}</strong>
-              ?
+          )}
+        </div>
+      </motion.section>
+
+        <LoginAnalytics logs={logs} />
+        <AuditLogs logs={logs} />
+
+
+      {/* Delete Confirmation Modal */}
+      {deleteUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 p-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-xl shadow-lg max-w-md w-full p-6"
+          >
+            <div className="flex items-center gap-4 mb-4">
+              <UserAvatar photoURL={deleteUser.profilePicUrl} name={deleteUser.name} size={12} />
+              <div>
+                <h3 className="font-semibold text-lg">Confirm User Deletion</h3>
+                <p className="text-gray-500 text-sm">{deleteUser.email}</p>
+              </div>
+            </div>
+            <p className="text-gray-700 mb-6">
+              Are you sure you want to permanently delete <span className="font-semibold">{deleteUser.name}</span>? This action cannot be undone.
             </p>
             <div className="flex justify-end gap-3">
               <button
-                onClick={handleCancelDelete}
-                className="px-4 py-2 border rounded hover:bg-gray-100"
+                onClick={() => setDeleteUser(null)}
+                className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteUserConfirm}
                 disabled={loadingDelete}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
               >
-                {loadingDelete ? "Deleting..." : "Delete"}
+                {loadingDelete ? (
+                  <>
+                    <FiRefreshCw className="animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <FiTrash2 />
+                    Delete User
+                  </>
+                )}
               </button>
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
     </div>
