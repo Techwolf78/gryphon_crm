@@ -202,7 +202,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
             return;
         }
         try {
-            const toastId = toast.loading("Submitting form and uploading files...");
+            const toastId = toast.loading("");
             const [studentUrl, mouUrl] = await Promise.all([
                 uploadFileToCloudinary(studentFile, "training-forms/student-files"),
                 uploadFileToCloudinary(mouFile, "training-forms/mou-files"),
