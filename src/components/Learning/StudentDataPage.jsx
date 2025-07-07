@@ -557,8 +557,8 @@ function StudentDataPage({ trainingId, onBack }) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-50 p-4 md:p-8">
-      <div className="bg-white rounded-2xl shadow-2xl overflow-hidden max-w-7xl mx-auto h-[calc(100vh-2rem)] flex flex-col">
+    <div className="  bg-gradient-to-br from-purple-50 to-indigo-50  ">
+      <div className="bg-white rounded-2xl shadow-2xl overflow-hidden max-w-4xl flex flex-col">
         <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-6 text-white flex-shrink-0">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div className="flex items-center gap-4">
