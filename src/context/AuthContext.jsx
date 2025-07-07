@@ -22,6 +22,7 @@ const getUserIP = async () => {
     const data = await res.json();
     return data.ip;
   } catch (err) {
+    console.error("Failed to fetch IP:", err); // Log the error for debugging
     return "N/A";
   }
 };
@@ -42,17 +43,17 @@ export const AuthProvider = ({ children }) => {
           );
           const querySnapshot = await getDocs(q);
 
- // In onAuthStateChanged callback:
-if (!querySnapshot.empty) {
-  const userData = querySnapshot.docs[0].data();
-  setUser({ 
-    ...firebaseUser, 
-    role: userData.role || "guest",
-    department: userData.department || "guest",
-    reportingManager: userData.reportingManager || null
-  });
-  setPhotoURL(userData.photoURL || "");
-} else {
+          // In onAuthStateChanged callback:
+          if (!querySnapshot.empty) {
+            const userData = querySnapshot.docs[0].data();
+            setUser({
+              ...firebaseUser,
+              role: userData.role || "guest",
+              department: userData.department || "guest",
+              reportingManager: userData.reportingManager || null,
+            });
+            setPhotoURL(userData.photoURL || "");
+          } else {
             setUser({ ...firebaseUser, role: "guest" });
             setPhotoURL("");
           }
@@ -76,20 +77,23 @@ if (!querySnapshot.empty) {
     const userCred = await signInWithEmailAndPassword(auth, email, password);
 
     try {
-      const q = query(collection(db, "users"), where("email", "==", userCred.user.email));
+      const q = query(
+        collection(db, "users"),
+        where("email", "==", userCred.user.email)
+      );
       const querySnapshot = await getDocs(q);
 
-// In login function:
-if (!querySnapshot.empty) {
-  const userData = querySnapshot.docs[0].data();
-  setUser({ 
-    ...userCred.user, 
-    role: userData.role || "guest",
-    department: userData.department || "guest",
-    reportingManager: userData.reportingManager || null
-  });
-  setPhotoURL(userData.photoURL || "");
-} else {
+      // In login function:
+      if (!querySnapshot.empty) {
+        const userData = querySnapshot.docs[0].data();
+        setUser({
+          ...userCred.user,
+          role: userData.role || "guest",
+          department: userData.department || "guest",
+          reportingManager: userData.reportingManager || null,
+        });
+        setPhotoURL(userData.photoURL || "");
+      } else {
         setUser({ ...userCred.user, role: "guest" });
         setPhotoURL("");
       }

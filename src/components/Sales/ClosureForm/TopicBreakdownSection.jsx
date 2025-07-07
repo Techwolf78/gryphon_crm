@@ -45,7 +45,7 @@ const TopicBreakdownSection = ({ formData, setFormData }) => {
       <div className="p-5 bg-white shadow-lg rounded-xl border border-gray-200 space-y-4">
         
         {/* Title Row with Total Hours on Right */}
-        <div className="flex justify-between items-center border-b-2 border-blue-500 pb-2">
+        <div className="flex justify-between items-center border-b border-blue-500 pb-2">
           <h3 className="text-2xl font-semibold text-blue-700">Training Total Hours Breakup</h3>
           <p className="font-semibold text-blue-800 text-sm md:text-base">
             Total Hours: {formData.totalHours || 0}

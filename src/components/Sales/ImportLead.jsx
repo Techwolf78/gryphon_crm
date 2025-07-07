@@ -440,7 +440,6 @@ const ImportLead = ({ handleImportComplete }) => {
       tcv: "Total Contract Value",
       contactMethod: "Contact Method",
       phase: "Lead Phase",
-      expectedClosureDate: "Expected Closure Date",
       affiliation: "Affiliation",
       accreditation: "Accreditation",
       courseType: "Course Type",
@@ -448,6 +447,7 @@ const ImportLead = ({ handleImportComplete }) => {
       passingYear: "Passing Year",
       address: "Address",
       state: "State",
+      expectedClosureDate: "Expected Closure Date",
       followups: "Follow-ups",
     };
 
@@ -460,7 +460,6 @@ const ImportLead = ({ handleImportComplete }) => {
         pocName: "Ramesh Rawet",
         phoneNo: "1234567890",
         email: "john@example.com",
-        expectedClosureDate: "2025-11-15",
         passingYear: "2024-2025",
         courseType: "MBA",
         specializations: "Marketing, Finance",
@@ -471,6 +470,7 @@ const ImportLead = ({ handleImportComplete }) => {
         perStudentCost: "5000",
         tcv: "250000",
         phase: "hot",
+        expectedClosureDate: "2025-11-15",
         followups: JSON.stringify({
           initial: {
             date: new Date().toISOString().split("T")[0],

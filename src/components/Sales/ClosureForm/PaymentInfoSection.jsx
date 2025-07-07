@@ -187,10 +187,9 @@ const PaymentInfoSection = ({ formData, setFormData }) => {
       )}
 
       {formData.paymentType && formData.gstType && formData.paymentType !== "EMI" && (
-        <div className={`grid gap-4 ${
-    fields.length <= 3 ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3" : "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
-  }`}
->
+        <div className={`grid gap-4 ${fields.length <= 3 ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3" : "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
+          }`}
+        >
           {fields.map((label, i) => {
             const percent = formData.paymentSplits?.[i] ?? "";
             const baseAmount = ((parseFloat(percent) || 0) / 100) * formData.totalCost;
