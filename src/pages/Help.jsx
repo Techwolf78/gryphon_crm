@@ -16,8 +16,25 @@ import {
   FiArchive,
 } from "react-icons/fi";
 import { AuthContext } from "../context/AuthContext";
-import { collection, addDoc, serverTimestamp, query, where, getDocs, updateDoc } from "firebase/firestore";
+// Add this to your firestore imports
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  query,
+  where,
+  getDocs,
+  updateDoc,
+  doc,
+  orderBy, // Add this
+} from "firebase/firestore";
 import { db } from "../firebase";
+import emailjs from "@emailjs/browser";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+
+// Initialize EmailJS with your public key
+emailjs.init("CXYkFqg_8EWTsrN8M");
 
 const Help = () => {
   const { user } = useContext(AuthContext);
@@ -27,6 +44,8 @@ const Help = () => {
   const [showRaisedTickets, setShowRaisedTickets] = useState(false);
   const [tickets, setTickets] = useState([]);
   const [activeTicket, setActiveTicket] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
 
   const [ticketForm, setTicketForm] = useState({
     title: "",
@@ -43,52 +62,103 @@ const Help = () => {
 
   const handleTicketFormChange = (e) => {
     const { name, value } = e.target;
-    setTicketForm(prev => ({
+    setTicketForm((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
+    // Clear error when user types
+    if (formErrors[name]) {
+      setFormErrors((prev) => ({ ...prev, [name]: "" }));
+    }
+  };
+
+  const validateForm = () => {
+    const errors = {};
+    if (!ticketForm.title.trim()) errors.title = "Title is required";
+    if (ticketForm.title.length > 100)
+      errors.title = "Title too long (max 100 chars)";
+    if (!ticketForm.description.trim())
+      errors.description = "Description is required";
+    if (ticketForm.description.length > 2000)
+      errors.description = "Description too long";
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const submitTicket = async (e) => {
     e.preventDefault();
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
     try {
       // Add ticket to Firestore
       const docRef = await addDoc(collection(db, "tickets"), {
         ...ticketForm,
         createdBy: user.email,
+        createdByName: user.name || user.email,
         status: "not-resolved",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
 
-      // Send email (simulated - in a real app you'd use a backend service)
-      const emailBody = `
-        New Ticket Raised:
-        Title: ${ticketForm.title}
-        Description: ${ticketForm.description}
-        Priority: ${ticketForm.priority}
-        Raised by: ${user.email}
-        
-        Please log in to the admin panel to address this ticket.
-      `;
+      // Send email using EmailJS
+      try {
+        await emailjs.send(
+          "service_0khg6af",
+          "support_ticket_template",
+          {
+            from_name: user.name || user.email,
+            from_email: user.email, // sender's email
+            ticket_title: ticketForm.title,
+            ticket_description: ticketForm.description,
+            ticket_priority: ticketForm.priority,
+            ticket_id: docRef.id,
+            ticket_status: "not-resolved",
+            date: new Date().toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            year: new Date().getFullYear(),
+            // reply_to should match your EmailJS template settings
+            reply_to: user.email,
+          },
+          {
+            publicKey: "CXYkFqg_8EWTsrN8M",
+          }
+        );
+        toast.success(
+          "Ticket submitted successfully! Our team will contact you soon."
+        );
+      } catch (emailError) {
+        console.error("Email sending failed:", emailError);
+        let errorMessage = "Ticket submitted but email notification failed";
 
-      console.log("Email would be sent to connect@gryphonacademy.co.in with body:", emailBody);
-      // In production, you'd actually send the email here using a backend service
+        if (emailError.status === 422) {
+          errorMessage =
+            "Email configuration error - recipient address may be invalid";
+        } else if (emailError.status === 400) {
+          errorMessage = "Invalid email parameters";
+        }
 
-      // Reset form and show success
+        toast.warning(errorMessage);
+      }
+
+      // Reset form
       setTicketForm({
         title: "",
         description: "",
         priority: "medium",
       });
       setShowTicketForm(false);
-      alert("Ticket submitted successfully! Our team will get back to you soon.");
-      
-      // Refresh tickets list
       fetchTickets();
     } catch (error) {
       console.error("Error submitting ticket:", error);
-      alert("Failed to submit ticket. Please try again.");
+      toast.error("Failed to submit ticket. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -96,38 +166,55 @@ const Help = () => {
     try {
       let q;
       if (isAdmin) {
-        q = query(collection(db, "tickets"));
+        q = query(collection(db, "tickets"), orderBy("createdAt", "desc"));
       } else {
-        q = query(collection(db, "tickets"), where("createdBy", "==", user.email));
+        q = query(
+          collection(db, "tickets"),
+          where("createdBy", "==", user.email),
+          orderBy("createdAt", "desc")
+        );
       }
-      
+
       const querySnapshot = await getDocs(q);
-      const ticketsData = querySnapshot.docs.map(doc => ({
+      const ticketsData = querySnapshot.docs.map((doc) => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
+        // Convert Firestore timestamp to JS Date
+        createdAt: doc.data().createdAt?.toDate() || new Date(),
       }));
       setTickets(ticketsData);
     } catch (error) {
       console.error("Error fetching tickets:", error);
+      toast.error("Failed to load tickets");
     }
   };
 
   const updateTicketStatus = async (ticketId, status) => {
     try {
-      // In a real app, you'd update the document in Firestore
-      // Here we're just updating local state for demonstration
-      setTickets(prev => prev.map(ticket => 
-        ticket.id === ticketId ? { ...ticket, status } : ticket
-      ));
-      
-      // In production, you'd actually update Firestore:
-      // const ticketRef = doc(db, "tickets", ticketId);
-      // await updateDoc(ticketRef, { status, updatedAt: serverTimestamp() });
-      
-      alert(`Ticket marked as ${status.replace("-", " ")}`);
+      const ticketRef = doc(db, "tickets", ticketId);
+      await updateDoc(ticketRef, {
+        status,
+        updatedAt: serverTimestamp(),
+        resolvedBy: isAdmin ? user.email : null,
+      });
+
+      setTickets((prev) =>
+        prev.map((ticket) =>
+          ticket.id === ticketId
+            ? {
+                ...ticket,
+                status,
+                updatedAt: new Date(),
+              }
+            : ticket
+        )
+      );
+
+      toast.success(`Ticket marked as ${status.replace("-", " ")}`);
+      setActiveTicket(null);
     } catch (error) {
       console.error("Error updating ticket status:", error);
-      alert("Failed to update ticket status");
+      toast.error("Failed to update ticket status");
     }
   };
 
@@ -227,7 +314,7 @@ const Help = () => {
               <h3 className="text-xl font-semibold text-gray-900 mb-6">
                 Raise a New Ticket
               </h3>
-              
+
               <form onSubmit={submitTicket}>
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -253,11 +340,18 @@ const Help = () => {
                     name="title"
                     value={ticketForm.title}
                     onChange={handleTicketFormChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full px-3 py-2 border ${
+                      formErrors.title ? "border-red-500" : "border-gray-300"
+                    } rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500`}
                     required
                   />
+                  {formErrors.title && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {formErrors.title}
+                    </p>
+                  )}
                 </div>
-                
+
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Description
@@ -271,7 +365,7 @@ const Help = () => {
                     required
                   ></textarea>
                 </div>
-                
+
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Priority
@@ -288,7 +382,7 @@ const Help = () => {
                     <option value="critical">Critical</option>
                   </select>
                 </div>
-                
+
                 <button
                   type="submit"
                   className="w-full px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
@@ -319,51 +413,71 @@ const Help = () => {
                 <h3 className="text-xl font-semibold text-gray-900">
                   {activeTicket.title}
                 </h3>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  activeTicket.priority === 'critical' ? 'bg-red-100 text-red-800' :
-                  activeTicket.priority === 'high' ? 'bg-orange-100 text-orange-800' :
-                  activeTicket.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-green-100 text-green-800'
-                }`}>
+                <span
+                  className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    activeTicket.priority === "critical"
+                      ? "bg-red-100 text-red-800"
+                      : activeTicket.priority === "high"
+                      ? "bg-orange-100 text-orange-800"
+                      : activeTicket.priority === "medium"
+                      ? "bg-yellow-100 text-yellow-800"
+                      : "bg-green-100 text-green-800"
+                  }`}
+                >
                   {activeTicket.priority}
                 </span>
               </div>
-              
+
               <div className="flex items-center text-sm text-gray-500 mb-4">
                 <span>Created by: {activeTicket.createdBy}</span>
                 <span className="mx-2">•</span>
-                <span>Status: 
-                  <span className={`ml-1 ${
-                    activeTicket.status === 'resolved' ? 'text-green-600' :
-                    activeTicket.status === "can't-resolve" ? 'text-gray-600' :
-                    'text-red-600'
-                  }`}>
-                    {activeTicket.status.replace('-', ' ')}
+                <span>
+                  Status:
+                  <span
+                    className={`ml-1 ${
+                      activeTicket.status === "resolved"
+                        ? "text-green-600"
+                        : activeTicket.status === "can't-resolve"
+                        ? "text-gray-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {activeTicket.status.replace("-", " ")}
                   </span>
                 </span>
               </div>
-              
+
               <div className="bg-gray-50 p-4 rounded-lg mb-6">
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Description:</h4>
-                <p className="text-gray-700 whitespace-pre-line">{activeTicket.description}</p>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">
+                  Description:
+                </h4>
+                <p className="text-gray-700 whitespace-pre-line">
+                  {activeTicket.description}
+                </p>
               </div>
-              
+
               {isAdmin && (
                 <div className="flex space-x-3">
                   <button
-                    onClick={() => updateTicketStatus(activeTicket.id, 'resolved')}
+                    onClick={() =>
+                      updateTicketStatus(activeTicket.id, "resolved")
+                    }
                     className="flex items-center px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
                   >
                     <FiCheck className="mr-2" /> Mark as Resolved
                   </button>
                   <button
-                    onClick={() => updateTicketStatus(activeTicket.id, "can't-resolve")}
+                    onClick={() =>
+                      updateTicketStatus(activeTicket.id, "can't-resolve")
+                    }
                     className="flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
                   >
                     <FiArchive className="mr-2" /> Can't Resolve
                   </button>
                   <button
-                    onClick={() => updateTicketStatus(activeTicket.id, 'not-resolved')}
+                    onClick={() =>
+                      updateTicketStatus(activeTicket.id, "not-resolved")
+                    }
                     className="flex items-center px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
                   >
                     <FiAlertCircle className="mr-2" /> Not Resolved
@@ -394,14 +508,22 @@ const Help = () => {
         <div className="flex border-b border-gray-200 mb-8">
           <button
             onClick={() => setShowRaisedTickets(false)}
-            className={`px-4 py-2 font-medium ${!showRaisedTickets ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`px-4 py-2 font-medium ${
+              !showRaisedTickets
+                ? "text-blue-600 border-b-2 border-blue-600"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
           >
             Help Center
           </button>
           {isAdmin && (
             <button
               onClick={() => setShowRaisedTickets(true)}
-              className={`px-4 py-2 font-medium ${showRaisedTickets ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-4 py-2 font-medium ${
+                showRaisedTickets
+                  ? "text-blue-600 border-b-2 border-blue-600"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
             >
               Raised Tickets
             </button>
@@ -412,7 +534,9 @@ const Help = () => {
           <div className="bg-white rounded-xl shadow-xs border border-gray-100 overflow-hidden">
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold text-gray-900">Raised Tickets</h2>
+                <h2 className="text-xl font-semibold text-gray-900">
+                  Raised Tickets
+                </h2>
                 <button
                   onClick={() => setShowTicketForm(true)}
                   className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -430,35 +554,58 @@ const Help = () => {
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created By</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Title
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Created By
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Priority
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {tickets.map((ticket) => (
                         <tr key={ticket.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{ticket.title}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ticket.createdBy}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {ticket.title}
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              ticket.priority === 'critical' ? 'bg-red-100 text-red-800' :
-                              ticket.priority === 'high' ? 'bg-orange-100 text-orange-800' :
-                              ticket.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-green-100 text-green-800'
-                            }`}>
+                            {ticket.createdBy}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                ticket.priority === "critical"
+                                  ? "bg-red-100 text-red-800"
+                                  : ticket.priority === "high"
+                                  ? "bg-orange-100 text-orange-800"
+                                  : ticket.priority === "medium"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-green-100 text-green-800"
+                              }`}
+                            >
                               {ticket.priority}
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              ticket.status === 'resolved' ? 'bg-green-100 text-green-800' :
-                              ticket.status === "can't-resolve" ? 'bg-gray-100 text-gray-800' :
-                              'bg-red-100 text-red-800'
-                            }`}>
-                              {ticket.status.replace('-', ' ')}
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                ticket.status === "resolved"
+                                  ? "bg-green-100 text-green-800"
+                                  : ticket.status === "can't-resolve"
+                                  ? "bg-gray-100 text-gray-800"
+                                  : "bg-red-100 text-red-800"
+                              }`}
+                            >
+                              {ticket.status.replace("-", " ")}
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -625,6 +772,18 @@ const Help = () => {
           </div>
         )}
       </div>
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     </div>
   );
 };

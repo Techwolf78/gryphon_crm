@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import * as XLSX from "xlsx-js-style";
 import { db } from "../../firebase";
 import {
@@ -15,6 +15,7 @@ function StudentDataPage({ trainingId, onBack }) {
   const [error, setError] = useState(null);
   const tableContainerRef = useRef(null);
   const importOptionsRef = useRef(null);
+
 
   // Expected headers for validation
   const expectedHeaders = [
@@ -440,7 +441,7 @@ function StudentDataPage({ trainingId, onBack }) {
         "SHIRDI", 2020, 57, 2020, 87, "", "", "", "", "BTECH",
         "MECHANICAL", 2026, 66, "MBA", "IT", 2027, 75
       ],
-       [
+      [
         2, "Sakshi Patil", "COEP", "LMN@GMAIL.COM", "7777777777", "30-Mar-04", "FEMALE",
         "PUNE", 2020, 57, "", "", "DIPLOMA", "CS", 2023, 73, "BTECH",
         "MECHANICAL", 2026, 66, "MBA", "IT", 2027, 75
@@ -556,9 +557,29 @@ function StudentDataPage({ trainingId, onBack }) {
     }, [ref, callback]);
   };
 
+  // Click outside handlers for all dropdowns/modals
+  useClickOutside(importOptionsRef, () => {
+    setShowImportOptions(false);
+  });
+
+  // Handle escape key to close dropdowns
+  useEffect(() => {
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setShowImportOptions(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
+
   return (
-    <div className="  bg-gradient-to-br from-purple-50 to-indigo-50  ">
-      <div className="bg-white rounded-2xl shadow-2xl overflow-hidden max-w-4xl flex flex-col">
+    <div className="min-w-screen bg-gradient-to-br from-purple-50 to-indigo-50 p-4 md:p-8">
+      <div className="bg-white rounded-2xl shadow-2xl overflow-hidden max-w-5xl flex flex-col">
+        {/* Header section */}
         <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-6 text-white flex-shrink-0">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div className="flex items-center gap-4">
@@ -578,11 +599,11 @@ function StudentDataPage({ trainingId, onBack }) {
             </div>
 
             <div className="flex flex-wrap gap-3">
+              {/* Import dropdown - now with proper click-outside handling */}
               <div className="relative" ref={importOptionsRef}>
                 <button
                   onClick={() => setShowImportOptions(!showImportOptions)}
-                  className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors border border-white/20"
-                >
+                  className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors border border-white/20">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                   </svg>
