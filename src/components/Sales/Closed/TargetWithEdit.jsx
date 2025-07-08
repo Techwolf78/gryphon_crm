@@ -12,6 +12,7 @@ const TargetWithEdit = ({
   users,
   onUpdate,
   viewMyLeadsOnly,
+  canEdit,      // <- Add this here
 }) => {
   const formatCurrency = (amt) =>
     typeof amt === "number"
@@ -43,21 +44,12 @@ const TargetWithEdit = ({
     (u) => u.reportingManager === currentUserObj?.name && ["Assistant Manager", "Executive"].includes(u.role)
   );
  
-  // Check edit permissions
-  let canEdit = false;
-  if (viewMyLeadsOnly) {
-    canEdit = currentUser?.uid === targetUserObj?.uid && currentRole === "Head";
-  } else {
-    if (currentRole === "Head" && targetRole === "Manager") {
-      canEdit = true;
-    } else if (currentRole === "Manager" && ["Assistant Manager", "Executive"].includes(targetRole)) {
-      canEdit = true;
-    }
-  }
- 
-  if (!canEdit || !targetUserObj) {
-    return <span className="text-gray-700 font-medium">{formatCurrency(value)}</span>;
-  }
+
+
+if (!canEdit || !targetUserObj) {
+  return <span className="text-gray-700 font-medium">{formatCurrency(value)}</span>;
+}
+
  
   const handleSave = async () => {
     const numValue = Number(editValue.replace(/,/g, ""));
@@ -244,6 +236,7 @@ TargetWithEdit.propTypes = {
   users: PropTypes.object.isRequired,
   onUpdate: PropTypes.func.isRequired,
   viewMyLeadsOnly: PropTypes.bool.isRequired,
+    canEdit: PropTypes.bool,
 };
  
 export default TargetWithEdit;
