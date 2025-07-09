@@ -157,7 +157,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
     const uploadStudentsToFirestore = async (studentList, formId) => {
         try {
             if (!studentList || studentList.length === 0) return;
-           
+ 
             const batch = writeBatch(db);
             const studentsCollectionRef = collection(db, "trainingForms", formId, "students");
  
@@ -202,7 +202,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
         }
  
         setIsSubmitting(true);
-       
+ 
         if (!contractStartDate || !contractEndDate) {
             toast.error("Please select both Contract Start Date and End Date.");
             setIsSubmitting(false);
@@ -210,10 +210,10 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
         }
  
         try {
-            const toastId = toast.loading("");
+            const toastId = toast.loading("Submitting form...");
             const rawProjectCode = formData.projectCode;
             const sanitizedProjectCode = rawProjectCode.replace(/\//g, "-");
-           
+ 
             // Check if form already exists
             const formRef = doc(db, "trainingForms", sanitizedProjectCode);
             const existingDoc = await getDoc(formRef);
@@ -238,8 +238,10 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
                     totalCost: formData.totalCost,
                     contractStartDate,
                     contractEndDate,
+                    projectCode: rawProjectCode // ✅ this line adds the projectCode into the lead
                 });
             }
+ 
  
             // Upload files (if they exist)
             const [studentUrl, mouUrl] = await Promise.all([
@@ -249,7 +251,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
  
             const assignedUser = users?.[lead?.assignedTo?.uid] || {};
             const { studentList, ...formDataWithoutStudents } = formData;
-           
+ 
             // Save form data
             await setDoc(formRef, {
                 ...formDataWithoutStudents,
