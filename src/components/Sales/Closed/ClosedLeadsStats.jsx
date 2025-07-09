@@ -4,30 +4,50 @@
 import React, { useState, useMemo } from "react";
 import PropTypes from "prop-types";
 import TargetWithEdit from "./TargetWithEdit";
-
+// 🔝 Top of ClosedLeadsStats.js
+const getCurrentFinancialYear = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth() + 1;
+  return month >= 4 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
+};
 const ClosedLeadsStats = ({
   leads,
   targets,
   currentUser,
   users,
-  selectedFY,
+  selectedFY: propSelectedFY,  // ← rename incoming prop
   activeQuarter,
   formatCurrency,
   viewMyLeadsOnly,
   handleTargetUpdate,
 }) => {
-  const userObj = Object.values(users).find((u) => u.uid === currentUser?.uid);
-  const isHead = ["Head", "Admin", "Director"].includes(userObj?.role);
-  const isManager = userObj?.role === "Manager";
-  const isDirector = userObj?.role === "Director";
 
-let teamMembers = [];
-if (isDirector || userObj?.role === "Admin") {
-  teamMembers = Object.values(users).filter(
-    (u) => u.department === "Sales" && u.uid !== userObj.uid
+  const [selectedFY, setSelectedFY] = useState(propSelectedFY || getCurrentFinancialYear());
+
+  const userObj = Object.values(users).find((u) => u.uid === currentUser?.uid);
+ const isHead = userObj?.role === "Head";
+const isAdminOrDirector = ["Admin", "Director"].includes(userObj?.role);
+
+  const isManager = userObj?.role === "Manager";
+
+  let teamMembers = [];
+if (isAdminOrDirector) {
+  teamMembers = Object.values(users).filter((u) =>
+    ["Head", "Manager", "Assistant Manager", "Executive"].includes(u.role)
   );
-} else if (isHead) {
-  teamMembers = Object.values(users).filter((u) => u.role === "Manager");
+}
+else if (isAdminOrDirector) {
+  allUids = Object.values(users)
+    .filter((u) =>
+      ["Head", "Manager", "Assistant Manager", "Executive"].includes(u.role)
+    )
+    .map((u) => u.uid);
+}
+ else if (isHead) {
+  teamMembers = Object.values(users).filter((u) =>
+    ["Manager"].includes(u.role)
+  );
 } else if (isManager) {
   teamMembers = Object.values(users).filter(
     (u) =>
@@ -42,68 +62,44 @@ if (isDirector || userObj?.role === "Admin") {
   let targetUser;
 
   const isAssistant = ["Assistant Manager", "Executive"].includes(userObj?.role);
-if (viewMyLeadsOnly) {
-  targetUser = userObj;
-} else if (isAssistant) {
-  targetUser = userObj;
-} else if (selectedTeamUserId !== "all") {
-  targetUser = teamMembers.find((u) => u.uid === selectedTeamUserId);
-} else if (isManager) {
-  targetUser = userObj;
-} else if (isHead && !isDirector) {
-  targetUser = null;
-} else if (isDirector) {
-  targetUser = userObj; // ✅ ADD THIS
-} else {
-  targetUser = userObj;
-}
+  
+  if (isAssistant) {
+    viewMyLeadsOnly = true;
+  }
+  if (viewMyLeadsOnly) {
+    targetUser = userObj;
+  } else if (isAssistant) {
+    targetUser = userObj; // ✅ Assistant/Executive ka khud ka target
+  } else if (selectedTeamUserId !== "all") {
+    targetUser = teamMembers.find((u) => u.uid === selectedTeamUserId);
+  } else if (isManager) {
+    targetUser = userObj;
+  } else if (isHead) {
+    targetUser = null;
+  } else {
+    targetUser = userObj;
+  }
 
   const targetUid = targetUser?.uid;
 
-const getQuarter = (date) => {
-  const m = date.getMonth() + 1;
-  if (m >= 4 && m <= 6) return "Q1";
-  if (m >= 7 && m <= 9) return "Q2";
-  if (m >= 10 && m <= 12) return "Q3";
-  return "Q4";
-};
+  const getQuarter = (date) => {
+    const m = date.getMonth() + 1;
+    if (m >= 4 && m <= 6) return "Q1";
+    if (m >= 7 && m <= 9) return "Q2";
+    if (m >= 10 && m <= 12) return "Q3";
+    return "Q4";
+  };
 
-const getAchievedAmount = (uid, quarter) => {
-if (isDirector) {
-  if (viewMyLeadsOnly) {
-    // My Leads mode -> apni leads dikhani hai
+  const getAchievedAmount = (uid, quarter) => {
     return Object.values(leads)
-      .filter((l) => l.assignedTo?.uid === userObj.uid && l.phase === "closed")
+      .filter((l) => l.assignedTo?.uid === uid && l.phase === "closed")
       .filter((l) => {
         if (quarter === "all") return true;
         const closedQuarter = getQuarter(new Date(l.closedDate));
         return closedQuarter === quarter;
       })
       .reduce((sum, l) => sum + (l.totalCost || 0), 0);
-  } else {
-    // My Team mode -> apni leads nahi, sirf team ke
-    return Object.values(leads)
-      .filter((l) => l.assignedTo?.uid !== userObj.uid && l.phase === "closed")
-      .filter((l) => {
-        if (quarter === "all") return true;
-        const closedQuarter = getQuarter(new Date(l.closedDate));
-        return closedQuarter === quarter;
-      })
-      .reduce((sum, l) => sum + (l.totalCost || 0), 0);
-  }
-}
-
-
-  return Object.values(leads)
-    .filter((l) => l.assignedTo?.uid === uid && l.phase === "closed")
-    .filter((l) => {
-      if (quarter === "all") return true;
-      const closedQuarter = getQuarter(new Date(l.closedDate));
-      return closedQuarter === quarter;
-    })
-    .reduce((sum, l) => sum + (l.totalCost || 0), 0);
-};
-
+  };
 
 
   const getQuarterTargetWithCarryForward = (uid) => {
@@ -171,9 +167,7 @@ if (isDirector) {
   };
 
   const isHeadViewingManager =
-  isHead && !isDirector && selectedTeamUserId !== "all" && targetUser?.role === "Manager";
-
-
+    isHead && selectedTeamUserId !== "all" && targetUser?.role === "Manager";
 
   let allUids = [];
   if (isHeadViewingManager) {
@@ -191,29 +185,48 @@ if (isDirector) {
   const uniqueTeamMembers = allTeamMembers.filter(
     (member, index, self) => index === self.findIndex((m) => m.uid === member.uid)
   );
-
-const aggregateValues = useMemo(() => {
-  if ((selectedTeamUserId !== "all" && isDirector) || (!isDirector && (selectedTeamUserId !== "all" || viewMyLeadsOnly))) {
+  const aggregateValues = useMemo(() => {
+  if (selectedTeamUserId !== "all" || viewMyLeadsOnly) {
     return null;
   }
 
-
   let allUids = [];
 
-  if (isDirector) {
-    // Director ko pure Sales department ke sab UIDs
+  if (isAdminOrDirector) {
     allUids = Object.values(users)
-      .filter((u) => u.department === "Sales")
+      .filter((u) =>
+        ["Head", "Manager", "Assistant Manager", "Executive"].includes(u.role)
+      )
       .map((u) => u.uid);
-  } else {
-    allUids = teamMembers.map((u) => u.uid);
+  } else if (isHead) {
+    let managers = teamMembers.filter((u) => u.role === "Manager");
 
-    if (isHead || isManager) {
-      allUids.push(userObj.uid);
-    }
+    managers.forEach((manager) => {
+      allUids.push(manager.uid);
+
+      const subordinates = Object.values(users).filter(
+        (u) =>
+          ["Assistant Manager", "Executive"].includes(u.role) &&
+          u.reportingManager === manager.name
+      );
+
+      subordinates.forEach((sub) => {
+        allUids.push(sub.uid);
+      });
+    });
+  } else if (isManager) {
+    allUids.push(userObj.uid);
+
+    const subordinates = Object.values(users).filter(
+      (u) =>
+        ["Assistant Manager", "Executive"].includes(u.role) &&
+        u.reportingManager === userObj.name
+    );
+
+    subordinates.forEach((sub) => {
+      allUids.push(sub.uid);
+    });
   }
-
-  allUids = [...new Set(allUids)];
 
   let totalAdjustedTarget = 0;
   let totalAchieved = 0;
@@ -254,33 +267,24 @@ const aggregateValues = useMemo(() => {
   activeQuarter,
   leads,
   users,
-  teamMembers,
-  isDirector, // ✅ add this dependency
 ]);
 
-const isViewingAllTeam = isDirector && selectedTeamUserId === "all" && !viewMyLeadsOnly;
-
-
-
-
   // Display targets and achieved values
-const displayQuarterTarget = isViewingAllTeam
-  ? aggregateValues
-  : isHeadViewingManager
+  const displayQuarterTarget = isHeadViewingManager
     ? getCombinedQuarterTarget(allUids)
-    : getQuarterTargetWithCarryForward(targetUid);
+    : selectedTeamUserId === "all" && !viewMyLeadsOnly && aggregateValues
+      ? aggregateValues
+      : getQuarterTargetWithCarryForward(targetUid);
 
-
-const achievedValue = isViewingAllTeam
-  ? aggregateValues.achieved
-  : isHeadViewingManager
+  const achievedValue = isHeadViewingManager
     ? getTotalAchievedAmount(allUids, activeQuarter)
-    : getAchievedAmount(targetUid, activeQuarter);
+    : selectedTeamUserId === "all" && !viewMyLeadsOnly && aggregateValues
+      ? aggregateValues.achieved
+      : getAchievedAmount(targetUid, activeQuarter);
 
-
- const annualTarget = isViewingAllTeam
-  ? aggregateValues.annualTarget
-  : ["Q1", "Q2", "Q3", "Q4"].reduce((total, q) => {
+  const annualTarget = selectedTeamUserId === "all" && !viewMyLeadsOnly && aggregateValues
+    ? aggregateValues.annualTarget
+    : ["Q1", "Q2", "Q3", "Q4"].reduce((total, q) => {
       const t = targets.find(
         (t) =>
           t.financial_year === selectedFY &&
@@ -290,7 +294,6 @@ const achievedValue = isViewingAllTeam
       return total + (t ? t.target_amount : 0);
     }, 0);
 
-
   const displayDeficit = displayQuarterTarget.deficit;
   const achievementPercentage =
     displayQuarterTarget.adjustedTarget > 0
@@ -299,13 +302,6 @@ const achievedValue = isViewingAllTeam
 
   const completionStatus = achievementPercentage >= 100 ? "Ahead" : "Behind";
   const statusColor = achievementPercentage >= 100 ? "text-green-600" : "text-red-600";
-let canEdit = false;
-if (viewMyLeadsOnly) {
-  canEdit = userObj?.role === "Director";
-} else {
-  canEdit = selectedTeamUserId !== "all";
-}
-
 
   return (
     // ... your existing UI (cards) as is, no change needed ...
@@ -401,27 +397,21 @@ if (viewMyLeadsOnly) {
                 </svg>
               </div>
               <h3 className="text-lg font-medium text-gray-700 mb-1">Annual Target</h3>
-              
               <div className="min-h-[48px] flex items-center justify-center mb-3">
                 {selectedTeamUserId === "all" && !viewMyLeadsOnly ? (
                   <p className="text-2xl font-bold text-gray-900">
                     {formatCurrency(annualTarget)}
                   </p>
                 ) : (
-                  
-<TargetWithEdit
-
-  value={annualTarget}
-  
-  fy={selectedFY}
-  currentUser={currentUser}
-  targetUser={!viewMyLeadsOnly && selectedTeamUserId !== "all" ? targetUser : null}
-  users={users}
-  onUpdate={handleTargetUpdate}
-  viewMyLeadsOnly={viewMyLeadsOnly}
-  canEdit={canEdit}
-/>
-
+                  <TargetWithEdit
+                    value={annualTarget}
+                    fy={selectedFY}
+                    currentUser={currentUser}
+                    targetUser={!viewMyLeadsOnly && selectedTeamUserId !== "all" ? targetUser : null}
+                    users={users}
+                    onUpdate={handleTargetUpdate}
+                    viewMyLeadsOnly={viewMyLeadsOnly}
+                  />
                 )}
               </div>
               <div className="w-full max-w-xs bg-gray-50 rounded-lg p-3 border border-gray-200">
