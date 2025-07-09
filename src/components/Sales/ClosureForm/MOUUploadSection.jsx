@@ -35,7 +35,7 @@ const MOUUploadSection = ({
         {/* Compact File Upload with Preview */}
         <div className="flex flex-col">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Signed MOU <span className="text-red-500">*</span>
+            Signed MOU 
           </label>
           <div className="flex gap-2">
             <label className="h-[42px] flex-1 flex items-center justify-center w-full p-2 border border-gray-200 rounded-lg cursor-pointer bg-blue-700 hover:border-blue-300  transition-colors">
@@ -64,7 +64,6 @@ const MOUUploadSection = ({
                 accept=".pdf"
                 className="hidden"
                 onChange={handleFileChange}
-                required
               />
             </label>
             {mouFile && (

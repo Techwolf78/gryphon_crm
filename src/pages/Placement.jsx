@@ -3,282 +3,181 @@ import { db } from "../firebase";
 import { collection, getDocs } from "firebase/firestore";
 import TrainingDetailModal from "../components/Learning/TrainingTables/TrainingDetailModal";
 import FilePreviewModal from "../components/Learning/TrainingTables/FilePreviewModal";
-import { FileText, Users, FileSignature, Eye, ChevronDown, Search } from "lucide-react";
+import AddJD from "../components/Placement/AddJD";
+import CompanyOpen from "../components/Placement/CompanyOpen";
 
 function Placement() {
   const [trainingData, setTrainingData] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [leads, setLeads] = useState([]);
   const [selectedTraining, setSelectedTraining] = useState(null);
+  const [selectedLead, setSelectedLead] = useState(null);
   const [fileModalData, setFileModalData] = useState({
     show: false,
     fileUrl: "",
     type: "",
-    trainingId: "",
   });
-  const [searchTerm, setSearchTerm] = useState("");
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [showJDForm, setShowJDForm] = useState(false);
+  const [activeTab, setActiveTab] = useState('warm');
 
-  const fetchTrainingData = async () => {
+  const fetchData = async () => {
     try {
-      const snapshot = await getDocs(collection(db, "trainingForms"));
-      const data = snapshot.docs.map((doc) => ({
+      // Fetch training data
+      const trainingSnapshot = await getDocs(collection(db, "trainingForms"));
+      const trainingData = trainingSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
       }));
-      setTrainingData(data);
+      setTrainingData(trainingData);
+
+      // Fetch leads data
+      const leadsSnapshot = await getDocs(collection(db, "leads"));
+      const leadsData = leadsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setLeads(leadsData);
     } catch (err) {
-      console.error("Error fetching training data:", err);
-    } finally {
-      setLoading(false);
+      console.error("Error fetching data:", err);
     }
   };
 
   useEffect(() => {
-    fetchTrainingData();
-    
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    fetchData();
   }, []);
 
-  const openFilePreview = (fileUrl, type, trainingId = "") => {
-    if (!fileUrl && type === "student") return;
-    setFileModalData({
-      show: true,
-      fileUrl,
-      type,
-      trainingId,
-    });
+  const openFilePreview = (fileUrl, type) => {
+    if (!fileUrl) return alert("File not available.");
+    setFileModalData({ show: true, fileUrl, type });
   };
 
-  const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case "completed":
-        return "bg-emerald-50 text-emerald-700 border-emerald-200";
-      case "ongoing":
-        return "bg-amber-50 text-amber-700 border-amber-200";
-      case "upcoming":
-        return "bg-blue-50 text-blue-700 border-blue-200";
-      default:
-        return "bg-gray-50 text-gray-700 border-gray-200";
-    }
+  const handleAddJD = (leadId, jdData, selectedColleges) => {
+    setLeads(prevLeads => prevLeads.map(lead => {
+      if (lead.id === leadId) {
+        return {
+          ...lead,
+          jds: [...(lead.jds || []), {
+            ...jdData,
+            colleges: selectedColleges,
+            createdAt: new Date().toISOString()
+          }]
+        };
+      }
+      return lead;
+    }));
   };
-
-  const filteredData = trainingData.filter(item => 
-    item.collegeName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.projectCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.course?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   return (
-    <div className="mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header Section */}
-      <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Placement Dashboard</h1>
-          <p className="mt-1 text-sm text-gray-500">Manage and track all college placement programs</p>
-        </div>
-        
-        <div className="relative w-full sm:w-64">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search className="h-4 w-4 text-gray-400" />
-          </div>
-          <input
-            type="text"
-            placeholder="Search colleges..."
-            className="block w-full pl-10 pr-3 py-2 border border-gray-200 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
+    <div className="p-2">
+      <h2 className="text-2xl font-bold mb-1 text-blue-800">
+        Placement Management
+      </h2>
+
+      {/* Tabs */}
+      <div className="flex mb-3 border-b">
+        <button
+          className={`px-4 py-2 font-medium ${!selectedLead ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
+          onClick={() => setSelectedLead(null)}
+        >
+          Training Data
+        </button>
+        <button
+          className={`px-4 py-2 font-medium ${selectedLead !== null ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
+          onClick={() => leads.length > 0 && setSelectedLead(leads[0])}
+        >
+          Placement Stats
+        </button>
       </div>
 
-      {/* Main Card */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        {/* Table Header - Desktop */}
-        {!isMobile && (
-          <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 bg-gradient-to-r from-gray-50 to-gray-100 text-gray-600 font-medium text-xs uppercase tracking-wider border-b border-gray-200">
-            <div className="col-span-2 flex items-center">
-              <FileText className="mr-2 h-4 w-4 text-gray-500" />
-              Project Code
-            </div>
-            <div className="col-span-3 flex items-center">
-              College
-            </div>
-            <div className="col-span-2 flex items-center">
-              Course
-            </div>
-            <div className="col-span-1 flex items-center justify-center">
-              Year
-            </div>
-            <div className="col-span-1 flex items-center">
-              Delivery
-            </div>
-            <div className="col-span-1 flex items-center justify-center">
-              Students
-            </div>
-            <div className="col-span-2 flex items-center justify-end">
-              Actions
-            </div>
-          </div>
-        )}
+      {selectedLead === null ? (
+        <>
+          {/* Training Data View */}
+          
 
-        {/* Loading State */}
-        {loading ? (
-          <div className="p-6 space-y-4">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="grid grid-cols-12 gap-4">
-                {[...Array(8)].map((_, j) => (
-                  <div key={j} className="col-span-1 h-4 bg-gray-100 rounded animate-pulse"></div>
-                ))}
-              </div>
-            ))}
-          </div>
-        ) : filteredData.length === 0 ? (
-          <div className="p-12 text-center">
-            <div className="mx-auto h-24 w-24 text-gray-300 mb-4">
-              <FileText className="w-full h-full" />
+          {trainingData.length === 0 ? (
+            <p>No training data found.</p>
+          ) : (
+            <div className="overflow-x-auto border border-gray-300 rounded">
+              <table className="min-w-full text-sm text-left">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="p-2 border">Project Code</th>
+                    <th className="p-2 border">College</th>
+                    <th className="p-2 border">Course</th>
+                    <th className="p-2 border">Year</th>
+                    <th className="p-2 border">Delivery Type</th>
+                    <th className="p-2 border">Total Students</th>
+                    <th className="p-2 border">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trainingData.map((item) => (
+                    <tr key={item.id} className="odd:bg-white even:bg-gray-50">
+                      <td className="p-2 border">{item.projectCode}</td>
+                      <td className="p-2 border">{item.collegeName}</td>
+                      <td className="p-2 border">{item.course}</td>
+                      <td className="p-2 border">{item.year}</td>
+                      <td className="p-2 border">{item.deliveryType}</td>
+                      <td className="p-2 border">{item.studentCount}</td>
+                      <td className="p-2 border space-x-2">
+                        <button
+                          onClick={() => setSelectedTraining(item)}
+                          className="px-2 py-1 bg-blue-500 text-white rounded"
+                        >
+                          View Details
+                        </button>
+                        <button
+                          onClick={() => openFilePreview(item.studentFileUrl, "student")}
+                          className="px-2 py-1 bg-indigo-500 text-white rounded"
+                          disabled={!item.studentFileUrl}
+                        >
+                          Student Data
+                        </button>
+                        <button
+                          onClick={() => openFilePreview(item.mouFileUrl, "mou")}
+                          className="px-2 py-1 bg-green-600 text-white rounded"
+                          disabled={!item.mouFileUrl}
+                        >
+                          MOU File
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-1">
-              {searchTerm ? "No matching results" : "No placement programs"}
-            </h3>
-            <p className="text-sm text-gray-500">
-              {searchTerm ? "Try a different search term" : "Get started by creating a new program"}
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {/* Data Rows */}
-            {filteredData.map((item) => (
-              <div
-                key={item.id}
-                className={`grid grid-cols-1 md:grid-cols-12 gap-4 px-4 md:px-6 py-4 text-sm group transition-all hover:bg-gray-50/50 ${
-                  selectedTraining?.id === item.id ? 'bg-blue-50' : 'bg-white'
-                }`}
-              >
-                {/* Project Code */}
-                <div className="col-span-2 flex items-center">
-                  {isMobile && (
-                    <FileText className="mr-2 h-4 w-4 text-gray-500 flex-shrink-0" />
-                  )}
-                  <div>
-                    {isMobile && <div className="text-xs text-gray-500 mb-1">Project Code</div>}
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
-                      {item.projectCode || "N/A"}
+          )}
+        </>
+      ) : (
+        <>
+          {/* Placement Leads View */}
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {leads
+              .filter(lead => lead.status === activeTab)
+              .map(lead => (
+                <div 
+                  key={lead.id}
+                  onClick={() => setSelectedLead(lead)}
+                  className="p-4 border rounded-lg cursor-pointer hover:shadow-md transition-shadow"
+                >
+                  <h3 className="font-medium text-lg">{lead.businessName}</h3>
+                  <p className="text-gray-600">{lead.pocName}</p>
+                  <p className="text-sm text-gray-500 mt-1">{lead.city}, {lead.state}</p>
+                  <div className="mt-3 flex justify-between items-center">
+                    <span className="text-sm font-medium">
+                      ₹{lead.tcv?.toLocaleString() || '0'} TCV
                     </span>
-                  </div>
-                </div>
-
-                {/* College */}
-                <div className="col-span-3 flex items-center">
-                  {isMobile && (
-                    <div className="mr-2 h-4 w-4 text-gray-500 flex-shrink-0" />
-                  )}
-                  <div>
-                    {isMobile && <div className="text-xs text-gray-500 mb-1">College</div>}
-                    <div className="font-medium text-gray-900">
-                      {item.collegeName}
-                    </div>
-                    {isMobile && item.department && (
-                      <div className="text-xs text-gray-500 mt-1">{item.department}</div>
+                    {lead.jds?.length > 0 && (
+                      <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                        {lead.jds.length} JD(s)
+                      </span>
                     )}
                   </div>
                 </div>
-
-                {/* Course */}
-                <div className="col-span-2 flex items-center">
-                  {isMobile && (
-                    <div className="mr-2 h-4 w-4 text-gray-500 flex-shrink-0" />
-                  )}
-                  <div>
-                    {isMobile && <div className="text-xs text-gray-500 mb-1">Course</div>}
-                    <div className="text-gray-700">
-                      {item.course}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Year */}
-                <div className="col-span-1 flex items-center justify-center">
-                  {isMobile && (
-                    <div className="mr-2 h-4 w-4 text-gray-500 flex-shrink-0" />
-                  )}
-                  <div>
-                    {isMobile && <div className="text-xs text-gray-500 mb-1">Year</div>}
-                    <div className="text-gray-700">
-                      {item.year}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Delivery */}
-                <div className="col-span-1 flex items-center">
-                  {isMobile && (
-                    <div className="mr-2 h-4 w-4 text-gray-500 flex-shrink-0" />
-                  )}
-                  <div>
-                    {isMobile && <div className="text-xs text-gray-500 mb-1">Delivery</div>}
-                    <span className="capitalize text-gray-700">
-                      {item.deliveryType}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Students */}
-                <div className="col-span-1 flex items-center justify-center">
-                  {isMobile && (
-                    <Users className="mr-2 h-4 w-4 text-gray-500 flex-shrink-0" />
-                  )}
-                  <div>
-                    {isMobile && <div className="text-xs text-gray-500 mb-1">Students</div>}
-                    <div className="text-gray-700">
-                      {item.studentCount}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="col-span-2 flex items-center justify-end ">
-                  <button
-                    onClick={() => setSelectedTraining(item)}
-                    className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                    title="View details"
-                    aria-label="View details"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => openFilePreview(item.studentFileUrl, "student", item.id)}
-                    disabled={!item.studentFileUrl}
-                    className={`p-2 rounded-lg transition-colors ${
-                      item.studentFileUrl 
-                        ? 'text-gray-600 hover:text-blue-600 hover:bg-blue-50' 
-                        : 'text-gray-300 cursor-not-allowed'
-                    }`}
-                    title="View students"
-                    aria-label="View students"
-                  >
-                    <Users className="h-4 w-4" />
-                  </button>
-                  {item.mouFileUrl && (
-                    <button
-                      onClick={() => openFilePreview(item.mouFileUrl, "mou")}
-                      className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                      title="View MOU"
-                      aria-label="View MOU"
-                    >
-                      <FileSignature className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+              ))}
           </div>
-        )}
-      </div>
+        </>
+      )}
 
       {/* Modals */}
       {selectedTraining && (
@@ -287,21 +186,29 @@ function Placement() {
           onClose={() => setSelectedTraining(null)}
         />
       )}
-
       {fileModalData.show && (
         <FilePreviewModal
           fileUrl={fileModalData.fileUrl}
           type={fileModalData.type}
-          trainingId={fileModalData.trainingId}
-          onClose={() =>
-            setFileModalData({
-              show: false,
-              fileUrl: "",
-              type: "",
-              trainingId: "",
-            })
-          }
+          onClose={() => setFileModalData({ show: false, fileUrl: "", type: "" })}
         />
+      )}
+      {showJDForm && (
+        <AddJD show={showJDForm} onClose={() => setShowJDForm(false)} />
+      )}
+      {selectedLead && (
+        <CompanyOpen
+  selectedLead={selectedLead}
+  onClose={() => setSelectedLead(null)}
+  onAddJD={(leadId, jdData) => {
+    // Update your leads data here
+    setLeads(leads.map(lead => 
+      lead.id === leadId 
+        ? { ...lead, jds: [...(lead.jds || []), jdData] } 
+        : lead
+    ));
+  }}
+/>
       )}
     </div>
   );

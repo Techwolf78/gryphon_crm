@@ -13,10 +13,12 @@ import { toast } from "react-toastify";
 import PropTypes from "prop-types";
 import syncLogo from "../../../assets/SYNC-logo.png";
 import * as XLSX from "xlsx-js-style";
+
 const validateCollegeCode = (value) => /^[A-Z]*$/.test(value);
 const validatePincode = (value) => /^[0-9]{0,6}$/.test(value);
 const validateGST = (value) =>
     /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(value);
+
 const TrainingForm = ({ show, onClose, lead, users }) => {
     const { currentUser } = useContext(AuthContext);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -68,6 +70,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
     const [mouFileError, setMouFileError] = useState("");
     const [contractStartDate, setContractStartDate] = useState("");
     const [contractEndDate, setContractEndDate] = useState("");
+
     useEffect(() => {
         if (lead) {
             setFormData((prev) => ({
@@ -87,6 +90,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
             setContractEndDate(lead.contractEndDate || "");
         }
     }, [lead]);
+
     useEffect(() => {
         const totalStudents = formData.courses.reduce(
             (sum, item) => sum + (parseInt(item.students) || 0),
@@ -98,6 +102,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
             totalCost: totalStudents * (parseFloat(prev.perStudentCost) || 0),
         }));
     }, [formData.courses, formData.perStudentCost]);
+
     useEffect(() => {
         const { collegeCode, course, year, deliveryType, passingYear } = formData;
         if (collegeCode && course && year && deliveryType && passingYear) {
@@ -114,6 +119,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
         formData.deliveryType,
         formData.passingYear,
     ]);
+
     const handleChange = useCallback((e) => {
         const { name, value } = e.target;
         setHasUnsavedChanges(true);
@@ -132,7 +138,9 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
         }
         setFormData((prev) => ({ ...prev, [name]: value }));
     }, []);
+
     const uploadFileToCloudinary = async (file, folderName) => {
+        if (!file) return null;
         const url = "https://api.cloudinary.com/v1_1/da0ypp61n/raw/upload";
         const formData = new FormData();
         formData.append("file", file);
@@ -145,13 +153,16 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
         }
         return data.secure_url;
     };
+
     const uploadStudentsToFirestore = async (studentList, formId) => {
         try {
+            if (!studentList || studentList.length === 0) return;
+
             const batch = writeBatch(db);
             const studentsCollectionRef = collection(db, "trainingForms", formId, "students");
 
             studentList.forEach((student) => {
-                const docRef = doc(studentsCollectionRef); // Auto-generate ID
+                const docRef = doc(studentsCollectionRef);
                 batch.set(docRef, student);
             });
 
@@ -161,21 +172,26 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
             throw error;
         }
     };
+
     const handleStudentFile = (file) => {
         setStudentFile(file);
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, { type: "array" });
-            const sheet = workbook.Sheets[workbook.SheetNames[0]];
-            const jsonData = XLSX.utils.sheet_to_json(sheet);
-            setFormData((prev) => ({ ...prev, studentList: jsonData }));
-        };
-        reader.readAsArrayBuffer(file);
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: "array" });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(sheet);
+                setFormData((prev) => ({ ...prev, studentList: jsonData }));
+            };
+            reader.readAsArrayBuffer(file);
+        } else {
+            setFormData((prev) => ({ ...prev, studentList: [] }));
+        }
     };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
-        // Add this validation check at the start
         if (!e.target.checkValidity()) {
             const firstInvalid = e.target.querySelector(':invalid');
             if (firstInvalid) {
@@ -186,29 +202,19 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
         }
 
         setIsSubmitting(true);
-        if (!studentFile) {
-            setStudentFileError("Please upload the Student Excel file.");
-            setIsSubmitting(false);
-            return;
-        }
-        if (!mouFile) {
-            setMouFileError("Please upload the MOU file.");
-            setIsSubmitting(false);
-            return;
-        }
+
         if (!contractStartDate || !contractEndDate) {
             toast.error("Please select both Contract Start Date and End Date.");
             setIsSubmitting(false);
             return;
         }
+
         try {
-            const toastId = toast.loading("");
-            const [studentUrl, mouUrl] = await Promise.all([
-                uploadFileToCloudinary(studentFile, "training-forms/student-files"),
-                uploadFileToCloudinary(mouFile, "training-forms/mou-files"),
-            ]);
+            const toastId = toast.loading("Submitting form...");
             const rawProjectCode = formData.projectCode;
             const sanitizedProjectCode = rawProjectCode.replace(/\//g, "-");
+
+            // Check if form already exists
             const formRef = doc(db, "trainingForms", sanitizedProjectCode);
             const existingDoc = await getDoc(formRef);
             if (existingDoc.exists()) {
@@ -221,6 +227,8 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
                 setIsSubmitting(false);
                 return;
             }
+
+            // Update lead if exists
             if (lead?.id) {
                 const leadRef = doc(db, "leads", lead.id);
                 await updateDoc(leadRef, {
@@ -230,10 +238,21 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
                     totalCost: formData.totalCost,
                     contractStartDate,
                     contractEndDate,
+                    projectCode: rawProjectCode // ✅ this line adds the projectCode into the lead
                 });
             }
+
+
+            // Upload files (if they exist)
+            const [studentUrl, mouUrl] = await Promise.all([
+                studentFile ? uploadFileToCloudinary(studentFile, "training-forms/student-files") : null,
+                mouFile ? uploadFileToCloudinary(mouFile, "training-forms/mou-files") : null
+            ]);
+
             const assignedUser = users?.[lead?.assignedTo?.uid] || {};
             const { studentList, ...formDataWithoutStudents } = formData;
+
+            // Save form data
             await setDoc(formRef, {
                 ...formDataWithoutStudents,
                 studentFileUrl: studentUrl,
@@ -247,7 +266,12 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
                     name: lead?.assignedTo?.name || assignedUser?.name || "",
                 },
             });
-            await uploadStudentsToFirestore(studentList, sanitizedProjectCode);
+
+            // Upload students (if student list exists)
+            if (studentList && studentList.length > 0) {
+                await uploadStudentsToFirestore(studentList, sanitizedProjectCode);
+            }
+
             toast.update(toastId, {
                 render: "Form submitted successfully!",
                 type: "success",
@@ -263,6 +287,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
             setIsSubmitting(false);
         }
     };
+
     const handleClose = useCallback(() => {
         if (
             hasUnsavedChanges &&
@@ -272,7 +297,9 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
         }
         onClose();
     }, [hasUnsavedChanges, onClose]);
+
     if (!show || !lead) return null;
+
     return (
         <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center px-4 z-54">
             <div className="bg-white w-full max-w-7xl h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col relative animate-fadeIn">
@@ -295,7 +322,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
                         </button>
                     </div>
                 </div>
-                <form className="flex-1 overflow-y-auto p-6 space-y-6" onSubmit={handleSubmit}  noValidate>
+                <form className="flex-1 overflow-y-auto p-6 space-y-6" onSubmit={handleSubmit} noValidate>
                     <CollegeInfoSection
                         formData={formData}
                         setFormData={setFormData}
@@ -353,15 +380,16 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
                         </div>
                     </div>
                 )}
-
             </div>
         </div>
     );
 };
+
 TrainingForm.propTypes = {
     show: PropTypes.bool.isRequired,
     onClose: PropTypes.func.isRequired,
     lead: PropTypes.object,
     users: PropTypes.object,
 };
+
 export default TrainingForm;

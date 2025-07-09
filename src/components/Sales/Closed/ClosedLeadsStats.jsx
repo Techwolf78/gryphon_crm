@@ -275,6 +275,8 @@ const ClosedLeadsStats = ({
   const completionStatus = achievementPercentage >= 100 ? "Ahead" : "Behind";
   const statusColor = achievementPercentage >= 100 ? "text-green-600" : "text-red-600";
 
+  
+
   return (
     // ... your existing UI (cards) as is, no change needed ...
     <>
