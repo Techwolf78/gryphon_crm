@@ -13,12 +13,12 @@ import { toast } from "react-toastify";
 import PropTypes from "prop-types";
 import syncLogo from "../../../assets/SYNC-logo.png";
 import * as XLSX from "xlsx-js-style";
- 
+
 const validateCollegeCode = (value) => /^[A-Z]*$/.test(value);
 const validatePincode = (value) => /^[0-9]{0,6}$/.test(value);
 const validateGST = (value) =>
     /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(value);
- 
+
 const TrainingForm = ({ show, onClose, lead, users }) => {
     const { currentUser } = useContext(AuthContext);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -50,16 +50,19 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
         courses: [{ specialization: "", othersSpecText: "", students: "" }],
         topics: [{ topic: "", hours: "" }],
         paymentType: "",
-        gstType: "include",
+        gstType: "",
         perStudentCost: 0,
         totalCost: 0,
         studentCount: 0,
         paymentSplits: [],
         emiMonths: 0,
         emiSplits: [],
+        gstAmount: 0,
+        netPayableAmount: 0,
+        paymentDetails: [],
         invoiceNumber: "",
         additionalNotes: "",
-        splitTotal: 0,
+        splitTotal: 0
     });
     const [collegeCodeError, setCollegeCodeError] = useState("");
     const [pincodeError, setPincodeError] = useState("");
@@ -70,7 +73,8 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
     const [mouFileError, setMouFileError] = useState("");
     const [contractStartDate, setContractStartDate] = useState("");
     const [contractEndDate, setContractEndDate] = useState("");
- 
+    const [duplicateProjectCode, setDuplicateProjectCode] = useState(false);
+
     useEffect(() => {
         if (lead) {
             setFormData((prev) => ({
@@ -81,6 +85,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
                 state: lead.state || "",
                 studentCount: lead.studentCount || 0,
                 totalCost: (lead.studentCount || 0) * (lead.perStudentCost || 0),
+                perStudentCost: lead.perStudentCost || 0,
                 course: lead.courseType || "",
                 tpoName: lead.pocName || "",
                 tpoEmail: lead.email || "",
@@ -90,7 +95,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
             setContractEndDate(lead.contractEndDate || "");
         }
     }, [lead]);
- 
+
     useEffect(() => {
         const totalStudents = formData.courses.reduce(
             (sum, item) => sum + (parseInt(item.students) || 0),
@@ -102,7 +107,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
             totalCost: totalStudents * (parseFloat(prev.perStudentCost) || 0),
         }));
     }, [formData.courses, formData.perStudentCost]);
- 
+
     useEffect(() => {
         const { collegeCode, course, year, deliveryType, passingYear } = formData;
         if (collegeCode && course && year && deliveryType && passingYear) {
@@ -111,6 +116,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
             const coursePart = course === "Engineering" ? "ENGG" : course;
             const code = `${collegeCode}/${coursePart}/${year}/${deliveryType}/${shortPassYear}`;
             setFormData((prev) => ({ ...prev, projectCode: code }));
+            setDuplicateProjectCode(false); // Reset duplicate flag when project code changes
         }
     }, [
         formData.collegeCode,
@@ -119,7 +125,47 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
         formData.deliveryType,
         formData.passingYear,
     ]);
- 
+
+    const validatePaymentSection = () => {
+        if (!formData.paymentType) {
+            toast.error("Please select a Payment Type");
+            return false;
+        }
+
+        if (!formData.gstType) {
+            toast.error("Please select GST Type");
+            return false;
+        }
+
+        if (formData.paymentType === "EMI") {
+            if (!formData.emiMonths || formData.emiMonths <= 0) {
+                toast.error("Please enter valid number of EMI installments");
+                return false;
+            }
+        } else {
+            if (!formData.paymentSplits || formData.paymentSplits.length === 0) {
+                toast.error("Please fill all payment splits");
+                return false;
+            }
+
+            // Fixed the reduce function
+            const sum = formData.paymentSplits.reduce((acc, val) => acc + (parseFloat(val) || 0), 0);
+
+            // Ensure sum is a number before calling toFixed
+            if (typeof sum !== 'number' || isNaN(sum)) {
+                toast.error("Invalid payment split values");
+                return false;
+            }
+
+            if (sum.toFixed(2) !== "100.00") {
+                toast.error("Payment splits must add up to 100%");
+                return false;
+            }
+        }
+
+        return true;
+    };
+
     const handleChange = useCallback((e) => {
         const { name, value } = e.target;
         setHasUnsavedChanges(true);
@@ -138,7 +184,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
         }
         setFormData((prev) => ({ ...prev, [name]: value }));
     }, []);
- 
+
     const uploadFileToCloudinary = async (file, folderName) => {
         if (!file) return null;
         const url = "https://api.cloudinary.com/v1_1/da0ypp61n/raw/upload";
@@ -153,26 +199,26 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
         }
         return data.secure_url;
     };
- 
+
     const uploadStudentsToFirestore = async (studentList, formId) => {
         try {
             if (!studentList || studentList.length === 0) return;
- 
+
             const batch = writeBatch(db);
             const studentsCollectionRef = collection(db, "trainingForms", formId, "students");
- 
+
             studentList.forEach((student) => {
                 const docRef = doc(studentsCollectionRef);
                 batch.set(docRef, student);
             });
- 
+
             await batch.commit();
         } catch (error) {
             console.error("Error uploading students:", error);
             throw error;
         }
     };
- 
+
     const handleStudentFile = (file) => {
         setStudentFile(file);
         if (file) {
@@ -189,9 +235,23 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
             setFormData((prev) => ({ ...prev, studentList: [] }));
         }
     };
- 
+
+    const checkDuplicateProjectCode = async (projectCode) => {
+        try {
+            const sanitizedProjectCode = projectCode.replace(/\//g, "-");
+            const formRef = doc(db, "trainingForms", sanitizedProjectCode);
+            const existingDoc = await getDoc(formRef);
+            return existingDoc.exists();
+        } catch (error) {
+            console.error("Error checking duplicate project code:", error);
+            return false;
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        // Basic form validation
         if (!e.target.checkValidity()) {
             const firstInvalid = e.target.querySelector(':invalid');
             if (firstInvalid) {
@@ -200,34 +260,44 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
             toast.error("Please fill all required fields");
             return;
         }
- 
-        setIsSubmitting(true);
- 
-        if (!contractStartDate || !contractEndDate) {
-            toast.error("Please select both Contract Start Date and End Date.");
-            setIsSubmitting(false);
+
+        // Payment section validation
+        if (!validatePaymentSection()) {
             return;
         }
- 
+
+        // Contract dates validation
+        if (!contractStartDate || !contractEndDate) {
+            toast.error("Please select both Contract Start Date and End Date.");
+            return;
+        }
+
+        setIsSubmitting(true);
+
         try {
             const toastId = toast.loading("Submitting form...");
             const rawProjectCode = formData.projectCode;
-            const sanitizedProjectCode = rawProjectCode.replace(/\//g, "-");
- 
-            // Check if form already exists
-            const formRef = doc(db, "trainingForms", sanitizedProjectCode);
-            const existingDoc = await getDoc(formRef);
-            if (existingDoc.exists()) {
+
+            // Check for duplicate project code
+            const isDuplicate = await checkDuplicateProjectCode(rawProjectCode);
+            if (isDuplicate) {
+                setDuplicateProjectCode(true);
                 toast.update(toastId, {
-                    render: "A form with this Project Code already exists!",
+                    render: (
+                        <div>
+                            <p className="font-bold">Duplicate Project Code!</p>
+                            <p>A form with this Project Code already exists.</p>
+                            <p>Please verify the details or contact support.</p>
+                        </div>
+                    ),
                     type: "error",
                     isLoading: false,
-                    autoClose: 3000,
+                    autoClose: 5000,
                 });
                 setIsSubmitting(false);
                 return;
             }
- 
+
             // Update lead if exists
             if (lead?.id) {
                 const leadRef = doc(db, "leads", lead.id);
@@ -236,58 +306,88 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
                     closureType: "new",
                     closedDate: new Date().toISOString(),
                     totalCost: formData.totalCost,
+                    perStudentCost: formData.perStudentCost,
                     contractStartDate,
                     contractEndDate,
-                    projectCode: rawProjectCode // ✅ this line adds the projectCode into the lead
+                    projectCode: rawProjectCode
                 });
             }
- 
- 
+
             // Upload files (if they exist)
             const [studentUrl, mouUrl] = await Promise.all([
                 studentFile ? uploadFileToCloudinary(studentFile, "training-forms/student-files") : null,
                 mouFile ? uploadFileToCloudinary(mouFile, "training-forms/mou-files") : null
             ]);
- 
+
             const assignedUser = users?.[lead?.assignedTo?.uid] || {};
             const { studentList, ...formDataWithoutStudents } = formData;
- 
+
+            // Prepare payment details for Firestore
+            const paymentDetails = formData.paymentDetails.map(detail => ({
+                ...detail,
+                baseAmount: parseFloat(detail.baseAmount),
+                gstAmount: parseFloat(detail.gstAmount),
+                totalAmount: parseFloat(detail.totalAmount),
+                percentage: parseFloat(detail.percentage),
+               
+            }));
+
+            const sanitizedProjectCode = rawProjectCode.replace(/\//g, "-");
+
             // Save form data
-            await setDoc(formRef, {
+            await setDoc(doc(db, "trainingForms", sanitizedProjectCode), {
                 ...formDataWithoutStudents,
+                paymentDetails,
                 studentFileUrl: studentUrl,
                 mouFileUrl: mouUrl,
                 contractStartDate,
                 contractEndDate,
+                totalCost: parseFloat(formData.totalCost),
+                perStudentCost: parseFloat(formData.perStudentCost),
+                gstAmount: parseFloat(formData.gstAmount),
+                netPayableAmount: parseFloat(formData.netPayableAmount),
+                studentCount: parseInt(formData.studentCount),
                 createdAt: serverTimestamp(),
                 createdBy: {
                     email: lead?.assignedTo?.email || assignedUser?.email || "Unknown",
                     uid: lead?.assignedTo?.uid || "",
                     name: lead?.assignedTo?.name || assignedUser?.name || "",
                 },
+                status: "active",
+                lastUpdated: serverTimestamp()
             });
- 
+
             // Upload students (if student list exists)
             if (studentList && studentList.length > 0) {
                 await uploadStudentsToFirestore(studentList, sanitizedProjectCode);
             }
- 
+
             toast.update(toastId, {
-                render: "Form submitted successfully!",
+                render: (
+                    <div>
+                        <p className="font-bold">Form submitted successfully!</p>
+                        <p>Project Code: {rawProjectCode}</p>
+                    </div>
+                ),
                 type: "success",
                 isLoading: false,
-                autoClose: 3000,
+                autoClose: 5000,
             });
             setHasUnsavedChanges(false);
             setTimeout(onClose, 1000);
         } catch (err) {
             console.error("Error submitting form: ", err);
-            toast.error(err.message || "Something went wrong. Please try again.");
+            toast.error(
+                <div>
+                    <p className="font-bold">Submission failed!</p>
+                    <p>{err.message || "Something went wrong. Please try again."}</p>
+                </div>
+            );
         } finally {
             setIsSubmitting(false);
         }
     };
- 
+
     const handleClose = useCallback(() => {
         if (
             hasUnsavedChanges &&
@@ -297,9 +397,9 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
         }
         onClose();
     }, [hasUnsavedChanges, onClose]);
- 
+
     if (!show || !lead) return null;
- 
+
     return (
         <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center px-4 z-54">
             <div className="bg-white w-full max-w-7xl h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col relative animate-fadeIn">
@@ -310,7 +410,8 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
                             name="projectCode"
                             value={formData.projectCode}
                             placeholder="Project Code"
-                            className="px-4 py-2 border rounded-lg text-base w-full font-semibold text-blue-700 bg-gray-100 cursor-not-allowed"
+                            className={`px-4 py-2 border rounded-lg text-base w-full font-semibold ${duplicateProjectCode ? "text-red-600 bg-red-50 border-red-300" : "text-blue-700 bg-gray-100"
+                                } cursor-not-allowed`}
                             readOnly
                         />
                         <button
@@ -321,6 +422,11 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
                             <FaTimes />
                         </button>
                     </div>
+                    {duplicateProjectCode && (
+                        <div className="absolute top-16 right-6 bg-red-100 border border-red-300 text-red-700 px-4 py-2 rounded-lg shadow-lg">
+                            This project code already exists!
+                        </div>
+                    )}
                 </div>
                 <form className="flex-1 overflow-y-auto p-6 space-y-6" onSubmit={handleSubmit} noValidate>
                     <CollegeInfoSection
@@ -364,7 +470,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
                             className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:bg-blue-400"
                             disabled={isSubmitting}
                         >
-                            Submit
+                            {isSubmitting ? "Submitting..." : "Submit"}
                         </button>
                     </div>
                 </form>
@@ -384,13 +490,12 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
         </div>
     );
 };
- 
+
 TrainingForm.propTypes = {
     show: PropTypes.bool.isRequired,
     onClose: PropTypes.func.isRequired,
     lead: PropTypes.object,
     users: PropTypes.object,
 };
- 
+
 export default TrainingForm;
- 

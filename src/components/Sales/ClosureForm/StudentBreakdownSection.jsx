@@ -175,7 +175,6 @@ const StudentBreakdownSection = ({ formData, setFormData, studentFile, setStuden
           onFileClear={() => setStudentFile(null)}
           fileError={studentFileError}
           initialFileName={studentFile?.name || ""}
-          required
         />
       </div>
     </section>

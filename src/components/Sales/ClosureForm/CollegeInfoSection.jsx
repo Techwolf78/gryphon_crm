@@ -54,9 +54,7 @@ const CollegeInfoSection = ({ formData, setFormData, handleChange, collegeCodeEr
             value={formData.gstNumber}
             onChange={handleChange}
           />
-          {gstError && (
-            <p className="text-red-500 text-sm mt-1">{gstError}</p>
-          )}
+          
         </div>
       </div>
 
