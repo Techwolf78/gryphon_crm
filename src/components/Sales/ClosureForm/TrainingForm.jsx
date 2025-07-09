@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useContext, useCallback } from "react";
 import { FaTimes } from "react-icons/fa";
 import { collection, serverTimestamp, doc, updateDoc, writeBatch, setDoc, getDoc } from "firebase/firestore";
@@ -9,7 +10,6 @@ import StudentBreakdownSection from "./StudentBreakdownSection";
 import TopicBreakdownSection from "./TopicBreakdownSection";
 import PaymentInfoSection from "./PaymentInfoSection";
 import MOUUploadSection from "./MOUUploadSection";
-import { toast } from "react-toastify";
 import PropTypes from "prop-types";
 import syncLogo from "../../../assets/SYNC-logo.png";
 import * as XLSX from "xlsx-js-style";
@@ -19,7 +19,14 @@ const validatePincode = (value) => /^[0-9]{0,6}$/.test(value);
 const validateGST = (value) =>
     /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(value);
 
-const TrainingForm = ({ show, onClose, lead, users }) => {
+const TrainingForm = ({ 
+    show, 
+    onClose, 
+    lead, 
+    users, 
+    existingFormData,
+    isLoading 
+}) => {
     const { currentUser } = useContext(AuthContext);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -74,7 +81,53 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
     const [contractStartDate, setContractStartDate] = useState("");
     const [contractEndDate, setContractEndDate] = useState("");
     const [duplicateProjectCode, setDuplicateProjectCode] = useState(false);
+    const [isFormValid, setIsFormValid] = useState(false);
 
+    // Check if all required fields are filled
+    useEffect(() => {
+        const requiredFields = [
+            formData.projectCode,
+            formData.collegeName,
+            formData.collegeCode,
+            formData.address,
+            formData.city,
+            formData.state,
+            formData.pincode,
+            formData.tpoName,
+            formData.tpoEmail,
+            formData.tpoPhone,
+            formData.course,
+            formData.year,
+            formData.deliveryType,
+            formData.passingYear,
+            formData.paymentType,
+            formData.gstType,
+            contractStartDate,
+            contractEndDate
+        ];
+
+        // Validate payment splits if payment type is not EMI
+        if (formData.paymentType === "EMI") {
+            requiredFields.push(formData.emiMonths > 0);
+        } else {
+            const splitsValid = formData.paymentSplits.length > 0 &&
+                formData.paymentSplits.reduce((acc, val) => acc + (parseFloat(val) || 0), 0) === 100;
+            requiredFields.push(splitsValid);
+        }
+
+        // Validate student count
+        requiredFields.push(formData.studentCount > 0);
+
+        const isValid = requiredFields.every(field => {
+            if (typeof field === 'boolean') return field;
+            return field && field.toString().trim() !== '';
+        });
+
+        setIsFormValid(isValid);
+    }, [formData, contractStartDate, contractEndDate]);
+
+
+    // Rest of your existing useEffect hooks remain the same...
     useEffect(() => {
         if (lead) {
             setFormData((prev) => ({
@@ -128,37 +181,28 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
 
     const validatePaymentSection = () => {
         if (!formData.paymentType) {
-            toast.error("Please select a Payment Type");
             return false;
         }
 
         if (!formData.gstType) {
-            toast.error("Please select GST Type");
             return false;
         }
 
         if (formData.paymentType === "EMI") {
             if (!formData.emiMonths || formData.emiMonths <= 0) {
-                toast.error("Please enter valid number of EMI installments");
                 return false;
             }
         } else {
             if (!formData.paymentSplits || formData.paymentSplits.length === 0) {
-                toast.error("Please fill all payment splits");
                 return false;
             }
 
-            // Fixed the reduce function
             const sum = formData.paymentSplits.reduce((acc, val) => acc + (parseFloat(val) || 0), 0);
-
-            // Ensure sum is a number before calling toFixed
             if (typeof sum !== 'number' || isNaN(sum)) {
-                toast.error("Invalid payment split values");
                 return false;
             }
 
             if (sum.toFixed(2) !== "100.00") {
-                toast.error("Payment splits must add up to 100%");
                 return false;
             }
         }
@@ -257,7 +301,6 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
             if (firstInvalid) {
                 firstInvalid.focus();
             }
-            toast.error("Please fill all required fields");
             return;
         }
 
@@ -268,32 +311,18 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
 
         // Contract dates validation
         if (!contractStartDate || !contractEndDate) {
-            toast.error("Please select both Contract Start Date and End Date.");
             return;
         }
 
         setIsSubmitting(true);
 
         try {
-            const toastId = toast.loading("Submitting form...");
             const rawProjectCode = formData.projectCode;
 
             // Check for duplicate project code
             const isDuplicate = await checkDuplicateProjectCode(rawProjectCode);
             if (isDuplicate) {
                 setDuplicateProjectCode(true);
-                toast.update(toastId, {
-                    render: (
-                        <div>
-                            <p className="font-bold">Duplicate Project Code!</p>
-                            <p>A form with this Project Code already exists.</p>
-                            <p>Please verify the details or contact support.</p>
-                        </div>
-                    ),
-                    type: "error",
-                    isLoading: false,
-                    autoClose: 5000,
-                });
                 setIsSubmitting(false);
                 return;
             }
@@ -329,7 +358,6 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
                 gstAmount: parseFloat(detail.gstAmount),
                 totalAmount: parseFloat(detail.totalAmount),
                 percentage: parseFloat(detail.percentage),
-               
             }));
 
             const sanitizedProjectCode = rawProjectCode.replace(/\//g, "-");
@@ -362,31 +390,15 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
                 await uploadStudentsToFirestore(studentList, sanitizedProjectCode);
             }
 
-            toast.update(toastId, {
-                render: (
-                    <div>
-                        <p className="font-bold">Form submitted successfully!</p>
-                        <p>Project Code: {rawProjectCode}</p>
-                    </div>
-                ),
-                type: "success",
-                isLoading: false,
-                autoClose: 5000,
-            });
             setHasUnsavedChanges(false);
             setTimeout(onClose, 1000);
         } catch (err) {
             console.error("Error submitting form: ", err);
-            toast.error(
-                <div>
-                    <p className="font-bold">Submission failed!</p>
-                    <p>{err.message || "Something went wrong. Please try again."}</p>
-                </div>
-            );
         } finally {
             setIsSubmitting(false);
         }
     };
+
 
     const handleClose = useCallback(() => {
         if (
@@ -468,7 +480,7 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
                         <button
                             type="submit"
                             className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:bg-blue-400"
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || !isFormValid}
                         >
                             {isSubmitting ? "Submitting..." : "Submit"}
                         </button>
@@ -490,12 +502,13 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
         </div>
     );
 };
-
 TrainingForm.propTypes = {
     show: PropTypes.bool.isRequired,
     onClose: PropTypes.func.isRequired,
     lead: PropTypes.object,
     users: PropTypes.object,
+    existingFormData: PropTypes.object, // Add this
+    isLoading: PropTypes.bool, // Add this
 };
 
 export default TrainingForm;
