@@ -9,7 +9,9 @@ import { doc, collection, setDoc, getDoc, getDocs, deleteDoc } from "firebase/fi
 const projectCodeToDocId = (projectCode) => projectCode.replace(/\//g, "-");
 const docIdToProjectCode = (docId) => docId.replace(/-/g, "/");
 const displayProjectCode = (code) => (code ? code.replace(/-/g, "/") : "-");
+
 const displayYear = (year) => year.replace(/-/g, " ");
+
 
 const ClosedLeadsTable = ({
   leads,
@@ -447,6 +449,7 @@ const processExcelData = async (data, projectCode) => {
         <tbody className="bg-white divide-y divide-gray-200">
           {leads.length > 0 ? (
             leads.map(([id, lead]) => (
+
               <tr key={id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {displayProjectCode(lead.projectCode) || "-"}
