@@ -1,6 +1,6 @@
 import React from "react";
 import { FaEye } from "react-icons/fa";
-
+ 
 const MOUUploadSection = ({
   mouFile,
   setMouFile,
@@ -18,24 +18,28 @@ const MOUUploadSection = ({
     }
     setMouFile(file);
   };
-
+ 
   const handlePreview = () => {
     if (mouFile) {
       window.open(URL.createObjectURL(mouFile), '_blank');
     }
   };
-
+ 
   return (
     <section className="p-6 bg-white rounded-xl border border-gray-200">
       <div className="flex items-center gap-2 pb-2 border-b border-blue-700 mb-6">
         <h3 className="text-2xl font-semibold text-blue-700">MOU Details</h3>
       </div>
-
+ 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Compact File Upload with Preview */}
         <div className="flex flex-col">
           <label className="block text-sm font-medium text-gray-700 mb-1">
+<<<<<<< HEAD
             Signed MOU 
+=======
+            Signed MOU
+>>>>>>> 8a424917b919a81b190f338e698109a50924d08f
           </label>
           <div className="flex gap-2">
             <label className="h-[42px] flex-1 flex items-center justify-center w-full p-2 border border-gray-200 rounded-lg cursor-pointer bg-blue-700 hover:border-blue-300  transition-colors">
@@ -95,7 +99,7 @@ const MOUUploadSection = ({
             </p>
           )}
         </div>
-
+ 
         {/* Contract Dates - Consistent height */}
         <div className="flex flex-col">
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -128,7 +132,7 @@ const MOUUploadSection = ({
             />
           </div>
         </div>
-
+ 
         <div className="flex flex-col">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             End Date <span className="text-red-500">*</span>
@@ -165,5 +169,6 @@ const MOUUploadSection = ({
     </section>
   );
 };
-
+ 
 export default MOUUploadSection;
+ 

@@ -1,332 +1,396 @@
-import React, { useState, useMemo, useEffect, useCallback } from "react";
-import PropTypes from "prop-types";
-import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
-import { collection, getDocs } from "firebase/firestore";
+import React, { useState, useEffect, useContext, useCallback } from "react";
+import { FaTimes } from "react-icons/fa";
+import { collection, serverTimestamp, doc, updateDoc, writeBatch, setDoc, getDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
-import ClosedLeadsProgressBar from "./ClosedLeadsProgressBar";
-import ClosedLeadsTable from "./ClosedLeadsTable";
-import ClosedLeadsStats from "./ClosedLeadsStats";
-import { doc, getDoc, writeBatch, updateDoc, serverTimestamp } from "firebase/firestore";
+import { AuthContext } from "../../../context/AuthContext";
+import CollegeInfoSection from "./CollegeInfoSection";
+import POCInfoSection from "./POCInfoSection";
+import StudentBreakdownSection from "./StudentBreakdownSection";
+import TopicBreakdownSection from "./TopicBreakdownSection";
+import PaymentInfoSection from "./PaymentInfoSection";
+import MOUUploadSection from "./MOUUploadSection";
+import { toast } from "react-toastify";
+import PropTypes from "prop-types";
+import syncLogo from "../../../assets/SYNC-logo.png";
 import * as XLSX from "xlsx-js-style";
-
-
-const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
-  const [filterType, setFilterType] = useState("all");
-  const [quarterFilter, setQuarterFilter] = useState("current");
-  const [targets, setTargets] = useState([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const rowsPerPage = 10;
-
-  const fetchTargets = useCallback(async () => {
-    const snapshot = await getDocs(collection(db, "quarterly_targets"));
-    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    setTargets(data);
-  }, []);
-
-  useEffect(() => {
-    fetchTargets();
-  }, [fetchTargets]);
-
-  const getFinancialYear = (date) => {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    return month >= 3 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
-  };
-
-  const getQuarter = (date) => {
-    const m = date.getMonth() + 1;
-    if (m >= 4 && m <= 6) return "Q1";
-    if (m >= 7 && m <= 9) return "Q2";
-    if (m >= 10 && m <= 12) return "Q3";
-    return "Q4";
-  };
-
-  const today = new Date();
-  const currentQuarter = getQuarter(today);
-  const selectedQuarter = quarterFilter === "current" ? currentQuarter : quarterFilter;
-  const selectedFY = getFinancialYear(today);
-
-  const currentUserObj = Object.values(users).find(u => u.uid === currentUser?.uid);
-  const currentRole = currentUserObj?.role;
-
-  const isUserInTeam = (uid) => {
-    if (!uid) return false;
-
-    if (currentRole === "Head") {
-      const user = Object.values(users).find(u => u.uid === uid);
-      if (!user) return false;
-
-      // Head can see all managers and all their subordinates
-      if (user.role === "Manager") return true;
-      if (["Assistant Manager", "Executive"].includes(user.role) && user.reportingManager) {
-        // Check if this subordinate's manager is among managers (head team)
-        return Object.values(users).some(
-          mgr => mgr.role === "Manager" && mgr.name === user.reportingManager
-        );
-      }
-    }
-
-    if (currentRole === "Manager") {
-      const user = Object.values(users).find(u => u.uid === uid);
-      if (!user) return false;
-
-      if (["Assistant Manager", "Executive"].includes(user.role)) {
-        return user.reportingManager === currentUserObj.name;
-      }
-    }
-
-    return false;
-  };
-
-  const filteredLeads = useMemo(() => {
-    if (!currentUser) return [];
-
-    return Object.entries(leads)
-      .filter(([, lead]) => {
-        if (viewMyLeadsOnly) {
-          // ✅ My Leads tab
-          return lead.assignedTo?.uid === currentUser.uid;
-        } else {
-          // ✅ My Team tab
-          if (currentRole === "Head") {
-            // Head ke liye: sirf team members ki leads, khud ki nahi
-            return isUserInTeam(lead.assignedTo?.uid);
-          } else if (currentRole === "Manager") {
-            // Manager ke liye: team members + khud ki leads
-            return (
-              isUserInTeam(lead.assignedTo?.uid) ||
-              lead.assignedTo?.uid === currentUser.uid
-            );
-          } else {
-            // Baaki koi role: default same as manager
-            return (
-              isUserInTeam(lead.assignedTo?.uid) ||
-              lead.assignedTo?.uid === currentUser.uid
-            );
-          }
-        }
-      })
-      .filter(([, lead]) => {
-        if (filterType === "all") return true;
-        return lead.closureType === filterType;
-      })
-      .filter(([, lead]) => {
-        if (selectedQuarter === "all") return true;
-        const closedQuarter = getQuarter(new Date(lead.closedDate));
-        return closedQuarter === selectedQuarter;
-      })
-      .sort(([, a], [, b]) => new Date(b.closedDate) - new Date(a.closedDate));
-  }, [leads, currentUser, currentRole, filterType, selectedQuarter, viewMyLeadsOnly, users]);
-
-
-
-  const startIdx = (currentPage - 1) * rowsPerPage;
-  const currentRows = filteredLeads.slice(startIdx, startIdx + rowsPerPage);
-  const totalPages = Math.ceil(filteredLeads.length / rowsPerPage);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filterType, quarterFilter, viewMyLeadsOnly]);
-
-  const achievedValue = useMemo(() => {
-    const value = filteredLeads.reduce((sum, [, lead]) => sum + (lead.totalCost || 0), 0);
-    console.log("🔥 Achieved Value (ClosedLeads):", value);
-    return value;
-  }, [filteredLeads]);
-
-  const formatCurrency = (amt) =>
-    typeof amt === "number"
-      ? new Intl.NumberFormat("en-IN", {
-        style: "currency",
-        currency: "INR",
-        maximumFractionDigits: 0,
-      }).format(amt)
-      : "-";
-
-  const formatDate = (ts) =>
-    ts
-      ? new Date(ts).toLocaleDateString("en-IN", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      })
-      : "-";
-
-  const handleTargetUpdate = async () => {
-    await fetchTargets();
-    // Update deficits for this user
-    await updateDeficitsAndCarryForward(currentUser.uid, selectedFY);
-    // Dobara fetch karo taaki latest deficit Firestore se aaye
-    await fetchTargets();
-  };
-  const handleReupload = async (file, type, projectCode) => {
-  if (!file || !projectCode) {
-    console.error("❌ File or Project Code missing");
-    return;
-  }
-
-  const safeProjectCode = projectCode.replaceAll("/", "-");
-  const studentsRef = collection(db, "trainingForms", safeProjectCode, "students");
-
-  try {
-    if (type === "student") {
-      const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: "array" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const students = XLSX.utils.sheet_to_json(sheet);
-
-      console.log("📋 Parsed Students:", students);
-
-      if (!students.length) {
-        console.warn("⚠️ Excel file is empty.");
-        return;
-      }
-
-      // 🔴 Delete existing student docs
-      const oldDocs = await getDocs(studentsRef);
-      const deleteBatch = writeBatch(db);
-      oldDocs.forEach((docSnap) => deleteBatch.delete(docSnap.ref));
-      await deleteBatch.commit();
-      console.log("🧹 Old student data deleted.");
-
-      // ✅ Upload new student data with same key structure
-      const uploadBatch = writeBatch(db);
-      students.forEach((student) => {
-        const id = student.Email?.toLowerCase().replace(/[^\w]/g, "") || Date.now().toString();
-        const studentRef = doc(studentsRef, id);
-        uploadBatch.set(studentRef, student, { merge: false });
-      });
-      await uploadBatch.commit();
-
-      console.log("✅ Students replaced successfully.");
-    }
-  } catch (err) {
-    console.error("❌ Upload Error:", err.message || err);
-  }
-};
-
-  const uploadFileToCloudinary = async (file, folder) => {
-    const cloudName = "gryphon"; // ✅ Make sure this matches your Cloudinary Cloud name
-    const uploadPreset = "lead_upload_preset"; // ✅ Ensure this is unsigned & configured correctly
-
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("upload_preset", uploadPreset);
-    formData.append("folder", folder);
-
-    const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/upload`, {
-      method: "POST",
-      body: formData,
+ 
+const validateCollegeCode = (value) => /^[A-Z]*$/.test(value);
+const validatePincode = (value) => /^[0-9]{0,6}$/.test(value);
+const validateGST = (value) =>
+    /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(value);
+ 
+const TrainingForm = ({ show, onClose, lead, users }) => {
+    const { currentUser } = useContext(AuthContext);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [formData, setFormData] = useState({
+        projectCode: "",
+        collegeName: lead?.businessName || "",
+        collegeCode: "",
+        address: lead?.address || "",
+        city: lead?.city || "",
+        state: lead?.state || "",
+        pincode: "",
+        gstNumber: "",
+        tpoName: "",
+        tpoEmail: "",
+        tpoPhone: "",
+        trainingName: "",
+        trainingEmail: "",
+        trainingPhone: "",
+        accountName: "",
+        accountEmail: "",
+        accountPhone: "",
+        course: "",
+        otherCourseText: "",
+        year: "",
+        deliveryType: "",
+        passingYear: "",
+        studentList: [],
+        courses: [{ specialization: "", othersSpecText: "", students: "" }],
+        topics: [{ topic: "", hours: "" }],
+        paymentType: "",
+        gstType: "include",
+        perStudentCost: 0,
+        totalCost: 0,
+        studentCount: 0,
+        paymentSplits: [],
+        emiMonths: 0,
+        emiSplits: [],
+        invoiceNumber: "",
+        additionalNotes: "",
+        splitTotal: 0,
     });
-
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error?.message || "Upload failed");
-
-    return data.secure_url;
-  };
-
-  return (
-    <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
-      <div className="px-6 py-5 border-b flex flex-col sm:flex-row justify-between gap-4">
-        <h2 className="text-2xl font-bold text-gray-900">Closed Deals</h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center bg-gray-50 rounded-lg p-1">
-            {["all", "new", "renewal"].map(type => (
-              <button
-                key={type}
-                onClick={() => setFilterType(type)}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${filterType === type
-                  ? "bg-white shadow-sm text-blue-600"
-                  : "text-gray-500 hover:text-gray-700"
-                  }`}
-              >
-                {type === "all" ? "All" : type === "new" ? "New" : "Renewals"}
-              </button>
-            ))}
-          </div>
-
-          <select
-            value={quarterFilter}
-            onChange={e => setQuarterFilter(e.target.value)}
-            className="px-4 py-2 border rounded-md text-sm bg-white shadow-sm"
-          >
-            <option value="current">Current Quarter</option>
-            <option value="Q1">Q1</option>
-            <option value="Q2">Q2</option>
-            <option value="Q3">Q3</option>
-            <option value="Q4">Q4</option>
-            <option value="all">All Quarters</option>
-          </select>
+    const [collegeCodeError, setCollegeCodeError] = useState("");
+    const [pincodeError, setPincodeError] = useState("");
+    const [gstError, setGstError] = useState("");
+    const [studentFile, setStudentFile] = useState(null);
+    const [mouFile, setMouFile] = useState(null);
+    const [studentFileError, setStudentFileError] = useState("");
+    const [mouFileError, setMouFileError] = useState("");
+    const [contractStartDate, setContractStartDate] = useState("");
+    const [contractEndDate, setContractEndDate] = useState("");
+ 
+    useEffect(() => {
+        if (lead) {
+            setFormData((prev) => ({
+                ...prev,
+                collegeName: lead.businessName || "",
+                address: lead.address || "",
+                city: lead.city || "",
+                state: lead.state || "",
+                studentCount: lead.studentCount || 0,
+                totalCost: (lead.studentCount || 0) * (lead.perStudentCost || 0),
+                course: lead.courseType || "",
+                tpoName: lead.pocName || "",
+                tpoEmail: lead.email || "",
+                tpoPhone: lead.phoneNo || "",
+            }));
+            setContractStartDate(lead.contractStartDate || "");
+            setContractEndDate(lead.contractEndDate || "");
+        }
+    }, [lead]);
+ 
+    useEffect(() => {
+        const totalStudents = formData.courses.reduce(
+            (sum, item) => sum + (parseInt(item.students) || 0),
+            0
+        );
+        setFormData((prev) => ({
+            ...prev,
+            studentCount: totalStudents,
+            totalCost: totalStudents * (parseFloat(prev.perStudentCost) || 0),
+        }));
+    }, [formData.courses, formData.perStudentCost]);
+ 
+    useEffect(() => {
+        const { collegeCode, course, year, deliveryType, passingYear } = formData;
+        if (collegeCode && course && year && deliveryType && passingYear) {
+            const passYear = passingYear.split("-");
+            const shortPassYear = `${passYear[0].slice(-2)}-${passYear[1].slice(-2)}`;
+            const coursePart = course === "Engineering" ? "ENGG" : course;
+            const code = `${collegeCode}/${coursePart}/${year}/${deliveryType}/${shortPassYear}`;
+            setFormData((prev) => ({ ...prev, projectCode: code }));
+        }
+    }, [
+        formData.collegeCode,
+        formData.course,
+        formData.year,
+        formData.deliveryType,
+        formData.passingYear,
+    ]);
+ 
+    const handleChange = useCallback((e) => {
+        const { name, value } = e.target;
+        setHasUnsavedChanges(true);
+        if (name === "collegeCode") {
+            setCollegeCodeError(
+                validateCollegeCode(value) ? "" : "Only uppercase letters (A-Z) allowed"
+            );
+        }
+        if (name === "pincode") {
+            setPincodeError(
+                validatePincode(value) ? "" : "Pincode must be up to 6 digits only"
+            );
+        }
+        if (name === "gstNumber") {
+            setGstError(value && !validateGST(value) ? "Invalid GST number format" : "");
+        }
+        setFormData((prev) => ({ ...prev, [name]: value }));
+    }, []);
+ 
+    const uploadFileToCloudinary = async (file, folderName) => {
+        if (!file) return null;
+        const url = "https://api.cloudinary.com/v1_1/da0ypp61n/raw/upload";
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("upload_preset", "react_profile_upload");
+        formData.append("folder", folderName);
+        const res = await fetch(url, { method: "POST", body: formData });
+        const data = await res.json();
+        if (!res.ok || !data.secure_url) {
+            throw new Error(data.error?.message || "File upload failed");
+        }
+        return data.secure_url;
+    };
+ 
+    const uploadStudentsToFirestore = async (studentList, formId) => {
+        try {
+            if (!studentList || studentList.length === 0) return;
+ 
+            const batch = writeBatch(db);
+            const studentsCollectionRef = collection(db, "trainingForms", formId, "students");
+ 
+            studentList.forEach((student) => {
+                const docRef = doc(studentsCollectionRef);
+                batch.set(docRef, student);
+            });
+ 
+            await batch.commit();
+        } catch (error) {
+            console.error("Error uploading students:", error);
+            throw error;
+        }
+    };
+ 
+    const handleStudentFile = (file) => {
+        setStudentFile(file);
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: "array" });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(sheet);
+                setFormData((prev) => ({ ...prev, studentList: jsonData }));
+            };
+            reader.readAsArrayBuffer(file);
+        } else {
+            setFormData((prev) => ({ ...prev, studentList: [] }));
+        }
+    };
+ 
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!e.target.checkValidity()) {
+            const firstInvalid = e.target.querySelector(':invalid');
+            if (firstInvalid) {
+                firstInvalid.focus();
+            }
+            toast.error("Please fill all required fields");
+            return;
+        }
+ 
+        setIsSubmitting(true);
+ 
+        if (!contractStartDate || !contractEndDate) {
+            toast.error("Please select both Contract Start Date and End Date.");
+            setIsSubmitting(false);
+            return;
+        }
+ 
+        try {
+            const toastId = toast.loading("Submitting form...");
+            const rawProjectCode = formData.projectCode;
+            const sanitizedProjectCode = rawProjectCode.replace(/\//g, "-");
+ 
+            // Check if form already exists
+            const formRef = doc(db, "trainingForms", sanitizedProjectCode);
+            const existingDoc = await getDoc(formRef);
+            if (existingDoc.exists()) {
+                toast.update(toastId, {
+                    render: "A form with this Project Code already exists!",
+                    type: "error",
+                    isLoading: false,
+                    autoClose: 3000,
+                });
+                setIsSubmitting(false);
+                return;
+            }
+ 
+            // Update lead if exists
+            if (lead?.id) {
+                const leadRef = doc(db, "leads", lead.id);
+                await updateDoc(leadRef, {
+                    phase: "closed",
+                    closureType: "new",
+                    closedDate: new Date().toISOString(),
+                    totalCost: formData.totalCost,
+                    contractStartDate,
+                    contractEndDate,
+                    projectCode: rawProjectCode // ✅ this line adds the projectCode into the lead
+                });
+            }
+ 
+ 
+            // Upload files (if they exist)
+            const [studentUrl, mouUrl] = await Promise.all([
+                studentFile ? uploadFileToCloudinary(studentFile, "training-forms/student-files") : null,
+                mouFile ? uploadFileToCloudinary(mouFile, "training-forms/mou-files") : null
+            ]);
+ 
+            const assignedUser = users?.[lead?.assignedTo?.uid] || {};
+            const { studentList, ...formDataWithoutStudents } = formData;
+ 
+            // Save form data
+            await setDoc(formRef, {
+                ...formDataWithoutStudents,
+                studentFileUrl: studentUrl,
+                mouFileUrl: mouUrl,
+                contractStartDate,
+                contractEndDate,
+                createdAt: serverTimestamp(),
+                createdBy: {
+                    email: lead?.assignedTo?.email || assignedUser?.email || "Unknown",
+                    uid: lead?.assignedTo?.uid || "",
+                    name: lead?.assignedTo?.name || assignedUser?.name || "",
+                },
+            });
+ 
+            // Upload students (if student list exists)
+            if (studentList && studentList.length > 0) {
+                await uploadStudentsToFirestore(studentList, sanitizedProjectCode);
+            }
+ 
+            toast.update(toastId, {
+                render: "Form submitted successfully!",
+                type: "success",
+                isLoading: false,
+                autoClose: 3000,
+            });
+            setHasUnsavedChanges(false);
+            setTimeout(onClose, 1000);
+        } catch (err) {
+            console.error("Error submitting form: ", err);
+            toast.error(err.message || "Something went wrong. Please try again.");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+ 
+    const handleClose = useCallback(() => {
+        if (
+            hasUnsavedChanges &&
+            !window.confirm("You have unsaved changes. Are you sure you want to close?")
+        ) {
+            return;
+        }
+        onClose();
+    }, [hasUnsavedChanges, onClose]);
+ 
+    if (!show || !lead) return null;
+ 
+    return (
+        <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center px-4 z-54">
+            <div className="bg-white w-full max-w-7xl h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col relative animate-fadeIn">
+                <div className="flex justify-between items-center px-6 py-4 border-b bg-blue-100">
+                    <h2 className="text-2xl font-bold text-blue-800">Client Onboarding Form</h2>
+                    <div className="flex items-center space-x-3 w-[450px]">
+                        <input
+                            name="projectCode"
+                            value={formData.projectCode}
+                            placeholder="Project Code"
+                            className="px-4 py-2 border rounded-lg text-base w-full font-semibold text-blue-700 bg-gray-100 cursor-not-allowed"
+                            readOnly
+                        />
+                        <button
+                            onClick={handleClose}
+                            className="text-xl text-red-500 hover:text-red-700"
+                            aria-label="Close form"
+                        >
+                            <FaTimes />
+                        </button>
+                    </div>
+                </div>
+                <form className="flex-1 overflow-y-auto p-6 space-y-6" onSubmit={handleSubmit} noValidate>
+                    <CollegeInfoSection
+                        formData={formData}
+                        setFormData={setFormData}
+                        handleChange={handleChange}
+                        collegeCodeError={collegeCodeError}
+                        pincodeError={pincodeError}
+                        gstError={gstError}
+                    />
+                    <POCInfoSection formData={formData} handleChange={handleChange} />
+                    <StudentBreakdownSection
+                        formData={formData}
+                        setFormData={setFormData}
+                        studentFile={studentFile}
+                        setStudentFile={handleStudentFile}
+                        studentFileError={studentFileError}
+                    />
+                    <TopicBreakdownSection formData={formData} setFormData={setFormData} />
+                    <PaymentInfoSection formData={formData} setFormData={setFormData} />
+                    <MOUUploadSection
+                        mouFile={mouFile}
+                        setMouFile={setMouFile}
+                        mouFileError={mouFileError}
+                        contractStartDate={contractStartDate}
+                        setContractStartDate={setContractStartDate}
+                        contractEndDate={contractEndDate}
+                        setContractEndDate={setContractEndDate}
+                    />
+                    <div className="pt-4 flex justify-end space-x-4">
+                        <button
+                            type="button"
+                            onClick={handleClose}
+                            className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-100"
+                            disabled={isSubmitting}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:bg-blue-400"
+                            disabled={isSubmitting}
+                        >
+                            Submit
+                        </button>
+                    </div>
+                </form>
+                {isSubmitting && (
+                    <div className="absolute inset-0 backdrop-blur-sm flex items-center justify-center z-50 rounded-2xl">
+                        <div className="relative w-24 h-24 animate-spin-slow">
+                            <img
+                                src={syncLogo}
+                                alt="Loading"
+                                className="absolute inset-0 w-16 h-16 m-auto z-10"
+                            />
+                            <div className="absolute inset-0 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
-      </div>
-
-      <ClosedLeadsStats
-        leads={leads}
-        targets={targets}
-        currentUser={currentUser}
-        users={users}
-        selectedFY={selectedFY}
-        activeQuarter={selectedQuarter}
-        formatCurrency={formatCurrency}
-        viewMyLeadsOnly={viewMyLeadsOnly}
-        achievedValue={achievedValue}
-        handleTargetUpdate={handleTargetUpdate}
-      />
-
-      <ClosedLeadsProgressBar
-        progressPercent={0}
-        achievedValue={achievedValue}
-        quarterTarget={0}
-        formatCurrency={formatCurrency}
-      />
-      <ClosedLeadsTable
-        leads={currentRows}
-        formatDate={formatDate}
-        formatCurrency={formatCurrency}
-        viewMyLeadsOnly={viewMyLeadsOnly}
-        onReupload={handleReupload}
-      />
-
-
-
-
-      {filteredLeads.length > rowsPerPage && (
-        <div className="px-6 py-4 flex flex-col sm:flex-row justify-between items-center border-t gap-4">
-          <div className="text-sm text-gray-500">
-            Showing <strong>{startIdx + 1}</strong> to{" "}
-            <strong>{Math.min(startIdx + rowsPerPage, filteredLeads.length)}</strong> of{" "}
-            <strong>{filteredLeads.length}</strong> results
-          </div>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
-              disabled={currentPage === 1}
-              className={`px-3 py-1 rounded-md border text-sm flex items-center ${currentPage === 1 ? "border-gray-200 text-gray-400" : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                }`}
-            >
-              <FiChevronLeft className="mr-1" /> Prev
-            </button>
-
-            <button
-              onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
-              disabled={currentPage === totalPages}
-              className={`px-3 py-1 rounded-md border text-sm flex items-center ${currentPage === totalPages ? "border-gray-200 text-gray-400" : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                }`}
-            >
-              Next <FiChevronRight className="ml-1" />
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+    );
 };
-
-ClosedLeads.propTypes = {
-  leads: PropTypes.object.isRequired,
-  viewMyLeadsOnly: PropTypes.bool.isRequired,
-  currentUser: PropTypes.shape({ uid: PropTypes.string }),
-  users: PropTypes.object.isRequired,
+ 
+TrainingForm.propTypes = {
+    show: PropTypes.bool.isRequired,
+    onClose: PropTypes.func.isRequired,
+    lead: PropTypes.object,
+    users: PropTypes.object,
 };
-
-export default ClosedLeads;
+ 
+export default TrainingForm;
+ 

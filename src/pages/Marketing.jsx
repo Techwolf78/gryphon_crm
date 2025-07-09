@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import { FiTool, FiClock, FiMail, FiX, FiChevronRight } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate } from "react-router-dom"; // <-- Add this import
+import { useNavigate } from "react-router-dom";
 
 const DigitalMarketing = () => {
   const [showRoadmap, setShowRoadmap] = useState(false);
-  const navigate = useNavigate(); // <-- Add this line
+  const navigate = useNavigate();
 
   return (
     <div className="min-h-[80vh] bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4 md:p-8">
@@ -31,7 +31,7 @@ const DigitalMarketing = () => {
             initial={{ y: 10, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.1 }}
-            className="text-3xl md:text-4xl font-bold text-gray-900 mb-3"
+            className="text-3xl md:text-4xl font-bold text-gray-900 mb-3 text-center"
           >
             Digital Marketing Suite
           </motion.h1>
@@ -64,9 +64,6 @@ const DigitalMarketing = () => {
             transition={{ delay: 0.5 }}
             className="flex flex-col sm:flex-row justify-center gap-4 mb-10"
           >
-            <button className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-all duration-200 flex items-center justify-center">
-              <FiMail className="mr-2" /> Get Early Access
-            </button>
             <button
               onClick={() => setShowRoadmap(true)}
               className="px-6 py-3 border border-gray-200 hover:border-gray-300 text-gray-700 font-medium rounded-lg transition-all duration-200 flex items-center justify-center"
@@ -100,7 +97,7 @@ const DigitalMarketing = () => {
                   Estimated Launch
                 </h3>
                 <div className="mt-1 text-sm text-blue-700">
-                  <p>Targeting Q4 2025 - Currently in active development</p>
+                  <p>Targeting Q4 2026 - Currently in active development</p>
                 </div>
               </div>
             </div>
@@ -118,11 +115,12 @@ const DigitalMarketing = () => {
             <div className="flex space-x-6">
               <button
                 className="text-gray-500 hover:text-gray-700 text-sm transition-colors"
-                onClick={() => navigate("/dashboard/help")} // <-- Update here
+                onClick={() => navigate("/dashboard/help")}
               >
                 Contact Support
               </button>
-              <button className="text-gray-500 hover:text-gray-700 text-sm transition-colors">
+              <button className="text-gray-500 hover:text-gray-700 text-sm transition-colors"
+              onClick={() => navigate("/dashboard/help")}>
                 Feature Requests
               </button>
             </div>
@@ -145,7 +143,7 @@ const DigitalMarketing = () => {
               exit={{ scale: 0.95, opacity: 0 }}
               className="bg-white/80 backdrop-blur-lg rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto border border-white/20"
             >
-              <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex justify-between items-center">
+              <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex justify-between items-center z-56">
                 <h3 className="text-xl font-bold text-gray-900">
                   Development Roadmap
                 </h3>
@@ -166,7 +164,7 @@ const DigitalMarketing = () => {
                     aria-hidden="true"
                   ></div>
 
-                  <div className="space-y-8">
+                  <div className="space-y-8 z-52">
                     {/* Timeline Item */}
                     <div className="relative pl-12">
                       <div className="absolute left-0 top-0 flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 ring-8 ring-indigo-50">

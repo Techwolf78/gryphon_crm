@@ -45,7 +45,7 @@ const CollegeInfoSection = ({ formData, setFormData, handleChange, collegeCodeEr
         {/* GST Number */}
         <div>
           <label className="font-medium block mb-1">
-            GST Number <span className="text-red-500">*</span>
+            GST Number 
           </label>
           <input
             name="gstNumber"
