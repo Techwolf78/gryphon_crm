@@ -35,11 +35,7 @@ const MOUUploadSection = ({
         {/* Compact File Upload with Preview */}
         <div className="flex flex-col">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-<<<<<<< HEAD
-            Signed MOU 
-=======
             Signed MOU
->>>>>>> 8a424917b919a81b190f338e698109a50924d08f
           </label>
           <div className="flex gap-2">
             <label className="h-[42px] flex-1 flex items-center justify-center w-full p-2 border border-gray-200 rounded-lg cursor-pointer bg-blue-700 hover:border-blue-300  transition-colors">

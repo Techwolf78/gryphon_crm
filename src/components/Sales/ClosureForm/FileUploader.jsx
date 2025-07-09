@@ -95,22 +95,14 @@ const FileUploader = ({
                 const colIndex = headerRow.indexOf(colName);
                 if (colIndex === -1) return;
                 const cellValue = row[colIndex];
-<<<<<<< HEAD
-                
-=======
                
->>>>>>> 8a424917b919a81b190f338e698109a50924d08f
                 // Check mandatory fields
                 if (rules.mandatory && (cellValue === undefined || cellValue === "")) {
                     errors.push(`Row ${rowNum}: ${colName} is mandatory`);
                     cellErrors[`${rowIndex}-${colIndex}`] = "Mandatory field";
                     return;
                 }
-<<<<<<< HEAD
-
-=======
  
->>>>>>> 8a424917b919a81b190f338e698109a50924d08f
                 if (cellValue === undefined || cellValue === "") return;
  
                 switch (rules.type) {
@@ -219,11 +211,7 @@ const FileUploader = ({
  
     const generateSampleFile = () => {
         const workbook = XLSX.utils.book_new();
-<<<<<<< HEAD
-
-=======
  
->>>>>>> 8a424917b919a81b190f338e698109a50924d08f
         // Main Data Sheet (only headers)
         const header = [
             "SN", "FULL NAME OF STUDENT", "CURRENT COLLEGE NAME", "EMAIL ID", "MOBILE NO.", "BIRTH DATE", "GENDER",
@@ -232,21 +220,12 @@ const FileUploader = ({
             "GRADUATION COURSE", "GRADUATION SPECIALIZATION", "GRADUATION PASSING YR", "GRADUATION OVERALL MARKS %",
             "COURSE", "SPECIALIZATION", "PASSING YEAR", "OVERALL MARKS %"
         ];
-<<<<<<< HEAD
-
-        const data = [header]; // Only headers, no sample data
-
-        const worksheet = XLSX.utils.aoa_to_sheet(data);
-        worksheet["!cols"] = calculateColumnWidths(data);
-
-=======
  
         const data = [header]; // Only headers, no sample data
  
         const worksheet = XLSX.utils.aoa_to_sheet(data);
         worksheet["!cols"] = calculateColumnWidths(data);
  
->>>>>>> 8a424917b919a81b190f338e698109a50924d08f
         // Format headers
         header.forEach((_, index) => {
             const cellAddress = XLSX.utils.encode_cell({ r: 0, c: index });
@@ -264,15 +243,9 @@ const FileUploader = ({
                 alignment: { horizontal: "center", vertical: "center" }
             };
         });
-<<<<<<< HEAD
-
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Student Data");
-
-=======
  
         XLSX.utils.book_append_sheet(workbook, worksheet, "Student Data");
  
->>>>>>> 8a424917b919a81b190f338e698109a50924d08f
         // Instructions Sheet
         const instructionsData = [
             ["STUDENT DATA FILE INSTRUCTIONS"],
@@ -303,11 +276,7 @@ const FileUploader = ({
             ["PASSING YEAR", "Year", "No", "Valid year"],
             ["OVERALL MARKS %", "Number", "No", "0-100"]
         ];
-<<<<<<< HEAD
-
-=======
  
->>>>>>> 8a424917b919a81b190f338e698109a50924d08f
         const instructionsSheet = XLSX.utils.aoa_to_sheet(instructionsData);
         instructionsSheet["!cols"] = [
             { wch: 25 }, // Field Name
@@ -315,22 +284,14 @@ const FileUploader = ({
             { wch: 10 }, // Mandatory
             { wch: 40 }  // Validation Rules
         ];
-<<<<<<< HEAD
-
-=======
  
->>>>>>> 8a424917b919a81b190f338e698109a50924d08f
         // Format instructions sheet
         const instructionsRange = XLSX.utils.decode_range(instructionsSheet["!ref"]);
         for (let R = 0; R <= instructionsRange.e.r; ++R) {
             for (let C = 0; C <= instructionsRange.e.c; ++C) {
                 const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
                 if (!instructionsSheet[cellAddress]) continue;
-<<<<<<< HEAD
-                
-=======
                
->>>>>>> 8a424917b919a81b190f338e698109a50924d08f
                 instructionsSheet[cellAddress].s = {
                     border: {
                         top: { style: "thin", color: { rgb: "000000" } },
@@ -340,11 +301,7 @@ const FileUploader = ({
                     },
                     alignment: { vertical: "center" }
                 };
-<<<<<<< HEAD
-
-=======
  
->>>>>>> 8a424917b919a81b190f338e698109a50924d08f
                 if (R === 0) {
                     // Title row
                     instructionsSheet[cellAddress].s.font = { bold: true, size: 16 };
@@ -356,28 +313,16 @@ const FileUploader = ({
                 }
             }
         }
-<<<<<<< HEAD
-
-=======
  
->>>>>>> 8a424917b919a81b190f338e698109a50924d08f
         // Merge title row
         instructionsSheet["!merges"] = [
             { s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }
         ];
-<<<<<<< HEAD
-
-        XLSX.utils.book_append_sheet(workbook, instructionsSheet, "Instructions");
-        XLSX.writeFile(workbook, "Student_Data_Template.xlsx");
-    };
-
-=======
  
         XLSX.utils.book_append_sheet(workbook, instructionsSheet, "Instructions");
         XLSX.writeFile(workbook, "Student_Data_Template.xlsx");
     };
  
->>>>>>> 8a424917b919a81b190f338e698109a50924d08f
     return (
         <div className="space-y-2 mt-4">
             {/* Buttons */}
@@ -443,11 +388,7 @@ const FileUploader = ({
                     <span>File is ready for upload</span>
                 </div>
             )}
-<<<<<<< HEAD
-
-=======
  
->>>>>>> 8a424917b919a81b190f338e698109a50924d08f
             {/* Preview Modal */}
             {showPreview && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -501,11 +442,6 @@ const FileUploader = ({
         </div>
     );
 };
-<<<<<<< HEAD
-
-export default FileUploader;
-=======
  
 export default FileUploader;
  
->>>>>>> 8a424917b919a81b190f338e698109a50924d08f
