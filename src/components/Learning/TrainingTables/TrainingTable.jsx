@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { FaEllipsisV, FaUsers, FaFileContract, FaRupeeSign, FaClock, FaUniversity } from "react-icons/fa";
 import { IoDocumentTextOutline } from "react-icons/io5";
 import { MdOutlineAttachMoney } from "react-icons/md";
@@ -6,6 +6,7 @@ import { MdOutlineAttachMoney } from "react-icons/md";
 function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouFile, onManageStudents }) {
   const [menuOpenId, setMenuOpenId] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const menuRefs = useRef({});
 
   const toggleMenu = (id, e) => {
     e.stopPropagation();
@@ -22,15 +23,39 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
   }, []);
 
   useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuOpenId !== null) {
+        const menuElement = menuRefs.current[menuOpenId];
+        if (menuElement && !menuElement.contains(event.target)) {
+          // Check if the click was on the three dots button of the same row
+          const dotsButton = document.querySelector(`button[data-id="${menuOpenId}"]`);
+          if (!dotsButton || !dotsButton.contains(event.target)) {
+            setMenuOpenId(null);
+          }
+        }
+      }
+    };
+
     if (menuOpenId !== null) {
+      document.addEventListener('mousedown', handleClickOutside);
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
     }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.body.style.overflow = "";
+    };
   }, [menuOpenId]);
 
   const formatCurrency = (amount) => {
     return amount ? `₹${amount.toLocaleString('en-IN')}` : '-';
+  };
+
+  // Assign ref to each menu
+  const setMenuRef = (id, element) => {
+    menuRefs.current[id] = element;
   };
 
   return (
@@ -147,6 +172,7 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
               {/* Three dots button */}
               <div className="relative">
                 <button
+                  data-id={item.id}
                   onClick={(e) => toggleMenu(item.id, e)}
                   className={`text-gray-500 hover:text-blue-600 p-2 rounded-full transition ${
                     menuOpenId === item.id ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100'
@@ -158,6 +184,7 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
                 {/* Dropdown Menu */}
                 {menuOpenId === item.id && (
                   <div
+                    ref={(el) => setMenuRef(item.id, el)}
                     onClick={(e) => e.stopPropagation()}
                     className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-xl text-sm w-48 border border-gray-200 z-20 overflow-hidden"
                   >
@@ -187,7 +214,6 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
                       <FaFileContract className="mr-2 text-blue-500" />
                       View MOU
                     </button>
-                   
                   </div>
                 )}
               </div>

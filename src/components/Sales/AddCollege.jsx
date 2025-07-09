@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from "react";
 import stateCityData from "../Sales/stateCityData";
-import { universityOptions } from "../Sales/universityData"; // Import the university data
+import { universityOptions } from "../Sales/universityData";
 import { auth, db } from "../../firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { XIcon } from "@heroicons/react/outline";
+import { XIcon, PlusIcon } from "@heroicons/react/outline";
+import CourseForm from "./CourseForm";
+import CollegeInfoForm from "./CollegeInfoForm";
+import ContactInfoForm from "./ContactInfoForm";
 
 const courseSpecializations = {
   Engineering: [
@@ -69,24 +72,23 @@ function AddCollegeModal({ show, onClose }) {
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
   const [expectedClosureDate, setExpectedClosureDate] = useState("");
-  const [courseType, setCourseType] = useState("");
-  const [specializations, setSpecializations] = useState([]); // Changed to array
-  const [studentCount, setStudentCount] = useState("");
-  const [perStudentCost, setPerStudentCost] = useState("");
-  const [tcv, setTcv] = useState(0);
-  const [manualSpecialization, setManualSpecialization] = useState("");
-  const [manualCourseType, setManualCourseType] = useState("");
-  const [passingYear, setPassingYear] = useState("");
   const [affiliation, setAffiliation] = useState("");
   const [accreditation, setAccreditation] = useState("");
   const [manualAffiliation, setManualAffiliation] = useState("");
   const [manualAccreditation, setManualAccreditation] = useState("");
-
-  useEffect(() => {
-    const count = parseInt(studentCount) || 0;
-    const cost = parseFloat(perStudentCost) || 0;
-    setTcv(count * cost);
-  }, [studentCount, perStudentCost]);
+  
+  const [courses, setCourses] = useState([
+    {
+      courseType: "",
+      specializations: [],
+      manualSpecialization: "",
+      manualCourseType: "",
+      passingYear: "",
+      studentCount: "",
+      perStudentCost: "",
+      tcv: 0
+    }
+  ]);
 
   const getLeadPhase = (expectedDateInput) => {
     if (!expectedDateInput) return "cold";
@@ -111,25 +113,85 @@ function AddCollegeModal({ show, onClose }) {
 
   const yearOptions = generateYearOptions();
 
-  const handleSpecializationChange = (e) => {
+  const handleSpecializationChange = (e, index) => {
     const value = e.target.value;
     const isChecked = e.target.checked;
 
-    if (value === "Other") {
-      // Handle "Other" checkbox separately
-      if (isChecked) {
-        setSpecializations((prev) => [...prev, "Other"]);
+    setCourses(prev => {
+      const updatedCourses = [...prev];
+      const course = {...updatedCourses[index]};
+      
+      if (value === "Other") {
+        if (isChecked) {
+          course.specializations = [...course.specializations, "Other"];
+        } else {
+          course.specializations = course.specializations.filter(item => item !== "Other");
+          course.manualSpecialization = "";
+        }
       } else {
-        setSpecializations((prev) => prev.filter((item) => item !== "Other"));
-        setManualSpecialization("");
+        if (isChecked) {
+          course.specializations = [...course.specializations, value];
+        } else {
+          course.specializations = course.specializations.filter(item => item !== value);
+        }
       }
-    } else {
-      if (isChecked) {
-        setSpecializations((prev) => [...prev, value]);
-      } else {
-        setSpecializations((prev) => prev.filter((item) => item !== value));
+      
+      updatedCourses[index] = course;
+      return updatedCourses;
+    });
+  };
+
+  const handleAddCourse = () => {
+    setCourses(prev => [
+      ...prev,
+      {
+        courseType: "",
+        specializations: [],
+        manualSpecialization: "",
+        manualCourseType: "",
+        passingYear: "",
+        studentCount: "",
+        perStudentCost: "",
+        tcv: 0
       }
-    }
+    ]);
+  };
+
+  const handleRemoveCourse = (index) => {
+    if (courses.length <= 1) return;
+    setCourses(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleCourseChange = (index, field, value) => {
+    setCourses(prev => {
+      const updatedCourses = [...prev];
+      const updatedCourse = {...updatedCourses[index]};
+      
+      if (field === 'courseType') {
+        updatedCourse.courseType = value;
+        updatedCourse.specializations = [];
+        updatedCourse.manualSpecialization = "";
+      } else if (field === 'manualSpecialization') {
+        updatedCourse.manualSpecialization = value;
+      } else if (field === 'manualCourseType') {
+        updatedCourse.manualCourseType = value;
+      } else if (field === 'passingYear') {
+        updatedCourse.passingYear = value;
+      } else if (field === 'studentCount') {
+        updatedCourse.studentCount = value;
+        const count = parseInt(value) || 0;
+        const cost = parseFloat(updatedCourse.perStudentCost) || 0;
+        updatedCourse.tcv = count * cost;
+      } else if (field === 'perStudentCost') {
+        updatedCourse.perStudentCost = value;
+        const count = parseInt(updatedCourse.studentCount) || 0;
+        const cost = parseFloat(value) || 0;
+        updatedCourse.tcv = count * cost;
+      }
+      
+      updatedCourses[index] = updatedCourse;
+      return updatedCourses;
+    });
   };
 
   const handleClose = () => {
@@ -141,14 +203,16 @@ function AddCollegeModal({ show, onClose }) {
     setState("");
     setCity("");
     setExpectedClosureDate("");
-    setCourseType("");
-    setSpecializations([]);
-    setStudentCount("");
-    setPerStudentCost("");
-    setTcv(0);
-    setManualSpecialization("");
-    setManualCourseType("");
-    setPassingYear("");
+    setCourses([{
+      courseType: "",
+      specializations: [],
+      manualSpecialization: "",
+      manualCourseType: "",
+      passingYear: "",
+      studentCount: "",
+      perStudentCost: "",
+      tcv: 0
+    }]);
     setAffiliation("");
     setAccreditation("");
     setManualAffiliation("");
@@ -174,22 +238,6 @@ function AddCollegeModal({ show, onClose }) {
     const phase = getLeadPhase(expectedClosureTimestamp);
     const timestamp = Date.now();
 
-    const finalCourseType =
-      courseType === "Others" && manualCourseType.trim()
-        ? manualCourseType.trim()
-        : courseType;
-
-    // Process specializations
-    let finalSpecializations = [...specializations];
-
-    // If "Other" is selected and manual specialization is provided
-    if (specializations.includes("Other") && manualSpecialization.trim()) {
-      // Remove "Other" and add the manual specialization
-      finalSpecializations = finalSpecializations
-        .filter((item) => item !== "Other")
-        .concat(manualSpecialization.trim());
-    }
-
     const finalAffiliation =
       affiliation === "Other" && manualAffiliation.trim()
         ? manualAffiliation.trim()
@@ -200,6 +248,30 @@ function AddCollegeModal({ show, onClose }) {
         ? manualAccreditation.trim()
         : accreditation;
 
+    const processedCourses = courses.map(course => {
+      const finalCourseType =
+        course.courseType === "Others" && course.manualCourseType.trim()
+          ? course.manualCourseType.trim()
+          : course.courseType;
+
+      let finalSpecializations = [...course.specializations];
+
+      if (course.specializations.includes("Other") && course.manualSpecialization.trim()) {
+        finalSpecializations = finalSpecializations
+          .filter(item => item !== "Other")
+          .concat(course.manualSpecialization.trim());
+      }
+
+      return {
+        courseType: finalCourseType,
+        specializations: finalSpecializations,
+        passingYear: course.passingYear || null,
+        studentCount: parseInt(course.studentCount) || 0,
+        perStudentCost: parseFloat(course.perStudentCost) || 0,
+        tcv: course.tcv || 0
+      };
+    });
+
     const newLead = {
       businessName,
       address,
@@ -209,13 +281,8 @@ function AddCollegeModal({ show, onClose }) {
       state,
       city,
       expectedClosureDate: expectedClosureTimestamp,
-      courseType: finalCourseType,
-      specializations: finalSpecializations, // Now stored as array
-      studentCount: parseInt(studentCount),
-      perStudentCost: parseFloat(perStudentCost),
-      tcv,
+      courses: processedCourses,
       phase,
-      passingYear: passingYear || null,
       affiliation: finalAffiliation || null,
       accreditation: finalAccreditation || null,
       contactMethod,
@@ -246,12 +313,13 @@ function AddCollegeModal({ show, onClose }) {
     phoneNo.trim() &&
     state &&
     city &&
-    ((courseType !== "Others" && courseType) ||
-      (courseType === "Others" && manualCourseType.trim())) &&
-    specializations.length > 0 &&
-    (!specializations.includes("Other") ||
-      (specializations.includes("Other") && manualSpecialization.trim())) &&
-    // Add university validation
+    courses.every(course => (
+      ((course.courseType !== "Others" && course.courseType) ||
+      (course.courseType === "Others" && course.manualCourseType.trim())) &&
+      course.specializations.length > 0 &&
+      (!course.specializations.includes("Other") ||
+      (course.specializations.includes("Other") && course.manualSpecialization.trim()))
+    )) &&
     (affiliation !== "Other" ||
       (affiliation === "Other" && manualAffiliation.trim()));
 
@@ -276,438 +344,31 @@ function AddCollegeModal({ show, onClose }) {
         {/* Modal Body */}
         <div className="p-6 overflow-y-auto max-h-[calc(100vh-180px)]">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* College Name */}
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                College/University Name
-                <span className="text-red-500 ml-1">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={businessName}
-                  onChange={(e) => setBusinessName(e.target.value)}
-                  placeholder="e.g. Acme College"
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                />
-                {!businessName.trim() && isFormValid && (
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                    <svg
-                      className="h-5 w-5 text-red-500"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </div>
-                )}
-              </div>
-            </div>
+            <CollegeInfoForm
+              businessName={businessName}
+              setBusinessName={setBusinessName}
+              address={address}
+              setAddress={setAddress}
+              state={state}
+              setState={setState}
+              city={city}
+              setCity={setCity}
+              isFormValid={isFormValid}
+            />
 
-            {/* Address */}
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Address
-              </label>
-              <input
-                type="text"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="e.g. 123 Main St"
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-              />
-            </div>
-
-            
-
-            {/* State */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                State<span className="text-red-500 ml-1">*</span>
-              </label>
-              <div className="relative">
-                <select
-                  value={state}
-                  onChange={(e) => {
-                    setState(e.target.value);
-                    setCity("");
-                  }}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
-                >
-                  <option value="">Select State</option>
-                  {Object.keys(stateCityData).map((st) => (
-                    <option key={st} value={st}>
-                      {st}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                  <svg
-                    className="h-4 w-4"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </div>
-                {!state && isFormValid && (
-                  <div className="absolute inset-y-0 right-7 pr-3 flex items-center pointer-events-none">
-                    <svg
-                      className="h-5 w-5 text-red-500"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* City */}
-            {state && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  City<span className="text-red-500 ml-1">*</span>
-                </label>
-                <div className="relative">
-                  <select
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
-                  >
-                    <option value="">Select City</option>
-                    {stateCityData[state].map((ct) => (
-                      <option key={ct} value={ct}>
-                        {ct}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                    <svg
-                      className="h-4 w-4"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </div>
-                  {!city && isFormValid && (
-                    <div className="absolute inset-y-0 right-7 pr-3 flex items-center pointer-events-none">
-                      <svg
-                        className="h-5 w-5 text-red-500"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* POC Name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                POC Name<span className="text-red-500 ml-1">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={pocName}
-                  onChange={(e) => setPocName(e.target.value)}
-                  placeholder="e.g. John Doe"
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                />
-                {!pocName.trim() && isFormValid && (
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                    <svg
-                      className="h-5 w-5 text-red-500"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Phone Number */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Phone No.<span className="text-red-500 ml-1">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={phoneNo}
-                  onChange={(e) => setPhoneNo(e.target.value)}
-                  placeholder="e.g. +91 9876543210"
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                />
-                {!phoneNo.trim() && isFormValid && (
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                    <svg
-                      className="h-5 w-5 text-red-500"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Email */}
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="e.g. contact@college.com"
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-              />
-            </div>
-
-            {/* Expected Closure Date */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Expected Closure Date
-              </label>
-              <div className="relative">
-                <input
-                  type="date"
-                  value={expectedClosureDate}
-                  min={new Date().toISOString().split("T")[0]}
-                  onChange={(e) => setExpectedClosureDate(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-            </div>
-
-            {/* Passing Year */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Passing Year
-              </label>
-              <div className="relative">
-                <select
-                  value={passingYear}
-                  onChange={(e) => setPassingYear(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
-                >
-                  <option value="">Select Passing Year</option>
-                  {yearOptions.map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                  <svg
-                    className="h-4 w-4"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            {/* Course Type */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Course Type<span className="text-red-500 ml-1">*</span>
-              </label>
-              <div className="relative">
-                <select
-                  value={courseType}
-                  onChange={(e) => {
-                    setCourseType(e.target.value);
-                    setSpecializations([]);
-                    setManualSpecialization("");
-                  }}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
-                >
-                  <option value="">Select Course</option>
-                  {Object.keys(courseSpecializations).map((course) => (
-                    <option key={course} value={course}>
-                      {course}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                  <svg
-                    className="h-4 w-4"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </div>
-                {!courseType && isFormValid && (
-                  <div className="absolute inset-y-0 right-7 pr-3 flex items-center pointer-events-none">
-                    <svg
-                      className="h-5 w-5 text-red-500"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {courseType === "Others" && (
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Please specify Course Type
-                  <span className="text-red-500 ml-1">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={manualCourseType}
-                    onChange={(e) => setManualCourseType(e.target.value)}
-                    placeholder="Enter custom course type"
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                      !manualCourseType.trim() && isFormValid
-                        ? "border-red-500"
-                        : "border-gray-300"
-                    }`}
-                  />
-                  {!manualCourseType.trim() && isFormValid && (
-                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                      <svg
-                        className="h-5 w-5 text-red-500"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-                {!manualCourseType.trim() && isFormValid && (
-                  <p className="mt-1 text-sm text-red-600">
-                    This field is required
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Specialization - Multi-Select Checkboxes */}
-            {courseType && (
-              <div className="col-span-2">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Specialization(s)
-                    <span className="text-red-500 ml-1">*</span>
-                  </label>
-                  <span className="text-xs text-gray-500">
-                    (Select multiple options)
-                  </span>
-                </div>
-
-                {/* Checkbox Grid */}
-                <div className="flex flex-wrap gap-4 p-2 border border-gray-200 rounded-lg bg-gray-50">
-                  {courseSpecializations[courseType].map((spec) => (
-                    <div key={spec} className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id={`spec-${spec}`}
-                        value={spec}
-                        checked={specializations.includes(spec)}
-                        onChange={handleSpecializationChange}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <label
-                        htmlFor={`spec-${spec}`}
-                        className="ml-2 text-sm text-gray-700"
-                      >
-                        {spec}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Other Specialization Input */}
-                {specializations.includes("Other") && (
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Please specify Specialization
-                      <span className="text-red-500 ml-1">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={manualSpecialization}
-                      onChange={(e) => setManualSpecialization(e.target.value)}
-                      placeholder="Enter custom specialization"
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                )}
-
-                {/* Validation Messages */}
-                {specializations.length === 0 && isFormValid && (
-                  <p className="mt-1 text-sm text-red-600">
-                    Please select at least one specialization
-                  </p>
-                )}
-              </div>
-            )}
+            <ContactInfoForm
+              pocName={pocName}
+              setPocName={setPocName}
+              phoneNo={phoneNo}
+              setPhoneNo={setPhoneNo}
+              email={email}
+              setEmail={setEmail}
+              expectedClosureDate={expectedClosureDate}
+              setExpectedClosureDate={setExpectedClosureDate}
+              contactMethod={contactMethod}
+              setContactMethod={setContactMethod}
+              isFormValid={isFormValid}
+            />
 
             {/* Accreditation */}
             <div className="col-span-2">
@@ -762,7 +423,7 @@ function AddCollegeModal({ show, onClose }) {
             </div>
 
             {/* Affiliation */}
-            <div>
+            <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 University Affiliation
               </label>
@@ -850,84 +511,34 @@ function AddCollegeModal({ show, onClose }) {
               )}
             </div>
 
-            {/* Contact Method */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Contact Method<span className="text-red-500 ml-1">*</span>
-              </label>
-              <div className="flex items-center space-x-4">
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    value="Visit"
-                    checked={contactMethod === "Visit"}
-                    onChange={(e) => setContactMethod(e.target.value)}
-                    className="form-radio text-blue-600"
-                  />
-                  <span className="ml-2 text-sm text-gray-700">Visit</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    value="Call"
-                    checked={contactMethod === "Call"}
-                    onChange={(e) => setContactMethod(e.target.value)}
-                    className="form-radio text-blue-600"
-                  />
-                  <span className="ml-2 text-sm text-gray-700">Call</span>
-                </label>
+            {/* Courses Section */}
+            <div className="col-span-2">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-lg font-medium text-gray-900">Courses</h3>
+                <button
+                  type="button"
+                  onClick={handleAddCourse}
+                  className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-full shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  <PlusIcon className="-ml-1 mr-1 h-4 w-4" />
+                  Add Course
+                </button>
               </div>
-            </div>
 
-            {/* Student Count, Per Student Cost, TCV */}
-            <div className="col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Student Count
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    value={studentCount}
-                    onChange={(e) => setStudentCount(e.target.value)}
-                    placeholder="e.g. 120"
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Per Student Cost
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-gray-500">₹</span>
-                  </div>
-                  <input
-                    type="number"
-                    value={perStudentCost}
-                    onChange={(e) => setPerStudentCost(e.target.value)}
-                    placeholder="e.g. 1500"
-                    className="w-full pl-8 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  TCV
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-gray-500">₹</span>
-                  </div>
-                  <input
-                    type="number"
-                    value={tcv}
-                    disabled
-                    className="w-full pl-8 pr-4 py-2.5 border border-gray-300 bg-gray-100 rounded-lg"
-                  />
-                </div>
-              </div>
+              {courses.map((course, index) => (
+                <CourseForm
+                  key={index}
+                  course={course}
+                  index={index}
+                  handleCourseChange={handleCourseChange}
+                  handleSpecializationChange={handleSpecializationChange}
+                  courseSpecializations={courseSpecializations}
+                  yearOptions={yearOptions}
+                  isFormValid={isFormValid}
+                  onRemove={() => handleRemoveCourse(index)}
+                  showRemoveButton={courses.length > 1}
+                />
+              ))}
             </div>
           </div>
         </div>

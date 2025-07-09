@@ -1,7 +1,7 @@
 import React, { useContext } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
-import logo from "../assets/sync-black.png";
+import logo from "../assets/sync-new.png";
 import {
   FiHome,
   FiUsers,
@@ -108,7 +108,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
       `}
     >
       {/* Header */}
-      <div className="px-6 py-6 text-2xl font-bold border-b border-gray-200 flex items-center justify-between">
+      <div className="px-6 py-6 text-2xl font-bold  flex items-center justify-between">
         {!collapsed && (
           <img
             src={logo}
