@@ -13,7 +13,7 @@ import { db } from "../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { debounce } from "lodash";
 import FollowupAlerts from "../components/Sales/FollowupAlerts";
-import AddCollegeModal from "../components/Sales/AddCollege";
+import AddCollegeModal from "../components/Sales/AddCollegeModal";
 import FollowUp from "../components/Sales/Followup";
 import TrainingForm from "../components/Sales/ClosureForm/TrainingForm";
 import LeadDetailsModal from "../components/Sales/EditDetailsModal";

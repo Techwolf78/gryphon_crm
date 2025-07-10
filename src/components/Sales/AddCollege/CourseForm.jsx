@@ -234,22 +234,27 @@ const CourseForm = ({
             />
           </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            TCV
-          </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <span className="text-gray-500">₹</span>
-            </div>
-            <input
-              type="number"
-              value={course.tcv}
-              disabled
-              className="w-full pl-8 pr-4 py-2.5 border border-gray-300 bg-gray-100 rounded-lg"
-            />
-          </div>
-        </div>
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">
+    TCV
+  </label>
+  <div className="relative">
+    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+      <span className="text-gray-500">₹</span>
+    </div>
+    <input
+      type="number"
+      value={course.courseTCV || 0}
+      disabled
+      className="w-full pl-8 pr-4 py-2.5 border border-gray-300 bg-gray-100 rounded-lg"
+    />
+  </div>
+  {course.studentCount && course.perStudentCost && (
+    <p className="mt-1 text-xs text-gray-500">
+      {course.studentCount} × ₹{course.perStudentCost} = ₹{course.courseTCV.toLocaleString()}
+    </p>
+  )}
+</div>
       </div>
     </div>
   );
