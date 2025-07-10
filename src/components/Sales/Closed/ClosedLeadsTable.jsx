@@ -3,11 +3,19 @@ import { FiFilter, FiMoreVertical, FiUpload, FiX } from "react-icons/fi";
 import PropTypes from "prop-types";
 import * as XLSX from "xlsx";
 import { db } from "../../../firebase";
-import { doc, collection, setDoc, getDoc, getDocs, deleteDoc } from "firebase/firestore";
+import {
+  doc,
+  collection,
+  setDoc,
+  getDoc,
+  getDocs,
+  deleteDoc,
+} from "firebase/firestore";
 
 // Project Code Conversion Utilities
-const projectCodeToDocId = (projectCode) => projectCode.replace(/\//g, "-");
-const docIdToProjectCode = (docId) => docId.replace(/-/g, "/");
+const projectCodeToDocId = (projectCode) =>
+  projectCode ? projectCode.replace(/\//g, "-") : "";
+const docIdToProjectCode = (docId) => (docId ? docId.replace(/-/g, "/") : "");
 const displayProjectCode = (code) => (code ? code.replace(/-/g, "/") : "-");
 const displayYear = (year) => year.replace(/-/g, " ");
 
@@ -74,25 +82,11 @@ const ClosedLeadsTable = ({
       return;
     }
 
-    console.log("Current Lead:", currentLead);
-    console.log("Lead Project Code:", currentLead.projectCode);
+    const projectCode = currentLead.projectCode || "";
 
-    if (currentLead?.projectCode) {
-      // Log before attempting upload
+    if (projectCode) {
       await logAvailableProjectCodes();
-
-      const docId = projectCodeToDocId(currentLead.projectCode);
-      console.log("Converted Doc ID:", docId);
-
-      // Verify document exists
-      const docRef = doc(db, "trainingForms", docId);
-      const docSnap = await getDoc(docRef);
-
-      if (!docSnap.exists()) {
-        console.warn("Document does not exist, will create new one");
-      }
-
-      handleUpload(currentLead.projectCode);
+      handleUpload(projectCode);
     } else {
       console.error("Invalid project code structure:", currentLead.projectCode);
       await logAvailableProjectCodes();
@@ -160,82 +154,82 @@ const ClosedLeadsTable = ({
     setUploadError(null);
   };
 
-const processExcelData = async (data, projectCode) => {
-  try {
-    setUploading(true);
-    setUploadProgress(0);
-    setUploadError(null);
+  const processExcelData = async (data, projectCode) => {
+    try {
+      setUploading(true);
+      setUploadProgress(0);
+      setUploadError(null);
 
-    const docId = projectCodeToDocId(projectCode);
-    const trainingFormRef = doc(db, "trainingForms", docId);
-    const docSnap = await getDoc(trainingFormRef);
+      const docId = projectCodeToDocId(projectCode);
+      const trainingFormRef = doc(db, "trainingForms", docId);
+      const docSnap = await getDoc(trainingFormRef);
 
-    if (!docSnap.exists()) {
-      await setDoc(trainingFormRef, {
-        projectCode,
-        docId,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-    }
-
-    const studentsRef = collection(trainingFormRef, "students");
-    
-    // DELETE ALL EXISTING STUDENTS FIRST
-    console.log("Deleting existing students...");
-    const existingStudents = await getDocs(studentsRef);
-    const deletePromises = existingStudents.docs.map(studentDoc => 
-      deleteDoc(doc(studentsRef, studentDoc.id))
-    );
-    await Promise.all(deletePromises);
-    console.log(`Deleted ${existingStudents.size} existing students`);
-
-    // Process new data
-    const totalRows = data.length;
-    let processedRows = 0;
-
-    for (const row of data) {
-      try {
-        const studentData = {};
-        Object.keys(row).forEach((key) => {
-          if (row[key] !== undefined && row[key] !== null) {
-            studentData[key] = row[key];
-          }
+      if (!docSnap.exists()) {
+        await setDoc(trainingFormRef, {
+          projectCode,
+          docId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
         });
-
-        studentData.uploadedAt = new Date();
-        studentData.projectCode = projectCode;
-
-        const newStudentRef = doc(studentsRef);
-        await setDoc(newStudentRef, studentData);
-
-        processedRows++;
-        setUploadProgress(Math.round((processedRows / totalRows) * 100));
-      } catch (error) {
-        console.error(`Error processing row ${processedRows + 1}:`, error);
       }
+
+      const studentsRef = collection(trainingFormRef, "students");
+
+      // DELETE ALL EXISTING STUDENTS FIRST
+      console.log("Deleting existing students...");
+      const existingStudents = await getDocs(studentsRef);
+      const deletePromises = existingStudents.docs.map((studentDoc) =>
+        deleteDoc(doc(studentsRef, studentDoc.id))
+      );
+      await Promise.all(deletePromises);
+      console.log(`Deleted ${existingStudents.size} existing students`);
+
+      // Process new data
+      const totalRows = data.length;
+      let processedRows = 0;
+
+      for (const row of data) {
+        try {
+          const studentData = {};
+          Object.keys(row).forEach((key) => {
+            if (row[key] !== undefined && row[key] !== null) {
+              studentData[key] = row[key];
+            }
+          });
+
+          studentData.uploadedAt = new Date();
+          studentData.projectCode = projectCode;
+
+          const newStudentRef = doc(studentsRef);
+          await setDoc(newStudentRef, studentData);
+
+          processedRows++;
+          setUploadProgress(Math.round((processedRows / totalRows) * 100));
+        } catch (error) {
+          console.error(`Error processing row ${processedRows + 1}:`, error);
+        }
+      }
+
+      // Update the parent document
+      await setDoc(
+        trainingFormRef,
+        {
+          studentCount: data.length,
+          updatedAt: new Date(),
+          studentFileUrl: selectedFile?.name || "uploaded_file",
+        },
+        { merge: true }
+      );
+
+      return true;
+    } catch (error) {
+      console.error("Error processing Excel data:", error);
+      setUploadError("Failed to process the file. Please try again.");
+      return false;
+    } finally {
+      setUploading(false);
     }
-
-    // Update the parent document
-    await setDoc(
-      trainingFormRef,
-      {
-        studentCount: data.length,
-        updatedAt: new Date(),
-        studentFileUrl: selectedFile?.name || "uploaded_file",
-      },
-      { merge: true }
-    );
-
-    return true;
-  } catch (error) {
-    console.error("Error processing Excel data:", error);
-    setUploadError("Failed to process the file. Please try again.");
-    return false;
-  } finally {
-    setUploading(false);
-  }
-};
+  };
 
   const handleUpload = async (projectCode) => {
     if (!selectedFile) return;
@@ -447,9 +441,15 @@ const processExcelData = async (data, projectCode) => {
         <tbody className="bg-white divide-y divide-gray-200">
           {leads.length > 0 ? (
             leads.map(([id, lead]) => (
-
               <tr key={id} className="hover:bg-gray-50 transition-colors">
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <td
+                  className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
+                  title={`DocID: ${projectCodeToDocId(
+                    lead.projectCode || ""
+                  )}, ProjectCode: ${docIdToProjectCode(
+                    projectCodeToDocId(lead.projectCode || "")
+                  )}, Year: ${displayYear(String(lead.closedDate || ""))}`}
+                >
                   {displayProjectCode(lead.projectCode) || "-"}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">

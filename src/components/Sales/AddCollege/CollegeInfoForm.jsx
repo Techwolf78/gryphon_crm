@@ -1,5 +1,5 @@
 import React from "react";
-import stateCityData from "../Sales/stateCityData";
+import stateCityData from "../stateCityData";
 
 const CollegeInfoForm = ({
   businessName,
