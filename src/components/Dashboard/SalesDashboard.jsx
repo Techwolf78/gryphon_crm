@@ -191,7 +191,108 @@ RecentActivity.defaultProps = {
   recentActivity: [],
   isLoading: false,
 };
+const EducationDistribution = ({ leadCategories, isLoading }) => {
+  const COLORS = ["#3B82F6", "#10B981", "#F59E0B"]; // Blue, Green, Amber
 
+  const renderCustomizedLabel = ({
+    cx,
+    cy,
+    midAngle,
+    innerRadius,
+    outerRadius,
+    percent,
+  }) => {
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos((-midAngle * Math.PI) / 180);
+    const y = cy + radius * Math.sin((-midAngle * Math.PI) / 180);
+
+    return (
+      <text
+        x={x}
+        y={y}
+        fill="white"
+        textAnchor="middle"
+        dominantBaseline="central"
+        className="text-xs font-medium"
+      >
+        {`${(percent * 100).toFixed(0)}%`}
+      </text>
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <div className="h-60 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500" />
+      </div>
+    );
+  }
+
+  if (!leadCategories || leadCategories.length === 0 || leadCategories.reduce((sum, cat) => sum + cat.value, 0) === 0) {
+    return (
+      <div className="h-60 flex items-center justify-center">
+        <p className="text-gray-500">No education data available</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="h-60">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={leadCategories}
+              cx="50%"
+              cy="50%"
+              labelLine={false}
+              label={renderCustomizedLabel}
+              outerRadius={70}
+              fill="#8884d8"
+              dataKey="value"
+            >
+              {leadCategories.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={COLORS[index % COLORS.length]}
+                />
+              ))}
+            </Pie>
+            <Tooltip />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="mt-2 flex flex-wrap justify-center gap-2">
+        {leadCategories.map((category, index) => (
+          <div key={index} className="flex items-center">
+            <div
+              className="w-3 h-3 rounded-full mr-2"
+              style={{ backgroundColor: COLORS[index % COLORS.length] }}
+            />
+            <span className="text-xs text-gray-600">
+              {category.name}: {category.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+};
+
+EducationDistribution.propTypes = {
+  leadCategories: PropTypes.arrayOf(
+    PropTypes.shape({
+      name: PropTypes.string,
+      value: PropTypes.number,
+    })
+  ),
+  isLoading: PropTypes.bool,
+};
+
+EducationDistribution.defaultProps = {
+  leadCategories: [],
+  isLoading: false,
+};
 const LeadDistribution = ({ leadSources, isLoading }) => {
   const COLORS = ["#4F46E5", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
 
@@ -601,7 +702,47 @@ const SalesDashboard = () => {
     setCurrentPeriodInfo(info);
   };
 
-  const processLeadsData = (snapshot) => {
+  const processLeadsData = (input) => {
+
+    const leadCategories = {
+      Engineering: 0,
+      MBA: 0,
+      Others: 0
+    };
+
+
+    // Handle both QuerySnapshot and filtered doc arrays
+    let docs = [];
+    let forEachFn;
+
+    if (input && input.docs) {
+      // It's a QuerySnapshot
+      docs = input.docs;
+      forEachFn = (callback) => {
+        docs.forEach(doc => callback(doc));
+      };
+    } else if (Array.isArray(input)) {
+      // It's an array of documents
+      docs = input;
+      forEachFn = (callback) => {
+        docs.forEach(doc => callback(doc));
+      };
+    } else {
+      // Invalid input
+      console.error('Invalid input to processLeadsData:', input);
+      return {
+        revenue: 0,
+        hotLeads: 0,
+        warmLeads: 0,
+        coldLeads: 0,
+        projectedTCV: 0,
+        chartData: [],
+        leadSources: [],
+        teamPerformance: [],
+        recentActivity: [],
+      };
+    }
+
     let revenue = 0;
     let hotLeads = 0;
     let warmLeads = 0;
@@ -621,15 +762,25 @@ const SalesDashboard = () => {
             ? 3
             : 12;
 
-    snapshot.forEach((doc) => {
-      const lead = doc.data();
+    forEachFn((doc) => {
+      const lead = docs === input ? doc : doc.data();
 
-      // Filter leads for selected user if one is selected
       if (selectedUserId) {
         const selectedUserObj = users.find((u) => u.id === selectedUserId);
         if (lead.assignedTo?.uid !== selectedUserObj?.uid) {
           return;
         }
+      }
+      if (lead.courseType) {
+        if (lead.courseType.includes("Engineering")) {
+          leadCategories.Engineering++;
+        } else if (lead.courseType.includes("MBA")) {
+          leadCategories.MBA++;
+        } else {
+          leadCategories.Others++;
+        }
+      } else {
+        leadCategories.Others++;
       }
 
       if (lead.phase === "hot") {
@@ -664,15 +815,13 @@ const SalesDashboard = () => {
                 1
               );
               const pastDaysOfMonth = closedDate.getDate() - 1;
-              dateKey = `Week ${Math.floor((firstDay.getDay() + pastDaysOfMonth) / 7) + 1
-                }`;
+              dateKey = `Week ${Math.floor((firstDay.getDay() + pastDaysOfMonth) / 7) + 1}`;
             } else if (timePeriod === "quarter") {
               dateKey = [
                 "Jan", "Feb", "Mar", "Apr", "May", "Jun",
                 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
               ][closedDate.getMonth()];
             } else {
-              // For fiscal year view (April-March)
               const month = closedDate.getMonth();
               dateKey = [
                 "Apr", "May", "Jun", "Jul", "Aug", "Sep",
@@ -719,7 +868,8 @@ const SalesDashboard = () => {
         time: new Date(lead.createdAt).toLocaleDateString(),
       });
     });
-    // Update this part in the processLeadsData function
+
+    // Generate chart data
     for (let i = 0; i < timePoints; i++) {
       let dateKey;
       if (timePeriod === "week") {
@@ -727,7 +877,6 @@ const SalesDashboard = () => {
       } else if (timePeriod === "month") {
         dateKey = `Week ${i + 1}`;
       } else if (timePeriod === "quarter") {
-        // Show actual month names for current quarter
         const now = new Date();
         const quarterMonth = now.getMonth();
         if (quarterMonth >= 3 && quarterMonth <= 5) {
@@ -740,7 +889,6 @@ const SalesDashboard = () => {
           dateKey = ["Jan", "Feb", "Mar"][i];
         }
       } else {
-        // For year view - show all 12 months in fiscal year order (April-March)
         const fiscalMonths = [
           "Apr", "May", "Jun", "Jul", "Aug", "Sep",
           "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"
@@ -748,19 +896,14 @@ const SalesDashboard = () => {
         dateKey = fiscalMonths[i];
       }
 
-      // Calculate current month highlight
       const now = new Date();
       const currentMonth = now.getMonth();
       let isCurrentMonth = false;
 
       if (timePeriod === "year") {
-        // Fiscal year runs April (3) to March (2)
-        // Map calendar months to fiscal months:
-        // Apr(3)=0, May(4)=1, ..., Mar(2)=11
         const fiscalMonthIndex = currentMonth < 3 ? currentMonth + 9 : currentMonth - 3;
         isCurrentMonth = i === fiscalMonthIndex;
       } else if (timePeriod === "quarter") {
-        // For quarter view, highlight current month in the quarter
         const quarterStartMonth = Math.floor(currentMonth / 3) * 3;
         isCurrentMonth = (currentMonth - quarterStartMonth) === i;
       }
@@ -775,6 +918,7 @@ const SalesDashboard = () => {
         currentMonth: isCurrentMonth
       });
     }
+
     return {
       revenue,
       hotLeads,
@@ -782,6 +926,11 @@ const SalesDashboard = () => {
       coldLeads,
       projectedTCV,
       chartData,
+      leadCategories: [
+        { name: "Engineering", value: leadCategories.Engineering },
+        { name: "MBA", value: leadCategories.MBA },
+        { name: "Others", value: leadCategories.Others }
+      ],
       leadSources: [
         { name: "Hot", value: leadSources.hot },
         { name: "Warm", value: leadSources.warm },
@@ -816,85 +965,169 @@ const SalesDashboard = () => {
 
   const fetchDataForRange = async (range) => {
     setIsLoading(true);
+
+    // Define calculateGrowth here so it's available in all code paths
+    const calculateGrowth = (current, previous) => {
+      if (previous === 0) return current === 0 ? 0 : 100;
+      return ((current - previous) / previous) * 100;
+    };
+
     try {
       const { start, end } = range;
       const currentStart = start.getTime();
       const currentEnd = end.getTime();
 
       // Fetch current period data
-      let currentLeadsQuery;
       const leadsRef = collection(db, "leads");
-      let baseQuery = query(
-        leadsRef,
-        where("createdAt", ">=", currentStart),
-        where("createdAt", "<=", currentEnd)
-      );
 
-      if (selectedUserId) {
-        const selectedUserObj = users.find((u) => u.id === selectedUserId);
-        currentLeadsQuery = query(
-          baseQuery,
-          where("assignedTo.uid", "==", selectedUserObj.uid)
+      try {
+        // First try with the composite index query
+        let currentLeadsQuery = query(
+          leadsRef,
+          where("createdAt", ">=", currentStart),
+          where("createdAt", "<=", currentEnd),
+          ...(selectedUserId ? [where("assignedTo.uid", "==",
+            users.find((u) => u.id === selectedUserId)?.uid)] : []
+          )
         );
-      } else {
-        currentLeadsQuery = baseQuery;
-      }
 
-      const currentSnapshot = await getDocs(currentLeadsQuery);
-      const currentData = processLeadsData(currentSnapshot);
-      // Fetch previous quarter data for comparison
-      const prevQuarterDateRange = getPreviousQuarterDateRange();
-      const prevStart = prevQuarterDateRange.start.getTime();
-      const prevEnd = prevQuarterDateRange.end.getTime();
+        const currentSnapshot = await getDocs(currentLeadsQuery);
+        const currentData = processLeadsData(currentSnapshot);
 
-      let prevLeadsQuery = query(
-        leadsRef,
-        where("createdAt", ">=", prevStart),
-        where("createdAt", "<=", prevEnd)
-      );
+        // Fetch previous quarter data for comparison
+        const prevQuarterDateRange = getPreviousQuarterDateRange();
+        const prevStart = prevQuarterDateRange.start.getTime();
+        const prevEnd = prevQuarterDateRange.end.getTime();
 
-      if (selectedUserId) {
-        const selectedUserObj = users.find((u) => u.id === selectedUserId);
-        prevLeadsQuery = query(
-          prevLeadsQuery,
-          where("assignedTo.uid", "==", selectedUserObj.uid)
+        let prevLeadsQuery = query(
+          leadsRef,
+          where("createdAt", ">=", prevStart),
+          where("createdAt", "<=", prevEnd),
+          ...(selectedUserId ? [where("assignedTo.uid", "==",
+            users.find((u) => u.id === selectedUserId)?.uid)] : []
+          )
         );
+
+        const prevSnapshot = await getDocs(prevLeadsQuery);
+        const prevData = processLeadsData(prevSnapshot);
+
+        const growth = {
+          revenue: calculateGrowth(currentData.revenue, prevData.revenue),
+          hotLeads: calculateGrowth(currentData.hotLeads, prevData.hotLeads),
+          warmLeads: calculateGrowth(currentData.warmLeads, prevData.warmLeads),
+          coldLeads: calculateGrowth(currentData.coldLeads, prevData.coldLeads),
+          projectedTCV: calculateGrowth(currentData.projectedTCV, prevData.projectedTCV),
+        };
+
+        setDashboardData({
+          ...currentData,
+          revenuePrevQuarter: prevData.revenue,
+          hotLeadsPrevQuarter: prevData.hotLeads,
+          warmLeadsPrevQuarter: prevData.warmLeads,
+          coldLeadsPrevQuarter: prevData.coldLeads,
+          projectedTCVPrevQuarter: prevData.projectedTCV,
+          growth: growth.revenue,
+        });
+
+      } catch (error) {
+        if (error.code === 'failed-precondition') {
+          console.warn('Falling back to client-side filtering due to missing index');
+
+          // Fallback approach with client-side filtering
+          const allLeadsQuery = query(
+            leadsRef,
+            where("createdAt", ">=", currentStart),
+            where("createdAt", "<=", currentEnd)
+          );
+
+          const snapshot = await getDocs(allLeadsQuery);
+          let filteredDocs = snapshot.docs;
+
+          if (selectedUserId) {
+            const selectedUserObj = users.find((u) => u.id === selectedUserId);
+            filteredDocs = snapshot.docs.filter(
+              doc => doc.data().assignedTo?.uid === selectedUserObj?.uid
+            );
+          }
+
+          const currentData = processLeadsData({
+            docs: filteredDocs,
+            forEach: (callback) => filteredDocs.forEach(callback)
+          });
+
+          // Similar fallback for previous quarter data
+          const prevQuarterDateRange = getPreviousQuarterDateRange();
+          const prevStart = prevQuarterDateRange.start.getTime();
+          const prevEnd = prevQuarterDateRange.end.getTime();
+
+          const prevAllLeadsQuery = query(
+            leadsRef,
+            where("createdAt", ">=", prevStart),
+            where("createdAt", "<=", prevEnd)
+          );
+
+          const prevSnapshot = await getDocs(prevAllLeadsQuery);
+          let prevFilteredDocs = prevSnapshot.docs;
+
+          if (selectedUserId) {
+            const selectedUserObj = users.find((u) => u.id === selectedUserId);
+            prevFilteredDocs = prevSnapshot.docs.filter(
+              doc => doc.data().assignedTo?.uid === selectedUserObj?.uid
+            );
+          }
+
+          const prevData = processLeadsData({
+            docs: prevFilteredDocs,
+            forEach: (callback) => prevFilteredDocs.forEach(callback)
+          });
+
+          // Calculate growth percentages
+          const growth = {
+            revenue: calculateGrowth(currentData.revenue, prevData.revenue),
+            hotLeads: calculateGrowth(currentData.hotLeads, prevData.hotLeads),
+            warmLeads: calculateGrowth(currentData.warmLeads, prevData.warmLeads),
+            coldLeads: calculateGrowth(currentData.coldLeads, prevData.coldLeads),
+            projectedTCV: calculateGrowth(currentData.projectedTCV, prevData.projectedTCV),
+          };
+
+          setDashboardData({
+            ...currentData,
+            revenuePrevQuarter: prevData.revenue,
+            hotLeadsPrevQuarter: prevData.hotLeads,
+            warmLeadsPrevQuarter: prevData.warmLeads,
+            coldLeadsPrevQuarter: prevData.coldLeads,
+            projectedTCVPrevQuarter: prevData.projectedTCV,
+            growth: growth.revenue,
+          });
+
+          console.error('Firestore index missing. Please create this index:', error.message);
+        } else {
+          throw error;
+        }
       }
-
-      const prevSnapshot = await getDocs(prevLeadsQuery);
-      const prevData = processLeadsData(prevSnapshot);
-
-      // Calculate growth percentages
-      const calculateGrowth = (current, previous) => {
-        if (previous === 0) return current === 0 ? 0 : 100;
-        return ((current - previous) / previous) * 100;
-      };
-
-      const growth = {
-        revenue: calculateGrowth(currentData.revenue, prevData.revenue),
-        hotLeads: calculateGrowth(currentData.hotLeads, prevData.hotLeads),
-        warmLeads: calculateGrowth(currentData.warmLeads, prevData.warmLeads),
-        coldLeads: calculateGrowth(currentData.coldLeads, prevData.coldLeads),
-        projectedTCV: calculateGrowth(currentData.projectedTCV, prevData.projectedTCV),
-      };
-
-      setDashboardData({
-        ...currentData,
-        revenuePrevQuarter: prevData.revenue,
-        hotLeadsPrevQuarter: prevData.hotLeads,
-        warmLeadsPrevQuarter: prevData.warmLeads,
-        coldLeadsPrevQuarter: prevData.coldLeads,
-        projectedTCVPrevQuarter: prevData.projectedTCV,
-        growth: growth.revenue,
-      });
-
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
+      setDashboardData({
+        revenue: 0,
+        revenuePrevQuarter: 0,
+        growth: 0,
+        hotLeads: 0,
+        hotLeadsPrevQuarter: 0,
+        warmLeads: 0,
+        warmLeadsPrevQuarter: 0,
+        coldLeads: 0,
+        coldLeadsPrevQuarter: 0,
+        projectedTCV: 0,
+        projectedTCVPrevQuarter: 0,
+        chartData: [],
+        leadSources: [],
+        teamPerformance: [],
+        recentActivity: [],
+      });
     } finally {
       setIsLoading(false);
     }
   };
-
   const handleNextPeriod = () => {
     const newRange = getNextDateRange(timePeriod, currentDateRange.start);
     setCurrentDateRange(newRange);
@@ -934,12 +1167,12 @@ const SalesDashboard = () => {
     fetchDataForRange(initialRange);
   }, []);
 
-useEffect(() => {
-  const newRange = getDateRange(timePeriod);
-  setCurrentDateRange(newRange);
-  updatePeriodInfo(newRange);
-  fetchDataForRange(newRange);
-}, [timePeriod, selectedUserId]);
+  useEffect(() => {
+    const newRange = getDateRange(timePeriod);
+    setCurrentDateRange(newRange);
+    updatePeriodInfo(newRange);
+    fetchDataForRange(newRange);
+  }, [timePeriod, selectedUserId]);
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -1236,17 +1469,31 @@ useEffect(() => {
             </div>
           </div>
 
-          <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Lead Distribution
-            </h2>
-            <LeadDistribution
-              leadSources={dashboardData.leadSources}
-              isLoading={isLoading}
-            />
-          </div>
-        </div>
+          <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm  ">
+              {/* Lead Distribution Box */}
+              <div className="">
+                <h3 className="text-md font-semibold text-gray-800 mb-3">
+                  Lead Distribution
+                </h3>
+                <LeadDistribution
+                  leadSources={dashboardData.leadSources}
+                  isLoading={isLoading}
+                />
+              </div>
 
+              {/* Education Distribution Box */}
+              <div className="">
+                <h3 className="text-md font-semibold text-gray-800 mb-3">
+                  Education Distribution
+                </h3>
+                <EducationDistribution
+                  leadCategories={dashboardData.leadCategories}
+                  isLoading={isLoading}
+                />
+              </div>
+            </div>
+
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm lg:col-span-2">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
