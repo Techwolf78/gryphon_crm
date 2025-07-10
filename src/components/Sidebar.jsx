@@ -2,6 +2,7 @@ import React, { useContext } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import logo from "../assets/SYNC-logo-2.png";
+import { MdOutlineCurrencyRupee } from "react-icons/md";
 import {
   FiHome,
   FiUsers,
