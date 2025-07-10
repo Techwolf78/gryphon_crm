@@ -9,9 +9,7 @@ import { doc, collection, setDoc, getDoc, getDocs, deleteDoc } from "firebase/fi
 const projectCodeToDocId = (projectCode) => projectCode.replace(/\//g, "-");
 const docIdToProjectCode = (docId) => docId.replace(/-/g, "/");
 const displayProjectCode = (code) => (code ? code.replace(/-/g, "/") : "-");
-
 const displayYear = (year) => year.replace(/-/g, " ");
-
 
 const ClosedLeadsTable = ({
   leads,
