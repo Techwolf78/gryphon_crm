@@ -4,7 +4,7 @@ import {
   FiChevronDown,
   FiFilter,
   FiDatabase,
-  FiInfo, // <-- Add this
+  FiInfo,
 } from "react-icons/fi";
 import * as XLSX from "xlsx-js-style";
 import { saveAs } from "file-saver";
@@ -13,7 +13,6 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Handle click outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -36,13 +35,10 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
     const followupsArray = Object.values(followupObj);
     if (followupsArray.length === 0) return "";
 
-    // Sort by timestamp (newest first)
     followupsArray.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
-    // Format each follow-up with consistent date format and numbering
     return followupsArray
       .map((followup, index) => {
-        // Format date consistently
         let dateStr = "";
         try {
           const date = followup.date?.seconds
@@ -59,7 +55,7 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
 
         return `${index + 1}. ${dateStr} - ${followup.remarks || ""}`;
       })
-      .join(String.fromCharCode(10)); // Use ASCII 10 for Excel line breaks
+      .join(String.fromCharCode(10));
   };
 
   const parseDate = (date) => {
@@ -74,7 +70,18 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
     }
   };
 
-  // Filter out leads with phase = closed
+  const formatCourses = (courses) => {
+    if (!courses || !Array.isArray(courses)) return "";
+    
+    return courses
+      .map((course, index) => {
+        const courseType = course.courseType || "";
+        const specializations = course.specializations?.join(", ") || "";
+        return `${index + 1}. ${courseType} - ${specializations}`;
+      })
+      .join(". ");
+  };
+
   const filterOutClosed = (leads) =>
     leads.filter((item) => {
       const lead = Array.isArray(item) ? item[1] : item;
@@ -90,7 +97,6 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
       const phase = lead.phase.toLowerCase();
       if (["hot", "warm", "cold"].includes(phase)) {
         result[phase].push({
-          // Institution Basic Info
           "College Name": lead.businessName || "",
           Address: lead.address || "",
           State: lead.state || "",
@@ -99,10 +105,7 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
           "Phone No.": lead.phoneNo || "",
           "Email ID": lead.email || "",
           "Passing Year": lead.passingYear || "",
-          "Course Type": lead.courseType || "",
-          Specializations: lead.specializations
-            ? lead.specializations.join(", ")
-            : "",
+          "Courses": formatCourses(lead.courses), // Combined course and specializations
           Accreditation: lead.accreditation || "",
           Affiliation: lead.affiliation || "",
           "Contact Method": lead.contactMethod || "",
@@ -127,9 +130,9 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
     const wb = XLSX.utils.book_new();
 
     const phaseColors = {
-      hot: "FFFFCCCC", // Light Red
-      warm: "FFFFFFCC", // Light Yellow
-      cold: "CCECFF", // Light Blue
+      hot: "FFFFCCCC",
+      warm: "FFFFFFCC",
+      cold: "CCECFF",
     };
 
     Object.entries(grouped).forEach(([phase, data]) => {
@@ -143,21 +146,16 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
 
       const ws = XLSX.utils.aoa_to_sheet(sheetData);
 
-      // With your custom column width configuration:
       ws["!cols"] = headers.map((header) => {
-        // Wider columns for fields that typically need more space
-        if (["Address", "Specializations", "Meetings"].includes(header)) {
+        if (["Address", "Courses", "Meetings"].includes(header)) {
           return { wch: 30 };
         }
-        // Medium width for other text fields
         if (["College Name", "Affiliation"].includes(header)) {
           return { wch: 25 };
         }
-        // Default width for others
         return { wch: 15 };
       });
 
-      // Then continue with the existing cell styling code:
       const range = XLSX.utils.decode_range(ws["!ref"]);
 
       for (let R = range.s.r; R <= range.e.r; ++R) {
@@ -167,7 +165,6 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
 
           if (cell) {
             if (R === 0) {
-              // Header styling
               cell.s = {
                 fill: {
                   fgColor: { rgb: phaseColors[phase] },
@@ -188,7 +185,6 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
                 },
               };
             } else {
-              // Alternating row color & borders for data cells
               const isEven = R % 2 === 0;
               const isFollowUpCell = headers[C] === "Meetings";
               cell.s = {
@@ -203,13 +199,12 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
                 },
                 alignment: {
                   horizontal: "left",
-                  vertical: "top", // Changed to top alignment
-                  wrapText: true, // Enable text wrapping
+                  vertical: "top",
+                  wrapText: true,
                 },
-                // Special formatting for follow-up cells
                 ...(isFollowUpCell && {
                   font: {
-                    sz: 10, // Slightly smaller font for follow-ups
+                    sz: 10,
                   },
                 }),
               };

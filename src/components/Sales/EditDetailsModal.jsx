@@ -106,19 +106,25 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
 
   const [formData, setFormData] = useState(defaultLeadFields);
 
-  // When lead prop changes, update formData state
   useEffect(() => {
     if (lead) {
-      // Ensure courses array exists and has at least one course
       const courses = lead.courses?.length
         ? lead.courses
         : defaultLeadFields.courses;
 
-      setFormData({
-        ...defaultLeadFields,
+      // Create a new object with default values first
+      const initialData = { ...defaultLeadFields };
+
+      // Then apply lead values, making sure to preserve dropdown selections
+      const updatedData = {
+        ...initialData,
         ...lead,
+        affiliation: lead.affiliation || initialData.affiliation,
+        accreditation: lead.accreditation || initialData.accreditation,
         courses,
-      });
+      };
+
+      setFormData(updatedData);
     }
   }, [lead, defaultLeadFields]);
 
@@ -254,28 +260,28 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
     }));
   };
 
-// Update the handleRemoveCourse function to properly update the total TCV
-const handleRemoveCourse = (index) => {
-  if (formData.courses.length <= 1) return;
-  
-  setFormData((prev) => {
-    // Get the course being removed
-    const courseToRemove = prev.courses[index];
-    const courseTCVToRemove = courseToRemove.courseTCV || 0;
-    
-    // Filter out the course to be removed
-    const updatedCourses = prev.courses.filter((_, i) => i !== index);
-    
-    // Calculate new total TCV by subtracting the removed course's TCV
-    const newTotalTCV = (prev.tcv || 0) - courseTCVToRemove;
-    
-    return {
-      ...prev,
-      courses: updatedCourses,
-      tcv: newTotalTCV > 0 ? newTotalTCV : 0 // Ensure tcv doesn't go negative
-    };
-  });
-};
+  // Update the handleRemoveCourse function to properly update the total TCV
+  const handleRemoveCourse = (index) => {
+    if (formData.courses.length <= 1) return;
+
+    setFormData((prev) => {
+      // Get the course being removed
+      const courseToRemove = prev.courses[index];
+      const courseTCVToRemove = courseToRemove.courseTCV || 0;
+
+      // Filter out the course to be removed
+      const updatedCourses = prev.courses.filter((_, i) => i !== index);
+
+      // Calculate new total TCV by subtracting the removed course's TCV
+      const newTotalTCV = (prev.tcv || 0) - courseTCVToRemove;
+
+      return {
+        ...prev,
+        courses: updatedCourses,
+        tcv: newTotalTCV > 0 ? newTotalTCV : 0, // Ensure tcv doesn't go negative
+      };
+    });
+  };
 
   // Save handler sends data with timestamps for dates
   const handleSave = () => {
@@ -293,6 +299,11 @@ const handleRemoveCourse = (index) => {
 
     onSave(updatedData);
   };
+
+  console.log("Current accreditation value:", formData.accreditation);
+  console.log("Current affiliation value:", formData.affiliation);
+  console.log("Available accreditation options:", accreditationOptions);
+  console.log("Available university options:", universityOptions);
 
   // Convert timestamp or string to yyyy-mm-dd for date input
   const formatDateForInput = (value) => {
@@ -455,72 +466,45 @@ const handleRemoveCourse = (index) => {
             {/* Accreditation & Affiliation */}
             <div className="col-span-2 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="border border-gray-100 rounded-lg p-4 hover:shadow transition-shadow">
-                  <label className="block text-xs font-semibold uppercase text-gray-500 tracking-wide mb-1">
+                {/* NAAC Accreditation */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-1">
                     NAAC Accreditation
                   </label>
                   <select
                     value={formData.accreditation || ""}
-                    onChange={(e) => {
-                      handleChange("accreditation", e.target.value);
-                      handleChange("manualAccreditation", "");
-                    }}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    onChange={(e) =>
+                      handleChange("accreditation", e.target.value)
+                    }
+                    className="w-full p-2 border rounded"
                   >
-                    <option value="">Select Accreditation</option>
+                    <option value="">Select NAAC Grade</option>
                     {accreditationOptions.map((option) => (
                       <option key={option} value={option}>
                         {option}
                       </option>
                     ))}
                   </select>
-                  {formData.accreditation === "Other" && (
-                    <div className="mt-2">
-                      <input
-                        type="text"
-                        value={formData.manualAccreditation || ""}
-                        onChange={(e) =>
-                          handleChange("manualAccreditation", e.target.value)
-                        }
-                        placeholder="Specify accreditation"
-                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                    </div>
-                  )}
                 </div>
 
-                <div className="border border-gray-100 rounded-lg p-4 hover:shadow transition-shadow">
-                  <label className="block text-xs font-semibold uppercase text-gray-500 tracking-wide mb-1">
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-1">
                     University Affiliation
                   </label>
                   <select
                     value={formData.affiliation || ""}
-                    onChange={(e) => {
-                      handleChange("affiliation", e.target.value);
-                      handleChange("manualAffiliation", "");
-                    }}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    onChange={(e) =>
+                      handleChange("affiliation", e.target.value)
+                    }
+                    className="w-full p-2 border rounded"
                   >
                     <option value="">Select University</option>
-                    {universityOptions.map((university) => (
-                      <option key={university} value={university}>
-                        {university}
+                    {universityOptions.map((univ) => (
+                      <option key={univ} value={univ}>
+                        {univ}
                       </option>
                     ))}
                   </select>
-                  {formData.affiliation === "Other" && (
-                    <div className="mt-2">
-                      <input
-                        type="text"
-                        value={formData.manualAffiliation || ""}
-                        onChange={(e) =>
-                          handleChange("manualAffiliation", e.target.value)
-                        }
-                        placeholder="Specify university name"
-                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                    </div>
-                  )}
                 </div>
               </div>
             </div>

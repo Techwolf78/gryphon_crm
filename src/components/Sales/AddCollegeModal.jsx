@@ -560,7 +560,6 @@ function AddCollegeModal({ show, onClose }) {
                     onRemove={() => handleRemoveCourse(index)}
                     showRemoveButton={courses.length > 1}
                   />
-
                 </div>
               ))}
 

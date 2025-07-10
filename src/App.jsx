@@ -13,7 +13,8 @@ import ProtectedRoute from "./routes/ProtectedRoute";
 import DashboardLayout from "./components/DashboardLayout";
 import Dashboard from "./pages/Dashboard";
 import Admin from "./pages/Admin";
-import Sales from "./pages/Sales";
+import SalesLeads from "./pages/Sales";
+import SalesClientOnboarding from "./pages/SalesClientOnboarding";
 import Placement from "./pages/Placement";
 import LearningDevelopment from "./pages/LearningDevelopment";
 import DigitalMarketing from "./pages/Marketing";
@@ -39,13 +40,15 @@ const AppContent = () => {
             </ProtectedRoute>
           }
         >
-          <Route index element={<Dashboard />} /> {/* /dashboard */}
-       
+          <Route index element={<Dashboard />} />
           <Route path="profile" element={<UpdateProfile />} />
           <Route path="admin" element={<Admin />} />
-          <Route path="sales" element={<Sales />} />
+          <Route path="sales">
+            <Route path="lead" element={<SalesLeads />} />
+            <Route path="close" element={<SalesClientOnboarding />} />
+          </Route>
           <Route path="placement" element={<Placement />} />
-             <Route path="help" element={<Help />} />
+          <Route path="help" element={<Help />} />
           <Route
             path="learning-development"
             element={<LearningDevelopment />}
@@ -61,7 +64,7 @@ const AppContent = () => {
 
 const App = () => (
   <AuthProvider>
-    <Router >
+    <Router>
       <AppContent />
     </Router>
   </AuthProvider>
