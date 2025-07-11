@@ -54,6 +54,13 @@ function CompanyFilter({
           .filter(Boolean)
       ),
     ],
+    jobTypes: [
+      ...new Set(
+        companies
+          .map((company) => company.jobType)
+          .filter(Boolean)
+      ),
+    ],
     salaries: [
       ...new Set(
         companies
