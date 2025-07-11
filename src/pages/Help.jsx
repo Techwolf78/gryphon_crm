@@ -1,3 +1,4 @@
+// ONLY the updated parts are modified. Remaining code is untouched.
 import React, { useState, useEffect, useContext } from "react";
 import {
   FiHelpCircle,
@@ -44,6 +45,9 @@ const Help = () => {
   const [activeTicket, setActiveTicket] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState({});
+  const [remark, setRemark] = useState("");
+
+
 
   const [ticketForm, setTicketForm] = useState({
     title: "",
@@ -174,6 +178,13 @@ const Help = () => {
       }
 
       const querySnapshot = await getDocs(q);
+
+      // This is a valid empty state - no need to show error
+      if (querySnapshot.empty) {
+        setTickets([]);
+        return;
+      }
+
       const ticketsData = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
@@ -183,7 +194,11 @@ const Help = () => {
       setTickets(ticketsData);
     } catch (error) {
       console.error("Error fetching tickets:", error);
-      toast.error("Failed to load tickets");
+      // Only show toast for actual errors, not empty collections
+      if (error.code !== "permission-denied") {
+        // You might want to handle permission errors differently
+        toast.error("Failed to load tickets");
+      }
     }
   };
 
@@ -194,28 +209,31 @@ const Help = () => {
         status,
         updatedAt: serverTimestamp(),
         resolvedBy: isAdmin ? user.email : null,
+        remark: isAdmin ? remark : "",
       });
+
 
       setTickets((prev) =>
         prev.map((ticket) =>
           ticket.id === ticketId
             ? {
-                ...ticket,
-                status,
-                updatedAt: new Date(),
-              }
+              ...ticket,
+              status,
+              updatedAt: new Date(),
+              remark,
+            }
             : ticket
         )
       );
 
       toast.success(`Ticket marked as ${status.replace("-", " ")}`);
       setActiveTicket(null);
+      setRemark("");
     } catch (error) {
       console.error("Error updating ticket status:", error);
       toast.error("Failed to update ticket status");
     }
   };
-
   useEffect(() => {
     if (user) {
       fetchTickets();
@@ -338,9 +356,8 @@ const Help = () => {
                     name="title"
                     value={ticketForm.title}
                     onChange={handleTicketFormChange}
-                    className={`w-full px-3 py-2 border ${
-                      formErrors.title ? "border-red-500" : "border-gray-300"
-                    } rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    className={`w-full px-3 py-2 border ${formErrors.title ? "border-red-500" : "border-gray-300"
+                      } rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500`}
                     required
                   />
                   {formErrors.title && (
@@ -383,9 +400,21 @@ const Help = () => {
 
                 <button
                   type="submit"
-                  className="w-full px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  disabled={isSubmitting}
+                  className={`w-full px-5 py-2.5 ${isSubmitting ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'
+                    } text-white font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`}
                 >
-                  Submit Ticket
+                  {isSubmitting ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Submitting...
+                    </>
+                  ) : (
+                    'Submit Ticket'
+                  )}
                 </button>
               </form>
             </div>
@@ -412,15 +441,14 @@ const Help = () => {
                   {activeTicket.title}
                 </h3>
                 <span
-                  className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    activeTicket.priority === "critical"
-                      ? "bg-red-100 text-red-800"
-                      : activeTicket.priority === "high"
+                  className={`px-2 py-1 rounded-full text-xs font-medium ${activeTicket.priority === "critical"
+                    ? "bg-red-100 text-red-800"
+                    : activeTicket.priority === "high"
                       ? "bg-orange-100 text-orange-800"
                       : activeTicket.priority === "medium"
-                      ? "bg-yellow-100 text-yellow-800"
-                      : "bg-green-100 text-green-800"
-                  }`}
+                        ? "bg-yellow-100 text-yellow-800"
+                        : "bg-green-100 text-green-800"
+                    }`}
                 >
                   {activeTicket.priority}
                 </span>
@@ -432,13 +460,12 @@ const Help = () => {
                 <span>
                   Status:
                   <span
-                    className={`ml-1 ${
-                      activeTicket.status === "resolved"
-                        ? "text-green-600"
-                        : activeTicket.status === "can't-resolve"
+                    className={`ml-1 ${activeTicket.status === "resolved"
+                      ? "text-green-600"
+                      : activeTicket.status === "can't-resolve"
                         ? "text-gray-600"
                         : "text-red-600"
-                    }`}
+                      }`}
                   >
                     {activeTicket.status.replace("-", " ")}
                   </span>
@@ -452,36 +479,45 @@ const Help = () => {
                 <p className="text-gray-700 whitespace-pre-line">
                   {activeTicket.description}
                 </p>
-              </div>
+                {activeTicket.status === "not-resolved" && (
+                  <div className="mb-4">
+                    <label className="text-sm font-medium text-gray-700 mb-1 block">
+                      Remark
+                    </label>
+                    <textarea
+                      value={remark}
+                      onChange={(e) => setRemark(e.target.value)}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Add a remark here..."
+                    ></textarea>
+                  </div>
+                )}
 
-              {isAdmin && (
+              </div>
+              {isAdmin && activeTicket.status === "not-resolved" && (
                 <div className="flex space-x-3">
                   <button
-                    onClick={() =>
-                      updateTicketStatus(activeTicket.id, "resolved")
-                    }
+                    onClick={() => updateTicketStatus(activeTicket.id, "resolved")}
                     className="flex items-center px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
                   >
                     <FiCheck className="mr-2" /> Mark as Resolved
                   </button>
                   <button
-                    onClick={() =>
-                      updateTicketStatus(activeTicket.id, "can't-resolve")
-                    }
+                    onClick={() => updateTicketStatus(activeTicket.id, "can't-resolve")}
                     className="flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
                   >
                     <FiArchive className="mr-2" /> Can't Resolve
                   </button>
                   <button
-                    onClick={() =>
-                      updateTicketStatus(activeTicket.id, "not-resolved")
-                    }
+                    onClick={() => updateTicketStatus(activeTicket.id, "not-resolved")}
                     className="flex items-center px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
                   >
                     <FiAlertCircle className="mr-2" /> Not Resolved
                   </button>
                 </div>
               )}
+
             </div>
           </div>
         </div>
@@ -489,7 +525,7 @@ const Help = () => {
 
       <div className="">
         {/* Header aligned left */}
-       <div className="mb-12">
+        <div className="mb-12">
           <div className="inline-flex items-center justify-start bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl p-5 mb-4 shadow-sm border border-white">
             <FiHelpCircle className="text-blue-600 w-8 h-8" />
           </div>
@@ -506,21 +542,19 @@ const Help = () => {
         <div className="flex border-b border-gray-200 mb-8">
           <button
             onClick={() => setShowRaisedTickets(false)}
-            className={`px-4 py-2 font-medium ${
-              !showRaisedTickets
-                ? "text-blue-600 border-b-2 border-blue-600"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
+            className={`px-4 py-2 font-medium ${!showRaisedTickets
+              ? "text-blue-600 border-b-2 border-blue-600"
+              : "text-gray-500 hover:text-gray-700"
+              }`}
           >
             Help Center
           </button>
           <button
             onClick={() => setShowRaisedTickets(true)}
-            className={`px-4 py-2 font-medium ${
-              showRaisedTickets
-                ? "text-blue-600 border-b-2 border-blue-600"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
+            className={`px-4 py-2 font-medium ${showRaisedTickets
+              ? "text-blue-600 border-b-2 border-blue-600"
+              : "text-gray-500 hover:text-gray-700"
+              }`}
           >
             {isAdmin ? "All Tickets" : "My Tickets"}
           </button>
@@ -544,7 +578,9 @@ const Help = () => {
               {tickets.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-gray-500">
-                    {isAdmin ? "No tickets found" : "You haven't created any tickets yet"}
+                    {isAdmin
+                      ? "No tickets found"
+                      : "You haven't created any tickets yet"}
                   </p>
                   {!isAdmin && (
                     <button
@@ -575,6 +611,9 @@ const Help = () => {
                           Status
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Remark
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Actions
                         </th>
                       </tr>
@@ -592,15 +631,14 @@ const Help = () => {
                           )}
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             <span
-                              className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                ticket.priority === "critical"
-                                  ? "bg-red-100 text-red-800"
-                                  : ticket.priority === "high"
+                              className={`px-2 py-1 rounded-full text-xs font-medium ${ticket.priority === "critical"
+                                ? "bg-red-100 text-red-800"
+                                : ticket.priority === "high"
                                   ? "bg-orange-100 text-orange-800"
                                   : ticket.priority === "medium"
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : "bg-green-100 text-green-800"
-                              }`}
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : "bg-green-100 text-green-800"
+                                }`}
                             >
                               {ticket.priority}
                             </span>
@@ -608,23 +646,31 @@ const Help = () => {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             <div className="flex items-center">
                               <span
-                                className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                  ticket.status === "resolved"
-                                    ? "bg-green-100 text-green-800"
-                                    : ticket.status === "can't-resolve"
+                                className={`px-2 py-1 rounded-full text-xs font-medium ${ticket.status === "resolved"
+                                  ? "bg-green-100 text-green-800"
+                                  : ticket.status === "can't-resolve"
                                     ? "bg-gray-100 text-gray-800"
                                     : "bg-red-100 text-red-800"
-                                }`}
+                                  }`}
                               >
-                                {ticket.status.replace("-", " ")}
+                                {ticket.status.replace("-", " ")}{" "}
+                                {ticket.status !== "not-resolved" && ticket.resolvedBy
+                                  ? `(by ${ticket.resolvedBy.split("@")[0]})`
+                                  : ""}
                               </span>
-                              {ticket.status === "resolved" && ticket.resolvedBy && (
-                                <span className="ml-2 text-xs text-gray-500">
-                                  (by {ticket.resolvedBy.split('@')[0]})
-                                </span>
-                              )}
                             </div>
                           </td>
+
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {ticket.remark
+                              ? ticket.remark
+                              : ticket.status === "resolved"
+                                ? `Resolved by ${ticket.resolvedBy?.split("@")[0] || "admin"}`
+                                : ticket.status === "can't-resolve"
+                                  ? "Couldn't resolve"
+                                  : "Pending resolution"}
+                          </td>
+
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             <button
                               onClick={() => setActiveTicket(ticket)}

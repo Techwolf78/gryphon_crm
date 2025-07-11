@@ -3,12 +3,19 @@ import { FiFilter, FiMoreVertical, FiUpload, FiX } from "react-icons/fi";
 import PropTypes from "prop-types";
 import * as XLSX from "xlsx";
 import { db } from "../../../firebase";
-import { doc, collection, setDoc, getDoc, getDocs, deleteDoc } from "firebase/firestore";
-import EditClosedLeadModal from "../Closed/EditClosedLeadModal";
+import {
+  doc,
+  collection,
+  setDoc,
+  getDoc,
+  getDocs,
+  deleteDoc,
+} from "firebase/firestore";
 
 // Project Code Conversion Utilities
-const projectCodeToDocId = (projectCode) => projectCode.replace(/\//g, "-");
-const docIdToProjectCode = (docId) => docId.replace(/-/g, "/");
+const projectCodeToDocId = (projectCode) =>
+  projectCode ? projectCode.replace(/\//g, "-") : "";
+const docIdToProjectCode = (docId) => (docId ? docId.replace(/-/g, "/") : "");
 const displayProjectCode = (code) => (code ? code.replace(/-/g, "/") : "-");
 const displayYear = (year) => year.replace(/-/g, " ");
 
@@ -26,16 +33,6 @@ const ClosedLeadsTable = ({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
-  // Add these new states for the edit modal
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [currentLead, setCurrentLead] = useState(null);
-
-  // Add this new handler function
-  const handleEditClick = (lead) => {
-    setCurrentLead(lead);
-    setShowEditModal(true);
-    setOpenDropdown(null); // Close the dropdown
-  };
 
   const logAvailableProjectCodes = async () => {
     try {
@@ -85,25 +82,11 @@ const ClosedLeadsTable = ({
       return;
     }
 
-    console.log("Current Lead:", currentLead);
-    console.log("Lead Project Code:", currentLead.projectCode);
+    const projectCode = currentLead.projectCode || "";
 
-    if (currentLead?.projectCode) {
-      // Log before attempting upload
+    if (projectCode) {
       await logAvailableProjectCodes();
-
-      const docId = projectCodeToDocId(currentLead.projectCode);
-      console.log("Converted Doc ID:", docId);
-
-      // Verify document exists
-      const docRef = doc(db, "trainingForms", docId);
-      const docSnap = await getDoc(docRef);
-
-      if (!docSnap.exists()) {
-        console.warn("Document does not exist, will create new one");
-      }
-
-      handleUpload(currentLead.projectCode);
+      handleUpload(projectCode);
     } else {
       console.error("Invalid project code structure:", currentLead.projectCode);
       await logAvailableProjectCodes();
@@ -195,7 +178,7 @@ const ClosedLeadsTable = ({
       // DELETE ALL EXISTING STUDENTS FIRST
       console.log("Deleting existing students...");
       const existingStudents = await getDocs(studentsRef);
-      const deletePromises = existingStudents.docs.map(studentDoc =>
+      const deletePromises = existingStudents.docs.map((studentDoc) =>
         deleteDoc(doc(studentsRef, studentDoc.id))
       );
       await Promise.all(deletePromises);
@@ -298,16 +281,6 @@ const ClosedLeadsTable = ({
 
   return (
     <div className="overflow-x-auto">
-      {showEditModal && (
-        <EditClosedLeadModal
-          lead={currentLead}
-          onClose={() => setShowEditModal(false)}
-          onSave={() => {
-            // You might want to refresh the leads data here
-            console.log("Lead updated successfully");
-          }}
-        />
-      )}
       {/* Upload Modal */}
       {showUploadModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
@@ -331,8 +304,9 @@ const ClosedLeadsTable = ({
             </div>
             <div className="px-6 py-4">
               <div
-                className={`border-2 border-dashed rounded-lg p-8 text-center ${isDragging ? "border-blue-500 bg-blue-50" : "border-gray-300"
-                  }`}
+                className={`border-2 border-dashed rounded-lg p-8 text-center ${
+                  isDragging ? "border-blue-500 bg-blue-50" : "border-gray-300"
+                }`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
@@ -426,10 +400,11 @@ const ClosedLeadsTable = ({
               </button>
               <button
                 type="button"
-                className={`px-4 py-2 text-sm font-medium text-white rounded-md ${selectedFile && !uploading
-                  ? "bg-blue-600 hover:bg-blue-700"
-                  : "bg-blue-300 cursor-not-allowed"
-                  }`}
+                className={`px-4 py-2 text-sm font-medium text-white rounded-md ${
+                  selectedFile && !uploading
+                    ? "bg-blue-600 hover:bg-blue-700"
+                    : "bg-blue-300 cursor-not-allowed"
+                }`}
                 disabled={!selectedFile || uploading}
                 onClick={handleUploadClick}
               >
@@ -466,9 +441,15 @@ const ClosedLeadsTable = ({
         <tbody className="bg-white divide-y divide-gray-200">
           {leads.length > 0 ? (
             leads.map(([id, lead]) => (
-
               <tr key={id} className="hover:bg-gray-50 transition-colors">
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <td
+                  className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
+                  title={`DocID: ${projectCodeToDocId(
+                    lead.projectCode || ""
+                  )}, ProjectCode: ${docIdToProjectCode(
+                    projectCodeToDocId(lead.projectCode || "")
+                  )}, Year: ${displayYear(String(lead.closedDate || ""))}`}
+                >
                   {displayProjectCode(lead.projectCode) || "-"}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -534,20 +515,21 @@ const ClosedLeadsTable = ({
                   </button>
                   {openDropdown === id && (
                     <div className="origin-top-right absolute right-10 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
-                      <div className="py-1" role="menu" aria-orientation="vertical">
+                      <div
+                        className="py-1"
+                        role="menu"
+                        aria-orientation="vertical"
+                        aria-labelledby="options-menu"
+                      >
                         <button
                           className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 w-full text-left"
+                          role="menuitem"
                           onClick={() => {
                             setShowUploadModal(true);
+                            // Don't setOpenDropdown(null) here - we need the ID for upload
                           }}
                         >
                           Upload Student List
-                        </button>
-                        <button
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 w-full text-left"
-                          onClick={() => handleEditClick(lead)}
-                        >
-                          Edit Lead
                         </button>
                       </div>
                     </div>
@@ -563,15 +545,15 @@ const ClosedLeadsTable = ({
                   No closed deals found
                 </h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  {`There are currently no ${viewMyLeadsOnly ? "your" : "team"
-                    } closed deals.`}
+                  {`There are currently no ${
+                    viewMyLeadsOnly ? "your" : "team"
+                  } closed deals.`}
                 </p>
               </td>
             </tr>
           )}
         </tbody>
       </table>
-
     </div>
   );
 };

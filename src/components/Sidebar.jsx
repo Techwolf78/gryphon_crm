@@ -1,11 +1,11 @@
 import React, { useContext } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
-import logo from "../assets/sync-new.png";
+import logo from "../assets/SYNC-logo-2.png";
+import { MdOutlineCurrencyRupee } from "react-icons/md";
 import {
   FiHome,
   FiUsers,
-  FiDollarSign,
   FiBriefcase,
   FiBook,
   FiTrendingUp,
@@ -18,7 +18,7 @@ import {
 const roleLinks = {
   admin: [
     { label: "Admin", path: "/dashboard/admin", icon: <FiUsers /> },
-    { label: "Sales", path: "/dashboard/sales", icon: <FiDollarSign /> },
+    { label: "Sales", path: "/dashboard/sales", icon: <MdOutlineCurrencyRupee /> },
     { label: "Placement", path: "/dashboard/placement", icon: <FiBriefcase /> },
     {
       label: "L & D",
@@ -27,7 +27,7 @@ const roleLinks = {
     },
     { label: "D M", path: "/dashboard/marketing", icon: <FiTrendingUp /> },
   ],
-  sales: [{ label: "Sales", path: "/dashboard/sales", icon: <FiDollarSign /> }],
+  sales: [{ label: "Sales", path: "/dashboard/sales", icon: <MdOutlineCurrencyRupee   /> }],
   placement: [
     { label: "Placement", path: "/dashboard/placement", icon: <FiBriefcase /> },
   ],

@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from "react";
-import stateCityData from "../Sales/stateCityData";
-import { universityOptions } from "../Sales/universityData";
+import { useState, useEffect } from "react";
+import { universityOptions } from "./universityData";
 import { auth, db } from "../../firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { XIcon, PlusIcon } from "@heroicons/react/outline";
-import CourseForm from "./CourseForm";
-import CollegeInfoForm from "./CollegeInfoForm";
-import ContactInfoForm from "./ContactInfoForm";
+import CourseForm from "./AddCollege/CourseForm";
+import CollegeInfoForm from "./AddCollege/CollegeInfoForm";
+import ContactInfoForm from "./AddCollege/ContactInfoForm";
 
 const courseSpecializations = {
   Engineering: [
@@ -76,7 +75,8 @@ function AddCollegeModal({ show, onClose }) {
   const [accreditation, setAccreditation] = useState("");
   const [manualAffiliation, setManualAffiliation] = useState("");
   const [manualAccreditation, setManualAccreditation] = useState("");
-  
+  const [tcv, setTcv] = useState(0); // Changed from totalContractValue to tcv
+
   const [courses, setCourses] = useState([
     {
       courseType: "",
@@ -86,9 +86,18 @@ function AddCollegeModal({ show, onClose }) {
       passingYear: "",
       studentCount: "",
       perStudentCost: "",
-      tcv: 0
-    }
+      courseTCV: 0, // Changed from tcv to courseTCV
+    },
   ]);
+
+  // Update the useEffect calculation
+  useEffect(() => {
+    const total = courses.reduce(
+      (sum, course) => sum + (course.courseTCV || 0),
+      0
+    );
+    setTcv(total); // Changed from setTotalContractValue to setTcv
+  }, [courses]);
 
   const getLeadPhase = (expectedDateInput) => {
     if (!expectedDateInput) return "cold";
@@ -117,32 +126,36 @@ function AddCollegeModal({ show, onClose }) {
     const value = e.target.value;
     const isChecked = e.target.checked;
 
-    setCourses(prev => {
+    setCourses((prev) => {
       const updatedCourses = [...prev];
-      const course = {...updatedCourses[index]};
-      
+      const course = { ...updatedCourses[index] };
+
       if (value === "Other") {
         if (isChecked) {
           course.specializations = [...course.specializations, "Other"];
         } else {
-          course.specializations = course.specializations.filter(item => item !== "Other");
+          course.specializations = course.specializations.filter(
+            (item) => item !== "Other"
+          );
           course.manualSpecialization = "";
         }
       } else {
         if (isChecked) {
           course.specializations = [...course.specializations, value];
         } else {
-          course.specializations = course.specializations.filter(item => item !== value);
+          course.specializations = course.specializations.filter(
+            (item) => item !== value
+          );
         }
       }
-      
+
       updatedCourses[index] = course;
       return updatedCourses;
     });
   };
 
   const handleAddCourse = () => {
-    setCourses(prev => [
+    setCourses((prev) => [
       ...prev,
       {
         courseType: "",
@@ -152,43 +165,43 @@ function AddCollegeModal({ show, onClose }) {
         passingYear: "",
         studentCount: "",
         perStudentCost: "",
-        tcv: 0
-      }
+        courseTCV: 0, // Changed from tcv to courseTCV
+      },
     ]);
   };
 
   const handleRemoveCourse = (index) => {
     if (courses.length <= 1) return;
-    setCourses(prev => prev.filter((_, i) => i !== index));
+    setCourses((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleCourseChange = (index, field, value) => {
-    setCourses(prev => {
+    setCourses((prev) => {
       const updatedCourses = [...prev];
-      const updatedCourse = {...updatedCourses[index]};
-      
-      if (field === 'courseType') {
+      const updatedCourse = { ...updatedCourses[index] };
+
+      if (field === "courseType") {
         updatedCourse.courseType = value;
         updatedCourse.specializations = [];
         updatedCourse.manualSpecialization = "";
-      } else if (field === 'manualSpecialization') {
+      } else if (field === "manualSpecialization") {
         updatedCourse.manualSpecialization = value;
-      } else if (field === 'manualCourseType') {
+      } else if (field === "manualCourseType") {
         updatedCourse.manualCourseType = value;
-      } else if (field === 'passingYear') {
+      } else if (field === "passingYear") {
         updatedCourse.passingYear = value;
-      } else if (field === 'studentCount') {
+      } else if (field === "studentCount") {
         updatedCourse.studentCount = value;
         const count = parseInt(value) || 0;
         const cost = parseFloat(updatedCourse.perStudentCost) || 0;
-        updatedCourse.tcv = count * cost;
-      } else if (field === 'perStudentCost') {
+        updatedCourse.courseTCV = count * cost; // Changed from tcv to courseTCV
+      } else if (field === "perStudentCost") {
         updatedCourse.perStudentCost = value;
         const count = parseInt(updatedCourse.studentCount) || 0;
         const cost = parseFloat(value) || 0;
-        updatedCourse.tcv = count * cost;
+        updatedCourse.courseTCV = count * cost; // Changed from tcv to courseTCV
       }
-      
+
       updatedCourses[index] = updatedCourse;
       return updatedCourses;
     });
@@ -203,20 +216,23 @@ function AddCollegeModal({ show, onClose }) {
     setState("");
     setCity("");
     setExpectedClosureDate("");
-    setCourses([{
-      courseType: "",
-      specializations: [],
-      manualSpecialization: "",
-      manualCourseType: "",
-      passingYear: "",
-      studentCount: "",
-      perStudentCost: "",
-      tcv: 0
-    }]);
+    setCourses([
+      {
+        courseType: "",
+        specializations: [],
+        manualSpecialization: "",
+        manualCourseType: "",
+        passingYear: "",
+        studentCount: "",
+        perStudentCost: "",
+        courseTCV: 0, // Changed from tcv to courseTCV
+      },
+    ]);
     setAffiliation("");
     setAccreditation("");
     setManualAffiliation("");
     setManualAccreditation("");
+    setTcv(0);
     onClose();
   };
 
@@ -248,7 +264,7 @@ function AddCollegeModal({ show, onClose }) {
         ? manualAccreditation.trim()
         : accreditation;
 
-    const processedCourses = courses.map(course => {
+    const processedCourses = courses.map((course) => {
       const finalCourseType =
         course.courseType === "Others" && course.manualCourseType.trim()
           ? course.manualCourseType.trim()
@@ -256,9 +272,12 @@ function AddCollegeModal({ show, onClose }) {
 
       let finalSpecializations = [...course.specializations];
 
-      if (course.specializations.includes("Other") && course.manualSpecialization.trim()) {
+      if (
+        course.specializations.includes("Other") &&
+        course.manualSpecialization.trim()
+      ) {
         finalSpecializations = finalSpecializations
-          .filter(item => item !== "Other")
+          .filter((item) => item !== "Other")
           .concat(course.manualSpecialization.trim());
       }
 
@@ -268,7 +287,7 @@ function AddCollegeModal({ show, onClose }) {
         passingYear: course.passingYear || null,
         studentCount: parseInt(course.studentCount) || 0,
         perStudentCost: parseFloat(course.perStudentCost) || 0,
-        tcv: course.tcv || 0
+        courseTCV: course.courseTCV || 0, // Changed from tcv to courseTCV
       };
     });
 
@@ -282,6 +301,7 @@ function AddCollegeModal({ show, onClose }) {
       city,
       expectedClosureDate: expectedClosureTimestamp,
       courses: processedCourses,
+      tcv,
       phase,
       affiliation: finalAffiliation || null,
       accreditation: finalAccreditation || null,
@@ -313,13 +333,15 @@ function AddCollegeModal({ show, onClose }) {
     phoneNo.trim() &&
     state &&
     city &&
-    courses.every(course => (
-      ((course.courseType !== "Others" && course.courseType) ||
-      (course.courseType === "Others" && course.manualCourseType.trim())) &&
-      course.specializations.length > 0 &&
-      (!course.specializations.includes("Other") ||
-      (course.specializations.includes("Other") && course.manualSpecialization.trim()))
-    )) &&
+    courses.every(
+      (course) =>
+        ((course.courseType !== "Others" && course.courseType) ||
+          (course.courseType === "Others" && course.manualCourseType.trim())) &&
+        course.specializations.length > 0 &&
+        (!course.specializations.includes("Other") ||
+          (course.specializations.includes("Other") &&
+            course.manualSpecialization.trim()))
+    ) &&
     (affiliation !== "Other" ||
       (affiliation === "Other" && manualAffiliation.trim()));
 
@@ -526,19 +548,58 @@ function AddCollegeModal({ show, onClose }) {
               </div>
 
               {courses.map((course, index) => (
-                <CourseForm
-                  key={index}
-                  course={course}
-                  index={index}
-                  handleCourseChange={handleCourseChange}
-                  handleSpecializationChange={handleSpecializationChange}
-                  courseSpecializations={courseSpecializations}
-                  yearOptions={yearOptions}
-                  isFormValid={isFormValid}
-                  onRemove={() => handleRemoveCourse(index)}
-                  showRemoveButton={courses.length > 1}
-                />
+                <div key={index} className="mb-6 border-b border-gray-200 pb-6">
+                  <CourseForm
+                    course={course}
+                    index={index}
+                    handleCourseChange={handleCourseChange}
+                    handleSpecializationChange={handleSpecializationChange}
+                    courseSpecializations={courseSpecializations}
+                    yearOptions={yearOptions}
+                    isFormValid={isFormValid}
+                    onRemove={() => handleRemoveCourse(index)}
+                    showRemoveButton={courses.length > 1}
+                  />
+                </div>
               ))}
+
+              {/* Total Contract Value Display - Enhanced */}
+              <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <span className="text-lg font-medium text-gray-700">
+                      Total Contract Value (TCV)
+                    </span>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Sum of all course values
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xl font-semibold text-blue-600">
+                      ₹{tcv.toLocaleString()}
+                    </span>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {courses.filter((c) => c.courseTCV > 0).length} course(s)
+                      included
+                    </p>
+                  </div>
+                </div>
+                {courses.filter((c) => c.courseTCV > 0).length > 0 && (
+                  <div className="mt-2 text-sm text-gray-600">
+                    <p>Breakdown:</p>
+                    <ul className="list-disc pl-5 mt-1">
+                      {courses
+                        .filter((c) => c.courseTCV > 0)
+                        .map((course, idx) => (
+                          <li key={idx}>
+                            {course.courseType || course.manualCourseType}: ₹
+                            {course.courseTCV.toLocaleString()}
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
