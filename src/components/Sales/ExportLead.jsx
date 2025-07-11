@@ -70,16 +70,26 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
     }
   };
 
-  const formatCourses = (courses) => {
-    if (!courses || !Array.isArray(courses)) return "";
-    
-    return courses
-      .map((course, index) => {
-        const courseType = course.courseType || "";
-        const specializations = course.specializations?.join(", ") || "";
-        return `${index + 1}. ${courseType} - ${specializations}`;
-      })
-      .join(". ");
+  const formatCourseDetails = (courses) => {
+    if (!courses || !Array.isArray(courses)) return [];
+
+    return courses.map((course) => {
+      const courseType = course.courseType || course.manualCourseType || "";
+      const specializations = course.specializations?.join(", ") || "";
+      const passingYear = course.passingYear || "";
+      const studentCount = course.studentCount || "";
+      const perStudentCost = course.perStudentCost || "";
+      const courseTCV = course.courseTCV || 0;
+
+      return {
+        courseType,
+        specializations,
+        passingYear,
+        studentCount,
+        perStudentCost,
+        courseTCV,
+      };
+    });
   };
 
   const filterOutClosed = (leads) =>
@@ -96,7 +106,10 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
 
       const phase = lead.phase.toLowerCase();
       if (["hot", "warm", "cold"].includes(phase)) {
-        result[phase].push({
+        const courseDetails = formatCourseDetails(lead.courses);
+
+        // Create base lead info with fixed columns first
+        const leadInfo = {
           "College Name": lead.businessName || "",
           Address: lead.address || "",
           State: lead.state || "",
@@ -104,17 +117,30 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
           "Contact Name": lead.pocName || "",
           "Phone No.": lead.phoneNo || "",
           "Email ID": lead.email || "",
-          "Passing Year": lead.passingYear || "",
-          "Courses": formatCourses(lead.courses), // Combined course and specializations
-          Accreditation: lead.accreditation || "",
-          Affiliation: lead.affiliation || "",
-          "Contact Method": lead.contactMethod || "",
-          "Student Count": lead.studentCount || "",
-          "Per Student Cost": lead.perStudentCost || "",
-          TCV: lead.tcv || "",
-          "Expected Closure": parseDate(lead.expectedClosureDate),
-          Meetings: getAllFollowUps(lead.followup),
+        };
+
+        // Add course details right after basic info
+        courseDetails.forEach((course, index) => {
+          const prefix = `Course ${index + 1}`;
+          leadInfo[`${prefix} - Type`] = course.courseType;
+          leadInfo[`${prefix} - Specializations`] = course.specializations;
+          leadInfo[`${prefix} - Passing Year`] = course.passingYear;
+          leadInfo[`${prefix} - Student Count`] = course.studentCount;
+          leadInfo[`${prefix} - Per Student Cost`] = course.perStudentCost;
+          leadInfo[`${prefix} - Course TCV`] = course.courseTCV;
         });
+
+        // Add accreditation and affiliation after course details
+        leadInfo["Accreditation"] = lead.accreditation || "";
+        leadInfo["Affiliation"] = lead.affiliation || "";
+
+        // Add remaining fields
+        leadInfo["Contact Method"] = lead.contactMethod || "";
+        leadInfo["Total TCV"] = lead.tcv || "";
+        leadInfo["Expected Closure"] = parseDate(lead.expectedClosureDate);
+        leadInfo["Meetings"] = getAllFollowUps(lead.followup);
+
+        result[phase].push(leadInfo);
       }
     });
     return result;
@@ -146,14 +172,21 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
 
       const ws = XLSX.utils.aoa_to_sheet(sheetData);
 
+      // Set column widths
       ws["!cols"] = headers.map((header) => {
-        if (["Address", "Courses", "Meetings"].includes(header)) {
+        if (header.includes("Address") || header.includes("Meetings")) {
           return { wch: 30 };
         }
-        if (["College Name", "Affiliation"].includes(header)) {
+        if (header.includes("College Name") || header.includes("Affiliation")) {
           return { wch: 25 };
         }
-        return { wch: 15 };
+        if (header.includes("Specializations")) {
+          return { wch: 20 };
+        }
+        if (header.includes("Type") || header.includes("Course")) {
+          return { wch: 15 };
+        }
+        return { wch: 12 };
       });
 
       const range = XLSX.utils.decode_range(ws["!ref"]);
@@ -206,6 +239,10 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
                   font: {
                     sz: 10,
                   },
+                }),
+                ...((headers[C].includes("TCV") ||
+                  headers[C].includes("Per Student Cost")) && {
+                  numFmt: '"₹"#,##0.00',
                 }),
               };
             }
