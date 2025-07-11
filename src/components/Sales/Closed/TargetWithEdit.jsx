@@ -12,7 +12,6 @@ const TargetWithEdit = ({
   users,
   onUpdate,
   viewMyLeadsOnly,
-  canEdit,      // <- Add this here
 }) => {
   const formatCurrency = (amt) =>
     typeof amt === "number"
@@ -44,10 +43,33 @@ const TargetWithEdit = ({
     (u) => u.reportingManager === currentUserObj?.name && ["Assistant Manager", "Executive"].includes(u.role)
   );
  
+  // Check edit permissions
+let canEdit = false;
 
+if (!viewMyLeadsOnly) {
+  if (["Admin", "Director"].includes(currentRole)) {
+    canEdit = true;
+  } else if (currentRole === "Head" && ["Manager", "Assistant Manager", "Executive"].includes(targetRole)) {
+    canEdit = true;
+  } else if (currentRole === "Manager" && ["Assistant Manager", "Executive"].includes(targetRole)) {
+    canEdit = true;
+  }
+}
 
-if (!canEdit || !targetUserObj) {
-  return <span className="text-gray-700 font-medium">{formatCurrency(value)}</span>;
+ 
+const isSelf = currentUser?.uid === targetUserObj?.uid;
+const isAdminOrDirector = ["Admin", "Director"].includes(currentUserObj?.role);
+
+// MyLeads access: Admin/Director can edit their own target
+if (viewMyLeadsOnly) {
+  if (!(isSelf && isAdminOrDirector)) {
+    return <span className="text-gray-700 font-medium">{formatCurrency(value)}</span>;
+  }
+} else {
+  // MyTeam access: based on hierarchy
+  if (!canEdit || !targetUserObj) {
+    return <span className="text-gray-700 font-medium">{formatCurrency(value)}</span>;
+  }
 }
 
  
@@ -236,7 +258,6 @@ TargetWithEdit.propTypes = {
   users: PropTypes.object.isRequired,
   onUpdate: PropTypes.func.isRequired,
   viewMyLeadsOnly: PropTypes.bool.isRequired,
-    canEdit: PropTypes.bool,
 };
  
 export default TargetWithEdit;
