@@ -85,10 +85,39 @@ const headerColorMap = {
   noapplications: "bg-gray-50 text-gray-800 border-b border-gray-200"
 };
 
-function CompanyDetails({ company, onClose }) {
+// Function to get college abbreviation
+const getCollegeAbbreviation = (collegeName) => {
+  if (!collegeName) return null;
+  
+  const commonAbbreviations = {
+    "Indian Institute of Technology": "IIT",
+    "National Institute of Technology": "NIT",
+    "Birla Institute of Technology and Science": "BITS",
+    "Indian Institute of Science": "IISc",
+    "Delhi Technological University": "DTU",
+    "Netaji Subhas University of Technology": "NSUT",
+    "Indira Gandhi Delhi Technical University for Women": "IGDTUW"
+  };
+
+  for (const [fullName, abbreviation] of Object.entries(commonAbbreviations)) {
+    if (collegeName.includes(fullName)) {
+      return abbreviation;
+    }
+  }
+
+  // If no common abbreviation found, take first letters of each word
+  return collegeName
+    .split(' ')
+    .map(word => word[0])
+    .join('')
+    .toUpperCase();
+};
+
+function CompanyDetails({ company, onClose, fetchStudents, students, loadingStudents, studentDataError }) {
+ const [showFullStudentData, setShowFullStudentData] = useState(false);
   return (
     <div className="fixed inset-0 flex items-center justify-center z-54">
-      <div className="fixed inset-0  bg-opacity-50 backdrop-blur" onClick={onClose}></div>
+      <div className="fixed inset-0 bg-opacity-50 backdrop-blur" onClick={onClose}></div>
       
       <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto z-50">
         <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white px-6 py-4 flex justify-between items-center sticky top-0">
@@ -203,7 +232,22 @@ function CompanyDetails({ company, onClose }) {
           )}
         </div>
 
-        <div className="sticky bottom-0 bg-gray-50 px-6 py-4 border-t flex justify-end">
+        <div className="sticky bottom-0 bg-gray-50 px-6 py-4 border-t flex justify-between">
+          <button
+            onClick={fetchStudents}
+            disabled={loadingStudents}
+            className={`px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition ${
+              loadingStudents ? "opacity-50 cursor-not-allowed" : ""
+            }`}
+          >
+            {loadingStudents ? "Loading..." : "View Student Data"}
+          </button>
+          <button
+            
+            className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition"
+          >
+            Copy
+          </button>
           <button
             onClick={onClose}
             className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition"
@@ -211,6 +255,46 @@ function CompanyDetails({ company, onClose }) {
             Close
           </button>
         </div>
+
+        {/* Student data preview */}
+        {students.length > 0 && (
+          <div className="px-6 pb-6">
+            <h3 className="text-lg font-semibold text-blue-700 mb-2">Students ({students.length})</h3>
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {students.slice(0, 3).map((student) => (
+                  <div key={student.id} className="border rounded-lg p-3 bg-white">
+                    <p className="font-medium text-gray-900">{student.accountName || "No name"}</p>
+                    <p className="text-sm text-gray-600">{student.accountEmail || "No email"}</p>
+                    <p className="text-sm text-gray-600">{student.accountPhone || "No phone"}</p>
+                  </div>
+                ))}
+                {students.length > 3 && (
+                  <div className="border rounded-lg p-3 bg-white flex items-center justify-center">
+                    <p className="text-gray-500">+{students.length - 3} more students</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {studentDataError && (
+          <div className="px-6 pb-6">
+            <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-red-700">{studentDataError}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -222,9 +306,7 @@ function DropdownActions({
   closeDropdown,
   setSelectedCompany,
   updateCompanyStatus,
-  activeTab,
-  setShowStudentData,
-  setSelectedStudentData
+  activeTab
 }) {
   return (
     <div className="origin-top-right absolute right-0 mt-2 w-40 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-54">
@@ -238,17 +320,6 @@ function DropdownActions({
           className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition"
         >
           View Details
-        </button>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setSelectedStudentData(companyData);
-            setShowStudentData(true);
-            closeDropdown();
-          }}
-          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition"
-        >
-          Student Data
         </button>
         {["complete", "ongoing", "onhold", "cancel", "noapplications"]
           .filter(status => status !== activeTab)
@@ -284,8 +355,9 @@ function CompanyOpen() {
   const [users, setUsers] = useState([]);
   const [showImportModal, setShowImportModal] = useState(false);
   const [error, setError] = useState(null);
-  const [showStudentData, setShowStudentData] = useState(false);
-  const [selectedStudentData, setSelectedStudentData] = useState(null);
+  const [students, setStudents] = useState([]);
+  const [loadingStudents, setLoadingStudents] = useState(false);
+  const [studentDataError, setStudentDataError] = useState(null);
 
   const fetchCompanies = async () => {
     try {
@@ -315,6 +387,42 @@ function CompanyOpen() {
       setUsers(usersData);
     } catch (error) {
       console.error("Error fetching users:", error);
+    }
+  };
+
+  const fetchStudents = async () => {
+    if (!selectedCompany) return;
+    
+    try {
+      setLoadingStudents(true);
+      setStudentDataError(null);
+      
+      // Extract college abbreviation
+      const collegeAbbr = getCollegeAbbreviation(selectedCompany.college);
+      if (!collegeAbbr) {
+        throw new Error("College information not available");
+      }
+      
+      // Construct the document ID pattern
+      const docId = `${collegeAbbr}-${selectedCompany.course}-${selectedCompany.passingYear}`;
+      
+      // Reference to the trainingForms collection and specific document
+      const trainingFormRef = doc(db, "trainingForms", docId);
+      const studentsCollectionRef = collection(trainingFormRef, "students");
+      
+      // Get all student documents
+      const snapshot = await getDocs(studentsCollectionRef);
+      const studentData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      setStudents(studentData);
+    } catch (error) {
+      console.error("Error fetching students:", error);
+      setStudentDataError("Failed to load student data. Please try again.");
+    } finally {
+      setLoadingStudents(false);
     }
   };
 
@@ -349,7 +457,7 @@ function CompanyOpen() {
       if (!filters || Object.keys(filters).length === 0) return true;
       
       return Object.entries(filters).every(([key, value]) => {
-        if (!value) return true;
+        if (!value || value.length === 0) return true;
         
         if (key === 'dateRange') {
           if (!value.start || !value.end) return true;
@@ -361,6 +469,18 @@ function CompanyOpen() {
         
         if (key === 'assignedTo') {
           return company.assignedTo === value;
+        }
+        
+        if (key === 'course') {
+          return value.includes(company.course);
+        }
+        
+        if (key === 'specialization') {
+          return value.includes(company.specialization);
+        }
+        
+        if (key === 'passingYear') {
+          return value.includes(company.passingYear);
         }
         
         return company[key]?.toString().toLowerCase() === value.toString().toLowerCase();
@@ -382,7 +502,7 @@ function CompanyOpen() {
           <div className="flex">
             <div className="flex-shrink-0">
               <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
               </svg>
             </div>
             <div className="ml-3">
@@ -450,39 +570,24 @@ function CompanyOpen() {
 
               <ExportData companies={companies} filteredCompanies={filteredCompanies} />
 
-              <div className="relative">
-                <button
-                  onClick={() => setIsFilterOpen(!isFilterOpen)}
-                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+              <button
+                onClick={() => setIsFilterOpen(!isFilterOpen)}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+              >
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  className="h-5 w-5" 
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 >
-                  <svg 
-                    xmlns="http://www.w3.org/2000/svg" 
-                    className="h-5 w-5" 
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-                  </svg>
-                  Filter
-                </button>
-                
-                {isFilterOpen && (
-                  <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-md shadow-lg z-50">
-                    <CompanyFilter
-                      filters={filters}
-                      setFilters={setFilters}
-                      isFilterOpen={isFilterOpen}
-                      setIsFilterOpen={setIsFilterOpen}
-                      users={users}
-                      companies={companies}
-                    />
-                  </div>
-                )}
-              </div>
+                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                </svg>
+                Filter
+              </button>
 
               <button
                 onClick={() => setShowJDForm(true)}
@@ -503,7 +608,7 @@ function CompanyOpen() {
                 Add JD
               </button>
               <button
-                onClick={() => setShowJDForm(true)}
+                
                 className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-5 py-2 rounded-xl font-semibold hover:opacity-90 transition-all shadow-md flex items-center whitespace-nowrap"
               >
                 <svg
@@ -520,6 +625,20 @@ function CompanyOpen() {
               </button>
             </div>
           </div>
+
+          {/* Filter dropdown */}
+          {isFilterOpen && (
+            <div className="bg-white rounded-lg shadow-lg p-4 mb-4 border border-gray-200">
+              <CompanyFilter
+                filters={filters}
+                setFilters={setFilters}
+                isFilterOpen={isFilterOpen}
+                setIsFilterOpen={setIsFilterOpen}
+                users={users}
+                companies={companies}
+              />
+            </div>
+          )}
 
           {/* Status tabs row */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
@@ -587,7 +706,7 @@ function CompanyOpen() {
                   </div>
 
                   <div className="text-sm text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis flex items-center h-full">
-                    {company.college || "-"}
+                    {getCollegeAbbreviation(company.college) || "-"}
                   </div>
 
                   <div className="text-sm text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis flex items-center h-full">
@@ -625,7 +744,7 @@ function CompanyOpen() {
                     {company.companyOpenDate || "-"}
                   </div>
 
-                  <div className="flex justify-center items-center gap-2">
+                  <div className="flex justify-center items-center gap-1">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -661,8 +780,6 @@ function CompanyOpen() {
                     setSelectedCompany={setSelectedCompany}
                     updateCompanyStatus={updateCompanyStatus}
                     activeTab={activeTab}
-                    setShowStudentData={setShowStudentData}
-                    setSelectedStudentData={setSelectedStudentData}
                   />
                 )}
               </div>
@@ -703,59 +820,16 @@ function CompanyOpen() {
         {selectedCompany && (
           <CompanyDetails
             company={selectedCompany}
-            onClose={() => setSelectedCompany(null)}
+            onClose={() => {
+              setSelectedCompany(null);
+              setStudents([]);
+              setStudentDataError(null);
+            }}
+            fetchStudents={fetchStudents}
+            students={students}
+            loadingStudents={loadingStudents}
+            studentDataError={studentDataError}
           />
-        )}
-
-        {showStudentData && selectedStudentData && (
-          <div className="fixed inset-0 flex items-center justify-center z-50">
-            <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setShowStudentData(false)}></div>
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto z-50">
-              <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white px-6 py-4 flex justify-between items-center sticky top-0">
-                <h2 className="text-lg font-semibold">Student Data for {selectedStudentData.companyName}</h2>
-                <button onClick={() => setShowStudentData(false)} className="p-1 rounded-full hover:bg-blue-700 transition">
-                  <XIcon className="h-5 w-5 text-white" />
-                </button>
-              </div>
-              <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <h3 className="text-lg font-semibold text-blue-700 mb-4">Applied Students</h3>
-                    <div className="space-y-4">
-                      <div className="border rounded-lg p-4 transition hover:shadow-md">
-                        <p className="font-medium text-gray-900">Student Name: John Doe</p>
-                        <p className="text-sm text-gray-600">Course: B.Tech (CSE)</p>
-                        <p className="text-sm text-gray-600">Status: Applied</p>
-                      </div>
-                      <div className="border rounded-lg p-4 transition hover:shadow-md">
-                        <p className="font-medium text-gray-900">Student Name: Jane Smith</p>
-                        <p className="text-sm text-gray-600">Course: B.Tech (ECE)</p>
-                        <p className="text-sm text-gray-600">Status: Interview Scheduled</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-blue-700 mb-4">Selected Students</h3>
-                    <div className="space-y-4">
-                      <div className="border rounded-lg p-4 bg-green-50 transition hover:shadow-md">
-                        <p className="font-medium text-gray-900">Student Name: Alex Johnson</p>
-                        <p className="text-sm text-gray-600">Course: B.Tech (CSE)</p>
-                        <p className="text-sm text-gray-600">Status: Offered</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="sticky bottom-0 bg-gray-50 px-6 py-4 border-t flex justify-end">
-                <button
-                  onClick={() => setShowStudentData(false)}
-                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
         )}
 
         {showJDForm && (
