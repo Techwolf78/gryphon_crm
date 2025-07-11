@@ -1,4 +1,4 @@
-import React, { createContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import { auth, db } from "../firebase"; // removed realtimeDb import
 import {
   onAuthStateChanged,
@@ -137,3 +137,7 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
+
+export function useAuth() {
+  return useContext(AuthContext);
+}

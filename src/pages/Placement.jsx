@@ -5,6 +5,7 @@ import TrainingDetailModal from "../components/Learning/TrainingTables/TrainingD
 import FilePreviewModal from "../components/Learning/TrainingTables/FilePreviewModal";
 import AddJD from "../components/Placement/AddJD";
 import CompanyOpen from "../components/Placement/CompanyOpen";
+import CompanyLeads from "../components/Placement/CompanyLeads";
 
 function Placement() {
   const [trainingData, setTrainingData] = useState([]);
@@ -17,7 +18,7 @@ function Placement() {
     type: "",
   });
   const [showJDForm, setShowJDForm] = useState(false);
-  const [activeTab, setActiveTab] = useState('warm');
+  const [viewMode, setViewMode] = useState('training'); // 'training', 'placement', or 'leads'
 
   const fetchData = async () => {
     try {
@@ -72,27 +73,30 @@ function Placement() {
         Placement Management
       </h2>
 
-      {/* Tabs */}
       <div className="flex mb-3 border-b">
         <button
-          className={`px-4 py-2 font-medium ${!selectedLead ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
-          onClick={() => setSelectedLead(null)}
+          className={`px-4 py-2 font-medium ${viewMode === 'training' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
+          onClick={() => setViewMode('training')}
         >
           Training Data
         </button>
         <button
-          className={`px-4 py-2 font-medium ${selectedLead !== null ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
-          onClick={() => leads.length > 0 && setSelectedLead(leads[0])}
+          className={`px-4 py-2 font-medium ${viewMode === 'placement' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
+          onClick={() => setViewMode('placement')}
         >
           Placement Stats
         </button>
+        <button
+          className={`px-4 py-2 font-medium ${viewMode === 'leads' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
+          onClick={() => setViewMode('leads')}
+        >
+          Company Leads
+        </button>
       </div>
 
-      {selectedLead === null ? (
+      {viewMode === 'training' && (
         <>
           {/* Training Data View */}
-          
-
           {trainingData.length === 0 ? (
             <p>No training data found.</p>
           ) : (
@@ -147,36 +151,20 @@ function Placement() {
             </div>
           )}
         </>
-      ) : (
-        <>
-          {/* Placement Leads View */}
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {leads
-              .filter(lead => lead.status === activeTab)
-              .map(lead => (
-                <div 
-                  key={lead.id}
-                  onClick={() => setSelectedLead(lead)}
-                  className="p-4 border rounded-lg cursor-pointer hover:shadow-md transition-shadow"
-                >
-                  <h3 className="font-medium text-lg">{lead.businessName}</h3>
-                  <p className="text-gray-600">{lead.pocName}</p>
-                  <p className="text-sm text-gray-500 mt-1">{lead.city}, {lead.state}</p>
-                  <div className="mt-3 flex justify-between items-center">
-                    <span className="text-sm font-medium">
-                      ₹{lead.tcv?.toLocaleString() || '0'} TCV
-                    </span>
-                    {lead.jds?.length > 0 && (
-                      <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
-                        {lead.jds.length} JD(s)
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-          </div>
-        </>
+      )}
+
+      {viewMode === 'placement' && (
+        <CompanyOpen />
+      )}
+
+      {viewMode === 'leads' && (
+        <CompanyLeads 
+          leads={leads} 
+          onLeadSelect={(lead) => {
+            setSelectedLead(lead);
+            setViewMode('placement');
+          }} 
+        />
       )}
 
       {/* Modals */}
@@ -198,17 +186,16 @@ function Placement() {
       )}
       {selectedLead && (
         <CompanyOpen
-  selectedLead={selectedLead}
-  onClose={() => setSelectedLead(null)}
-  onAddJD={(leadId, jdData) => {
-    // Update your leads data here
-    setLeads(leads.map(lead => 
-      lead.id === leadId 
-        ? { ...lead, jds: [...(lead.jds || []), jdData] } 
-        : lead
-    ));
-  }}
-/>
+          selectedLead={selectedLead}
+          onClose={() => setSelectedLead(null)} 
+          onAddJD={(leadId, jdData) => {
+            setLeads(leads.map(lead => 
+              lead.id === leadId 
+                ? { ...lead, jds: [...(lead.jds || []), jdData] } 
+                : lead
+            ));
+          }}
+        />
       )}
     </div>
   );

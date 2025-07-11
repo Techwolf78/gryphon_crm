@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useAuth } from "../../context/AuthContext"; // Adjust the path as needed
 import PropTypes from "prop-types";
 import {
   FiTrendingUp,
@@ -132,43 +133,52 @@ const RecentActivity = ({ recentActivity, isLoading }) => {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {recentActivity.map((activity) => (
         <div
           key={activity.id}
-          className="p-3 hover:bg-gray-50 rounded-lg transition-colors"
+          className="p-3 hover:bg-gray-50 rounded-lg transition-colors group"
         >
-          <div className="flex justify-between">
-            <div className="flex items-start">
-              <div
-                className={`p-2 rounded-lg ${
-                  activity.amount
-                    ? "bg-green-100 text-green-600"
-                    : "bg-indigo-100 text-indigo-600"
-                }`}
-              >
-                {activity.amount ? (
-                  <FiDollarSign size={16} />
-                ) : (
-                  <FiUsers size={16} />
+          <div className="flex justify-between items-start">
+            <div className="flex items-start gap-3">
+              <div className="relative">
+                <div
+                  className={`p-2 rounded-lg ${
+                    activity.amount
+                      ? "bg-green-100 text-green-600"
+                      : "bg-indigo-100 text-indigo-600"
+                  }`}
+                >
+                  {activity.amount ? (
+                    <FiDollarSign size={16} />
+                  ) : (
+                    <FiUsers size={16} />
+                  )}
+                </div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {activity.action}
+                  </p>
+                  <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded-full">
+                    {activity.userInitials}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-0.5 truncate">
+                  {activity.company}
+                </p>
+                {activity.amount && (
+                  <p className="text-sm font-medium text-gray-900 mt-1">
+                    ₹{activity.amount.toLocaleString()}
+                  </p>
                 )}
               </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-900">
-                  {activity.action}
-                </p>
-                <p className="text-xs text-gray-500">{activity.company}</p>
-              </div>
             </div>
-            <span className="text-xs text-gray-400">{activity.time}</span>
+            <span className="text-xs text-gray-400 whitespace-nowrap ml-2">
+              {activity.time}
+            </span>
           </div>
-          {activity.amount && (
-            <div className="mt-2 ml-11">
-              <span className="text-sm font-medium text-gray-900">
-                ₹{activity.amount.toLocaleString()}
-              </span>
-            </div>
-          )}
         </div>
       ))}
     </div>
@@ -183,6 +193,8 @@ RecentActivity.propTypes = {
       amount: PropTypes.number,
       company: PropTypes.string,
       time: PropTypes.string,
+      user: PropTypes.string,
+      userInitials: PropTypes.string,
     })
   ),
   isLoading: PropTypes.bool,
@@ -478,6 +490,7 @@ const SalesDashboard = () => {
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState("Team");
   const [selectedUserId, setSelectedUserId] = useState(null);
+  const currentUser = useAuth()?.user;
   const [currentPeriodInfo, setCurrentPeriodInfo] = useState("");
   const [currentDateRange, setCurrentDateRange] = useState({
     start: new Date(),
@@ -901,6 +914,12 @@ const SalesDashboard = () => {
         amount: lead.phase === "closed" ? lead.totalCost : null,
         company: lead.businessName,
         user: lead.assignedTo?.name || "Unassigned",
+        userInitials: lead.assignedTo?.name
+          ? lead.assignedTo.name
+              .split(" ")
+              .map((n) => n[0])
+              .join("")
+          : "NA",
         time: new Date(lead.createdAt).toLocaleDateString(),
       });
     });
@@ -994,25 +1013,42 @@ const SalesDashboard = () => {
   };
 
   // WITH THIS:
-  const fetchAllUsers = async () => {
-    setIsLoadingUsers(true);
-    try {
-      const usersRef = collection(db, "users");
-      const usersQuery = query(usersRef); // Removed department filter
-      const usersSnapshot = await getDocs(usersQuery);
+const fetchAllUsers = async () => {
+  setIsLoadingUsers(true);
+  try {
+    const usersRef = collection(db, "users");
 
-      const usersData = usersSnapshot.docs.map((doc) => ({
+    let usersQuery;
+
+    if (currentUser?.department === "admin") {
+      // Admin sees all users
+      usersQuery = query(usersRef);
+    } else if (currentUser?.department === "sales") {
+      // Sales see only sales users
+      usersQuery = query(usersRef, where("department", "==", "sales"));
+    } else {
+      // Others see no users
+      usersQuery = null;
+    }
+
+    let usersData = [];
+
+    if (usersQuery) {
+      const usersSnapshot = await getDocs(usersQuery);
+      usersData = usersSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
-
-      setUsers(usersData);
-    } catch (error) {
-      console.error("Error fetching users:", error);
-    } finally {
-      setIsLoadingUsers(false);
     }
-  };
+
+    setUsers(usersData);
+  } catch (error) {
+    console.error("Error fetching users:", error);
+  } finally {
+    setIsLoadingUsers(false);
+  }
+};
+
 
   const fetchDataForRange = async (range) => {
     setIsLoading(true);
@@ -1362,21 +1398,24 @@ const SalesDashboard = () => {
 
               {isFilterOpen && (
                 <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
-                  <div className="flex space-x-2">
+                  <div className="p-3">
                     {[
                       { value: "week", label: "This Week" },
                       { value: "month", label: "This Month" },
-                      { value: "quarter", label: "Current Qtr" },
+                      { value: "quarter", label: "Current Quarter" },
                       { value: "year", label: "This Year" },
                     ].map((period) => (
                       <button
                         type="button"
                         key={period.value}
-                        onClick={() => setTimePeriod(period.value)}
-                        className={`text-xs px-3 py-1 rounded-full ${
+                        onClick={() => {
+                          setTimePeriod(period.value);
+                          setIsFilterOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
                           timePeriod === period.value
-                            ? "bg-indigo-600 text-white"
-                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                            ? "bg-indigo-100 text-indigo-700"
+                            : "text-gray-700 hover:bg-gray-100"
                         }`}
                       >
                         {period.label}
