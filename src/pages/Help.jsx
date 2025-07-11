@@ -174,6 +174,13 @@ const Help = () => {
       }
 
       const querySnapshot = await getDocs(q);
+
+      // This is a valid empty state - no need to show error
+      if (querySnapshot.empty) {
+        setTickets([]);
+        return;
+      }
+
       const ticketsData = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
@@ -183,7 +190,11 @@ const Help = () => {
       setTickets(ticketsData);
     } catch (error) {
       console.error("Error fetching tickets:", error);
-      toast.error("Failed to load tickets");
+      // Only show toast for actual errors, not empty collections
+      if (error.code !== "permission-denied") {
+        // You might want to handle permission errors differently
+        toast.error("Failed to load tickets");
+      }
     }
   };
 
@@ -489,7 +500,7 @@ const Help = () => {
 
       <div className="">
         {/* Header aligned left */}
-       <div className="mb-12">
+        <div className="mb-12">
           <div className="inline-flex items-center justify-start bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl p-5 mb-4 shadow-sm border border-white">
             <FiHelpCircle className="text-blue-600 w-8 h-8" />
           </div>
@@ -544,7 +555,9 @@ const Help = () => {
               {tickets.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-gray-500">
-                    {isAdmin ? "No tickets found" : "You haven't created any tickets yet"}
+                    {isAdmin
+                      ? "No tickets found"
+                      : "You haven't created any tickets yet"}
                   </p>
                   {!isAdmin && (
                     <button
@@ -618,11 +631,12 @@ const Help = () => {
                               >
                                 {ticket.status.replace("-", " ")}
                               </span>
-                              {ticket.status === "resolved" && ticket.resolvedBy && (
-                                <span className="ml-2 text-xs text-gray-500">
-                                  (by {ticket.resolvedBy.split('@')[0]})
-                                </span>
-                              )}
+                              {ticket.status === "resolved" &&
+                                ticket.resolvedBy && (
+                                  <span className="ml-2 text-xs text-gray-500">
+                                    (by {ticket.resolvedBy.split("@")[0]})
+                                  </span>
+                                )}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

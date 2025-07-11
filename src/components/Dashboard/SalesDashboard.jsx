@@ -141,11 +141,10 @@ const RecentActivity = ({ recentActivity, isLoading }) => {
           <div className="flex justify-between">
             <div className="flex items-start">
               <div
-                className={`p-2 rounded-lg ${
-                  activity.amount
-                    ? "bg-green-100 text-green-600"
-                    : "bg-indigo-100 text-indigo-600"
-                }`}
+                className={`p-2 rounded-lg ${activity.amount
+                  ? "bg-green-100 text-green-600"
+                  : "bg-indigo-100 text-indigo-600"
+                  }`}
               >
                 {activity.amount ? (
                   <FiDollarSign size={16} />
@@ -192,7 +191,108 @@ RecentActivity.defaultProps = {
   recentActivity: [],
   isLoading: false,
 };
+const EducationDistribution = ({ leadCategories, isLoading }) => {
+  const COLORS = ["#3B82F6", "#10B981", "#F59E0B"]; // Blue, Green, Amber
 
+  const renderCustomizedLabel = ({
+    cx,
+    cy,
+    midAngle,
+    innerRadius,
+    outerRadius,
+    percent,
+  }) => {
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos((-midAngle * Math.PI) / 180);
+    const y = cy + radius * Math.sin((-midAngle * Math.PI) / 180);
+
+    return (
+      <text
+        x={x}
+        y={y}
+        fill="white"
+        textAnchor="middle"
+        dominantBaseline="central"
+        className="text-xs font-medium"
+      >
+        {`${(percent * 100).toFixed(0)}%`}
+      </text>
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <div className="h-60 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500" />
+      </div>
+    );
+  }
+
+  if (!leadCategories || leadCategories.length === 0 || leadCategories.reduce((sum, cat) => sum + cat.value, 0) === 0) {
+    return (
+      <div className="h-60 flex items-center justify-center">
+        <p className="text-gray-500">No education data available</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="h-60">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={leadCategories}
+              cx="50%"
+              cy="50%"
+              labelLine={false}
+              label={renderCustomizedLabel}
+              outerRadius={70}
+              fill="#8884d8"
+              dataKey="value"
+            >
+              {leadCategories.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={COLORS[index % COLORS.length]}
+                />
+              ))}
+            </Pie>
+            <Tooltip />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="mt-2 flex flex-wrap justify-center gap-2">
+        {leadCategories.map((category, index) => (
+          <div key={index} className="flex items-center">
+            <div
+              className="w-3 h-3 rounded-full mr-2"
+              style={{ backgroundColor: COLORS[index % COLORS.length] }}
+            />
+            <span className="text-xs text-gray-600">
+              {category.name}: {category.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+};
+
+EducationDistribution.propTypes = {
+  leadCategories: PropTypes.arrayOf(
+    PropTypes.shape({
+      name: PropTypes.string,
+      value: PropTypes.number,
+    })
+  ),
+  isLoading: PropTypes.bool,
+};
+
+EducationDistribution.defaultProps = {
+  leadCategories: [],
+  isLoading: false,
+};
 const LeadDistribution = ({ leadSources, isLoading }) => {
   const COLORS = ["#4F46E5", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
 
@@ -300,8 +400,8 @@ const CustomTooltip = ({ active, payload, label, timePeriod }) => {
   if (active && payload && payload.length) {
     const dataPoint = payload[0].payload;
     let timeLabel = "";
-    
-    switch(timePeriod) {
+
+    switch (timePeriod) {
       case "week":
         timeLabel = `Day: ${label}`;
         break;
@@ -317,7 +417,7 @@ const CustomTooltip = ({ active, payload, label, timePeriod }) => {
       default:
         timeLabel = `Period: ${label}`;
     }
-    
+
     return (
       <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
         <p className="font-medium text-gray-900">{timeLabel}</p>
@@ -411,29 +511,29 @@ const SalesDashboard = () => {
 
       case "quarter":
         if (month >= 3 && month <= 5) {
-          start = new Date(year, 3, 1);
-          end = new Date(year, 5, 30);
+          start = new Date(year, 3, 1); // April 1
+          end = new Date(year, 5, 30);  // June 30
         } else if (month >= 6 && month <= 8) {
-          start = new Date(year, 6, 1);
-          end = new Date(year, 8, 30);
+          start = new Date(year, 6, 1); // July 1
+          end = new Date(year, 8, 30);  // September 30
         } else if (month >= 9 && month <= 11) {
-          start = new Date(year, 9, 1);
-          end = new Date(year, 11, 31);
+          start = new Date(year, 9, 1); // October 1
+          end = new Date(year, 11, 31); // December 31
         } else {
-          start = new Date(year, 0, 1);
-          end = new Date(year, 2, 31);
+          start = new Date(year, 0, 1); // January 1
+          end = new Date(year, 2, 31);  // March 31
         }
         break;
 
-   case "year":
-  if (month < 3) {
-    start = new Date(year - 1, 3, 1); // April 1 of previous year
-    end = new Date(year, 2, 31);     // March 31 of current year
-  } else {
-    start = new Date(year, 3, 1);    // April 1 of current year
-    end = new Date(year + 1, 2, 31); // March 31 of next year
-  }
-  break;
+      case "year":
+        if (month < 3) {
+          start = new Date(year - 1, 3, 1); // April 1 of previous year
+          end = new Date(year, 2, 31);     // March 31 of current year
+        } else {
+          start = new Date(year, 3, 1);    // April 1 of current year
+          end = new Date(year + 1, 2, 31); // March 31 of next year
+        }
+        break;
 
       default:
         return getDateRange("quarter");
@@ -461,16 +561,16 @@ const SalesDashboard = () => {
 
       case "quarter":
         const quarterMonth = start.getMonth();
-        if (quarterMonth >= 0 && quarterMonth <= 2) {
+        if (quarterMonth >= 0 && quarterMonth <= 2) { // Q4 -> Q1
           newStart = new Date(start.getFullYear(), 3, 1);
           newEnd = new Date(start.getFullYear(), 5, 30);
-        } else if (quarterMonth >= 3 && quarterMonth <= 5) {
+        } else if (quarterMonth >= 3 && quarterMonth <= 5) { // Q1 -> Q2
           newStart = new Date(start.getFullYear(), 6, 1);
           newEnd = new Date(start.getFullYear(), 8, 30);
-        } else if (quarterMonth >= 6 && quarterMonth <= 8) {
+        } else if (quarterMonth >= 6 && quarterMonth <= 8) { // Q2 -> Q3
           newStart = new Date(start.getFullYear(), 9, 1);
           newEnd = new Date(start.getFullYear(), 11, 31);
-        } else {
+        } else { // Q3 -> Q4
           newStart = new Date(start.getFullYear() + 1, 0, 1);
           newEnd = new Date(start.getFullYear() + 1, 2, 31);
         }
@@ -538,9 +638,9 @@ const SalesDashboard = () => {
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth();
-    
+
     let start, end;
-    
+
     if (month >= 3 && month <= 5) {
       start = new Date(year - 1, 0, 1);
       end = new Date(year - 1, 2, 31);
@@ -554,38 +654,95 @@ const SalesDashboard = () => {
       start = new Date(year, 9, 1);
       end = new Date(year, 11, 31);
     }
-    
+
     return { start, end };
   };
-const updatePeriodInfo = (range) => {
-  const { start, end } = range;
-  let info = "";
+  const updatePeriodInfo = (range, isCurrentPeriod = true) => {
+    const { start, end } = range;
+    let info = "";
+    const now = new Date();
+    const isCurrent = isCurrentPeriod &&
+      start <= now &&
+      end >= now;
 
-  switch (timePeriod) {
-    case "week":
-      info = `Current Week: ${start.toLocaleDateString()} to ${end.toLocaleDateString()}`;
-      break;
-    case "month":
-      info = `Current Month: ${start.toLocaleDateString("default", { month: "long" })} ${start.getFullYear()}`;
-      break;
-    case "quarter":
-      const quarter = Math.floor(start.getMonth() / 3) + 1;
-      const quarterMonths = [
-        "Jan-Mar", "Apr-Jun", "Jul-Sep", "Oct-Dec"
-      ][quarter - 1];
-      info = `Current Quarter: Q${quarter} (${quarterMonths}) ${start.getFullYear()}`;
-      break;
-    case "year":
-  info = `Current Fiscal Year: ${start.getFullYear()}-${end.getFullYear()}`;
-  break;
-    default:
-      info = `Current Quarter: ${getCurrentQuarter()}`;
-  }
+    switch (timePeriod) {
+      case "week":
+        info = `${isCurrent ? 'Current ' : ''}Week: ${start.toLocaleDateString()} to ${end.toLocaleDateString()}`;
+        break;
+      case "month":
+        info = `${isCurrent ? 'Current ' : ''}Month: ${start.toLocaleDateString("default", { month: "long" })} ${start.getFullYear()}`;
+        break;
+      case "quarter":
+        const month = start.getMonth();
+        let quarter, quarterMonths;
 
-  setCurrentPeriodInfo(info);
-};
+        if (month >= 3 && month <= 5) {
+          quarter = "Q1";
+          quarterMonths = "Apr-Jun";
+        } else if (month >= 6 && month <= 8) {
+          quarter = "Q2";
+          quarterMonths = "Jul-Sep";
+        } else if (month >= 9 && month <= 11) {
+          quarter = "Q3";
+          quarterMonths = "Oct-Dec";
+        } else {
+          quarter = "Q4";
+          quarterMonths = "Jan-Mar";
+        }
 
-  const processLeadsData = (snapshot) => {
+        info = `${isCurrent ? 'Current ' : ''}Quarter: ${quarter} (${quarterMonths}) ${start.getFullYear()}`;
+        break;
+      case "year":
+        info = `${isCurrent ? 'Current ' : ''}Fiscal Year: ${start.getFullYear()}-${end.getFullYear()}`;
+        break;
+      default:
+        info = `${isCurrent ? 'Current ' : ''}Quarter: ${getCurrentQuarter()}`;
+    }
+
+    setCurrentPeriodInfo(info);
+  };
+
+  const processLeadsData = (input) => {
+
+    const leadCategories = {
+      Engineering: 0,
+      MBA: 0,
+      Others: 0
+    };
+
+
+    // Handle both QuerySnapshot and filtered doc arrays
+    let docs = [];
+    let forEachFn;
+
+    if (input && input.docs) {
+      // It's a QuerySnapshot
+      docs = input.docs;
+      forEachFn = (callback) => {
+        docs.forEach(doc => callback(doc));
+      };
+    } else if (Array.isArray(input)) {
+      // It's an array of documents
+      docs = input;
+      forEachFn = (callback) => {
+        docs.forEach(doc => callback(doc));
+      };
+    } else {
+      // Invalid input
+      console.error('Invalid input to processLeadsData:', input);
+      return {
+        revenue: 0,
+        hotLeads: 0,
+        warmLeads: 0,
+        coldLeads: 0,
+        projectedTCV: 0,
+        chartData: [],
+        leadSources: [],
+        teamPerformance: [],
+        recentActivity: [],
+      };
+    }
+
     let revenue = 0;
     let hotLeads = 0;
     let warmLeads = 0;
@@ -597,17 +754,35 @@ const updatePeriodInfo = (range) => {
     const revenueByDate = {};
     const chartData = [];
     const timePoints =
-    timePeriod === "week"
-      ? 7
-      : timePeriod === "month"
-      ? 4
-      : timePeriod === "quarter"
-      ? 3
-      : 12;
+      timePeriod === "week"
+        ? 7
+        : timePeriod === "month"
+          ? 4
+          : timePeriod === "quarter"
+            ? 3
+            : 12;
 
-    snapshot.forEach((doc) => {
-      const lead = doc.data();
-      
+    forEachFn((doc) => {
+      const lead = docs === input ? doc : doc.data();
+
+      if (selectedUserId) {
+        const selectedUserObj = users.find((u) => u.id === selectedUserId);
+        if (lead.assignedTo?.uid !== selectedUserObj?.uid) {
+          return;
+        }
+      }
+      if (lead.courseType) {
+        if (lead.courseType.includes("Engineering")) {
+          leadCategories.Engineering++;
+        } else if (lead.courseType.includes("MBA")) {
+          leadCategories.MBA++;
+        } else {
+          leadCategories.Others++;
+        }
+      } else {
+        leadCategories.Others++;
+      }
+
       if (lead.phase === "hot") {
         hotLeads++;
         leadSources.hot++;
@@ -622,50 +797,47 @@ const updatePeriodInfo = (range) => {
       if (lead.phase === "closed" && lead.totalCost) {
         revenue += lead.totalCost;
 
-       if (lead.closedDate) {
-  try {
-    const closedDate = new Date(lead.closedDate);
-    if (Number.isNaN(closedDate.getTime()))
-      throw new Error("Invalid date");
+        if (lead.closedDate) {
+          try {
+            const closedDate = new Date(lead.closedDate);
+            if (Number.isNaN(closedDate.getTime()))
+              throw new Error("Invalid date");
 
-    let dateKey;
-    if (timePeriod === "week") {
-      dateKey = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
-        closedDate.getDay()
-      ];
-    } else if (timePeriod === "month") {
-      const firstDay = new Date(
-        closedDate.getFullYear(),
-        closedDate.getMonth(),
-        1
-      );
-      const pastDaysOfMonth = closedDate.getDate() - 1;
-      dateKey = `Week ${
-        Math.floor((firstDay.getDay() + pastDaysOfMonth) / 7) + 1
-      }`;
-    } else if (timePeriod === "quarter") {
-      dateKey = [
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-      ][closedDate.getMonth()];
-    } else {
-      // For fiscal year view (April-March)
-      const month = closedDate.getMonth();
-      dateKey = [
-        "Apr", "May", "Jun", "Jul", "Aug", "Sep",
-        "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"
-      ][month < 3 ? month + 9 : month - 3];
-    }
+            let dateKey;
+            if (timePeriod === "week") {
+              dateKey = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
+                closedDate.getDay()
+              ];
+            } else if (timePeriod === "month") {
+              const firstDay = new Date(
+                closedDate.getFullYear(),
+                closedDate.getMonth(),
+                1
+              );
+              const pastDaysOfMonth = closedDate.getDate() - 1;
+              dateKey = `Week ${Math.floor((firstDay.getDay() + pastDaysOfMonth) / 7) + 1}`;
+            } else if (timePeriod === "quarter") {
+              dateKey = [
+                "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+              ][closedDate.getMonth()];
+            } else {
+              const month = closedDate.getMonth();
+              dateKey = [
+                "Apr", "May", "Jun", "Jul", "Aug", "Sep",
+                "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"
+              ][month < 3 ? month + 9 : month - 3];
+            }
 
-    if (!revenueByDate[dateKey]) {
-      revenueByDate[dateKey] = { revenue: 0, dealCount: 0 };
-    }
-    revenueByDate[dateKey].revenue += lead.totalCost;
-    revenueByDate[dateKey].dealCount += 1;
-  } catch (e) {
-    console.error("Error processing closed date:", e);
-  }
-}
+            if (!revenueByDate[dateKey]) {
+              revenueByDate[dateKey] = { revenue: 0, dealCount: 0 };
+            }
+            revenueByDate[dateKey].revenue += lead.totalCost;
+            revenueByDate[dateKey].dealCount += 1;
+          } catch (e) {
+            console.error("Error processing closed date:", e);
+          }
+        }
       }
 
       if (lead.tcv) {
@@ -696,62 +868,57 @@ const updatePeriodInfo = (range) => {
         time: new Date(lead.createdAt).toLocaleDateString(),
       });
     });
-// Update this part in the processLeadsData function
-for (let i = 0; i < timePoints; i++) {
-  let dateKey;
-  if (timePeriod === "week") {
-    dateKey = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][i];
-  } else if (timePeriod === "month") {
-    dateKey = `Week ${i + 1}`;
-  } else if (timePeriod === "quarter") {
-    // Show actual month names for current quarter
-    const now = new Date();
-    const quarterMonth = now.getMonth();
-    if (quarterMonth >= 3 && quarterMonth <= 5) {
-      dateKey = ["Apr", "May", "Jun"][i];
-    } else if (quarterMonth >= 6 && quarterMonth <= 8) {
-      dateKey = ["Jul", "Aug", "Sep"][i];
-    } else if (quarterMonth >= 9 && quarterMonth <= 11) {
-      dateKey = ["Oct", "Nov", "Dec"][i];
-    } else {
-      dateKey = ["Jan", "Feb", "Mar"][i];
+
+    // Generate chart data
+    for (let i = 0; i < timePoints; i++) {
+      let dateKey;
+      if (timePeriod === "week") {
+        dateKey = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][i];
+      } else if (timePeriod === "month") {
+        dateKey = `Week ${i + 1}`;
+      } else if (timePeriod === "quarter") {
+        const now = new Date();
+        const quarterMonth = now.getMonth();
+        if (quarterMonth >= 3 && quarterMonth <= 5) {
+          dateKey = ["Apr", "May", "Jun"][i];
+        } else if (quarterMonth >= 6 && quarterMonth <= 8) {
+          dateKey = ["Jul", "Aug", "Sep"][i];
+        } else if (quarterMonth >= 9 && quarterMonth <= 11) {
+          dateKey = ["Oct", "Nov", "Dec"][i];
+        } else {
+          dateKey = ["Jan", "Feb", "Mar"][i];
+        }
+      } else {
+        const fiscalMonths = [
+          "Apr", "May", "Jun", "Jul", "Aug", "Sep",
+          "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"
+        ];
+        dateKey = fiscalMonths[i];
+      }
+
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      let isCurrentMonth = false;
+
+      if (timePeriod === "year") {
+        const fiscalMonthIndex = currentMonth < 3 ? currentMonth + 9 : currentMonth - 3;
+        isCurrentMonth = i === fiscalMonthIndex;
+      } else if (timePeriod === "quarter") {
+        const quarterStartMonth = Math.floor(currentMonth / 3) * 3;
+        isCurrentMonth = (currentMonth - quarterStartMonth) === i;
+      }
+
+      chartData.push({
+        name: dateKey,
+        revenue: revenueByDate[dateKey]?.revenue || 0,
+        dealCount: revenueByDate[dateKey]?.dealCount || 0,
+        leads: Math.floor(
+          ((hotLeads + warmLeads + coldLeads) * (0.7 + Math.random() * 0.6)) / timePoints
+        ),
+        currentMonth: isCurrentMonth
+      });
     }
-  } else {
-    // For year view - show all 12 months in fiscal year order (April-March)
-    const fiscalMonths = [
-      "Apr", "May", "Jun", "Jul", "Aug", "Sep",
-      "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"
-    ];
-    dateKey = fiscalMonths[i];
-  }
 
-  // Calculate current month highlight
-  const now = new Date();
-  const currentMonth = now.getMonth();
-  let isCurrentMonth = false;
-  
-  if (timePeriod === "year") {
-    // Fiscal year runs April (3) to March (2)
-    // Map calendar months to fiscal months:
-    // Apr(3)=0, May(4)=1, ..., Mar(2)=11
-    const fiscalMonthIndex = currentMonth < 3 ? currentMonth + 9 : currentMonth - 3;
-    isCurrentMonth = i === fiscalMonthIndex;
-  } else if (timePeriod === "quarter") {
-    // For quarter view, highlight current month in the quarter
-    const quarterStartMonth = Math.floor(currentMonth / 3) * 3;
-    isCurrentMonth = (currentMonth - quarterStartMonth) === i;
-  }
-
-  chartData.push({
-    name: dateKey,
-    revenue: revenueByDate[dateKey]?.revenue || 0,
-    dealCount: revenueByDate[dateKey]?.dealCount || 0,
-    leads: Math.floor(
-      ((hotLeads + warmLeads + coldLeads) * (0.7 + Math.random() * 0.6)) / timePoints
-    ),
-    currentMonth: isCurrentMonth
-  });
-}
     return {
       revenue,
       hotLeads,
@@ -759,6 +926,11 @@ for (let i = 0; i < timePoints; i++) {
       coldLeads,
       projectedTCV,
       chartData,
+      leadCategories: [
+        { name: "Engineering", value: leadCategories.Engineering },
+        { name: "MBA", value: leadCategories.MBA },
+        { name: "Others", value: leadCategories.Others }
+      ],
       leadSources: [
         { name: "Hot", value: leadSources.hot },
         { name: "Warm", value: leadSources.warm },
@@ -793,87 +965,169 @@ for (let i = 0; i < timePoints; i++) {
 
   const fetchDataForRange = async (range) => {
     setIsLoading(true);
+
+    // Define calculateGrowth here so it's available in all code paths
+    const calculateGrowth = (current, previous) => {
+      if (previous === 0) return current === 0 ? 0 : 100;
+      return ((current - previous) / previous) * 100;
+    };
+
     try {
       const { start, end } = range;
       const currentStart = start.getTime();
       const currentEnd = end.getTime();
 
       // Fetch current period data
-      let currentLeadsQuery;
       const leadsRef = collection(db, "leads");
 
-      let baseQuery = query(
-        leadsRef,
-        where("createdAt", ">=", currentStart),
-        where("createdAt", "<=", currentEnd)
-      );
-
-      if (selectedUserId) {
-        const selectedUserObj = users.find((u) => u.id === selectedUserId);
-        currentLeadsQuery = query(
-          baseQuery,
-          where("assignedTo.uid", "==", selectedUserObj.uid)
+      try {
+        // First try with the composite index query
+        let currentLeadsQuery = query(
+          leadsRef,
+          where("createdAt", ">=", currentStart),
+          where("createdAt", "<=", currentEnd),
+          ...(selectedUserId ? [where("assignedTo.uid", "==",
+            users.find((u) => u.id === selectedUserId)?.uid)] : []
+          )
         );
-      } else {
-        currentLeadsQuery = baseQuery;
-      }
 
-      const currentSnapshot = await getDocs(currentLeadsQuery);
-      const currentData = processLeadsData(currentSnapshot);
+        const currentSnapshot = await getDocs(currentLeadsQuery);
+        const currentData = processLeadsData(currentSnapshot);
 
-      // Fetch previous quarter data for comparison
-      const prevQuarterDateRange = getPreviousQuarterDateRange();
-      const prevStart = prevQuarterDateRange.start.getTime();
-      const prevEnd = prevQuarterDateRange.end.getTime();
+        // Fetch previous quarter data for comparison
+        const prevQuarterDateRange = getPreviousQuarterDateRange();
+        const prevStart = prevQuarterDateRange.start.getTime();
+        const prevEnd = prevQuarterDateRange.end.getTime();
 
-      let prevLeadsQuery = query(
-        leadsRef,
-        where("createdAt", ">=", prevStart),
-        where("createdAt", "<=", prevEnd)
-      );
-
-      if (selectedUserId) {
-        const selectedUserObj = users.find((u) => u.id === selectedUserId);
-        prevLeadsQuery = query(
-          prevLeadsQuery,
-          where("assignedTo.uid", "==", selectedUserObj.uid)
+        let prevLeadsQuery = query(
+          leadsRef,
+          where("createdAt", ">=", prevStart),
+          where("createdAt", "<=", prevEnd),
+          ...(selectedUserId ? [where("assignedTo.uid", "==",
+            users.find((u) => u.id === selectedUserId)?.uid)] : []
+          )
         );
+
+        const prevSnapshot = await getDocs(prevLeadsQuery);
+        const prevData = processLeadsData(prevSnapshot);
+
+        const growth = {
+          revenue: calculateGrowth(currentData.revenue, prevData.revenue),
+          hotLeads: calculateGrowth(currentData.hotLeads, prevData.hotLeads),
+          warmLeads: calculateGrowth(currentData.warmLeads, prevData.warmLeads),
+          coldLeads: calculateGrowth(currentData.coldLeads, prevData.coldLeads),
+          projectedTCV: calculateGrowth(currentData.projectedTCV, prevData.projectedTCV),
+        };
+
+        setDashboardData({
+          ...currentData,
+          revenuePrevQuarter: prevData.revenue,
+          hotLeadsPrevQuarter: prevData.hotLeads,
+          warmLeadsPrevQuarter: prevData.warmLeads,
+          coldLeadsPrevQuarter: prevData.coldLeads,
+          projectedTCVPrevQuarter: prevData.projectedTCV,
+          growth: growth.revenue,
+        });
+
+      } catch (error) {
+        if (error.code === 'failed-precondition') {
+          console.warn('Falling back to client-side filtering due to missing index');
+
+          // Fallback approach with client-side filtering
+          const allLeadsQuery = query(
+            leadsRef,
+            where("createdAt", ">=", currentStart),
+            where("createdAt", "<=", currentEnd)
+          );
+
+          const snapshot = await getDocs(allLeadsQuery);
+          let filteredDocs = snapshot.docs;
+
+          if (selectedUserId) {
+            const selectedUserObj = users.find((u) => u.id === selectedUserId);
+            filteredDocs = snapshot.docs.filter(
+              doc => doc.data().assignedTo?.uid === selectedUserObj?.uid
+            );
+          }
+
+          const currentData = processLeadsData({
+            docs: filteredDocs,
+            forEach: (callback) => filteredDocs.forEach(callback)
+          });
+
+          // Similar fallback for previous quarter data
+          const prevQuarterDateRange = getPreviousQuarterDateRange();
+          const prevStart = prevQuarterDateRange.start.getTime();
+          const prevEnd = prevQuarterDateRange.end.getTime();
+
+          const prevAllLeadsQuery = query(
+            leadsRef,
+            where("createdAt", ">=", prevStart),
+            where("createdAt", "<=", prevEnd)
+          );
+
+          const prevSnapshot = await getDocs(prevAllLeadsQuery);
+          let prevFilteredDocs = prevSnapshot.docs;
+
+          if (selectedUserId) {
+            const selectedUserObj = users.find((u) => u.id === selectedUserId);
+            prevFilteredDocs = prevSnapshot.docs.filter(
+              doc => doc.data().assignedTo?.uid === selectedUserObj?.uid
+            );
+          }
+
+          const prevData = processLeadsData({
+            docs: prevFilteredDocs,
+            forEach: (callback) => prevFilteredDocs.forEach(callback)
+          });
+
+          // Calculate growth percentages
+          const growth = {
+            revenue: calculateGrowth(currentData.revenue, prevData.revenue),
+            hotLeads: calculateGrowth(currentData.hotLeads, prevData.hotLeads),
+            warmLeads: calculateGrowth(currentData.warmLeads, prevData.warmLeads),
+            coldLeads: calculateGrowth(currentData.coldLeads, prevData.coldLeads),
+            projectedTCV: calculateGrowth(currentData.projectedTCV, prevData.projectedTCV),
+          };
+
+          setDashboardData({
+            ...currentData,
+            revenuePrevQuarter: prevData.revenue,
+            hotLeadsPrevQuarter: prevData.hotLeads,
+            warmLeadsPrevQuarter: prevData.warmLeads,
+            coldLeadsPrevQuarter: prevData.coldLeads,
+            projectedTCVPrevQuarter: prevData.projectedTCV,
+            growth: growth.revenue,
+          });
+
+          console.error('Firestore index missing. Please create this index:', error.message);
+        } else {
+          throw error;
+        }
       }
-
-      const prevSnapshot = await getDocs(prevLeadsQuery);
-      const prevData = processLeadsData(prevSnapshot);
-
-      // Calculate growth percentages
-      const calculateGrowth = (current, previous) => {
-        if (previous === 0) return current === 0 ? 0 : 100;
-        return ((current - previous) / previous) * 100;
-      };
-
-      const growth = {
-        revenue: calculateGrowth(currentData.revenue, prevData.revenue),
-        hotLeads: calculateGrowth(currentData.hotLeads, prevData.hotLeads),
-        warmLeads: calculateGrowth(currentData.warmLeads, prevData.warmLeads),
-        coldLeads: calculateGrowth(currentData.coldLeads, prevData.coldLeads),
-        projectedTCV: calculateGrowth(currentData.projectedTCV, prevData.projectedTCV),
-      };
-
-      setDashboardData({
-        ...currentData,
-        revenuePrevQuarter: prevData.revenue,
-        hotLeadsPrevQuarter: prevData.hotLeads,
-        warmLeadsPrevQuarter: prevData.warmLeads,
-        coldLeadsPrevQuarter: prevData.coldLeads,
-        projectedTCVPrevQuarter: prevData.projectedTCV,
-        growth: growth.revenue,
-      });
-
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
+      setDashboardData({
+        revenue: 0,
+        revenuePrevQuarter: 0,
+        growth: 0,
+        hotLeads: 0,
+        hotLeadsPrevQuarter: 0,
+        warmLeads: 0,
+        warmLeadsPrevQuarter: 0,
+        coldLeads: 0,
+        coldLeadsPrevQuarter: 0,
+        projectedTCV: 0,
+        projectedTCVPrevQuarter: 0,
+        chartData: [],
+        leadSources: [],
+        teamPerformance: [],
+        recentActivity: [],
+      });
     } finally {
       setIsLoading(false);
     }
   };
-
   const handleNextPeriod = () => {
     const newRange = getNextDateRange(timePeriod, currentDateRange.start);
     setCurrentDateRange(newRange);
@@ -887,7 +1141,6 @@ for (let i = 0; i < timePoints; i++) {
     updatePeriodInfo(newRange);
     fetchDataForRange(newRange);
   };
-
   const handleUserSelect = (user) => {
     if (user === "Team") {
       setSelectedUser("Team");
@@ -919,7 +1172,7 @@ for (let i = 0; i < timePoints; i++) {
     setCurrentDateRange(newRange);
     updatePeriodInfo(newRange);
     fetchDataForRange(newRange);
-  }, [timePeriod]);
+  }, [timePeriod, selectedUserId]);
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -934,7 +1187,7 @@ for (let i = 0; i < timePoints; i++) {
             </p>
             <div className="mt-2 flex items-center text-sm text-gray-500">
               <FiCalendar className="mr-1" />
-              <button 
+              <button
                 onClick={handlePrevPeriod}
                 className="p-1 rounded-full hover:bg-gray-200"
                 disabled={isLoading}
@@ -942,7 +1195,7 @@ for (let i = 0; i < timePoints; i++) {
                 <FiChevronLeft className="h-4 w-4" />
               </button>
               <span className="mx-1">{currentPeriodInfo || getCurrentQuarter()}</span>
-              <button 
+              <button
                 onClick={handleNextPeriod}
                 className="p-1 rounded-full hover:bg-gray-200"
                 disabled={isLoading}
@@ -978,11 +1231,10 @@ for (let i = 0; i < timePoints; i++) {
                     <button
                       type="button"
                       onClick={() => handleUserSelect("Team")}
-                      className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
-                        selectedUser === "Team"
-                          ? "bg-indigo-100 text-indigo-700"
-                          : "text-gray-700 hover:bg-gray-100"
-                      }`}
+                      className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${selectedUser === "Team"
+                        ? "bg-indigo-100 text-indigo-700"
+                        : "text-gray-700 hover:bg-gray-100"
+                        }`}
                     >
                       Team
                     </button>
@@ -991,11 +1243,10 @@ for (let i = 0; i < timePoints; i++) {
                         type="button"
                         key={user.id}
                         onClick={() => handleUserSelect(user)}
-                        className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
-                          selectedUser === user.name
-                            ? "bg-indigo-100 text-indigo-700"
-                            : "text-gray-700 hover:bg-gray-100"
-                        }`}
+                        className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${selectedUser === user.name
+                          ? "bg-indigo-100 text-indigo-700"
+                          : "text-gray-700 hover:bg-gray-100"
+                          }`}
                       >
                         {user.name} ({user.role})
                       </button>
@@ -1004,7 +1255,6 @@ for (let i = 0; i < timePoints; i++) {
                 </div>
               )}
             </div>
-
             <div className="relative">
               <button
                 type="button"
@@ -1024,27 +1274,26 @@ for (let i = 0; i < timePoints; i++) {
 
               {isFilterOpen && (
                 <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
-    <div className="flex space-x-2">
-  {[
-    { value: "week", label: "This Week" },
-    { value: "month", label: "This Month" },
-    { value: "quarter", label: "Current Qtr" },
-    { value: "year", label: "This Year" }
-  ].map((period) => (
-    <button
-      type="button"
-      key={period.value}
-      onClick={() => setTimePeriod(period.value)}
-      className={`text-xs px-3 py-1 rounded-full ${
-        timePeriod === period.value
-          ? "bg-indigo-600 text-white"
-          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-      }`}
-    >
-      {period.label}
-    </button>
-  ))}
-</div>
+                  <div className="flex space-x-2">
+                    {[
+                      { value: "week", label: "This Week" },
+                      { value: "month", label: "This Month" },
+                      { value: "quarter", label: "Current Qtr" },
+                      { value: "year", label: "This Year" }
+                    ].map((period) => (
+                      <button
+                        type="button"
+                        key={period.value}
+                        onClick={() => setTimePeriod(period.value)}
+                        className={`text-xs px-3 py-1 rounded-full ${timePeriod === period.value
+                          ? "bg-indigo-600 text-white"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                          }`}
+                      >
+                        {period.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -1052,9 +1301,8 @@ for (let i = 0; i < timePoints; i++) {
             <button
               type="button"
               onClick={handleRefresh}
-              className={`p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors ${
-                isLoading ? "animate-spin" : ""
-              }`}
+              className={`p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors ${isLoading ? "animate-spin" : ""
+                }`}
               disabled={isLoading}
             >
               <FiRefreshCw className="h-5 w-5 text-gray-500" />
@@ -1074,32 +1322,32 @@ for (let i = 0; i < timePoints; i++) {
             {
               title: selectedUserId ? "Your Hot Leads" : "Team Hot Leads",
               value: dashboardData.hotLeads.toLocaleString(),
-              change: ((dashboardData.hotLeads - dashboardData.hotLeadsPrevQuarter) / 
-                      (dashboardData.hotLeadsPrevQuarter || 1)) * 100,
+              change: ((dashboardData.hotLeads - dashboardData.hotLeadsPrevQuarter) /
+                (dashboardData.hotLeadsPrevQuarter || 1)) * 100,
               icon: <FiThermometer className="text-white" size={20} />,
               color: "bg-red-600",
-            },
+            }, ,
             {
               title: selectedUserId ? "Your Warm Leads" : "Team Warm Leads",
               value: dashboardData.warmLeads.toLocaleString(),
-              change: ((dashboardData.warmLeads - dashboardData.warmLeadsPrevQuarter) / 
-                      (dashboardData.warmLeadsPrevQuarter || 1)) * 100,
+              change: ((dashboardData.warmLeads - dashboardData.warmLeadsPrevQuarter) /
+                (dashboardData.warmLeadsPrevQuarter || 1)) * 100,
               icon: <FiThermometer className="text-white" size={20} />,
               color: "bg-amber-500",
             },
             {
               title: selectedUserId ? "Your Cold Leads" : "Team Cold Leads",
               value: dashboardData.coldLeads.toLocaleString(),
-              change: ((dashboardData.coldLeads - dashboardData.coldLeadsPrevQuarter) / 
-                      (dashboardData.coldLeadsPrevQuarter || 1)) * 100,
+              change: ((dashboardData.coldLeads - dashboardData.coldLeadsPrevQuarter) /
+                (dashboardData.coldLeadsPrevQuarter || 1)) * 100,
               icon: <FiThermometer className="text-white" size={20} />,
               color: "bg-blue-600",
             },
             {
               title: selectedUserId ? "Your Projected TCV" : "Team Projected TCV",
               value: `₹${dashboardData.projectedTCV.toLocaleString()}`,
-              change: ((dashboardData.projectedTCV - dashboardData.projectedTCVPrevQuarter) / 
-                      (dashboardData.projectedTCVPrevQuarter || 1)) * 100,
+              change: ((dashboardData.projectedTCV - dashboardData.projectedTCVPrevQuarter) /
+                (dashboardData.projectedTCVPrevQuarter || 1)) * 100,
               icon: <FiTrendingUp className="text-white" size={20} />,
               color: "bg-green-600",
             },
@@ -1121,15 +1369,14 @@ for (let i = 0; i < timePoints; i++) {
               </div>
               <div className="mt-4 flex items-center">
                 <span
-                  className={`text-xs font-medium px-2 py-1 rounded-full ${
-                    metric.change >= 0 || isNaN(metric.change)
-                      ? "bg-green-100 text-green-800"
-                      : "bg-red-100 text-red-800"
-                  }`}
+                  className={`text-xs font-medium px-2 py-1 rounded-full ${metric.change >= 0 || isNaN(metric.change)
+                    ? "bg-green-100 text-green-800"
+                    : "bg-red-100 text-red-800"
+                    }`}
                 >
-                  {isNaN(metric.change) ? "↑ 0%" : 
-                   metric.change >= 0 ? `↑ ${Math.abs(metric.change).toFixed(1)}%` : 
-                   `↓ ${Math.abs(metric.change).toFixed(1)}%`}
+                  {isNaN(metric.change) ? "↑ 0%" :
+                    metric.change >= 0 ? `↑ ${Math.abs(metric.change).toFixed(1)}%` :
+                      `↓ ${Math.abs(metric.change).toFixed(1)}%`}
                 </span>
                 <span className="text-xs opacity-80 ml-2">vs last quarter</span>
               </div>
@@ -1149,11 +1396,10 @@ for (let i = 0; i < timePoints; i++) {
                     type="button"
                     key={period}
                     onClick={() => setTimePeriod(period)}
-                    className={`text-xs px-3 py-1 rounded-full ${
-                      timePeriod === period
-                        ? "bg-indigo-600 text-white"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    }`}
+                    className={`text-xs px-3 py-1 rounded-full ${timePeriod === period
+                      ? "bg-indigo-600 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
                   >
                     {period.charAt(0).toUpperCase() + period.slice(1)}
                   </button>
@@ -1223,17 +1469,31 @@ for (let i = 0; i < timePoints; i++) {
             </div>
           </div>
 
-          <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Lead Distribution
-            </h2>
-            <LeadDistribution
-              leadSources={dashboardData.leadSources}
-              isLoading={isLoading}
-            />
-          </div>
-        </div>
+          <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm  ">
+              {/* Lead Distribution Box */}
+              <div className="">
+                <h3 className="text-md font-semibold text-gray-800 mb-3">
+                  Lead Distribution
+                </h3>
+                <LeadDistribution
+                  leadSources={dashboardData.leadSources}
+                  isLoading={isLoading}
+                />
+              </div>
 
+              {/* Education Distribution Box */}
+              <div className="">
+                <h3 className="text-md font-semibold text-gray-800 mb-3">
+                  Education Distribution
+                </h3>
+                <EducationDistribution
+                  leadCategories={dashboardData.leadCategories}
+                  isLoading={isLoading}
+                />
+              </div>
+            </div>
+
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm lg:col-span-2">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
