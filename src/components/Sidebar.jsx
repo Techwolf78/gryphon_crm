@@ -1,4 +1,4 @@
-import React, { useState, useContext } from "react";
+import React, { useContext } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import logo from "../assets/SYNC-logo-2.png";
@@ -12,23 +12,13 @@ import {
   FiChevronLeft,
   FiChevronRight,
   FiHelpCircle,
-  FiChevronDown,
-  FiChevronUp,
 } from "react-icons/fi";
 
 // Role-based links
 const roleLinks = {
   admin: [
     { label: "Admin", path: "/dashboard/admin", icon: <FiUsers /> },
-    { 
-      label: "Sales", 
-      path: "/dashboard/sales/lead", 
-      icon: <MdOutlineCurrencyRupee />,
-      subItems: [
-        { label: "Leads", path: "/dashboard/sales/lead" },
-        { label: "Client Onboarding", path: "/dashboard/sales/close" }
-      ]
-    },
+    { label: "Sales", path: "/dashboard/sales", icon: <MdOutlineCurrencyRupee /> },
     { label: "Placement", path: "/dashboard/placement", icon: <FiBriefcase /> },
     {
       label: "L & D",
@@ -37,15 +27,7 @@ const roleLinks = {
     },
     { label: "D M", path: "/dashboard/marketing", icon: <FiTrendingUp /> },
   ],
-  sales: [{ 
-    label: "Sales", 
-    path: "/dashboard/sales/lead", 
-    icon: <MdOutlineCurrencyRupee />,
-    subItems: [
-      { label: "Leads", path: "/dashboard/sales/lead" },
-      { label: "Client Onboarding", path: "/dashboard/sales/close" }
-    ]
-  }],
+  sales: [{ label: "Sales", path: "/dashboard/sales", icon: <MdOutlineCurrencyRupee   /> }],
   placement: [
     { label: "Placement", path: "/dashboard/placement", icon: <FiBriefcase /> },
   ],
@@ -87,7 +69,6 @@ const normalizeRole = (roleOrDepartment) => {
 const Sidebar = ({ collapsed, onToggle }) => {
   const { user } = useContext(AuthContext);
   const location = useLocation();
-  const [openDropdown, setOpenDropdown] = useState(null);
 
   if (!user) return null;
 
@@ -99,14 +80,6 @@ const Sidebar = ({ collapsed, onToggle }) => {
       return location.pathname === "/dashboard";
     }
     return location.pathname.startsWith(path);
-  };
-
-  const toggleDropdown = (label) => {
-    if (openDropdown === label) {
-      setOpenDropdown(null);
-    } else {
-      setOpenDropdown(label);
-    }
   };
 
   const links = [
@@ -154,66 +127,24 @@ const Sidebar = ({ collapsed, onToggle }) => {
 
       {/* Links */}
       <nav className="flex-grow px-4 py-6 space-y-3 overflow-y-auto">
-        {links.map(({ label, path, icon, skipRedirect, subItems }) => (
-          <div key={path}>
-            <div
-              className={`flex items-center px-4 py-2 rounded transition ${
-                isActive(path)
-                  ? "bg-blue-50 text-blue-600 font-semibold"
-                  : "text-gray-600 hover:bg-gray-100 hover:text-blue-600"
-              } ${subItems ? 'cursor-pointer' : ''}`}
-              onClick={subItems ? () => toggleDropdown(label) : undefined}
-              title={collapsed ? label : ""}
-              aria-label={label}
-            >
-              {subItems ? (
-                <Link
-                  to="#"
-                  state={skipRedirect ? { skipRedirect: true } : undefined}
-                  className="flex items-center flex-grow"
-                >
-                  <span className="text-xl">{icon}</span>
-                  {!collapsed && (
-                    <span className="ml-3 whitespace-nowrap flex-grow">{label}</span>
-                  )}
-                  {!collapsed && (
-                    <span className="ml-2">
-                      {openDropdown === label ? <FiChevronUp /> : <FiChevronDown />}
-                    </span>
-                  )}
-                </Link>
-              ) : (
-                <Link
-                  to={path}
-                  state={skipRedirect ? { skipRedirect: true } : undefined}
-                  className="flex items-center flex-grow"
-                >
-                  <span className="text-xl">{icon}</span>
-                  {!collapsed && (
-                    <span className="ml-3 whitespace-nowrap">{label}</span>
-                  )}
-                </Link>
-              )}
-            </div>
-
-            {!collapsed && subItems && openDropdown === label && (
-              <div className="ml-8 mt-1 space-y-1">
-                {subItems.map((subItem) => (
-                  <Link
-                    key={subItem.path}
-                    to={subItem.path}
-                    className={`flex items-center px-3 py-2 rounded transition ${
-                      isActive(subItem.path)
-                        ? "bg-blue-50 text-blue-600 font-semibold"
-                        : "text-gray-600 hover:bg-gray-100 hover:text-blue-600"
-                    }`}
-                  >
-                    {subItem.label}
-                  </Link>
-                ))}
-              </div>
+        {links.map(({ label, path, icon, skipRedirect }) => (
+          <Link
+            key={path}
+            to={path}
+            state={skipRedirect ? { skipRedirect: true } : undefined}
+            className={`flex items-center px-4 py-2 rounded transition ${
+              isActive(path)
+                ? "bg-blue-50 text-blue-600 font-semibold"
+                : "text-gray-600 hover:bg-gray-100 hover:text-blue-600"
+            }`}
+            title={collapsed ? label : ""}
+            aria-label={label}
+          >
+            <span className="text-xl">{icon}</span>
+            {!collapsed && (
+              <span className="ml-3 whitespace-nowrap">{label}</span>
             )}
-          </div>
+          </Link>
         ))}
       </nav>
     </aside>
