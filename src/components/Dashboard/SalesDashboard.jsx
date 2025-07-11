@@ -141,10 +141,11 @@ const RecentActivity = ({ recentActivity, isLoading }) => {
           <div className="flex justify-between">
             <div className="flex items-start">
               <div
-                className={`p-2 rounded-lg ${activity.amount
-                  ? "bg-green-100 text-green-600"
-                  : "bg-indigo-100 text-indigo-600"
-                  }`}
+                className={`p-2 rounded-lg ${
+                  activity.amount
+                    ? "bg-green-100 text-green-600"
+                    : "bg-indigo-100 text-indigo-600"
+                }`}
               >
                 {activity.amount ? (
                   <FiDollarSign size={16} />
@@ -228,7 +229,11 @@ const EducationDistribution = ({ leadCategories, isLoading }) => {
     );
   }
 
-  if (!leadCategories || leadCategories.length === 0 || leadCategories.reduce((sum, cat) => sum + cat.value, 0) === 0) {
+  if (
+    !leadCategories ||
+    leadCategories.length === 0 ||
+    leadCategories.reduce((sum, cat) => sum + cat.value, 0) === 0
+  ) {
     return (
       <div className="h-60 flex items-center justify-center">
         <p className="text-gray-500">No education data available</p>
@@ -512,25 +517,25 @@ const SalesDashboard = () => {
       case "quarter":
         if (month >= 3 && month <= 5) {
           start = new Date(year, 3, 1); // April 1
-          end = new Date(year, 5, 30);  // June 30
+          end = new Date(year, 5, 30); // June 30
         } else if (month >= 6 && month <= 8) {
           start = new Date(year, 6, 1); // July 1
-          end = new Date(year, 8, 30);  // September 30
+          end = new Date(year, 8, 30); // September 30
         } else if (month >= 9 && month <= 11) {
           start = new Date(year, 9, 1); // October 1
           end = new Date(year, 11, 31); // December 31
         } else {
           start = new Date(year, 0, 1); // January 1
-          end = new Date(year, 2, 31);  // March 31
+          end = new Date(year, 2, 31); // March 31
         }
         break;
 
       case "year":
         if (month < 3) {
           start = new Date(year - 1, 3, 1); // April 1 of previous year
-          end = new Date(year, 2, 31);     // March 31 of current year
+          end = new Date(year, 2, 31); // March 31 of current year
         } else {
-          start = new Date(year, 3, 1);    // April 1 of current year
+          start = new Date(year, 3, 1); // April 1 of current year
           end = new Date(year + 1, 2, 31); // March 31 of next year
         }
         break;
@@ -561,16 +566,20 @@ const SalesDashboard = () => {
 
       case "quarter":
         const quarterMonth = start.getMonth();
-        if (quarterMonth >= 0 && quarterMonth <= 2) { // Q4 -> Q1
+        if (quarterMonth >= 0 && quarterMonth <= 2) {
+          // Q4 -> Q1
           newStart = new Date(start.getFullYear(), 3, 1);
           newEnd = new Date(start.getFullYear(), 5, 30);
-        } else if (quarterMonth >= 3 && quarterMonth <= 5) { // Q1 -> Q2
+        } else if (quarterMonth >= 3 && quarterMonth <= 5) {
+          // Q1 -> Q2
           newStart = new Date(start.getFullYear(), 6, 1);
           newEnd = new Date(start.getFullYear(), 8, 30);
-        } else if (quarterMonth >= 6 && quarterMonth <= 8) { // Q2 -> Q3
+        } else if (quarterMonth >= 6 && quarterMonth <= 8) {
+          // Q2 -> Q3
           newStart = new Date(start.getFullYear(), 9, 1);
           newEnd = new Date(start.getFullYear(), 11, 31);
-        } else { // Q3 -> Q4
+        } else {
+          // Q3 -> Q4
           newStart = new Date(start.getFullYear() + 1, 0, 1);
           newEnd = new Date(start.getFullYear() + 1, 2, 31);
         }
@@ -661,16 +670,19 @@ const SalesDashboard = () => {
     const { start, end } = range;
     let info = "";
     const now = new Date();
-    const isCurrent = isCurrentPeriod &&
-      start <= now &&
-      end >= now;
+    const isCurrent = isCurrentPeriod && start <= now && end >= now;
 
     switch (timePeriod) {
       case "week":
-        info = `${isCurrent ? 'Current ' : ''}Week: ${start.toLocaleDateString()} to ${end.toLocaleDateString()}`;
+        info = `${
+          isCurrent ? "Current " : ""
+        }Week: ${start.toLocaleDateString()} to ${end.toLocaleDateString()}`;
         break;
       case "month":
-        info = `${isCurrent ? 'Current ' : ''}Month: ${start.toLocaleDateString("default", { month: "long" })} ${start.getFullYear()}`;
+        info = `${isCurrent ? "Current " : ""}Month: ${start.toLocaleDateString(
+          "default",
+          { month: "long" }
+        )} ${start.getFullYear()}`;
         break;
       case "quarter":
         const month = start.getMonth();
@@ -690,26 +702,28 @@ const SalesDashboard = () => {
           quarterMonths = "Jan-Mar";
         }
 
-        info = `${isCurrent ? 'Current ' : ''}Quarter: ${quarter} (${quarterMonths}) ${start.getFullYear()}`;
+        info = `${
+          isCurrent ? "Current " : ""
+        }Quarter: ${quarter} (${quarterMonths}) ${start.getFullYear()}`;
         break;
       case "year":
-        info = `${isCurrent ? 'Current ' : ''}Fiscal Year: ${start.getFullYear()}-${end.getFullYear()}`;
+        info = `${
+          isCurrent ? "Current " : ""
+        }Fiscal Year: ${start.getFullYear()}-${end.getFullYear()}`;
         break;
       default:
-        info = `${isCurrent ? 'Current ' : ''}Quarter: ${getCurrentQuarter()}`;
+        info = `${isCurrent ? "Current " : ""}Quarter: ${getCurrentQuarter()}`;
     }
 
     setCurrentPeriodInfo(info);
   };
 
   const processLeadsData = (input) => {
-
     const leadCategories = {
       Engineering: 0,
       MBA: 0,
-      Others: 0
+      Others: 0,
     };
-
 
     // Handle both QuerySnapshot and filtered doc arrays
     let docs = [];
@@ -719,17 +733,17 @@ const SalesDashboard = () => {
       // It's a QuerySnapshot
       docs = input.docs;
       forEachFn = (callback) => {
-        docs.forEach(doc => callback(doc));
+        docs.forEach((doc) => callback(doc));
       };
     } else if (Array.isArray(input)) {
       // It's an array of documents
       docs = input;
       forEachFn = (callback) => {
-        docs.forEach(doc => callback(doc));
+        docs.forEach((doc) => callback(doc));
       };
     } else {
       // Invalid input
-      console.error('Invalid input to processLeadsData:', input);
+      console.error("Invalid input to processLeadsData:", input);
       return {
         revenue: 0,
         hotLeads: 0,
@@ -757,10 +771,10 @@ const SalesDashboard = () => {
       timePeriod === "week"
         ? 7
         : timePeriod === "month"
-          ? 4
-          : timePeriod === "quarter"
-            ? 3
-            : 12;
+        ? 4
+        : timePeriod === "quarter"
+        ? 3
+        : 12;
 
     forEachFn((doc) => {
       const lead = docs === input ? doc : doc.data();
@@ -815,17 +829,39 @@ const SalesDashboard = () => {
                 1
               );
               const pastDaysOfMonth = closedDate.getDate() - 1;
-              dateKey = `Week ${Math.floor((firstDay.getDay() + pastDaysOfMonth) / 7) + 1}`;
+              dateKey = `Week ${
+                Math.floor((firstDay.getDay() + pastDaysOfMonth) / 7) + 1
+              }`;
             } else if (timePeriod === "quarter") {
               dateKey = [
-                "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+                "Jan",
+                "Feb",
+                "Mar",
+                "Apr",
+                "May",
+                "Jun",
+                "Jul",
+                "Aug",
+                "Sep",
+                "Oct",
+                "Nov",
+                "Dec",
               ][closedDate.getMonth()];
             } else {
               const month = closedDate.getMonth();
               dateKey = [
-                "Apr", "May", "Jun", "Jul", "Aug", "Sep",
-                "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"
+                "Apr",
+                "May",
+                "Jun",
+                "Jul",
+                "Aug",
+                "Sep",
+                "Oct",
+                "Nov",
+                "Dec",
+                "Jan",
+                "Feb",
+                "Mar",
               ][month < 3 ? month + 9 : month - 3];
             }
 
@@ -890,8 +926,18 @@ const SalesDashboard = () => {
         }
       } else {
         const fiscalMonths = [
-          "Apr", "May", "Jun", "Jul", "Aug", "Sep",
-          "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec",
+          "Jan",
+          "Feb",
+          "Mar",
         ];
         dateKey = fiscalMonths[i];
       }
@@ -901,11 +947,12 @@ const SalesDashboard = () => {
       let isCurrentMonth = false;
 
       if (timePeriod === "year") {
-        const fiscalMonthIndex = currentMonth < 3 ? currentMonth + 9 : currentMonth - 3;
+        const fiscalMonthIndex =
+          currentMonth < 3 ? currentMonth + 9 : currentMonth - 3;
         isCurrentMonth = i === fiscalMonthIndex;
       } else if (timePeriod === "quarter") {
         const quarterStartMonth = Math.floor(currentMonth / 3) * 3;
-        isCurrentMonth = (currentMonth - quarterStartMonth) === i;
+        isCurrentMonth = currentMonth - quarterStartMonth === i;
       }
 
       chartData.push({
@@ -913,9 +960,10 @@ const SalesDashboard = () => {
         revenue: revenueByDate[dateKey]?.revenue || 0,
         dealCount: revenueByDate[dateKey]?.dealCount || 0,
         leads: Math.floor(
-          ((hotLeads + warmLeads + coldLeads) * (0.7 + Math.random() * 0.6)) / timePoints
+          ((hotLeads + warmLeads + coldLeads) * (0.7 + Math.random() * 0.6)) /
+            timePoints
         ),
-        currentMonth: isCurrentMonth
+        currentMonth: isCurrentMonth,
       });
     }
 
@@ -929,25 +977,28 @@ const SalesDashboard = () => {
       leadCategories: [
         { name: "Engineering", value: leadCategories.Engineering },
         { name: "MBA", value: leadCategories.MBA },
-        { name: "Others", value: leadCategories.Others }
+        { name: "Others", value: leadCategories.Others },
       ],
       leadSources: [
         { name: "Hot", value: leadSources.hot },
         { name: "Warm", value: leadSources.warm },
         { name: "Cold", value: leadSources.cold },
       ],
-      teamPerformance: Object.values(teamPerformance).sort((a, b) => b.value - a.value),
+      teamPerformance: Object.values(teamPerformance).sort(
+        (a, b) => b.value - a.value
+      ),
       recentActivity: recentActivity
         .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
         .slice(0, 5),
     };
   };
 
-  const fetchSalesUsers = async () => {
+  // WITH THIS:
+  const fetchAllUsers = async () => {
     setIsLoadingUsers(true);
     try {
       const usersRef = collection(db, "users");
-      const usersQuery = query(usersRef, where("department", "==", "Sales"));
+      const usersQuery = query(usersRef); // Removed department filter
       const usersSnapshot = await getDocs(usersQuery);
 
       const usersData = usersSnapshot.docs.map((doc) => ({
@@ -986,9 +1037,15 @@ const SalesDashboard = () => {
           leadsRef,
           where("createdAt", ">=", currentStart),
           where("createdAt", "<=", currentEnd),
-          ...(selectedUserId ? [where("assignedTo.uid", "==",
-            users.find((u) => u.id === selectedUserId)?.uid)] : []
-          )
+          ...(selectedUserId
+            ? [
+                where(
+                  "assignedTo.uid",
+                  "==",
+                  users.find((u) => u.id === selectedUserId)?.uid
+                ),
+              ]
+            : [])
         );
 
         const currentSnapshot = await getDocs(currentLeadsQuery);
@@ -1003,9 +1060,15 @@ const SalesDashboard = () => {
           leadsRef,
           where("createdAt", ">=", prevStart),
           where("createdAt", "<=", prevEnd),
-          ...(selectedUserId ? [where("assignedTo.uid", "==",
-            users.find((u) => u.id === selectedUserId)?.uid)] : []
-          )
+          ...(selectedUserId
+            ? [
+                where(
+                  "assignedTo.uid",
+                  "==",
+                  users.find((u) => u.id === selectedUserId)?.uid
+                ),
+              ]
+            : [])
         );
 
         const prevSnapshot = await getDocs(prevLeadsQuery);
@@ -1016,7 +1079,10 @@ const SalesDashboard = () => {
           hotLeads: calculateGrowth(currentData.hotLeads, prevData.hotLeads),
           warmLeads: calculateGrowth(currentData.warmLeads, prevData.warmLeads),
           coldLeads: calculateGrowth(currentData.coldLeads, prevData.coldLeads),
-          projectedTCV: calculateGrowth(currentData.projectedTCV, prevData.projectedTCV),
+          projectedTCV: calculateGrowth(
+            currentData.projectedTCV,
+            prevData.projectedTCV
+          ),
         };
 
         setDashboardData({
@@ -1028,10 +1094,11 @@ const SalesDashboard = () => {
           projectedTCVPrevQuarter: prevData.projectedTCV,
           growth: growth.revenue,
         });
-
       } catch (error) {
-        if (error.code === 'failed-precondition') {
-          console.warn('Falling back to client-side filtering due to missing index');
+        if (error.code === "failed-precondition") {
+          console.warn(
+            "Falling back to client-side filtering due to missing index"
+          );
 
           // Fallback approach with client-side filtering
           const allLeadsQuery = query(
@@ -1046,13 +1113,13 @@ const SalesDashboard = () => {
           if (selectedUserId) {
             const selectedUserObj = users.find((u) => u.id === selectedUserId);
             filteredDocs = snapshot.docs.filter(
-              doc => doc.data().assignedTo?.uid === selectedUserObj?.uid
+              (doc) => doc.data().assignedTo?.uid === selectedUserObj?.uid
             );
           }
 
           const currentData = processLeadsData({
             docs: filteredDocs,
-            forEach: (callback) => filteredDocs.forEach(callback)
+            forEach: (callback) => filteredDocs.forEach(callback),
           });
 
           // Similar fallback for previous quarter data
@@ -1072,22 +1139,31 @@ const SalesDashboard = () => {
           if (selectedUserId) {
             const selectedUserObj = users.find((u) => u.id === selectedUserId);
             prevFilteredDocs = prevSnapshot.docs.filter(
-              doc => doc.data().assignedTo?.uid === selectedUserObj?.uid
+              (doc) => doc.data().assignedTo?.uid === selectedUserObj?.uid
             );
           }
 
           const prevData = processLeadsData({
             docs: prevFilteredDocs,
-            forEach: (callback) => prevFilteredDocs.forEach(callback)
+            forEach: (callback) => prevFilteredDocs.forEach(callback),
           });
 
           // Calculate growth percentages
           const growth = {
             revenue: calculateGrowth(currentData.revenue, prevData.revenue),
             hotLeads: calculateGrowth(currentData.hotLeads, prevData.hotLeads),
-            warmLeads: calculateGrowth(currentData.warmLeads, prevData.warmLeads),
-            coldLeads: calculateGrowth(currentData.coldLeads, prevData.coldLeads),
-            projectedTCV: calculateGrowth(currentData.projectedTCV, prevData.projectedTCV),
+            warmLeads: calculateGrowth(
+              currentData.warmLeads,
+              prevData.warmLeads
+            ),
+            coldLeads: calculateGrowth(
+              currentData.coldLeads,
+              prevData.coldLeads
+            ),
+            projectedTCV: calculateGrowth(
+              currentData.projectedTCV,
+              prevData.projectedTCV
+            ),
           };
 
           setDashboardData({
@@ -1100,7 +1176,10 @@ const SalesDashboard = () => {
             growth: growth.revenue,
           });
 
-          console.error('Firestore index missing. Please create this index:', error.message);
+          console.error(
+            "Firestore index missing. Please create this index:",
+            error.message
+          );
         } else {
           throw error;
         }
@@ -1159,8 +1238,9 @@ const SalesDashboard = () => {
     fetchDataForRange(newRange);
   };
 
+  // WITH THIS:
   useEffect(() => {
-    fetchSalesUsers();
+    fetchAllUsers(); // Changed function name here
     const initialRange = getDateRange(timePeriod);
     setCurrentDateRange(initialRange);
     updatePeriodInfo(initialRange);
@@ -1194,7 +1274,9 @@ const SalesDashboard = () => {
               >
                 <FiChevronLeft className="h-4 w-4" />
               </button>
-              <span className="mx-1">{currentPeriodInfo || getCurrentQuarter()}</span>
+              <span className="mx-1">
+                {currentPeriodInfo || getCurrentQuarter()}
+              </span>
               <button
                 onClick={handleNextPeriod}
                 className="p-1 rounded-full hover:bg-gray-200"
@@ -1231,10 +1313,11 @@ const SalesDashboard = () => {
                     <button
                       type="button"
                       onClick={() => handleUserSelect("Team")}
-                      className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${selectedUser === "Team"
-                        ? "bg-indigo-100 text-indigo-700"
-                        : "text-gray-700 hover:bg-gray-100"
-                        }`}
+                      className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
+                        selectedUser === "Team"
+                          ? "bg-indigo-100 text-indigo-700"
+                          : "text-gray-700 hover:bg-gray-100"
+                      }`}
                     >
                       Team
                     </button>
@@ -1243,12 +1326,17 @@ const SalesDashboard = () => {
                         type="button"
                         key={user.id}
                         onClick={() => handleUserSelect(user)}
-                        className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${selectedUser === user.name
-                          ? "bg-indigo-100 text-indigo-700"
-                          : "text-gray-700 hover:bg-gray-100"
-                          }`}
+                        className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
+                          selectedUser === user.name
+                            ? "bg-indigo-100 text-indigo-700"
+                            : "text-gray-700 hover:bg-gray-100"
+                        }`}
                       >
-                        {user.name} ({user.role})
+                        {user.name} (
+                        {user.department
+                          ? `${user.role} (${user.department})`
+                          : user.role || "User"}
+                        )
                       </button>
                     ))}
                   </div>
@@ -1279,16 +1367,17 @@ const SalesDashboard = () => {
                       { value: "week", label: "This Week" },
                       { value: "month", label: "This Month" },
                       { value: "quarter", label: "Current Qtr" },
-                      { value: "year", label: "This Year" }
+                      { value: "year", label: "This Year" },
                     ].map((period) => (
                       <button
                         type="button"
                         key={period.value}
                         onClick={() => setTimePeriod(period.value)}
-                        className={`text-xs px-3 py-1 rounded-full ${timePeriod === period.value
-                          ? "bg-indigo-600 text-white"
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                          }`}
+                        className={`text-xs px-3 py-1 rounded-full ${
+                          timePeriod === period.value
+                            ? "bg-indigo-600 text-white"
+                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        }`}
                       >
                         {period.label}
                       </button>
@@ -1301,8 +1390,9 @@ const SalesDashboard = () => {
             <button
               type="button"
               onClick={handleRefresh}
-              className={`p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors ${isLoading ? "animate-spin" : ""
-                }`}
+              className={`p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors ${
+                isLoading ? "animate-spin" : ""
+              }`}
               disabled={isLoading}
             >
               <FiRefreshCw className="h-5 w-5 text-gray-500" />
@@ -1322,32 +1412,46 @@ const SalesDashboard = () => {
             {
               title: selectedUserId ? "Your Hot Leads" : "Team Hot Leads",
               value: dashboardData.hotLeads.toLocaleString(),
-              change: ((dashboardData.hotLeads - dashboardData.hotLeadsPrevQuarter) /
-                (dashboardData.hotLeadsPrevQuarter || 1)) * 100,
+              change:
+                ((dashboardData.hotLeads - dashboardData.hotLeadsPrevQuarter) /
+                  (dashboardData.hotLeadsPrevQuarter || 1)) *
+                100,
               icon: <FiThermometer className="text-white" size={20} />,
               color: "bg-red-600",
-            }, ,
+            },
+            ,
             {
               title: selectedUserId ? "Your Warm Leads" : "Team Warm Leads",
               value: dashboardData.warmLeads.toLocaleString(),
-              change: ((dashboardData.warmLeads - dashboardData.warmLeadsPrevQuarter) /
-                (dashboardData.warmLeadsPrevQuarter || 1)) * 100,
+              change:
+                ((dashboardData.warmLeads -
+                  dashboardData.warmLeadsPrevQuarter) /
+                  (dashboardData.warmLeadsPrevQuarter || 1)) *
+                100,
               icon: <FiThermometer className="text-white" size={20} />,
               color: "bg-amber-500",
             },
             {
               title: selectedUserId ? "Your Cold Leads" : "Team Cold Leads",
               value: dashboardData.coldLeads.toLocaleString(),
-              change: ((dashboardData.coldLeads - dashboardData.coldLeadsPrevQuarter) /
-                (dashboardData.coldLeadsPrevQuarter || 1)) * 100,
+              change:
+                ((dashboardData.coldLeads -
+                  dashboardData.coldLeadsPrevQuarter) /
+                  (dashboardData.coldLeadsPrevQuarter || 1)) *
+                100,
               icon: <FiThermometer className="text-white" size={20} />,
               color: "bg-blue-600",
             },
             {
-              title: selectedUserId ? "Your Projected TCV" : "Team Projected TCV",
+              title: selectedUserId
+                ? "Your Projected TCV"
+                : "Team Projected TCV",
               value: `₹${dashboardData.projectedTCV.toLocaleString()}`,
-              change: ((dashboardData.projectedTCV - dashboardData.projectedTCVPrevQuarter) /
-                (dashboardData.projectedTCVPrevQuarter || 1)) * 100,
+              change:
+                ((dashboardData.projectedTCV -
+                  dashboardData.projectedTCVPrevQuarter) /
+                  (dashboardData.projectedTCVPrevQuarter || 1)) *
+                100,
               icon: <FiTrendingUp className="text-white" size={20} />,
               color: "bg-green-600",
             },
@@ -1369,14 +1473,17 @@ const SalesDashboard = () => {
               </div>
               <div className="mt-4 flex items-center">
                 <span
-                  className={`text-xs font-medium px-2 py-1 rounded-full ${metric.change >= 0 || isNaN(metric.change)
-                    ? "bg-green-100 text-green-800"
-                    : "bg-red-100 text-red-800"
-                    }`}
+                  className={`text-xs font-medium px-2 py-1 rounded-full ${
+                    metric.change >= 0 || isNaN(metric.change)
+                      ? "bg-green-100 text-green-800"
+                      : "bg-red-100 text-red-800"
+                  }`}
                 >
-                  {isNaN(metric.change) ? "↑ 0%" :
-                    metric.change >= 0 ? `↑ ${Math.abs(metric.change).toFixed(1)}%` :
-                      `↓ ${Math.abs(metric.change).toFixed(1)}%`}
+                  {isNaN(metric.change)
+                    ? "↑ 0%"
+                    : metric.change >= 0
+                    ? `↑ ${Math.abs(metric.change).toFixed(1)}%`
+                    : `↓ ${Math.abs(metric.change).toFixed(1)}%`}
                 </span>
                 <span className="text-xs opacity-80 ml-2">vs last quarter</span>
               </div>
@@ -1396,10 +1503,11 @@ const SalesDashboard = () => {
                     type="button"
                     key={period}
                     onClick={() => setTimePeriod(period)}
-                    className={`text-xs px-3 py-1 rounded-full ${timePeriod === period
-                      ? "bg-indigo-600 text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                      }`}
+                    className={`text-xs px-3 py-1 rounded-full ${
+                      timePeriod === period
+                        ? "bg-indigo-600 text-white"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
                   >
                     {period.charAt(0).toUpperCase() + period.slice(1)}
                   </button>
@@ -1470,29 +1578,28 @@ const SalesDashboard = () => {
           </div>
 
           <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm  ">
-              {/* Lead Distribution Box */}
-              <div className="">
-                <h3 className="text-md font-semibold text-gray-800 mb-3">
-                  Lead Distribution
-                </h3>
-                <LeadDistribution
-                  leadSources={dashboardData.leadSources}
-                  isLoading={isLoading}
-                />
-              </div>
-
-              {/* Education Distribution Box */}
-              <div className="">
-                <h3 className="text-md font-semibold text-gray-800 mb-3">
-                  Education Distribution
-                </h3>
-                <EducationDistribution
-                  leadCategories={dashboardData.leadCategories}
-                  isLoading={isLoading}
-                />
-              </div>
+            {/* Lead Distribution Box */}
+            <div className="">
+              <h3 className="text-md font-semibold text-gray-800 mb-3">
+                Lead Distribution
+              </h3>
+              <LeadDistribution
+                leadSources={dashboardData.leadSources}
+                isLoading={isLoading}
+              />
             </div>
 
+            {/* Education Distribution Box */}
+            <div className="">
+              <h3 className="text-md font-semibold text-gray-800 mb-3">
+                Education Distribution
+              </h3>
+              <EducationDistribution
+                leadCategories={dashboardData.leadCategories}
+                isLoading={isLoading}
+              />
+            </div>
+          </div>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm lg:col-span-2">
