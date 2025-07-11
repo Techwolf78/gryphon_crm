@@ -1,7 +1,20 @@
 // firebase.js
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { 
+  getAuth, 
+  setPersistence, 
+  browserLocalPersistence,
+  browserSessionPersistence 
+} from "firebase/auth";
+import { 
+  getFirestore, 
+  Timestamp,
+  serverTimestamp 
+} from "firebase/firestore";
+import { getStorage } from "firebase/storage";
+import { getFunctions } from "firebase/functions";
+import { getAnalytics, isSupported } from "firebase/analytics";
+
 
 const firebaseConfig = {
   apiKey: "AIzaSyD9SBw0ZckY3ht0CwH39C5pPRWwkR2zR4M",
@@ -14,17 +27,60 @@ const firebaseConfig = {
   measurementId: "G-0V7B973Q8T"
 };
 
-// Primary Firebase app initialization
+// Initialize Primary Firebase App
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+
+// Initialize Firebase Services
 const auth = getAuth(app);
-setPersistence(auth, browserLocalPersistence);
-
-// Firestore instance
 const db = getFirestore(app);
+const storage = getStorage(app);
+const functions = getFunctions(app);
 
-// Secondary Firebase app (named "Secondary") for creating new users without signing out main user
+// Initialize Analytics only if in browser environment and measurementId exists
+let analytics;
+if (typeof window !== 'undefined') {
+  isSupported().then((supported) => {
+    if (supported && firebaseConfig.measurementId) {
+      analytics = getAnalytics(app);
+    }
+  });
+}
+
+// Set persistence for auth
+setPersistence(auth, browserLocalPersistence)
+  .then(() => console.log("Auth persistence set to LOCAL"))
+  .catch((error) => console.error("Error setting auth persistence:", error));
+
+// Initialize Secondary Firebase App for admin operations
 const secondaryApp = initializeApp(firebaseConfig, "Secondary");
 const secondaryAuth = getAuth(secondaryApp);
-setPersistence(secondaryAuth, browserLocalPersistence);
+setPersistence(secondaryAuth, browserSessionPersistence); // Using session persistence for secondary auth
 
-export { app, auth, db, secondaryApp, secondaryAuth };
+// Export all Firebase services and utilities
+export {
+  // Primary app services
+  app,
+  auth,
+  db,
+  storage,
+  functions,
+  analytics,
+  
+  // Secondary app services
+  secondaryApp,
+  secondaryAuth,
+  
+  // Firestore utilities
+  Timestamp,
+  serverTimestamp,
+  
+  // Direct Firebase modules for tree-shaking
+  initializeApp,
+  getAuth,
+  getFirestore,
+  getStorage,
+  getFunctions
+};
+
+// Optional: Export additional Firestore types if using TypeScript
+export * from "firebase/firestore";

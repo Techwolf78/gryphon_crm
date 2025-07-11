@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { XIcon } from "@heroicons/react/outline";
+import { XIcon, EyeIcon } from "@heroicons/react/outline";
 import { db } from "../../firebase";
 import { collection, addDoc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
 
@@ -36,6 +36,9 @@ function AddJD({ show, onClose }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [availableColleges, setAvailableColleges] = useState([]);
+  const [studentsData, setStudentsData] = useState({});
+  const [viewingCollege, setViewingCollege] = useState(null);
+  const [isLoadingStudents, setIsLoadingStudents] = useState(false);
 
   const specializationOptions = {
     Engineering: [
@@ -127,12 +130,62 @@ function AddJD({ show, onClose }) {
     }
   };
 
-  const openInOutlook = () => {
-    // Format the form data into email content
-    const emailSubject = `Job Description: ${formData.companyName}`;
+  const fetchStudentsForCollege = async (college) => {
+    setIsLoadingStudents(true);
+    try {
+      // First, find the training form document ID for this college
+      const trainingFormQuery = query(
+        collection(db, "trainingForms"),
+        where("collegeName", "==", college)
+      );
+      
+      const trainingFormSnapshot = await getDocs(trainingFormQuery);
+      if (trainingFormSnapshot.empty) {
+        console.log(`No training form found for college: ${college}`);
+        setStudentsData(prev => ({ ...prev, [college]: [] }));
+        return;
+      }
+
+      const trainingFormId = trainingFormSnapshot.docs[0].id;
+      
+      // Now fetch students for this training form
+      const studentsQuery = query(
+        collection(db, "trainingForms", trainingFormId, "students")
+      );
+      
+      const studentsSnapshot = await getDocs(studentsQuery);
+      const students = studentsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      setStudentsData(prev => ({ ...prev, [college]: students }));
+    } catch (error) {
+      console.error(`Error fetching students for ${college}:`, error);
+      setStudentsData(prev => ({ ...prev, [college]: [] }));
+    } finally {
+      setIsLoadingStudents(false);
+    }
+  };
+
+  const viewStudents = (college) => {
+    setViewingCollege(college);
+    
+    // Fetch students if not already fetched
+    if (!studentsData[college]) {
+      fetchStudentsForCollege(college);
+    }
+  };
+
+  const closeStudentView = () => {
+    setViewingCollege(null);
+  };
+
+  const sendEmail = () => {
+    const emailSubject = `Job Opportunity: ${formData.companyName}`;
     
     let emailBody = `
-      <h2>Job Description Details</h2>
+      <h2>Job Opportunity Details</h2>
       <p><strong>Company Name:</strong> ${formData.companyName}</p>
       <p><strong>Website:</strong> ${formData.companyWebsite || 'N/A'}</p>
       
@@ -160,18 +213,16 @@ function AddJD({ show, onClose }) {
       <p>${formData.jobDescription.replace(/\n/g, '<br>')}</p>
       ` : ''}
       
+      <p><strong>Coordinator:</strong> ${formData.coordinator}</p>
       <p><strong>Colleges Selected:</strong> ${selectedColleges.join(', ')}</p>
     `;
 
-    // Create mailto link with HTML content
     const mailtoLink = `mailto:?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
 
-    // Try to open Outlook
     try {
       window.location.href = mailtoLink;
     } catch (e) {
       console.error("Error opening email client:", e);
-      // Fallback - show the content in a new window
       const emailWindow = window.open("", "_blank");
       emailWindow.document.write(`
         <html>
@@ -211,10 +262,7 @@ function AddJD({ show, onClose }) {
       });
 
       await Promise.all(promises);
-      
-      // Open Outlook after successful submission
-      openInOutlook();
-      
+      sendEmail();
       onClose();
     } catch (error) {
       console.error("Error adding documents: ", error);
@@ -228,29 +276,17 @@ function AddJD({ show, onClose }) {
     const fetchColleges = async () => {
       if (formData.course && formData.passingYear) {
         try {
-          console.log('[DEBUG] Starting fetch with:', {
-            course: formData.course,
-            passingYear: formData.passingYear
-          });
-
-          // Corrected year conversion - subtract 1 year first
           const passingYearNum = parseInt(formData.passingYear);
           if (isNaN(passingYearNum)) {
             console.error('Invalid passing year:', formData.passingYear);
             return;
           }
           
-          const yearStart = (passingYearNum - 1).toString().slice(-2); // Previous year
-          const yearEnd = passingYearNum.toString().slice(-2); // Current year
-          const passingYearFormat1 = `${yearStart}-${yearEnd}`; // 30-31 format
-          const passingYearFormat2 = `20${yearStart}-20${yearEnd}`; // 2030-2031 format
-          
-          console.log('[DEBUG] Trying academic year formats:', {
-            format1: passingYearFormat1,
-            format2: passingYearFormat2
-          });
+          const yearStart = (passingYearNum - 1).toString().slice(-2);
+          const yearEnd = passingYearNum.toString().slice(-2);
+          const passingYearFormat1 = `${yearStart}-${yearEnd}`;
+          const passingYearFormat2 = `20${yearStart}-20${yearEnd}`;
 
-          // Try both year formats
           const queries = [
             query(
               collection(db, "trainingForms"),
@@ -268,36 +304,21 @@ function AddJD({ show, onClose }) {
           let totalDocs = 0;
 
           for (const q of queries) {
-            console.log('[DEBUG] Executing query:', q);
             const querySnapshot = await getDocs(q);
-            console.log(`[DEBUG] Got ${querySnapshot.size} docs for query`);
-
             querySnapshot.forEach((doc) => {
               totalDocs++;
               const data = doc.data();
-              console.log(`[DEBUG] Doc ${totalDocs}:`, {
-                id: doc.id,
-                collegeName: data.collegeName,
-                college: data.college,
-                passingYear: data.passingYear
-              });
-
               const collegeName = data.collegeName || data.college || doc.id.split("-")[0];
               if (collegeName) {
-                console.log(`[DEBUG] Adding college: ${collegeName}`);
                 colleges.add(collegeName);
               }
             });
           }
 
-          console.log('[DEBUG] Final colleges before defaults:', Array.from(colleges));
-          
-          // Add default options
           const finalColleges = Array.from(colleges)
             .concat(["Other", "Multiple"])
             .sort();
           
-          console.log('[DEBUG] Final colleges list:', finalColleges);
           setAvailableColleges(finalColleges);
 
         } catch (error) {
@@ -498,7 +519,7 @@ function AddJD({ show, onClose }) {
                       }`}
                     >
                       <option value="">Select Year</option>
-                      {[2022,2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030, 2031, 2032,2035].map((yr) => (
+                      {[2022,2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030, 2031, 2032,2034].map((yr) => (
                         <option key={yr}>{yr}</option>
                       ))}
                     </select>
@@ -1067,17 +1088,26 @@ function AddJD({ show, onClose }) {
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto p-2 border border-gray-200 rounded-lg bg-gray-50">
                     {availableColleges.map((college) => (
-                      <div key={college} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id={college}
-                          checked={selectedColleges.includes(college)}
-                          onChange={() => handleCollegeSelection(college)}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                        <label htmlFor={college} className="ml-2 text-sm text-gray-700">
-                          {college}
-                        </label>
+                      <div key={college} className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <input
+                            type="checkbox"
+                            id={college}
+                            checked={selectedColleges.includes(college)}
+                            onChange={() => handleCollegeSelection(college)}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          />
+                          <label htmlFor={college} className="ml-2 text-sm text-gray-700">
+                            {college}
+                          </label>
+                        </div>
+                        <button
+                          onClick={() => viewStudents(college)}
+                          className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+                        >
+                          <EyeIcon className="h-4 w-4 mr-1" />
+                          View Students
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -1157,11 +1187,94 @@ function AddJD({ show, onClose }) {
             </div>
           </>
         )}
+
+        {/* Student Data Modal */}
+        {viewingCollege && (
+          <div className="fixed inset-0 z-60 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+              <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center">
+                <h2 className="text-xl font-semibold text-white">
+                  Students at {viewingCollege}
+                </h2>
+                <button
+                  onClick={closeStudentView}
+                  className="text-white hover:text-gray-200 focus:outline-none"
+                >
+                  <XIcon className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto flex-grow">
+                {isLoadingStudents ? (
+                  <div className="flex justify-center items-center h-32">
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+                  </div>
+                ) : (
+                  <>
+                    {studentsData[viewingCollege]?.length > 0 ? (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Name
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Email
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Phone
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Specialization
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {studentsData[viewingCollege].map((student) => (
+                              <tr key={student.id}>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                  {student.accountName || 'N/A'}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  {student.accountEmail || 'N/A'}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  {student.accountPhone || 'N/A'}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  {student.specialization || 'N/A'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <p className="text-gray-500">
+                          No student data found for {viewingCollege}
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              <div className="bg-gray-50 px-6 py-4 flex justify-end">
+                <button
+                  onClick={closeStudentView}
+                  className="px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 export default AddJD;
-
-
