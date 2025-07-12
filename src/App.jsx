@@ -20,6 +20,7 @@ import DigitalMarketing from "./pages/Marketing";
 import Footer from "./pages/footer";
 import UpdateProfile from "./components/UpdateProfile";
 import Help from "./pages/Help";
+import SessionManager from "./components/SessionManager"; // Add this import
 
 const AppContent = () => {
   const location = useLocation();
@@ -27,6 +28,7 @@ const AppContent = () => {
   return (
     <>
       <Navbar />
+       <SessionManager /> {/* Add this line */}
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />

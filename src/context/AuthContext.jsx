@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { auth, db } from "../firebase"; // removed realtimeDb import
+import { createContext, useContext, useEffect, useState } from "react";
+import { auth, db } from "../firebase";
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -22,7 +22,7 @@ const getUserIP = async () => {
     const data = await res.json();
     return data.ip;
   } catch (err) {
-    console.error("Failed to fetch IP:", err); // Log the error for debugging
+    console.error("Failed to fetch IP:", err);
     return "N/A";
   }
 };
@@ -32,7 +32,38 @@ export const AuthProvider = ({ children }) => {
   const [photoURL, setPhotoURL] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // Listen to auth state changes and fetch user role from Firestore
+  const refreshSession = async () => {
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) return false;
+
+      await currentUser.getIdToken(true);
+
+      const q = query(
+        collection(db, "users"),
+        where("email", "==", currentUser.email)
+      );
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        const userData = querySnapshot.docs[0].data();
+        setUser({
+          ...currentUser,
+          role: userData.role || "guest",
+          department: userData.department || "guest",
+          reportingManager: userData.reportingManager || null,
+        });
+        setPhotoURL(userData.photoURL || "");
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Session refresh failed:", error);
+      logout();
+      return false;
+    }
+  };
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
@@ -43,7 +74,6 @@ export const AuthProvider = ({ children }) => {
           );
           const querySnapshot = await getDocs(q);
 
-          // In onAuthStateChanged callback:
           if (!querySnapshot.empty) {
             const userData = querySnapshot.docs[0].data();
             setUser({
@@ -58,7 +88,7 @@ export const AuthProvider = ({ children }) => {
             setPhotoURL("");
           }
         } catch (error) {
-          console.error("Error fetching user data by email:", error);
+          console.error("Error fetching user data:", error);
           setUser({ ...firebaseUser, role: "guest" });
           setPhotoURL("");
         }
@@ -68,7 +98,6 @@ export const AuthProvider = ({ children }) => {
       }
       setLoading(false);
     });
-
     return () => unsub();
   }, []);
 
@@ -114,7 +143,6 @@ export const AuthProvider = ({ children }) => {
     });
   };
 
-  // Logout clears user info & local storage
   const logout = async () => {
     await signOut(auth);
     localStorage.clear();
@@ -128,6 +156,7 @@ export const AuthProvider = ({ children }) => {
         user,
         login,
         logout,
+        refreshSession,
         isAuthenticated: !!user,
         photoURL,
         setPhotoURL,
@@ -138,6 +167,4 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-export function useAuth() {
-  return useContext(AuthContext);
-}
+export const useAuth = () => useContext(AuthContext);

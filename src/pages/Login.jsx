@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext } from "react";
+import { setAuthPersistence } from '../firebase'; // Add this import
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import {
@@ -104,6 +105,7 @@ export default function LoginPage() {
 
     if (Object.keys(newErrors).length === 0) {
       try {
+        await setAuthPersistence(rememberMe); // Add this line
         await login(email, password);
         setLoginError("");
         if (rememberMe) {
