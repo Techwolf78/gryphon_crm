@@ -110,7 +110,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
     },
   ];
 
-  return (
+ return (
     <aside
       className={`
         ${collapsed ? "w-20" : "w-[168px]"}
@@ -119,46 +119,42 @@ const Sidebar = ({ collapsed, onToggle }) => {
         transition-all duration-300 ease-in-out
       `}
     >
-      {/* Header section */}
+      {/* Header section - now with dynamic layout */}
       <div
-        className={`px-4 py-4 flex flex-col items-center ${
-          collapsed ? "space-y-4" : "space-y-0 justify-between"
-        } border-b border-gray-200`}
+        className={`
+          px-4 py-4 border-b border-gray-200
+          ${collapsed ? "flex flex-col items-center space-y-4" : "flex items-center justify-between"}
+        `}
       >
+        {/* Logo - changes based on collapsed state */}
         {collapsed ? (
-          <>
-            {/* Compact logo - shown when sidebar is collapsed */}
-            <div className="flex items-center justify-center w-10 h-10">
-              <img
-                src={compactLogo}
-                alt="SYNC"
-                className="w-full h-full object-contain"
-              />
-            </div>
-            <button
-              onClick={onToggle}
-              className="p-1 rounded-md hover:bg-gray-100 focus:outline-none transition-colors"
-              aria-label="Expand sidebar"
-            >
-              <img src={expandIcon} alt="Expand" className="w-5 h-5" />
-            </button>
-          </>
+          <img
+            src={compactLogo}
+            alt="SYNC"
+            className="w-8 h-8 object-contain"
+          />
         ) : (
-          <>
-            {/* Full logo - shown when sidebar is expanded */}
-            <img src={logo} alt="SYNC Logo" className="h-6" />
-            <button
-              onClick={onToggle}
-              className="p-1 rounded-md hover:bg-gray-100 focus:outline-none transition-colors"
-              aria-label="Collapse sidebar"
-            >
-              <img src={collapseIcon} alt="Collapse" className="w-5 h-5" />
-            </button>
-          </>
+          <img src={logo} alt="SYNC Logo" className="h-6" />
         )}
+
+        {/* Toggle button - position changes based on collapsed state */}
+        <button
+          onClick={onToggle}
+          className={`
+            p-1 rounded-md hover:bg-gray-100 focus:outline-none transition-colors
+            ${collapsed ? "mt-2" : ""}
+          `}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          <img 
+            src={collapsed ? expandIcon : collapseIcon} 
+            alt={collapsed ? "Expand" : "Collapse"} 
+            className="w-5 h-5" 
+          />
+        </button>
       </div>
 
-      {/* Navigation links */}
+      {/* Navigation links (unchanged) */}
       <nav className="flex-grow px-4 py-6 space-y-3 overflow-y-auto">
         {links.map(({ label, path, icon, skipRedirect }) => (
           <Link
