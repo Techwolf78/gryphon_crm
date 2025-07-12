@@ -1,5 +1,6 @@
+
 import React, { useState } from "react";
-import { FiFilter, FiMoreVertical, FiUpload, FiX } from "react-icons/fi";
+import { FiFilter, FiMoreVertical, FiUpload, FiX, FiFileText, FiEdit } from "react-icons/fi";
 import PropTypes from "prop-types";
 import * as XLSX from "xlsx";
 import { db } from "../../../firebase";
@@ -10,6 +11,9 @@ import {
   getDoc,
   getDocs,
   deleteDoc,
+  updateDoc,
+  arrayUnion,
+  serverTimestamp
 } from "firebase/firestore";
 
 // Project Code Conversion Utilities
@@ -24,6 +28,7 @@ const ClosedLeadsTable = ({
   formatDate,
   formatCurrency,
   viewMyLeadsOnly,
+  onEditClosureForm // Add this new prop
 }) => {
   const [openDropdown, setOpenDropdown] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -33,7 +38,112 @@ const ClosedLeadsTable = ({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [showMOUUploadModal, setShowMOUUploadModal] = useState(false);
+  const [mouFile, setMOUFile] = useState(null);
+  const [mouUploading, setMOUUploading] = useState(false);
+  const [activeLeadId, setActiveLeadId] = useState(null);
 
+  // Cloudinary upload function
+  // Cloudinary upload function - FINAL VERSION
+  const uploadToCloudinary = async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', 'unsigned_mou'); // Using your preset name
+    formData.append('folder', 'mou_documents');
+    formData.append('timestamp', Math.round(Date.now() / 1000)); // Adds timestamp for security
+
+    try {
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/c-3ba25d52dfa7b0b1eb50b3400ea294/upload`, // Your cloud name
+        {
+          method: 'POST',
+          body: formData
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Upload failed');
+      }
+
+      const result = await response.json();
+
+      return {
+        url: result.secure_url,
+        public_id: result.public_id,
+        format: result.format,
+        bytes: result.bytes,
+        created_at: result.created_at
+      };
+
+    } catch (error) {
+      console.error('Cloudinary upload error:', error);
+      throw new Error(`MOU upload failed: ${error.message}`);
+    }
+  };
+
+  const handleMOUMenuClick = (id) => {
+    setActiveLeadId(id); // Store the lead ID separately
+    setShowMOUUploadModal(true);
+    setOpenDropdown(null); // Close dropdown but keep lead reference
+  };
+
+  const handleMOUUpload = async () => {
+    if (!mouFile) {
+      setUploadError("Please select a file first");
+      return;
+    }
+
+    // Validate PDF
+    const isPDF = mouFile.type.includes('pdf') ||
+      mouFile.name.toLowerCase().endsWith('.pdf');
+    if (!isPDF) {
+      setUploadError("Only PDF files are accepted");
+      return;
+    }
+
+    if (mouFile.size > 10 * 1024 * 1024) {
+      setUploadError("File must be smaller than 10MB");
+      return;
+    }
+
+    setMOUUploading(true);
+    setUploadError(null);
+
+    try {
+      // Use activeLeadId instead of openDropdown
+      const currentLead = leads.find(([id]) => id === activeLeadId);
+
+      if (!currentLead || !currentLead[1]?.projectCode) {
+        throw new Error("Could not find lead data - please refresh and try again");
+      }
+
+      const leadData = currentLead[1];
+
+      // Upload to Cloudinary
+      const cloudinaryResponse = await uploadToCloudinary(mouFile);
+      const newMouUrl = cloudinaryResponse.secure_url;
+
+      // Update Firestore
+      const docId = projectCodeToDocId(leadData.projectCode);
+      const docRef = doc(db, "trainingForms", docId);
+
+      await updateDoc(docRef, {
+        mouFileUrl: newMouUrl,
+        lastUpdated: serverTimestamp()
+      });
+
+      setShowMOUUploadModal(false);
+      setMOUFile(null);
+      setActiveLeadId(null); // Clear after successful upload
+
+    } catch (error) {
+      console.error("MOU upload failed:", error);
+      setUploadError(`Upload failed: ${error.message}`);
+    } finally {
+      setMOUUploading(false);
+    }
+  };
   const logAvailableProjectCodes = async () => {
     try {
       console.group("Debugging Project Code Mismatch");
@@ -278,6 +388,22 @@ const ClosedLeadsTable = ({
       reader.readAsArrayBuffer(file);
     });
   };
+  const processMOUFile = (file) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        resolve({
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          lastModified: file.lastModified,
+          data: e.target.result.split(',')[1] // Remove data URL prefix
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
 
   return (
     <div className="overflow-x-auto">
@@ -304,9 +430,8 @@ const ClosedLeadsTable = ({
             </div>
             <div className="px-6 py-4">
               <div
-                className={`border-2 border-dashed rounded-lg p-8 text-center ${
-                  isDragging ? "border-blue-500 bg-blue-50" : "border-gray-300"
-                }`}
+                className={`border-2 border-dashed rounded-lg p-8 text-center ${isDragging ? "border-blue-500 bg-blue-50" : "border-gray-300"
+                  }`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
@@ -400,11 +525,10 @@ const ClosedLeadsTable = ({
               </button>
               <button
                 type="button"
-                className={`px-4 py-2 text-sm font-medium text-white rounded-md ${
-                  selectedFile && !uploading
-                    ? "bg-blue-600 hover:bg-blue-700"
-                    : "bg-blue-300 cursor-not-allowed"
-                }`}
+                className={`px-4 py-2 text-sm font-medium text-white rounded-md ${selectedFile && !uploading
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : "bg-blue-300 cursor-not-allowed"
+                  }`}
                 disabled={!selectedFile || uploading}
                 onClick={handleUploadClick}
               >
@@ -414,7 +538,99 @@ const ClosedLeadsTable = ({
           </div>
         </div>
       )}
+      {/* MOU Upload Modal */}
+      {showMOUUploadModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="flex justify-between items-center border-b px-6 py-4">
+              <h3 className="text-lg font-medium text-gray-900">Upload MOU</h3>
+              <button
+                onClick={() => {
+                  setShowMOUUploadModal(false);
+                  setMOUFile(null);
+                  setUploadError(null);
+                }}
+                className="text-gray-400 hover:text-gray-500"
+                disabled={mouUploading}
+              >
+                <FiX className="h-6 w-6" />
+              </button>
+            </div>
 
+            <div className="px-6 py-4">
+              {uploadError && (
+                <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-md text-sm">
+                  {uploadError}
+                </div>
+              )}
+
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                <FiFileText className="mx-auto h-12 w-12 text-gray-400" />
+                <div className="mt-4 flex justify-center text-sm text-gray-600">
+                  <label className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500">
+                    <span>Select PDF File</span>
+                    <input
+                      type="file"
+                      className="sr-only"
+                      accept=".pdf,application/pdf"
+                      onChange={(e) => setMOUFile(e.target.files[0])}
+                      disabled={mouUploading}
+                    />
+                  </label>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">PDF files only (max 10MB)</p>
+              </div>
+
+              {mouFile && (
+                <div className="mt-4 p-3 bg-gray-50 rounded-md">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {mouFile.name}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {(mouFile.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setMOUFile(null)}
+                      className="text-gray-400 hover:text-gray-500"
+                      disabled={mouUploading}
+                    >
+                      <FiX className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-gray-50 px-6 py-3 flex justify-end border-t">
+              <button
+                type="button"
+                className="mr-3 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                onClick={() => {
+                  setShowMOUUploadModal(false);
+                  setMOUFile(null);
+                }}
+                disabled={mouUploading}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={`px-4 py-2 text-sm font-medium text-white rounded-md ${mouFile && !mouUploading
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : "bg-blue-300 cursor-not-allowed"
+                  }`}
+                disabled={!mouFile || mouUploading}
+                onClick={handleMOUUpload}
+              >
+                {mouUploading ? "Uploading..." : "Upload MOU"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Table */}
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
@@ -515,21 +731,33 @@ const ClosedLeadsTable = ({
                   </button>
                   {openDropdown === id && (
                     <div className="origin-top-right absolute right-10 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
-                      <div
-                        className="py-1"
-                        role="menu"
-                        aria-orientation="vertical"
-                        aria-labelledby="options-menu"
-                      >
+                      <div className="py-1" role="menu">
                         <button
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 w-full text-left"
-                          role="menuitem"
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
                           onClick={() => {
                             setShowUploadModal(true);
-                            // Don't setOpenDropdown(null) here - we need the ID for upload
+                            setOpenDropdown(null);
                           }}
                         >
+                          <FiUpload className="mr-2 h-4 w-4" />
                           Upload Student List
+                        </button>
+                        <button
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                          onClick={() => handleMOUMenuClick(id)} // Use the new handler
+                        >
+                          <FiFileText className="mr-2 h-4 w-4" />
+                          {lead.mouFileUrl ? "Re-upload MOU" : "Upload MOU"}
+                        </button>
+                        <button
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                          onClick={() => {
+                            onEditClosureForm(lead);
+                            setOpenDropdown(null);
+                          }}
+                        >
+                          <FiEdit className="mr-2 h-4 w-4" />
+                          Edit Closure Form
                         </button>
                       </div>
                     </div>
@@ -545,9 +773,8 @@ const ClosedLeadsTable = ({
                   No closed deals found
                 </h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  {`There are currently no ${
-                    viewMyLeadsOnly ? "your" : "team"
-                  } closed deals.`}
+                  {`There are currently no ${viewMyLeadsOnly ? "your" : "team"
+                    } closed deals.`}
                 </p>
               </td>
             </tr>
