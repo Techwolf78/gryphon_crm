@@ -297,20 +297,28 @@ const TrainingForm = ({ show, onClose, lead, users }) => {
                 setIsSubmitting(false);
                 return;
             }
+  const today = new Date();
+        const endDate = new Date(contractEndDate);
+        const diffTime = endDate - today;
+        const diffDays = diffTime / (1000 * 60 * 60 * 24);
 
+        let closureType = "new";
+        if (diffDays <= 90 && diffDays >= 0) {
+            closureType = "renewal";
+        }
             // Update lead if exists
-            if (lead?.id) {
-                const leadRef = doc(db, "leads", lead.id);
-                await updateDoc(leadRef, {
-                    phase: "closed",
-                    closureType: "new",
-                    closedDate: new Date().toISOString(),
-                    totalCost: formData.totalCost,
-                    perStudentCost: formData.perStudentCost,
-                    contractStartDate,
-                    contractEndDate,
-                    projectCode: rawProjectCode
-                });
+           if (lead?.id) {
+            const leadRef = doc(db, "leads", lead.id);
+            await updateDoc(leadRef, {
+                phase: "closed",
+                closureType: closureType, // dynamic
+                closedDate: new Date().toISOString(),
+                totalCost: formData.totalCost,
+                perStudentCost: formData.perStudentCost,
+                contractStartDate,
+                contractEndDate,
+                projectCode: rawProjectCode
+            });
             }
 
             // Upload files (if they exist)
