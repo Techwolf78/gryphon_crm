@@ -76,8 +76,9 @@ export default function LeadsTable({
     );
     if (entries.length === 0) return "-";
     const latest = entries[entries.length - 1][1];
-    return `${latest.date || "-"} ${latest.time || ""} - ${latest.remarks || ""
-      }`;
+    return `${latest.date || "-"} ${latest.time || ""} - ${
+      latest.remarks || ""
+    }`;
   }, []);
 
   // Loading state
@@ -149,6 +150,11 @@ export default function LeadsTable({
               <br />
               Name
             </div>
+                       <div className="break-words">
+              Course/
+              <br />
+              Year
+            </div>
             <div className="break-words">City</div>
             <div className="break-words">
               Contact
@@ -160,11 +166,7 @@ export default function LeadsTable({
               <br />
               No.
             </div>
-            <div className="break-words">
-              Email
-              <br />
-              ID
-            </div>
+ 
             <div className="break-words">TCV</div>
             <div className="break-words">
               Opened
@@ -200,6 +202,14 @@ export default function LeadsTable({
                     {lead.businessName || "-"}
                   </div>
 
+                  {/* Replace the email cell with course/year */}
+                  <div className="text-sm text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis flex items-center h-full">
+                    {lead.courses?.[0]?.courseType || "-"}{" "}
+                    {lead.courses?.[0]?.year
+                      ? `(${lead.courses?.[0]?.year})`
+                      : ""}
+                  </div>
+
                   <div className="text-sm text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis flex items-center h-full">
                     {lead.city || "-"}
                   </div>
@@ -210,10 +220,6 @@ export default function LeadsTable({
 
                   <div className="text-sm text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis flex items-center h-full">
                     {lead.phoneNo || "-"}
-                  </div>
-
-                  <div className="text-sm text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis flex items-center h-full">
-                    {lead.email || "-"}
                   </div>
 
                   <div className="text-sm text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis flex items-center h-full">
@@ -253,10 +259,11 @@ export default function LeadsTable({
                         e.stopPropagation();
                         toggleDropdown(id, e);
                       }}
-                      className={`text-gray-500 hover:text-gray-700 focus:outline-none transition p-2 rounded-full hover:bg-gray-100 ${dropdownOpenId === id
-                        ? "bg-gray-200 text-gray-900 shadow-inner"
-                        : ""
-                        }`}
+                      className={`text-gray-500 hover:text-gray-700 focus:outline-none transition p-2 rounded-full hover:bg-gray-100 ${
+                        dropdownOpenId === id
+                          ? "bg-gray-200 text-gray-900 shadow-inner"
+                          : ""
+                      }`}
                       aria-expanded={dropdownOpenId === id}
                       aria-haspopup="true"
                       aria-label={
@@ -293,7 +300,6 @@ export default function LeadsTable({
                     setLeadBeingUpdated={setLeadBeingUpdated}
                   />
                 )}
-
               </div>
             ))}
           </div>

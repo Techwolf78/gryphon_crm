@@ -1,15 +1,15 @@
 import React, { useState } from "react";
 import {
-  FaPhone,
   FaCalendarCheck,
   FaEdit,
   FaArrowRight,
   FaCheckCircle,
+  FaTrash,
 } from "react-icons/fa";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 
-export default function DropdownActions({
+const DropdownActions = ({
   leadId,
   leadData,
   closeDropdown,
@@ -25,77 +25,74 @@ export default function DropdownActions({
   setShowExpectedDateModal,
   setPendingPhaseChange,
   setLeadBeingUpdated,
-}) {
+}) => {
   const [assignHovered, setAssignHovered] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  // Debug logs for props
-  console.log("DropdownActions props:", { leadId, leadData, currentUser, users });
+  const handleDeleteLead = async () => {
+    if (!window.confirm("Are you sure you want to permanently delete this lead?")) {
+      return;
+    }
 
-  // Dummy data for testing, comment this out when using real data
-  /*
-  const dummyUsers = {
-    user1: { uid: "user1", name: "John Doe", role: "Manager", department: "Sales", reportingManager: "Director A" },
-    user2: { uid: "user2", name: "Jane Smith", role: "Executive", department: "Sales", reportingManager: "John Doe" },
-    user3: { uid: "user3", name: "Director A", role: "Director", department: "Sales" }
+    setIsDeleting(true);
+    try {
+      await deleteDoc(doc(db, "leads", leadId));
+      // Add success toast notification here if needed
+    } catch (error) {
+      console.error("Error deleting lead:", error);
+      // Add error toast notification here if needed
+    } finally {
+      setIsDeleting(false);
+      closeDropdown();
+    }
   };
-  const dummyCurrentUser = { uid: "user1" };
-  */
-function getAssignableUsers(currentUser, users) {
-  console.log("getAssignableUsers called with:", currentUser, users);
 
-  if (!currentUser?.uid || !users || Object.keys(users).length === 0) {
-    console.warn("currentUser or users data missing");
+  const getAssignableUsers = (currentUser, users) => {
+    if (!currentUser?.uid || !users || Object.keys(users).length === 0) {
+      return [];
+    }
+
+    const userList = Object.values(users);
+    const allSalesUsers = userList.filter((u) => u.department === "Sales");
+    const currentUserData = userList.find((u) => u.uid === currentUser.uid);
+
+    if (!currentUserData) {
+      return [];
+    }
+
+    const role = currentUserData.role;
+
+    // Director/Head can assign to all sales users
+    if (["Director", "Head"].includes(role)) {
+      return allSalesUsers;
+    }
+
+    // Manager can assign to their team members
+    if (role === "Manager") {
+      return allSalesUsers.filter(
+        (u) =>
+          u.reportingManager === currentUserData.name &&
+          ["Assistant Manager", "Executive"].includes(u.role)
+      );
+    }
+
+    // Team members can assign to their manager and peers
+    if (["Assistant Manager", "Executive"].includes(role)) {
+      const manager = userList.find(
+        (u) => u.name === currentUserData.reportingManager
+      );
+      const peers = allSalesUsers.filter(
+        (u) =>
+          u.reportingManager === currentUserData.reportingManager &&
+          u.uid !== currentUser.uid
+      );
+      return [manager, ...peers].filter(Boolean);
+    }
+
     return [];
-  }
+  };
 
-  const userList = Object.values(users);
-  const allSalesUsers = userList.filter(u => u.department === "Sales");
-  const currentUserData = userList.find(u => u.uid === currentUser.uid);
-
-  if (!currentUserData) {
-    console.warn("No currentUserData found for uid:", currentUser.uid);
-    return [];
-  }
-
-  const role = currentUserData.role;
-  console.log("Current user role:", role);
-
-  // Director / Head can see all sales users
-  if (["Director", "Head"].includes(role)) {
-    return allSalesUsers;
-  }
-
-  // Manager can assign to Assistant Managers & Executives reporting to them
-  if (role === "Manager") {
-    return allSalesUsers.filter(
-      u =>
-        u.reportingManager === currentUserData.name &&
-        ["Assistant Manager", "Executive"].includes(u.role)
-    );
-  }
-
-  // Executive / Assistant Manager can assign to their manager and peers (same reportingManager)
-  if (["Executive", "Assistant Manager"].includes(role)) {
-    const manager = userList.find(u => u.name === currentUserData.reportingManager);
-    
-    // Peers with same reportingManager irrespective of Executive or Assistant Manager role (except self)
-    const peers = allSalesUsers.filter(
-      u =>
-        u.reportingManager === currentUserData.reportingManager &&
-        u.uid !== currentUser.uid // exclude self
-    );
-
-    // Return manager + all peers with same reportingManager
-    return [manager, ...peers].filter(Boolean);
-  }
-
-  return [];
-}
-
-
-  // Use real data here:
   const assignableUsers = getAssignableUsers(currentUser, users);
-  console.log("Assignable Users:", assignableUsers);
 
   return (
     <div
@@ -144,7 +141,9 @@ function getAssignableUsers(currentUser, users) {
           {assignHovered && (
             <div className="absolute right-full top-0 ml-2 w-48 bg-white border rounded-lg shadow-lg z-50 p-2 animate-fadeIn max-h-60 overflow-y-auto">
               {assignableUsers.length === 0 ? (
-                <div className="text-gray-500 px-3 py-1.5 text-sm">No users available</div>
+                <div className="text-gray-500 px-3 py-1.5 text-sm">
+                  No users available
+                </div>
               ) : (
                 assignableUsers.map((user) => (
                   <button
@@ -159,7 +158,6 @@ function getAssignableUsers(currentUser, users) {
                             email: user.email,
                           },
                         });
-                        console.log("Assigned to:", user.name);
                       } catch (error) {
                         console.error("Error assigning lead:", error);
                       }
@@ -168,7 +166,8 @@ function getAssignableUsers(currentUser, users) {
                     }}
                     className="block w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded"
                   >
-                    {user.name} <span className="text-xs text-gray-400">({user.role})</span>
+                    {user.name}{" "}
+                    <span className="text-xs text-gray-400">({user.role})</span>
                   </button>
                 ))
               )}
@@ -191,7 +190,8 @@ function getAssignableUsers(currentUser, users) {
               onClick={async (e) => {
                 e.stopPropagation();
                 const isFromHotToWarmOrCold =
-                  leadData.phase === "hot" && (phase === "warm" || phase === "cold");
+                  leadData.phase === "hot" &&
+                  (phase === "warm" || phase === "cold");
 
                 if (isFromHotToWarmOrCold) {
                   setLeadBeingUpdated({ ...leadData, id: leadId });
@@ -232,7 +232,29 @@ function getAssignableUsers(currentUser, users) {
             Closure
           </button>
         )}
+
+        {/* Delete Button (only for Admin) */}
+        {currentUser?.department === "Admin" && (
+          <>
+            <div className="border-t border-gray-200 my-1"></div>
+            <button
+              className={`flex items-center w-full px-4 py-3 text-sm ${
+                isDeleting ? "text-gray-500" : "text-red-600"
+              } hover:bg-red-50 transition`}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteLead();
+              }}
+              disabled={isDeleting}
+            >
+              <FaTrash className={`mr-3 ${isDeleting ? "text-gray-400" : "text-red-500"}`} />
+              {isDeleting ? "Deleting..." : "Delete"}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
-}
+};
+
+export default DropdownActions;
