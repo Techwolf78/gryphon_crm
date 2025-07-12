@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from "react";
-import { FaEllipsisV, FaTimes } from "react-icons/fa";
+import { FaEllipsisV, FaTimes, FaArrowDown } from "react-icons/fa";
 import DropdownActions from "./DropdownAction";
 import ClosedLeads from "../Sales/Closed/ClosedLeads";
 import LeadDetailsModal from "./LeadDetailsModal";
@@ -42,6 +42,26 @@ export default function LeadsTable({
   gridColumns,
 }) {
   const [selectedLeadForDetails, setSelectedLeadForDetails] = useState(null);
+  const [visibleLeadsCount, setVisibleLeadsCount] = useState(10);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  const handleLoadMore = useCallback(() => {
+    setVisibleLeadsCount((prev) => prev + 20);
+  }, []);
+
+  // Sort leads by openedDate (newest first)
+  const sortedLeads = useMemo(() => {
+    return [...filteredLeads].sort(([, a], [, b]) => {
+      const dateA = a.openedDate || a.createdAt;
+      const dateB = b.openedDate || b.createdAt;
+      return (dateB || 0) - (dateA || 0);
+    });
+  }, [filteredLeads]);
+
+  // Get visible leads based on count
+  const visibleLeads = useMemo(() => {
+    return sortedLeads.slice(0, visibleLeadsCount);
+  }, [sortedLeads, visibleLeadsCount]);
 
   // Memoized lead details modal
   const leadDetailsModal = useMemo(
@@ -57,16 +77,27 @@ export default function LeadsTable({
     [selectedLeadForDetails, users, activeTab]
   );
 
-  // Format date function
-  const formatDate = useCallback(
-    (ms) =>
-      new Date(ms).toLocaleDateString(undefined, {
+  const formatDate = useCallback((dateValue) => {
+    // If it's a Firestore Timestamp object
+    if (dateValue && typeof dateValue.toDate === "function") {
+      return dateValue.toDate().toLocaleDateString(undefined, {
         year: "numeric",
         month: "short",
         day: "numeric",
-      }),
-    []
-  );
+      });
+    }
+
+    // If it's a milliseconds number
+    if (dateValue && typeof dateValue === "number") {
+      return new Date(dateValue).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    }
+
+    return "-";
+  }, []);
 
   // Get latest followup memoized
   const getLatestFollowup = useCallback((lead) => {
@@ -150,7 +181,7 @@ export default function LeadsTable({
               <br />
               Name
             </div>
-                       <div className="break-words">
+            <div className="break-words">
               Course/
               <br />
               Year
@@ -166,7 +197,7 @@ export default function LeadsTable({
               <br />
               No.
             </div>
- 
+
             <div className="break-words">TCV</div>
             <div className="break-words">
               Opened
@@ -189,7 +220,7 @@ export default function LeadsTable({
 
           {/* Rows */}
           <div className="space-y-3">
-            {filteredLeads.map(([id, lead]) => (
+            {visibleLeads.map(([id, lead]) => (
               <div
                 key={id}
                 className="relative group cursor-pointer"
@@ -227,9 +258,7 @@ export default function LeadsTable({
                   </div>
 
                   <div className="text-sm text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis flex items-center h-full">
-                    {lead.openedDate || lead.createdAt
-                      ? formatDate(lead.openedDate || lead.createdAt)
-                      : "-"}
+                    {formatDate(lead.openedDate || lead.createdAt)}
                   </div>
 
                   <div className="text-sm text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis flex items-center h-full">
@@ -303,6 +332,70 @@ export default function LeadsTable({
               </div>
             ))}
           </div>
+
+          {/* Load More button - Professional Version */}
+          {visibleLeads.length < sortedLeads.length && (
+            <div className="flex justify-center pb-3">
+              <button
+                onClick={handleLoadMore}
+                disabled={isLoadingMore}
+                className={`
+        flex items-center justify-center 
+        px-5 py-2 
+        text-sm font-medium 
+        text-blue-600 
+        border border-blue-200 
+        rounded-md 
+        hover:bg-blue-50 
+        transition-colors duration-200
+        min-w-[160px]
+        ${isLoadingMore ? "opacity-80 pointer-events-none" : ""}
+      `}
+              >
+                {isLoadingMore ? (
+                  <span className="flex items-center gap-2">
+                    <svg
+                      className="animate-spin h-4 w-4 text-blue-600"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    Loading...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    Show more
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M16.707 10.293a1 1 0 010 1.414l-6 6a1 1 0 01-1.414 0l-6-6a1 1 0 111.414-1.414L9 14.586V3a1 1 0 012 0v11.586l4.293-4.293a1 1 0 011.414 0z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </span>
+                )}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

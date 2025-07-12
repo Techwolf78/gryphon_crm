@@ -2,6 +2,10 @@ import React, { useContext } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import logo from "../assets/SYNC-logo-2.png";
+import compactLogo from "../assets/s-final.png"; // Import the compact logo
+// Import your custom icons
+import collapseIcon from "../assets/sidebar-close.png";
+import expandIcon from "../assets/sidebar-open.png";
 import { MdOutlineCurrencyRupee } from "react-icons/md";
 import {
   FiHome,
@@ -9,8 +13,6 @@ import {
   FiBriefcase,
   FiBook,
   FiTrendingUp,
-  FiChevronLeft,
-  FiChevronRight,
   FiHelpCircle,
 } from "react-icons/fi";
 
@@ -18,7 +20,11 @@ import {
 const roleLinks = {
   admin: [
     { label: "Admin", path: "/dashboard/admin", icon: <FiUsers /> },
-    { label: "Sales", path: "/dashboard/sales", icon: <MdOutlineCurrencyRupee /> },
+    {
+      label: "Sales",
+      path: "/dashboard/sales",
+      icon: <MdOutlineCurrencyRupee />,
+    },
     { label: "Placement", path: "/dashboard/placement", icon: <FiBriefcase /> },
     {
       label: "L & D",
@@ -27,7 +33,13 @@ const roleLinks = {
     },
     { label: "D M", path: "/dashboard/marketing", icon: <FiTrendingUp /> },
   ],
-  sales: [{ label: "Sales", path: "/dashboard/sales", icon: <MdOutlineCurrencyRupee   /> }],
+  sales: [
+    {
+      label: "Sales",
+      path: "/dashboard/sales",
+      icon: <MdOutlineCurrencyRupee />,
+    },
+  ],
   placement: [
     { label: "Placement", path: "/dashboard/placement", icon: <FiBriefcase /> },
   ],
@@ -107,25 +119,46 @@ const Sidebar = ({ collapsed, onToggle }) => {
         transition-all duration-300 ease-in-out
       `}
     >
-      {/* Header */}
-      <div className="px-6 py-6 text-2xl font-bold  flex items-center justify-between">
-        {!collapsed && (
-          <img
-            src={logo}
-            alt="SRC Logo"
-            className="h-8"
-          />
+      {/* Header section */}
+      <div
+        className={`px-4 py-4 flex flex-col items-center ${
+          collapsed ? "space-y-4" : "space-y-0 justify-between"
+        } border-b border-gray-200`}
+      >
+        {collapsed ? (
+          <>
+            {/* Compact logo - shown when sidebar is collapsed */}
+            <div className="flex items-center justify-center w-10 h-10">
+              <img
+                src={compactLogo}
+                alt="SYNC"
+                className="w-full h-full object-contain"
+              />
+            </div>
+            <button
+              onClick={onToggle}
+              className="p-1 rounded-md hover:bg-gray-100 focus:outline-none transition-colors"
+              aria-label="Expand sidebar"
+            >
+              <img src={expandIcon} alt="Expand" className="w-5 h-5" />
+            </button>
+          </>
+        ) : (
+          <>
+            {/* Full logo - shown when sidebar is expanded */}
+            <img src={logo} alt="SYNC Logo" className="h-6" />
+            <button
+              onClick={onToggle}
+              className="p-1 rounded-md hover:bg-gray-100 focus:outline-none transition-colors"
+              aria-label="Collapse sidebar"
+            >
+              <img src={collapseIcon} alt="Collapse" className="w-5 h-5" />
+            </button>
+          </>
         )}
-        <button
-          onClick={onToggle}
-          className="text-gray-500 hover:text-blue-600 focus:outline-none"
-          aria-label="Toggle Sidebar"
-        >
-          {collapsed ? <FiChevronRight size={24} /> : <FiChevronLeft size={24} />}
-        </button>
       </div>
 
-      {/* Links */}
+      {/* Navigation links */}
       <nav className="flex-grow px-4 py-6 space-y-3 overflow-y-auto">
         {links.map(({ label, path, icon, skipRedirect }) => (
           <Link

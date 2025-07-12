@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   FaCalendarCheck,
   FaEdit,
@@ -20,55 +20,74 @@ const DropdownActions = ({
   updateLeadPhase,
   activeTab,
   dropdownRef,
-  users,
-  currentUser,
+  users, // Firestore users collection
+  currentUser, // Firebase Auth user
   setShowExpectedDateModal,
   setPendingPhaseChange,
   setLeadBeingUpdated,
 }) => {
   const [assignHovered, setAssignHovered] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [currentUserData, setCurrentUserData] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Debug logs
+  useEffect(() => {
+    console.group("DropdownActions Debug");
+    console.log("Firebase Auth User:", currentUser);
+    console.log("Firestore Users Collection:", users);
+    console.log("Current User Data:", currentUserData);
+    console.log("Is Admin:", currentUserData?.department === "Admin");
+    console.groupEnd();
+  }, [currentUser, users, currentUserData]);
+
+  // Get complete user data from Firestore
+  useEffect(() => {
+    if (currentUser?.uid && users) {
+      // Find user in Firestore collection
+      const userDoc = Object.values(users).find(
+        (user) => user.uid === currentUser.uid
+      );
+
+      if (userDoc) {
+        setCurrentUserData(userDoc);
+        console.log("Found user document:", userDoc);
+      } else {
+        console.warn("User document not found in Firestore");
+        setCurrentUserData(null);
+      }
+    }
+  }, [currentUser, users]);
 
   const handleDeleteLead = async () => {
-    if (!window.confirm("Are you sure you want to permanently delete this lead?")) {
-      return;
-    }
-
     setIsDeleting(true);
     try {
       await deleteDoc(doc(db, "leads", leadId));
-      // Add success toast notification here if needed
+      console.log("Lead deleted successfully");
     } catch (error) {
       console.error("Error deleting lead:", error);
-      // Add error toast notification here if needed
     } finally {
       setIsDeleting(false);
+      setShowDeleteConfirm(false);
       closeDropdown();
     }
   };
 
-  const getAssignableUsers = (currentUser, users) => {
-    if (!currentUser?.uid || !users || Object.keys(users).length === 0) {
-      return [];
-    }
+  const getAssignableUsers = () => {
+    if (!currentUserData || !users) return [];
 
     const userList = Object.values(users);
     const allSalesUsers = userList.filter((u) => u.department === "Sales");
-    const currentUserData = userList.find((u) => u.uid === currentUser.uid);
 
-    if (!currentUserData) {
-      return [];
-    }
-
-    const role = currentUserData.role;
+    console.log("Current user role:", currentUserData.role);
 
     // Director/Head can assign to all sales users
-    if (["Director", "Head"].includes(role)) {
+    if (["Director", "Head"].includes(currentUserData.role)) {
       return allSalesUsers;
     }
 
     // Manager can assign to their team members
-    if (role === "Manager") {
+    if (currentUserData.role === "Manager") {
       return allSalesUsers.filter(
         (u) =>
           u.reportingManager === currentUserData.name &&
@@ -77,7 +96,7 @@ const DropdownActions = ({
     }
 
     // Team members can assign to their manager and peers
-    if (["Assistant Manager", "Executive"].includes(role)) {
+    if (["Assistant Manager", "Executive"].includes(currentUserData.role)) {
       const manager = userList.find(
         (u) => u.name === currentUserData.reportingManager
       );
@@ -92,7 +111,7 @@ const DropdownActions = ({
     return [];
   };
 
-  const assignableUsers = getAssignableUsers(currentUser, users);
+  const assignableUsers = getAssignableUsers();
 
   return (
     <div
@@ -234,7 +253,7 @@ const DropdownActions = ({
         )}
 
         {/* Delete Button (only for Admin) */}
-        {currentUser?.department === "Admin" && (
+        {currentUserData?.department === "Admin" && (
           <>
             <div className="border-t border-gray-200 my-1"></div>
             <button
@@ -243,16 +262,79 @@ const DropdownActions = ({
               } hover:bg-red-50 transition`}
               onClick={(e) => {
                 e.stopPropagation();
-                handleDeleteLead();
+                setShowDeleteConfirm(true);
               }}
               disabled={isDeleting}
             >
-              <FaTrash className={`mr-3 ${isDeleting ? "text-gray-400" : "text-red-500"}`} />
+              <FaTrash
+                className={`mr-3 ${
+                  isDeleting ? "text-gray-400" : "text-red-500"
+                }`}
+              />
               {isDeleting ? "Deleting..." : "Delete"}
             </button>
           </>
         )}
       </div>
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 backdrop-blur-lg flex items-center justify-center z-50 p-4">
+          <div className="bg-white bg-opacity-20 backdrop-blur-xl rounded-xl shadow-lg max-w-md w-full p-6 animate-fadeIn border border-white border-opacity-30">
+            <div className="text-center">
+              <FaTrash className="mx-auto text-red-500 text-4xl mb-4" />
+              <h3 className="text-lg font-medium text-gray-800 mb-2">
+                Delete Lead
+              </h3>
+              <p className="text-gray-500 mb-6">
+                Are you sure you want to permanently delete this lead? This
+                action cannot be undone.
+              </p>
+
+              <div className="flex justify-center space-x-4">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteLead}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition flex items-center justify-center"
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    <>
+                      <svg
+                        className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                      Deleting...
+                    </>
+                  ) : (
+                    "Delete Permanently"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
