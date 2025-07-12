@@ -8,10 +8,16 @@ import {
   FiInfo,
 } from "react-icons/fi";
 import Papa from "papaparse";
-import * as XLSX from "xlsx-js-style"; // styling supported version
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "../../firebase"; // Adjust path as needed
+import * as XLSX from "xlsx-js-style";
+import {
+  collection,
+  serverTimestamp,
+  writeBatch,
+  doc,
+} from "firebase/firestore";
+import { db } from "../../firebase";
 import { getAuth } from "firebase/auth";
+import { universityOptions } from "./universityData";
 
 const ImportLead = ({ handleImportComplete }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -26,15 +32,66 @@ const ImportLead = ({ handleImportComplete }) => {
   const dropdownRef = useRef(null);
   const auth = getAuth();
 
-  // Required fields based on your system
+  // Required fields based on your college leads system
   const requiredFields = [
     "businessName",
     "city",
+    "state",
     "pocName",
     "phoneNo",
     "email",
+    "contactMethod",
+    "phase",
+    "courseType",
+  ];
+
+  // Course-related fields that need special handling
+  const courseFields = [
+    "courseType",
+    "specializations",
+    "passingYear",
+    "studentCount",
+    "perStudentCost",
     "tcv",
   ];
+
+  // Accreditation options
+  const accreditationOptions = [
+    "A++",
+    "A+",
+    "A",
+    "B++",
+    "B+",
+    "B",
+    "C",
+    "D",
+    "Not Accredited",
+    "Applied For",
+    "Other",
+  ];
+
+  const headerToFieldMap = {
+    "College Name": "businessName",
+    Address: "address",
+    State: "state",
+    City: "city",
+    "Contact Person": "pocName",
+    "Phone Number": "phoneNo",
+    "Email Address": "email",
+    "Contact Method": "contactMethod",
+    "Lead Phase": "phase",
+    "University Affiliation": "affiliation",
+    "NAAC Accreditation": "accreditation",
+    "Course Type": "courseType",
+    "Specializations (comma separated)": "specializations",
+    "Passing Year": "passingYear",
+    "Student Count": "studentCount",
+    "Per Student Cost (₹)": "perStudentCost",
+    "Total Contract Value (₹)": "tcv",
+    "Expected Closure Date (yyyy-mm-dd)": "expectedClosureDate",
+    Notes: "notes",
+    "Follow-ups (JSON format)": "followups",
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -48,61 +105,119 @@ const ImportLead = ({ handleImportComplete }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const processCSV = (file) => {
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => validateAndUploadData(results.data),
-      error: (err) =>
-        handleImportError(err.message || "Error parsing CSV file"),
-    });
+const processCSV = (file) => {
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    complete: (results) => {
+      const mappedData = results.data.map(row => {
+        const newRow = {};
+        Object.keys(row).forEach(header => {
+          const fieldName = headerToFieldMap[header] || header;
+          let value = row[header];
+          
+          // Only normalize these specific fields
+          if (fieldName === 'contactMethod' && typeof value === 'string') {
+            value = value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+          }
+          if (fieldName === 'phase' && typeof value === 'string') {
+            value = value.toLowerCase();
+          }
+          
+          newRow[fieldName] = value;
+        });
+        return newRow;
+      });
+      
+      validateAndUploadData(mappedData);
+    },
+    error: (err) => handleImportError(err.message || "Error parsing CSV file")
+  });
+};
+
+const processExcel = (file) => {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: "array" });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      
+      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+      
+      const mappedData = jsonData.map(row => {
+        const newRow = {};
+        Object.keys(row).forEach(header => {
+          const fieldName = headerToFieldMap[header] || header;
+          let value = row[header];
+          
+          // Only normalize these specific fields
+          if (fieldName === 'contactMethod' && typeof value === 'string') {
+            value = value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+          }
+          if (fieldName === 'phase' && typeof value === 'string') {
+            value = value.toLowerCase();
+          }
+          
+          newRow[fieldName] = value;
+        });
+        return newRow;
+      });
+      
+      validateAndUploadData(mappedData);
+    } catch (error) {
+      handleImportError(error.message || "Error processing Excel file");
+    }
   };
 
-  const processExcel = (file) => {
-    const reader = new FileReader();
-
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: "array" });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet);
-        validateAndUploadData(jsonData);
-      } catch (error) {
-        handleImportError("Error processing Excel file");
-      }
-    };
-
-    reader.onerror = () => handleImportError("Error reading file");
-    reader.readAsArrayBuffer(file);
-  };
+  reader.onerror = () => handleImportError("Error reading file");
+  reader.readAsArrayBuffer(file);
+};
 
   const validateDate = (dateString) => {
-    if (!dateString) return true; // Skip validation if empty
-
-    // Check format exactly matches yyyy-mm-dd
+    if (!dateString) return true;
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!dateRegex.test(dateString)) {
       return false;
     }
-
-    // Check if it's a valid date
     const date = new Date(dateString);
     return !isNaN(date.getTime());
   };
 
   const validatePhoneNumber = (phone) => {
-    if (!phone) return false; // Phone is required (already checked by required fields)
-
-    // Convert to string if it's not already
+    if (!phone) return false;
     const phoneStr = String(phone);
-
-    // Remove all non-digit characters
     const digitsOnly = phoneStr.replace(/\D/g, "");
-
-    // Check if we have at least 6 digits (minimum reasonable phone number length)
     return digitsOnly.length >= 6;
+  };
+
+  const validateContactMethod = (method) => {
+    if (!method) return false;
+    const validMethods = ["Visit", "Call", "Email", "Reference", "Other"];
+    return validMethods.some((m) => m.toLowerCase() === method.toLowerCase());
+  };
+
+  const validatePhase = (phase) => {
+    if (!phase) return false;
+    const validPhases = ["hot", "warm", "cold"];
+    return validPhases.includes(phase.toLowerCase());
+  };
+
+  const validateCourseType = (courseType) => {
+    if (!courseType) return false;
+    const validTypes = [
+      "Engineering",
+      "MBA",
+      "BBA",
+      "BCA",
+      "MCA",
+      "Diploma",
+      "BSC",
+      "MSC",
+      "Others",
+    ];
+    return validTypes.some((t) => t.toLowerCase() === courseType.toLowerCase());
   };
 
   const validateAndUploadData = async (data) => {
@@ -111,17 +226,29 @@ const ImportLead = ({ handleImportComplete }) => {
         throw new Error("File is empty");
       }
 
-      // Validate required fields
-      const sampleKeys = Object.keys(data[0] || {});
-      const missingFields = requiredFields.filter(
-        (f) => !sampleKeys.includes(f)
-      );
+      // Check for missing required fields in each row
+      const rowsWithMissingFields = [];
+      data.forEach((row, index) => {
+        const missingFields = requiredFields.filter(
+          (field) => !(field in row) || String(row[field]).trim() === ""
+        );
 
-      if (missingFields.length > 0) {
-        throw new Error(`Missing required fields: ${missingFields.join(", ")}`);
+        if (missingFields.length > 0) {
+          rowsWithMissingFields.push({
+            rowNumber: index + 2, // +2 because header is row 1 and we count from 0
+            missingFields,
+          });
+        }
+      });
+
+      if (rowsWithMissingFields.length > 0) {
+        const errorMessage = `Missing required fields in some rows:\n${rowsWithMissingFields
+          .map((r) => `Row ${r.rowNumber}: ${r.missingFields.join(", ")}`)
+          .join("\n")}`;
+        throw new Error(errorMessage);
       }
 
-      // Validate each record and collect errors
+      // Rest of your existing validation logic...
       const validatedLeads = [];
       const errorLeads = [];
 
@@ -129,7 +256,7 @@ const ImportLead = ({ handleImportComplete }) => {
         const errors = {};
         let hasError = false;
 
-        // Check required fields
+        // Validate required fields
         requiredFields.forEach((field) => {
           if (!lead[field] || String(lead[field]).trim() === "") {
             errors[field] = "This field is required";
@@ -137,21 +264,76 @@ const ImportLead = ({ handleImportComplete }) => {
           }
         });
 
-        // Special validation for city
+        // Validate field formats
         if (lead.city && !validateCity(lead.city)) {
           errors.city =
             "City must contain only letters (no numbers or special characters)";
           hasError = true;
         }
 
-        // Phone number validation
         if (lead.phoneNo && !validatePhoneNumber(lead.phoneNo)) {
           errors.phoneNo =
             "Phone number must contain only numbers (no letters or special characters)";
           hasError = true;
         }
 
-        // Check expectedClosureDate format if present
+        if (lead.contactMethod && !validateContactMethod(lead.contactMethod)) {
+          errors.contactMethod =
+            "Contact method must be one of: Visit, Call, Email, Reference, Other";
+          hasError = true;
+        }
+
+        if (lead.phase && !validatePhase(lead.phase)) {
+          errors.phase = "Phase must be one of: hot, warm, cold";
+          hasError = true;
+        }
+
+        if (lead.courseType && !validateCourseType(lead.courseType)) {
+          errors.courseType =
+            "Course type must be one of: Engineering, MBA, BBA, BCA, MCA, Diploma, BSC, MSC, Others";
+          hasError = true;
+        }
+
+        // Validate specializations
+        if (lead.specializations) {
+          const specArray =
+            typeof lead.specializations === "string"
+              ? lead.specializations.split(",").map((s) => s.trim())
+              : Array.isArray(lead.specializations)
+              ? lead.specializations
+              : [];
+
+          const hasInvalidSpecs = specArray.some(
+            (spec) => !isNaN(spec) && spec.trim() !== "" // Check if it's a number
+          );
+
+          if (hasInvalidSpecs) {
+            errors.specializations =
+              "Specializations should be text values (e.g. 'CS,IT')";
+            hasError = true;
+          }
+        }
+
+        // Validate accreditation
+        if (
+          lead.accreditation &&
+          !accreditationOptions.includes(lead.accreditation)
+        ) {
+          errors.accreditation = "Invalid accreditation value";
+          hasError = true;
+        }
+
+        // Validate university affiliation
+        if (
+          lead.affiliation &&
+          lead.affiliation !== "Other" &&
+          !universityOptions.includes(lead.affiliation)
+        ) {
+          errors.affiliation = "Invalid university affiliation";
+          hasError = true;
+        }
+
+        // Validate dates
         if (
           lead.expectedClosureDate &&
           !validateDate(lead.expectedClosureDate)
@@ -168,12 +350,15 @@ const ImportLead = ({ handleImportComplete }) => {
             __errors: errors,
           });
         } else {
-          validatedLeads.push(lead);
+          validatedLeads.push({
+            ...lead,
+            phase: lead.phase.toLowerCase(), // Ensure phase is lowercase
+          });
         }
       });
 
       if (validatedLeads.length === 0 && errorLeads.length > 0) {
-        setErrorData(errorLeads); // Make sure to set error data first
+        setErrorData(errorLeads);
         throw new Error(
           "All records have validation errors. Download error file to see details."
         );
@@ -186,29 +371,97 @@ const ImportLead = ({ handleImportComplete }) => {
         );
       }
 
-      // Upload to Firebase
       setImportStatus((prev) => ({ ...prev, loading: true }));
 
-      const batchResults = await Promise.allSettled(
-        validatedLeads.map((lead) => uploadLeadToFirebase(lead))
-      );
+      // Use batch write for better performance
+      const batch = writeBatch(db);
+      const currentUser = auth.currentUser;
+      const currentDate = new Date();
 
-      const successfulImports = batchResults.filter(
-        (r) => r.status === "fulfilled"
-      );
-      const failedImports = batchResults.filter((r) => r.status === "rejected");
+      validatedLeads.forEach((lead) => {
+        const docRef = doc(collection(db, "leads"));
+
+        // Process specializations
+        const specializations = lead.specializations
+          ? typeof lead.specializations === "string"
+            ? lead.specializations
+                .split(",")
+                .map((item) => item.trim())
+                .filter((item) => item && isNaN(item)) // Filter out numeric values
+            : Array.isArray(lead.specializations)
+            ? lead.specializations.filter((item) => isNaN(item))
+            : []
+          : [];
+
+        // Calculate TCV if not provided
+        const studentCount = lead.studentCount ? Number(lead.studentCount) : 0;
+        const perStudentCost = lead.perStudentCost
+          ? Number(lead.perStudentCost)
+          : 0;
+        const tcv = lead.tcv ? Number(lead.tcv) : studentCount * perStudentCost;
+
+        const leadToUpload = {
+          businessName: lead.businessName || "",
+          address: lead.address || "",
+          city: lead.city || "",
+          state: lead.state || "",
+          pocName: lead.pocName || "",
+          phoneNo: String(lead.phoneNo || ""),
+          email: lead.email || "",
+          contactMethod: lead.contactMethod || "Visit",
+          phase: lead.phase || "cold",
+          createdAt: new Date().getTime(),
+          assignedTo: {
+            uid: currentUser?.uid || "imported-unknown-uid",
+            name: currentUser?.displayName || "Imported Lead",
+            email: currentUser?.email || "no-email@imported.com",
+          },
+          firestoreTimestamp: serverTimestamp(),
+          lastUpdatedAt: serverTimestamp(),
+          lastUpdatedBy: "import-process",
+          // Course information
+          courses: [
+            {
+              courseType: lead.courseType || "",
+              specializations: specializations,
+              manualSpecialization: lead.manualSpecialization || "",
+              manualCourseType: lead.manualCourseType || "",
+              passingYear: lead.passingYear || "",
+              studentCount: studentCount,
+              perStudentCost: perStudentCost,
+              tcv: tcv,
+            },
+          ],
+          // Accreditation and affiliation
+          affiliation: lead.affiliation || null,
+          accreditation: lead.accreditation || null,
+          manualAffiliation: lead.manualAffiliation || "",
+          manualAccreditation: lead.manualAccreditation || "",
+          // Optional fields
+          ...(lead.expectedClosureDate && {
+            expectedClosureDate: new Date(lead.expectedClosureDate).getTime(),
+          }),
+          ...(lead.notes && { notes: lead.notes }),
+          ...(lead.followups && {
+            followup:
+              typeof lead.followups === "string"
+                ? JSON.parse(lead.followups)
+                : lead.followups,
+          }),
+        };
+
+        batch.set(docRef, leadToUpload);
+      });
+
+      await batch.commit();
 
       setImportStatus({
         loading: false,
         success: true,
-        error:
-          failedImports.length > 0
-            ? `${failedImports.length} records failed to import`
-            : null,
-        count: successfulImports.length,
+        error: null,
+        count: validatedLeads.length,
       });
 
-      // Refresh table data if provided
       if (handleImportComplete) {
         handleImportComplete();
       }
@@ -218,71 +471,9 @@ const ImportLead = ({ handleImportComplete }) => {
   };
 
   const validateCity = (city) => {
-    if (!city) return false; // City is required
-    const cityRegex = /^[A-Za-z\s]+$/; // Only letters and spaces allowed
+    if (!city) return false;
+    const cityRegex = /^[A-Za-z\s]+$/;
     return cityRegex.test(city);
-  };
-
-  const uploadLeadToFirebase = async (leadData) => {
-    try {
-      const currentUser = auth.currentUser;
-      const currentDate = new Date(); // Get current date/time
-
-      const leadToUpload = {
-        businessName: leadData.businessName || "",
-        city: leadData.city || "",
-        pocName: leadData.pocName || "",
-        phoneNo: leadData.phoneNo || "",
-        email: leadData.email || "",
-        tcv: leadData.tcv || "",
-        phase: "hot", // Default phase
-        createdAt: serverTimestamp(), // Firestore server timestamp
-        openedDate: currentDate.getTime(), // Current timestamp for "Opened Date"
-        assignedTo: currentUser
-          ? {
-              uid: currentUser.uid,
-              name: currentUser.displayName || "Current User",
-            }
-          : null,
-      };
-
-      // Add optional fields
-      if (leadData.expectedClosureDate) {
-        leadToUpload.expectedClosureDate = new Date(
-          leadData.expectedClosureDate
-        ).getTime();
-      }
-
-      if (leadData.notes) {
-        leadToUpload.notes = leadData.notes;
-      }
-
-      if (leadData.followups) {
-        try {
-          leadToUpload.followup =
-            typeof leadData.followups === "string"
-              ? JSON.parse(leadData.followups)
-              : leadData.followups;
-        } catch {
-          leadToUpload.followup = {
-            initial: {
-              date: currentDate.toISOString().split("T")[0], // Use current date
-              time: "12:00 PM",
-              remarks: leadData.notes || "Initial contact",
-              timestamp: Date.now(),
-            },
-          };
-        }
-      }
-
-      // Add to Firestore
-      await addDoc(collection(db, "leads"), leadToUpload);
-
-      return { success: true };
-    } catch (error) {
-      console.error("Error uploading lead:", error);
-      return { success: false, error: error.message };
-    }
   };
 
   const handleImportError = (message) => {
@@ -292,8 +483,6 @@ const ImportLead = ({ handleImportComplete }) => {
       error: message,
       count: 0,
     });
-
-    // Don't clear errorData here - we want to keep it for downloading
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -301,7 +490,7 @@ const ImportLead = ({ handleImportComplete }) => {
 
   const resetState = () => {
     setImportStatus({ loading: false, success: false, error: null, count: 0 });
-    setErrorData(null); // Clear error data when resetting
+    setErrorData(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -402,19 +591,56 @@ const ImportLead = ({ handleImportComplete }) => {
     XLSX.utils.book_append_sheet(workbook, summarySheet, "Error Summary");
 
     // Export file
-    XLSX.writeFile(workbook, "Import_Errors.xlsx");
+    XLSX.writeFile(workbook, "College_Leads_Import_Errors.xlsx");
   };
 
   const downloadSampleFile = () => {
+    // Define user-friendly header names
+    const headerDisplayNames = {
+      businessName: "College Name",
+      address: "Address",
+      city: "City",
+      state: "State",
+      pocName: "Contact Person",
+      phoneNo: "Phone Number",
+      email: "Email Address",
+      contactMethod: "Contact Method",
+      phase: "Lead Phase",
+      affiliation: "University Affiliation",
+      accreditation: "NAAC Accreditation",
+      courseType: "Course Type",
+      specializations: "Specializations (comma separated)",
+      passingYear: "Passing Year",
+      studentCount: "Student Count",
+      perStudentCost: "Per Student Cost (₹)",
+      tcv: "Total Contract Value (₹)",
+      expectedClosureDate: "Expected Closure Date (yyyy-mm-dd)",
+      notes: "Notes",
+      followups: "Follow-ups (JSON format)",
+    };
+
+    // Sample data with all possible fields
     const sampleData = [
       {
-        businessName: "ABC College",
-        city: "New York",
-        pocName: "John Doe",
-        phoneNo: "1234567890",
-        email: "john@example.com",
-        tcv: "25000",
-        expectedClosureDate: "2025-11-15", // Example of correct format
+        businessName: "ABC College of Engineering",
+        address: "123 College Street, Education Nagar",
+        state: "Maharashtra",
+        city: "Pune",
+        pocName: "Dr. Ramesh Patil",
+        phoneNo: "9876543210",
+        email: "principal@abccollege.edu",
+        contactMethod: "Visit",
+        phase: "hot",
+        affiliation: "University of Mumbai",
+        accreditation: "A+",
+        courseType: "Engineering",
+        specializations: "CS,IT,Mechanical",
+        passingYear: "2024-2025",
+        studentCount: "120",
+        perStudentCost: "5000",
+        tcv: "600000",
+        expectedClosureDate: "2025-11-15",
+        notes: "Interested in AI/ML program",
         followups: JSON.stringify({
           initial: {
             date: new Date().toISOString().split("T")[0],
@@ -424,116 +650,272 @@ const ImportLead = ({ handleImportComplete }) => {
           },
         }),
       },
+      {
+        businessName: "XYZ Business School",
+        address: "456 Business Avenue",
+        state: "Karnataka",
+        city: "Bangalore",
+        pocName: "Ms. Priya Sharma",
+        phoneNo: "8765432109",
+        email: "admissions@xyzbschool.edu",
+        contactMethod: "Email",
+        phase: "warm",
+        affiliation: "Other",
+        manualAffiliation: "XYZ Autonomous University",
+        accreditation: "B++",
+        courseType: "MBA",
+        specializations: "Marketing,Finance",
+        passingYear: "2023-2024",
+        studentCount: "80",
+        perStudentCost: "7500",
+        tcv: "600000",
+        expectedClosureDate: "2025-09-30",
+      },
     ];
 
+    // Enhanced instructions with styling metadata
     const instructions = [
-      { instruction: "FILE REQUIREMENTS:" },
+      { instruction: "COLLEGE LEADS IMPORT GUIDE", type: "header" },
+      { instruction: "File Requirements", type: "section" },
       {
         instruction:
-          "1. Required fields (highlighted in green) must be filled for all records",
+          "• Required fields (highlighted in green) must be filled for all records",
+        type: "item",
       },
-      { instruction: "2. Optional fields are highlighted in yellow" },
-      { instruction: "3. Do not modify column headers" },
+      {
+        instruction: "• Optional fields are highlighted in yellow",
+        type: "item",
+      },
+      { instruction: "• Do not modify column headers", type: "item" },
       {
         instruction:
-          "4. expectedClosureDate must be in exact format yyyy-mm-dd (e.g. 2025-11-15)",
+          "• Dates must be in exact format yyyy-mm-dd (e.g. 2025-11-15)",
+        type: "item",
       },
-      { instruction: "5. TCV should be numeric without currency symbols" },
-      { instruction: "" },
-      { instruction: "REQUIRED FIELDS (MUST INCLUDE):" },
-      { instruction: "- businessName: College/Institution name" },
+      {
+        instruction: "• Numeric fields should not contain currency symbols",
+        type: "item",
+      },
+      {
+        instruction: "• Specializations must be text values only (no numbers)",
+        type: "item",
+        highlight: true,
+      },
+      { type: "spacer" },
+      { instruction: "Field Specifications", type: "section" },
+      { instruction: "Required Fields:", type: "subsection" },
+      { instruction: "businessName: College/Institution name", type: "field" },
+      { instruction: "city: Location (letters only)", type: "field" },
+      { instruction: "state: State where college is located", type: "field" },
+      { instruction: "pocName: Contact person's full name", type: "field" },
+      { instruction: "phoneNo: 10-digit number (no symbols)", type: "field" },
+      { instruction: "email: Valid email address format", type: "field" },
       {
         instruction:
-          "- city: Location of the institution (letters only, no numbers or special characters)",
+          "contactMethod: One of [Visit, Call, Email, Reference, Other]",
+        type: "field",
       },
-      { instruction: "- pocName: Contact person's name" },
+      { instruction: "phase: One of [hot, warm, cold]", type: "field" },
       {
         instruction:
-          "- phoneNo: Contact phone number (digits only, no spaces or special characters)",
+          "courseType: One of [Engineering, MBA, BBA, BCA, MCA, Diploma, BSC, MSC, Others]",
+        type: "field",
       },
-      { instruction: "- email: Contact email address" },
-      { instruction: "- tcv: Total Contract Value (numeric)" },
-      { instruction: "" },
-      { instruction: "OPTIONAL FIELDS:" },
-      { instruction: "- openedDate: When lead was created (timestamp)" },
+      { type: "spacer" },
+      { instruction: "Course Information:", type: "subsection" },
+      {
+        instruction: "specializations: Comma-separated values (e.g. 'CS,IT')",
+        type: "field",
+      },
+      {
+        instruction: "studentCount: Number of students (numeric only)",
+        type: "field",
+      },
+      {
+        instruction: "perStudentCost: Cost per student (numeric only)",
+        type: "field",
+      },
+      {
+        instruction: "tcv: Total contract value (auto-calculated if blank)",
+        type: "field",
+      },
+      {
+        instruction: "passingYear: Academic year (e.g. 2024-2025)",
+        type: "field",
+      },
+      { type: "spacer" },
+      { instruction: "Accreditation:", type: "subsection" },
       {
         instruction:
-          "- expectedClosureDate: Expected deal closure date (must be yyyy-mm-dd)",
+          "accreditation: One of [A++, A+, A, B++, B+, B, C, D, Not Accredited, Applied For, Other]",
+        type: "field",
       },
-      { instruction: "- followups: JSON string of followup history" },
       {
         instruction:
-          "- assignedTo: JSON string with uid and name of assigned user",
+          "manualAccreditation: Required if accreditation is 'Other'",
+        type: "field",
       },
+      { instruction: "Affiliation:", type: "subsection" },
+      {
+        instruction: "affiliation: Select from university list or 'Other'",
+        type: "field",
+      },
+      {
+        instruction: "manualAffiliation: Required if affiliation is 'Other'",
+        type: "field",
+      },
+      { type: "spacer" },
+      { instruction: "Field Mappings:", type: "section" },
+      ...Object.entries(headerDisplayNames).map(([key, displayName]) => ({
+        instruction: `${displayName} (stored as: ${key})`,
+        type: "field",
+      })),
     ];
 
     const workbook = XLSX.utils.book_new();
 
-    const requiredFields = [
-      "businessName",
-      "city",
-      "pocName",
-      "phoneNo",
-      "email",
-      "tcv",
-    ];
-    const optionalFields = [
-      "expectedClosureDate",
-      "followups",
-      "openedDate",
-      "assignedTo",
-    ];
-
-    // Generate styled worksheet from JSON
+    // ===== Sample Data Sheet =====
     const ws = XLSX.utils.json_to_sheet(sampleData, { origin: "A2" });
 
+    // Apply styles to headers
     const headerKeys = Object.keys(sampleData[0]);
-
-    // Apply styled headers
     headerKeys.forEach((key, colIndex) => {
-      const cellAddress = XLSX.utils.encode_cell({ r: 1, c: colIndex }); // Row 2 for headers (0-indexed)
-      ws[cellAddress] = {
-        v: key,
-        t: "s",
-        s: {
-          fill: {
-            patternType: "solid",
-            fgColor: {
-              rgb: requiredFields.includes(key) ? "E6FFE6" : "FFFFE0",
-            },
+      const cellAddress = XLSX.utils.encode_cell({ r: 1, c: colIndex });
+      if (headerDisplayNames[key]) {
+        ws[cellAddress].v = headerDisplayNames[key]; // Show display name
+      }
+
+      // Apply styling based on whether field is required
+      const isRequired =
+        requiredFields.includes(key) || courseFields.includes(key);
+      ws[cellAddress].s = {
+        fill: {
+          patternType: "solid",
+          fgColor: {
+            rgb: isRequired ? "E6FFE6" : "FFFFE0", // Green for required, yellow for optional
           },
-          font: { bold: true },
-          alignment: { horizontal: "center" },
-          border: {
-            top: { style: "thin", color: { rgb: "000000" } },
-            bottom: { style: "thin", color: { rgb: "000000" } },
-            left: { style: "thin", color: { rgb: "000000" } },
-            right: { style: "thin", color: { rgb: "000000" } },
-          },
+        },
+        font: {
+          bold: true,
+          color: { rgb: isRequired ? "006600" : "666600" }, // Dark green for required, dark yellow for optional
+        },
+        alignment: {
+          horizontal: "center",
+          vertical: "center",
+          wrapText: true,
+        },
+        border: {
+          top: { style: "thin", color: { rgb: "000000" } },
+          bottom: { style: "thin", color: { rgb: "000000" } },
+          left: { style: "thin", color: { rgb: "000000" } },
+          right: { style: "thin", color: { rgb: "000000" } },
         },
       };
     });
 
     // Auto-size columns
-    const maxColWidths = headerKeys.map((key) => {
-      const header = key.length;
-      const maxData = sampleData.reduce((max, row) => {
-        const value = row[key];
-        const length = value ? String(value).length : 0;
-        return Math.max(max, length);
+    ws["!cols"] = headerKeys.map((key) => {
+      const displayName = headerDisplayNames[key] || key;
+      const headerLength = displayName.length;
+      const maxDataLength = sampleData.reduce((max, row) => {
+        const value = row[key] ? String(row[key]).length : 0;
+        return Math.max(max, value);
       }, 0);
-      return { wch: Math.max(header, maxData) + 2 };
+      return { wch: Math.max(headerLength, maxDataLength) + 2 };
     });
 
-    ws["!cols"] = maxColWidths;
-    XLSX.utils.book_append_sheet(workbook, ws, "Leads Data");
+    // Add sample data sheet
+    XLSX.utils.book_append_sheet(workbook, ws, "College Leads Data");
+
+    // ===== Instructions Sheet =====
+    const instructionWs = XLSX.utils.json_to_sheet(
+      instructions.map((item) => ({ Instruction: item.instruction || " " })),
+      { skipHeader: true }
+    );
+
+    // Apply styles to each row based on type
+    instructions.forEach((item, index) => {
+      const cellAddress = XLSX.utils.encode_cell({ r: index, c: 0 });
+
+      let style = {
+        font: { name: "Calibri", sz: 11, color: { rgb: "000000" } },
+        alignment: { wrapText: true, vertical: "top" },
+      };
+
+      switch (item.type) {
+        case "header":
+          style = {
+            ...style,
+            font: { bold: true, sz: 16, color: { rgb: "FFFFFF" } },
+            fill: { fgColor: { rgb: "2A5885" } }, // Dark blue background
+            alignment: { horizontal: "center", vertical: "center" },
+          };
+          break;
+        case "section":
+          style = {
+            ...style,
+            font: { bold: true, sz: 14, color: { rgb: "2A5885" } },
+            fill: { fgColor: { rgb: "D6E7FF" } }, // Light blue background
+            alignment: { horizontal: "left" },
+          };
+          break;
+        case "subsection":
+          style = {
+            ...style,
+            font: { bold: true, sz: 12, color: { rgb: "3D7EBB" } },
+            fill: { fgColor: { rgb: "FFFFFF" } },
+          };
+          break;
+        case "field":
+          style = {
+            ...style,
+            font: { sz: 11 },
+            fill: { fgColor: { rgb: item.highlight ? "FFF2E6" : "FFFFFF" } }, // Orange highlight if needed
+          };
+          break;
+        case "item":
+          style = {
+            ...style,
+            font: { sz: 11 },
+            fill: { fgColor: { rgb: "FFFFFF" } },
+          };
+          break;
+        case "spacer":
+          style = {
+            ...style,
+            font: { sz: 4 },
+            fill: { fgColor: { rgb: "FFFFFF" } },
+          };
+          break;
+      }
+
+      instructionWs[cellAddress].s = style;
+    });
+
+    // Set column width and row heights
+    instructionWs["!cols"] = [{ wch: 100 }]; // Wide column for instructions
+    instructionWs["!rows"] = instructions.map((item) =>
+      item.type === "header"
+        ? { hpx: 30 }
+        : item.type === "section"
+        ? { hpx: 24 }
+        : item.type === "spacer"
+        ? { hpx: 8 }
+        : { hpx: 18 }
+    );
 
     // Add instructions sheet
-    const instructionSheet = XLSX.utils.json_to_sheet(instructions);
-    XLSX.utils.book_append_sheet(workbook, instructionSheet, "Instructions");
+    XLSX.utils.book_append_sheet(workbook, instructionWs, "Instructions");
 
-    // Export file
-    XLSX.writeFile(workbook, "Leads_Import_Template.xlsx");
+    // ===== University List Sheet =====
+    const universityWs = XLSX.utils.json_to_sheet(
+      universityOptions.map((uni) => ({ "University Name": uni })),
+      { skipHeader: true }
+    );
+    XLSX.utils.book_append_sheet(workbook, universityWs, "University List");
+
+    // ===== Export File =====
+    XLSX.writeFile(workbook, "College_Leads_Import_Template.xlsx");
     setIsDropdownOpen(false);
   };
 
@@ -566,7 +948,7 @@ const ImportLead = ({ handleImportComplete }) => {
         ) : (
           <div className="flex items-center gap-2 text-gray-700">
             <FiUpload className="w-4 h-4" />
-            <span>Import Leads</span>
+            <span>Import College Leads</span>
             <FiChevronDown className="w-4 h-4" />
           </div>
         )}
@@ -574,9 +956,11 @@ const ImportLead = ({ handleImportComplete }) => {
 
       {/* Dropdown Menu */}
       {isDropdownOpen && (
-        <div className="absolute right-0 mt-2 w-64 bg-white rounded-md shadow-lg z-10 border border-gray-200">
-          <div className="px-3 py-2 border-b border-gray-10 bg-gray-50">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">IMPORT OPTIONS</p>
+        <div className="absolute right-0 mt-2 w-72 bg-white rounded-md shadow-lg z-10 border border-gray-200">
+          <div className="px-3 py-2 border-b border-gray-100 bg-gray-50">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              IMPORT OPTIONS
+            </p>
           </div>
           <div className="py-1">
             <button
@@ -584,7 +968,7 @@ const ImportLead = ({ handleImportComplete }) => {
               className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
             >
               <FiDownload className="w-4 h-4 mr-2 text-blue-500" />
-              Download sample file
+              Download template
             </button>
 
             <label className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
@@ -638,7 +1022,7 @@ const ImportLead = ({ handleImportComplete }) => {
         <div className="absolute left-0 mt-2 w-full bg-green-50 text-green-700 text-xs p-2 rounded shadow z-10">
           <div className="flex justify-between">
             <div>
-              <strong>Nice!</strong> Added {importStatus.count} leads
+              <strong>Success!</strong> Added {importStatus.count} college leads
               {importStatus.error && (
                 <div className="text-yellow-700 mt-1">{importStatus.error}</div>
               )}

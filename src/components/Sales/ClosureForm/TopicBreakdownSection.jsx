@@ -8,20 +8,36 @@ const TopicBreakdownSection = ({ formData, setFormData }) => {
   const updateTopic = (index, field, value) => {
     const updated = [...formData.topics];
     updated[index][field] = value;
-    setFormData((prev) => ({ ...prev, topics: updated }));
+    const totalHours = updated.reduce((sum, t) => sum + (parseFloat(t.hours) || 0), 0);
+
+    setFormData((prev) => ({
+      ...prev,
+      topics: updated,
+      totalHours: totalHours
+    }));
   };
 
   const addTopicField = () => {
+    const updated = [...formData.topics, { topic: "", hours: "" }];
+    const totalHours = updated.reduce((sum, t) => sum + (parseFloat(t.hours) || 0), 0);
+
     setFormData((prev) => ({
       ...prev,
-      topics: [...prev.topics, { topic: "", hours: "" }]
+      topics: updated,
+      totalHours: totalHours
     }));
   };
 
   const removeTopicField = (index) => {
     const updated = [...formData.topics];
     updated.splice(index, 1);
-    setFormData((prev) => ({ ...prev, topics: updated }));
+    const totalHours = updated.reduce((sum, t) => sum + (parseFloat(t.hours) || 0), 0);
+
+    setFormData((prev) => ({
+      ...prev,
+      topics: updated,
+      totalHours: totalHours
+    }));
   };
 
   return (
@@ -29,10 +45,10 @@ const TopicBreakdownSection = ({ formData, setFormData }) => {
       <div className="p-5 bg-white shadow-lg rounded-xl border border-gray-200 space-y-4">
         
         {/* Title Row with Total Hours on Right */}
-        <div className="flex justify-between items-center border-b-2 border-blue-500 pb-2">
+        <div className="flex justify-between items-center border-b border-blue-500 pb-2">
           <h3 className="text-2xl font-semibold text-blue-700">Training Total Hours Breakup</h3>
           <p className="font-semibold text-blue-800 text-sm md:text-base">
-            Total Hours: {formData.topics.reduce((sum, t) => sum + (parseFloat(t.hours) || 0), 0)}
+            Total Hours: {formData.totalHours || 0}
           </p>
         </div>
 

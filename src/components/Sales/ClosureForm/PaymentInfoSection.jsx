@@ -16,6 +16,54 @@ const PaymentInfoSection = ({ formData, setFormData }) => {
   const [autoEmiSplits, setAutoEmiSplits] = useState([]);
   const [showAllInstallments, setShowAllInstallments] = useState(false);
 
+  // Calculate all payment amounts and update form state
+  const calculatePaymentAmounts = () => {
+    const baseAmount = formData.totalCost || 0;
+    const gstAmount = formData.gstType === "include" ? baseAmount * 0.18 : 0;
+    const netPayable = baseAmount + gstAmount;
+    
+    // Calculate payment splits with amounts
+    let paymentDetails = [];
+    
+    if (formData.paymentType === "EMI" && formData.emiMonths > 0) {
+      // For EMI payments
+      const emiAmount = netPayable / formData.emiMonths;
+      paymentDetails = Array(formData.emiMonths).fill().map((_, i) => ({
+        name: `Installment ${i + 1}`,
+        percentage: (100 / formData.emiMonths).toFixed(2),
+        baseAmount: (baseAmount / formData.emiMonths).toFixed(2),
+        gstAmount: (gstAmount / formData.emiMonths).toFixed(2),
+        totalAmount: emiAmount.toFixed(2),
+        dueDate: "", // You can add due date calculation here
+      }));
+    } else if (formData.paymentType && formData.paymentType !== "EMI") {
+      // For other payment types
+      paymentDetails = fields.map((label, i) => {
+        const percentage = parseFloat(formData.paymentSplits?.[i] || 0);
+        const splitBase = (percentage / 100) * baseAmount;
+        const splitGst = (percentage / 100) * gstAmount;
+        return {
+          name: label,
+          percentage: percentage.toFixed(2),
+          baseAmount: splitBase.toFixed(2),
+          gstAmount: splitGst.toFixed(2),
+          totalAmount: (splitBase + splitGst).toFixed(2),
+          dueDate: "", // You can add due date calculation here
+        };
+      });
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      gstAmount,
+      netPayableAmount: netPayable,
+      paymentDetails, // This will store all payment breakdowns
+      emiSplits: formData.paymentType === "EMI" && formData.emiMonths > 0 
+        ? Array(formData.emiMonths).fill(netPayable / formData.emiMonths)
+        : prev.emiSplits
+    }));
+  };
+
   const handlePerStudentCostChange = (e) => {
     const perStudentCost = parseFloat(e.target.value) || 0;
     const totalCost = (formData.studentCount || 0) * perStudentCost;
@@ -60,6 +108,19 @@ const PaymentInfoSection = ({ formData, setFormData }) => {
       setAutoEmiSplits(emiArr);
     }
   }, [formData.emiMonths, formData.totalCost, formData.paymentType]);
+
+  // Recalculate whenever relevant values change
+  useEffect(() => {
+    if (formData.totalCost && formData.gstType) {
+      calculatePaymentAmounts();
+    }
+  }, [
+    formData.totalCost, 
+    formData.gstType, 
+    formData.paymentType, 
+    formData.emiMonths,
+    formData.paymentSplits
+  ]);
 
   return (
     <section className="p-5 bg-white rounded-xl shadow-lg space-y-6">
@@ -116,6 +177,9 @@ const PaymentInfoSection = ({ formData, setFormData }) => {
               emiSplits: [],
               emiMonths: "",
               gstType: "",
+              paymentDetails: [],
+              gstAmount: 0,
+              netPayableAmount: 0
             }));
             setAutoEmiSplits([]);
             setShowAllInstallments(false);
@@ -164,8 +228,32 @@ const PaymentInfoSection = ({ formData, setFormData }) => {
         </div>
       )}
 
+      {formData.paymentType && formData.gstType && (
+        <div className="mt-4 p-4 bg-blue-50 rounded-lg shadow-md space-y-1">
+          <h4 className="font-medium text-blue-800">Payment Summary</h4>
+          <p className="text-gray-700">
+            Base Amount: ₹{formData.totalCost.toFixed(2)}
+          </p>
+          <p className="text-gray-700">
+            GST ({formData.gstType === "include" ? "18%" : "0%"}): ₹
+            {formData.gstAmount?.toFixed(2) || "0.00"}
+          </p>
+          <p className="font-semibold text-lg text-blue-900">
+            Total Payable: ₹{formData.netPayableAmount?.toFixed(2) || "0.00"}
+          </p>
+          {formData.paymentType === "EMI" && formData.emiMonths > 0 && (
+            <p className="text-gray-700">
+              EMI Installments: {formData.emiMonths} × ₹
+              {(formData.netPayableAmount / formData.emiMonths).toFixed(2)}
+            </p>
+          )}
+        </div>
+      )}
+
       {formData.paymentType && formData.gstType && formData.paymentType !== "EMI" && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-auto-fit gap-4">
+        <div className={`grid gap-4 ${fields.length <= 3 ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3" : "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
+          }`}
+        >
           {fields.map((label, i) => {
             const percent = formData.paymentSplits?.[i] ?? "";
             const baseAmount = ((parseFloat(percent) || 0) / 100) * formData.totalCost;

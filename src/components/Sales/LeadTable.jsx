@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { FaEllipsisV, FaTimes } from "react-icons/fa";
 import DropdownActions from "./DropdownAction";
-import ClosedLeads from "./ClosedLeads";
+import ClosedLeads from "../Sales/Closed/ClosedLeads";
 import LeadDetailsModal from "./LeadDetailsModal";
 
 const borderColorMap = {
@@ -17,17 +17,6 @@ const headerColorMap = {
   cold: "bg-cyan-50 text-cyan-800 border-b border-cyan-200",
   closed: "bg-green-50 text-green-800 border-b border-green-200",
 };
-
-// Helpers
-function formatDate(timestamp) {
-  if (!timestamp) return "-";
-  return new Date(timestamp).toLocaleDateString();
-}
-
-function getLatestFollowup(lead) {
-  if (!lead.followups || lead.followups.length === 0) return "-";
-  return lead.followups[lead.followups.length - 1].note || "-";
-}
 
 export default function LeadsTable({
   loading,
@@ -50,11 +39,48 @@ export default function LeadsTable({
   setShowModal,
   viewMyLeadsOnly,
   currentUser,
+  gridColumns,
 }) {
   const [selectedLeadForDetails, setSelectedLeadForDetails] = useState(null);
 
-  const gridColumns = "grid grid-cols-11 gap-4";
+  // Memoized lead details modal
+  const leadDetailsModal = useMemo(
+    () =>
+      selectedLeadForDetails && (
+        <LeadDetailsModal
+          selectedLead={selectedLeadForDetails}
+          onClose={() => setSelectedLeadForDetails(null)}
+          users={users}
+          activeTab={activeTab}
+        />
+      ),
+    [selectedLeadForDetails, users, activeTab]
+  );
 
+  // Format date function
+  const formatDate = useCallback(
+    (ms) =>
+      new Date(ms).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      }),
+    []
+  );
+
+  // Get latest followup memoized
+  const getLatestFollowup = useCallback((lead) => {
+    const followData = lead.followup || {};
+    const entries = Object.entries(followData).sort(
+      (a, b) => a[1].timestamp - b[1].timestamp
+    );
+    if (entries.length === 0) return "-";
+    const latest = entries[entries.length - 1][1];
+    return `${latest.date || "-"} ${latest.time || ""} - ${latest.remarks || ""
+      }`;
+  }, []);
+
+  // Loading state
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -63,18 +89,19 @@ export default function LeadsTable({
     );
   }
 
+  // Closed leads tab
   if (activeTab === "closed") {
     return (
-<ClosedLeads
-      leads={leads}
-      users={users} // Keep this one
-      viewMyLeadsOnly={viewMyLeadsOnly}
-      currentUser={currentUser}
-      // Remove the duplicate users={users} below
-    />
+      <ClosedLeads
+        leads={leads}
+        users={users}
+        viewMyLeadsOnly={viewMyLeadsOnly}
+        currentUser={currentUser}
+      />
     );
   }
 
+  // Empty state
   if (filteredLeads.length === 0) {
     return (
       <div className="bg-white rounded-xl p-8 text-center border-2 border-dashed border-gray-200">
@@ -108,25 +135,6 @@ export default function LeadsTable({
       </div>
     );
   }
-
-  const getLatestFollowup = (lead) => {
-    const followData = lead.followup || {};
-    const entries = Object.entries(followData).sort(
-      (a, b) => a[1].timestamp - b[1].timestamp
-    );
-    if (entries.length === 0) return "-";
-    const latest = entries[entries.length - 1][1];
-    return `${latest.date || "-"} ${latest.time || ""} - ${
-      latest.remarks || ""
-    }`;
-  };
-
-  const formatDate = (ms) =>
-    new Date(ms).toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
 
   return (
     <>
@@ -188,54 +196,67 @@ export default function LeadsTable({
                 <div
                   className={`${gridColumns} gap-4 p-5 rounded-xl bg-white shadow-sm hover:shadow-md transition-all duration-300 ${borderColorMap[activeTab]}`}
                 >
-                  {[
-                    "businessName",
-                    "city",
-                    "pocName",
-                    "phoneNo",
-                    "email",
-                    "tcv",
-                    "openedDate",
-                    "expectedClosureDate",
-                  ].map((field, i) => (
-                    <div
-                      key={i}
-                      className="text-sm text-gray-700 break-words whitespace-normal"
-                    >
-                      {(field === "openedDate" ||
-                        field === "expectedClosureDate") &&
-                      (lead[field] ||
-                        (field === "openedDate" && lead.createdAt))
-                        ? formatDate(
-                            field === "openedDate"
-                              ? lead.openedDate || lead.createdAt
-                              : lead[field]
-                          )
-                        : lead[field] || "-"}
-                    </div>
-                  ))}
+                  <div className="text-sm text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis flex items-center h-full">
+                    {lead.businessName || "-"}
+                  </div>
 
-                  <div className="text-sm text-gray-700 break-words whitespace-normal">
+                  <div className="text-sm text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis flex items-center h-full">
+                    {lead.city || "-"}
+                  </div>
+
+                  <div className="text-sm text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis flex items-center h-full">
+                    {lead.pocName || "-"}
+                  </div>
+
+                  <div className="text-sm text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis flex items-center h-full">
+                    {lead.phoneNo || "-"}
+                  </div>
+
+                  <div className="text-sm text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis flex items-center h-full">
+                    {lead.email || "-"}
+                  </div>
+
+                  <div className="text-sm text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis flex items-center h-full">
+                    {lead.tcv || "-"}
+                  </div>
+
+                  <div className="text-sm text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis flex items-center h-full">
+                    {lead.openedDate || lead.createdAt
+                      ? formatDate(lead.openedDate || lead.createdAt)
+                      : "-"}
+                  </div>
+
+                  <div className="text-sm text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis flex items-center h-full">
+                    {lead.expectedClosureDate
+                      ? formatDate(lead.expectedClosureDate)
+                      : "-"}
+                  </div>
+
+                  <div className="text-sm text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis flex items-center h-full">
                     {getLatestFollowup(lead)}
                   </div>
 
-                  <div className="text-sm text-gray-700 break-words whitespace-normal">
+                  <div className="text-sm text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis flex items-center h-full">
                     {lead.assignedTo?.uid && users[lead.assignedTo.uid]?.name
                       ? users[lead.assignedTo.uid].name
                       : lead.assignedTo?.name || "-"}
                   </div>
 
-                  <div className="flex justify-center items-center">
+                  <div className="flex justify-center items-center gap-2">
+                    {lead.contactMethod && (
+                      <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-0.5 rounded-full">
+                        {lead.contactMethod.toLowerCase()}
+                      </span>
+                    )}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         toggleDropdown(id, e);
                       }}
-                      className={`text-gray-500 hover:text-gray-700 focus:outline-none transition p-2 rounded-full hover:bg-gray-100 ${
-                        dropdownOpenId === id
-                          ? "bg-gray-200 text-gray-900 shadow-inner"
-                          : ""
-                      }`}
+                      className={`text-gray-500 hover:text-gray-700 focus:outline-none transition p-2 rounded-full hover:bg-gray-100 ${dropdownOpenId === id
+                        ? "bg-gray-200 text-gray-900 shadow-inner"
+                        : ""
+                        }`}
                       aria-expanded={dropdownOpenId === id}
                       aria-haspopup="true"
                       aria-label={
@@ -253,7 +274,6 @@ export default function LeadsTable({
                   </div>
                 </div>
 
-                {/* Dropdown Actions */}
                 {dropdownOpenId === id && (
                   <DropdownActions
                     leadId={id}
@@ -267,25 +287,20 @@ export default function LeadsTable({
                     activeTab={activeTab}
                     dropdownRef={dropdownRef}
                     users={users}
+                    currentUser={currentUser}
                     setShowExpectedDateModal={setShowExpectedDateModal}
                     setPendingPhaseChange={setPendingPhaseChange}
                     setLeadBeingUpdated={setLeadBeingUpdated}
                   />
                 )}
+
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {selectedLeadForDetails && (
-        <LeadDetailsModal
-          selectedLead={selectedLeadForDetails}
-          onClose={() => setSelectedLeadForDetails(null)}
-          users={users}
-          activeTab={activeTab}
-        />
-      )}
+      {leadDetailsModal}
     </>
   );
 }

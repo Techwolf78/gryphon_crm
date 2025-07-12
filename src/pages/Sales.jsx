@@ -1,22 +1,33 @@
-import { useState, useEffect, useRef } from "react";
-import { collection, doc, onSnapshot, updateDoc } from "firebase/firestore";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import {
+  collection,
+  doc,
+  onSnapshot,
+  updateDoc,
+  query,
+  where,
+  orderBy,
+  limit,
+} from "firebase/firestore";
 import { db } from "../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { debounce } from "lodash";
 import FollowupAlerts from "../components/Sales/FollowupAlerts";
-import AddCollegeModal from "../components/Sales/AddCollege";
+import AddCollegeModal from "../components/Sales/AddCollegeModal";
 import FollowUp from "../components/Sales/Followup";
 import TrainingForm from "../components/Sales/ClosureForm/TrainingForm";
 import LeadDetailsModal from "../components/Sales/EditDetailsModal";
 import ExpectedDateModal from "../components/Sales/ExpectedDateWarning";
 import LeadsTable from "../components/Sales/LeadTable";
-import LeadFilters from "../components/Sales/LeadFilters"; // Adjust path as needed
+import LeadFilters from "../components/Sales/LeadFilters";
+
 const tabLabels = {
   hot: "Hot",
   warm: "Warm",
   cold: "Cold",
-  closed: "Closed", // Changed from renewal to closed
+  closed: "Closed",
 };
-// Updated color scheme
+
 const tabColorMap = {
   hot: {
     active: "bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg",
@@ -28,18 +39,19 @@ const tabColorMap = {
       "bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200",
   },
   cold: {
-    active: "bg-gradient-to-r from-cyan-400 to-cyan-500 text-white shadow-lg", // Changed to icy blue
+    active: "bg-gradient-to-r from-cyan-400 to-cyan-500 text-white shadow-lg",
     inactive:
-      "bg-cyan-50 text-cyan-600 hover:bg-cyan-100 border border-cyan-200", // Changed to icy blue
+      "bg-cyan-50 text-cyan-600 hover:bg-cyan-100 border border-cyan-200",
   },
   closed: {
-    active: "bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg", // Changed to success green
+    active: "bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg",
     inactive:
-      "bg-green-50 text-green-600 hover:bg-green-100 border border-green-200", // Changed to success green
+      "bg-green-50 text-green-600 hover:bg-green-100 border border-green-200",
   },
 };
 
 function Sales() {
+  // State management
   const [activeTab, setActiveTab] = useState("hot");
   const [users, setUsers] = useState({});
   const [dropdownOpenId, setDropdownOpenId] = useState(null);
@@ -52,168 +64,120 @@ function Sales() {
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [viewMyLeadsOnly, setViewMyLeadsOnly] = useState(true); // Default to true now
   const [todayFollowUps, setTodayFollowUps] = useState([]);
   const [showTodayFollowUpAlert, setShowTodayFollowUpAlert] = useState(false);
-  const [reminderPopup, setReminderPopup] = useState(null); // For 15 min reminders
+  const [reminderPopup, setReminderPopup] = useState(null);
   const remindedLeadsRef = useRef(new Set());
   const [showExpectedDateModal, setShowExpectedDateModal] = useState(false);
-  const [pendingPhaseChange, setPendingPhaseChange] = useState(null); // "warm" ya "cold"
-  const [leadBeingUpdated, setLeadBeingUpdated] = useState(null); // lead object
-  const [expectedDate, setExpectedDate] = useState(""); // date string like "2025-06-25"
+  const [pendingPhaseChange, setPendingPhaseChange] = useState(null);
+  const [leadBeingUpdated, setLeadBeingUpdated] = useState(null);
+  const [expectedDate, setExpectedDate] = useState("");
+
+  // Filter state with debouncing
+  const [rawFilters, setRawFilters] = useState({});
   const [filters, setFilters] = useState({});
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
-  // Add this function to handle filter changes
-  const handleFilterChange = (newFilters) => {
-    setFilters(newFilters);
-  };
+  // View mode state with localStorage persistence
+  const [viewMyLeadsOnly, setViewMyLeadsOnly] = useState(() => {
+    const saved = localStorage.getItem("viewMyLeadsOnly");
+    return saved !== null ? JSON.parse(saved) : null;
+  });
+  const [isViewModeLoading, setIsViewModeLoading] = useState(true);
 
-  // Add this function to handle CSV import
-  const handleImportComplete = (importedData) => {
-    // Implement your import logic here
-    console.log("Imported data:", importedData);
-  };
-
-  const computePhaseCounts = () => {
-    const user = users[currentUser?.uid];
-    const counts = {
-      hot: 0,
-      warm: 0,
-      cold: 0,
-      closed: 0, // Changed from renewal to closed
-    };
-
-    if (!user) return counts;
-
-    const isSalesDept = user.department === "Sales";
-    const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
-    const isLowerRole = ["Assistant Manager", "Executive"].includes(user.role);
-
-    Object.values(leads).forEach((lead) => {
-      const phase = lead.phase || "hot";
-      const isOwnLead = lead.assignedTo?.uid === currentUser?.uid;
-
-      const shouldInclude =
-        isSalesDept && isHigherRole
-          ? viewMyLeadsOnly
-            ? isOwnLead
-            : true
-          : isSalesDept && isLowerRole
-          ? isOwnLead
-          : false;
-
-      if (shouldInclude && counts[phase] !== undefined) {
-        counts[phase]++;
-      }
-    });
-
-    return counts;
-  };
-
-  const phaseCounts = computePhaseCounts();
-
+  // Persist view mode to localStorage
   useEffect(() => {
-    const auth = getAuth();
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setCurrentUser(user);
-        // Check user role and set viewMyLeadsOnly accordingly
-        const userData = Object.values(users).find((u) => u.uid === user.uid);
-        if (userData) {
-          const isHigherRole = ["Director", "Head", "Manager"].includes(
-            userData.role
-          );
-          // For higher roles, default to "My Leads" view
-          setViewMyLeadsOnly(isHigherRole);
+    if (viewMyLeadsOnly !== null) {
+      localStorage.setItem("viewMyLeadsOnly", JSON.stringify(viewMyLeadsOnly));
+    }
+  }, [viewMyLeadsOnly]);
+
+  // Debounce the filter updates
+  useEffect(() => {
+    const debounced = debounce(() => {
+      setFilters(rawFilters);
+    }, 300);
+    debounced();
+    return () => debounced.cancel();
+  }, [rawFilters]);
+
+  // Memoized computations
+const computePhaseCounts = useCallback(() => {
+  const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
+  const counts = { hot: 0, warm: 0, cold: 0, closed: 0 };
+
+  if (!user) return counts;
+
+  const isSalesDept = user.department === "Sales";
+  const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
+  const isLowerRole = ["Assistant Manager", "Executive"].includes(user.role);
+
+  Object.values(leads).forEach((lead) => {
+  const phase = lead.phase || "hot";
+  const isOwnLead = lead.assignedTo?.uid === currentUser?.uid;
+  let shouldInclude = false;
+
+  if (user.role === "Director") {
+    if (viewMyLeadsOnly) {
+      shouldInclude = isOwnLead;
+    } else {
+      shouldInclude = true;
+    }
+  } else if (isSalesDept && isHigherRole) {
+    if (viewMyLeadsOnly) {
+      shouldInclude = isOwnLead;
+    } else {
+      if (user.role === "Manager") {
+        const subordinates = Object.values(users).filter(
+          (u) =>
+            u.reportingManager === user.name &&
+            ["Assistant Manager", "Executive"].includes(u.role)
+        );
+        const teamUids = subordinates.map((u) => u.uid);
+        shouldInclude = teamUids.includes(lead.assignedTo?.uid);
+      } else if (user.role === "Head") {
+        const leadUser = Object.values(users).find(
+          (u) => u.uid === lead.assignedTo?.uid
+        );
+        if (leadUser) {
+          if (leadUser.role === "Manager") {
+            shouldInclude = true;
+          } else if (
+            ["Assistant Manager", "Executive"].includes(leadUser.role) &&
+            leadUser.reportingManager &&
+            Object.values(users).some(
+              (mgr) => mgr.role === "Manager" && mgr.name === leadUser.reportingManager
+            )
+          ) {
+            shouldInclude = true;
+          }
         }
       } else {
-        setCurrentUser(null);
+        shouldInclude = true;
       }
-    });
-
-    return () => unsubscribe();
-  }, [users]); // Add users as dependency
-
-  useEffect(() => {
-    const unsubLeads = onSnapshot(collection(db, "leads"), (snapshot) => {
-      const data = {};
-      snapshot.forEach((doc) => {
-        data[doc.id] = { id: doc.id, ...doc.data() };
-      });
-      setLeads(data);
-      setLoading(false);
-    });
-
-const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
-  const data = {};
-  snapshot.forEach((doc) => {
-    const userData = { id: doc.id, ...doc.data() };
-    if (userData.uid) {
-      data[userData.uid] = userData;
     }
-  });
-  setUsers(data);
+  } else if (isSalesDept && isLowerRole) {
+    shouldInclude = isOwnLead;
+  }
+
+  if (shouldInclude && counts[phase] !== undefined) {
+    counts[phase]++;
+  }
 });
 
+  return counts;
+}, [users, currentUser, leads, viewMyLeadsOnly]);
 
-    return () => {
-      unsubLeads();
-      unsubUsers();
-    };
-  }, []);
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setDropdownOpenId(null);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
-  const toggleDropdown = (id, e) => {
-    e.stopPropagation();
-    setDropdownOpenId((currentId) => (currentId === id ? null : id));
-  };
+  const phaseCounts = useMemo(() => computePhaseCounts(), [computePhaseCounts]);
 
-  const updateLeadPhase = async (id, newPhase) => {
-    try {
-      await updateDoc(doc(db, "leads", id), { phase: newPhase });
-    } catch (err) {
-      console.error("Phase update failed", err);
-    }
-  };
-
-  // In Sales.jsx
-  const handleSaveLead = async (updatedLead) => {
-    if (!updatedLead?.id) return;
-
-    // Convert date string back to timestamp if it exists
-    if (updatedLead.createdAt && typeof updatedLead.createdAt === "string") {
-      updatedLead.createdAt = new Date(updatedLead.createdAt).getTime();
-    }
-
-    const { ...dataToUpdate } = updatedLead;
-
-    try {
-      await updateDoc(doc(db, "leads", updatedLead.id), dataToUpdate);
-
-      setShowDetailsModal(false);
-      setSelectedLead(null);
-    } catch (error) {
-      console.error("Failed to update lead", error);
-    }
-  };
-
-  const filteredLeads = Object.entries(leads).filter(([, lead]) => {
+const filteredLeads = useMemo(() => {
+  return Object.entries(leads).filter(([, lead]) => {
     const phaseMatch = (lead.phase || "hot") === activeTab;
-    const user = users[currentUser?.uid];
+    const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
     if (!user) return false;
 
-    // Apply additional filters
     const matchesFilters =
       (!filters.city || lead.city?.includes(filters.city)) &&
       (!filters.assignedTo || lead.assignedTo?.uid === filters.assignedTo) &&
@@ -225,34 +189,140 @@ const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
         lead.pocName?.toLowerCase().includes(filters.pocName.toLowerCase())) &&
       (!filters.phoneNo || lead.phoneNo?.includes(filters.phoneNo)) &&
       (!filters.email ||
-        lead.email?.toLowerCase().includes(filters.email.toLowerCase()));
+        lead.email?.toLowerCase().includes(filters.email.toLowerCase())) &&
+      (!filters.contactMethod ||
+        lead.contactMethod?.toLowerCase() === filters.contactMethod.toLowerCase());
 
     const isSalesDept = user.department === "Sales";
     const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
-    const isLowerRole = ["Assistant Manager", "Executive"].includes(user.role);
+
+   if (user.role === "Director") {
+  if (viewMyLeadsOnly) {
+    // Director -> My Leads: only own leads
+    return phaseMatch && matchesFilters && lead.assignedTo?.uid === currentUser?.uid;
+  } else {
+    // Director -> My Team: all sales team leads
+    return phaseMatch && matchesFilters;
+  }
+}
 
     if (isSalesDept && isHigherRole) {
-      return viewMyLeadsOnly
-        ? phaseMatch &&
-            matchesFilters &&
-            lead.assignedTo?.uid === currentUser?.uid
-        : phaseMatch && matchesFilters;
+      if (viewMyLeadsOnly) {
+        return phaseMatch && matchesFilters && lead.assignedTo?.uid === currentUser?.uid;
+      } else {
+        if (user.role === "Manager") {
+          const subordinates = Object.values(users).filter(
+            (u) =>
+              u.reportingManager === user.name &&
+              ["Assistant Manager", "Executive"].includes(u.role)
+          );
+          const teamUids = subordinates.map((u) => u.uid);
+          return phaseMatch && matchesFilters && teamUids.includes(lead.assignedTo?.uid);
+        }
+        
+
+        if (user.role === "Head") {
+          const leadUser = Object.values(users).find((u) => u.uid === lead.assignedTo?.uid);
+          if (!leadUser) return false;
+
+          if (leadUser.role === "Manager") return phaseMatch && matchesFilters;
+
+          if (
+            ["Assistant Manager", "Executive"].includes(leadUser.role) &&
+            leadUser.reportingManager &&
+            Object.values(users).some(
+              (mgr) => mgr.role === "Manager" && mgr.name === leadUser.reportingManager
+            )
+          ) {
+            return phaseMatch && matchesFilters;
+          }
+        }
+
+        return phaseMatch && matchesFilters;
+      }
     }
 
-    if (isSalesDept && isLowerRole) {
-      return (
-        phaseMatch &&
-        matchesFilters &&
-        lead.assignedTo?.uid === currentUser?.uid
-      );
+    if (isSalesDept && ["Assistant Manager", "Executive"].includes(user.role)) {
+      return phaseMatch && matchesFilters && lead.assignedTo?.uid === currentUser?.uid;
     }
 
     return false;
   });
+}, [leads, activeTab, users, currentUser, viewMyLeadsOnly, filters]);
 
-  // Define the grid columns based on the fields we want to display
-  // const gridColumns = "grid grid-cols-11 gap-4";
 
+
+
+
+  // Auth state listener
+  useEffect(() => {
+    const auth = getAuth();
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setCurrentUser(user);
+        const userData = Object.values(users).find((u) => u.uid === user.uid);
+        if (userData) {
+          const isHigherRole = ["Director", "Head", "Manager"].includes(
+            userData.role
+          );
+          // Only set initial value if no preference exists
+          if (viewMyLeadsOnly === null) {
+            setViewMyLeadsOnly(isHigherRole);
+          }
+        }
+        setIsViewModeLoading(false);
+      } else {
+        setCurrentUser(null);
+        setIsViewModeLoading(false);
+      }
+    });
+    return () => unsubscribe();
+  }, [users, viewMyLeadsOnly]);
+
+  // Firestore data subscriptions with query constraints
+  useEffect(() => {
+    const leadsQuery = query(
+      collection(db, "leads"),
+      where("phase", "in", ["hot", "warm", "cold", "closed"]),
+      orderBy("createdAt", "desc"),
+      limit(500)
+    );
+
+    const unsubLeads = onSnapshot(leadsQuery, (snapshot) => {
+      const data = {};
+      snapshot.forEach((doc) => {
+        data[doc.id] = { id: doc.id, ...doc.data() };
+      });
+      setLeads(data);
+      setLoading(false);
+    });
+
+    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+      const data = {};
+      snapshot.forEach((doc) => {
+        data[doc.id] = { id: doc.id, ...doc.data() };
+      });
+      setUsers(data);
+    });
+
+    return () => {
+      unsubLeads();
+      unsubUsers();
+    };
+  }, []);
+
+  // Click outside dropdown handler
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpenId(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Today's follow-ups check
   useEffect(() => {
     if (!loading && Object.keys(leads).length > 0) {
       const now = new Date();
@@ -281,34 +351,16 @@ const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
       if (matchingLeads.length > 0) {
         setTodayFollowUps(matchingLeads);
         setShowTodayFollowUpAlert(true);
-
-        // ✅ Automatically hide after 4 seconds
-        const timer = setTimeout(() => {
-          setShowTodayFollowUpAlert(false);
-        }, 4000);
-
-        return () => clearTimeout(timer); // Cleanup
+        const timer = setTimeout(() => setShowTodayFollowUpAlert(false), 4000);
+        return () => clearTimeout(timer);
       }
     }
   }, [leads, loading, currentUser?.uid]);
-  // Fix: include currentUser?.uid as dependency
-  function convertTo24HrTime(timeStr) {
-    if (!timeStr) return "00:00:00";
-    const [time, modifier] = timeStr.split(" ");
-    let [hours, minutes] = time.split(":").map(Number);
 
-    if (modifier === "PM" && hours !== 12) hours += 12;
-    if (modifier === "AM" && hours === 12) hours = 0;
-
-    return `${hours.toString().padStart(2, "0")}:${minutes
-      .toString()
-      .padStart(2, "0")}:00`;
-  }
-
+  // Reminder interval
   useEffect(() => {
     const interval = setInterval(() => {
       const now = new Date();
-
       const upcomingReminder = Object.values(leads).find((lead) => {
         if (lead.assignedTo?.uid !== currentUser?.uid) return false;
         if ((lead.phase || "hot") !== "hot") return false;
@@ -327,15 +379,13 @@ const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
           latest.date === now.toISOString().split("T")[0] &&
           reminderTime <= now &&
           followUpTime > now;
-
         const alreadyReminded = remindedLeadsRef.current.has(lead.id);
 
         return isToday && !alreadyReminded;
       });
 
       if (upcomingReminder) {
-        remindedLeadsRef.current.add(upcomingReminder.id); // ✅ Track shown reminders
-
+        remindedLeadsRef.current.add(upcomingReminder.id);
         setReminderPopup({
           leadId: upcomingReminder.id,
           college: upcomingReminder.businessName,
@@ -349,9 +399,92 @@ const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
     return () => clearInterval(interval);
   }, [leads, currentUser]);
 
+  // Helper functions
+  const convertTo24HrTime = (timeStr) => {
+    if (!timeStr) return "00:00:00";
+    const [time, modifier] = timeStr.split(" ");
+    let [hours, minutes] = time.split(":").map(Number);
+
+    if (modifier === "PM" && hours !== 12) hours += 12;
+    if (modifier === "AM" && hours === 12) hours = 0;
+
+    return `${hours.toString().padStart(2, "0")}:${minutes
+      .toString()
+      .padStart(2, "0")}:00`;
+  };
+
+  const toggleDropdown = useCallback((id, e) => {
+    e.stopPropagation();
+    setDropdownOpenId((currentId) => (currentId === id ? null : id));
+  }, []);
+
+  const updateLeadPhase = useCallback(async (id, newPhase) => {
+    try {
+      await updateDoc(doc(db, "leads", id), { phase: newPhase });
+    } catch (err) {
+      console.error("Phase update failed", err);
+    }
+  }, []);
+
+  const handleSaveLead = useCallback(async (updatedLead) => {
+    if (!updatedLead?.id) return;
+
+    if (updatedLead.createdAt && typeof updatedLead.createdAt === "string") {
+      updatedLead.createdAt = new Date(updatedLead.createdAt).getTime();
+    }
+
+    const { ...dataToUpdate } = updatedLead;
+
+    try {
+      await updateDoc(doc(db, "leads", updatedLead.id), dataToUpdate);
+      setShowDetailsModal(false);
+      setSelectedLead(null);
+    } catch (error) {
+      console.error("Failed to update lead", error);
+    }
+  }, []);
+
+  const handleImportComplete = useCallback((importedData) => {
+    console.log("Imported data:", importedData);
+  }, []);
+
+  const handleTabChange = useCallback((tab) => setActiveTab(tab), []);
+
+  // View Mode Toggle Component
+  const ViewModeToggle = ({ isHigherRole }) => {
+    if (!isHigherRole) return null;
+
+    return (
+      <div className="flex gap-2">
+        <button
+          onClick={() => setViewMyLeadsOnly(true)}
+          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${
+            viewMyLeadsOnly
+              ? "bg-blue-600 text-white border-blue-600 shadow-md"
+              : "bg-white text-blue-600 border-blue-300 hover:bg-blue-50"
+          }`}
+          aria-label="Show only my leads"
+        >
+          My Leads
+        </button>
+        <button
+          onClick={() => setViewMyLeadsOnly(false)}
+          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${
+            !viewMyLeadsOnly
+              ? "bg-blue-600 text-white border-blue-600 shadow-md"
+              : "bg-white text-blue-600 border-blue-300 hover:bg-blue-50"
+          }`}
+          aria-label="Show my team's leads"
+        >
+          My Team
+        </button>
+      </div>
+    );
+  };
+
   return (
-    <div className="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen font-sans ">
-      <div className=" mx-auto">
+    <div className="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen font-sans">
+      <div className="mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
@@ -371,7 +504,9 @@ const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
                     role
                   );
 
-                  return (
+                  return isViewModeLoading ? (
+                    <div className="h-8 w-48 bg-gray-100 rounded-full animate-pulse"></div>
+                  ) : (
                     <div className="flex items-center gap-2">
                       <p
                         className={`text-xs font-medium px-3 py-1 rounded-full ${
@@ -387,31 +522,7 @@ const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
                             : "All Sales Leads"
                           : "My Leads Only"}
                       </p>
-
-                      {isHigherRole && (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => setViewMyLeadsOnly(true)}
-                            className={`text-xs font-medium px-3 py-1 rounded-full border transition ${
-                              viewMyLeadsOnly
-                                ? "bg-blue-600 text-white border-blue-600"
-                                : "bg-white text-blue-600 border-blue-300"
-                            }`}
-                          >
-                            My Leads
-                          </button>
-                          <button
-                            onClick={() => setViewMyLeadsOnly(false)}
-                            className={`text-xs font-medium px-3 py-1 rounded-full border transition ${
-                              !viewMyLeadsOnly
-                                ? "bg-blue-600 text-white border-blue-600"
-                                : "bg-white text-blue-600 border-blue-300"
-                            }`}
-                          >
-                            My Team
-                          </button>
-                        </div>
-                      )}
+                      <ViewModeToggle isHigherRole={isHigherRole} />
                     </div>
                   );
                 })()}
@@ -419,12 +530,13 @@ const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
               <LeadFilters
                 filteredLeads={filteredLeads}
                 handleImportComplete={handleImportComplete}
-                filters={filters}
-                setFilters={setFilters}
+                filters={rawFilters}
+                setFilters={setRawFilters}
                 isFilterOpen={isFilterOpen}
                 setIsFilterOpen={setIsFilterOpen}
                 users={users}
-                leads={leads} // Pass leads data to extract filter options
+                leads={leads}
+                activeTab={activeTab}
               />
             </div>
           </div>
@@ -448,11 +560,12 @@ const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
             Add College
           </button>
         </div>
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
           {Object.keys(tabLabels).map((key) => (
             <button
               key={key}
-              onClick={() => setActiveTab(key)}
+              onClick={() => handleTabChange(key)}
               className={`py-3.5 rounded-xl text-sm font-semibold transition-all duration-300 ease-out transform hover:scale-[1.02] ${
                 activeTab === key
                   ? tabColorMap[key].active
@@ -466,8 +579,8 @@ const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
                     : key === "warm"
                     ? "ring-amber-400"
                     : key === "cold"
-                    ? "ring-cyan-400" // Changed to icy blue
-                    : "ring-green-500" // Changed to success green
+                    ? "ring-cyan-400"
+                    : "ring-green-500"
                   : ""
               }`}
             >
@@ -500,15 +613,14 @@ const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
           headerColorMap={{
             open: "bg-blue-100",
             inProgress: "bg-yellow-100",
-            closed: "bg-gray-100", // agar zarurat ho to add karo
+            closed: "bg-gray-100",
           }}
           borderColorMap={{
             open: "border-blue-400",
             inProgress: "border-yellow-400",
-            closed: "border-gray-400", // agar zarurat ho to add karo
+            closed: "border-gray-400",
           }}
           setShowModal={setShowModal}
-          // Add props needed for ClosedLeads
           leads={leads}
           viewMyLeadsOnly={viewMyLeadsOnly}
           currentUser={currentUser}
@@ -545,31 +657,6 @@ const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
         reminderPopup={reminderPopup}
         setReminderPopup={setReminderPopup}
       />
-
-      <style>{`
-  @keyframes slideInRight {
-    0% {
-      transform: translateX(100%);
-      opacity: 0;
-    }
-    15% {
-      transform: translateX(0);
-      opacity: 1;
-    }
-    85% {
-      transform: translateX(0);
-      opacity: 1;
-    }
-    100% {
-      transform: translateX(100%);
-      opacity: 0;
-    }
-  }
-
-  .animate-slideInRight {
-    animation: slideInRight 4s ease-in-out forwards;
-  }
-`}</style>
 
       <ExpectedDateModal
         show={showExpectedDateModal}
