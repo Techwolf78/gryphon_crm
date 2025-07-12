@@ -1,4 +1,4 @@
-
+ 
 import React, { useState, useEffect, useContext, useCallback } from "react";
 import { FaTimes } from "react-icons/fa";
 import { collection, serverTimestamp, doc, updateDoc, writeBatch, setDoc, getDoc } from "firebase/firestore";
@@ -13,19 +13,19 @@ import MOUUploadSection from "./MOUUploadSection";
 import PropTypes from "prop-types";
 import syncLogo from "../../../assets/SYNC-logo.png";
 import * as XLSX from "xlsx-js-style";
-
+ 
 const validateCollegeCode = (value) => /^[A-Z]*$/.test(value);
 const validatePincode = (value) => /^[0-9]{0,6}$/.test(value);
 const validateGST = (value) =>
     /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(value);
-
-const TrainingForm = ({ 
-    show, 
-    onClose, 
-    lead, 
-    users, 
+ 
+const TrainingForm = ({
+    show,
+    onClose,
+    lead,
+    users,
     existingFormData,
-    isLoading 
+    isLoading
 }) => {
     const { currentUser } = useContext(AuthContext);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -82,7 +82,7 @@ const TrainingForm = ({
     const [contractEndDate, setContractEndDate] = useState("");
     const [duplicateProjectCode, setDuplicateProjectCode] = useState(false);
     const [isFormValid, setIsFormValid] = useState(false);
-
+ 
     // Check if all required fields are filled
     useEffect(() => {
         const requiredFields = [
@@ -105,7 +105,7 @@ const TrainingForm = ({
             contractStartDate,
             contractEndDate
         ];
-
+ 
         // Validate payment splits if payment type is not EMI
         if (formData.paymentType === "EMI") {
             requiredFields.push(formData.emiMonths > 0);
@@ -114,19 +114,48 @@ const TrainingForm = ({
                 formData.paymentSplits.reduce((acc, val) => acc + (parseFloat(val) || 0), 0) === 100;
             requiredFields.push(splitsValid);
         }
-
+ 
         // Validate student count
         requiredFields.push(formData.studentCount > 0);
-
+ 
         const isValid = requiredFields.every(field => {
             if (typeof field === 'boolean') return field;
             return field && field.toString().trim() !== '';
         });
-
+ 
         setIsFormValid(isValid);
     }, [formData, contractStartDate, contractEndDate]);
-
-
+ 
+useEffect(() => {
+  if (existingFormData) {
+    setFormData((prev) => ({
+      ...prev,
+      ...existingFormData
+    }));
+    setContractStartDate(existingFormData.contractStartDate || "");
+    setContractEndDate(existingFormData.contractEndDate || "");
+  } else if (lead) {
+    // fallback agar existingFormData nahi diya
+    setFormData((prev) => ({
+      ...prev,
+      collegeName: lead.businessName || "",
+      address: lead.address || "",
+      city: lead.city || "",
+      state: lead.state || "",
+      studentCount: lead.studentCount || 0,
+      totalCost: (lead.studentCount || 0) * (lead.perStudentCost || 0),
+      perStudentCost: lead.perStudentCost || 0,
+      course: lead.courseType || "",
+      tpoName: lead.pocName || "",
+      tpoEmail: lead.email || "",
+      tpoPhone: lead.phoneNo || "",
+    }));
+    setContractStartDate(lead.contractStartDate || "");
+    setContractEndDate(lead.contractEndDate || "");
+  }
+}, [existingFormData, lead]);
+ 
+ 
     // Rest of your existing useEffect hooks remain the same...
     useEffect(() => {
         if (lead) {
@@ -148,7 +177,7 @@ const TrainingForm = ({
             setContractEndDate(lead.contractEndDate || "");
         }
     }, [lead]);
-
+ 
     useEffect(() => {
         const totalStudents = formData.courses.reduce(
             (sum, item) => sum + (parseInt(item.students) || 0),
@@ -160,7 +189,7 @@ const TrainingForm = ({
             totalCost: totalStudents * (parseFloat(prev.perStudentCost) || 0),
         }));
     }, [formData.courses, formData.perStudentCost]);
-
+ 
     useEffect(() => {
         const { collegeCode, course, year, deliveryType, passingYear } = formData;
         if (collegeCode && course && year && deliveryType && passingYear) {
@@ -178,16 +207,16 @@ const TrainingForm = ({
         formData.deliveryType,
         formData.passingYear,
     ]);
-
+ 
     const validatePaymentSection = () => {
         if (!formData.paymentType) {
             return false;
         }
-
+ 
         if (!formData.gstType) {
             return false;
         }
-
+ 
         if (formData.paymentType === "EMI") {
             if (!formData.emiMonths || formData.emiMonths <= 0) {
                 return false;
@@ -196,20 +225,20 @@ const TrainingForm = ({
             if (!formData.paymentSplits || formData.paymentSplits.length === 0) {
                 return false;
             }
-
+ 
             const sum = formData.paymentSplits.reduce((acc, val) => acc + (parseFloat(val) || 0), 0);
             if (typeof sum !== 'number' || isNaN(sum)) {
                 return false;
             }
-
+ 
             if (sum.toFixed(2) !== "100.00") {
                 return false;
             }
         }
-
+ 
         return true;
     };
-
+ 
     const handleChange = useCallback((e) => {
         const { name, value } = e.target;
         setHasUnsavedChanges(true);
@@ -228,7 +257,7 @@ const TrainingForm = ({
         }
         setFormData((prev) => ({ ...prev, [name]: value }));
     }, []);
-
+ 
     const uploadFileToCloudinary = async (file, folderName) => {
         if (!file) return null;
         const url = "https://api.cloudinary.com/v1_1/da0ypp61n/raw/upload";
@@ -243,26 +272,26 @@ const TrainingForm = ({
         }
         return data.secure_url;
     };
-
+ 
     const uploadStudentsToFirestore = async (studentList, formId) => {
         try {
             if (!studentList || studentList.length === 0) return;
-
+ 
             const batch = writeBatch(db);
             const studentsCollectionRef = collection(db, "trainingForms", formId, "students");
-
+ 
             studentList.forEach((student) => {
                 const docRef = doc(studentsCollectionRef);
                 batch.set(docRef, student);
             });
-
+ 
             await batch.commit();
         } catch (error) {
             console.error("Error uploading students:", error);
             throw error;
         }
     };
-
+ 
     const handleStudentFile = (file) => {
         setStudentFile(file);
         if (file) {
@@ -279,7 +308,7 @@ const TrainingForm = ({
             setFormData((prev) => ({ ...prev, studentList: [] }));
         }
     };
-
+ 
     const checkDuplicateProjectCode = async (projectCode) => {
         try {
             const sanitizedProjectCode = projectCode.replace(/\//g, "-");
@@ -291,10 +320,10 @@ const TrainingForm = ({
             return false;
         }
     };
-
+ 
     const handleSubmit = async (e) => {
         e.preventDefault();
-
+ 
         // Basic form validation
         if (!e.target.checkValidity()) {
             const firstInvalid = e.target.querySelector(':invalid');
@@ -303,22 +332,22 @@ const TrainingForm = ({
             }
             return;
         }
-
+ 
         // Payment section validation
         if (!validatePaymentSection()) {
             return;
         }
-
+ 
         // Contract dates validation
         if (!contractStartDate || !contractEndDate) {
             return;
         }
-
+ 
         setIsSubmitting(true);
-
+ 
         try {
             const rawProjectCode = formData.projectCode;
-
+ 
             // Check for duplicate project code
             const isDuplicate = await checkDuplicateProjectCode(rawProjectCode);
             if (isDuplicate) {
@@ -326,31 +355,39 @@ const TrainingForm = ({
                 setIsSubmitting(false);
                 return;
             }
-
+  const today = new Date();
+        const endDate = new Date(contractEndDate);
+        const diffTime = endDate - today;
+        const diffDays = diffTime / (1000 * 60 * 60 * 24);
+ 
+        let closureType = "new";
+        if (diffDays <= 90 && diffDays >= 0) {
+            closureType = "renewal";
+        }
             // Update lead if exists
-            if (lead?.id) {
-                const leadRef = doc(db, "leads", lead.id);
-                await updateDoc(leadRef, {
-                    phase: "closed",
-                    closureType: "new",
-                    closedDate: new Date().toISOString(),
-                    totalCost: formData.totalCost,
-                    perStudentCost: formData.perStudentCost,
-                    contractStartDate,
-                    contractEndDate,
-                    projectCode: rawProjectCode
-                });
+           if (lead?.id) {
+            const leadRef = doc(db, "leads", lead.id);
+            await updateDoc(leadRef, {
+                phase: "closed",
+                closureType: closureType, // dynamic
+                closedDate: new Date().toISOString(),
+                totalCost: formData.totalCost,
+                perStudentCost: formData.perStudentCost,
+                contractStartDate,
+                contractEndDate,
+                projectCode: rawProjectCode
+            });
             }
-
+ 
             // Upload files (if they exist)
             const [studentUrl, mouUrl] = await Promise.all([
                 studentFile ? uploadFileToCloudinary(studentFile, "training-forms/student-files") : null,
                 mouFile ? uploadFileToCloudinary(mouFile, "training-forms/mou-files") : null
             ]);
-
+ 
             const assignedUser = users?.[lead?.assignedTo?.uid] || {};
             const { studentList, ...formDataWithoutStudents } = formData;
-
+ 
             // Prepare payment details for Firestore
             const paymentDetails = formData.paymentDetails.map(detail => ({
                 ...detail,
@@ -359,9 +396,9 @@ const TrainingForm = ({
                 totalAmount: parseFloat(detail.totalAmount),
                 percentage: parseFloat(detail.percentage),
             }));
-
+ 
             const sanitizedProjectCode = rawProjectCode.replace(/\//g, "-");
-
+ 
             // Save form data
             await setDoc(doc(db, "trainingForms", sanitizedProjectCode), {
                 ...formDataWithoutStudents,
@@ -384,12 +421,12 @@ const TrainingForm = ({
                 status: "active",
                 lastUpdated: serverTimestamp()
             });
-
+ 
             // Upload students (if student list exists)
             if (studentList && studentList.length > 0) {
                 await uploadStudentsToFirestore(studentList, sanitizedProjectCode);
             }
-
+ 
             setHasUnsavedChanges(false);
             setTimeout(onClose, 1000);
         } catch (err) {
@@ -398,8 +435,8 @@ const TrainingForm = ({
             setIsSubmitting(false);
         }
     };
-
-
+ 
+ 
     const handleClose = useCallback(() => {
         if (
             hasUnsavedChanges &&
@@ -409,9 +446,9 @@ const TrainingForm = ({
         }
         onClose();
     }, [hasUnsavedChanges, onClose]);
-
+ 
     if (!show || !lead) return null;
-
+ 
     return (
         <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center px-4 z-54">
             <div className="bg-white w-full max-w-7xl h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col relative animate-fadeIn">
@@ -510,5 +547,6 @@ TrainingForm.propTypes = {
     existingFormData: PropTypes.object, // Add this
     isLoading: PropTypes.bool, // Add this
 };
-
+ 
 export default TrainingForm;
+ 
