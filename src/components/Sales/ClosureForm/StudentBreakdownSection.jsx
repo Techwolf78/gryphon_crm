@@ -117,6 +117,7 @@ const StudentBreakdownSection = ({ formData, setFormData, studentFile, setStuden
           {(formData.courses || []).map((item, index) => {
             const isOthersSpec = item.specialization === "Other";
             return (
+              
               <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="space-y-1">
                   <label className="font-medium">Specialization <span className="text-red-500">*</span></label>
