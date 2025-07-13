@@ -12,35 +12,13 @@ export default function SessionManager() {
 
     let warningTimer;
     let logoutTimer;
+    let lastActiveTime = Date.now();
 
-    // Convert minutes to milliseconds
+    // Time constants
     const MINUTE = 60 * 1000;
-    const WARNING_TIME = 10 * MINUTE; // Show warning after 10 minutes
-    const LOGOUT_TIME = 15 * MINUTE; // Total session time (15 minutes)
-    const TIME_BETWEEN_WARNING_AND_LOGOUT = LOGOUT_TIME - WARNING_TIME; // 5 minutes
-
-    const resetTimers = () => {
-      // Clear existing timers
-      clearTimeout(warningTimer);
-      clearTimeout(logoutTimer);
-
-      // Set warning to appear after 10 minutes
-      warningTimer = setTimeout(() => {
-        const shouldRefresh = window.confirm(
-          `Your session will expire in ${TIME_BETWEEN_WARNING_AND_LOGOUT / MINUTE} minutes due to inactivity. Click OK to stay logged in.`
-        );
-        
-        if (shouldRefresh) {
-          refreshSession();
-          resetTimers();
-        } else {
-          handleLogout();
-        }
-
-        // Set logout to happen at the full session time (15 minutes total)
-        logoutTimer = setTimeout(handleLogout, TIME_BETWEEN_WARNING_AND_LOGOUT);
-      }, WARNING_TIME);
-    };
+    const WARNING_TIME = 10 * MINUTE;
+    const LOGOUT_TIME = 15 * MINUTE;
+    const MAX_SESSION_AGE = 12 * 60 * MINUTE; // 12 hours max session
 
     const handleLogout = () => {
       logout();
@@ -49,36 +27,61 @@ export default function SessionManager() {
       });
     };
 
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'visible') {
-        try {
-          const refreshed = await refreshSession();
-          if (!refreshed) throw new Error('Session refresh failed');
-          resetTimers();
-        } catch (error) {
-          console.error('Connection check failed:', error);
+    const checkSessionAge = () => {
+      const sessionAge = Date.now() - lastActiveTime;
+      if (sessionAge > MAX_SESSION_AGE) {
+        handleLogout();
+        return false;
+      }
+      return true;
+    };
+
+    const resetTimers = () => {
+      clearTimeout(warningTimer);
+      clearTimeout(logoutTimer);
+      lastActiveTime = Date.now();
+
+      warningTimer = setTimeout(() => {
+        if (!checkSessionAge()) return;
+        
+        const shouldRefresh = window.confirm(
+          'Your session will expire in 5 minutes. Click OK to stay logged in.'
+        );
+        
+        if (shouldRefresh) {
+          refreshSession().then(success => {
+            if (success) resetTimers();
+          });
+        } else {
           handleLogout();
         }
+
+        logoutTimer = setTimeout(handleLogout, 5 * MINUTE);
+      }, WARNING_TIME);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Check if session expired while tab was inactive
+        if (!checkSessionAge()) return;
+        
+        // Verify session with server
+        refreshSession().then(success => {
+          if (success) resetTimers();
+        });
       }
     };
 
-    // Set up event listeners
+    // Initialize
+    resetTimers();
     const events = ['mousedown', 'keypress', 'scroll', 'touchstart', 'click', 'mousemove'];
-    events.forEach(event => {
-      window.addEventListener(event, resetTimers);
-    });
+    events.forEach(event => window.addEventListener(event, resetTimers));
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // Initialize timers
-    resetTimers();
-
-    // Cleanup
     return () => {
       clearTimeout(warningTimer);
       clearTimeout(logoutTimer);
-      events.forEach(event => {
-        window.removeEventListener(event, resetTimers);
-      });
+      events.forEach(event => window.removeEventListener(event, resetTimers));
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [user, logout, navigate, location, refreshSession]);
