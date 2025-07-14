@@ -37,8 +37,8 @@ const TrainingDetailModal = ({ training, onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex justify-center items-center z-54 p-4 animate-fadeIn">
-      <div 
-        ref={modalRef} 
+      <div
+        ref={modalRef}
         className="bg-white rounded-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden shadow-2xl border border-gray-100 animate-slideUp transform transition-all duration-300"
       >
         {/* Header */}
@@ -62,8 +62,8 @@ const TrainingDetailModal = ({ training, onClose }) => {
               </div>
             </div>
           </div>
-          <button 
-            onClick={onClose} 
+          <button
+            onClick={onClose}
             className="text-white/90 hover:text-white transition-all p-2 rounded-full hover:bg-white/20 flex items-center justify-center"
             aria-label="Close modal"
           >
@@ -74,8 +74,8 @@ const TrainingDetailModal = ({ training, onClose }) => {
         {/* Content */}
         <div className="overflow-y-auto h-[calc(95vh-72px)] p-6 space-y-6">
           {/* 1. Institution Section */}
-          <ModernSection 
-            title="Institution Details" 
+          <ModernSection
+            title="Institution Details"
             icon={<IoMdBusiness className="text-blue-500" />}
             badge={`${training?.collegeCode || 'No Code'}`}
             className="bg-gradient-to-br from-blue-50 to-blue-50/70"
@@ -92,33 +92,33 @@ const TrainingDetailModal = ({ training, onClose }) => {
           </ModernSection>
 
           {/* 2. Contacts Section */}
-          <ModernSection 
-            title="Contact Information" 
+          <ModernSection
+            title="Contact Information"
             icon={<MdPeople className="text-purple-500" />}
             className="bg-gradient-to-br from-purple-50 to-purple-50/70"
           >
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <ContactCard 
-                type="TPO" 
-                name={training?.tpoName} 
-                email={training?.tpoEmail} 
-                phone={training?.tpoPhone} 
+              <ContactCard
+                type="TPO"
+                name={training?.tpoName}
+                email={training?.tpoEmail}
+                phone={training?.tpoPhone}
                 color="bg-purple-100"
                 iconColor="text-purple-500"
               />
-              <ContactCard 
-                type="Training Coordinator" 
-                name={training?.trainingName} 
-                email={training?.trainingEmail} 
-                phone={training?.trainingPhone} 
+              <ContactCard
+                type="Training Coordinator"
+                name={training?.trainingName}
+                email={training?.trainingEmail}
+                phone={training?.trainingPhone}
                 color="bg-blue-100"
                 iconColor="text-blue-500"
               />
-              <ContactCard 
-                type="Account Contact" 
-                name={training?.accountName} 
-                email={training?.accountEmail} 
-                phone={training?.accountPhone} 
+              <ContactCard
+                type="Account Contact"
+                name={training?.accountName}
+                email={training?.accountEmail}
+                phone={training?.accountPhone}
                 color="bg-amber-100"
                 iconColor="text-amber-500"
               />
@@ -126,8 +126,8 @@ const TrainingDetailModal = ({ training, onClose }) => {
           </ModernSection>
 
           {/* 3. Program Details */}
-          <ModernSection 
-            title="Program Details" 
+          <ModernSection
+            title="Program Details"
             icon={<IoIosSchool className="text-green-500" />}
             badge={`${training?.studentCount || '0'} Students`}
             className="bg-gradient-to-br from-green-50 to-green-50/70"
@@ -137,14 +137,29 @@ const TrainingDetailModal = ({ training, onClose }) => {
               <DetailCard label="Year" value={training?.year} iconColor="text-green-400" />
               <DetailCard label="Delivery Type" value={training?.deliveryType} iconColor="text-green-400" />
               <DetailCard label="Passing Year" value={training?.passingYear} iconColor="text-green-400" />
-              <DetailCard label="Specialization" value={training?.specialization} iconColor="text-green-400" />
+              <DetailCard
+                label="Course Specializations"
+                value={
+                  training?.courses?.length ? (
+                    <ul className="list-disc pl-5 space-y-1">
+                      {training.courses.map((course, index) => (
+                        <li key={index} className="text-sm">
+                          {course.specialization} ({course.students} students)
+                        </li>
+                      ))}
+                    </ul>
+                  ) : 'Not specified'
+                }
+                fullWidth
+                iconColor="text-green-400"
+              />
               <DetailCard label="Total Students" value={training?.studentCount} iconColor="text-green-400" />
               <DetailCard label="Total Hours" value={training?.totalHours} iconColor="text-green-400" />
-              <DetailCard 
-                label="Student Data" 
-                value={training?.studentFileUrl ? "Uploaded" : "Not uploaded"} 
-                icon={training?.studentFileUrl ? 
-                  <FaFileExcel className="text-green-500" /> : 
+              <DetailCard
+                label="Student Data"
+                value={training?.studentFileUrl ? "Uploaded" : "Not uploaded"}
+                icon={training?.studentFileUrl ?
+                  <FaFileExcel className="text-green-500" /> :
                   <FaFileExcel className="text-gray-400" />}
                 status={training?.studentFileUrl ? "success" : "neutral"}
               />
@@ -179,37 +194,37 @@ const TrainingDetailModal = ({ training, onClose }) => {
           </ModernSection>
 
           {/* 4. Financials */}
-          <ModernSection 
-            title="Financial Information" 
+          <ModernSection
+            title="Financial Information"
             icon={<RiMoneyDollarCircleLine className="text-amber-500" />}
             badge={formatCurrency(training?.totalCost)}
             className="bg-gradient-to-br from-amber-50 to-amber-50/70"
           >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <DetailCard 
-                label="Total Students" 
-                value={training?.studentCount} 
+              <DetailCard
+                label="Total Students"
+                value={training?.studentCount}
                 iconColor="text-amber-400"
               />
-              <DetailCard 
-                label="Cost per Student" 
-                value={formatCurrency(training?.perStudentCost)} 
+              <DetailCard
+                label="Cost per Student"
+                value={formatCurrency(training?.perStudentCost)}
                 iconColor="text-amber-400"
               />
-              <DetailCard 
-                label="Total Amount" 
-                value={formatCurrency(training?.totalCost)} 
+              <DetailCard
+                label="Total Amount"
+                value={formatCurrency(training?.totalCost)}
                 highlight
                 iconColor="text-amber-400"
               />
-              <DetailCard 
-                label="Payment Type" 
-                value={training?.paymentType} 
+              <DetailCard
+                label="Payment Type"
+                value={training?.paymentType}
                 iconColor="text-amber-400"
               />
-              <DetailCard 
-                label="Payment Status" 
-                value={training?.paymentReceived ? "Completed" : "Pending"} 
+              <DetailCard
+                label="Payment Status"
+                value={training?.paymentReceived ? "Completed" : "Pending"}
                 status={training?.paymentReceived ? "success" : "warning"}
                 iconColor="text-amber-400"
               />
@@ -217,29 +232,29 @@ const TrainingDetailModal = ({ training, onClose }) => {
           </ModernSection>
 
           {/* 5. Contract */}
-          <ModernSection 
-            title="Contract Details" 
+          <ModernSection
+            title="Contract Details"
             icon={<FaFilePdf className="text-red-500" />}
             badge={training?.mouFileUrl ? "MOU Uploaded" : "No MOU"}
             className="bg-gradient-to-br from-red-50 to-red-50/70"
           >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <DetailCard 
-                label="MOU Status" 
-                value={training?.mouFileUrl ? "Uploaded" : "Not uploaded"} 
-                icon={training?.mouFileUrl ? 
-                  <FaFilePdf className="text-red-500" /> : 
+              <DetailCard
+                label="MOU Status"
+                value={training?.mouFileUrl ? "Uploaded" : "Not uploaded"}
+                icon={training?.mouFileUrl ?
+                  <FaFilePdf className="text-red-500" /> :
                   <FaFilePdf className="text-gray-400" />}
                 status={training?.mouFileUrl ? "success" : "neutral"}
               />
-              <DetailCard 
-                label="Contract Start" 
-                value={formatDate(training?.contractStartDate)} 
+              <DetailCard
+                label="Contract Start"
+                value={formatDate(training?.contractStartDate)}
                 icon={<FaCalendarAlt className="text-gray-400" />}
               />
-              <DetailCard 
-                label="Contract End" 
-                value={formatDate(training?.contractEndDate)} 
+              <DetailCard
+                label="Contract End"
+                value={formatDate(training?.contractEndDate)}
                 icon={<FaCalendarAlt className="text-gray-400" />}
               />
             </div>
@@ -276,7 +291,7 @@ const DetailCard = ({ label, value, icon, fullWidth = false, highlight = false, 
   if (status === "success") statusClasses = "text-green-700 bg-green-100/50 border-green-200";
   if (status === "warning") statusClasses = "text-amber-700 bg-amber-100/50 border-amber-200";
   if (status === "neutral") statusClasses = "text-gray-700 bg-gray-100/50 border-gray-200";
-  
+
   return (
     <div className={`${fullWidth ? "col-span-full" : ""}`}>
       <div className="flex items-start space-x-3">
@@ -287,10 +302,10 @@ const DetailCard = ({ label, value, icon, fullWidth = false, highlight = false, 
         )}
         <div className="flex-1">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">{label}</p>
-          <p className={`mt-1 text-sm font-medium ${highlight ? "text-blue-600 font-semibold" : "text-gray-800"} 
+          <div className={`mt-1 text-sm font-medium ${highlight ? "text-blue-600 font-semibold" : "text-gray-800"} 
             ${status && status !== "neutral" ? `${statusClasses} px-3 py-1.5 rounded-lg border text-sm` : ""}`}>
             {value || 'Not specified'}
-          </p>
+          </div>
         </div>
       </div>
     </div>
