@@ -461,13 +461,22 @@ export default function LeadDetailsModal({
                 <div className="space-y-4">
                   {selectedLead.courses?.map((course, index) => (
                     <div key={index} className="mb-4 last:mb-0">
-                      <div className="grid grid-cols-3 gap-4 mb-2">
+ 
+                      <div className="grid grid-cols-4 gap-4 mb-2">
                         <div>
                           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                             Course Type
                           </p>
                           <p className="text-gray-900 font-medium">
                             {course.courseType || "-"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            Year
+                          </p>
+                          <p className="text-gray-900 font-medium">
+                            {course.year || "-"}
                           </p>
                         </div>
                         <div>
@@ -479,7 +488,6 @@ export default function LeadDetailsModal({
                           </p>
                         </div>
                       </div>
-
                       <div className="mb-2">
                         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
                           Specializations
@@ -499,7 +507,6 @@ export default function LeadDetailsModal({
                           )}
                         </div>
                       </div>
-
                       <div className="grid grid-cols-3 gap-4">
                         <div>
                           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">

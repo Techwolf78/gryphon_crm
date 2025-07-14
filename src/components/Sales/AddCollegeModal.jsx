@@ -6,7 +6,7 @@ import { XIcon, PlusIcon } from "@heroicons/react/outline";
 import CourseForm from "./AddCollege/CourseForm";
 import CollegeInfoForm from "./AddCollege/CollegeInfoForm";
 import ContactInfoForm from "./AddCollege/ContactInfoForm";
- 
+
 const courseSpecializations = {
   Engineering: [
     "CS",
@@ -46,7 +46,7 @@ const courseSpecializations = {
   MSC: ["Physics", "Chemistry", "Mathematics", "CS", "Other"],
   Others: ["Other"],
 };
- 
+
 const accreditationOptions = [
   "A++",
   "A+",
@@ -60,7 +60,6 @@ const accreditationOptions = [
   "Applied For",
   "Other",
 ];
- 
 function AddCollegeModal({ show, onClose }) {
   const [contactMethod, setContactMethod] = useState("Visit");
   const [businessName, setBusinessName] = useState("");
@@ -78,7 +77,7 @@ function AddCollegeModal({ show, onClose }) {
   const [tcv, setTcv] = useState(0); // Changed from totalContractValue to tcv
   const [loading, setLoading] = useState(false);
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
- 
+
   const [courses, setCourses] = useState([
     {
       courseType: "",
@@ -91,7 +90,7 @@ function AddCollegeModal({ show, onClose }) {
       courseTCV: 0, // Changed from tcv to courseTCV
     },
   ]);
- 
+
   // Update the useEffect calculation
   useEffect(() => {
     const total = courses.reduce(
@@ -100,7 +99,7 @@ function AddCollegeModal({ show, onClose }) {
     );
     setTcv(total); // Changed from setTotalContractValue to setTcv
   }, [courses]);
- 
+
   const getLeadPhase = (expectedDateInput) => {
     if (!expectedDateInput) return "cold";
     const now = new Date();
@@ -110,7 +109,7 @@ function AddCollegeModal({ show, onClose }) {
     if (diffInDays > 30) return "warm";
     return "hot";
   };
- 
+
   const generateYearOptions = () => {
     const currentYear = new Date().getFullYear();
     const years = [];
@@ -121,17 +120,17 @@ function AddCollegeModal({ show, onClose }) {
     }
     return years;
   };
- 
+
   const yearOptions = generateYearOptions();
- 
+
   const handleSpecializationChange = (e, index) => {
     const value = e.target.value;
     const isChecked = e.target.checked;
- 
+
     setCourses((prev) => {
       const updatedCourses = [...prev];
       const course = { ...updatedCourses[index] };
- 
+
       if (value === "Other") {
         if (isChecked) {
           course.specializations = [...course.specializations, "Other"];
@@ -150,12 +149,12 @@ function AddCollegeModal({ show, onClose }) {
           );
         }
       }
- 
+
       updatedCourses[index] = course;
       return updatedCourses;
     });
   };
- 
+
   const handleAddCourse = () => {
     setCourses((prev) => [
       ...prev,
@@ -171,17 +170,17 @@ function AddCollegeModal({ show, onClose }) {
       },
     ]);
   };
- 
+
   const handleRemoveCourse = (index) => {
     if (courses.length <= 1) return;
     setCourses((prev) => prev.filter((_, i) => i !== index));
   };
- 
+
   const handleCourseChange = (index, field, value) => {
     setCourses((prev) => {
       const updatedCourses = [...prev];
       const updatedCourse = { ...updatedCourses[index] };
- 
+
       if (field === "courseType") {
         updatedCourse.courseType = value;
         updatedCourse.specializations = [];
@@ -202,13 +201,15 @@ function AddCollegeModal({ show, onClose }) {
         const count = parseInt(updatedCourse.studentCount) || 0;
         const cost = parseFloat(value) || 0;
         updatedCourse.courseTCV = count * cost; // Changed from tcv to courseTCV
+      } else if (field === "year") {
+        updatedCourse.year = value;
       }
- 
+
       updatedCourses[index] = updatedCourse;
       return updatedCourses;
     });
   };
- 
+
   const handleClose = () => {
     setBusinessName("");
     setAddress("");
@@ -237,16 +238,16 @@ function AddCollegeModal({ show, onClose }) {
     setTcv(0);
     onClose();
   };
- 
+
   const handleAddBusiness = async () => {
     const user = auth.currentUser;
     if (!user) {
       alert("You must be logged in to add a lead.");
       return;
     }
- 
+
     setLoading(true); // Start loading
- 
+
     let expectedClosureTimestamp = null;
     if (expectedClosureDate) {
       const d = new Date(expectedClosureDate);
@@ -254,28 +255,30 @@ function AddCollegeModal({ show, onClose }) {
         expectedClosureTimestamp = d.getTime();
       }
     }
- 
+
     const phase = getLeadPhase(expectedClosureTimestamp);
     const timestamp = Date.now();
- 
+
     const finalAffiliation =
       affiliation === "Other" && manualAffiliation.trim()
         ? manualAffiliation.trim()
         : affiliation;
- 
+
     const finalAccreditation =
       accreditation === "Other" && manualAccreditation.trim()
         ? manualAccreditation.trim()
         : accreditation;
- 
-    const processedCourses = courses.map((course) => {
+
+    // Create an array of promises for adding each course as a separate lead
+    const addLeadPromises = courses.map((course) => {
+      // Process course data
       const finalCourseType =
         course.courseType === "Others" && course.manualCourseType.trim()
           ? course.manualCourseType.trim()
           : course.courseType;
- 
+
       let finalSpecializations = [...course.specializations];
- 
+
       if (
         course.specializations.includes("Other") &&
         course.manualSpecialization.trim()
@@ -284,79 +287,74 @@ function AddCollegeModal({ show, onClose }) {
           .filter((item) => item !== "Other")
           .concat(course.manualSpecialization.trim());
       }
- 
-      return {
-        courseType: finalCourseType,
-        specializations: finalSpecializations,
-        passingYear: course.passingYear || null,
-        studentCount: parseInt(course.studentCount) || 0,
-        perStudentCost: parseFloat(course.perStudentCost) || 0,
-        courseTCV: course.courseTCV || 0,
+
+      // Create a new lead object for this course
+      const newLead = {
+        businessName,
+        address,
+        pocName,
+        phoneNo,
+        email,
+        state,
+        city,
+        expectedClosureDate: expectedClosureTimestamp,
+        courses: [
+          {
+            courseType: finalCourseType,
+            specializations: finalSpecializations,
+            passingYear: course.passingYear || null,
+            year: course.year || null, // Add this line
+            studentCount: parseInt(course.studentCount) || 0,
+            perStudentCost: parseFloat(course.perStudentCost) || 0,
+            courseTCV: course.courseTCV || 0,
+          },
+        ], // Note: courses is now an array with just one course
+        tcv: course.courseTCV || 0, // TCV is just for this single course
+        phase,
+        affiliation: finalAffiliation || null,
+        accreditation: finalAccreditation || null,
+        contactMethod,
+        assignedTo: {
+          uid: user.uid,
+          name: user.displayName?.trim() || "No Name Provided",
+          email: user.email || "No Email Provided",
+        },
+createdAt: timestamp, // store actual time as number
+        openedDate: serverTimestamp(), // Set openedDate as well if needed
+        lastUpdatedAt: serverTimestamp(),
+        lastUpdatedBy: user.uid,
+        firestoreTimestamp: serverTimestamp(),
       };
+
+      return addDoc(collection(db, "leads"), newLead);
     });
- 
-    const newLead = {
-      businessName,
-      address,
-      pocName,
-      phoneNo,
-      email,
-      state,
-      city,
-      expectedClosureDate: expectedClosureTimestamp,
-      courses: processedCourses,
-      tcv,
-      phase,
-      affiliation: finalAffiliation || null,
-      accreditation: finalAccreditation || null,
-      contactMethod,
-      assignedTo: {
-        uid: user.uid,
-        name: user.displayName?.trim() || "No Name Provided",
-        email: user.email || "No Email Provided",
-      },
-      createdAt: timestamp,
-      lastUpdatedBy: user.uid,
-      lastUpdatedAt: timestamp,
-      firestoreTimestamp: serverTimestamp(),
-    };
- 
+
     try {
-      const addPromise = addDoc(collection(db, "leads"), newLead);
-      const delayPromise = sleep(2000); // ✅ Wait at least 2 sec
- 
+      const addPromise = Promise.all(addLeadPromises); // Create all leads
+      const delayPromise = sleep(2000); // Wait at least 2 sec
+
       await Promise.all([addPromise, delayPromise]);
- 
+
       setLoading(false);
       handleClose();
     } catch (error) {
-      console.error("Error adding lead:", error);
-      alert("Failed to add lead. Please try again.");
+      console.error("Error adding leads:", error);
+      alert("Failed to add some leads. Please try again.");
       setLoading(false);
     }
   };
- 
- 
+
   const isFormValid =
     businessName.trim() &&
     pocName.trim() &&
     phoneNo.trim() &&
     state &&
     city &&
-    courses.every(
-      (course) =>
-        ((course.courseType !== "Others" && course.courseType) ||
-          (course.courseType === "Others" && course.manualCourseType.trim())) &&
-        course.specializations.length > 0 &&
-        (!course.specializations.includes("Other") ||
-          (course.specializations.includes("Other") &&
-            course.manualSpecialization.trim()))
-    ) &&
     (affiliation !== "Other" ||
       (affiliation === "Other" && manualAffiliation.trim()));
- 
+
   if (!show) return null;
- 
+
   return (
     <div className="fixed inset-0 z-52 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-3xl rounded-xl shadow-2xl overflow-hidden">
@@ -372,7 +370,7 @@ function AddCollegeModal({ show, onClose }) {
             <XIcon className="h-5 w-5" />
           </button>
         </div>
- 
+
         {/* Modal Body */}
         <div className="p-6 overflow-y-auto max-h-[calc(100vh-180px)]">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -387,7 +385,7 @@ function AddCollegeModal({ show, onClose }) {
               setCity={setCity}
               isFormValid={isFormValid}
             />
- 
+
             <ContactInfoForm
               pocName={pocName}
               setPocName={setPocName}
@@ -401,7 +399,7 @@ function AddCollegeModal({ show, onClose }) {
               setContactMethod={setContactMethod}
               isFormValid={isFormValid}
             />
- 
+
             {/* Accreditation */}
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -437,7 +435,7 @@ function AddCollegeModal({ show, onClose }) {
                   </svg>
                 </div>
               </div>
- 
+
               {accreditation === "Other" && (
                 <div className="mt-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -453,7 +451,7 @@ function AddCollegeModal({ show, onClose }) {
                 </div>
               )}
             </div>
- 
+
             {/* Affiliation */}
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -489,7 +487,7 @@ function AddCollegeModal({ show, onClose }) {
                   </svg>
                 </div>
               </div>
- 
+
               {affiliation === "Other" && (
                 <div className="mt-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -506,12 +504,13 @@ function AddCollegeModal({ show, onClose }) {
                       value={manualAffiliation}
                       onChange={(e) => setManualAffiliation(e.target.value)}
                       placeholder="Enter university name"
-                      className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${affiliation === "Other" &&
+                      className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        affiliation === "Other" &&
                         !manualAffiliation.trim() &&
                         isFormValid
-                        ? "border-red-500"
-                        : "border-gray-300"
-                        }`}
+                          ? "border-red-500"
+                          : "border-gray-300"
+                      }`}
                     />
                     {affiliation === "Other" &&
                       !manualAffiliation.trim() &&
@@ -541,7 +540,7 @@ function AddCollegeModal({ show, onClose }) {
                 </div>
               )}
             </div>
- 
+
             {/* Courses Section */}
             <div className="col-span-2">
               <div className="flex justify-between items-center mb-2">
@@ -555,7 +554,7 @@ function AddCollegeModal({ show, onClose }) {
                   Add Course
                 </button>
               </div>
- 
+
               {courses.map((course, index) => (
                 <div key={index} className="mb-6 border-b border-gray-200 pb-6">
                   <CourseForm
@@ -571,7 +570,7 @@ function AddCollegeModal({ show, onClose }) {
                   />
                 </div>
               ))}
- 
+
               {/* Total Contract Value Display - Enhanced */}
               <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
                 <div className="flex justify-between items-center">
@@ -612,7 +611,7 @@ function AddCollegeModal({ show, onClose }) {
             </div>
           </div>
         </div>
- 
+
         {/* Modal Footer */}
         <div className="bg-gray-50 px-6 py-4 flex justify-end">
           <div className="flex space-x-3">
@@ -625,21 +624,19 @@ function AddCollegeModal({ show, onClose }) {
             <button
               onClick={handleAddBusiness}
               disabled={!isFormValid || loading}
-              className={`px-6 py-2.5 rounded-lg text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition ${isFormValid && !loading
+              className={`px-6 py-2.5 rounded-lg text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition ${
+                isFormValid && !loading
                   ? "bg-blue-600 hover:bg-blue-700"
                   : "bg-gray-400 cursor-not-allowed"
-                }`}
+              }`}
             >
               {loading ? "Adding..." : "Add College Lead"}
             </button>
- 
           </div>
         </div>
       </div>
     </div>
   );
 }
- 
+
 export default AddCollegeModal;
- 
- 

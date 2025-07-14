@@ -10,12 +10,31 @@ const CourseForm = ({
   yearOptions,
   isFormValid,
   onRemove,
-  showRemoveButton
+  showRemoveButton,
 }) => {
+
+  const courseYears = {
+    Engineering: ["1st", "2nd", "3rd", "4th"],
+    MBA: ["1st", "2nd"],
+    BBA: ["1st", "2nd", "3rd"],
+    BCA: ["1st", "2nd", "3rd"],
+    MCA: ["1st", "2nd", "3rd"],
+    Diploma: ["1st", "2nd", "3rd"],
+    BSC: ["1st", "2nd", "3rd"],
+    MSC: ["1st", "2nd"],
+    Others: ["1st", "2nd", "3rd", "4th"],
+  };
+
+  // Get available years based on selected course type
+const availableYears = course.courseType 
+  ? courseYears[course.courseType] || ["1st"]
+  : ["1st"];
   return (
     <div className="mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
       <div className="flex justify-between items-center mb-3">
-        <h4 className="text-sm font-medium text-gray-700">Course {index + 1}</h4>
+        <h4 className="text-sm font-medium text-gray-700">
+          Course {index + 1}
+        </h4>
         {showRemoveButton && (
           <button
             type="button"
@@ -31,12 +50,14 @@ const CourseForm = ({
         {/* Course Type */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Course Type<span className="text-red-500 ml-1">*</span>
+            Course Type
           </label>
           <div className="relative">
             <select
               value={course.courseType}
-              onChange={(e) => handleCourseChange(index, 'courseType', e.target.value)}
+              onChange={(e) =>
+                handleCourseChange(index, "courseType", e.target.value)
+              }
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
             >
               <option value="">Select Course</option>
@@ -47,11 +68,7 @@ const CourseForm = ({
               ))}
             </select>
             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-              <svg
-                className="h-4 w-4"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
+              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
                 <path
                   fillRule="evenodd"
                   d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
@@ -70,7 +87,9 @@ const CourseForm = ({
           <div className="relative">
             <select
               value={course.passingYear}
-              onChange={(e) => handleCourseChange(index, 'passingYear', e.target.value)}
+              onChange={(e) =>
+                handleCourseChange(index, "passingYear", e.target.value)
+              }
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
             >
               <option value="">Select Passing Year</option>
@@ -81,11 +100,7 @@ const CourseForm = ({
               ))}
             </select>
             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-              <svg
-                className="h-4 w-4"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
+              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
                 <path
                   fillRule="evenodd"
                   d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
@@ -95,6 +110,39 @@ const CourseForm = ({
             </div>
           </div>
         </div>
+
+{/* Year */}
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">
+    Year
+  </label>
+  <div className="relative">
+    <select
+      value={course.year || ""}
+      onChange={(e) =>
+        handleCourseChange(index, "year", e.target.value)
+      }
+      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
+    >
+      <option value="">Select Year</option>
+      {availableYears.map((year) => (
+        <option key={year} value={year}>
+          {year} Year
+        </option>
+      ))}
+    </select>
+    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+        <path
+          fillRule="evenodd"
+          d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+          clipRule="evenodd"
+        />
+      </svg>
+    </div>
+  </div>
+</div>
+
       </div>
 
       {/* Custom Course Type */}
@@ -108,7 +156,9 @@ const CourseForm = ({
             <input
               type="text"
               value={course.manualCourseType}
-              onChange={(e) => handleCourseChange(index, 'manualCourseType', e.target.value)}
+              onChange={(e) =>
+                handleCourseChange(index, "manualCourseType", e.target.value)
+              }
               placeholder="Enter custom course type"
               className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                 !course.manualCourseType.trim() && isFormValid
@@ -133,9 +183,7 @@ const CourseForm = ({
             )}
           </div>
           {!course.manualCourseType.trim() && isFormValid && (
-            <p className="mt-1 text-sm text-red-600">
-              This field is required
-            </p>
+            <p className="mt-1 text-sm text-red-600">This field is required</p>
           )}
         </div>
       )}
@@ -185,7 +233,13 @@ const CourseForm = ({
               <input
                 type="text"
                 value={course.manualSpecialization}
-                onChange={(e) => handleCourseChange(index, 'manualSpecialization', e.target.value)}
+                onChange={(e) =>
+                  handleCourseChange(
+                    index,
+                    "manualSpecialization",
+                    e.target.value
+                  )
+                }
                 placeholder="Enter custom specialization"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
@@ -211,7 +265,9 @@ const CourseForm = ({
             <input
               type="number"
               value={course.studentCount}
-              onChange={(e) => handleCourseChange(index, 'studentCount', e.target.value)}
+              onChange={(e) =>
+                handleCourseChange(index, "studentCount", e.target.value)
+              }
               placeholder="e.g. 120"
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
@@ -228,33 +284,36 @@ const CourseForm = ({
             <input
               type="number"
               value={course.perStudentCost}
-              onChange={(e) => handleCourseChange(index, 'perStudentCost', e.target.value)}
+              onChange={(e) =>
+                handleCourseChange(index, "perStudentCost", e.target.value)
+              }
               placeholder="e.g. 1500"
               className="w-full pl-8 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
         </div>
-<div>
-  <label className="block text-sm font-medium text-gray-700 mb-1">
-    TCV
-  </label>
-  <div className="relative">
-    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-      <span className="text-gray-500">₹</span>
-    </div>
-    <input
-      type="number"
-      value={course.courseTCV || 0}
-      disabled
-      className="w-full pl-8 pr-4 py-2.5 border border-gray-300 bg-gray-100 rounded-lg"
-    />
-  </div>
-  {course.studentCount && course.perStudentCost && (
-    <p className="mt-1 text-xs text-gray-500">
-      {course.studentCount} × ₹{course.perStudentCost} = ₹{course.courseTCV.toLocaleString()}
-    </p>
-  )}
-</div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            TCV
+          </label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <span className="text-gray-500">₹</span>
+            </div>
+            <input
+              type="number"
+              value={course.courseTCV || 0}
+              disabled
+              className="w-full pl-8 pr-4 py-2.5 border border-gray-300 bg-gray-100 rounded-lg"
+            />
+          </div>
+          {course.studentCount && course.perStudentCost && (
+            <p className="mt-1 text-xs text-gray-500">
+              {course.studentCount} × ₹{course.perStudentCost} = ₹
+              {course.courseTCV.toLocaleString()}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
