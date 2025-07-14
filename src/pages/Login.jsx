@@ -134,11 +134,37 @@ export default function LoginPage() {
       }
     } catch (error) {
       console.error("Login failed:", error);
+
+      let errorMessage = "Login failed. Please try again.";
+      let emailErrors = [];
+      let passwordErrors = [];
+
+      // Handle Firebase authentication errors
+      switch (error.code) {
+        case "auth/user-not-found":
+          emailErrors = ["User not found. Please check your email address."];
+          break;
+        case "auth/wrong-password":
+          passwordErrors = ["Incorrect password. Please try again."];
+          break;
+        case "auth/invalid-email":
+          emailErrors = ["Invalid email format."];
+          break;
+        case "auth/too-many-requests":
+          passwordErrors = ["Too many attempts. Please try again later."];
+          break;
+        case "auth/user-disabled":
+          passwordErrors = ["Account disabled. Please contact admin."];
+          break;
+        default:
+          passwordErrors = ["Login failed. Please try again."];
+      }
+
       setErrorModal({
         show: true,
         errors: {
-          email: [],
-          password: ["Invalid email or password. Please try again."]
+          email: emailErrors,
+          password: passwordErrors
         }
       });
     } finally {
