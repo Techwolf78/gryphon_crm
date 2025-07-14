@@ -319,7 +319,7 @@ function AddCollegeModal({ show, onClose }) {
           name: user.displayName?.trim() || "No Name Provided",
           email: user.email || "No Email Provided",
         },
-        createdAt: serverTimestamp(), // Use serverTimestamp directly
+createdAt: timestamp, // store actual time as number
         openedDate: serverTimestamp(), // Set openedDate as well if needed
         lastUpdatedAt: serverTimestamp(),
         lastUpdatedBy: user.uid,
