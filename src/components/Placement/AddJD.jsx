@@ -12,6 +12,7 @@ function AddJD({ show, onClose }) {
     passingYear: "",
     gender: "",
     marksCriteria: "",
+    backlogCriteria: "", // <-- Added this line
     otherCriteria: "",
     jobType: "",
     jobDesignation: "",
@@ -435,7 +436,7 @@ function AddJD({ show, onClose }) {
                       <option>BSC</option>
                       <option>MSC</option>
                       <option>Diploma</option>
-                      <option>Others</option>
+                      <option>Other</option> {/* <-- Changed from Others to Other */}
                     </select>
                     <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
                       <svg
