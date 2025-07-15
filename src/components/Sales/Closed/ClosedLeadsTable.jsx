@@ -15,7 +15,8 @@ import {
   arrayUnion,
   serverTimestamp
 } from "firebase/firestore";
- 
+ import EditClosedLeadModal from "./EditClosedLeadModal"; // Adjust path if needed
+
 // Project Code Conversion Utilities
 const projectCodeToDocId = (projectCode) =>
   projectCode ? projectCode.replace(/\//g, "-") : "";
@@ -42,29 +43,29 @@ const ClosedLeadsTable = ({
   const [mouFile, setMOUFile] = useState(null);
   const [mouUploading, setMOUUploading] = useState(false);
   const [activeLeadId, setActiveLeadId] = useState(null);
-const [showEditClosureForm, setShowEditClosureForm] = useState(false);
-const [selectedFormData, setSelectedFormData] = useState(null);
-const [isLoadingForm, setIsLoadingForm] = useState(false);
- 
-const handleEditClosureClick = async (projectCode) => {
-try {
-    const sanitizedCode = projectCode.replace(/\//g, "-");
-    const docRef = doc(db, "trainingForms", sanitizedCode);
+  const [showEditClosureModal, setShowEditClosureModal] = useState(false);
+  const [selectedLead, setSelectedLead] = useState(null);
+  
+  const handleEditClosureClick = async (projectCode) => {
+    try {
+      setIsLoadingForm(true);
+      const sanitizedCode = projectCode.replace(/\//g, "-");
+      const docRef = doc(db, "trainingForms", sanitizedCode);
+      const docSnap = await getDoc(docRef);
 
-    await updateDoc(docRef, {
-      ...formData,
-      lastUpdated: serverTimestamp(),
-    });
+      if (docSnap.exists()) {
+        setSelectedFormData(docSnap.data());
+        setShowEditClosureForm(true);
+      } else {
+        console.error("No such form data found!");
+      }
+    } catch (err) {
+      console.error("Error fetching form data: ", err);
+    } finally {
+      setIsLoadingForm(false);
+    }
+  };
 
-    console.log("Form updated successfully!");
-  } catch (error) {
-    console.error("Error updating form:", error);
-  }
-};
-
- 
-  // Cloudinary upload function
-  // Cloudinary upload function - FINAL VERSION
   const uploadToCloudinary = async (file) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -176,6 +177,12 @@ setActiveLeadId(null);
       setMOUUploading(false);
     }
   };
+  const handleEditClosureForm = (lead) => {
+    setSelectedLead(lead);
+    setShowEditClosureModal(true);
+    setOpenDropdown(null); // Close the dropdown menu
+  };
+  
   const logAvailableProjectCodes = async () => {
     try {
       console.group("Debugging Project Code Mismatch");
@@ -215,44 +222,32 @@ setActiveLeadId(null);
     }
   };
  
-const handleUploadClick = async () => {
-  const currentLead = leads.find(([id]) => id === activeLeadId)?.[1];
- 
-  if (!currentLead) {
-    console.error("No lead found for ID:", activeLeadId);
-    setUploadError("No lead selected");
-    return;
-  }
- 
-  const projectCode = currentLead?.projectCode || currentLead?.id || "default";
-  await handleUpload(projectCode);
-};
- 
- 
+ const handleUploadClick = async () => {
+    const currentLead = leads.find(([id]) => id === activeLeadId)?.[1];
+
+    if (!currentLead) {
+      console.error("No lead found for ID:", activeLeadId);
+      setUploadError("No lead selected");
+      return;
+    }
+
+    const projectCode = currentLead?.projectCode || currentLead?.id || "default";
+    await handleUpload(projectCode);
+  };
+
   const toggleDropdown = (id) => {
     setOpenDropdown(openDropdown === id ? null : id);
   };
- 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file && isValidFileType(file)) {
-      if (file.size > 5 * 1024 * 1024) {
-        setUploadError("File size exceeds 5MB limit");
-        return;
-      }
-      setSelectedFile(file);
-      setUploadError(null);
-    }
-  };
- 
-  const handleDragOver = (e) => {
+
+ const handleDragOver = (e) => {
     e.preventDefault();
     setIsDragging(true);
   };
- 
+
   const handleDragLeave = () => {
     setIsDragging(false);
   };
+ 
  
   const handleDrop = (e) => {
     e.preventDefault();
@@ -267,6 +262,7 @@ const handleUploadClick = async () => {
       setUploadError(null);
     }
   };
+
  
   const isValidFileType = (file) => {
     const validTypes = [
@@ -776,12 +772,9 @@ const handleUploadClick = async () => {
                           <FiFileText className="mr-2 h-4 w-4" />
                           {lead.mouFileUrl ? "Re-upload MOU" : "Upload MOU"}
                         </button>
-                        <button
+                       <button
                           className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                          onClick={() => {
-                            onEditClosureForm(lead);
-                            setOpenDropdown(null);
-                          }}
+                          onClick={() => handleEditClosureForm(lead)}
                         >
                           <FiEdit className="mr-2 h-4 w-4" />
                           Edit Closure Form
@@ -808,6 +801,21 @@ const handleUploadClick = async () => {
           )}
         </tbody>
       </table>
+       {/* Edit Closure Modal */}
+      {showEditClosureModal && selectedLead && (
+        <EditClosedLeadModal
+          lead={selectedLead}
+          onClose={() => {
+            setShowEditClosureModal(false);
+            setSelectedLead(null);
+          }}
+          onSave={() => {
+            // Optional: Add logic to refresh data or show success message
+            setShowEditClosureModal(false);
+            setSelectedLead(null);
+          }}
+        />
+      )}
     </div>
   );
 };

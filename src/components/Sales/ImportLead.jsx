@@ -948,7 +948,7 @@ const processExcel = (file) => {
         ) : (
           <div className="flex items-center gap-2 text-gray-700">
             <FiUpload className="w-4 h-4" />
-            <span>Import College Leads</span>
+            <span>Import Leads</span>
             <FiChevronDown className="w-4 h-4" />
           </div>
         )}

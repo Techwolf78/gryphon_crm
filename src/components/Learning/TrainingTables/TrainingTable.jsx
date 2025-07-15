@@ -153,6 +153,8 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
                   {formatCurrency(item.perStudentCost)}
                 </div>
               </div>
+
+              
             </div>
 
             {/* Total Hours & Actions */}

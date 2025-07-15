@@ -1,15 +1,11 @@
 import React, { useState, useEffect, useContext } from "react";
-import { useNavigate } from "react-router-dom";
+import { setAuthPersistence } from '../firebase'; // Add this import
+import { useNavigate, useLocation } from "react-router-dom";
+
 import { AuthContext } from "../context/AuthContext";
-import {
-  FaEye,
-  FaEyeSlash,
-  FaEnvelope,
-  FaLock,
-  FaInfoCircle,
-} from "react-icons/fa";
-import { useLocation } from "react-router-dom";
-import { toast } from "react-toastify";
+import { FaEye, FaEyeSlash, FaEnvelope, FaLock, FaInfoCircle } from "react-icons/fa";
+
+
 
 export default function LoginPage() {
   const { login, user } = useContext(AuthContext);
@@ -19,12 +15,15 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState({});
-  const [touched, setTouched] = useState({ email: false, password: false });
-  const [loginError, setLoginError] = useState("");
   const [capsLockOn, setCapsLockOn] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
-
+  const [errorModal, setErrorModal] = useState({
+    show: false,
+    errors: {
+      email: [],  // Will store email-specific errors
+      password: [] // Will store password-specific errors
+    }
+  });
   // Check for caps lock
   const handleKeyDown = (e) => {
     if (e.getModifierState("CapsLock")) {
@@ -47,11 +46,16 @@ export default function LoginPage() {
   const location = useLocation();
   useEffect(() => {
     if (location.state?.showLogoutToast) {
-      toast.success("Logged out successfully!");
+      setErrorModal({
+        show: true,
+        errors: {
+          email: [],
+          password: ["Logged out successfully!"]
+        }
+      });
       window.history.replaceState({}, document.title);
     }
   }, [location.state]);
-
   useEffect(() => {
     if (user) {
       const roleRoutes = {
@@ -66,64 +70,140 @@ export default function LoginPage() {
   }, [user, navigate]);
 
   const validate = () => {
-    const newErrors = {};
+    const errors = {
+      email: [],
+      password: []
+    };
     const emailRegex = /^[a-zA-Z0-9._%+-]+@gryphon(?:academy)?\.co\.in$/;
 
+    // Validate email
     if (!email.trim()) {
-      newErrors.email = "Email is required";
-    } else if (!email.includes("@")) {
-      newErrors.email = "Email must include '@'";
-    } else if (!emailRegex.test(email)) {
-      newErrors.email = "Use valid Gryphon email";
+      errors.email.push("• Email is required");
+    }
+    if (email.trim() && !email.includes("@")) {
+      errors.email.push("• Email must include '@'");
+    }
+    if (email.trim() && email.includes("@") && !emailRegex.test(email)) {
+      errors.email.push("• Use valid Gryphon email");
     }
 
-    const passwordErrors = [];
+    // Validate password
     if (!password) {
-      passwordErrors.push("Password is required");
-    } else {
-      if (password.length < 8) passwordErrors.push("At least 8 characters");
-      if (!/[A-Z]/.test(password)) passwordErrors.push("One uppercase letter");
-      if (!/\d/.test(password)) passwordErrors.push("One number");
-      if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
-        passwordErrors.push("One special character");
-      }
+      errors.password.push("• Password is required");
+    }
+    if (password && password.length < 8) {
+      errors.password.push("• At least 8 characters");
+    }
+    if (password && !/[A-Z]/.test(password)) {
+      errors.password.push("• One uppercase letter");
+    }
+    if (password && !/\d/.test(password)) {
+      errors.password.push("• One number");
+    }
+    if (password && !/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
+      errors.password.push("• One special character");
     }
 
-    if (passwordErrors.length > 0) {
-      newErrors.password = passwordErrors.join(", ");
-    }
-    return newErrors;
+    return errors;
   };
+
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    setTouched({ email: true, password: true });
-    const newErrors = validate();
-    setErrors(newErrors);
 
-    if (Object.keys(newErrors).length === 0) {
-      try {
-        await login(email, password);
-        setLoginError("");
-        if (rememberMe) {
-          localStorage.setItem("rememberedEmail", email);
-          localStorage.setItem("rememberedPassword", password);
-        } else {
-          localStorage.removeItem("rememberedEmail");
-          localStorage.removeItem("rememberedPassword");
-        }
-      } catch (error) {
-        console.error("Login failed:", error);
-        setLoginError("Invalid email or password. Please try again.");
-      } finally {
-        setIsSubmitting(false);
+    const validationErrors = validate();
+
+    // Show modal if there are any errors
+    if (validationErrors.email.length > 0 || validationErrors.password.length > 0) {
+      setErrorModal({
+        show: true,
+        errors: validationErrors
+      });
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      await login(email, password);
+      if (rememberMe) {
+        localStorage.setItem("rememberedEmail", email);
+        localStorage.setItem("rememberedPassword", password);
+      } else {
+        localStorage.removeItem("rememberedEmail");
+        localStorage.removeItem("rememberedPassword");
       }
-    } else {
+    } catch (error) {
+      console.error("Login failed:", error);
+      setErrorModal({
+        show: true,
+        errors: {
+          email: [],
+          password: ["Invalid email or password. Please try again."]
+        }
+      });
+    } finally {
       setIsSubmitting(false);
     }
   };
 
+
+  const ErrorModal = () => (
+    <div className="fixed inset-0  bg-black/30 backdrop-blur-md backdrop-saturate-150 backdrop-contrast-75 transition-all  duration-300 flex items-center justify-center z-54">
+      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+        <div className="flex justify-between items-start mb-4">
+          <div className="flex items-center">
+            <svg className="w-6 h-6 text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h3 className="text-xl font-bold text-gray-800">Please fix these issues</h3>
+          </div>
+          <button
+            onClick={() => setErrorModal({ show: false, errors: { email: [], password: [] } })}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            &times;
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          {/* Always show email errors section if there are any */}
+          {errorModal.errors.email.length > 0 && (
+            <div className="bg-red-50 p-4 rounded-lg border-l-4 border-red-500">
+              <h4 className="font-medium text-red-700 mb-2">Email Issues</h4>
+              <div className="space-y-1 text-red-600">
+                {errorModal.errors.email.map((error, index) => (
+                  <p key={`email-${index}`}>{error}</p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Always show password errors section if there are any */}
+          {errorModal.errors.password.length > 0 && (
+            <div className="bg-red-50 p-4 rounded-lg border-l-4 border-red-500">
+              <h4 className="font-medium text-red-700 mb-2">Password Requirements</h4>
+              <div className="space-y-1 text-red-600">
+                {errorModal.errors.password.map((error, index) => (
+                  <p key={`password-${index}`}>{error}</p>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-6 flex justify-end">
+          <button
+            onClick={() => setErrorModal({ show: false, errors: { email: [], password: [] } })}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
+          >
+            I Understand
+          </button>
+        </div>
+      </div>
+    </div>
+  );
   const ContactModal = () => (
     <div className="fixed inset-0 bg-white/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
@@ -180,7 +260,10 @@ export default function LoginPage() {
   );
 
   return (
-    <div className=" flex items-center justify-center bg-gray-50 font-sans  h-[80vh]">
+    <div className="flex items-center justify-center bg-gray-50 font-sans h-[80vh]">
+      {/* Add ErrorModal */}
+      {errorModal.show && <ErrorModal />}
+
       {showContactModal && <ContactModal />}
       <div className="w-full max-w-5xl bg-white rounded-xl shadow-lg overflow-hidden flex flex-col md:flex-row">
         {/* Left Side - Branding */}
@@ -263,13 +346,6 @@ export default function LoginPage() {
               </p>
             </div>
 
-            {loginError && (
-              <div className="mb-6 p-3 bg-red-50 text-red-600 rounded-md text-sm flex items-start">
-                <FaInfoCircle className="mt-0.5 mr-2 flex-shrink-0" />
-                <span>{loginError}</span>
-              </div>
-            )}
-
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <label
@@ -289,15 +365,9 @@ export default function LoginPage() {
                     placeholder="name@gryphon.co.in"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    onBlur={() =>
-                      setTouched((prev) => ({ ...prev, email: true }))
-                    }
                     className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
-                {touched.email && errors.email && (
-                  <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-                )}
               </div>
 
               <div>
@@ -327,9 +397,6 @@ export default function LoginPage() {
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    onBlur={() =>
-                      setTouched((prev) => ({ ...prev, password: true }))
-                    }
                     onKeyDown={handleKeyDown}
                     className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
@@ -351,16 +418,6 @@ export default function LoginPage() {
                 {capsLockOn && (
                   <div className="mt-1 text-sm text-yellow-600 flex items-center">
                     <FaInfoCircle className="mr-1" /> Caps Lock is on
-                  </div>
-                )}
-                {touched.password && errors.password && (
-                  <div className="mt-1 text-sm text-red-600">
-                    <p>Password must contain:</p>
-                    <ul className="list-disc pl-5 mt-1 space-y-1">
-                      {errors.password.split(", ").map((req, i) => (
-                        <li key={i}>{req}</li>
-                      ))}
-                    </ul>
                   </div>
                 )}
               </div>

@@ -82,7 +82,8 @@ const TrainingForm = ({
     const [contractEndDate, setContractEndDate] = useState("");
     const [duplicateProjectCode, setDuplicateProjectCode] = useState(false);
     const [isFormValid, setIsFormValid] = useState(false);
-        const isEdit = !!existingFormData; 
+    const isEdit = !!existingFormData; 
+ 
     // Check if all required fields are filled
     useEffect(() => {
         const requiredFields = [
@@ -135,6 +136,7 @@ useEffect(() => {
     setContractStartDate(existingFormData.contractStartDate || "");
     setContractEndDate(existingFormData.contractEndDate || "");
   } else if (lead) {
+    // fallback agar existingFormData nahi diya
     setFormData((prev) => ({
       ...prev,
       collegeName: lead.businessName || "",
@@ -154,6 +156,29 @@ useEffect(() => {
   }
 }, [existingFormData, lead]);
 
+ 
+ 
+    // Rest of your existing useEffect hooks remain the same...
+    useEffect(() => {
+        if (lead) {
+            setFormData((prev) => ({
+                ...prev,
+                collegeName: lead.businessName || "",
+                address: lead.address || "",
+                city: lead.city || "",
+                state: lead.state || "",
+                studentCount: lead.studentCount || 0,
+                totalCost: (lead.studentCount || 0) * (lead.perStudentCost || 0),
+                perStudentCost: lead.perStudentCost || 0,
+                course: lead.courseType || "",
+                tpoName: lead.pocName || "",
+                tpoEmail: lead.email || "",
+                tpoPhone: lead.phoneNo || "",
+            }));
+            setContractStartDate(lead.contractStartDate || "");
+            setContractEndDate(lead.contractEndDate || "");
+        }
+    }, [lead]);
  
     useEffect(() => {
         const totalStudents = formData.courses.reduce(
@@ -212,6 +237,10 @@ useEffect(() => {
     return false;
 }
 
+ 
+            if (sum.toFixed(2) !== "100.00") {
+                return false;
+            }
         }
  
         return true;
@@ -300,6 +329,7 @@ useEffect(() => {
     };
  const isEditMode = !!existingFormData;
 
+ 
     const handleSubmit = async (e) => {
         e.preventDefault();
  

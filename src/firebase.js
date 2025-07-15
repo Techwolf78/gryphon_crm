@@ -1,9 +1,9 @@
-// firebase.js
 import { initializeApp, getApps, getApp } from "firebase/app";
 import {
   getAuth,
   setPersistence,
-  browserLocalPersistence,
+  browserSessionPersistence,
+  browserLocalPersistence
 } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
@@ -16,20 +16,26 @@ const firebaseConfig = {
   storageBucket: "authencation-39485.firebasestorage.app",
   messagingSenderId: "366538675183",
   appId: "1:366538675183:web:8504a18fce2d563c491c1a",
-  measurementId: "G-0V7B973Q8T"
+
+  measurementId: "G-0V7B973Q8T",
 };
 
-// Primary Firebase app initialization
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
-setPersistence(auth, browserLocalPersistence);
 
-// Firestore instance
+export const setAuthPersistence = async (rememberMe) => {
+  await setPersistence(
+    auth, 
+    rememberMe ? browserLocalPersistence : browserSessionPersistence
+  );
+};
+
+setPersistence(auth, browserSessionPersistence);
+
 const db = getFirestore(app);
 
-// Secondary Firebase app (named "Secondary") for creating new users without signing out main user
 const secondaryApp = initializeApp(firebaseConfig, "Secondary");
 const secondaryAuth = getAuth(secondaryApp);
-setPersistence(secondaryAuth, browserLocalPersistence);
+setPersistence(secondaryAuth, browserSessionPersistence);
 
 export { app, auth, db, secondaryApp, secondaryAuth };

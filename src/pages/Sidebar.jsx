@@ -2,6 +2,10 @@ import React, { useContext } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import logo from "../assets/SYNC-logo-2.png";
+import compactLogo from "../assets/s-final.png"; // Import the compact logo
+// Import your custom icons
+import collapseIcon from "../assets/sidebar-close.png";
+import expandIcon from "../assets/sidebar-open.png";
 import { MdOutlineCurrencyRupee } from "react-icons/md";
 import {
   FiHome,
@@ -9,8 +13,6 @@ import {
   FiBriefcase,
   FiBook,
   FiTrendingUp,
-  FiChevronLeft,
-  FiChevronRight,
   FiHelpCircle,
 } from "react-icons/fi";
 
@@ -18,7 +20,11 @@ import {
 const roleLinks = {
   admin: [
     { label: "Admin", path: "/dashboard/admin", icon: <FiUsers /> },
-    { label: "Sales", path: "/dashboard/sales", icon: <MdOutlineCurrencyRupee /> },
+    {
+      label: "Sales",
+      path: "/dashboard/sales",
+      icon: <MdOutlineCurrencyRupee />,
+    },
     { label: "Placement", path: "/dashboard/placement", icon: <FiBriefcase /> },
     {
       label: "L & D",
@@ -27,7 +33,13 @@ const roleLinks = {
     },
     { label: "D M", path: "/dashboard/marketing", icon: <FiTrendingUp /> },
   ],
-  sales: [{ label: "Sales", path: "/dashboard/sales", icon: <MdOutlineCurrencyRupee   /> }],
+  sales: [
+    {
+      label: "Sales",
+      path: "/dashboard/sales",
+      icon: <MdOutlineCurrencyRupee />,
+    },
+  ],
   placement: [
     { label: "Placement", path: "/dashboard/placement", icon: <FiBriefcase /> },
   ],
@@ -98,7 +110,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
     },
   ];
 
-  return (
+ return (
     <aside
       className={`
         ${collapsed ? "w-20" : "w-[168px]"}
@@ -107,25 +119,42 @@ const Sidebar = ({ collapsed, onToggle }) => {
         transition-all duration-300 ease-in-out
       `}
     >
-      {/* Header */}
-      <div className="px-6 py-6 text-2xl font-bold  flex items-center justify-between">
-        {!collapsed && (
+      {/* Header section - now with dynamic layout */}
+      <div
+        className={`
+          px-4 py-4 border-b border-gray-200
+          ${collapsed ? "flex flex-col items-center space-y-4" : "flex items-center justify-between"}
+        `}
+      >
+        {/* Logo - changes based on collapsed state */}
+        {collapsed ? (
           <img
-            src={logo}
-            alt="SRC Logo"
-            className="h-8"
+            src={compactLogo}
+            alt="SYNC"
+            className="w-8 h-8 object-contain"
           />
+        ) : (
+          <img src={logo} alt="SYNC Logo" className="h-6" />
         )}
+
+        {/* Toggle button - position changes based on collapsed state */}
         <button
           onClick={onToggle}
-          className="text-gray-500 hover:text-blue-600 focus:outline-none"
-          aria-label="Toggle Sidebar"
+          className={`
+            p-1 rounded-md hover:bg-gray-100 focus:outline-none transition-colors
+            ${collapsed ? "mt-2" : ""}
+          `}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          {collapsed ? <FiChevronRight size={24} /> : <FiChevronLeft size={24} />}
+          <img 
+            src={collapsed ? expandIcon : collapseIcon} 
+            alt={collapsed ? "Expand" : "Collapse"} 
+            className="w-5 h-5" 
+          />
         </button>
       </div>
 
-      {/* Links */}
+      {/* Navigation links (unchanged) */}
       <nav className="flex-grow px-4 py-6 space-y-3 overflow-y-auto">
         {links.map(({ label, path, icon, skipRedirect }) => (
           <Link
