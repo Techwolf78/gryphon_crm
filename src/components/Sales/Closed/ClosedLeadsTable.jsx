@@ -190,11 +190,32 @@ setActiveLeadId(null);
       setMOUUploading(false);
     }
   };
-  const handleEditClosureForm = (lead) => {
-    setSelectedLead(lead);
-    setShowEditClosureModal(true);
-    setOpenDropdown(null); // Close the dropdown menu
-  };
+  const handleEditClosureForm = async (lead) => {
+  try {
+    setOpenDropdown(null);
+
+    const projectCode = lead.projectCode;
+    if (!projectCode) {
+      alert("Project code not found!");
+      return;
+    }
+
+    const docId = projectCodeToDocId(projectCode);
+    const docRef = doc(db, "trainingForms", docId);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      setSelectedLead({ id: docSnap.id, ...docSnap.data() }); // ✅ Ye trainingForms ka data bhejega
+      setShowEditClosureModal(true);
+    } else {
+      alert("Training form data not found in Firestore!");
+    }
+  } catch (error) {
+    console.error("Error fetching training form data:", error);
+    alert("Failed to fetch form data");
+  }
+};
+
   
   const logAvailableProjectCodes = async () => {
     try {
@@ -828,18 +849,18 @@ setActiveLeadId(null);
       </table>
        {/* Edit Closure Modal */}
       {showEditClosureModal && selectedLead && (
-        <EditClosedLeadModal
-          lead={selectedLead}
-          onClose={() => {
-            setShowEditClosureModal(false);
-            setSelectedLead(null);
-          }}
-          onSave={() => {
-            // Optional: Add logic to refresh data or show success message
-            setShowEditClosureModal(false);
-            setSelectedLead(null);
-          }}
-        />
+       <EditClosedLeadModal
+  lead={selectedLead} // Ye ab trainingForms ka data hai
+  onClose={() => {
+    setShowEditClosureModal(false);
+    setSelectedLead(null);
+  }}
+  onSave={() => {
+    setShowEditClosureModal(false);
+    setSelectedLead(null);
+  }}
+/>
+
       )}
     </div>
   );
