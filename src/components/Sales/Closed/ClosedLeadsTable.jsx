@@ -109,6 +109,19 @@ const ClosedLeadsTable = ({
     setShowMOUUploadModal(true);
     setOpenDropdown(null); // Close dropdown but keep lead reference
   };
+   const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file && isValidFileType(file)) {
+      if (file.size > 5 * 1024 * 1024) {
+        setUploadError("File size exceeds 5MB limit");
+        return;
+      }
+      setSelectedFile(file);
+      setUploadError(null);
+    }
+  };
+ 
+ 
  
   const handleMOUUpload = async () => {
     if (!mouFile) {
