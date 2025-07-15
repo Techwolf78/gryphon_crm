@@ -383,207 +383,199 @@ const TrainingForm = ({
         }
       }
 
-      const today = new Date();
-      const endDate = new Date(contractEndDate);
-      const diffTime = endDate - today;
-      const diffDays = diffTime / (1000 * 60 * 60 * 24);
-
-      let closureType = "new";
-      if (diffDays <= 90 && diffDays >= 0) {
-        closureType = "renewal";
-      }
-      // Update lead if exists
-      if (lead?.id) {
-        const leadRef = doc(db, "leads", lead.id);
-        await updateDoc(leadRef, {
-          phase: "closed",
-          closureType: closureType, // dynamic
-          closedDate: new Date().toISOString(),
-          totalCost: formData.totalCost,
-          perStudentCost: formData.perStudentCost,
-          contractStartDate,
-          contractEndDate,
-          projectCode: rawProjectCode,
-        });
-      }
-
-      // Upload files (if they exist)
-      const [studentUrl, mouUrl] = await Promise.all([
-        studentFile
-          ? uploadFileToCloudinary(studentFile, "training-forms/student-files")
-          : null,
-        mouFile
-          ? uploadFileToCloudinary(mouFile, "training-forms/mou-files")
-          : null,
-      ]);
-
-      const assignedUser = users?.[lead?.assignedTo?.uid] || {};
-      const { studentList, ...formDataWithoutStudents } = formData;
-
-      // Prepare payment details for Firestore
-      const paymentDetails = formData.paymentDetails.map((detail) => ({
-        ...detail,
-        baseAmount: parseFloat(detail.baseAmount),
-        gstAmount: parseFloat(detail.gstAmount),
-        totalAmount: parseFloat(detail.totalAmount),
-        percentage: parseFloat(detail.percentage),
-      }));
-
-      const sanitizedProjectCode = rawProjectCode.replace(/\//g, "-");
-
-      // Save form data
-      await setDoc(doc(db, "trainingForms", sanitizedProjectCode), {
-        ...formDataWithoutStudents,
-        paymentDetails,
-        studentFileUrl: studentUrl,
-        mouFileUrl: mouUrl,
-        contractStartDate,
-        contractEndDate,
-        totalCost: parseFloat(formData.totalCost),
-        perStudentCost: parseFloat(formData.perStudentCost),
-        gstAmount: parseFloat(formData.gstAmount),
-        netPayableAmount: parseFloat(formData.netPayableAmount),
-        studentCount: parseInt(formData.studentCount),
-        createdAt: serverTimestamp(),
-        createdBy: {
-          email: lead?.assignedTo?.email || assignedUser?.email || "Unknown",
-          uid: lead?.assignedTo?.uid || "",
-          name: lead?.assignedTo?.name || assignedUser?.name || "",
-        },
-        status: "active",
-        lastUpdated: serverTimestamp(),
-      });
-
-      // Upload students (if student list exists)
-      if (studentList && studentList.length > 0) {
-        await uploadStudentsToFirestore(studentList, sanitizedProjectCode);
-      }
-
-      setHasUnsavedChanges(false);
-      setTimeout(onClose, 1000);
-    } catch (err) {
-      console.error("Error submitting form: ", err);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleClose = useCallback(() => {
-    if (
-      hasUnsavedChanges &&
-      !window.confirm(
-        "You have unsaved changes. Are you sure you want to close?"
-      )
-    ) {
-      return;
-    }
-    onClose();
-  }, [hasUnsavedChanges, onClose]);
-
-  if (!show || !lead) return null;
-
-  return (
-    <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center px-4 z-54">
-      <div className="bg-white w-full max-w-7xl h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col relative animate-fadeIn">
-        <div className="flex justify-between items-center px-6 py-4 border-b bg-blue-100">
-          <h2 className="text-2xl font-bold text-blue-800">
-            Client Onboarding Form
-          </h2>
-          <div className="flex items-center space-x-3 w-[450px]">
-            <input
-              name="projectCode"
-              value={formData.projectCode}
-              placeholder="Project Code"
-              className={`px-4 py-2 border rounded-lg text-base w-full font-semibold ${
-                duplicateProjectCode
-                  ? "text-red-600 bg-red-50 border-red-300"
-                  : "text-blue-700 bg-gray-100"
-              } cursor-not-allowed`}
-              readOnly
-            />
-            <button
-              onClick={handleClose}
-              className="text-xl text-red-500 hover:text-red-700"
-              aria-label="Close form"
-            >
-              <FaTimes />
-            </button>
-          </div>
-          {duplicateProjectCode && (
-            <div className="absolute top-16 right-6 bg-red-100 border border-red-300 text-red-700 px-4 py-2 rounded-lg shadow-lg">
-              This project code already exists!
+  const today = new Date();
+        const endDate = new Date(contractEndDate);
+        const diffTime = endDate - today;
+        const diffDays = diffTime / (1000 * 60 * 60 * 24);
+ 
+        let closureType = "new";
+        if (diffDays <= 90 && diffDays >= 0) {
+            closureType = "renewal";
+        }
+            // Update lead if exists
+           if (lead?.id) {
+            const leadRef = doc(db, "leads", lead.id);
+            await updateDoc(leadRef, {
+                phase: "closed",
+                closureType: closureType, // dynamic
+                closedDate: new Date().toISOString(),
+                totalCost: formData.totalCost,
+                perStudentCost: formData.perStudentCost,
+                contractStartDate,
+                contractEndDate,
+                projectCode: rawProjectCode
+            });
+            }
+ 
+            // Upload files (if they exist)
+            const [studentUrl, mouUrl] = await Promise.all([
+                studentFile ? uploadFileToCloudinary(studentFile, "training-forms/student-files") : null,
+                mouFile ? uploadFileToCloudinary(mouFile, "training-forms/mou-files") : null
+            ]);
+ 
+            const assignedUser = users?.[lead?.assignedTo?.uid] || {};
+            const { studentList, ...formDataWithoutStudents } = formData;
+ 
+            // Prepare payment details for Firestore
+            const paymentDetails = formData.paymentDetails.map(detail => ({
+                ...detail,
+                baseAmount: parseFloat(detail.baseAmount),
+                gstAmount: parseFloat(detail.gstAmount),
+                totalAmount: parseFloat(detail.totalAmount),
+                percentage: parseFloat(detail.percentage),
+            }));
+ 
+            const sanitizedProjectCode = rawProjectCode.replace(/\//g, "-");
+ 
+            // Save form data\
+            const formDocData = {
+  ...formDataWithoutStudents,
+  paymentDetails,
+  studentFileUrl: studentUrl,
+  mouFileUrl: mouUrl,
+  contractStartDate,
+  contractEndDate,
+  totalCost: parseFloat(formData.totalCost),
+  perStudentCost: parseFloat(formData.perStudentCost),
+  gstAmount: parseFloat(formData.gstAmount),
+  netPayableAmount: parseFloat(formData.netPayableAmount),
+  studentCount: parseInt(formData.studentCount),
+  createdAt: serverTimestamp(),
+  createdBy: {
+    email: lead?.assignedTo?.email || assignedUser?.email || "Unknown",
+    uid: lead?.assignedTo?.uid || "",
+    name: lead?.assignedTo?.name || assignedUser?.name || "",
+  },
+  status: "active",
+  lastUpdated: serverTimestamp()
+};
+try {
+  await setDoc(doc(db, "trainingForms", sanitizedProjectCode), formDocData);
+  await setDoc(doc(db, "placementData", sanitizedProjectCode), formDocData);
+  console.log("Both documents saved successfully ✅");
+} catch (error) {
+  console.error("Error while saving to placementData: ", error);
+}
+ 
+            // Upload students (if student list exists)
+            if (studentList && studentList.length > 0) {
+                await uploadStudentsToFirestore(studentList, sanitizedProjectCode);
+            }
+ 
+            setHasUnsavedChanges(false);
+            setTimeout(onClose, 1000);
+        } catch (err) {
+            console.error("Error submitting form: ", err);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+ 
+ 
+    const handleClose = useCallback(() => {
+        if (
+            hasUnsavedChanges &&
+            !window.confirm("You have unsaved changes. Are you sure you want to close?")
+        ) {
+            return;
+        }
+        onClose();
+    }, [hasUnsavedChanges, onClose]);
+ 
+    if (!show || !lead) return null;
+ 
+    return (
+        <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center px-4 z-54">
+            <div className="bg-white w-full max-w-7xl h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col relative animate-fadeIn">
+                <div className="flex justify-between items-center px-6 py-4 border-b bg-blue-100">
+                    <h2 className="text-2xl font-bold text-blue-800">Client Onboarding Form</h2>
+                    <div className="flex items-center space-x-3 w-[450px]">
+                        <input
+                            name="projectCode"
+                            value={formData.projectCode}
+                            placeholder="Project Code"
+                            className={`px-4 py-2 border rounded-lg text-base w-full font-semibold ${duplicateProjectCode ? "text-red-600 bg-red-50 border-red-300" : "text-blue-700 bg-gray-100"
+                                } cursor-not-allowed`}
+                            readOnly
+                        />
+                        <button
+                            onClick={handleClose}
+                            className="text-xl text-red-500 hover:text-red-700"
+                            aria-label="Close form"
+                        >
+                            <FaTimes />
+                        </button>
+                    </div>
+                    {duplicateProjectCode && (
+                        <div className="absolute top-16 right-6 bg-red-100 border border-red-300 text-red-700 px-4 py-2 rounded-lg shadow-lg">
+                            This project code already exists!
+                        </div>
+                    )}
+                </div>
+                <form className="flex-1 overflow-y-auto p-6 space-y-6" onSubmit={handleSubmit} noValidate>
+                    <CollegeInfoSection
+                        formData={formData}
+                        setFormData={setFormData}
+                        handleChange={handleChange}
+                        collegeCodeError={collegeCodeError}
+                        pincodeError={pincodeError}
+                        gstError={gstError}
+                        isEdit ={isEdit}
+                     
+                        
+                    />
+                    <POCInfoSection formData={formData} handleChange={handleChange} />
+                    <StudentBreakdownSection
+                        formData={formData}
+                        setFormData={setFormData}
+                        studentFile={studentFile}
+                        setStudentFile={handleStudentFile}
+                        studentFileError={studentFileError}
+                    />
+                    <TopicBreakdownSection formData={formData} setFormData={setFormData} />
+                    <PaymentInfoSection formData={formData} setFormData={setFormData} />
+                    <MOUUploadSection
+                        mouFile={mouFile}
+                        setMouFile={setMouFile}
+                        mouFileError={mouFileError}
+                        contractStartDate={contractStartDate}
+                        setContractStartDate={setContractStartDate}
+                        contractEndDate={contractEndDate}
+                        setContractEndDate={setContractEndDate}
+                    />
+                    <div className="pt-4 flex justify-end space-x-4">
+                        <button
+                            type="button"
+                            onClick={handleClose}
+                            className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-100"
+                            disabled={isSubmitting}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:bg-blue-400"
+                            disabled={isSubmitting || !isFormValid}
+                        >
+                            {isSubmitting ? "Submitting..." : "Submit"}
+                        </button>
+                    </div>
+                </form>
+                {isSubmitting && (
+                    <div className="absolute inset-0 backdrop-blur-sm flex items-center justify-center z-50 rounded-2xl">
+                        <div className="relative w-24 h-24 animate-spin-slow">
+                            <img
+                                src={syncLogo}
+                                alt="Loading"
+                                className="absolute inset-0 w-16 h-16 m-auto z-10"
+                            />
+                            <div className="absolute inset-0 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                    </div>
+                )}
             </div>
-          )}
         </div>
-        <form
-          className="flex-1 overflow-y-auto p-6 space-y-6"
-          onSubmit={handleSubmit}
-          noValidate
-        >
-          <CollegeInfoSection
-            formData={formData}
-            setFormData={setFormData}
-            handleChange={handleChange}
-            collegeCodeError={collegeCodeError}
-            pincodeError={pincodeError}
-            gstError={gstError}
-            isEdit={isEdit}
-          />
-          <POCInfoSection formData={formData} handleChange={handleChange} />
-          <StudentBreakdownSection
-            formData={formData}
-            setFormData={setFormData}
-            studentFile={studentFile}
-            setStudentFile={handleStudentFile}
-            studentFileError={studentFileError}
-          />
-          <TopicBreakdownSection
-            formData={formData}
-            setFormData={setFormData}
-          />
-          <PaymentInfoSection formData={formData} setFormData={setFormData} />
-          <MOUUploadSection
-            mouFile={mouFile}
-            setMouFile={setMouFile}
-            mouFileError={mouFileError}
-            contractStartDate={contractStartDate}
-            setContractStartDate={setContractStartDate}
-            contractEndDate={contractEndDate}
-            setContractEndDate={setContractEndDate}
-          />
-          <div className="pt-4 flex justify-end space-x-4">
-            <button
-              type="button"
-              onClick={handleClose}
-              className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-100"
-              disabled={isSubmitting}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:bg-blue-400"
-              disabled={isSubmitting || !isFormValid}
-            >
-              {isSubmitting ? "Submitting..." : "Submit"}
-            </button>
-          </div>
-        </form>
-        {isSubmitting && (
-          <div className="absolute inset-0 backdrop-blur-sm flex items-center justify-center z-50 rounded-2xl">
-            <div className="relative w-24 h-24 animate-spin-slow">
-              <img
-                src={syncLogo}
-                alt="Loading"
-                className="absolute inset-0 w-16 h-16 m-auto z-10"
-              />
-              <div className="absolute inset-0 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+    );
 };
 TrainingForm.propTypes = {
   show: PropTypes.bool.isRequired,
