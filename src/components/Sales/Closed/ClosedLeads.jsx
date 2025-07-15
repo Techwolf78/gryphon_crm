@@ -8,6 +8,7 @@ import ClosedLeadsTable from "./ClosedLeadsTable";
 import ClosedLeadsStats from "./ClosedLeadsStats";
 import TrainingForm from '../ClosureForm/TrainingForm'
 const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
+
   const [filterType, setFilterType] = useState("all");
   const [quarterFilter, setQuarterFilter] = useState("current");
   const [targets, setTargets] = useState([]);
@@ -17,7 +18,8 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
 const [selectedClosureForm, setSelectedClosureForm] = useState(null);
 const [selectedLead, setSelectedLead] = useState(null);
 const [isLoadingForm, setIsLoadingForm] = useState(false);
- 
+const [selectedTeamUserId, setSelectedTeamUserId] = useState("all");
+
 const handleEditClosureForm = async (lead) => {
   try {
     // Project code sanitize
@@ -34,6 +36,7 @@ const handleEditClosureForm = async (lead) => {
       const formData = formSnap.data();
       // Ye data tumhare modal ko bhejna he (TrainingForm)
      setSelectedClosureForm(formData);
+
 setSelectedLead(lead);
 setShowClosureForm(true);
  
@@ -109,31 +112,32 @@ const isUserInTeam = (uid) => {
  
 const filteredLeads = useMemo(() => {
   if (!currentUser) return [];
- 
+
   return Object.entries(leads)
-   .filter(([, lead]) => {
-  if (viewMyLeadsOnly) {
-    return lead.assignedTo?.uid === currentUser.uid;
-  } else {
-    if (currentRole === "Director") {
-      return true; // ✅ Director ko sari leads dikhao
-    }
-    if (currentRole === "Head") {
-      return isUserInTeam(lead.assignedTo?.uid);
-    } else if (currentRole === "Manager") {
-      return (
-        isUserInTeam(lead.assignedTo?.uid) ||
-        lead.assignedTo?.uid === currentUser.uid
-      );
-    } else {
-      return (
-        isUserInTeam(lead.assignedTo?.uid) ||
-        lead.assignedTo?.uid === currentUser.uid
-      );
-    }
-  }
-})
- 
+    .filter(([, lead]) => {
+      if (viewMyLeadsOnly) {
+        return lead.assignedTo?.uid === currentUser.uid;
+      } else if (selectedTeamUserId !== "all") {
+        return lead.assignedTo?.uid === selectedTeamUserId;
+      } else {
+        if (currentRole === "Director") {
+          return true;
+        }
+        if (currentRole === "Head") {
+          return isUserInTeam(lead.assignedTo?.uid);
+        } else if (currentRole === "Manager") {
+          return (
+            isUserInTeam(lead.assignedTo?.uid) ||
+            lead.assignedTo?.uid === currentUser.uid
+          );
+        } else {
+          return (
+            isUserInTeam(lead.assignedTo?.uid) ||
+            lead.assignedTo?.uid === currentUser.uid
+          );
+        }
+      }
+    })
     .filter(([, lead]) => {
       if (filterType === "all") return true;
       return lead.closureType === filterType;
@@ -144,9 +148,14 @@ const filteredLeads = useMemo(() => {
       return closedQuarter === selectedQuarter;
     })
     .sort(([, a], [, b]) => new Date(b.closedDate) - new Date(a.closedDate));
-}, [leads, currentUser, currentRole, filterType, selectedQuarter, viewMyLeadsOnly, users]);
- 
- 
+}, [leads, currentUser, currentRole, filterType, selectedQuarter, viewMyLeadsOnly, selectedTeamUserId, users]);
+
+// ⭐⭐ Yeh line add karo ⭐⭐
+console.log("🔥 Selected Team User ID:", selectedTeamUserId);
+console.log("🔥 Filtered Leads:", filteredLeads);
+
+
+
  
   const startIdx = (currentPage - 1) * rowsPerPage;
   const currentRows = filteredLeads.slice(startIdx, startIdx + rowsPerPage);
@@ -225,18 +234,23 @@ const handleTargetUpdate = async () => {
       </div>
     </div>
  
-    <ClosedLeadsStats
-      leads={leads}
-      targets={targets}
-      currentUser={currentUser}
-      users={users}
-      selectedFY={selectedFY}
-      activeQuarter={selectedQuarter}
-      formatCurrency={formatCurrency}
-      viewMyLeadsOnly={viewMyLeadsOnly}
-      achievedValue={achievedValue}
-      handleTargetUpdate={handleTargetUpdate}
-    />
+
+<ClosedLeadsStats
+  leads={leads}
+  targets={targets}
+  currentUser={currentUser}
+  users={users}
+  selectedFY={selectedFY}
+  activeQuarter={selectedQuarter}
+  formatCurrency={formatCurrency}
+  viewMyLeadsOnly={viewMyLeadsOnly}
+  achievedValue={achievedValue}
+  handleTargetUpdate={handleTargetUpdate}
+  selectedTeamUserId={selectedTeamUserId}
+  setSelectedTeamUserId={setSelectedTeamUserId}
+/>
+
+
  
     <ClosedLeadsProgressBar
       progressPercent={0}
@@ -245,13 +259,15 @@ const handleTargetUpdate = async () => {
       formatCurrency={formatCurrency}
     />
  
-    <ClosedLeadsTable
-      leads={currentRows}
-      formatDate={formatDate}
-      formatCurrency={formatCurrency}
-      viewMyLeadsOnly={viewMyLeadsOnly}
-      onEditClosureForm={handleEditClosureForm}
-    />
+ <ClosedLeadsTable
+  leads={currentRows}
+  formatDate={formatDate}
+  formatCurrency={formatCurrency}
+  viewMyLeadsOnly={viewMyLeadsOnly}
+  onEditClosureForm={handleEditClosureForm}
+/>
+
+ 
  
     {filteredLeads.length > rowsPerPage && (
       <div className="px-6 py-4 flex flex-col sm:flex-row justify-between items-center border-t gap-4">

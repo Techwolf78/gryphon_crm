@@ -82,6 +82,7 @@ const TrainingForm = ({
     const [contractEndDate, setContractEndDate] = useState("");
     const [duplicateProjectCode, setDuplicateProjectCode] = useState(false);
     const [isFormValid, setIsFormValid] = useState(false);
+    const isEdit = !!existingFormData; 
  
     // Check if all required fields are filled
     useEffect(() => {
@@ -154,6 +155,7 @@ useEffect(() => {
     setContractEndDate(lead.contractEndDate || "");
   }
 }, [existingFormData, lead]);
+
  
  
     // Rest of your existing useEffect hooks remain the same...
@@ -206,6 +208,7 @@ useEffect(() => {
         formData.year,
         formData.deliveryType,
         formData.passingYear,
+        [formData.projectCode]
     ]);
  
     const validatePaymentSection = () => {
@@ -230,6 +233,10 @@ useEffect(() => {
             if (typeof sum !== 'number' || isNaN(sum)) {
                 return false;
             }
+ if (Math.abs(sum - 100) > 0.01) {
+    return false;
+}
+
  
             if (sum.toFixed(2) !== "100.00") {
                 return false;
@@ -320,6 +327,8 @@ useEffect(() => {
             return false;
         }
     };
+ const isEditMode = !!existingFormData;
+
  
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -348,13 +357,15 @@ useEffect(() => {
         try {
             const rawProjectCode = formData.projectCode;
  
-            // Check for duplicate project code
-            const isDuplicate = await checkDuplicateProjectCode(rawProjectCode);
-            if (isDuplicate) {
-                setDuplicateProjectCode(true);
-                setIsSubmitting(false);
-                return;
-            }
+            if (!isEditMode) {
+  const isDuplicate = await checkDuplicateProjectCode(rawProjectCode);
+  if (isDuplicate) {
+    setDuplicateProjectCode(true);
+    setIsSubmitting(false);
+    return;
+  }
+}
+
   const today = new Date();
         const endDate = new Date(contractEndDate);
         const diffTime = endDate - today;
@@ -485,6 +496,9 @@ useEffect(() => {
                         collegeCodeError={collegeCodeError}
                         pincodeError={pincodeError}
                         gstError={gstError}
+                        isEdit ={isEdit}
+                     
+                        
                     />
                     <POCInfoSection formData={formData} handleChange={handleChange} />
                     <StudentBreakdownSection
