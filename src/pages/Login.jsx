@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useContext } from "react";
+import { setAuthPersistence } from '../firebase'; // Add this import
 import { useNavigate, useLocation } from "react-router-dom";
+
 import { AuthContext } from "../context/AuthContext";
 import { FaEye, FaEyeSlash, FaEnvelope, FaLock, FaInfoCircle } from "react-icons/fa";
 

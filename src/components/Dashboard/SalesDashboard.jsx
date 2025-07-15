@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext"; // Adjust the path as needed
 import PropTypes from "prop-types";
 import {
@@ -1012,43 +1012,68 @@ const SalesDashboard = () => {
     };
   };
 
-  // WITH THIS:
-const fetchAllUsers = async () => {
-  setIsLoadingUsers(true);
-  try {
-    const usersRef = collection(db, "users");
+  const fetchAllUsers = async () => {
+    setIsLoadingUsers(true);
+    console.log("[DEBUG] Starting fetchAllUsers..."); // Debug 1
 
-    let usersQuery;
+    try {
+      console.log("[DEBUG] Current user:", {
+        uid: currentUser?.uid,
+        department: currentUser?.department,
+      }); // Debug 2
 
-    if (currentUser?.department === "admin") {
-      // Admin sees all users
-      usersQuery = query(usersRef);
-    } else if (currentUser?.department === "sales") {
-      // Sales see only sales users
-      usersQuery = query(usersRef, where("department", "==", "sales"));
-    } else {
-      // Others see no users
-      usersQuery = null;
-    }
+      const usersRef = collection(db, "users");
+      console.log("[DEBUG] usersRef created"); // Debug 3
 
-    let usersData = [];
+      let usersQuery;
+      if (currentUser?.department === "sales") {
+        console.log("[DEBUG] Building query for sales team"); // Debug 4
+        usersQuery = query(usersRef, where("department", "==", "sales"));
+      } else if (currentUser?.department === "Admin") {
+        console.log("[DEBUG] Building query for Admin"); // Debug 5
+        usersQuery = query(usersRef);
+      } else {
+        console.log(
+          "[DEBUG] Building query for department:",
+          currentUser?.department
+        ); // Debug 6
+        usersQuery = query(
+          usersRef,
+          where("department", "==", currentUser?.department || "")
+        );
+      }
 
-    if (usersQuery) {
+      console.log("[DEBUG] Query to be executed:", usersQuery); // Debug 7
       const usersSnapshot = await getDocs(usersQuery);
-      usersData = usersSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      console.log("[DEBUG] Query executed, snapshot:", usersSnapshot); // Debug 8
+
+      const usersData = usersSnapshot.docs.map((doc) => {
+        console.log("[DEBUG] Processing doc:", doc.id); // Debug 9
+        return {
+          id: doc.id,
+          ...doc.data(),
+        };
+      });
+
+      console.log("[DEBUG] Raw users data:", usersData); // Debug 10
+
+      // Replace the filteredUsers line with:
+      const filteredUsers = usersData;
+
+      console.log("[DEBUG] Final users list:", filteredUsers); // Debug 12
+      setUsers(filteredUsers);
+    } catch (error) {
+      console.error("[ERROR] in fetchAllUsers:", {
+        error: error.message,
+        code: error.code,
+        stack: error.stack,
+      }); // Debug 13
+      setUsers([]);
+    } finally {
+      console.log("[DEBUG] Fetch completed, setting loading false"); // Debug 14
+      setIsLoadingUsers(false);
     }
-
-    setUsers(usersData);
-  } catch (error) {
-    console.error("Error fetching users:", error);
-  } finally {
-    setIsLoadingUsers(false);
-  }
-};
-
+  };
 
   const fetchDataForRange = async (range) => {
     setIsLoading(true);

@@ -73,10 +73,25 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
   const formatCourseDetails = (courses) => {
     if (!courses || !Array.isArray(courses)) return [];
 
+    const currentYear = new Date().getFullYear();
+    const nextYear = currentYear + 1;
+    const currentAcademicYear = `${currentYear}-${nextYear}`;
+
     return courses.map((course) => {
       const courseType = course.courseType || course.manualCourseType || "";
       const specializations = course.specializations?.join(", ") || "";
       const passingYear = course.passingYear || "";
+      const yearOfStudy = course.year || ""; // "2nd", "3rd", etc.
+
+      // Format passing year information
+      let passingYearDisplay = passingYear;
+      if (passingYear) {
+        passingYearDisplay = `${passingYear} (Current: ${currentAcademicYear})`;
+        if (yearOfStudy) {
+          passingYearDisplay += `, ${yearOfStudy} Year`;
+        }
+      }
+
       const studentCount = course.studentCount || "";
       const perStudentCost = course.perStudentCost || "";
       const courseTCV = course.courseTCV || 0;
@@ -84,10 +99,11 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
       return {
         courseType,
         specializations,
-        passingYear,
+        passingYear: passingYearDisplay,
         studentCount,
         perStudentCost,
         courseTCV,
+        yearOfStudy, // Added as separate field if you want it in export
       };
     });
   };
@@ -119,12 +135,12 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
           "Email ID": lead.email || "",
         };
 
-        // Add course details right after basic info
         courseDetails.forEach((course, index) => {
           const prefix = `Course ${index + 1}`;
           leadInfo[`${prefix} - Type`] = course.courseType;
           leadInfo[`${prefix} - Specializations`] = course.specializations;
           leadInfo[`${prefix} - Passing Year`] = course.passingYear;
+          leadInfo[`${prefix} - Year of Study`] = course.yearOfStudy; // Added this line
           leadInfo[`${prefix} - Student Count`] = course.studentCount;
           leadInfo[`${prefix} - Per Student Cost`] = course.perStudentCost;
           leadInfo[`${prefix} - Course TCV`] = course.courseTCV;
