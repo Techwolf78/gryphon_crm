@@ -24,17 +24,6 @@ function LearningDevelopment() {
     console.log("Trainer added successfully");
   };
 
-  if (studentPageData) {
-    return (
-      <StudentDataPage
-        fileUrl={studentPageData.fileUrl}
-        trainingId={studentPageData.trainingId}
-        trainingName={studentPageData.trainingName}
-        onBack={() => setStudentPageData(null)}
-      />
-    );
-  }
-
   const fetchTrainings = async () => {
     try {
       setLoading(true);

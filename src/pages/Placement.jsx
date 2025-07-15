@@ -6,6 +6,7 @@ import FilePreviewModal from "../components/Learning/TrainingTables/FilePreviewM
 import AddJD from "../components/Placement/AddJD";
 import CompanyOpen from "../components/Placement/CompanyOpen";
 import CompanyLeads from "../components/Placement/CompanyLeads";
+import PlacementDetailsModal from "../components/Placement//PlacementDetailsModal";
 
 function Placement() {
   const [trainingData, setTrainingData] = useState([]);
@@ -23,7 +24,7 @@ function Placement() {
   const fetchData = async () => {
     try {
       // Fetch training data
-      const trainingSnapshot = await getDocs(collection(db, "trainingForms"));
+      const trainingSnapshot = await getDocs(collection(db, "placementData"));
       const trainingData = trainingSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
@@ -169,7 +170,7 @@ function Placement() {
 
       {/* Modals */}
       {selectedTraining && (
-        <TrainingDetailModal
+        <PlacementDetailsModal
           training={selectedTraining}
           onClose={() => setSelectedTraining(null)}
         />
