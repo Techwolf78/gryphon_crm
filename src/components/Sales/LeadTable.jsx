@@ -44,6 +44,7 @@ export default function LeadsTable({
   const [selectedLeadForDetails, setSelectedLeadForDetails] = useState(null);
   const [visibleLeadsCount, setVisibleLeadsCount] = useState(10);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [selectedTeamUserId, setSelectedTeamUserId] = useState("all");
 
   const handleLoadMore = useCallback(() => {
     setVisibleLeadsCount((prev) => prev + 20);

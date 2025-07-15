@@ -21,6 +21,8 @@ const ClosedLeadsStats = ({
   formatCurrency,
   viewMyLeadsOnly,
   handleTargetUpdate,
+  selectedTeamUserId,        
+  setSelectedTeamUserId
 }) => {
 
   const [selectedFY, setSelectedFY] = useState(propSelectedFY || getCurrentFinancialYear());
@@ -57,7 +59,6 @@ else if (isAdminOrDirector) {
 }
 
 
-  const [selectedTeamUserId, setSelectedTeamUserId] = useState("all");
 
   let targetUser;
 
@@ -487,6 +488,9 @@ ClosedLeadsStats.propTypes = {
   formatCurrency: PropTypes.func.isRequired,
   viewMyLeadsOnly: PropTypes.bool.isRequired,
   handleTargetUpdate: PropTypes.func.isRequired,
+  selectedTeamUserId: PropTypes.string.isRequired,
+  setSelectedTeamUserId: PropTypes.func.isRequired,
 };
+
 
 export default ClosedLeadsStats;
