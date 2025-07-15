@@ -95,7 +95,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
         setError(null);
 
         try {
-            const leadRef = doc(db, "leads", lead.id);
+            const leadRef = doc(db, "trainingForms", lead.id);
             await updateDoc(leadRef, {
                 ...formData,
                 updatedAt: new Date()
