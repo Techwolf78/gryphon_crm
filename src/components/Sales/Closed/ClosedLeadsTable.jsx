@@ -260,6 +260,18 @@ setActiveLeadId(null);
   const handleDragLeave = () => {
     setIsDragging(false);
   };
+  
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file && isValidFileType(file)) {
+      if (file.size > 5 * 1024 * 1024) {
+        setUploadError("File size exceeds 5MB limit");
+        return;
+      }
+      setSelectedFile(file);
+      setUploadError(null);
+    }
+  };
  
  
   const handleDrop = (e) => {
