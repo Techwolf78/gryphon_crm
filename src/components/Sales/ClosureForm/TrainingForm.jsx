@@ -410,28 +410,35 @@ useEffect(() => {
  
             const sanitizedProjectCode = rawProjectCode.replace(/\//g, "-");
  
-            // Save form data
-            await setDoc(doc(db, "trainingForms", sanitizedProjectCode), {
-                ...formDataWithoutStudents,
-                paymentDetails,
-                studentFileUrl: studentUrl,
-                mouFileUrl: mouUrl,
-                contractStartDate,
-                contractEndDate,
-                totalCost: parseFloat(formData.totalCost),
-                perStudentCost: parseFloat(formData.perStudentCost),
-                gstAmount: parseFloat(formData.gstAmount),
-                netPayableAmount: parseFloat(formData.netPayableAmount),
-                studentCount: parseInt(formData.studentCount),
-                createdAt: serverTimestamp(),
-                createdBy: {
-                    email: lead?.assignedTo?.email || assignedUser?.email || "Unknown",
-                    uid: lead?.assignedTo?.uid || "",
-                    name: lead?.assignedTo?.name || assignedUser?.name || "",
-                },
-                status: "active",
-                lastUpdated: serverTimestamp()
-            });
+            // Save form data\
+            const formDocData = {
+  ...formDataWithoutStudents,
+  paymentDetails,
+  studentFileUrl: studentUrl,
+  mouFileUrl: mouUrl,
+  contractStartDate,
+  contractEndDate,
+  totalCost: parseFloat(formData.totalCost),
+  perStudentCost: parseFloat(formData.perStudentCost),
+  gstAmount: parseFloat(formData.gstAmount),
+  netPayableAmount: parseFloat(formData.netPayableAmount),
+  studentCount: parseInt(formData.studentCount),
+  createdAt: serverTimestamp(),
+  createdBy: {
+    email: lead?.assignedTo?.email || assignedUser?.email || "Unknown",
+    uid: lead?.assignedTo?.uid || "",
+    name: lead?.assignedTo?.name || assignedUser?.name || "",
+  },
+  status: "active",
+  lastUpdated: serverTimestamp()
+};
+try {
+  await setDoc(doc(db, "trainingForms", sanitizedProjectCode), formDocData);
+  await setDoc(doc(db, "placementData", sanitizedProjectCode), formDocData);
+  console.log("Both documents saved successfully ✅");
+} catch (error) {
+  console.error("Error while saving to placementData: ", error);
+}
  
             // Upload students (if student list exists)
             if (studentList && studentList.length > 0) {
