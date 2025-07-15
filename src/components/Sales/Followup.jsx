@@ -10,6 +10,7 @@ import {
   FaStickyNote,
   FaChevronUp,
   FaChevronDown,
+  FaTrash,
 } from "react-icons/fa";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
@@ -75,6 +76,25 @@ const FollowUp = ({ lead, onClose }) => {
       console.error("Error fetching past followups:", err);
     }
   }, [lead?.id]);
+
+    const handleDeleteFollowup = async (followupKey) => {
+    if (!lead?.id) return;
+    
+    try {
+      const docRef = doc(db, "leads", lead.id);
+      const snapshot = await getDoc(docRef);
+      const leadData = snapshot.data() || {};
+      const existing = leadData.followup || {};
+
+      delete existing[followupKey];
+
+      await updateDoc(docRef, { followup: existing });
+      fetchPastFollowups(); // Refresh the list
+    } catch (err) {
+      console.error("Error deleting followup:", err);
+      alert("Failed to delete follow-up.\n" + err.message);
+    }
+  };
 
   useEffect(() => {
     if (lead?.id) {
@@ -450,53 +470,52 @@ const FollowUp = ({ lead, onClose }) => {
             </form>
           </div>
 
-          <div className="border-l border-gray-200 pl-6 md:pl-8">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <FaRegClock className="text-indigo-600" />
-              Previous Meetings
-            </h3>
+    <div className="border-l border-gray-200 pl-6 md:pl-8">
+      <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+        <FaRegClock className="text-indigo-600" />
+        Previous Meetings
+      </h3>
 
-            {pastFollowups.length === 0 ? (
-              <div className="bg-blue-50 rounded-xl p-2 text-center text-base">
-                <p className="text-gray-600">No previous meetings recorded</p>
-              </div>
-            ) : (
-              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
-                {pastFollowups.map((followup, index) => (
-                  <div
-                    key={followup.key}
-                    className="bg-white border border-gray-200 rounded-xl p-4"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-gray-800">
-                          {followup.formattedDate ||
-                            dayjs(followup.date).format("MMM D, YYYY")}
-                        </span>
-                        <span className="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full">
-                          {followup.time}
-                        </span>
-                      </div>
-                      <p className="text-gray-600 mt-2">{followup.remarks}</p>
-                      <div className="mt-4">
-                        {index === 0 ? (
-                          <span className="bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded-full">
-                            Latest
-                          </span>
-                        ) : (
-                          <span className="bg-red-100 text-red-800 text-xs font-medium px-2 py-1 rounded-full">
-                            {followup.relativeTime}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+      {pastFollowups.map((followup, index) => (
+        <div
+          key={followup.key}
+          className="bg-white border border-gray-200 rounded-xl p-4 relative"
+        >
+          <button
+            onClick={() => handleDeleteFollowup(followup.key)}
+            className="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition"
+            title="Delete this meeting"
+          >
+            <FaTrash className="text-sm" />
+          </button>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-gray-800">
+                {followup.formattedDate ||
+                  dayjs(followup.date).format("MMM D, YYYY")}
+              </span>
+              <span className="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full">
+                {followup.time}
+              </span>
+            </div>
+            <p className="text-gray-600 mt-2">{followup.remarks}</p>
+            <div className="mt-4">
+              {index === 0 ? (
+                <span className="bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded-full">
+                  Latest
+                </span>
+              ) : (
+                <span className="bg-red-100 text-red-800 text-xs font-medium px-2 py-1 rounded-full">
+                  {followup.relativeTime}
+                </span>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      ))}
+    </div>
+  </div>
+</div>
 
       <style>{`
         .animate-fadeIn {

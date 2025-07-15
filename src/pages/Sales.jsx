@@ -162,13 +162,32 @@ function Sales() {
         shouldInclude = isOwnLead;
       }
 
-      if (shouldInclude && counts[phase] !== undefined) {
+      // Add filter conditions here
+      const matchesFilters =
+        (!filters.city || lead.city?.includes(filters.city)) &&
+        (!filters.assignedTo || lead.assignedTo?.uid === filters.assignedTo) &&
+        (!filters.dateRange?.start ||
+          lead.createdAt >= new Date(filters.dateRange.start).getTime()) &&
+        (!filters.dateRange?.end ||
+          lead.createdAt <= new Date(filters.dateRange.end).getTime()) &&
+        (!filters.pocName ||
+          lead.pocName
+            ?.toLowerCase()
+            .includes(filters.pocName.toLowerCase())) &&
+        (!filters.phoneNo || lead.phoneNo?.includes(filters.phoneNo)) &&
+        (!filters.email ||
+          lead.email?.toLowerCase().includes(filters.email.toLowerCase())) &&
+        (!filters.contactMethod ||
+          lead.contactMethod?.toLowerCase() ===
+            filters.contactMethod.toLowerCase());
+
+      if (shouldInclude && matchesFilters && counts[phase] !== undefined) {
         counts[phase]++;
       }
     });
 
     return counts;
-  }, [users, currentUser, leads, viewMyLeadsOnly]);
+  }, [users, currentUser, leads, viewMyLeadsOnly, filters]);
 
   const phaseCounts = useMemo(() => computePhaseCounts(), [computePhaseCounts]);
 
@@ -195,7 +214,6 @@ function Sales() {
         (!filters.contactMethod ||
           lead.contactMethod?.toLowerCase() ===
             filters.contactMethod.toLowerCase());
-
       const isSalesDept = user.department === "Sales";
       const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
 
@@ -306,8 +324,7 @@ function Sales() {
     const leadsQuery = query(
       collection(db, "leads"),
       where("phase", "in", ["hot", "warm", "cold", "closed"]),
-      orderBy("createdAt", "desc"),
-      limit(500)
+      orderBy("createdAt", "desc")
     );
 
     const unsubLeads = onSnapshot(leadsQuery, (snapshot) => {
@@ -448,34 +465,38 @@ function Sales() {
     }
   }, []);
 
-const handleSaveLead = useCallback(async (leadsToSave) => {
-  try {
-    const leadsArray = Array.isArray(leadsToSave) ? leadsToSave : [leadsToSave];
-    const { addDoc, collection, serverTimestamp, updateDoc } = await import('firebase/firestore');
-    
-    const savePromises = leadsArray.map(async lead => {
-      if (lead.id) {
-        // Update existing lead - explicitly remove id from data to update
-        const { id, ...dataToUpdate } = lead;
-        return updateDoc(doc(db, "leads", id), dataToUpdate);
-      } else {
-        // Create new lead - don't include id field at all
-        const { id, ...newLeadData } = lead;
-        return addDoc(collection(db, "leads"), {
-          ...newLeadData,
-          createdAt: serverTimestamp(),
-          lastUpdatedAt: serverTimestamp()
-        });
-      }
-    });
+  const handleSaveLead = useCallback(async (leadsToSave) => {
+    try {
+      const leadsArray = Array.isArray(leadsToSave)
+        ? leadsToSave
+        : [leadsToSave];
+      const { addDoc, collection, serverTimestamp, updateDoc } = await import(
+        "firebase/firestore"
+      );
 
-    await Promise.all(savePromises);
-    setShowDetailsModal(false);
-    setSelectedLead(null);
-  } catch (error) {
-    console.error("Error saving leads:", error);
-  }
-}, []);
+      const savePromises = leadsArray.map(async (lead) => {
+        if (lead.id) {
+          // Update existing lead - explicitly remove id from data to update
+          const { id, ...dataToUpdate } = lead;
+          return updateDoc(doc(db, "leads", id), dataToUpdate);
+        } else {
+          // Create new lead - don't include id field at all
+          const { id, ...newLeadData } = lead;
+          return addDoc(collection(db, "leads"), {
+            ...newLeadData,
+            createdAt: serverTimestamp(),
+            lastUpdatedAt: serverTimestamp(),
+          });
+        }
+      });
+
+      await Promise.all(savePromises);
+      setShowDetailsModal(false);
+      setSelectedLead(null);
+    } catch (error) {
+      console.error("Error saving leads:", error);
+    }
+  }, []);
 
   const handleImportComplete = useCallback((importedData) => {
     console.log("Imported data:", importedData);
@@ -516,115 +537,124 @@ const handleSaveLead = useCallback(async (leadsToSave) => {
   };
 
   return (
-    <div className="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen font-sans">
+    <div className="bg-gradient-to-br from-gray-50 to-gray-100  font-sans">
       <div className="mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
-              Sales Dashboard
-            </h1>
-            <p className="text-gray-600 mt-1">
-              Manage your leads and follow-ups
-            </p>
-
-            <div className="flex items-center justify-between mt-2">
-              {currentUser &&
-                (() => {
-                  const role = Object.values(users).find(
-                    (u) => u.uid === currentUser.uid
-                  )?.role;
-                  const isHigherRole = ["Director", "Head", "Manager"].includes(
-                    role
-                  );
-
-                  return isViewModeLoading ? (
-                    <div className="h-8 w-48 bg-gray-100 rounded-full animate-pulse"></div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <p
-                        className={`text-xs font-medium px-3 py-1 rounded-full ${
-                          isHigherRole
-                            ? "bg-green-100 text-green-700"
-                            : "bg-blue-100 text-blue-700"
-                        }`}
-                      >
-                        Viewing:{" "}
-                        {isHigherRole
-                          ? viewMyLeadsOnly
-                            ? "My Leads Only"
-                            : "All Sales Leads"
-                          : "My Leads Only"}
-                      </p>
-                      <ViewModeToggle isHigherRole={isHigherRole} />
-                    </div>
-                  );
-                })()}
-
-              <LeadFilters
-                filteredLeads={filteredLeads}
-                handleImportComplete={handleImportComplete}
-                filters={rawFilters}
-                setFilters={setRawFilters}
-                isFilterOpen={isFilterOpen}
-                setIsFilterOpen={setIsFilterOpen}
-                users={users}
-                leads={leads}
-                activeTab={activeTab}
-              />
+        {/* Sticky Header Section */}
+        <div className="sticky top-0 z-20 bg-gradient-to-br from-gray-50 to-gray-100 pb-2 border-b border-gray-200">
+          {/* Dashboard Title and Description */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+                Sales Dashboard
+              </h1>
+              <p className="text-gray-600 mt-1">
+                Manage your leads and follow-ups
+              </p>
             </div>
+
+            <button
+              onClick={() => setShowModal(true)}
+              className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-5 py-2.5 rounded-xl font-semibold hover:opacity-90 transition-all shadow-md flex items-center"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5 mr-2"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              Add College
+            </button>
           </div>
 
-          <button
-            onClick={() => setShowModal(true)}
-            className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-5 py-2.5 rounded-xl font-semibold hover:opacity-90 transition-all shadow-md flex items-center"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5 mr-2"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fillRule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"
-                clipRule="evenodd"
-              />
-            </svg>
-            Add College
-          </button>
+          {/* View Mode and Filters */}
+          <div className="flex items-center justify-between mb-2">
+            {currentUser &&
+              (() => {
+                const role = Object.values(users).find(
+                  (u) => u.uid === currentUser.uid
+                )?.role;
+                const isHigherRole = ["Director", "Head", "Manager"].includes(
+                  role
+                );
+
+                return isViewModeLoading ? (
+                  <div className="h-8 w-48 bg-gray-100 rounded-full animate-pulse"></div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <p
+                      className={`text-xs font-medium px-3 py-1 rounded-full ${
+                        isHigherRole
+                          ? "bg-green-100 text-green-700"
+                          : "bg-blue-100 text-blue-700"
+                      }`}
+                    >
+                      Viewing:{" "}
+                      {isHigherRole
+                        ? viewMyLeadsOnly
+                          ? "My Leads Only"
+                          : "All Sales Leads"
+                        : "My Leads Only"}
+                    </p>
+                    <ViewModeToggle isHigherRole={isHigherRole} />
+                  </div>
+                );
+              })()}
+
+            <LeadFilters
+              filteredLeads={filteredLeads}
+              handleImportComplete={handleImportComplete}
+              filters={rawFilters}
+              setFilters={setRawFilters}
+              isFilterOpen={isFilterOpen}
+              setIsFilterOpen={setIsFilterOpen}
+              users={users}
+              leads={leads}
+              activeTab={activeTab}
+            />
+          </div>
+
+          {/* Phase Tabs */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
+            {Object.keys(tabLabels).map((key) => (
+              <button
+                key={key}
+                onClick={() => handleTabChange(key)}
+                className={`py-3.5 rounded-xl text-sm font-semibold transition-all duration-300 ease-out transform hover:scale-[1.02] ${
+                  activeTab === key
+                    ? tabColorMap[key].active
+                    : tabColorMap[key].inactive
+                } ${
+                  activeTab === key
+                    ? "ring-2 ring-offset-2 ring-opacity-50"
+                    : ""
+                } ${
+                  activeTab === key
+                    ? key === "hot"
+                      ? "ring-red-500"
+                      : key === "warm"
+                      ? "ring-amber-400"
+                      : key === "cold"
+                      ? "ring-cyan-400"
+                      : "ring-green-500"
+                    : ""
+                }`}
+              >
+                {tabLabels[key]}{" "}
+                <span className="ml-1 text-xs font-bold">
+                  ({phaseCounts[key]})
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-          {Object.keys(tabLabels).map((key) => (
-            <button
-              key={key}
-              onClick={() => handleTabChange(key)}
-              className={`py-3.5 rounded-xl text-sm font-semibold transition-all duration-300 ease-out transform hover:scale-[1.02] ${
-                activeTab === key
-                  ? tabColorMap[key].active
-                  : tabColorMap[key].inactive
-              } ${
-                activeTab === key ? "ring-2 ring-offset-2 ring-opacity-50" : ""
-              } ${
-                activeTab === key
-                  ? key === "hot"
-                    ? "ring-red-500"
-                    : key === "warm"
-                    ? "ring-amber-400"
-                    : key === "cold"
-                    ? "ring-cyan-400"
-                    : "ring-green-500"
-                  : ""
-              }`}
-            >
-              {tabLabels[key]}{" "}
-              <span className="ml-1 text-xs font-bold">
-                ({phaseCounts[key]})
-              </span>
-            </button>
-          ))}
-        </div>
-
+        {/* Leads Table - This will scroll under the sticky header */}
         <LeadsTable
           loading={loading}
           activeTab={activeTab}

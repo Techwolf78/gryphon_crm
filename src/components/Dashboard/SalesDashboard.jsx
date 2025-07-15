@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext"; // Adjust the path as needed
 import PropTypes from "prop-types";
 import {
@@ -1057,8 +1057,8 @@ const SalesDashboard = () => {
 
       console.log("[DEBUG] Raw users data:", usersData); // Debug 10
 
-// Replace the filteredUsers line with:
-const filteredUsers = usersData;
+      // Replace the filteredUsers line with:
+      const filteredUsers = usersData;
 
       console.log("[DEBUG] Final users list:", filteredUsers); // Debug 12
       setUsers(filteredUsers);
