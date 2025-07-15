@@ -5,6 +5,7 @@ import TrainingTable from "../components/Learning/TrainingTables/TrainingTable";
 import TrainingDetailModal from "../components/Learning/TrainingTables/TrainingDetailModal";
 import FilePreviewModal from "../components/Learning/TrainingTables/FilePreviewModal";
 import StudentDataPage from "../components/Learning/StudentDataPage";
+import AddTrainer from "../components/Learning/AddTrainer"; // Add this import
 
 function LearningDevelopment() {
   const [trainings, setTrainings] = useState([]);
@@ -16,6 +17,23 @@ function LearningDevelopment() {
   const [studentPageData, setStudentPageData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showAddTrainer, setShowAddTrainer] = useState(false); // Add this state
+
+ const handleTrainerAdded = () => {
+    // You can add a toast notification here or refresh trainers list if needed
+    console.log("Trainer added successfully");
+  };
+
+  if (studentPageData) {
+    return (
+      <StudentDataPage
+        fileUrl={studentPageData.fileUrl}
+        trainingId={studentPageData.trainingId}
+        trainingName={studentPageData.trainingName}
+        onBack={() => setStudentPageData(null)}
+      />
+    );
+  }
 
   const fetchTrainings = async () => {
     try {
@@ -91,8 +109,13 @@ function LearningDevelopment() {
         <h1 className="text-3xl font-bold text-blue-800">
           Training Onboarding Submissions
         </h1>
+        <button
+          onClick={() => setShowAddTrainer(true)}
+          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+        >
+          Add Trainer
+        </button>
       </div>
-
       {error && (
         <div className="mb-4 p-4 bg-red-100 border-l-4 border-red-500 text-red-700">
           {error}
@@ -134,6 +157,13 @@ function LearningDevelopment() {
             />
           )}
         </>
+      )}
+
+      {showAddTrainer && (
+        <AddTrainer
+          onClose={() => setShowAddTrainer(false)}
+          onTrainerAdded={handleTrainerAdded}
+        />
       )}
     </div>
   );

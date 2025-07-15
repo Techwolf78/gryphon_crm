@@ -116,7 +116,7 @@ const DropdownActions = ({
   return (
     <div
       ref={dropdownRef}
-      className="fixed z-50 bg-white rounded-xl shadow-xl w-48 overflow-visible -right-4 top-full mt-1 animate-fadeIn"
+      className="absolute z-50 bg-white rounded-xl shadow-xl w-48 overflow-visible -right-4 top-full mt-1 animate-fadeIn"
       onClick={(e) => e.stopPropagation()}
     >
       <div className="py-1 relative">
