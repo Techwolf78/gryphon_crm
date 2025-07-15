@@ -1,35 +1,73 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import PropTypes from "prop-types";
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
 import ClosedLeadsProgressBar from "./ClosedLeadsProgressBar";
 import ClosedLeadsTable from "./ClosedLeadsTable";
 import ClosedLeadsStats from "./ClosedLeadsStats";
-
+import TrainingForm from '../ClosureForm/TrainingForm'
 const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
-  const [filterType, setFilterType] = useState("all");
-  const [quarterFilter, setQuarterFilter] = useState("current");
-  const [targets, setTargets] = useState([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const rowsPerPage = 10;
+const [filterType, setFilterType] = useState("all");
+const [quarterFilter, setQuarterFilter] = useState("current");
+const [targets, setTargets] = useState([]);
+const [currentPage, setCurrentPage] = useState(1);
+const rowsPerPage = 10;
+const [showClosureForm, setShowClosureForm] = useState(false);
+const [selectedClosureForm, setSelectedClosureForm] = useState(null);
+const [selectedLead, setSelectedLead] = useState(null);
+const [isLoadingForm, setIsLoadingForm] = useState(false);
+const [selectedTeamUserId, setSelectedTeamUserId] = useState("all");
+const selectedUser = selectedTeamUserId !== "all"
+  ? Object.values(users).find(u => u.uid === selectedTeamUserId)
+  : null;
 
+const handleEditClosureForm = async (lead) => {
+  try {
+    // Project code sanitize
+    const sanitizedCode = lead.projectCode?.replace(/\//g, "-");
+    if (!sanitizedCode) {
+      console.error("Project code not found!");
+      return;
+    }
+ 
+    const formRef = doc(db, "trainingForms", sanitizedCode);
+    const formSnap = await getDoc(formRef);
+ 
+    if (formSnap.exists()) {
+      const formData = formSnap.data();
+      // Ye data tumhare modal ko bhejna he (TrainingForm)
+     setSelectedClosureForm(formData);
+     setSelectedLead(lead);
+     setShowClosureForm(true);
+     
+
+ 
+    } else {
+      console.error("Form not found");
+    }
+  } catch (error) {
+    console.error("Error fetching closure form:", error);
+  }
+};
+ 
+ 
   const fetchTargets = useCallback(async () => {
     const snapshot = await getDocs(collection(db, "quarterly_targets"));
     const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     setTargets(data);
   }, []);
-
+ 
   useEffect(() => {
     fetchTargets();
   }, [fetchTargets]);
-
+ 
   const getFinancialYear = (date) => {
     const year = date.getFullYear();
     const month = date.getMonth();
     return month >= 3 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
   };
-
+ 
   const getQuarter = (date) => {
     const m = date.getMonth() + 1;
     if (m >= 4 && m <= 6) return "Q1";
@@ -37,22 +75,22 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
     if (m >= 10 && m <= 12) return "Q3";
     return "Q4";
   };
-
+ 
   const today = new Date();
   const currentQuarter = getQuarter(today);
   const selectedQuarter = quarterFilter === "current" ? currentQuarter : quarterFilter;
   const selectedFY = getFinancialYear(today);
-
+ 
   const currentUserObj = Object.values(users).find(u => u.uid === currentUser?.uid);
   const currentRole = currentUserObj?.role;
-
+ 
 const isUserInTeam = (uid) => {
   if (!uid) return false;
-
+ 
   if (currentRole === "Head") {
     const user = Object.values(users).find(u => u.uid === uid);
     if (!user) return false;
-
+ 
     // Head can see all managers and all their subordinates
     if (user.role === "Manager") return true;
     if (["Assistant Manager", "Executive"].includes(user.role) && user.reportingManager) {
@@ -62,46 +100,48 @@ const isUserInTeam = (uid) => {
       );
     }
   }
-
+ 
   if (currentRole === "Manager") {
     const user = Object.values(users).find(u => u.uid === uid);
     if (!user) return false;
-
+ 
     if (["Assistant Manager", "Executive"].includes(user.role)) {
       return user.reportingManager === currentUserObj.name;
     }
   }
-
+ 
   return false;
 };
-
+ 
 const filteredLeads = useMemo(() => {
   if (!currentUser) return [];
 
   return Object.entries(leads)
-   .filter(([, lead]) => {
-  if (viewMyLeadsOnly) {
-    return lead.assignedTo?.uid === currentUser.uid;
-  } else {
-    if (currentRole === "Director") {
-      return true; // ✅ Director ko sari leads dikhao
-    }
-    if (currentRole === "Head") {
-      return isUserInTeam(lead.assignedTo?.uid);
-    } else if (currentRole === "Manager") {
-      return (
-        isUserInTeam(lead.assignedTo?.uid) ||
-        lead.assignedTo?.uid === currentUser.uid
-      );
-    } else {
-      return (
-        isUserInTeam(lead.assignedTo?.uid) ||
-        lead.assignedTo?.uid === currentUser.uid
-      );
-    }
-  }
-})
-
+    .filter(([, lead]) => {
+      if (selectedUser) {
+        return lead.assignedTo?.uid === selectedUser.uid;
+      }
+      if (viewMyLeadsOnly) {
+        return lead.assignedTo?.uid === currentUser.uid;
+      } else {
+        if (currentRole === "Director") {
+          return true;
+        }
+        if (currentRole === "Head") {
+          return isUserInTeam(lead.assignedTo?.uid);
+        } else if (currentRole === "Manager") {
+          return (
+            isUserInTeam(lead.assignedTo?.uid) ||
+            lead.assignedTo?.uid === currentUser.uid
+          );
+        } else {
+          return (
+            isUserInTeam(lead.assignedTo?.uid) ||
+            lead.assignedTo?.uid === currentUser.uid
+          );
+        }
+      }
+    })
     .filter(([, lead]) => {
       if (filterType === "all") return true;
       return lead.closureType === filterType;
@@ -112,24 +152,25 @@ const filteredLeads = useMemo(() => {
       return closedQuarter === selectedQuarter;
     })
     .sort(([, a], [, b]) => new Date(b.closedDate) - new Date(a.closedDate));
-}, [leads, currentUser, currentRole, filterType, selectedQuarter, viewMyLeadsOnly, users]);
+}, [leads, currentUser, currentRole, filterType, selectedQuarter, viewMyLeadsOnly, users, selectedUser]);
 
-
-
+ 
+ 
+ 
   const startIdx = (currentPage - 1) * rowsPerPage;
   const currentRows = filteredLeads.slice(startIdx, startIdx + rowsPerPage);
   const totalPages = Math.ceil(filteredLeads.length / rowsPerPage);
-
+ 
   useEffect(() => {
     setCurrentPage(1);
   }, [filterType, quarterFilter, viewMyLeadsOnly]);
-
+ 
 const achievedValue = useMemo(() => {
   const value = filteredLeads.reduce((sum, [, lead]) => sum + (lead.totalCost || 0), 0);
   console.log("🔥 Achieved Value (ClosedLeads):", value);
   return value;
 }, [filteredLeads]);
-
+ 
   const formatCurrency = (amt) =>
     typeof amt === "number"
       ? new Intl.NumberFormat("en-IN", {
@@ -138,7 +179,7 @@ const achievedValue = useMemo(() => {
           maximumFractionDigits: 0,
         }).format(amt)
       : "-";
-
+ 
   const formatDate = (ts) =>
     ts
       ? new Date(ts).toLocaleDateString("en-IN", {
@@ -147,7 +188,7 @@ const achievedValue = useMemo(() => {
           year: "numeric",
         })
       : "-";
-
+ 
 const handleTargetUpdate = async () => {
   await fetchTargets();
   // Update deficits for this user
@@ -155,110 +196,128 @@ const handleTargetUpdate = async () => {
   // Dobara fetch karo taaki latest deficit Firestore se aaye
   await fetchTargets();
 };
-
-
+ 
+ 
   return (
-    <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
-      <div className="px-6 py-5 border-b flex flex-col sm:flex-row justify-between gap-4">
-        <h2 className="text-2xl font-bold text-gray-900">Closed Deals</h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center bg-gray-50 rounded-lg p-1">
-            {["all", "new", "renewal"].map(type => (
-              <button
-                key={type}
-                onClick={() => setFilterType(type)}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                  filterType === type
-                    ? "bg-white shadow-sm text-blue-600"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                {type === "all" ? "All" : type === "new" ? "New" : "Renewals"}
-              </button>
-            ))}
-          </div>
+  <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+    <div className="px-6 py-5 border-b flex flex-col sm:flex-row justify-between gap-4">
+      <h2 className="text-2xl font-bold text-gray-900">Closed Deals</h2>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center bg-gray-50 rounded-lg p-1">
+          {["all", "new", "renewal"].map(type => (
+            <button
+              key={type}
+              onClick={() => setFilterType(type)}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                filterType === type
+                  ? "bg-white shadow-sm text-blue-600"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {type === "all" ? "All" : type === "new" ? "New" : "Renewals"}
+            </button>
+          ))}
+        </div>
+ 
+        <select
+          value={quarterFilter}
+          onChange={e => setQuarterFilter(e.target.value)}
+          className="px-4 py-2 border rounded-md text-sm bg-white shadow-sm"
+        >
+          <option value="current">Current Quarter</option>
+          <option value="Q1">Q1</option>
+          <option value="Q2">Q2</option>
+          <option value="Q3">Q3</option>
+          <option value="Q4">Q4</option>
+          <option value="all">All Quarters</option>
+        </select>
+      </div>
+    </div>
+ 
+  <ClosedLeadsStats
+  leads={leads}
+  targets={targets}
+  currentUser={currentUser}
+  users={users}
+  selectedFY={selectedFY}
+  activeQuarter={selectedQuarter}
+  formatCurrency={formatCurrency}
+  viewMyLeadsOnly={viewMyLeadsOnly}
+  achievedValue={achievedValue}
+  handleTargetUpdate={handleTargetUpdate}
+  selectedTeamUserId={selectedTeamUserId}
+  setSelectedTeamUserId={setSelectedTeamUserId}
+/>
 
-          <select
-            value={quarterFilter}
-            onChange={e => setQuarterFilter(e.target.value)}
-            className="px-4 py-2 border rounded-md text-sm bg-white shadow-sm"
+ 
+    <ClosedLeadsProgressBar
+      progressPercent={0}
+      achievedValue={achievedValue}
+      quarterTarget={0}
+      formatCurrency={formatCurrency}
+    />
+ 
+    <ClosedLeadsTable
+      leads={currentRows}
+      formatDate={formatDate}
+      formatCurrency={formatCurrency}
+      viewMyLeadsOnly={viewMyLeadsOnly}
+      onEditClosureForm={handleEditClosureForm}
+    />
+ 
+    {filteredLeads.length > rowsPerPage && (
+      <div className="px-6 py-4 flex flex-col sm:flex-row justify-between items-center border-t gap-4">
+        <div className="text-sm text-gray-500">
+          Showing <strong>{startIdx + 1}</strong> to{" "}
+          <strong>{Math.min(startIdx + rowsPerPage, filteredLeads.length)}</strong> of{" "}
+          <strong>{filteredLeads.length}</strong> results
+        </div>
+        <div className="flex space-x-2">
+          <button
+            onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+            disabled={currentPage === 1}
+            className={`px-3 py-1 rounded-md border text-sm flex items-center ${
+              currentPage === 1 ? "border-gray-200 text-gray-400" : "border-gray-300 text-gray-700 hover:bg-gray-50"
+            }`}
           >
-            <option value="current">Current Quarter</option>
-            <option value="Q1">Q1</option>
-            <option value="Q2">Q2</option>
-            <option value="Q3">Q3</option>
-            <option value="Q4">Q4</option>
-            <option value="all">All Quarters</option>
-          </select>
+            <FiChevronLeft className="mr-1" /> Prev
+          </button>
+ 
+          <button
+            onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+            disabled={currentPage === totalPages}
+            className={`px-3 py-1 rounded-md border text-sm flex items-center ${
+              currentPage === totalPages ? "border-gray-200 text-gray-400" : "border-gray-300 text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            Next <FiChevronRight className="ml-1" />
+          </button>
         </div>
       </div>
-
-      <ClosedLeadsStats
-        leads={leads}
-        targets={targets}
-        currentUser={currentUser}
-        users={users}
-        selectedFY={selectedFY}
-        activeQuarter={selectedQuarter}
-        formatCurrency={formatCurrency}
-        viewMyLeadsOnly={viewMyLeadsOnly}
-        achievedValue={achievedValue}
-        handleTargetUpdate={handleTargetUpdate}
-      />
-
-      <ClosedLeadsProgressBar
-        progressPercent={0}
-        achievedValue={achievedValue}
-        quarterTarget={0}
-        formatCurrency={formatCurrency}
-      />
-
-      <ClosedLeadsTable
-        leads={currentRows}
-        formatDate={formatDate}
-        formatCurrency={formatCurrency}
-        viewMyLeadsOnly={viewMyLeadsOnly}
-      />
-
-      {filteredLeads.length > rowsPerPage && (
-        <div className="px-6 py-4 flex flex-col sm:flex-row justify-between items-center border-t gap-4">
-          <div className="text-sm text-gray-500">
-            Showing <strong>{startIdx + 1}</strong> to{" "}
-            <strong>{Math.min(startIdx + rowsPerPage, filteredLeads.length)}</strong> of{" "}
-            <strong>{filteredLeads.length}</strong> results
-          </div>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
-              disabled={currentPage === 1}
-              className={`px-3 py-1 rounded-md border text-sm flex items-center ${
-                currentPage === 1 ? "border-gray-200 text-gray-400" : "border-gray-300 text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              <FiChevronLeft className="mr-1" /> Prev
-            </button>
-
-            <button
-              onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
-              disabled={currentPage === totalPages}
-              className={`px-3 py-1 rounded-md border text-sm flex items-center ${
-                currentPage === totalPages ? "border-gray-200 text-gray-400" : "border-gray-300 text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              Next <FiChevronRight className="ml-1" />
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+    )}
+ 
+    {/* ⭐⭐ Yeh line ab add kar ⭐⭐ */}
+<TrainingForm
+  show={showClosureForm}
+  onClose={() => setShowClosureForm(false)}
+  lead={selectedLead}
+  existingFormData={selectedClosureForm}
+  users={users}
+/>
+ 
+ 
+  </div>
+);
+ 
 };
-
+ 
 ClosedLeads.propTypes = {
   leads: PropTypes.object.isRequired,
   viewMyLeadsOnly: PropTypes.bool.isRequired,
   currentUser: PropTypes.shape({ uid: PropTypes.string }),
   users: PropTypes.object.isRequired,
 };
-
+ 
 export default ClosedLeads;
+ 
+ 

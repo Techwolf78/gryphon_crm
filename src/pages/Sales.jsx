@@ -102,157 +102,179 @@ function Sales() {
   }, [rawFilters]);
 
   // Memoized computations
-const computePhaseCounts = useCallback(() => {
-  const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
-  const counts = { hot: 0, warm: 0, cold: 0, closed: 0 };
-
-  if (!user) return counts;
-
-  const isSalesDept = user.department === "Sales";
-  const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
-  const isLowerRole = ["Assistant Manager", "Executive"].includes(user.role);
-
-  Object.values(leads).forEach((lead) => {
-  const phase = lead.phase || "hot";
-  const isOwnLead = lead.assignedTo?.uid === currentUser?.uid;
-  let shouldInclude = false;
-
-  if (user.role === "Director") {
-    if (viewMyLeadsOnly) {
-      shouldInclude = isOwnLead;
-    } else {
-      shouldInclude = true;
-    }
-  } else if (isSalesDept && isHigherRole) {
-    if (viewMyLeadsOnly) {
-      shouldInclude = isOwnLead;
-    } else {
-      if (user.role === "Manager") {
-        const subordinates = Object.values(users).filter(
-          (u) =>
-            u.reportingManager === user.name &&
-            ["Assistant Manager", "Executive"].includes(u.role)
-        );
-        const teamUids = subordinates.map((u) => u.uid);
-        shouldInclude = teamUids.includes(lead.assignedTo?.uid);
-      } else if (user.role === "Head") {
-        const leadUser = Object.values(users).find(
-          (u) => u.uid === lead.assignedTo?.uid
-        );
-        if (leadUser) {
-          if (leadUser.role === "Manager") {
-            shouldInclude = true;
-          } else if (
-            ["Assistant Manager", "Executive"].includes(leadUser.role) &&
-            leadUser.reportingManager &&
-            Object.values(users).some(
-              (mgr) => mgr.role === "Manager" && mgr.name === leadUser.reportingManager
-            )
-          ) {
-            shouldInclude = true;
-          }
-        }
-      } else {
-        shouldInclude = true;
-      }
-    }
-  } else if (isSalesDept && isLowerRole) {
-    shouldInclude = isOwnLead;
-  }
-
-  if (shouldInclude && counts[phase] !== undefined) {
-    counts[phase]++;
-  }
-});
-
-  return counts;
-}, [users, currentUser, leads, viewMyLeadsOnly]);
-
-
-
-  const phaseCounts = useMemo(() => computePhaseCounts(), [computePhaseCounts]);
-
-const filteredLeads = useMemo(() => {
-  return Object.entries(leads).filter(([, lead]) => {
-    const phaseMatch = (lead.phase || "hot") === activeTab;
+  const computePhaseCounts = useCallback(() => {
     const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
-    if (!user) return false;
+    const counts = { hot: 0, warm: 0, cold: 0, closed: 0 };
 
-    const matchesFilters =
-      (!filters.city || lead.city?.includes(filters.city)) &&
-      (!filters.assignedTo || lead.assignedTo?.uid === filters.assignedTo) &&
-      (!filters.dateRange?.start ||
-        lead.createdAt >= new Date(filters.dateRange.start).getTime()) &&
-      (!filters.dateRange?.end ||
-        lead.createdAt <= new Date(filters.dateRange.end).getTime()) &&
-      (!filters.pocName ||
-        lead.pocName?.toLowerCase().includes(filters.pocName.toLowerCase())) &&
-      (!filters.phoneNo || lead.phoneNo?.includes(filters.phoneNo)) &&
-      (!filters.email ||
-        lead.email?.toLowerCase().includes(filters.email.toLowerCase())) &&
-      (!filters.contactMethod ||
-        lead.contactMethod?.toLowerCase() === filters.contactMethod.toLowerCase());
+    if (!user) return counts;
 
     const isSalesDept = user.department === "Sales";
     const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
+    const isLowerRole = ["Assistant Manager", "Executive"].includes(user.role);
 
-   if (user.role === "Director") {
-  if (viewMyLeadsOnly) {
-    // Director -> My Leads: only own leads
-    return phaseMatch && matchesFilters && lead.assignedTo?.uid === currentUser?.uid;
-  } else {
-    // Director -> My Team: all sales team leads
-    return phaseMatch && matchesFilters;
-  }
-}
+    Object.values(leads).forEach((lead) => {
+      const phase = lead.phase || "hot";
+      const isOwnLead = lead.assignedTo?.uid === currentUser?.uid;
+      let shouldInclude = false;
 
-    if (isSalesDept && isHigherRole) {
-      if (viewMyLeadsOnly) {
-        return phaseMatch && matchesFilters && lead.assignedTo?.uid === currentUser?.uid;
-      } else {
-        if (user.role === "Manager") {
-          const subordinates = Object.values(users).filter(
-            (u) =>
-              u.reportingManager === user.name &&
-              ["Assistant Manager", "Executive"].includes(u.role)
-          );
-          const teamUids = subordinates.map((u) => u.uid);
-          return phaseMatch && matchesFilters && teamUids.includes(lead.assignedTo?.uid);
+      if (user.role === "Director") {
+        if (viewMyLeadsOnly) {
+          shouldInclude = isOwnLead;
+        } else {
+          shouldInclude = true;
         }
-        
-
-        if (user.role === "Head") {
-          const leadUser = Object.values(users).find((u) => u.uid === lead.assignedTo?.uid);
-          if (!leadUser) return false;
-
-          if (leadUser.role === "Manager") return phaseMatch && matchesFilters;
-
-          if (
-            ["Assistant Manager", "Executive"].includes(leadUser.role) &&
-            leadUser.reportingManager &&
-            Object.values(users).some(
-              (mgr) => mgr.role === "Manager" && mgr.name === leadUser.reportingManager
-            )
-          ) {
-            return phaseMatch && matchesFilters;
+      } else if (isSalesDept && isHigherRole) {
+        if (viewMyLeadsOnly) {
+          shouldInclude = isOwnLead;
+        } else {
+          if (user.role === "Manager") {
+            const subordinates = Object.values(users).filter(
+              (u) =>
+                u.reportingManager === user.name &&
+                ["Assistant Manager", "Executive"].includes(u.role)
+            );
+            const teamUids = subordinates.map((u) => u.uid);
+            shouldInclude = teamUids.includes(lead.assignedTo?.uid);
+          } else if (user.role === "Head") {
+            const leadUser = Object.values(users).find(
+              (u) => u.uid === lead.assignedTo?.uid
+            );
+            if (leadUser) {
+              if (leadUser.role === "Manager") {
+                shouldInclude = true;
+              } else if (
+                ["Assistant Manager", "Executive"].includes(leadUser.role) &&
+                leadUser.reportingManager &&
+                Object.values(users).some(
+                  (mgr) =>
+                    mgr.role === "Manager" &&
+                    mgr.name === leadUser.reportingManager
+                )
+              ) {
+                shouldInclude = true;
+              }
+            }
+          } else {
+            shouldInclude = true;
           }
         }
-
-        return phaseMatch && matchesFilters;
+      } else if (isSalesDept && isLowerRole) {
+        shouldInclude = isOwnLead;
       }
-    }
 
-    if (isSalesDept && ["Assistant Manager", "Executive"].includes(user.role)) {
-      return phaseMatch && matchesFilters && lead.assignedTo?.uid === currentUser?.uid;
-    }
+      if (shouldInclude && counts[phase] !== undefined) {
+        counts[phase]++;
+      }
+    });
 
-    return false;
-  });
-}, [leads, activeTab, users, currentUser, viewMyLeadsOnly, filters]);
+    return counts;
+  }, [users, currentUser, leads, viewMyLeadsOnly]);
 
+  const phaseCounts = useMemo(() => computePhaseCounts(), [computePhaseCounts]);
 
+  const filteredLeads = useMemo(() => {
+    return Object.entries(leads).filter(([, lead]) => {
+      const phaseMatch = (lead.phase || "hot") === activeTab;
+      const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
+      if (!user) return false;
 
+      const matchesFilters =
+        (!filters.city || lead.city?.includes(filters.city)) &&
+        (!filters.assignedTo || lead.assignedTo?.uid === filters.assignedTo) &&
+        (!filters.dateRange?.start ||
+          lead.createdAt >= new Date(filters.dateRange.start).getTime()) &&
+        (!filters.dateRange?.end ||
+          lead.createdAt <= new Date(filters.dateRange.end).getTime()) &&
+        (!filters.pocName ||
+          lead.pocName
+            ?.toLowerCase()
+            .includes(filters.pocName.toLowerCase())) &&
+        (!filters.phoneNo || lead.phoneNo?.includes(filters.phoneNo)) &&
+        (!filters.email ||
+          lead.email?.toLowerCase().includes(filters.email.toLowerCase())) &&
+        (!filters.contactMethod ||
+          lead.contactMethod?.toLowerCase() ===
+            filters.contactMethod.toLowerCase());
 
+      const isSalesDept = user.department === "Sales";
+      const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
+
+      if (user.role === "Director") {
+        if (viewMyLeadsOnly) {
+          // Director -> My Leads: only own leads
+          return (
+            phaseMatch &&
+            matchesFilters &&
+            lead.assignedTo?.uid === currentUser?.uid
+          );
+        } else {
+          // Director -> My Team: all sales team leads
+          return phaseMatch && matchesFilters;
+        }
+      }
+
+      if (isSalesDept && isHigherRole) {
+        if (viewMyLeadsOnly) {
+          return (
+            phaseMatch &&
+            matchesFilters &&
+            lead.assignedTo?.uid === currentUser?.uid
+          );
+        } else {
+          if (user.role === "Manager") {
+            const subordinates = Object.values(users).filter(
+              (u) =>
+                u.reportingManager === user.name &&
+                ["Assistant Manager", "Executive"].includes(u.role)
+            );
+            const teamUids = subordinates.map((u) => u.uid);
+            return (
+              phaseMatch &&
+              matchesFilters &&
+              teamUids.includes(lead.assignedTo?.uid)
+            );
+          }
+
+          if (user.role === "Head") {
+            const leadUser = Object.values(users).find(
+              (u) => u.uid === lead.assignedTo?.uid
+            );
+            if (!leadUser) return false;
+
+            if (leadUser.role === "Manager")
+              return phaseMatch && matchesFilters;
+
+            if (
+              ["Assistant Manager", "Executive"].includes(leadUser.role) &&
+              leadUser.reportingManager &&
+              Object.values(users).some(
+                (mgr) =>
+                  mgr.role === "Manager" &&
+                  mgr.name === leadUser.reportingManager
+              )
+            ) {
+              return phaseMatch && matchesFilters;
+            }
+          }
+
+          return phaseMatch && matchesFilters;
+        }
+      }
+
+      if (
+        isSalesDept &&
+        ["Assistant Manager", "Executive"].includes(user.role)
+      ) {
+        return (
+          phaseMatch &&
+          matchesFilters &&
+          lead.assignedTo?.uid === currentUser?.uid
+        );
+      }
+
+      return false;
+    });
+  }, [leads, activeTab, users, currentUser, viewMyLeadsOnly, filters]);
 
   // Auth state listener
   useEffect(() => {
@@ -426,23 +448,34 @@ const filteredLeads = useMemo(() => {
     }
   }, []);
 
-  const handleSaveLead = useCallback(async (updatedLead) => {
-    if (!updatedLead?.id) return;
+const handleSaveLead = useCallback(async (leadsToSave) => {
+  try {
+    const leadsArray = Array.isArray(leadsToSave) ? leadsToSave : [leadsToSave];
+    const { addDoc, collection, serverTimestamp, updateDoc } = await import('firebase/firestore');
+    
+    const savePromises = leadsArray.map(async lead => {
+      if (lead.id) {
+        // Update existing lead - explicitly remove id from data to update
+        const { id, ...dataToUpdate } = lead;
+        return updateDoc(doc(db, "leads", id), dataToUpdate);
+      } else {
+        // Create new lead - don't include id field at all
+        const { id, ...newLeadData } = lead;
+        return addDoc(collection(db, "leads"), {
+          ...newLeadData,
+          createdAt: serverTimestamp(),
+          lastUpdatedAt: serverTimestamp()
+        });
+      }
+    });
 
-    if (updatedLead.createdAt && typeof updatedLead.createdAt === "string") {
-      updatedLead.createdAt = new Date(updatedLead.createdAt).getTime();
-    }
-
-    const { ...dataToUpdate } = updatedLead;
-
-    try {
-      await updateDoc(doc(db, "leads", updatedLead.id), dataToUpdate);
-      setShowDetailsModal(false);
-      setSelectedLead(null);
-    } catch (error) {
-      console.error("Failed to update lead", error);
-    }
-  }, []);
+    await Promise.all(savePromises);
+    setShowDetailsModal(false);
+    setSelectedLead(null);
+  } catch (error) {
+    console.error("Error saving leads:", error);
+  }
+}, []);
 
   const handleImportComplete = useCallback((importedData) => {
     console.log("Imported data:", importedData);

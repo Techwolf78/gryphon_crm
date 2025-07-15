@@ -21,6 +21,8 @@ const ClosedLeadsStats = ({
   formatCurrency,
   viewMyLeadsOnly,
   handleTargetUpdate,
+  selectedTeamUserId,
+  setSelectedTeamUserId,
 }) => {
 
   const [selectedFY, setSelectedFY] = useState(propSelectedFY || getCurrentFinancialYear());
@@ -57,7 +59,6 @@ else if (isAdminOrDirector) {
 }
 
 
-  const [selectedTeamUserId, setSelectedTeamUserId] = useState("all");
 
   let targetUser;
 
