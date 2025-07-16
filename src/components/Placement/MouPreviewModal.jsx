@@ -1,6 +1,32 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 
 const MouPreviewModal = ({ show, onClose, mouFileUrl }) => {
+  const [fileError, setFileError] = useState(false);
+
+  useEffect(() => {
+    if (!show) return;
+    
+    // Reset error state when modal opens
+    setFileError(false);
+    
+    // Check if the file exists when the modal opens
+    if (mouFileUrl) {
+      checkFileAccessibility(mouFileUrl);
+    }
+  }, [show, mouFileUrl]);
+
+  const checkFileAccessibility = (url) => {
+    fetch(url, { method: 'HEAD' })
+      .then(response => {
+        if (!response.ok) {
+          setFileError(true);
+        }
+      })
+      .catch(() => {
+        setFileError(true);
+      });
+  };
+
   if (!show) return null;
 
   return (
@@ -45,7 +71,21 @@ const MouPreviewModal = ({ show, onClose, mouFileUrl }) => {
           </button>
         </div>
         
-        {mouFileUrl ? (
+        {!mouFileUrl ? (
+          <div style={{ textAlign: 'center', padding: '20px' }}>
+            <p style={{ color: '#6c757d', marginBottom: '10px' }}>No file to preview</p>
+            <p style={{ color: '#6c757d', fontSize: '0.9rem' }}>
+              No MOU file has been uploaded for this record.
+            </p>
+          </div>
+        ) : fileError ? (
+          <div style={{ textAlign: 'center', padding: '20px' }}>
+            <p style={{ color: '#dc3545', marginBottom: '10px' }}>Problem accessing the file</p>
+            <p style={{ color: '#6c757d', fontSize: '0.9rem' }}>
+              The MOU file exists but cannot be displayed. Please contact the administrator.
+            </p>
+          </div>
+        ) : (
           <div style={{ display: 'flex', justifyContent: 'center' }}>
             <iframe 
               src={mouFileUrl}
@@ -57,10 +97,9 @@ const MouPreviewModal = ({ show, onClose, mouFileUrl }) => {
               }}
               frameBorder="0"
               title="MOU Preview"
+              onError={() => setFileError(true)}
             />
           </div>
-        ) : (
-          <p>No MOU file available</p>
         )}
         
         <div style={{
@@ -82,20 +121,21 @@ const MouPreviewModal = ({ show, onClose, mouFileUrl }) => {
           >
             Close
           </button>
-          <button
-            onClick={() => window.open(mouFileUrl, "_blank")}
-            disabled={!mouFileUrl}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: mouFileUrl ? '#007bff' : '#cccccc',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: mouFileUrl ? 'pointer' : 'not-allowed'
-            }}
-          >
-            Open in New Tab
-          </button>
+          {mouFileUrl && !fileError && (
+            <button
+              onClick={() => window.open(mouFileUrl, "_blank")}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#007bff',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              Open in New Tab
+            </button>
+          )}
         </div>
       </div>
     </div>
