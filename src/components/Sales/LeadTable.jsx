@@ -171,7 +171,7 @@ export default function LeadsTable({
 
   return (
     <>
-      <div className="overflow-hidden">
+    <div className="min-h-screen flex flex-col overflow-hidden">
         {/* Fixed Header */}
         <div
           className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-2`}
@@ -219,7 +219,7 @@ export default function LeadsTable({
 
         {/* Scrollable Body */}
         <div
-          className="overflow-y-auto"
+          className="overflow-y-auto min-h-screen"
           style={{ maxHeight: "calc(100vh - 310px)" }}
         >
           {visibleLeads.length === 0 ? (

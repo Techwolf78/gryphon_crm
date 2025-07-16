@@ -2,10 +2,11 @@ import React, { useState, useEffect } from "react";
 import { db } from "../firebase";
 import { collection, getDocs } from "firebase/firestore";
 import TrainingDetailModal from "../components/Learning/TrainingTables/TrainingDetailModal";
-import FilePreviewModal from "../components/Learning/TrainingTables/FilePreviewModal";
+import StudentListModal from "../components/Placement/StudentListModal";
 import AddJD from "../components/Placement/AddJD";
 import CompanyOpen from "../components/Placement/CompanyOpen";
 import CompanyLeads from "../components/Placement/CompanyLeads";
+import MouPreviewModal from "../components/Placement/MouPreviewModal";
 import PlacementDetailsModal from "../components/Placement//PlacementDetailsModal";
 
 function Placement() {
@@ -13,13 +14,16 @@ function Placement() {
   const [leads, setLeads] = useState([]);
   const [selectedTraining, setSelectedTraining] = useState(null);
   const [selectedLead, setSelectedLead] = useState(null);
-  const [fileModalData, setFileModalData] = useState({
+  const [studentModalData, setStudentModalData] = useState({
     show: false,
-    fileUrl: "",
-    type: "",
+    students: [],
   });
   const [showJDForm, setShowJDForm] = useState(false);
-  const [viewMode, setViewMode] = useState('training'); // 'training', 'placement', or 'leads'
+  const [viewMode, setViewMode] = useState("training");
+  const [mouPreview, setMouPreview] = useState({
+    show: false,
+    url: null,
+  });
 
   const fetchData = async () => {
     try {
@@ -31,9 +35,8 @@ function Placement() {
       }));
       setTrainingData(trainingData);
 
-      // Fetch leads data
       const leadsSnapshot = await getDocs(collection(db, "leads"));
-      const leadsData = leadsSnapshot.docs.map(doc => ({
+      const leadsData = leadsSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
@@ -47,25 +50,38 @@ function Placement() {
     fetchData();
   }, []);
 
-  const openFilePreview = (fileUrl, type) => {
-    if (!fileUrl) return alert("File not available.");
-    setFileModalData({ show: true, fileUrl, type });
+  const fetchStudentData = async (trainingDocId) => {
+    try {
+      const studentsSnapshot = await getDocs(
+        collection(db, "trainingForms", trainingDocId, "students")
+      );
+      const students = studentsSnapshot.docs.map((doc) => doc.data());
+      setStudentModalData({ show: true, students });
+    } catch (err) {
+      console.error("Failed to fetch students:", err);
+      alert("Failed to load student data.");
+    }
   };
 
   const handleAddJD = (leadId, jdData, selectedColleges) => {
-    setLeads(prevLeads => prevLeads.map(lead => {
-      if (lead.id === leadId) {
-        return {
-          ...lead,
-          jds: [...(lead.jds || []), {
-            ...jdData,
-            colleges: selectedColleges,
-            createdAt: new Date().toISOString()
-          }]
-        };
-      }
-      return lead;
-    }));
+    setLeads((prevLeads) =>
+      prevLeads.map((lead) => {
+        if (lead.id === leadId) {
+          return {
+            ...lead,
+            jds: [
+              ...(lead.jds || []),
+              {
+                ...jdData,
+                colleges: selectedColleges,
+                createdAt: new Date().toISOString(),
+              },
+            ],
+          };
+        }
+        return lead;
+      })
+    );
   };
 
   return (
@@ -76,28 +92,39 @@ function Placement() {
 
       <div className="flex mb-3 border-b">
         <button
-          className={`px-4 py-2 font-medium ${viewMode === 'training' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
-          onClick={() => setViewMode('training')}
+          className={`px-4 py-2 font-medium ${
+            viewMode === "training"
+              ? "border-b-2 border-blue-500 text-blue-600"
+              : "text-gray-500"
+          }`}
+          onClick={() => setViewMode("training")}
         >
           Training Data
         </button>
         <button
-          className={`px-4 py-2 font-medium ${viewMode === 'placement' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
-          onClick={() => setViewMode('placement')}
+          className={`px-4 py-2 font-medium ${
+            viewMode === "placement"
+              ? "border-b-2 border-blue-500 text-blue-600"
+              : "text-gray-500"
+          }`}
+          onClick={() => setViewMode("placement")}
         >
           Placement Stats
         </button>
         <button
-          className={`px-4 py-2 font-medium ${viewMode === 'leads' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
-          onClick={() => setViewMode('leads')}
+          className={`px-4 py-2 font-medium ${
+            viewMode === "leads"
+              ? "border-b-2 border-blue-500 text-blue-600"
+              : "text-gray-500"
+          }`}
+          onClick={() => setViewMode("leads")}
         >
           Company Leads
         </button>
       </div>
 
-      {viewMode === 'training' && (
+      {viewMode === "training" && (
         <>
-          {/* Training Data View */}
           {trainingData.length === 0 ? (
             <p>No training data found.</p>
           ) : (
@@ -131,14 +158,13 @@ function Placement() {
                           View Details
                         </button>
                         <button
-                          onClick={() => openFilePreview(item.studentFileUrl, "student")}
+                          onClick={() => fetchStudentData(item.id)}
                           className="px-2 py-1 bg-indigo-500 text-white rounded"
-                          disabled={!item.studentFileUrl}
                         >
                           Student Data
                         </button>
                         <button
-                          onClick={() => openFilePreview(item.mouFileUrl, "mou")}
+                          onClick={() => setMouPreview({ show: true, url: item.mouFileUrl })}
                           className="px-2 py-1 bg-green-600 text-white rounded"
                           disabled={!item.mouFileUrl}
                         >
@@ -154,48 +180,57 @@ function Placement() {
         </>
       )}
 
-      {viewMode === 'placement' && (
-        <CompanyOpen />
-      )}
-
-      {viewMode === 'leads' && (
-        <CompanyLeads 
-          leads={leads} 
+      {viewMode === "placement" && <CompanyOpen />}
+      {viewMode === "leads" && (
+        <CompanyLeads
+          leads={leads}
           onLeadSelect={(lead) => {
             setSelectedLead(lead);
-            setViewMode('placement');
-          }} 
+            setViewMode("placement");
+          }}
         />
       )}
 
-      {/* Modals */}
       {selectedTraining && (
         <PlacementDetailsModal
           training={selectedTraining}
           onClose={() => setSelectedTraining(null)}
         />
       )}
-      {fileModalData.show && (
-        <FilePreviewModal
-          fileUrl={fileModalData.fileUrl}
-          type={fileModalData.type}
-          onClose={() => setFileModalData({ show: false, fileUrl: "", type: "" })}
+
+      {studentModalData.show && (
+        <StudentListModal
+          students={studentModalData.students}
+          onClose={() => setStudentModalData({ show: false, students: [] })}
         />
       )}
+
       {showJDForm && (
         <AddJD show={showJDForm} onClose={() => setShowJDForm(false)} />
       )}
+
       {selectedLead && (
         <CompanyOpen
           selectedLead={selectedLead}
-          onClose={() => setSelectedLead(null)} 
+          onClose={() => setSelectedLead(null)}
           onAddJD={(leadId, jdData) => {
-            setLeads(leads.map(lead => 
-              lead.id === leadId 
-                ? { ...lead, jds: [...(lead.jds || []), jdData] } 
-                : lead
-            ));
+            setLeads(
+              leads.map((lead) =>
+                lead.id === leadId
+                  ? { ...lead, jds: [...(lead.jds || []), jdData] }
+                  : lead
+              )
+            );
           }}
+        />
+      )}
+
+      {/* MOU Preview Modal - Correctly placed at the bottom */}
+      {mouPreview.show && (
+        <MouPreviewModal
+          show={mouPreview.show}
+          onClose={() => setMouPreview({ show: false, url: null })}
+          mouFileUrl={mouPreview.url}
         />
       )}
     </div>

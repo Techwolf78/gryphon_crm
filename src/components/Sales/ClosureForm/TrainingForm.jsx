@@ -1,7 +1,14 @@
- 
 import React, { useState, useEffect, useContext, useCallback } from "react";
 import { FaTimes } from "react-icons/fa";
-import { collection, serverTimestamp, doc, updateDoc, writeBatch, setDoc, getDoc } from "firebase/firestore";
+import {
+  collection,
+  serverTimestamp,
+  doc,
+  updateDoc,
+  writeBatch,
+  setDoc,
+  getDoc,
+} from "firebase/firestore";
 import { db } from "../../../firebase";
 import { AuthContext } from "../../../context/AuthContext";
 import CollegeInfoSection from "./CollegeInfoSection";
@@ -13,358 +20,368 @@ import MOUUploadSection from "./MOUUploadSection";
 import PropTypes from "prop-types";
 import syncLogo from "../../../assets/SYNC-logo.png";
 import * as XLSX from "xlsx-js-style";
- 
+
 const validateCollegeCode = (value) => /^[A-Z]*$/.test(value);
 const validatePincode = (value) => /^[0-9]{0,6}$/.test(value);
 const validateGST = (value) =>
-    /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(value);
- 
+  /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(value);
+
 const TrainingForm = ({
-    show,
-    onClose,
-    lead,
-    users,
-    existingFormData,
-    isLoading
+  show,
+  onClose,
+  lead,
+  users,
+  existingFormData,
+  isLoading,
 }) => {
-    const { currentUser } = useContext(AuthContext);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-    const [formData, setFormData] = useState({
-        projectCode: "",
-        collegeName: lead?.businessName || "",
-        collegeCode: "",
-        address: lead?.address || "",
-        city: lead?.city || "",
-        state: lead?.state || "",
-        pincode: "",
-        gstNumber: "",
-        tpoName: "",
-        tpoEmail: "",
-        tpoPhone: "",
-        trainingName: "",
-        trainingEmail: "",
-        trainingPhone: "",
-        accountName: "",
-        accountEmail: "",
-        accountPhone: "",
-        course: "",
-        otherCourseText: "",
-        year: "",
-        deliveryType: "",
-        passingYear: "",
-        studentList: [],
-        courses: [{ specialization: "", othersSpecText: "", students: "" }],
-        topics: [{ topic: "", hours: "" }],
-        paymentType: "",
-        gstType: "",
-        perStudentCost: 0,
-        totalCost: 0,
-        studentCount: 0,
-        paymentSplits: [],
-        emiMonths: 0,
-        emiSplits: [],
-        gstAmount: 0,
-        netPayableAmount: 0,
-        paymentDetails: [],
-        invoiceNumber: "",
-        additionalNotes: "",
-        splitTotal: 0
+  const { currentUser } = useContext(AuthContext);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [formData, setFormData] = useState({
+    projectCode: "",
+    collegeName: lead?.businessName || "",
+    collegeCode: "",
+    address: lead?.address || "",
+    city: lead?.city || "",
+    state: lead?.state || "",
+    pincode: "",
+    gstNumber: "",
+    tpoName: "",
+    tpoEmail: "",
+    tpoPhone: "",
+    trainingName: "",
+    trainingEmail: "",
+    trainingPhone: "",
+    accountName: "",
+    accountEmail: "",
+    accountPhone: "",
+    course: "",
+    otherCourseText: "",
+    year: "",
+    deliveryType: "",
+    passingYear: "",
+    studentList: [],
+    courses: [{ specialization: "", othersSpecText: "", students: "" }],
+    topics: [{ topic: "", hours: "" }],
+    paymentType: "",
+    gstType: "",
+    perStudentCost: 0,
+    totalCost: 0,
+    studentCount: 0,
+    paymentSplits: [],
+    emiMonths: 0,
+    emiSplits: [],
+    gstAmount: 0,
+    netPayableAmount: 0,
+    paymentDetails: [],
+    invoiceNumber: "",
+    additionalNotes: "",
+    splitTotal: 0,
+  });
+  const [collegeCodeError, setCollegeCodeError] = useState("");
+  const [pincodeError, setPincodeError] = useState("");
+  const [gstError, setGstError] = useState("");
+  const [studentFile, setStudentFile] = useState(null);
+  const [mouFile, setMouFile] = useState(null);
+  const [studentFileError, setStudentFileError] = useState("");
+  const [mouFileError, setMouFileError] = useState("");
+  const [contractStartDate, setContractStartDate] = useState("");
+  const [contractEndDate, setContractEndDate] = useState("");
+  const [duplicateProjectCode, setDuplicateProjectCode] = useState(false);
+  const [isFormValid, setIsFormValid] = useState(false);
+  const isEdit = !!existingFormData;
+
+  // Check if all required fields are filled
+  useEffect(() => {
+    const requiredFields = [
+      formData.projectCode,
+      formData.collegeName,
+      formData.collegeCode,
+      formData.address,
+      formData.city,
+      formData.state,
+      formData.pincode,
+      formData.tpoName,
+      formData.tpoEmail,
+      formData.tpoPhone,
+      formData.course,
+      formData.year,
+      formData.deliveryType,
+      formData.passingYear,
+      formData.paymentType,
+      formData.gstType,
+      contractStartDate,
+      contractEndDate,
+    ];
+
+    // Validate payment splits if payment type is not EMI
+    if (formData.paymentType === "EMI") {
+      requiredFields.push(formData.emiMonths > 0);
+    } else {
+      const splitsValid =
+        formData.paymentSplits.length > 0 &&
+        formData.paymentSplits.reduce(
+          (acc, val) => acc + (parseFloat(val) || 0),
+          0
+        ) === 100;
+      requiredFields.push(splitsValid);
+    }
+
+    // Validate student count
+    requiredFields.push(formData.studentCount > 0);
+
+    const isValid = requiredFields.every((field) => {
+      if (typeof field === "boolean") return field;
+      return field && field.toString().trim() !== "";
     });
-    const [collegeCodeError, setCollegeCodeError] = useState("");
-    const [pincodeError, setPincodeError] = useState("");
-    const [gstError, setGstError] = useState("");
-    const [studentFile, setStudentFile] = useState(null);
-    const [mouFile, setMouFile] = useState(null);
-    const [studentFileError, setStudentFileError] = useState("");
-    const [mouFileError, setMouFileError] = useState("");
-    const [contractStartDate, setContractStartDate] = useState("");
-    const [contractEndDate, setContractEndDate] = useState("");
-    const [duplicateProjectCode, setDuplicateProjectCode] = useState(false);
-    const [isFormValid, setIsFormValid] = useState(false);
-    const isEdit = !!existingFormData; 
- 
-    // Check if all required fields are filled
-    useEffect(() => {
-        const requiredFields = [
-            formData.projectCode,
-            formData.collegeName,
-            formData.collegeCode,
-            formData.address,
-            formData.city,
-            formData.state,
-            formData.pincode,
-            formData.tpoName,
-            formData.tpoEmail,
-            formData.tpoPhone,
-            formData.course,
-            formData.year,
-            formData.deliveryType,
-            formData.passingYear,
-            formData.paymentType,
-            formData.gstType,
-            contractStartDate,
-            contractEndDate
-        ];
- 
-        // Validate payment splits if payment type is not EMI
-        if (formData.paymentType === "EMI") {
-            requiredFields.push(formData.emiMonths > 0);
-        } else {
-            const splitsValid = formData.paymentSplits.length > 0 &&
-                formData.paymentSplits.reduce((acc, val) => acc + (parseFloat(val) || 0), 0) === 100;
-            requiredFields.push(splitsValid);
-        }
- 
-        // Validate student count
-        requiredFields.push(formData.studentCount > 0);
- 
-        const isValid = requiredFields.every(field => {
-            if (typeof field === 'boolean') return field;
-            return field && field.toString().trim() !== '';
-        });
- 
-        setIsFormValid(isValid);
-    }, [formData, contractStartDate, contractEndDate]);
- 
-useEffect(() => {
-  if (existingFormData) {
+
+    setIsFormValid(isValid);
+  }, [formData, contractStartDate, contractEndDate]);
+
+  useEffect(() => {
+    if (existingFormData) {
+      setFormData((prev) => ({
+        ...prev,
+        ...existingFormData,
+      }));
+      setContractStartDate(existingFormData.contractStartDate || "");
+      setContractEndDate(existingFormData.contractEndDate || "");
+    } else if (lead) {
+      // fallback agar existingFormData nahi diya
+      setFormData((prev) => ({
+        ...prev,
+        collegeName: lead.businessName || "",
+        address: lead.address || "",
+        city: lead.city || "",
+        state: lead.state || "",
+        studentCount: lead.studentCount || 0,
+        totalCost: (lead.studentCount || 0) * (lead.perStudentCost || 0),
+        perStudentCost: lead.perStudentCost || 0,
+        course: lead.courseType || "",
+        tpoName: lead.pocName || "",
+        tpoEmail: lead.email || "",
+        tpoPhone: lead.phoneNo || "",
+      }));
+      setContractStartDate(lead.contractStartDate || "");
+      setContractEndDate(lead.contractEndDate || "");
+    }
+  }, [existingFormData, lead]);
+
+  // Rest of your existing useEffect hooks remain the same...
+  useEffect(() => {
+    if (lead) {
+      setFormData((prev) => ({
+        ...prev,
+        collegeName: lead.businessName || "",
+        address: lead.address || "",
+        city: lead.city || "",
+        state: lead.state || "",
+        studentCount: lead.studentCount || 0,
+        totalCost: (lead.studentCount || 0) * (lead.perStudentCost || 0),
+        perStudentCost: lead.perStudentCost || 0,
+        course: lead.courseType || "",
+        tpoName: lead.pocName || "",
+        tpoEmail: lead.email || "",
+        tpoPhone: lead.phoneNo || "",
+      }));
+      setContractStartDate(lead.contractStartDate || "");
+      setContractEndDate(lead.contractEndDate || "");
+    }
+  }, [lead]);
+
+  useEffect(() => {
+    const totalStudents = formData.courses.reduce(
+      (sum, item) => sum + (parseInt(item.students) || 0),
+      0
+    );
     setFormData((prev) => ({
       ...prev,
-      ...existingFormData
+      studentCount: totalStudents,
+      totalCost: totalStudents * (parseFloat(prev.perStudentCost) || 0),
     }));
-    setContractStartDate(existingFormData.contractStartDate || "");
-    setContractEndDate(existingFormData.contractEndDate || "");
-  } else if (lead) {
-    // fallback agar existingFormData nahi diya
-    setFormData((prev) => ({
-      ...prev,
-      collegeName: lead.businessName || "",
-      address: lead.address || "",
-      city: lead.city || "",
-      state: lead.state || "",
-      studentCount: lead.studentCount || 0,
-      totalCost: (lead.studentCount || 0) * (lead.perStudentCost || 0),
-      perStudentCost: lead.perStudentCost || 0,
-      course: lead.courseType || "",
-      tpoName: lead.pocName || "",
-      tpoEmail: lead.email || "",
-      tpoPhone: lead.phoneNo || "",
-    }));
-    setContractStartDate(lead.contractStartDate || "");
-    setContractEndDate(lead.contractEndDate || "");
-  }
-}, [existingFormData, lead]);
+  }, [formData.courses, formData.perStudentCost]);
 
- 
- 
-    // Rest of your existing useEffect hooks remain the same...
-    useEffect(() => {
-        if (lead) {
-            setFormData((prev) => ({
-                ...prev,
-                collegeName: lead.businessName || "",
-                address: lead.address || "",
-                city: lead.city || "",
-                state: lead.state || "",
-                studentCount: lead.studentCount || 0,
-                totalCost: (lead.studentCount || 0) * (lead.perStudentCost || 0),
-                perStudentCost: lead.perStudentCost || 0,
-                course: lead.courseType || "",
-                tpoName: lead.pocName || "",
-                tpoEmail: lead.email || "",
-                tpoPhone: lead.phoneNo || "",
-            }));
-            setContractStartDate(lead.contractStartDate || "");
-            setContractEndDate(lead.contractEndDate || "");
-        }
-    }, [lead]);
- 
-    useEffect(() => {
-        const totalStudents = formData.courses.reduce(
-            (sum, item) => sum + (parseInt(item.students) || 0),
-            0
-        );
-        setFormData((prev) => ({
-            ...prev,
-            studentCount: totalStudents,
-            totalCost: totalStudents * (parseFloat(prev.perStudentCost) || 0),
-        }));
-    }, [formData.courses, formData.perStudentCost]);
- 
-    useEffect(() => {
-        const { collegeCode, course, year, deliveryType, passingYear } = formData;
-        if (collegeCode && course && year && deliveryType && passingYear) {
-            const passYear = passingYear.split("-");
-            const shortPassYear = `${passYear[0].slice(-2)}-${passYear[1].slice(-2)}`;
-            const coursePart = course === "Engineering" ? "ENGG" : course;
-            const code = `${collegeCode}/${coursePart}/${year}/${deliveryType}/${shortPassYear}`;
-            setFormData((prev) => ({ ...prev, projectCode: code }));
-            setDuplicateProjectCode(false); // Reset duplicate flag when project code changes
-        }
-    }, [
-        formData.collegeCode,
-        formData.course,
-        formData.year,
-        formData.deliveryType,
-        formData.passingYear,
-        [formData.projectCode]
-    ]);
- 
-    const validatePaymentSection = () => {
-        if (!formData.paymentType) {
-            return false;
-        }
- 
-        if (!formData.gstType) {
-            return false;
-        }
- 
-        if (formData.paymentType === "EMI") {
-            if (!formData.emiMonths || formData.emiMonths <= 0) {
-                return false;
-            }
-        } else {
-            if (!formData.paymentSplits || formData.paymentSplits.length === 0) {
-                return false;
-            }
- 
-            const sum = formData.paymentSplits.reduce((acc, val) => acc + (parseFloat(val) || 0), 0);
-            if (typeof sum !== 'number' || isNaN(sum)) {
-                return false;
-            }
- if (Math.abs(sum - 100) > 0.01) {
-    return false;
-}
+  useEffect(() => {
+    const { collegeCode, course, year, deliveryType, passingYear } = formData;
+    if (collegeCode && course && year && deliveryType && passingYear) {
+      const passYear = passingYear.split("-");
+      const shortPassYear = `${passYear[0].slice(-2)}-${passYear[1].slice(-2)}`;
+      const coursePart = course === "Engineering" ? "ENGG" : course;
+      const code = `${collegeCode}/${coursePart}/${year}/${deliveryType}/${shortPassYear}`;
+      setFormData((prev) => ({ ...prev, projectCode: code }));
+      setDuplicateProjectCode(false); // Reset duplicate flag when project code changes
+    }
+  }, [
+    formData.collegeCode,
+    formData.course,
+    formData.year,
+    formData.deliveryType,
+    formData.passingYear,
+    [formData.projectCode],
+  ]);
 
- 
-            if (sum.toFixed(2) !== "100.00") {
-                return false;
-            }
-        }
- 
-        return true;
-    };
- 
-    const handleChange = useCallback((e) => {
-        const { name, value } = e.target;
-        setHasUnsavedChanges(true);
-        if (name === "collegeCode") {
-            setCollegeCodeError(
-                validateCollegeCode(value) ? "" : "Only uppercase letters (A-Z) allowed"
-            );
-        }
-        if (name === "pincode") {
-            setPincodeError(
-                validatePincode(value) ? "" : "Pincode must be up to 6 digits only"
-            );
-        }
-        if (name === "gstNumber") {
-            setGstError(value && !validateGST(value) ? "Invalid GST number format" : "");
-        }
-        setFormData((prev) => ({ ...prev, [name]: value }));
-    }, []);
- 
-    const uploadFileToCloudinary = async (file, folderName) => {
-        if (!file) return null;
-        const url = "https://api.cloudinary.com/v1_1/da0ypp61n/raw/upload";
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("upload_preset", "react_profile_upload");
-        formData.append("folder", folderName);
-        const res = await fetch(url, { method: "POST", body: formData });
-        const data = await res.json();
-        if (!res.ok || !data.secure_url) {
-            throw new Error(data.error?.message || "File upload failed");
-        }
-        return data.secure_url;
-    };
- 
-    const uploadStudentsToFirestore = async (studentList, formId) => {
-        try {
-            if (!studentList || studentList.length === 0) return;
- 
-            const batch = writeBatch(db);
-            const studentsCollectionRef = collection(db, "trainingForms", formId, "students");
- 
-            studentList.forEach((student) => {
-                const docRef = doc(studentsCollectionRef);
-                batch.set(docRef, student);
-            });
- 
-            await batch.commit();
-        } catch (error) {
-            console.error("Error uploading students:", error);
-            throw error;
-        }
-    };
- 
-    const handleStudentFile = (file) => {
-        setStudentFile(file);
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: "array" });
-                const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                const jsonData = XLSX.utils.sheet_to_json(sheet);
-                setFormData((prev) => ({ ...prev, studentList: jsonData }));
-            };
-            reader.readAsArrayBuffer(file);
-        } else {
-            setFormData((prev) => ({ ...prev, studentList: [] }));
-        }
-    };
- 
-    const checkDuplicateProjectCode = async (projectCode) => {
-        try {
-            const sanitizedProjectCode = projectCode.replace(/\//g, "-");
-            const formRef = doc(db, "trainingForms", sanitizedProjectCode);
-            const existingDoc = await getDoc(formRef);
-            return existingDoc.exists();
-        } catch (error) {
-            console.error("Error checking duplicate project code:", error);
-            return false;
-        }
-    };
- const isEditMode = !!existingFormData;
+  const validatePaymentSection = () => {
+    if (!formData.paymentType) {
+      return false;
+    }
 
- 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
- 
-        // Basic form validation
-        if (!e.target.checkValidity()) {
-            const firstInvalid = e.target.querySelector(':invalid');
-            if (firstInvalid) {
-                firstInvalid.focus();
-            }
-            return;
+    if (!formData.gstType) {
+      return false;
+    }
+
+    if (formData.paymentType === "EMI") {
+      if (!formData.emiMonths || formData.emiMonths <= 0) {
+        return false;
+      }
+    } else {
+      if (!formData.paymentSplits || formData.paymentSplits.length === 0) {
+        return false;
+      }
+
+      const sum = formData.paymentSplits.reduce(
+        (acc, val) => acc + (parseFloat(val) || 0),
+        0
+      );
+      if (typeof sum !== "number" || isNaN(sum)) {
+        return false;
+      }
+      if (Math.abs(sum - 100) > 0.01) {
+        return false;
+      }
+
+      if (sum.toFixed(2) !== "100.00") {
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const handleChange = useCallback((e) => {
+    const { name, value } = e.target;
+    setHasUnsavedChanges(true);
+    if (name === "collegeCode") {
+      setCollegeCodeError(
+        validateCollegeCode(value) ? "" : "Only uppercase letters (A-Z) allowed"
+      );
+    }
+    if (name === "pincode") {
+      setPincodeError(
+        validatePincode(value) ? "" : "Pincode must be up to 6 digits only"
+      );
+    }
+    if (name === "gstNumber") {
+      setGstError(
+        value && !validateGST(value) ? "Invalid GST number format" : ""
+      );
+    }
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  }, []);
+
+  const uploadFileToCloudinary = async (file, folderName) => {
+    if (!file) return null;
+    const url = "https://api.cloudinary.com/v1_1/da0ypp61n/raw/upload";
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", "react_profile_upload");
+    formData.append("folder", folderName);
+    const res = await fetch(url, { method: "POST", body: formData });
+    const data = await res.json();
+    if (!res.ok || !data.secure_url) {
+      throw new Error(data.error?.message || "File upload failed");
+    }
+    return data.secure_url;
+  };
+
+  const uploadStudentsToFirestore = async (studentList, formId) => {
+    try {
+      if (!studentList || studentList.length === 0) return;
+
+      const batch = writeBatch(db);
+      const studentsCollectionRef = collection(
+        db,
+        "trainingForms",
+        formId,
+        "students"
+      );
+
+      studentList.forEach((student) => {
+        const docRef = doc(studentsCollectionRef);
+        batch.set(docRef, student);
+      });
+
+      await batch.commit();
+    } catch (error) {
+      console.error("Error uploading students:", error);
+      throw error;
+    }
+  };
+
+  const handleStudentFile = (file) => {
+    setStudentFile(file);
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(sheet);
+        setFormData((prev) => ({ ...prev, studentList: jsonData }));
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      setFormData((prev) => ({ ...prev, studentList: [] }));
+    }
+  };
+
+  const checkDuplicateProjectCode = async (projectCode) => {
+    try {
+      const sanitizedProjectCode = projectCode.replace(/\//g, "-");
+      const formRef = doc(db, "trainingForms", sanitizedProjectCode);
+      const existingDoc = await getDoc(formRef);
+      return existingDoc.exists();
+    } catch (error) {
+      console.error("Error checking duplicate project code:", error);
+      return false;
+    }
+  };
+  const isEditMode = !!existingFormData;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    // Basic form validation
+    if (!e.target.checkValidity()) {
+      const firstInvalid = e.target.querySelector(":invalid");
+      if (firstInvalid) {
+        firstInvalid.focus();
+      }
+      return;
+    }
+
+    // Payment section validation
+    if (!validatePaymentSection()) {
+      return;
+    }
+
+    // Contract dates validation
+    if (!contractStartDate || !contractEndDate) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const rawProjectCode = formData.projectCode;
+
+      if (!isEditMode) {
+        const isDuplicate = await checkDuplicateProjectCode(rawProjectCode);
+        if (isDuplicate) {
+          setDuplicateProjectCode(true);
+          setIsSubmitting(false);
+          return;
         }
- 
-        // Payment section validation
-        if (!validatePaymentSection()) {
-            return;
-        }
- 
-        // Contract dates validation
-        if (!contractStartDate || !contractEndDate) {
-            return;
-        }
- 
-        setIsSubmitting(true);
- 
-        try {
-            const rawProjectCode = formData.projectCode;
- 
-            if (!isEditMode) {
-  const isDuplicate = await checkDuplicateProjectCode(rawProjectCode);
-  if (isDuplicate) {
-    setDuplicateProjectCode(true);
-    setIsSubmitting(false);
-    return;
-  }
-}
+      }
 
   const today = new Date();
         const endDate = new Date(contractEndDate);
@@ -561,13 +578,12 @@ try {
     );
 };
 TrainingForm.propTypes = {
-    show: PropTypes.bool.isRequired,
-    onClose: PropTypes.func.isRequired,
-    lead: PropTypes.object,
-    users: PropTypes.object,
-    existingFormData: PropTypes.object, // Add this
-    isLoading: PropTypes.bool, // Add this
+  show: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  lead: PropTypes.object,
+  users: PropTypes.object,
+  existingFormData: PropTypes.object, // Add this
+  isLoading: PropTypes.bool, // Add this
 };
- 
+
 export default TrainingForm;
- 

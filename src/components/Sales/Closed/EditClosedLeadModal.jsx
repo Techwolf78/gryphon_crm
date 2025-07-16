@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
-import { FiX, FiChevronDown, FiInfo, FiDollarSign, FiUser, FiPhone, FiMail, FiMapPin, FiCalendar, FiArrowLeft, FiArrowRight, FiCheck } from "react-icons/fi";
+import { FiX, FiChevronDown, FiInfo, FiDollarSign, FiUser, FiPhone, FiMail, FiMapPin, FiCalendar, FiArrowLeft, FiArrowRight, FiCheck, FiPlus, FiTrash2 } from "react-icons/fi";
 
 const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
     const [formData, setFormData] = useState({});
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [activeSection, setActiveSection] = useState("basic");
-    const sections = ['basic', 'financial', 'course', 'contacts', 'contract'];
+    const sections = ['basic', 'financial', 'course', 'contacts', 'contract', 'topics'];
 
     useEffect(() => {
         if (lead) {
@@ -26,9 +26,12 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                 netPayableAmount: lead.netPayableAmount || 0,
                 gstNumber: lead.gstNumber || "",
                 gstType: lead.gstType || "include",
-                course: lead.course || "",
+                courses: lead.courses || [{
+                    specialization: "",
+                    students: 0,
+                    othersSpecText: ""
+                }],
                 year: lead.year || "",
-                specialization: lead.specialization || "",
                 deliveryType: lead.deliveryType || "",
                 passingYear: lead.passingYear || "",
                 tpoName: lead.tpoName || "",
@@ -46,6 +49,14 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                 address: lead.address || "",
                 pincode: lead.pincode || "",
                 status: lead.status || "active",
+                topics: lead.topics || [{
+                    topic: "",
+                    hours: ""
+                }],
+                totalHours: lead.totalHours || 0,
+                studentFileUrl: lead.studentFileUrl || "",
+                mouFileUrl: lead.mouFileUrl || "",
+                otherCourseText: lead.otherCourseText || ""
             });
         }
     }, [lead]);
@@ -54,7 +65,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
         const { name, value } = e.target;
         setFormData(prev => ({
             ...prev,
-            [name]: name.includes("Amount") || name.includes("Cost") ? parseFloat(value) || 0 : value
+            [name]: name.includes("Amount") || name.includes("Cost") || name.includes("Hours") ? parseFloat(value) || 0 : value
         }));
     };
 
@@ -70,6 +81,26 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
         }));
     };
 
+    const handleCourseChange = (index, field, value) => {
+        const updatedCourses = [...formData.courses];
+        updatedCourses[index][field] = field === "students" ? parseInt(value) || 0 : value;
+        
+        setFormData(prev => ({
+            ...prev,
+            courses: updatedCourses
+        }));
+    };
+
+    const handleTopicChange = (index, field, value) => {
+        const updatedTopics = [...formData.topics];
+        updatedTopics[index][field] = field === "hours" ? parseInt(value) || 0 : value;
+        
+        setFormData(prev => ({
+            ...prev,
+            topics: updatedTopics
+        }));
+    };
+
     const addPaymentDetail = () => {
         setFormData(prev => ({
             ...prev,
@@ -80,12 +111,58 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
         }));
     };
 
+    const addCourse = () => {
+        setFormData(prev => ({
+            ...prev,
+            courses: [
+                ...prev.courses,
+                { specialization: "", students: 0, othersSpecText: "" }
+            ]
+        }));
+    };
+
+    const addTopic = () => {
+        setFormData(prev => ({
+            ...prev,
+            topics: [
+                ...prev.topics,
+                { topic: "", hours: "" }
+            ]
+        }));
+    };
+
     const removePaymentDetail = (index) => {
         const updatedPaymentDetails = [...formData.paymentDetails];
         updatedPaymentDetails.splice(index, 1);
         setFormData(prev => ({
             ...prev,
             paymentDetails: updatedPaymentDetails
+        }));
+    };
+
+    const removeCourse = (index) => {
+        const updatedCourses = [...formData.courses];
+        updatedCourses.splice(index, 1);
+        setFormData(prev => ({
+            ...prev,
+            courses: updatedCourses
+        }));
+    };
+
+    const removeTopic = (index) => {
+        const updatedTopics = [...formData.topics];
+        updatedTopics.splice(index, 1);
+        setFormData(prev => ({
+            ...prev,
+            topics: updatedTopics
+        }));
+    };
+
+    const calculateTotalHours = () => {
+        const total = formData.topics.reduce((sum, topic) => sum + (parseInt(topic.hours) || 0), 0);
+        setFormData(prev => ({
+            ...prev,
+            totalHours: total
         }));
     };
 
@@ -107,13 +184,31 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                     collegeName: formData.collegeName,
                     city: formData.city,
                     state: formData.state,
-                    course: formData.course,
+                    courses: formData.courses,
                     year: formData.year,
-                    specialization: formData.specialization,
                     deliveryType: formData.deliveryType,
                     studentCount: formData.studentCount,
                     perStudentCost: formData.perStudentCost,
                     totalCost: formData.totalCost,
+                    gstAmount: formData.gstAmount,
+                    netPayableAmount: formData.netPayableAmount,
+                    gstNumber: formData.gstNumber,
+                    gstType: formData.gstType,
+                    paymentDetails: formData.paymentDetails,
+                    contractStartDate: formData.contractStartDate,
+                    contractEndDate: formData.contractEndDate,
+                    tpoName: formData.tpoName,
+                    tpoEmail: formData.tpoEmail,
+                    tpoPhone: formData.tpoPhone,
+                    trainingName: formData.trainingName,
+                    trainingEmail: formData.trainingEmail,
+                    trainingPhone: formData.trainingPhone,
+                    address: formData.address,
+                    pincode: formData.pincode,
+                    passingYear: formData.passingYear,
+                    topics: formData.topics,
+                    totalHours: formData.totalHours,
+                    otherCourseText: formData.otherCourseText,
                     updatedAt: new Date()
                 });
             }
@@ -515,88 +610,129 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
 
                         {/* Course Information Section */}
                         {activeSection === 'course' && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Course</label>
-                                    <div className="relative">
-                                        <select
-                                            name="course"
-                                            value={formData.course}
-                                            onChange={handleChange}
-                                            className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 appearance-none"
-                                        >
-                                            <option value="Engineering">Engineering</option>
-                                            <option value="Pharmacy">Pharmacy</option>
-                                            <option value="Management">Management</option>
-                                            <option value="Other">Other</option>
-                                        </select>
-                                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                                            <FiChevronDown className="h-5 w-5 text-gray-400" />
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+                                        <div className="relative">
+                                            <select
+                                                name="year"
+                                                value={formData.year}
+                                                onChange={handleChange}
+                                                className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 appearance-none"
+                                            >
+                                                <option value="1st">1st Year</option>
+                                                <option value="2nd">2nd Year</option>
+                                                <option value="3rd">3rd Year</option>
+                                                <option value="4th">4th Year</option>
+                                            </select>
+                                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                                <FiChevronDown className="h-5 w-5 text-gray-400" />
+                                            </div>
                                         </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Type</label>
+                                        <div className="relative">
+                                            <select
+                                                name="deliveryType"
+                                                value={formData.deliveryType}
+                                                onChange={handleChange}
+                                                className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 appearance-none"
+                                            >
+                                                <option value="OT">Onsite Training</option>
+                                                <option value="OL">Online Training</option>
+                                                <option value="HY">Hybrid</option>
+                                                <option value="TP">Training Partner</option>
+                                            </select>
+                                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                                <FiChevronDown className="h-5 w-5 text-gray-400" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Passing Year</label>
+                                        <input
+                                            type="text"
+                                            name="passingYear"
+                                            value={formData.passingYear}
+                                            onChange={handleChange}
+                                            className="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                            placeholder="2020-2021"
+                                        />
                                     </div>
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
-                                    <div className="relative">
-                                        <select
-                                            name="year"
-                                            value={formData.year}
-                                            onChange={handleChange}
-                                            className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 appearance-none"
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="text-lg font-medium text-gray-900">Course Details</h3>
+                                        <button
+                                            type="button"
+                                            onClick={addCourse}
+                                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-full shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                                         >
-                                            <option value="1st">1st Year</option>
-                                            <option value="2nd">2nd Year</option>
-                                            <option value="3rd">3rd Year</option>
-                                            <option value="4th">4th Year</option>
-                                        </select>
-                                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                                            <FiChevronDown className="h-5 w-5 text-gray-400" />
-                                        </div>
+                                            Add Course
+                                        </button>
                                     </div>
-                                </div>
 
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Specialization</label>
-                                    <input
-                                        type="text"
-                                        name="specialization"
-                                        value={formData.specialization}
-                                        onChange={handleChange}
-                                        className="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                                        placeholder="Computer Science"
-                                    />
-                                </div>
+                                    {formData.courses?.map((course, index) => (
+                                        <div key={index} className="bg-gray-50 p-4 rounded-lg mb-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-500 mb-1">Specialization</label>
+                                                    <input
+                                                        type="text"
+                                                        value={course.specialization}
+                                                        onChange={(e) => handleCourseChange(index, "specialization", e.target.value)}
+                                                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                        placeholder="Computer Science"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-500 mb-1">Students</label>
+                                                    <input
+                                                        type="number"
+                                                        value={course.students}
+                                                        onChange={(e) => handleCourseChange(index, "students", e.target.value)}
+                                                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-500 mb-1">Other Spec Text</label>
+                                                    <input
+                                                        type="text"
+                                                        value={course.othersSpecText}
+                                                        onChange={(e) => handleCourseChange(index, "othersSpecText", e.target.value)}
+                                                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                        placeholder="Other specialization details"
+                                                    />
+                                                </div>
+                                                <div className="flex items-end">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeCourse(index)}
+                                                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-full shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
 
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Type</label>
-                                    <div className="relative">
-                                        <select
-                                            name="deliveryType"
-                                            value={formData.deliveryType}
+                                    <div className="mt-4">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Other Course Text</label>
+                                        <input
+                                            type="text"
+                                            name="otherCourseText"
+                                            value={formData.otherCourseText}
                                             onChange={handleChange}
-                                            className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 appearance-none"
-                                        >
-                                            <option value="OT">Onsite Training</option>
-                                            <option value="OL">Online Training</option>
-                                            <option value="HY">Hybrid</option>
-                                        </select>
-                                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                                            <FiChevronDown className="h-5 w-5 text-gray-400" />
-                                        </div>
+                                            className="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                            placeholder="Other course details"
+                                        />
                                     </div>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Passing Year</label>
-                                    <input
-                                        type="text"
-                                        name="passingYear"
-                                        value={formData.passingYear}
-                                        onChange={handleChange}
-                                        className="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                                        placeholder="2020-2021"
-                                    />
                                 </div>
                             </div>
                         )}
@@ -750,6 +886,93 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                         </div>
                                     </div>
                                 </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">MOU File URL</label>
+                                    <input
+                                        type="text"
+                                        name="mouFileUrl"
+                                        value={formData.mouFileUrl || ""}
+                                        onChange={handleChange}
+                                        className="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                        placeholder="https://example.com/mou.pdf"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Student File URL</label>
+                                    <input
+                                        type="text"
+                                        name="studentFileUrl"
+                                        value={formData.studentFileUrl || ""}
+                                        onChange={handleChange}
+                                        className="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                        placeholder="https://example.com/students.xlsx"
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Topics Section */}
+                        {activeSection === 'topics' && (
+                            <div className="space-y-6">
+                                <div className="flex justify-between items-center">
+                                    <h3 className="text-lg font-medium text-gray-900">Training Topics</h3>
+                                    <button
+                                        type="button"
+                                        onClick={addTopic}
+                                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-full shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                    >
+                                        Add Topic
+                                    </button>
+                                </div>
+
+                                {formData.topics?.map((topic, index) => (
+                                    <div key={index} className="bg-gray-50 p-4 rounded-lg">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-500 mb-1">Topic</label>
+                                                <input
+                                                    type="text"
+                                                    value={topic.topic}
+                                                    onChange={(e) => handleTopicChange(index, "topic", e.target.value)}
+                                                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                    placeholder="Soft Skills"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-500 mb-1">Hours</label>
+                                                <input
+                                                    type="number"
+                                                    value={topic.hours}
+                                                    onChange={(e) => handleTopicChange(index, "hours", e.target.value)}
+                                                    onBlur={calculateTotalHours}
+                                                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                />
+                                            </div>
+                                            <div className="flex items-end">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeTopic(index)}
+                                                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-full shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                                >
+                                                    Remove
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+
+                                <div className="bg-blue-50 p-4 rounded-lg">
+                                    <label className="block text-sm font-medium text-blue-700 mb-1">Total Training Hours</label>
+                                    <input
+                                        type="number"
+                                        name="totalHours"
+                                        value={formData.totalHours}
+                                        className="block w-full px-3 py-2 border border-blue-300 rounded-lg shadow-sm bg-blue-100 focus:ring-blue-500 focus:border-blue-500"
+                                        readOnly
+                                    />
+                                </div>
                             </div>
                         )}
                     </div>
@@ -796,7 +1019,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                         </span>
                                     ) : (
                                         <>
-                                            <FiCheck className="mr-2" /> Resubmit
+                                            <FiCheck className="mr-2" /> Save Changes
                                         </>
                                     )}
                                 </button>

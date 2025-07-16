@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../context/AuthContext"; // Adjust the path as needed
 import PropTypes from "prop-types";
 import {
@@ -311,7 +311,8 @@ EducationDistribution.defaultProps = {
   isLoading: false,
 };
 const LeadDistribution = ({ leadSources, isLoading }) => {
-  const COLORS = ["#4F46E5", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
+  // Set colors: Hot = red, Warm = orange, Cold = blue
+  const COLORS = ["#EF4444", "#F59E0B", "#3B82F6"]; // Red, Orange, Blue
 
   const renderCustomizedLabel = ({
     cx,
@@ -465,6 +466,9 @@ CustomTooltip.defaultProps = {
 };
 
 const SalesDashboard = () => {
+  const userDropdownRef = useRef(null);
+  const filterDropdownRef = useRef(null);
+
   const [timePeriod, setTimePeriod] = useState("quarter");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isUserFilterOpen, setIsUserFilterOpen] = useState(false);
@@ -1315,6 +1319,30 @@ const SalesDashboard = () => {
     fetchDataForRange(newRange);
   }, [timePeriod, selectedUserId]);
 
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        userDropdownRef.current &&
+        !userDropdownRef.current.contains(event.target)
+      ) {
+        setIsUserFilterOpen(false);
+      }
+
+      if (
+        filterDropdownRef.current &&
+        !filterDropdownRef.current.contains(event.target)
+      ) {
+        setIsFilterOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="mx-auto max-w-8xl">
@@ -1351,7 +1379,7 @@ const SalesDashboard = () => {
           </div>
 
           <div className="flex items-center space-x-3 mt-4 md:mt-0">
-            <div className="relative">
+            <div className="relative" ref={userDropdownRef}>
               <button
                 type="button"
                 onClick={() => setIsUserFilterOpen(!isUserFilterOpen)}
@@ -1404,7 +1432,7 @@ const SalesDashboard = () => {
                 </div>
               )}
             </div>
-            <div className="relative">
+            <div className="relative" ref={filterDropdownRef}>
               <button
                 type="button"
                 onClick={() => setIsFilterOpen(!isFilterOpen)}
@@ -1483,7 +1511,6 @@ const SalesDashboard = () => {
               icon: <FiThermometer className="text-white" size={20} />,
               color: "bg-red-600",
             },
-            ,
             {
               title: selectedUserId ? "Your Warm Leads" : "Team Warm Leads",
               value: dashboardData.warmLeads.toLocaleString(),
