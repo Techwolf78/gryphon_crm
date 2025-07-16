@@ -21,6 +21,7 @@ import Footer from "./pages/footer";
 import UpdateProfile from "./components/UpdateProfile";
 import Help from "./pages/Help";
 import SessionManager from "./components/SessionManager"; // Add this import
+import TrainersDashboard from './components/Learning/TrainersDashboard';
 
 const AppContent = () => {
   const location = useLocation();
@@ -48,10 +49,10 @@ const AppContent = () => {
           <Route path="sales" element={<Sales />} />
           <Route path="placement" element={<Placement />} />
              <Route path="help" element={<Help />} />
-          <Route
-            path="learning-development"
-            element={<LearningDevelopment />}
-          />
+<Route path="learning-development">
+  <Route index element={<LearningDevelopment />} />
+  <Route path="trainers" element={<TrainersDashboard />} />
+</Route>
           <Route path="marketing" element={<DigitalMarketing />} />
         </Route>
       </Routes>
