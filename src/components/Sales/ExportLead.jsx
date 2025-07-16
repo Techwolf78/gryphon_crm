@@ -4,7 +4,7 @@ import {
   FiChevronDown,
   FiFilter,
   FiDatabase,
-  FiInfo, // <-- Add this
+  FiInfo,
 } from "react-icons/fi";
 import * as XLSX from "xlsx-js-style";
 import { saveAs } from "file-saver";
@@ -13,7 +13,6 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Handle click outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -36,13 +35,10 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
     const followupsArray = Object.values(followupObj);
     if (followupsArray.length === 0) return "";
 
-    // Sort by timestamp (newest first)
     followupsArray.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
-    // Format each follow-up with consistent date format and numbering
     return followupsArray
       .map((followup, index) => {
-        // Format date consistently
         let dateStr = "";
         try {
           const date = followup.date?.seconds
@@ -59,7 +55,7 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
 
         return `${index + 1}. ${dateStr} - ${followup.remarks || ""}`;
       })
-      .join(String.fromCharCode(10)); // Use ASCII 10 for Excel line breaks
+      .join(String.fromCharCode(10));
   };
 
   const parseDate = (date) => {
@@ -74,7 +70,28 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
     }
   };
 
-  // Filter out leads with phase = closed
+  const formatCourseDetails = (courses) => {
+    if (!courses || !Array.isArray(courses)) return [];
+
+    return courses.map((course) => {
+      const courseType = course.courseType || course.manualCourseType || "";
+      const specializations = course.specializations?.join(", ") || "";
+      const passingYear = course.passingYear || "";
+      const studentCount = course.studentCount || "";
+      const perStudentCost = course.perStudentCost || "";
+      const courseTCV = course.courseTCV || 0;
+
+      return {
+        courseType,
+        specializations,
+        passingYear,
+        studentCount,
+        perStudentCost,
+        courseTCV,
+      };
+    });
+  };
+
   const filterOutClosed = (leads) =>
     leads.filter((item) => {
       const lead = Array.isArray(item) ? item[1] : item;
@@ -89,8 +106,10 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
 
       const phase = lead.phase.toLowerCase();
       if (["hot", "warm", "cold"].includes(phase)) {
-        result[phase].push({
-          // Institution Basic Info
+        const courseDetails = formatCourseDetails(lead.courses);
+
+        // Create base lead info with fixed columns first
+        const leadInfo = {
           "College Name": lead.businessName || "",
           Address: lead.address || "",
           State: lead.state || "",
@@ -98,20 +117,30 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
           "Contact Name": lead.pocName || "",
           "Phone No.": lead.phoneNo || "",
           "Email ID": lead.email || "",
-          "Passing Year": lead.passingYear || "",
-          "Course Type": lead.courseType || "",
-          Specializations: lead.specializations
-            ? lead.specializations.join(", ")
-            : "",
-          Accreditation: lead.accreditation || "",
-          Affiliation: lead.affiliation || "",
-          "Contact Method": lead.contactMethod || "",
-          "Student Count": lead.studentCount || "",
-          "Per Student Cost": lead.perStudentCost || "",
-          TCV: lead.tcv || "",
-          "Expected Closure": parseDate(lead.expectedClosureDate),
-          Meetings: getAllFollowUps(lead.followup),
+        };
+
+        // Add course details right after basic info
+        courseDetails.forEach((course, index) => {
+          const prefix = `Course ${index + 1}`;
+          leadInfo[`${prefix} - Type`] = course.courseType;
+          leadInfo[`${prefix} - Specializations`] = course.specializations;
+          leadInfo[`${prefix} - Passing Year`] = course.passingYear;
+          leadInfo[`${prefix} - Student Count`] = course.studentCount;
+          leadInfo[`${prefix} - Per Student Cost`] = course.perStudentCost;
+          leadInfo[`${prefix} - Course TCV`] = course.courseTCV;
         });
+
+        // Add accreditation and affiliation after course details
+        leadInfo["Accreditation"] = lead.accreditation || "";
+        leadInfo["Affiliation"] = lead.affiliation || "";
+
+        // Add remaining fields
+        leadInfo["Contact Method"] = lead.contactMethod || "";
+        leadInfo["Total TCV"] = lead.tcv || "";
+        leadInfo["Expected Closure"] = parseDate(lead.expectedClosureDate);
+        leadInfo["Meetings"] = getAllFollowUps(lead.followup);
+
+        result[phase].push(leadInfo);
       }
     });
     return result;
@@ -127,9 +156,9 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
     const wb = XLSX.utils.book_new();
 
     const phaseColors = {
-      hot: "FFFFCCCC", // Light Red
-      warm: "FFFFFFCC", // Light Yellow
-      cold: "CCECFF", // Light Blue
+      hot: "FFFFCCCC",
+      warm: "FFFFFFCC",
+      cold: "CCECFF",
     };
 
     Object.entries(grouped).forEach(([phase, data]) => {
@@ -143,21 +172,23 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
 
       const ws = XLSX.utils.aoa_to_sheet(sheetData);
 
-      // With your custom column width configuration:
+      // Set column widths
       ws["!cols"] = headers.map((header) => {
-        // Wider columns for fields that typically need more space
-        if (["Address", "Specializations", "Meetings"].includes(header)) {
+        if (header.includes("Address") || header.includes("Meetings")) {
           return { wch: 30 };
         }
-        // Medium width for other text fields
-        if (["College Name", "Affiliation"].includes(header)) {
+        if (header.includes("College Name") || header.includes("Affiliation")) {
           return { wch: 25 };
         }
-        // Default width for others
-        return { wch: 15 };
+        if (header.includes("Specializations")) {
+          return { wch: 20 };
+        }
+        if (header.includes("Type") || header.includes("Course")) {
+          return { wch: 15 };
+        }
+        return { wch: 12 };
       });
 
-      // Then continue with the existing cell styling code:
       const range = XLSX.utils.decode_range(ws["!ref"]);
 
       for (let R = range.s.r; R <= range.e.r; ++R) {
@@ -167,7 +198,6 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
 
           if (cell) {
             if (R === 0) {
-              // Header styling
               cell.s = {
                 fill: {
                   fgColor: { rgb: phaseColors[phase] },
@@ -188,7 +218,6 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
                 },
               };
             } else {
-              // Alternating row color & borders for data cells
               const isEven = R % 2 === 0;
               const isFollowUpCell = headers[C] === "Meetings";
               cell.s = {
@@ -203,14 +232,17 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
                 },
                 alignment: {
                   horizontal: "left",
-                  vertical: "top", // Changed to top alignment
-                  wrapText: true, // Enable text wrapping
+                  vertical: "top",
+                  wrapText: true,
                 },
-                // Special formatting for follow-up cells
                 ...(isFollowUpCell && {
                   font: {
-                    sz: 10, // Slightly smaller font for follow-ups
+                    sz: 10,
                   },
+                }),
+                ...((headers[C].includes("TCV") ||
+                  headers[C].includes("Per Student Cost")) && {
+                  numFmt: '"₹"#,##0.00',
                 }),
               };
             }

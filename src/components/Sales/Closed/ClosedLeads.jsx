@@ -79,30 +79,29 @@ const filteredLeads = useMemo(() => {
   if (!currentUser) return [];
 
   return Object.entries(leads)
-    .filter(([, lead]) => {
-      if (viewMyLeadsOnly) {
-        // ✅ My Leads tab
-        return lead.assignedTo?.uid === currentUser.uid;
-      } else {
-        // ✅ My Team tab
-        if (currentRole === "Head") {
-          // Head ke liye: sirf team members ki leads, khud ki nahi
-          return isUserInTeam(lead.assignedTo?.uid);
-        } else if (currentRole === "Manager") {
-          // Manager ke liye: team members + khud ki leads
-          return (
-            isUserInTeam(lead.assignedTo?.uid) ||
-            lead.assignedTo?.uid === currentUser.uid
-          );
-        } else {
-          // Baaki koi role: default same as manager
-          return (
-            isUserInTeam(lead.assignedTo?.uid) ||
-            lead.assignedTo?.uid === currentUser.uid
-          );
-        }
-      }
-    })
+   .filter(([, lead]) => {
+  if (viewMyLeadsOnly) {
+    return lead.assignedTo?.uid === currentUser.uid;
+  } else {
+    if (currentRole === "Director") {
+      return true; // ✅ Director ko sari leads dikhao
+    }
+    if (currentRole === "Head") {
+      return isUserInTeam(lead.assignedTo?.uid);
+    } else if (currentRole === "Manager") {
+      return (
+        isUserInTeam(lead.assignedTo?.uid) ||
+        lead.assignedTo?.uid === currentUser.uid
+      );
+    } else {
+      return (
+        isUserInTeam(lead.assignedTo?.uid) ||
+        lead.assignedTo?.uid === currentUser.uid
+      );
+    }
+  }
+})
+
     .filter(([, lead]) => {
       if (filterType === "all") return true;
       return lead.closureType === filterType;

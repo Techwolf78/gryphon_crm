@@ -1,3 +1,5 @@
+import React from "react";
+
 const statusColorMap = {
   hot: {
     border: "border-red-500",
@@ -384,7 +386,7 @@ export default function LeadDetailsModal({
 
             {/* Column 2 - Lead Details */}
             <div className="space-y-5">
-              {/* Lead Details Card */}
+              {/* Accreditation & Affiliation Card */}
               <div
                 className={`bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:border-gray-200 ${statusColors.ring} hover:ring-2`}
               >
@@ -403,91 +405,137 @@ export default function LeadDetailsModal({
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                        d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
                       />
                     </svg>
-                    Lead Details
+                    Accreditation & Affiliation
                   </span>
                 </h3>
 
                 <div className="space-y-4">
                   <div className="grid grid-cols-4 gap-4">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider col-span-1">
-                      Specializations
+                      NAAC Accreditation
                     </p>
-                    <div className="col-span-3">
-                      {selectedLead.specializations?.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {selectedLead.specializations.map((spec, index) => (
-                            <span
-                              key={index}
-                              className="inline-block px-3 py-1 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100 hover:bg-blue-100 transition-colors"
-                            >
-                              {spec}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-gray-900 font-medium">-</p>
-                      )}
-                    </div>
+                    <p className="mt-0 text-gray-900 font-medium col-span-3">
+                      {selectedLead.accreditation || "-"}
+                    </p>
                   </div>
-
                   <div className="grid grid-cols-4 gap-4">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider col-span-1">
-                      Education
+                      University Affiliation
                     </p>
-                    <div className="col-span-3">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-gray-900 font-medium">
-                            {selectedLead.courseType || "-"}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            Course Type
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-gray-900 font-medium">
-                            {selectedLead.passingYear || "-"}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            Passing Year
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-4 gap-4">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider col-span-1">
-                      Accreditation
+                    <p className="mt-0 text-gray-900 font-medium col-span-3">
+                      {selectedLead.affiliation || "-"}
                     </p>
-                    <div className="col-span-3">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-gray-900 font-medium">
-                            {selectedLead.affiliation || "-"}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            Affiliation
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-gray-900 font-medium">
-                            {selectedLead.accreditation || "-"}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            Accreditation
-                          </p>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Financial Card */}
+              {/* Courses Card */}
+              <div
+                className={`bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:border-gray-200 ${statusColors.ring} hover:ring-2`}
+              >
+                <h3 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100 flex items-center">
+                  <span
+                    className={`inline-block w-2 h-2 rounded-full ${statusColors.accent} mr-2`}
+                  ></span>
+                  <span className="flex items-center">
+                    <svg
+                      className="w-5 h-5 mr-2 text-gray-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                      />
+                    </svg>
+                    Courses Offered
+                  </span>
+                </h3>
+
+                <div className="space-y-4">
+                  {selectedLead.courses?.map((course, index) => (
+                    <div key={index} className="mb-4 last:mb-0">
+                      <div className="grid grid-cols-3 gap-4 mb-2">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            Course Type
+                          </p>
+                          <p className="text-gray-900 font-medium">
+                            {course.courseType || "-"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            Passing Year
+                          </p>
+                          <p className="text-gray-900 font-medium">
+                            {course.passingYear || "-"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mb-2">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                          Specializations
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {course.specializations?.length > 0 ? (
+                            course.specializations.map((spec, specIndex) => (
+                              <span
+                                key={specIndex}
+                                className="inline-block px-2 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100"
+                              >
+                                {spec}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-gray-500 text-sm">-</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            Students
+                          </p>
+                          <p className="text-gray-900 font-medium">
+                            {course.studentCount || "-"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            Per Student
+                          </p>
+                          <p className="text-gray-900 font-medium">
+                            {course.perStudentCost
+                              ? `₹${course.perStudentCost.toLocaleString()}`
+                              : "-"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            TCV
+                          </p>
+                          <p className="text-gray-900 font-medium">
+                            {course.courseTCV
+                              ? `₹${course.courseTCV.toLocaleString()}`
+                              : "-"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Financial Summary Card */}
               <div
                 className={`bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:border-gray-200 ${statusColors.ring} hover:ring-2`}
               >
@@ -509,14 +557,14 @@ export default function LeadDetailsModal({
                         d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                       />
                     </svg>
-                    Financial Information
+                    Financial Summary
                   </span>
                 </h3>
 
                 <div className="grid grid-cols-3 gap-4">
                   <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      TCV
+                      Total TCV
                     </p>
                     <p className="mt-1 text-gray-900 font-bold text-lg">
                       {selectedLead.tcv ? (
@@ -530,24 +578,18 @@ export default function LeadDetailsModal({
                   </div>
                   <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Per Student
+                      Total Students
                     </p>
                     <p className="mt-1 text-gray-900 font-bold text-lg">
-                      {selectedLead.perStudentCost ? (
-                        <span className="text-blue-600">
-                          ₹{selectedLead.perStudentCost.toLocaleString()}
-                        </span>
-                      ) : (
-                        "-"
-                      )}
-                    </p>
-                  </div>
-                  <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Students
-                    </p>
-                    <p className="mt-1 text-gray-900 font-bold text-lg">
-                      {selectedLead.studentCount || "-"}
+                      {selectedLead.courses && selectedLead.courses.length > 0
+                        ? selectedLead.courses
+                            .reduce(
+                              (sum, course) =>
+                                sum + (parseInt(course.studentCount) || 0),
+                              0
+                            )
+                            .toLocaleString()
+                        : "-"}
                     </p>
                   </div>
                 </div>
@@ -582,12 +624,10 @@ export default function LeadDetailsModal({
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Opened Date
+                      Created Date
                     </p>
                     <p className="mt-1 text-gray-900 font-medium">
-                      {formatDate(
-                        selectedLead.openedDate || selectedLead.createdAt
-                      )}
+                      {formatDate(selectedLead.createdAt)}
                     </p>
                   </div>
                   <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">

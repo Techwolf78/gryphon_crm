@@ -45,7 +45,7 @@ const CollegeInfoSection = ({ formData, setFormData, handleChange, collegeCodeEr
         {/* GST Number */}
         <div>
           <label className="font-medium block mb-1">
-            GST Number <span className="text-red-500">*</span>
+            GST Number 
           </label>
           <input
             name="gstNumber"
@@ -54,9 +54,7 @@ const CollegeInfoSection = ({ formData, setFormData, handleChange, collegeCodeEr
             value={formData.gstNumber}
             onChange={handleChange}
           />
-          {gstError && (
-            <p className="text-red-500 text-sm mt-1">{gstError}</p>
-          )}
+          
         </div>
       </div>
 

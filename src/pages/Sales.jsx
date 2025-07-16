@@ -13,7 +13,7 @@ import { db } from "../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { debounce } from "lodash";
 import FollowupAlerts from "../components/Sales/FollowupAlerts";
-import AddCollegeModal from "../components/Sales/AddCollege";
+import AddCollegeModal from "../components/Sales/AddCollegeModal";
 import FollowUp from "../components/Sales/Followup";
 import TrainingForm from "../components/Sales/ClosureForm/TrainingForm";
 import LeadDetailsModal from "../components/Sales/EditDetailsModal";
@@ -113,58 +113,61 @@ const computePhaseCounts = useCallback(() => {
   const isLowerRole = ["Assistant Manager", "Executive"].includes(user.role);
 
   Object.values(leads).forEach((lead) => {
-    const phase = lead.phase || "hot";
-    const isOwnLead = lead.assignedTo?.uid === currentUser?.uid;
-    let shouldInclude = false;
+  const phase = lead.phase || "hot";
+  const isOwnLead = lead.assignedTo?.uid === currentUser?.uid;
+  let shouldInclude = false;
 
-    if (isSalesDept && isHigherRole) {
-      if (viewMyLeadsOnly) {
-        // Only show own leads
-        shouldInclude = isOwnLead;
-      } else {
-        if (user.role === "Manager") {
-          // Manager: show subordinates (Assistant Manager + Executive) leads
-          const subordinates = Object.values(users).filter(
-            (u) =>
-              u.reportingManager === user.name &&
-              ["Assistant Manager", "Executive"].includes(u.role)
-          );
-          const teamUids = subordinates.map((u) => u.uid);
-          shouldInclude = teamUids.includes(lead.assignedTo?.uid);
-        } else if (user.role === "Head") {
-          // Head: show Manager + their subordinates
-          const leadUser = Object.values(users).find(
-            (u) => u.uid === lead.assignedTo?.uid
-          );
-          if (leadUser) {
-            if (leadUser.role === "Manager") {
-              shouldInclude = true;
-            } else if (
-              ["Assistant Manager", "Executive"].includes(leadUser.role) &&
-              leadUser.reportingManager &&
-              Object.values(users).some(
-                (mgr) => mgr.role === "Manager" && mgr.name === leadUser.reportingManager
-              )
-            ) {
-              shouldInclude = true;
-            }
-          }
-        } else {
-          // Director: can see all
-          shouldInclude = true;
-        }
-      }
-    } else if (isSalesDept && isLowerRole) {
+  if (user.role === "Director") {
+    if (viewMyLeadsOnly) {
       shouldInclude = isOwnLead;
+    } else {
+      shouldInclude = true;
     }
+  } else if (isSalesDept && isHigherRole) {
+    if (viewMyLeadsOnly) {
+      shouldInclude = isOwnLead;
+    } else {
+      if (user.role === "Manager") {
+        const subordinates = Object.values(users).filter(
+          (u) =>
+            u.reportingManager === user.name &&
+            ["Assistant Manager", "Executive"].includes(u.role)
+        );
+        const teamUids = subordinates.map((u) => u.uid);
+        shouldInclude = teamUids.includes(lead.assignedTo?.uid);
+      } else if (user.role === "Head") {
+        const leadUser = Object.values(users).find(
+          (u) => u.uid === lead.assignedTo?.uid
+        );
+        if (leadUser) {
+          if (leadUser.role === "Manager") {
+            shouldInclude = true;
+          } else if (
+            ["Assistant Manager", "Executive"].includes(leadUser.role) &&
+            leadUser.reportingManager &&
+            Object.values(users).some(
+              (mgr) => mgr.role === "Manager" && mgr.name === leadUser.reportingManager
+            )
+          ) {
+            shouldInclude = true;
+          }
+        }
+      } else {
+        shouldInclude = true;
+      }
+    }
+  } else if (isSalesDept && isLowerRole) {
+    shouldInclude = isOwnLead;
+  }
 
-    if (shouldInclude && counts[phase] !== undefined) {
-      counts[phase]++;
-    }
-  });
+  if (shouldInclude && counts[phase] !== undefined) {
+    counts[phase]++;
+  }
+});
 
   return counts;
 }, [users, currentUser, leads, viewMyLeadsOnly]);
+
 
 
   const phaseCounts = useMemo(() => computePhaseCounts(), [computePhaseCounts]);
@@ -193,26 +196,32 @@ const filteredLeads = useMemo(() => {
     const isSalesDept = user.department === "Sales";
     const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
 
+   if (user.role === "Director") {
+  if (viewMyLeadsOnly) {
+    // Director -> My Leads: only own leads
+    return phaseMatch && matchesFilters && lead.assignedTo?.uid === currentUser?.uid;
+  } else {
+    // Director -> My Team: all sales team leads
+    return phaseMatch && matchesFilters;
+  }
+}
+
     if (isSalesDept && isHigherRole) {
       if (viewMyLeadsOnly) {
         return phaseMatch && matchesFilters && lead.assignedTo?.uid === currentUser?.uid;
       } else {
-        const currentUserData = Object.values(users).find((u) => u.uid === currentUser?.uid);
-        if (!currentUserData) return false;
-
-        if (currentUserData.role === "Manager") {
-          // Manager: show assistants & executives
+        if (user.role === "Manager") {
           const subordinates = Object.values(users).filter(
             (u) =>
-              u.reportingManager === currentUserData.name &&
+              u.reportingManager === user.name &&
               ["Assistant Manager", "Executive"].includes(u.role)
           );
           const teamUids = subordinates.map((u) => u.uid);
           return phaseMatch && matchesFilters && teamUids.includes(lead.assignedTo?.uid);
         }
+        
 
-        if (currentUserData.role === "Head") {
-          // Head: show managers & their subordinates
+        if (user.role === "Head") {
           const leadUser = Object.values(users).find((u) => u.uid === lead.assignedTo?.uid);
           if (!leadUser) return false;
 
@@ -229,7 +238,6 @@ const filteredLeads = useMemo(() => {
           }
         }
 
-        // Director (if required) — can see all
         return phaseMatch && matchesFilters;
       }
     }
@@ -241,6 +249,8 @@ const filteredLeads = useMemo(() => {
     return false;
   });
 }, [leads, activeTab, users, currentUser, viewMyLeadsOnly, filters]);
+
+
 
 
 

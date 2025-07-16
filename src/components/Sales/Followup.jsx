@@ -114,7 +114,7 @@ const FollowUp = ({ lead, onClose }) => {
       const eventEnd = eventStart.add(30, "minute");
 
       const event = {
-        subject: `Follow-up: ${lead.businessName}`,
+        subject: `${lead.businessName} - Meeting`,
         body: {
           contentType: "HTML",
           content: remarks,

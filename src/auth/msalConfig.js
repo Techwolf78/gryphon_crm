@@ -4,7 +4,7 @@ export const msalConfig = {
   auth: {
     clientId: "2a251889-6bec-4b99-83a0-314aba62c2b8",
     authority: "https://login.microsoftonline.com/d6642298-69f0-4366-b0bb-9d7c675d3fd3",
-    redirectUri: "http://localhost:5173", // Must match Azure config
+    redirectUri: "https://www.gryphonacademy.co.in/sync", // Must match Azure config
   },
   cache: {
     cacheLocation: "localStorage", // Optional but recommended
