@@ -40,6 +40,9 @@ function AddJD({ show, onClose }) {
   const [studentsData, setStudentsData] = useState({});
   const [viewingCollege, setViewingCollege] = useState(null);
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
+  const [otherCollegesInput, setOtherCollegesInput] = useState("");
+  const [showOtherCollegesInput, setShowOtherCollegesInput] = useState(false);
+  const [collegeData, setCollegeData] = useState([]); // Stores college data with TPO emails
 
   const specializationOptions = {
     Engineering: [
@@ -124,11 +127,36 @@ function AddJD({ show, onClose }) {
   };
 
   const handleCollegeSelection = (college) => {
+    if (college === "Other") {
+      setShowOtherCollegesInput(!showOtherCollegesInput);
+      if (showOtherCollegesInput) {
+        // Remove any manually added colleges when unchecking "Other"
+        setSelectedColleges(prev => prev.filter(c => !availableColleges.includes(c)));
+      }
+      return;
+    }
+
     if (selectedColleges.includes(college)) {
       setSelectedColleges(selectedColleges.filter(c => c !== college));
     } else {
       setSelectedColleges([...selectedColleges, college]);
     }
+  };
+
+  const handleOtherCollegesChange = (e) => {
+    setOtherCollegesInput(e.target.value);
+    // Parse the input and update selected colleges
+    const colleges = e.target.value
+      .split(',')
+      .map(college => college.trim())
+      .filter(college => college.length > 0);
+    
+    // Remove previously added manual colleges
+    const filteredSelected = selectedColleges.filter(college => 
+      availableColleges.includes(college) || college === "Other"
+    );
+    
+    setSelectedColleges([...filteredSelected, ...colleges]);
   };
 
   const fetchStudentsForCollege = async (college) => {
@@ -170,6 +198,8 @@ function AddJD({ show, onClose }) {
   };
 
   const viewStudents = (college) => {
+    if (college === "Other" || !availableColleges.includes(college)) return;
+    
     setViewingCollege(college);
     
     // Fetch students if not already fetched
@@ -182,77 +212,104 @@ function AddJD({ show, onClose }) {
     setViewingCollege(null);
   };
 
-  const sendEmail = () => {
+  const generateEmailContent = () => {
     const emailSubject = `Job Opportunity: ${formData.companyName}`;
     
-    let emailBody = `
-      <h2>Job Opportunity Details</h2>
-      <p><strong>Company Name:</strong> ${formData.companyName}</p>
-      <p><strong>Website:</strong> ${formData.companyWebsite || 'N/A'}</p>
-      
-      <h3>Eligibility Criteria</h3>
-      <p><strong>Course:</strong> ${formData.course}</p>
-      <p><strong>Specialization:</strong> ${formData.specialization.join(', ')}</p>
-      <p><strong>Passing Year:</strong> ${formData.passingYear}</p>
-      <p><strong>Marks Criteria:</strong> ${formData.marksCriteria}</p>
-      
-      <h3>Job Details</h3>
-      <p><strong>Job Type:</strong> ${formData.jobType}</p>
-      <p><strong>Designation:</strong> ${formData.jobDesignation || 'N/A'}</p>
-      <p><strong>Location:</strong> ${formData.jobLocation || 'N/A'}</p>
-      <p><strong>Salary:</strong> ${formData.salary || 'N/A'}</p>
-      ${formData.internshipDuration ? `<p><strong>Internship Duration:</strong> ${formData.internshipDuration}</p>` : ''}
-      ${formData.stipend ? `<p><strong>Stipend:</strong> ${formData.stipend}</p>` : ''}
-      
-      <h3>Additional Information</h3>
-      <p><strong>Mode of Interview:</strong> ${formData.modeOfInterview || 'N/A'}</p>
-      <p><strong>Joining Period:</strong> ${formData.joiningPeriod || 'N/A'}</p>
-      <p><strong>Mode of Work:</strong> ${formData.modeOfWork || 'N/A'}</p>
-      
-      ${formData.jobDescription ? `
-      <h3>Job Description</h3>
-      <p>${formData.jobDescription.replace(/\n/g, '<br>')}</p>
-      ` : ''}
-      
-      <p><strong>Coordinator:</strong> ${formData.coordinator}</p>
-      <p><strong>Colleges Selected:</strong> ${selectedColleges.join(', ')}</p>
+    // Plain text format with Outlook-supported bold syntax
+    const emailBody = `
+Job Opportunity Details
+*Company Name:* ${formData.companyName || 'N/A'}
+*Website:* ${formData.companyWebsite || 'N/A'}
+
+Eligibility Criteria
+*Course:* ${formData.course || 'N/A'}
+*Specialization:* ${formData.specialization.join(', ') || 'N/A'}
+*Passing Year:* ${formData.passingYear || 'N/A'}
+*Marks Criteria:* ${formData.marksCriteria || 'N/A'}
+*Gender:* ${formData.gender || 'N/A'}
+
+Job Details
+*Job Type:* ${formData.jobType || 'N/A'}
+*Designation:* ${formData.jobDesignation || 'N/A'}
+*Location:* ${formData.jobLocation || 'N/A'}
+*Salary:* ${formData.salary || 'N/A'}
+${formData.internshipDuration ? `*Internship Duration:* ${formData.internshipDuration}` : ''}
+${formData.stipend ? `*Stipend:* ${formData.stipend}` : ''}
+
+Additional Information
+*Mode of Interview:* ${formData.modeOfInterview || 'N/A'}
+*Joining Period:* ${formData.joiningPeriod || 'N/A'}
+*Mode of Work:* ${formData.modeOfWork || 'N/A'}
+
+Selection Process ${formData.modeOfInterview}:
+1. Application Form Submission
+2. Online Assessment Test (Communication & Aptitude)
+3. Interview Round - Technical
+4. Interview Round - HR
+5. Result Declaration
+
+${formData.jobDescription ? `
+Job Description
+${formData.jobDescription.replace(/\n/g, '\n')}
+` : ''}
+
+*Please share the detailed list of eligible and interested students 
+as per the attached excel sheet format along with their respective 
+resumes in a zip folder by 10th July 2025 by 2:00 pm.*
     `;
 
-    const mailtoLink = `mailto:?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+    return { subject: emailSubject, body: emailBody };
+  };
 
-    try {
-      window.location.href = mailtoLink;
-    } catch (e) {
-      console.error("Error opening email client:", e);
-      const emailWindow = window.open("", "_blank");
-      emailWindow.document.write(`
-        <html>
-          <head>
-            <title>${emailSubject}</title>
-            <style>
-              body { font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; }
-              h2, h3 { color: #2c3e50; }
-              strong { color: #34495e; }
-            </style>
-          </head>
-          <body>
-            ${emailBody}
-            <p><button onclick="window.close()">Close</button></p>
-          </body>
-        </html>
-      `);
-    }
+  const openOutlookEmail = (college, tpoEmail) => {
+    const { subject, body } = generateEmailContent();
+    
+    // Create the mailto link with TPO email if available
+    const mailtoLink = `https://outlook.office365.com/mail/deeplink/compose?to=${encodeURIComponent(tpoEmail || '')}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    
+    // Open in a new tab
+    window.open(mailtoLink, '_blank');
   };
 
   const handleFinalSubmit = async () => {
-    if (selectedColleges.length === 0) {
+    if (selectedColleges.length === 0 || (selectedColleges.includes("Other") && otherCollegesInput.trim() === "")) {
       alert("Please select at least one college");
       return;
     }
     
     setIsSubmitting(true);
     try {
-      const promises = selectedColleges.map(college => {
+      // Filter out the "Other" option and only keep actual college names
+      const collegesToSubmit = selectedColleges.filter(c => c !== "Other");
+      
+      // First, fetch TPO emails for all selected colleges
+      const collegesWithTPO = await Promise.all(
+        collegesToSubmit.map(async (college) => {
+          try {
+            // Query the trainingForms collection to find the college
+            const trainingFormQuery = query(
+              collection(db, "trainingForms"),
+              where("collegeName", "==", college)
+            );
+            
+            const trainingFormSnapshot = await getDocs(trainingFormQuery);
+            if (trainingFormSnapshot.empty) {
+              console.log(`No training form found for college: ${college}`);
+              return { college, tpoEmail: null };
+            }
+            
+            // Get the TPO email from the first matching document
+            const tpoEmail = trainingFormSnapshot.docs[0].data().tpoEmail || null;
+            return { college, tpoEmail };
+          } catch (error) {
+            console.error(`Error fetching TPO email for ${college}:`, error);
+            return { college, tpoEmail: null };
+          }
+        })
+      );
+
+      // Submit company data to Firestore
+      const promises = collegesToSubmit.map(college => {
         const companyData = {
           ...formData,
           college,
@@ -263,7 +320,12 @@ function AddJD({ show, onClose }) {
       });
 
       await Promise.all(promises);
-      sendEmail();
+      
+      // Open Outlook email for each selected college in new tabs
+      collegesWithTPO.forEach(({ college, tpoEmail }) => {
+        openOutlookEmail(college, tpoEmail);
+      });
+      
       onClose();
     } catch (error) {
       console.error("Error adding documents: ", error);
@@ -302,6 +364,7 @@ function AddJD({ show, onClose }) {
           ];
 
           const colleges = new Set();
+          const collegeInfo = [];
           let totalDocs = 0;
 
           for (const q of queries) {
@@ -312,22 +375,29 @@ function AddJD({ show, onClose }) {
               const collegeName = data.collegeName || data.college || doc.id.split("-")[0];
               if (collegeName) {
                 colleges.add(collegeName);
+                collegeInfo.push({
+                  collegeName,
+                  tpoEmail: data.tpoEmail || ''
+                });
               }
             });
           }
 
           const finalColleges = Array.from(colleges)
-            .concat(["Other", "Multiple"])
+            .concat(["Other"]) // Add "Other" option
             .sort();
           
           setAvailableColleges(finalColleges);
+          setCollegeData(collegeInfo);
 
         } catch (error) {
           console.error('[ERROR] Fetch failed:', error);
-          setAvailableColleges(["Other", "Multiple"]);
+          setAvailableColleges(["Other"]); // Just show "Other" option if fetch fails
+          setCollegeData([]);
         }
       } else {
-        setAvailableColleges(["Other", "Multiple"]);
+        setAvailableColleges(["Other"]); // Just show "Other" option if no course/year selected
+        setCollegeData([]);
       }
     };
 
@@ -799,43 +869,46 @@ function AddJD({ show, onClose }) {
                       value={formData.salary}
                       onChange={handleChange}
                       placeholder="e.g. 500000"
-                      className="w-full pl-8 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full pl-8 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
                     />
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Internship/Training Duration
-                  </label>
-                  <input
-                    type="text"
-                    name="internshipDuration"
-                    value={formData.internshipDuration}
-                    onChange={handleChange}
-                    placeholder="e.g. 6 months"
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Stipend
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <span className="text-gray-500">₹</span>
+                {formData.jobType === "Internship" || formData.jobType === "Int + PPO" ? (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Internship Duration
+                      </label>
+                      <input
+                        type="text"
+                        name="internshipDuration"
+                        value={formData.internshipDuration}
+                        onChange={handleChange}
+                        placeholder="e.g. 6 months"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                      />
                     </div>
-                    <input
-                      type="text"
-                      name="stipend"
-                      value={formData.stipend}
-                      onChange={handleChange}
-                      placeholder="e.g. 15000"
-                      className="w-full pl-8 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Stipend
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <span className="text-gray-500">₹</span>
+                        </div>
+                        <input
+                          type="text"
+                          name="stipend"
+                          value={formData.stipend}
+                          onChange={handleChange}
+                          placeholder="e.g. 25000"
+                          className="w-full pl-8 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                        />
+                      </div>
+                    </div>
+                  </>
+                ) : null}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -851,8 +924,7 @@ function AddJD({ show, onClose }) {
                       <option value="">Select Mode</option>
                       <option>Online</option>
                       <option>Offline</option>
-                      <option>Online/Offline</option>
-                      <option>Campus Drive </option>
+                      <option>Hybrid</option>
                     </select>
                     <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
                       <svg
@@ -879,22 +951,21 @@ function AddJD({ show, onClose }) {
                     name="joiningPeriod"
                     value={formData.joiningPeriod}
                     onChange={handleChange}
-                    placeholder="e.g. MM/YYYY"
+                    placeholder="e.g. Immediate/15 days"
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Company Open Date (dd/mm/yyyy)<span className="text-red-500 ml-1">*</span>
+                    Company Open Date<span className="text-red-500 ml-1">*</span>
                   </label>
                   <div className="relative">
                     <input
-                      type="text"
+                      type="date"
                       name="companyOpenDate"
                       value={formData.companyOpenDate}
                       onChange={handleChange}
-                      placeholder="e.g. 15/08/2025"
                       className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                         formErrors.companyOpenDate ? "border-red-500" : "border-gray-300"
                       }`}
@@ -1073,7 +1144,7 @@ function AddJD({ show, onClose }) {
                 </button>
               </div>
             </div>
-          </>
+          </> 
         ) : (
           <>
             {/* College Selection Step */}
@@ -1102,48 +1173,34 @@ function AddJD({ show, onClose }) {
                             {college}
                           </label>
                         </div>
-                        <button
-                          onClick={() => viewStudents(college)}
-                          className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-                        >
-                          <EyeIcon className="h-4 w-4 mr-1" />
-                          View Students
-                        </button>
+                        {college !== "Other" && (
+                          <button
+                            onClick={() => viewStudents(college)}
+                            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+                          >
+                            <EyeIcon className="h-4 w-4 mr-1" />
+                            View Students
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
 
-                  {/* Other College Input */}
-                  {selectedColleges.includes("Other") && (
+                  {/* Other Colleges Input */}
+                  {showOtherCollegesInput && (
                     <div className="mt-4">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Enter other college names (separate multiple with commas)
+                        Enter other college names (separate with commas)
                       </label>
                       <textarea
-                        value={formData.otherColleges || ""}
-                        onChange={(e) => {
-                          const otherColleges = e.target.value;
-                          setFormData({...formData, otherColleges});
-                          
-                          if (otherColleges.trim()) {
-                            const collegesToAdd = otherColleges
-                              .split(",")
-                              .map(college => college.trim())
-                              .filter(college => college.length > 0);
-                            
-                            setSelectedColleges(prev => [
-                              ...prev.filter(c => c !== "Other"),
-                              ...collegesToAdd
-                            ]);
-                          }
-                        }}
+                        value={otherCollegesInput}
+                        onChange={handleOtherCollegesChange}
                         rows={3}
                         className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
                         placeholder="e.g. ABC College, XYZ University"
                       />
                       <p className="text-sm text-gray-500 mt-1">
-                        {formData.otherColleges?.split(",").filter(c => c.trim()).length || 0} 
-                        colleges added
+                        {otherCollegesInput.split(',').filter(c => c.trim()).length} college(s) added
                       </p>
                     </div>
                   )}
@@ -1152,7 +1209,6 @@ function AddJD({ show, onClose }) {
                 <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
                   <p className="text-gray-500">
                     No colleges found for {formData.course} course with passing year {formData.passingYear}.
-                    You can still select "Other" or "Multiple" options.
                   </p>
                 </div>
               )}
@@ -1175,14 +1231,14 @@ function AddJD({ show, onClose }) {
                 </button>
                 <button
                   onClick={handleFinalSubmit}
-                  disabled={selectedColleges.length === 0 || isSubmitting}
+                  disabled={selectedColleges.length === 0 || (selectedColleges.includes("Other") && otherCollegesInput.trim() === "") || isSubmitting}
                   className={`px-6 py-2.5 rounded-lg text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition ${
-                    selectedColleges.length === 0 || isSubmitting
+                    selectedColleges.length === 0 || (selectedColleges.includes("Other") && otherCollegesInput.trim() === "") || isSubmitting
                       ? "bg-gray-400 cursor-not-allowed"
                       : "bg-blue-600 hover:bg-blue-700"
                   }`}
                 >
-                  {isSubmitting ? 'Submitting...' : `Submit to ${selectedColleges.length} college(s)`}
+                  {isSubmitting ? 'Submitting...' : `Submit to ${selectedColleges.filter(c => c !== "Other").length} college(s)`}
                 </button>
               </div>
             </div>
