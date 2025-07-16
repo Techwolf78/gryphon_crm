@@ -199,7 +199,7 @@ const handleTargetUpdate = async () => {
  
  
   return (
-  <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+  <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden min-h-screen">
     <div className="px-6 py-5 border-b flex flex-col sm:flex-row justify-between gap-4">
       <h2 className="text-2xl font-bold text-gray-900">Closed Deals</h2>
       <div className="flex flex-wrap items-center gap-2">
