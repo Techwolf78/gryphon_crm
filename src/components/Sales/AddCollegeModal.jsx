@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { universityOptions } from "./universityData";
 import { auth, db } from "../../firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp,query, where, getDocs, } from "firebase/firestore";
 import { XIcon, PlusIcon } from "@heroicons/react/outline";
 import CourseForm from "./AddCollege/CourseForm";
 import CollegeInfoForm from "./AddCollege/CollegeInfoForm";
 import ContactInfoForm from "./AddCollege/ContactInfoForm";
+
 
 const courseSpecializations = {
   Engineering: [
@@ -247,7 +248,93 @@ function AddCollegeModal({ show, onClose }) {
     }
 
     setLoading(true); // Start loading
+try {
+  // Duplicate check ke liye query banate hai
+const leadsRef = collection(db, "leads");
+const q = query(
+  leadsRef,
+  where("businessName", "==", businessName.trim()),
+  where("address", "==", address.trim()),
+  where("state", "==", state),
+  where("city", "==", city),
+  where("pocName", "==", pocName.trim()),
+  where("phoneNo", "==", phoneNo.trim()),
+  where("email", "==", email.trim())
+);
 
+const querySnapshot = await getDocs(q);
+
+let isDuplicate = false;
+
+querySnapshot.forEach((doc) => {
+  const data = doc.data();
+  const dbCourses = data.courses || [];
+
+  courses.forEach((newCourse) => {
+    // Prepare new course values
+    const finalCourseType =
+      newCourse.courseType === "Others" && newCourse.manualCourseType.trim()
+        ? newCourse.manualCourseType.trim()
+        : newCourse.courseType;
+
+    let finalSpecializations = [...newCourse.specializations];
+    if (
+      newCourse.specializations.includes("Other") &&
+      newCourse.manualSpecialization.trim()
+    ) {
+      finalSpecializations = finalSpecializations
+        .filter((item) => item !== "Other")
+        .concat(newCourse.manualSpecialization.trim());
+    }
+
+    dbCourses.forEach((dbCourse) => {
+      // Type check
+      const isTypeMatch = dbCourse.courseType === finalCourseType;
+
+      // Specializations check (order-independent)
+      const dbSpecs = dbCourse.specializations || [];
+      const newSpecs = finalSpecializations || [];
+      const isSpecsMatch =
+        dbSpecs.length === newSpecs.length &&
+        dbSpecs.every((spec) => newSpecs.includes(spec));
+
+      // Year check
+      const isYearMatch = (dbCourse.year || "") === (newCourse.year || "");
+
+      // Passing year check
+      const isPassingYearMatch =
+        (dbCourse.passingYear || "") === (newCourse.passingYear || "");
+
+      // Student count check
+      const isStudentCountMatch =
+        (parseInt(dbCourse.studentCount) || 0) ===
+        (parseInt(newCourse.studentCount) || 0);
+
+      if (
+        isTypeMatch &&
+        isSpecsMatch &&
+        isYearMatch &&
+        isPassingYearMatch &&
+        isStudentCountMatch
+      ) {
+        isDuplicate = true;
+      }
+    });
+  });
+});
+
+if (isDuplicate) {
+  alert("Duplicate found with matching courses and fields. Please check the details.");
+  setLoading(false);
+  return;
+}
+
+} catch (error) {
+  console.error("Error checking duplicate:", error);
+  alert("Something went wrong while checking duplicate.");
+  setLoading(false);
+  return;
+}
     let expectedClosureTimestamp = null;
     if (expectedClosureDate) {
       const d = new Date(expectedClosureDate);
