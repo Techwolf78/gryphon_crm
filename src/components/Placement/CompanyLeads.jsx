@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import AddLeads from "./AddLeads";
-import { collection, getDocs, query, orderBy, where, updateDoc, doc } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, where, updateDoc, doc, arrayUnion } from "firebase/firestore";
 import { db } from "../../firebase";
-import { DotsVerticalIcon, XIcon } from "@heroicons/react/outline";
+import { DotsVerticalIcon, XIcon, PlusIcon } from "@heroicons/react/outline";
 
 const statusColorMap = {
   hot: {
@@ -55,7 +55,7 @@ const tabLabels = {
 };
 
 function CompanyLeads() {
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState('hot');
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddLeadForm, setShowAddLeadForm] = useState(false);
   const [leads, setLeads] = useState([]);
@@ -63,29 +63,32 @@ function CompanyLeads() {
   const [selectedLead, setSelectedLead] = useState(null);
   const [showActionMenu, setShowActionMenu] = useState(null);
   const [showLeadDetails, setShowLeadDetails] = useState(false);
+  const [showAddContactForm, setShowAddContactForm] = useState(false);
+  const [newContact, setNewContact] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    location: '',
+    designation: ''
+  });
 
-  // Fetch leads from Firestore
+  // Fetch all leads from Firestore
   useEffect(() => {
     const fetchLeads = async () => {
       try {
-        let q;
-        if (activeTab === 'all') {
-          q = query(collection(db, "CompanyLeads"), orderBy("createdAt", "desc"));
-        } else {
-          q = query(
-            collection(db, "CompanyLeads"),
-            where("status", "==", activeTab),
-            orderBy("createdAt", "desc")
-          );
-        }
-        
+        setLoading(true);
+        const q = query(collection(db, "CompanyLeads"), orderBy("createdAt", "desc"));
         const querySnapshot = await getDocs(q);
         const leadsData = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
           createdAt: doc.data().createdAt?.toDate
             ? doc.data().createdAt.toDate().toISOString()
-            : new Date().toISOString()
+            : new Date().toISOString(),
+          updatedAt: doc.data().updatedAt?.toDate
+            ? doc.data().updatedAt.toDate().toISOString()
+            : new Date().toISOString(),
+          contacts: doc.data().contacts || []
         }));
         setLeads(leadsData);
       } catch (error) {
@@ -96,23 +99,46 @@ function CompanyLeads() {
     };
 
     fetchLeads();
-  }, [activeTab]);
+  }, []);
 
+  // Filter leads based on active tab and search term
   const filteredLeads = leads.filter(lead => {
+    // First filter by status if not showing all
+    if (activeTab !== 'all' && lead.status !== activeTab) {
+      return false;
+    }
+    
+    // Then filter by search term if present
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
       return (
-        (lead.companyName?.toLowerCase().includes(searchLower) || '') ||
-        (lead.pocName?.toLowerCase().includes(searchLower) || '') ||
+        (lead.companyName?.toLowerCase().includes(searchLower) || '' ||
+        (lead.pocName?.toLowerCase().includes(searchLower) || '' ||
         (lead.pocLocation?.toLowerCase().includes(searchLower) || '') ||
-        (lead.pocPhone?.toLowerCase().includes(searchLower) || '')
-      );
+        (lead.pocPhone?.toLowerCase().includes(searchLower) || '') ||
+        (lead.contacts?.some(contact => 
+          contact.name?.toLowerCase().includes(searchLower) ||
+          contact.email?.toLowerCase().includes(searchLower) ||
+          contact.phone?.toLowerCase().includes(searchLower)
+        ))
+        )));
     }
     return true;
   });
 
+  // Group leads by status for tab counts
+  const leadsByStatus = leads.reduce((acc, lead) => {
+    acc[lead.status] = (acc[lead.status] || 0) + 1;
+    return acc;
+  }, {});
+
   const handleAddLead = (newLead) => {
-    setLeads(prevLeads => [newLead, ...prevLeads]);
+    setLeads(prevLeads => [{
+      ...newLead,
+      contacts: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }, ...prevLeads]);
   };
 
   const handleStatusChange = async (leadId, newStatus) => {
@@ -123,11 +149,56 @@ function CompanyLeads() {
       });
       
       setLeads(leads.map(lead => 
-        lead.id === leadId ? {...lead, status: newStatus} : lead
+        lead.id === leadId ? {...lead, status: newStatus, updatedAt: new Date().toISOString()} : lead
       ));
       setShowActionMenu(null);
     } catch (error) {
       console.error("Error updating status:", error);
+    }
+  };
+
+  const handleAddContact = async (leadId) => {
+    try {
+      if (!newContact.name) {
+        alert("Contact name is required");
+        return;
+      }
+
+      const contactData = {
+        name: newContact.name,
+        email: newContact.email,
+        phone: newContact.phone,
+        location: newContact.location,
+        designation: newContact.designation,
+        addedAt: new Date().toISOString()
+      };
+
+      await updateDoc(doc(db, "CompanyLeads", leadId), {
+        contacts: arrayUnion(contactData),
+        updatedAt: new Date().toISOString()
+      });
+
+      setLeads(leads.map(lead => 
+        lead.id === leadId 
+          ? { 
+              ...lead, 
+              contacts: [...lead.contacts, contactData],
+              updatedAt: new Date().toISOString()
+            } 
+          : lead
+      ));
+
+      setNewContact({
+        name: '',
+        email: '',
+        phone: '',
+        location: '',
+        designation: ''
+      });
+      setShowAddContactForm(false);
+
+    } catch (error) {
+      console.error("Error adding contact:", error);
     }
   };
 
@@ -136,94 +207,340 @@ function CompanyLeads() {
     setShowActionMenu(showActionMenu === leadId ? null : leadId);
   };
 
+  const formatDate = useCallback((dateString) => {
+    try {
+      return dateString ? new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }) : "-";
+    } catch {
+      return "-";
+    }
+  }, []);
+
   const LeadDetailsModal = ({ lead, onClose }) => {
     if (!lead) return null;
 
+    const handleContactChange = (e) => {
+      const { name, value } = e.target;
+      setNewContact(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    };
+
     return (
-      <div className="fixed inset-0 bg-blur backdrop-blur bg-opacity-50 flex items-center justify-center z-54">
-        <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-          <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white px-6 py-4 flex justify-between items-center sticky top-0">
-            <h2 className="text-lg font-semibold">Company Details</h2>
-            <button onClick={onClose} className="p-1 rounded-full hover:bg-blue-700 transition">
-              <XIcon className="h-5 w-5 text-white" />
+      <div className="fixed inset-0 bg-opacity-50 backdrop-blur flex items-center justify-center z-54 p-4">
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-6 py-4 flex justify-between items-center sticky top-0 z-10">
+            <div>
+              <h2 className="text-xl font-semibold">Company Details</h2>
+              <p className="text-sm opacity-90 mt-1">{lead.companyName || "Unnamed Company"}</p>
+            </div>
+            <button 
+              onClick={onClose} 
+              className="p-1 rounded-full hover:bg-blue-700 transition focus:outline-none focus:ring-2 focus:ring-white"
+              aria-label="Close modal"
+            >
+              <XIcon className="h-5 w-5" />
             </button>
           </div>
 
-          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="col-span-2">
-              <h3 className="text-lg font-semibold text-blue-700 mb-2">Company Information</h3>
+          <div className="p-6 space-y-6">
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Company Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-500">Company Name</label>
-                  <p className="mt-1 text-gray-900">{lead.companyName || "-"}</p>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">Company Name</label>
+                  <p className="text-gray-900 font-medium">{lead.companyName || "-"}</p>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-500">Website</label>
-                  <p className="mt-1 text-gray-900">{lead.companyWebsite || "-"}</p>
+                
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">Website</label>
+                  {lead.companyWebsite ? (
+                    <a 
+                      href={lead.companyWebsite.startsWith('http') ? lead.companyWebsite : `https://${lead.companyWebsite}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 hover:underline"
+                    >
+                      {lead.companyWebsite}
+                    </a>
+                  ) : (
+                    <p className="text-gray-900">-</p>
+                  )}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-500">Industry</label>
-                  <p className="mt-1 text-gray-900">{lead.industry || "-"}</p>
+                
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">Industry</label>
+                  <p className="text-gray-900">{lead.industry || "-"}</p>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-500">Company Size</label>
-                  <p className="mt-1 text-gray-900">{lead.companySize || "-"}</p>
+                
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">Company Size</label>
+                  <p className="text-gray-900">{lead.companySize || "-"}</p>
                 </div>
               </div>
             </div>
 
-            <div className="col-span-2">
-              <h3 className="text-lg font-semibold text-blue-700 mb-2">Contact Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-500">Contact Person</label>
-                  <p className="mt-1 text-gray-900">{lead.pocName || "-"}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-500">Email</label>
-                  <p className="mt-1 text-gray-900">{lead.pocMail || "-"}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-500">Phone</label>
-                  <p className="mt-1 text-gray-900">{lead.pocPhone || "-"}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-500">Location</label>
-                  <p className="mt-1 text-gray-900">{lead.pocLocation || "-"}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-500">Designation</label>
-                  <p className="mt-1 text-gray-900">{lead.pocDesignation || "-"}</p>
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Contact Information</h3>
+              
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <h4 className="font-medium text-blue-800 mb-2">Primary Contact</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-blue-600 mb-1">Name</label>
+                    <p className="text-gray-900">{lead.pocName || "-"}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-blue-600 mb-1">Designation</label>
+                    <p className="text-gray-900">{lead.pocDesignation || "-"}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-blue-600 mb-1">Email</label>
+                    {lead.pocMail ? (
+                      <a 
+                        href={`mailto:${lead.pocMail}`}
+                        className="text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        {lead.pocMail}
+                      </a>
+                    ) : (
+                      <p className="text-gray-900">-</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-blue-600 mb-1">Phone</label>
+                    {lead.pocPhone ? (
+                      <a 
+                        href={`tel:${lead.pocPhone}`}
+                        className="text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        {lead.pocPhone}
+                      </a>
+                    ) : (
+                      <p className="text-gray-900">-</p>
+                    )}
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-blue-600 mb-1">Location</label>
+                    <p className="text-gray-900">{lead.pocLocation || "-"}</p>
+                  </div>
                 </div>
               </div>
+
+              {lead.contacts.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="font-medium text-gray-700">Additional Contacts ({lead.contacts.length})</h4>
+                  {lead.contacts.map((contact, index) => (
+                    <div key={index} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-600 mb-1">Name</label>
+                          <p className="text-gray-900">{contact.name || "-"}</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-600 mb-1">Designation</label>
+                          <p className="text-gray-900">{contact.designation || "-"}</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-600 mb-1">Email</label>
+                          {contact.email ? (
+                            <a 
+                              href={`mailto:${contact.email}`}
+                              className="text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              {contact.email}
+                            </a>
+                          ) : (
+                            <p className="text-gray-900">-</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-600 mb-1">Phone</label>
+                          {contact.phone ? (
+                            <a 
+                              href={`tel:${contact.phone}`}
+                              className="text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              {contact.phone}
+                            </a>
+                          ) : (
+                            <p className="text-gray-900">-</p>
+                          )}
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-600 mb-1">Location</label>
+                          <p className="text-gray-900">{contact.location || "-"}</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-600 mb-1">Added On</label>
+                          <p className="text-gray-900">{formatDate(contact.addedAt)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {!showAddContactForm ? (
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => setShowAddContactForm(true)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center"
+                  >
+                    <PlusIcon className="h-4 w-4 mr-2" />
+                    Add Contact
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <h4 className="font-medium text-gray-700 mb-3">Add New Contact</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Name*</label>
+                      <input
+                        type="text"
+                        name="name"
+                        value={newContact.name}
+                        onChange={handleContactChange}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Contact name"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Designation</label>
+                      <input
+                        type="text"
+                        name="designation"
+                        value={newContact.designation}
+                        onChange={handleContactChange}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Designation"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Email</label>
+                      <input
+                        type="email"
+                        name="email"
+                        value={newContact.email}
+                        onChange={handleContactChange}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Email address"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Phone</label>
+                      <input
+                        type="tel"
+                        name="phone"
+                        value={newContact.phone}
+                        onChange={handleContactChange}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Phone number"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Location</label>
+                      <input
+                        type="text"
+                        name="location"
+                        value={newContact.location}
+                        onChange={handleContactChange}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Location"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-4 flex justify-end space-x-3">
+                    <button
+                      onClick={() => {
+                        setShowAddContactForm(false);
+                        setNewContact({
+                          name: '',
+                          email: '',
+                          phone: '',
+                          location: '',
+                          designation: ''
+                        });
+                      }}
+                      className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleAddContact(lead.id)}
+                      className={`px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center ${
+                        newContact.name 
+                          ? "bg-blue-600 text-white hover:bg-blue-700" 
+                          : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      }`}
+                      disabled={!newContact.name}
+                    >
+                      <PlusIcon className="h-4 w-4 mr-2" />
+                      Add Contact
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="col-span-2">
-              <h3 className="text-lg font-semibold text-blue-700 mb-2">Additional Information</h3>
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Additional Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-500">Status</label>
-                  <p className="mt-1 capitalize text-gray-900">{lead.status || "-"}</p>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Status</label>
+                  <div className="flex items-center">
+                    <span className={`inline-block h-2 w-2 rounded-full mr-2 ${
+                      lead.status === 'hot' ? 'bg-red-500' : 
+                      lead.status === 'warm' ? 'bg-orange-500' : 
+                      lead.status === 'cold' ? 'bg-blue-500' : 
+                      'bg-green-500'
+                    }`}></span>
+                    <span className="capitalize text-gray-900">{lead.status || "-"}</span>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-500">Source</label>
-                  <p className="mt-1 text-gray-900">{lead.source || "-"}</p>
+                
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Source</label>
+                  <p className="text-gray-900 capitalize">{lead.source || "-"}</p>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-500">Created At</label>
-                  <p className="mt-1 text-gray-900">
-                    {new Date(lead.createdAt).toLocaleDateString() || "-"}
-                  </p>
+                
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Created At</label>
+                  <p className="text-gray-900">{formatDate(lead.createdAt)}</p>
+                </div>
+                
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Last Updated</label>
+                  <p className="text-gray-900">{formatDate(lead.updatedAt)}</p>
                 </div>
               </div>
             </div>
 
             {lead.notes && (
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-500">Notes</label>
-                <p className="mt-1 whitespace-pre-line text-gray-900">{lead.notes}</p>
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Notes</h3>
+                <div className="bg-gray-50 p-4 rounded-lg whitespace-pre-line text-gray-900">
+                  {lead.notes}
+                </div>
               </div>
             )}
+          </div>
+
+          <div className="bg-gray-50 px-6 py-4 sticky bottom-0 flex justify-end space-x-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition"
+            >
+              Close
+            </button>
           </div>
         </div>
       </div>
@@ -241,11 +558,11 @@ function CompanyLeads() {
   return (
     <div className="bg-white rounded-lg shadow p-4">
       {/* Top Row - Search and Add Lead Button */}
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex-1 max-w-xs">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+        <div className="w-full md:max-w-xs">
           <input
             type="text"
-            placeholder="Search companies..."
+            placeholder="Search companies or contacts..."
             className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -253,22 +570,11 @@ function CompanyLeads() {
         </div>
         <button
           onClick={() => setShowAddLeadForm(true)}
-          className="ml-4 px-4 py-2 text-white rounded-lg font-semibold flex items-center focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md relative overflow-hidden"
+          className="w-full md:w-auto px-4 py-2 text-white rounded-lg font-semibold flex items-center justify-center focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md relative overflow-hidden"
         >
           <span className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-700 opacity-100 hover:opacity-90 transition-opacity duration-200 z-0"></span>
           <span className="relative z-10 flex items-center">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5 mr-2"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fillRule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"
-                clipRule="evenodd"
-              />
-            </svg>
+            <PlusIcon className="h-5 w-5 mr-2" />
             Add Company
           </span>
         </button>
@@ -302,7 +608,7 @@ function CompanyLeads() {
           >
             {tabLabels[key]}{" "}
             <span className="ml-1 text-xs font-bold">
-              ({key === 'all' ? leads.length : leads.filter(l => l.status === key).length})
+              ({leadsByStatus[key] || 0})
             </span>
           </button>
         ))}
@@ -324,7 +630,7 @@ function CompanyLeads() {
             {filteredLeads.length === 0 ? (
               <tr>
                 <td colSpan="5" className="py-4 text-center text-gray-500">
-                  No companies found
+                  {searchTerm ? "No matching companies found" : `No ${activeTab} companies found`}
                 </td>
               </tr>
             ) : (
@@ -335,9 +641,17 @@ function CompanyLeads() {
                   onClick={() => {
                     setSelectedLead(lead);
                     setShowLeadDetails(true);
+                    setShowAddContactForm(false);
                   }}
                 >
-                  <td className="py-3 px-4 border-b">{lead.companyName || 'N/A'}</td>
+                  <td className="py-3 px-4 border-b">
+                    <div className="font-medium">{lead.companyName || 'N/A'}</div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {lead.contacts.length > 0 
+                        ? `${lead.contacts.length} additional contact${lead.contacts.length > 1 ? 's' : ''}`
+                        : 'No additional contacts'}
+                    </div>
+                  </td>
                   <td className="py-3 px-4 border-b">
                     {lead.pocName || 'N/A'} <br />
                     <span className="text-sm text-gray-500">{lead.pocMail || 'No email'}</span>
@@ -356,6 +670,7 @@ function CompanyLeads() {
                           ? "bg-gray-200 text-gray-900 shadow-inner"
                           : ""
                       }`}
+                      aria-label="Actions"
                     >
                       <DotsVerticalIcon className="h-5 w-5 text-gray-500" />
                     </button>
