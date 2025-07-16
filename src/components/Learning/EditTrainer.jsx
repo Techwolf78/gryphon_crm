@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from "react";
-import {doc,setDoc, getDocs, query,orderBy, collection,} from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
-import * as XLSX from "xlsx";
-import { FiX,FiUpload, FiDownload,FiUserPlus,FiInfo,FiCheckCircle,FiAlertCircle,} from "react-icons/fi";
+import {
+  FiX,
+  FiUser,
+  FiCheckCircle,
+  FiAlertCircle,
+} from "react-icons/fi";
 import specializationOptions from './specializationOptions'
 
-
-function AddTrainer({ onClose, onTrainerAdded }) {
+function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
   const [trainerData, setTrainerData] = useState({
     trainerId: "",
     name: "",
@@ -29,40 +32,55 @@ function AddTrainer({ onClose, onTrainerAdded }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showOtherSpecialization, setShowOtherSpecialization] = useState(false);
-  const [importStatus, setImportStatus] = useState("");
-  const [importProgress, setImportProgress] = useState(0);
   const [currentSection, setCurrentSection] = useState("basic");
 
-  // Generate next trainer ID
+  
+
   useEffect(() => {
-    const getNextTrainerId = async () => {
+    const fetchTrainer = async () => {
       try {
-        const q = query(
-          collection(db, "trainers"),
-          orderBy("createdAt", "desc")
-        );
-        const snapshot = await getDocs(q);
+        setLoading(true);
+        const docRef = doc(db, "trainers", trainerId);
+        const docSnap = await getDoc(docRef);
 
-        let maxNumber = 0;
-        snapshot.forEach((doc) => {
-          const id = doc.id;
-          if (id && id.startsWith("GA-T")) {
-            const num = parseInt(id.replace("GA-T", ""));
-            if (!isNaN(num)) {
-              maxNumber = Math.max(maxNumber, num);
-            }
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setTrainerData({
+            trainerId: data.trainerId || trainerId,
+            name: data.name || "",
+            contact: data.contact || "",
+            email: data.email || "",
+            domain: data.domain || "Soft Skills",
+            nameAsPerBank: data.nameAsPerBank || "",
+            bankName: data.bankName || "",
+            accountNumber: data.accountNumber || "",
+            ifsc: data.ifsc || "",
+            pan: data.pan || "",
+            aadhar: data.aadhar || "",
+            bankAddress: data.bankAddress || "",
+            paymentType: data.paymentType || "Per Hour",
+            charges: data.charges || "",
+            specialization: data.specialization || "",
+            otherSpecialization: data.otherSpecialization || "",
+          });
+
+          if (data.specialization === "Others" ||
+            !specializationOptions.includes(data.specialization)) {
+            setShowOtherSpecialization(true);
           }
-        });
-
-        const nextId = `GA-T${(maxNumber + 1).toString().padStart(3, "0")}`;
-        setTrainerData((prev) => ({ ...prev, trainerId: nextId }));
+        } else {
+          setError("Trainer not found");
+        }
       } catch (err) {
-        console.error("Error generating ID:", err);
-        setTrainerData((prev) => ({ ...prev, trainerId: "GA-T001" }));
+        console.error("Error fetching trainer:", err);
+        setError("Failed to load trainer data");
+      } finally {
+        setLoading(false);
       }
     };
-    getNextTrainerId();
-  }, []);
+
+    fetchTrainer();
+  }, [trainerId]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -81,7 +99,7 @@ function AddTrainer({ onClose, onTrainerAdded }) {
     setError("");
 
     try {
-      const trainerToSave = {
+      const trainerToUpdate = {
         trainerId: trainerData.trainerId,
         name: trainerData.name,
         contact: trainerData.contact,
@@ -99,159 +117,25 @@ function AddTrainer({ onClose, onTrainerAdded }) {
         specialization: showOtherSpecialization
           ? trainerData.otherSpecialization
           : trainerData.specialization,
-        createdAt: new Date(),
+        updatedAt: new Date(),
       };
 
       if (showOtherSpecialization) {
-        trainerToSave.otherSpecialization = trainerData.otherSpecialization;
+        trainerToUpdate.otherSpecialization = trainerData.otherSpecialization;
       }
 
-      await setDoc(doc(db, "trainers", trainerData.trainerId), trainerToSave, {
-        merge: true,
-      });
-
-      onTrainerAdded();
+      await updateDoc(doc(db, "trainers", trainerId), trainerToUpdate);
+      onTrainerUpdated();
       onClose();
     } catch (err) {
-      console.error("Error adding trainer:", err);
-      setError(`Failed to add trainer: ${err.message}`);
+      console.error("Error updating trainer:", err);
+      setError(`Failed to update trainer: ${err.message}`);
     } finally {
       setLoading(false);
     }
   };
-  const handleFileImport = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
 
-    setImportStatus("Processing file...");
-    setImportProgress(10);
-    setLoading(true);
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        setImportProgress(30);
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: "array" });
-        setImportProgress(60);
-
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json(firstSheet);
-
-        if (jsonData.length === 0) {
-          throw new Error("No data found in the Excel file");
-        }
-
-        setImportProgress(80);
-
-        for (const importedData of jsonData) {
-          let trainerId = importedData["Trainer ID"] || "";
-          if (!trainerId) {
-            const q = query(
-              collection(db, "trainers"),
-              orderBy("createdAt", "desc")
-            );
-            const snapshot = await getDocs(q);
-
-            let maxNumber = 0;
-            snapshot.forEach((doc) => {
-              const id = doc.id;
-              if (id && id.startsWith("GA-T")) {
-                const num = parseInt(id.replace("GA-T", ""));
-                if (!isNaN(num)) {
-                  maxNumber = Math.max(maxNumber, num);
-                }
-              }
-            });
-            trainerId = `GA-T${(maxNumber + 1).toString().padStart(3, "0")}`;
-          }
-
-          const trainerToSave = {
-            trainerId: trainerId,
-            name: importedData["Name"] || "",
-            contact: importedData["Contact"] || "",
-            email: importedData["Email"] || "",
-            domain: importedData["Domain"] || "Soft Skills",
-            nameAsPerBank: importedData["Name as per Bank"] || "",
-            bankName: importedData["Bank Name"] || "",
-            accountNumber: importedData["Account Number"] || "",
-            ifsc: importedData["IFSC Code"] || "",
-            pan: importedData["PAN"] || "",
-            aadhar: importedData["Aadhar"] || "",
-            bankAddress: importedData["Bank Address"] || "",
-            paymentType: importedData["Payment Type"] || "Per Hour",
-            charges: Number(importedData["Charges"]) || 0,
-            specialization: importedData["Specialization"] || "Soft Skills",
-            createdAt: new Date(),
-          };
-
-          if (!specializationOptions.includes(importedData["Specialization"])) {
-            trainerToSave.specialization = "Others";
-            trainerToSave.otherSpecialization =
-              importedData["Specialization"] || "";
-          }
-
-          await setDoc(doc(db, "trainers", trainerId), trainerToSave);
-
-          if (importedData === jsonData[jsonData.length - 1]) {
-            setTrainerData(trainerToSave);
-          }
-        }
-
-        setImportStatus(`${jsonData.length} trainers imported successfully!`);
-        setImportProgress(100);
-        onTrainerAdded();
-
-        setTimeout(() => {
-          setImportStatus("");
-          setImportProgress(0);
-        }, 3000);
-      } catch (error) {
-        console.error("Import error:", error);
-        setError(`Import failed: ${error.message}`);
-        setImportStatus("Import failed");
-        setImportProgress(0);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    reader.onerror = () => {
-      setError("Error reading file");
-      setImportStatus("Import failed");
-      setImportProgress(0);
-      setLoading(false);
-    };
-
-    reader.readAsArrayBuffer(file);
-  };
-
-  const handleExportTemplate = () => {
-    const templateData = [
-      {
-        Name: "",
-        Contact: "",
-        Email: "",
-        Domain: "Soft Skills",
-        "Name as per Bank": "",
-        "Bank Name": "",
-        "Account Number": "",
-        "IFSC Code": "",
-        PAN: "",
-        Aadhar: "",
-        "Bank Address": "",
-        "Payment Type": "Per Hour",
-        Charges: "",
-        Specialization: "",
-      },
-    ];
-
-    const worksheet = XLSX.utils.json_to_sheet(templateData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Trainers");
-    XLSX.writeFile(workbook, "trainer_import_template.xlsx");
-  };
-
+  // Add these functions to the EditTrainer component
   const renderBasicInfoSection = () => (
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -559,7 +443,7 @@ function AddTrainer({ onClose, onTrainerAdded }) {
               Saving...
             </>
           ) : (
-            "Save Trainer"
+            "Update Trainer"
           )}
         </button>
       </div>
@@ -567,20 +451,17 @@ function AddTrainer({ onClose, onTrainerAdded }) {
   );
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      {/* Backdrop - fixed positioning and proper z-index */}
+    <div className="fixed inset-0 z-54 overflow-y-auto">
       <div
         className="fixed inset-0 transition-opacity"
         style={{
-          backgroundColor: "rgba(0, 0, 50, 0.2)", // soft transparent blue
-          backdropFilter: "blur(10px)", // blurry glass effect
-          WebkitBackdropFilter: "blur(10px)", // Safari support
+          backgroundColor: "rgba(0, 0, 50, 0.2)",
+          backdropFilter: "blur(10px)",
+          WebkitBackdropFilter: "blur(10px)",
         }}
       ></div>
 
-      {/* Modal container */}
       <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        {/* This element is to trick the browser into centering the modal contents */}
         <span
           className="hidden sm:inline-block sm:align-middle sm:h-screen"
           aria-hidden="true"
@@ -588,14 +469,13 @@ function AddTrainer({ onClose, onTrainerAdded }) {
           &#8203;
         </span>
 
-        {/* Modal content - relative positioning and higher z-index */}
         <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full relative z-10">
           <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <div className="flex justify-between items-start">
               <div>
                 <h3 className="text-lg leading-6 font-medium text-gray-900">
-                  <FiUserPlus className="inline mr-2" />
-                  Add New Trainer
+                  <FiUser className="inline mr-2" />
+                  Edit Trainer
                 </h3>
                 <p className="text-sm text-gray-500 mt-1">
                   {currentSection === "basic"
@@ -618,77 +498,42 @@ function AddTrainer({ onClose, onTrainerAdded }) {
               </div>
             )}
 
-            {importStatus && (
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-blue-700 text-sm flex flex-col">
-                <div className="flex items-start">
-                  {importProgress === 100 ? (
-                    <FiCheckCircle className="flex-shrink-0 h-5 w-5 mr-2 mt-0.5 text-green-500" />
-                  ) : (
-                    <FiInfo className="flex-shrink-0 h-5 w-5 mr-2 mt-0.5" />
-                  )}
-                  <span>{importStatus}</span>
+            {loading && !trainerData.name ? (
+              <div className="mt-4 flex justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+              </div>
+            ) : (
+              <div className="mt-6">
+                <div className="mb-4">
+                  <nav className="flex space-x-4" aria-label="Tabs">
+                    <button
+                      onClick={() => setCurrentSection("basic")}
+                      className={`px-3 py-2 text-sm font-medium rounded-md ${currentSection === "basic"
+                        ? "bg-blue-100 text-blue-700"
+                        : "text-gray-500 hover:text-gray-700"
+                        }`}
+                    >
+                      Basic Info
+                    </button>
+                    <button
+                      onClick={() => setCurrentSection("payment")}
+                      className={`px-3 py-2 text-sm font-medium rounded-md ${currentSection === "payment"
+                        ? "bg-blue-100 text-blue-700"
+                        : "text-gray-500 hover:text-gray-700"
+                        }`}
+                    >
+                      Payment & Bank
+                    </button>
+                  </nav>
                 </div>
-                {importProgress > 0 && (
-                  <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                    <div
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${importProgress}%` }}
-                    ></div>
-                  </div>
-                )}
+
+                <form onSubmit={handleSubmit}>
+                  {currentSection === "basic"
+                    ? renderBasicInfoSection()
+                    : renderPaymentInfoSection()}
+                </form>
               </div>
             )}
-
-            <div className="mt-4 flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={handleExportTemplate}
-                className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                <FiDownload className="mr-2 h-4 w-4" />
-                Download Template
-              </button>
-              <label className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer">
-                <FiUpload className="mr-2 h-4 w-4" />
-                Import from Excel
-                <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={handleFileImport}
-                  className="hidden"
-                />
-              </label>
-            </div>
-
-            <div className="mt-6">
-              <div className="mb-4">
-                <nav className="flex space-x-4" aria-label="Tabs">
-                  <button
-                    onClick={() => setCurrentSection("basic")}
-                    className={`px-3 py-2 text-sm font-medium rounded-md ${currentSection === "basic"
-                        ? "bg-blue-100 text-blue-700"
-                        : "text-gray-500 hover:text-gray-700"
-                      }`}
-                  >
-                    Basic Info
-                  </button>
-                  <button
-                    onClick={() => setCurrentSection("payment")}
-                    className={`px-3 py-2 text-sm font-medium rounded-md ${currentSection === "payment"
-                        ? "bg-blue-100 text-blue-700"
-                        : "text-gray-500 hover:text-gray-700"
-                      }`}
-                  >
-                    Payment & Bank
-                  </button>
-                </nav>
-              </div>
-
-              <form onSubmit={handleSubmit}>
-                {currentSection === "basic"
-                  ? renderBasicInfoSection()
-                  : renderPaymentInfoSection()}
-              </form>
-            </div>
           </div>
         </div>
       </div>
@@ -696,4 +541,4 @@ function AddTrainer({ onClose, onTrainerAdded }) {
   );
 }
 
-export default AddTrainer;
+export default EditTrainer;
