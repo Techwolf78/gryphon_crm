@@ -119,9 +119,6 @@ function AddTrainer({ onClose, onTrainerAdded }) {
       setLoading(false);
     }
   };
-
-
-
   const handleFileImport = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
