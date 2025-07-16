@@ -4,12 +4,10 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { XIcon } from "@heroicons/react/outline";
 
 const statusOptions = [
-  "Active",
-  "Inactive",
-  "Prospect",
-  "Lead",
-  "On Hold",
-  "Blacklisted"
+  "Hot",
+  "Warm",
+  "Cold",
+  "Onboarded",
 ];
 
 function AddLeads({ show, onClose, onAddLead }) {
@@ -22,7 +20,7 @@ function AddLeads({ show, onClose, onAddLead }) {
   const [pocPhone, setPocPhone] = useState("");
   const [pocMail, setPocMail] = useState("");
   const [pocDesignation, setPocDesignation] = useState("");
-  const [status, setStatus] = useState("Active");
+  const [status, setStatus] = useState("Warm");
 
   const handleClose = () => {
     setCompanyName("");
@@ -34,7 +32,7 @@ function AddLeads({ show, onClose, onAddLead }) {
     setPocPhone("");
     setPocMail("");
     setPocDesignation("");
-    setStatus("Active");
+    setStatus("Warm");
     onClose();
   };
 
@@ -60,7 +58,7 @@ function AddLeads({ show, onClose, onAddLead }) {
       pocPhone,
       pocMail,
       pocDesignation,
-      status: status || "Active",
+      status: status.toLowerCase() || "warm",
       assignedTo: {
         uid: user.uid,
         name: user.displayName?.trim() || "No Name Provided",
@@ -98,7 +96,7 @@ function AddLeads({ show, onClose, onAddLead }) {
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-54 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-3xl rounded-xl shadow-2xl overflow-hidden">
         <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center">
           <h2 className="text-xl font-semibold text-white">Add New Company</h2>
