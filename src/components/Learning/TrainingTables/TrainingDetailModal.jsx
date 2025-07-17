@@ -137,22 +137,34 @@ const TrainingDetailModal = ({ training, onClose }) => {
               <DetailCard label="Year" value={training?.year} iconColor="text-green-400" />
               <DetailCard label="Delivery Type" value={training?.deliveryType} iconColor="text-green-400" />
               <DetailCard label="Passing Year" value={training?.passingYear} iconColor="text-green-400" />
-              <DetailCard
-                label="Course Specializations"
-                value={
-                  training?.courses?.length ? (
-                    <ul className="list-disc pl-5 space-y-1">
-                      {training.courses.map((course, index) => (
-                        <li key={index} className="text-sm">
-                          {course.specialization} ({course.students} students)
-                        </li>
-                      ))}
-                    </ul>
-                  ) : 'Not specified'
-                }
-                fullWidth
-                iconColor="text-green-400"
-              />
+
+              {/* Course Specializations Table */}
+              {training?.courses?.length > 0 && (
+                <div className="col-span-full mt-4">
+                  <h4 className="font-medium text-gray-700 mb-3 flex items-center gap-2">
+                    <IoIosSchool className="text-green-500" />
+                    Course Specializations
+                  </h4>
+                  <div className="border rounded-xl overflow-hidden border-gray-200">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="text-left px-4 py-3 font-medium text-gray-600">Specialization</th>
+                          <th className="text-left px-4 py-3 font-medium text-gray-600">Students</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {training.courses.map((course, index) => (
+                          <tr key={index} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-4 py-3">{course.specialization || 'N/A'}</td>
+                            <td className="px-4 py-3 font-medium">{course.students || 'N/A'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
               <DetailCard label="Total Students" value={training?.studentCount} iconColor="text-green-400" />
               <DetailCard label="Total Hours" value={training?.totalHours} iconColor="text-green-400" />
               <DetailCard

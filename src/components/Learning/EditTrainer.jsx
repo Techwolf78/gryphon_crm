@@ -34,8 +34,6 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
   const [showOtherSpecialization, setShowOtherSpecialization] = useState(false);
   const [currentSection, setCurrentSection] = useState("basic");
 
-  
-
   useEffect(() => {
     const fetchTrainer = async () => {
       try {
@@ -60,13 +58,24 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
             bankAddress: data.bankAddress || "",
             paymentType: data.paymentType || "Per Hour",
             charges: data.charges || "",
-            specialization: data.specialization || "",
-            otherSpecialization: data.otherSpecialization || "",
+            specialization: Array.isArray(data.specialization) ? data.specialization.join(", ") : (data.specialization || ""),
+            otherSpecialization: Array.isArray(data.otherSpecialization) ? data.otherSpecialization.join(", ") : (data.otherSpecialization || ""),
           });
 
-          if (data.specialization === "Others" ||
-            !specializationOptions.includes(data.specialization)) {
+          // Show Other Specialization if Firestore has values or "Others" is present
+          const specArr = Array.isArray(data.specialization)
+            ? data.specialization
+            : typeof data.specialization === "string"
+              ? data.specialization.split(",").map(s => s.trim())
+              : [];
+          if (
+            (Array.isArray(data.otherSpecialization) && data.otherSpecialization.length > 0) ||
+            specArr.includes("Others") ||
+            specArr.some(s => !specializationOptions.includes(s))
+          ) {
             setShowOtherSpecialization(true);
+          } else {
+            setShowOtherSpecialization(false);
           }
         } else {
           setError("Trainer not found");
@@ -86,10 +95,17 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
     const { name, value } = e.target;
     setTrainerData((prev) => ({ ...prev, [name]: value }));
 
-    if (name === "specialization" && value === "Others") {
-      setShowOtherSpecialization(true);
-    } else if (name === "specialization") {
-      setShowOtherSpecialization(false);
+    if (name === "specialization") {
+      // If "Others" is selected or not in options, show otherSpecialization
+      const selectedSpecs = value.split(",").map(s => s.trim());
+      if (
+        selectedSpecs.includes("Others") ||
+        selectedSpecs.some(s => !specializationOptions.includes(s))
+      ) {
+        setShowOtherSpecialization(true);
+      } else {
+        setShowOtherSpecialization(false);
+      }
     }
   };
 
@@ -99,6 +115,14 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
     setError("");
 
     try {
+      // Always save as arrays in Firestore
+      const specializationArr = trainerData.specialization
+        ? trainerData.specialization.split(",").map(s => s.trim()).filter(Boolean)
+        : [];
+      const otherSpecializationArr = trainerData.otherSpecialization
+        ? trainerData.otherSpecialization.split(",").map(s => s.trim()).filter(Boolean)
+        : [];
+
       const trainerToUpdate = {
         trainerId: trainerData.trainerId,
         name: trainerData.name,
@@ -114,14 +138,14 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
         bankAddress: trainerData.bankAddress,
         paymentType: trainerData.paymentType,
         charges: Number(trainerData.charges) || 0,
-        specialization: showOtherSpecialization
-          ? trainerData.otherSpecialization
-          : trainerData.specialization,
+        specialization: specializationArr,
         updatedAt: new Date(),
       };
 
       if (showOtherSpecialization) {
-        trainerToUpdate.otherSpecialization = trainerData.otherSpecialization;
+        trainerToUpdate.otherSpecialization = otherSpecializationArr;
+      } else {
+        trainerToUpdate.otherSpecialization = [];
       }
 
       await updateDoc(doc(db, "trainers", trainerId), trainerToUpdate);
@@ -218,11 +242,18 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Specialization*
           </label>
-          <select>
-            {specializationOptions.map((option, idx) => (
-              <option key={idx} value={option}>{option}</option>
-            ))}
-          </select>
+          <input
+            type="text"
+            name="specialization"
+            value={trainerData.specialization}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            placeholder="e.g. Power BI, Advanced Excel"
+            required
+          />
+          <small className="text-gray-500">
+            Enter comma separated values. Example: Power BI, Advanced Excel
+          </small>
         </div>
       </div>
 
@@ -239,7 +270,11 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
               onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               required={showOtherSpecialization}
+              placeholder="e.g. Microsoft Excel, PowerPoint"
             />
+            <small className="text-gray-500">
+              Enter comma separated values. Example: Microsoft Excel, PowerPoint
+            </small>
           </div>
         </div>
       )}

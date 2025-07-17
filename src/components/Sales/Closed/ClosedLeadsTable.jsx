@@ -692,7 +692,7 @@ const ClosedLeadsTable = ({
         </div>
       )}
       {/* Table */}
-      <table className="min-w-full divide-y divide-gray-200 min-h-screen">
+      <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
             {[
