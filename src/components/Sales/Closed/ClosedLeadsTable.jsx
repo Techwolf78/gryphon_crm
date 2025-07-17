@@ -695,36 +695,38 @@ const ClosedLeadsTable = ({
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
-            {[
-              "Project Code",
-              "Institution",
-              "Location",
-              "Closed Date",
-              "Actual TCV",
-              "Projected TCV",
-              "Owner",
-              "Actions",
-            ].map((h, idx) => (
-              <th
-                key={h}
-                className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
-                  h === "Actions" ? "text-center" : ""
-                }`}
-              >
-                {h}
-              </th>
-            ))}
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Project Code
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[180px]">
+              Institution
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Location
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Closed Date
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Actual TCV
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Projected TCV
+            </th>
+            <th className="px-8 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[140px]">
+              Owner
+            </th>
+            <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[60px]">
+              Actions
+            </th>
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
           {leads.length > 0 ? (
             leads.map(([id, lead]) => (
-              <tr
-                key={id}
-                className="hover:bg-gray-50 transition-colors align-top"
-              >
+              <tr key={id} className="hover:bg-gray-50 transition-colors align-top">
                 <td
-                  className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
+                  className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 overflow-hidden truncate max-w-[120px]"
                   title={`DocID: ${projectCodeToDocId(
                     lead.projectCode || ""
                   )}, ProjectCode: ${docIdToProjectCode(
@@ -733,13 +735,13 @@ const ClosedLeadsTable = ({
                 >
                   {displayProjectCode(lead.projectCode) || "-"}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-6 py-4 whitespace-nowrap overflow-hidden truncate max-w-[180px]">
                   <div className="flex items-center">
                     <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-medium flex-shrink-0">
                       {lead.businessName?.charAt(0)?.toUpperCase() || "?"}
                     </div>
                     <div className="ml-4">
-                      <div className="font-medium text-gray-900 truncate max-w-xs">
+                      <div className="font-medium text-gray-900 truncate max-w-[140px] overflow-hidden whitespace-nowrap">
                         {lead.businessName || "-"}
                       </div>
                       <div className="text-xs text-gray-500 mt-1">
@@ -756,24 +758,24 @@ const ClosedLeadsTable = ({
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">
+                <td className="px-6 py-4 whitespace-nowrap overflow-hidden truncate max-w-[120px]">
+                  <div className="text-sm text-gray-900 truncate max-w-[100px] overflow-hidden whitespace-nowrap">
                     {lead.city || "-"}
                   </div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-gray-500 truncate max-w-[100px] overflow-hidden whitespace-nowrap">
                     {lead.state || ""}
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 overflow-hidden truncate max-w-[120px]">
                   {formatDate(lead.closedDate)}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
+                <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900 overflow-hidden truncate max-w-[120px]">
                   {formatCurrency(lead.totalCost)}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
+                <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900 overflow-hidden truncate max-w-[120px]">
                   {formatCurrency(lead.tcv)}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-8 py-4 whitespace-nowrap overflow-hidden truncate w-[140px]">
                   <div className="flex items-center">
                     <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-xs font-medium flex-shrink-0">
                       {lead.assignedTo?.name
@@ -782,14 +784,13 @@ const ClosedLeadsTable = ({
                         .join("")
                         .toUpperCase() || "?"}
                     </div>
-                    <div className="ml-3 text-sm font-medium text-gray-900 truncate max-w-xs">
+                    <div className="ml-3 text-sm font-medium text-gray-900 truncate max-w-[100px] overflow-hidden whitespace-nowrap">
                       {lead.assignedTo?.name || "-"}
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap text-right">
-                  <div className="relative flex justify-end">
-                    {/* Modern dropdown trigger button */}
+                <td className="px-2 py-3 whitespace-nowrap w-[60px]">
+                  <div className="flex justify-center items-center h-full">
                     <button
                       onClick={() => toggleDropdown(id)}
                       aria-label="Action menu"
@@ -803,10 +804,7 @@ const ClosedLeadsTable = ({
                       {openDropdown === id ? (
                         <FiX className="h-5 w-5" aria-hidden="true" />
                       ) : (
-                        <FiMoreVertical
-                          className="h-5 w-5"
-                          aria-hidden="true"
-                        />
+                        <FiMoreVertical className="h-5 w-5" aria-hidden="true" />
                       )}
                     </button>
 
