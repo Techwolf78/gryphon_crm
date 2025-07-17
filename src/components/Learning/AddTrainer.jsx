@@ -329,36 +329,47 @@ function AddTrainer({ onClose, onTrainerAdded }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Specialization*
-          </label>
-          <select>
-            {specializationOptions.map((option, idx) => (
-              <option key={idx} value={option}>{option}</option>
-            ))}
-          </select>
-        </div>
-      </div>
+<div className="grid grid-cols-1 gap-4">
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+      Specialization*
+    </label>
+    <div className="relative">
+      <select
+        className="block w-full pl-3 pr-10 py-2.5 text-base border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/80 focus:border-blue-500 transition-all duration-150 appearance-none"
+        style={{
+          backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")",
+          backgroundPosition: "right 0.5rem center",
+          backgroundRepeat: "no-repeat",
+          backgroundSize: "1.5em 1.5em"
+        }}
+      >
+        {specializationOptions.map((option, idx) => (
+          <option key={idx} value={option}>{option}</option>
+        ))}
+      </select>
+    </div>
+  </div>
+</div>
 
-      {showOtherSpecialization && (
-        <div className="grid grid-cols-1 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Other Specialization*
-            </label>
-            <input
-              type="text"
-              name="otherSpecialization"
-              value={trainerData.otherSpecialization}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              required={showOtherSpecialization}
-            />
-          </div>
-        </div>
-      )}
+{showOtherSpecialization && (
+  <div className="grid grid-cols-1 gap-4 mt-2">
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+        Other Specialization*
+      </label>
+      <input
+        type="text"
+        name="otherSpecialization"
+        value={trainerData.otherSpecialization}
+        onChange={handleChange}
+        className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/80 focus:border-blue-500 transition-all duration-150"
+        required={showOtherSpecialization}
+        placeholder="Enter your specialization"
+      />
+    </div>
+  </div>
+)}
 
       <div className="flex justify-end">
         <button
@@ -567,7 +578,7 @@ function AddTrainer({ onClose, onTrainerAdded }) {
   );
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div className="fixed inset-0 z-54 overflow-y-auto">
       {/* Backdrop - fixed positioning and proper z-index */}
       <div
         className="fixed inset-0 transition-opacity"
