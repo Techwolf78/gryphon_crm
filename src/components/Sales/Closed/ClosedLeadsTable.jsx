@@ -170,6 +170,19 @@ const ClosedLeadsTable = ({
         lastUpdated: serverTimestamp(),
       });
 
+      // Also update placementData collection
+      const placementRef = doc(db, "placementData", docId);
+      await updateDoc(placementRef, {
+        mouFileUrl: newMouUrl,
+        mouFileMeta: {
+          public_id: cloudinaryResponse.public_id || "",
+          format: cloudinaryResponse.format || "",
+          bytes: cloudinaryResponse.bytes || 0,
+          created_at: cloudinaryResponse.created_at || "",
+        },
+        lastUpdated: serverTimestamp(),
+      });
+
       setShowMOUUploadModal(false);
       setMOUFile(null);
       setActiveLeadId(null);
@@ -327,10 +340,13 @@ const ClosedLeadsTable = ({
       setUploadError(null);
 
       const docId = projectCodeToDocId(projectCode);
-      const trainingFormRef = doc(db, "trainingForms", docId);
-      const docSnap = await getDoc(trainingFormRef);
 
-      if (!docSnap.exists()) {
+      // --- TRAINING FORMS ---
+      const trainingFormRef = doc(db, "trainingForms", docId);
+      const trainingStudentsRef = collection(trainingFormRef, "students");
+      const trainingDocSnap = await getDoc(trainingFormRef);
+
+      if (!trainingDocSnap.exists()) {
         await setDoc(trainingFormRef, {
           projectCode,
           docId,
@@ -339,18 +355,35 @@ const ClosedLeadsTable = ({
         });
       }
 
-      const studentsRef = collection(trainingFormRef, "students");
-
-      // DELETE ALL EXISTING STUDENTS FIRST
-      console.log("Deleting existing students...");
-      const existingStudents = await getDocs(studentsRef);
-      const deletePromises = existingStudents.docs.map((studentDoc) =>
-        deleteDoc(doc(studentsRef, studentDoc.id))
+      // DELETE ALL EXISTING STUDENTS IN TRAINING FORMS
+      const existingTrainingStudents = await getDocs(trainingStudentsRef);
+      const deleteTrainingPromises = existingTrainingStudents.docs.map((studentDoc) =>
+        deleteDoc(doc(trainingStudentsRef, studentDoc.id))
       );
-      await Promise.all(deletePromises);
-      console.log(`Deleted ${existingStudents.size} existing students`);
+      await Promise.all(deleteTrainingPromises);
 
-      // Process new data
+      // --- PLACEMENT DATA ---
+      const placementFormRef = doc(db, "placementData", docId);
+      const placementStudentsRef = collection(placementFormRef, "students");
+      const placementDocSnap = await getDoc(placementFormRef);
+
+      if (!placementDocSnap.exists()) {
+        await setDoc(placementFormRef, {
+          projectCode,
+          docId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
+
+      // DELETE ALL EXISTING STUDENTS IN PLACEMENT DATA
+      const existingPlacementStudents = await getDocs(placementStudentsRef);
+      const deletePlacementPromises = existingPlacementStudents.docs.map((studentDoc) =>
+        deleteDoc(doc(placementStudentsRef, studentDoc.id))
+      );
+      await Promise.all(deletePlacementPromises);
+
+      // Process new data for both collections
       const totalRows = data.length;
       let processedRows = 0;
 
@@ -366,8 +399,13 @@ const ClosedLeadsTable = ({
           studentData.uploadedAt = new Date();
           studentData.projectCode = projectCode;
 
-          const newStudentRef = doc(studentsRef);
-          await setDoc(newStudentRef, studentData);
+          // Add to trainingForms
+          const newTrainingStudentRef = doc(trainingStudentsRef);
+          await setDoc(newTrainingStudentRef, studentData);
+
+          // Add to placementData
+          const newPlacementStudentRef = doc(placementStudentsRef);
+          await setDoc(newPlacementStudentRef, studentData);
 
           processedRows++;
           setUploadProgress(Math.round((processedRows / totalRows) * 100));
@@ -376,9 +414,18 @@ const ClosedLeadsTable = ({
         }
       }
 
-      // Update the parent document
+      // Update the parent documents in both collections
       await setDoc(
         trainingFormRef,
+        {
+          studentCount: data.length,
+          updatedAt: new Date(),
+          studentFileUrl: selectedFile?.name || "uploaded_file",
+        },
+        { merge: true }
+      );
+      await setDoc(
+        placementFormRef,
         {
           studentCount: data.length,
           updatedAt: new Date(),
@@ -790,7 +837,7 @@ const ClosedLeadsTable = ({
                   </div>
                 </td>
                 <td className="px-2 py-3 whitespace-nowrap w-[60px]">
-                  <div className="flex justify-center items-center h-full">
+                  <div className="flex justify-center items-center h-full relative"> {/* <-- Add relative here */}
                     <button
                       onClick={() => toggleDropdown(id)}
                       aria-label="Action menu"

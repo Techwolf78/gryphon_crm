@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { db } from "../firebase";
 import { collection, getDocs } from "firebase/firestore";
-import TrainingDetailModal from "../components/Learning/TrainingTables/TrainingDetailModal";
 import StudentListModal from "../components/Placement/StudentListModal";
 import AddJD from "../components/Placement/AddJD";
 import CompanyOpen from "../components/Placement/CompanyOpen";
@@ -53,7 +52,7 @@ function Placement() {
   const fetchStudentData = async (trainingDocId) => {
     try {
       const studentsSnapshot = await getDocs(
-        collection(db, "trainingForms", trainingDocId, "students")
+        collection(db, "placementData", trainingDocId, "students")
       );
       const students = studentsSnapshot.docs.map((doc) => doc.data());
       setStudentModalData({ show: true, students });

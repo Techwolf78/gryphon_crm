@@ -242,17 +242,40 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Specialization*
           </label>
-          <input
-            type="text"
+          <select
             name="specialization"
-            value={trainerData.specialization}
-            onChange={handleChange}
+            multiple
+            value={trainerData.specialization.split(",").map(s => s.trim())}
+            onChange={e => {
+              const selected = Array.from(e.target.selectedOptions).map(opt => opt.value);
+              // Merge with previous selections if not already present
+              const prevSpecs = trainerData.specialization
+                ? trainerData.specialization.split(",").map(s => s.trim())
+                : [];
+              const mergedSpecs = Array.from(new Set([...prevSpecs, ...selected]));
+              setTrainerData(prev => ({
+                ...prev,
+                specialization: mergedSpecs.join(", "),
+              }));
+              if (
+                mergedSpecs.includes("Others") ||
+                mergedSpecs.some(s => !specializationOptions.includes(s))
+              ) {
+                setShowOtherSpecialization(true);
+              } else {
+                setShowOtherSpecialization(false);
+              }
+            }}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="e.g. Power BI, Advanced Excel"
             required
-          />
+          >
+            {specializationOptions.map(opt => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+            <option value="Others">Others</option>
+          </select>
           <small className="text-gray-500">
-            Enter comma separated values. Example: Power BI, Advanced Excel
+            Hold Ctrl (Windows) or Cmd (Mac) to select multiple.
           </small>
         </div>
       </div>
