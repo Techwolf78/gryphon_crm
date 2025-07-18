@@ -2,19 +2,19 @@
 import React, { useState, useEffect } from "react";
 import { doc, updateDoc, getDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
-import { FiX, FiChevronDown, FiInfo, FiDollarSign, FiPercent ,FiUser, FiPhone, FiCreditCard, FiMail, FiMapPin, FiCalendar, FiArrowLeft, FiArrowRight, FiCheck, FiPlus, FiTrash2 } from "react-icons/fi";
+import { FiX, FiChevronDown, FiInfo, FiDollarSign, FiPercent, FiUser, FiPhone, FiCreditCard, FiMail, FiMapPin, FiCalendar, FiArrowLeft, FiArrowRight, FiCheck, FiPlus, FiTrash2 } from "react-icons/fi";
 
 const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
     const [formData, setFormData] = useState({});
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [activeSection, setActiveSection] = useState("basic");
-    const sections = ['basic', 'contacts', 'course', 'topics', 'financial', 'contract'];
+    const sections = ['basic', 'contacts', 'course', 'topics', 'financial',];
 
     useEffect(() => {
         if (lead) {
             setFormData({
-                businessName: lead.businessName || "",
+                businessName: lead.collegeName || "",
                 projectCode: lead.projectCode || "",
                 city: lead.city || "",
                 state: lead.state || "",
@@ -97,18 +97,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
         MSC: ["Physics", "Chemistry", "Mathematics", "CS", "Other"],
         Others: ["Other"]
     };
-    const topicOptions = [
-        "Soft Skills",
-        "Technical Training",
-        "Communication Skills",
-        "Leadership Development",
-        "Team Building",
-        "Problem Solving",
-        "Time Management",
-        "Career Guidance",
-        "Industry Readiness",
-        "Other"
-    ];
+    const topicOptions = ["Soft Skills", "Aptitude", "Domain Technical", "Excel - Power BI", "Looker Studio"]
 
     const generatePassingYears = () => {
         const currentYear = new Date().getFullYear();
@@ -140,21 +129,53 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
         const updatedCourses = [...formData.courses];
         updatedCourses[index][field] = field === "students" ? parseInt(value) || 0 : value;
 
-        setFormData(prev => ({
-            ...prev,
+        // Calculate new total cost whenever student numbers change
+        const newFormData = {
+            ...formData,
             courses: updatedCourses
-        }));
+        };
+
+        if (field === "students") {
+            const totalStudents = updatedCourses.reduce((sum, course) => sum + (parseInt(course.students) || 0), 0);
+            const totalAmount = (formData.perStudentCost || 0) * totalStudents;
+
+            newFormData.totalCost = totalAmount;
+
+            // Update payment details to match new total
+            newFormData.paymentDetails = formData.paymentDetails.map(payment => {
+                const paymentAmount = totalAmount * ((payment.percentage || 0) / 100);
+                const gstRate = formData.gstType === 'include' ? 0.18 : 0;
+                const baseAmount = formData.gstType === 'include'
+                    ? paymentAmount / (1 + gstRate)
+                    : paymentAmount;
+                const gstAmount = baseAmount * gstRate;
+
+                return {
+                    ...payment,
+                    totalAmount: paymentAmount,
+                    baseAmount: baseAmount,
+                    gstAmount: gstAmount
+                };
+            });
+        }
+
+        setFormData(newFormData);
     };
 
     const handleTopicChange = (index, field, value) => {
         const updatedTopics = [...formData.topics];
         updatedTopics[index][field] = field === "hours" ? parseInt(value) || 0 : value;
 
+        // Calculate new total hours - fixed the calculation
+        const total = updatedTopics.reduce((sum, topic) => sum + (parseInt(topic.hours) || 0), 0);
+
         setFormData(prev => ({
             ...prev,
-            topics: updatedTopics
+            topics: updatedTopics,
+            totalHours: total
         }));
     };
+
 
     const addPaymentDetail = () => {
         setFormData(prev => ({
@@ -207,9 +228,14 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
     const removeTopic = (index) => {
         const updatedTopics = [...formData.topics];
         updatedTopics.splice(index, 1);
+
+        // Calculate new total hours - fixed the calculation
+        const total = updatedTopics.reduce((sum, topic) => sum + (parseInt(topic.hours) || 0), 0);
+
         setFormData(prev => ({
             ...prev,
-            topics: updatedTopics
+            topics: updatedTopics,
+            totalHours: total
         }));
     };
 
@@ -434,177 +460,301 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                             placeholder="400001"
                                         />
                                     </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Contract Start Date</label>
+                                        <div className="relative">
+                                            <input
+                                                type="date"
+                                                name="contractStartDate"
+                                                value={formData.contractStartDate}
+                                                onChange={handleChange}
+                                                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                            />
+                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <FiCalendar className="h-5 w-5 text-gray-400" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Contract End Date</label>
+                                        <div className="relative">
+                                            <input
+                                                type="date"
+                                                name="contractEndDate"
+                                                value={formData.contractEndDate}
+                                                onChange={handleChange}
+                                                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                            />
+                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <FiCalendar className="h-5 w-5 text-gray-400" />
+                                            </div>
+                                        </div>
+                                    </div>
 
 
                                 </div>
                             </div>
                         )}
-
+                        {/* Financial Section */}
                         {activeSection === 'financial' && (
-  <div className="space-y-6">
-    {/* Student Count and Cost Summary */}
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      {/* Total Students (readonly) - Calculated from courses */}
-      <div className="bg-blue-50 p-4 rounded-lg">
-        <label className="block text-sm font-medium text-blue-700 mb-1">Total Students</label>
-        <div className="relative">
-          <input
-            type="number"
-            value={formData.courses?.reduce((sum, course) => sum + (parseInt(course.students) || 0, 0) || 0)}
-            className="block w-full pl-10 pr-3 py-2 border border-blue-300 rounded-lg shadow-sm bg-blue-100"
-            readOnly
-          />
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <FiUser className="h-5 w-5 text-blue-400" />
-          </div>
-        </div>
-      </div>
+                            <div className="space-y-6">
+                                {/* Student Count and Cost Summary */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    {/* Total Students (readonly) */}
+                                    <div className="bg-blue-50 p-4 rounded-lg">
+                                        <label className="block text-sm font-medium text-blue-700 mb-1">Total Students</label>
+                                        <div className="relative">
+                                            <input
+                                                type="number"
+                                                value={formData.courses?.reduce((sum, course) => sum + (parseInt(course.students) || 0), 0) || 0}
+                                                className="block w-full pl-10 pr-3 py-2 border border-blue-300 rounded-lg shadow-sm bg-blue-100"
+                                                readOnly
+                                            />
+                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <FiUser className="h-5 w-5 text-blue-400" />
+                                            </div>
+                                        </div>
+                                    </div>
 
-      {/* Cost Per Student (editable) */}
-      <div className="bg-blue-50 p-4 rounded-lg">
-        <label className="block text-sm font-medium text-blue-700 mb-1">Cost Per Student (₹)</label>
-        <div className="relative">
-          <input
-            type="number"
-            value={formData.perStudentCost || 0}
-            onChange={(e) => {
-              const perStudentCost = parseFloat(e.target.value) || 0;
-              const totalStudents = formData.courses?.reduce((sum, course) => sum + (parseInt(course.students) || 0, 0) || 0);
-              const totalAmount = perStudentCost * totalStudents;
-              
-              setFormData(prev => ({
-                ...prev,
-                perStudentCost,
-                totalAmount
-              }));
-            }}
-            className="block w-full pl-10 pr-3 py-2 border border-blue-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
-          />
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <FiDollarSign className="h-5 w-5 text-blue-400" />
-          </div>
-        </div>
-      </div>
+                                    {/* Cost Per Student (editable) */}
+                                    <div className="bg-blue-50 p-4 rounded-lg">
+                                        <label className="block text-sm font-medium text-blue-700 mb-1">Cost Per Student (₹)</label>
+                                        <div className="relative">
+                                            <input
+                                                type="number"
+                                                value={formData.perStudentCost || 0}
+                                                onChange={(e) => {
+                                                    const perStudentCost = parseFloat(e.target.value) || 0;
+                                                    const totalStudents = formData.courses?.reduce((sum, course) => sum + (parseInt(course.students) || 0), 0) || 0;
+                                                    const totalAmount = perStudentCost * totalStudents;
 
-      {/* Total Amount (readonly) */}
-      <div className="bg-green-50 p-4 rounded-lg">
-        <label className="block text-sm font-medium text-green-700 mb-1">Total Amount (₹)</label>
-        <div className="relative">
-          <input
-            type="number"
-            value={formData.perStudentCost * (formData.courses?.reduce((sum, course) => sum + (parseInt(course.students) || 0), 0) || 0)}
-            className="block w-full pl-10 pr-3 py-2 border border-green-300 rounded-lg shadow-sm bg-green-100"
-            readOnly
-          />
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <FiDollarSign className="h-5 w-5 text-green-400" />
-          </div>
-        </div>
-      </div>
-    </div>
+                                                    setFormData(prev => ({
+                                                        ...prev,
+                                                        perStudentCost,
+                                                        totalCost: totalAmount,
+                                                        paymentDetails: prev.paymentDetails.map(payment => {
+                                                            const paymentAmount = totalAmount * ((payment.percentage || 0) / 100);
+                                                            const gstRate = prev.gstType === 'include' ? 0.18 : 0;
+                                                            const baseAmount = prev.gstType === 'include'
+                                                                ? paymentAmount / (1 + gstRate)
+                                                                : paymentAmount;
+                                                            const gstAmount = baseAmount * gstRate;
 
-    {/* Payment Type and GST Info */}
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {/* Payment Type (readonly) */}
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <label className="block text-sm font-medium text-gray-700 mb-1">Payment Type</label>
-        <div className="relative">
-          <input
-            type="text"
-            value={formData.paymentType || ''}
-            className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg shadow-sm bg-gray-100"
-            readOnly
-          />
-          <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-            <FiCreditCard className="h-5 w-5 text-gray-400" />
-          </div>
-        </div>
-      </div>
+                                                            return {
+                                                                ...payment,
+                                                                totalAmount: paymentAmount,
+                                                                baseAmount: baseAmount,
+                                                                gstAmount: gstAmount
+                                                            };
+                                                        })
+                                                    }));
+                                                }}
+                                                className="block w-full pl-10 pr-3 py-2 border border-blue-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                            />
+                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <FiDollarSign className="h-5 w-5 text-blue-400" />
+                                            </div>
+                                        </div>
+                                    </div>
 
-      {/* GST Type (readonly) */}
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <label className="block text-sm font-medium text-gray-700 mb-1">GST Type</label>
-        <div className="relative">
-          <input
-            type="text"
-            value={formData.gstType === 'include' ? 'GST Included (18%)' : 'No GST'}
-            className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg shadow-sm bg-gray-100"
-            readOnly
-          />
-          <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-            <FiPercent className="h-5 w-5 text-gray-400" />
-          </div>
-        </div>
-      </div>
-    </div>
+                                    {/* Total Amount (auto-calculated) */}
+                                    <div className="bg-green-50 p-4 rounded-lg">
+                                        <label className="block text-sm font-medium text-green-700 mb-1">
+                                            Total Amount ({formData.gstType === 'include' ? 'incl. GST' : 'excl. GST'})
+                                        </label>
+                                        <div className="relative">
+                                            <input
+                                                type="number"
+                                                value={formData.totalCost.toFixed(2)}
+                                                readOnly
+                                                className="block w-full pl-10 pr-3 py-2 border border-green-300 rounded-lg shadow-sm bg-green-100"
+                                            />
+                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <FiDollarSign className="h-5 w-5 text-green-400" />
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-green-600 mt-1">
+                                            {formData.gstType === 'include' ? (
+                                                `(Base: ₹${(formData.totalCost / 1.18).toFixed(2)} + GST: ₹${(formData.totalCost * 0.18 / 1.18).toFixed(2)})`
+                                            ) : (
+                                                "GST will be added separately"
+                                            )}
+                                        </p>
+                                    </div>
+                                </div>
+                                {/* Payment Breakdown */}
+                                {formData.paymentDetails?.length > 0 && (
+                                    <div className="space-y-4">
+                                        <h3 className="text-lg font-medium text-gray-900">Payment Breakdown</h3>
 
-    {/* Payment Breakdown - Simplified with inline calculations */}
-    <div className="space-y-4">
-      <h3 className="text-lg font-medium text-gray-900">Payment Breakdown</h3>
-      
-      {formData.paymentDetails?.map((payment, index) => {
-        const totalAmount = parseFloat(payment.totalAmount) || 0;
-        const baseAmount = parseFloat(payment.baseAmount) || 0;
-        const gstAmount = parseFloat(payment.gstAmount) || 0;
-        
-        return (
-          <div key={index} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Payment Name */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {payment.name}
-                </label>
-              </div>
-              
-              {/* Amount Input */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Amount (₹)
-                  <span className="ml-2 text-xs text-gray-500">
-                    (Base: ₹{baseAmount.toFixed(2)} + GST: ₹{gstAmount.toFixed(2)})
-                  </span>
-                </label>
-                <input
-                  type="number"
-                  value={totalAmount}
-                  onChange={(e) => {
-                    const newTotal = parseFloat(e.target.value) || 0;
-                    const gstRate = formData.gstType === 'include' ? 0.18 : 0;
-                    const newBase = formData.gstType === 'include' 
-                      ? newTotal / (1 + gstRate)
-                      : newTotal;
-                    const newGst = newBase * gstRate;
+                                        {formData.paymentDetails.map((payment, index) => {
+                                            const totalAmount = parseFloat(payment.totalAmount) || 0;
+                                            const baseAmount = parseFloat(payment.baseAmount) || 0;
+                                            const gstAmount = parseFloat(payment.gstAmount) || 0;
 
-                    const newDetails = [...formData.paymentDetails];
-                    newDetails[index] = {
-                      ...newDetails[index],
-                      baseAmount: newBase,
-                      gstAmount: newGst,
-                      totalAmount: newTotal
-                    };
-                    setFormData(prev => ({ ...prev, paymentDetails: newDetails }));
-                  }}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
-                />
-              </div>
-            </div>
-          </div>
-        );
-      })}
+                                            return (
+                                                <div key={index} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                        {/* Payment Name (editable) */}
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 mb-1">Payment Name</label>
+                                                            <input
+                                                                type="text"
+                                                                value={payment.name}
+                                                                onChange={(e) => handlePaymentDetailChange(index, "name", e.target.value)}
+                                                                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                                                placeholder="e.g., Advance, Installment"
+                                                            />
+                                                        </div>
 
-      {/* Summary */}
-      <div className="bg-blue-50 p-4 rounded-lg">
-        <div className="flex justify-between items-center">
-          <span className="font-medium">Total Payable:</span>
-          <span className="font-bold text-lg">
-            ₹{formData.paymentDetails?.reduce((sum, payment) => sum + (parseFloat(payment.totalAmount) || 0), 0).toFixed(2)}
-          </span>
-        </div>
-      </div>
-    </div>
-  </div>
-)}
+                                                        {/* Percentage (editable) */}
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 mb-1">Percentage (%)</label>
+                                                            <div className="relative">
+                                                                <input
+                                                                    type="number"
+                                                                    value={payment.percentage || 0}
+                                                                    onChange={(e) => {
+                                                                        let newPercentage = parseInt(e.target.value) || 0;
+
+                                                                        // Validate the new percentage
+                                                                        if (newPercentage < 0) {
+                                                                            newPercentage = 0;
+                                                                        } else if (newPercentage > 100) {
+                                                                            newPercentage = 100;
+                                                                        }
+
+                                                                        // Calculate how much we can actually adjust
+                                                                        const currentTotal = formData.paymentDetails.reduce((sum, p) => sum + (p.percentage || 0), 0);
+                                                                        const otherPaymentsTotal = currentTotal - (payment.percentage || 0);
+                                                                        const maxAllowed = 100 - otherPaymentsTotal;
+
+                                                                        if (newPercentage > maxAllowed) {
+                                                                            newPercentage = maxAllowed;
+                                                                        }
+
+                                                                        // Update all payment details
+                                                                        const newDetails = [...formData.paymentDetails];
+                                                                        newDetails[index].percentage = newPercentage;
+
+                                                                        // Calculate remaining percentage to distribute
+                                                                        let remaining = 100 - newPercentage;
+                                                                        const otherPayments = newDetails.filter((_, i) => i !== index);
+
+                                                                        // Distribute remaining percentage proportionally to other payments
+                                                                        if (otherPayments.length > 0) {
+                                                                            const otherPaymentsTotal = otherPayments.reduce((sum, p) => sum + (p.percentage || 0), 0);
+                                                                            const scaleFactor = remaining / otherPaymentsTotal;
+
+                                                                            newDetails.forEach((p, i) => {
+                                                                                if (i !== index) {
+                                                                                    newDetails[i].percentage = Math.round(p.percentage * scaleFactor);
+                                                                                }
+                                                                            });
+
+                                                                            // Fix any rounding errors by adjusting the last payment
+                                                                            const finalTotal = newDetails.reduce((sum, p) => sum + (p.percentage || 0), 0);
+                                                                            if (finalTotal !== 100) {
+                                                                                newDetails[newDetails.length - 1].percentage += (100 - finalTotal);
+                                                                            }
+                                                                        }
+
+                                                                        // Recalculate all amounts
+                                                                        const totalCost = formData.perStudentCost *
+                                                                            formData.courses?.reduce((sum, course) => sum + (parseInt(course.students) || 0), 0);
+
+                                                                        newDetails.forEach(payment => {
+                                                                            const paymentAmount = totalCost * ((payment.percentage || 0) / 100);
+                                                                            const gstRate = formData.gstType === 'include' ? 0.18 : 0;
+                                                                            const baseAmount = formData.gstType === 'include'
+                                                                                ? paymentAmount / (1 + gstRate)
+                                                                                : paymentAmount;
+                                                                            const gstAmount = baseAmount * gstRate;
+
+                                                                            payment.totalAmount = paymentAmount;
+                                                                            payment.baseAmount = baseAmount;
+                                                                            payment.gstAmount = gstAmount;
+                                                                        });
+
+                                                                        setFormData(prev => ({
+                                                                            ...prev,
+                                                                            paymentDetails: newDetails,
+                                                                            totalCost: totalCost
+                                                                        }));
+                                                                    }}
+                                                                    min="0"
+                                                                    max="100"
+                                                                    step="1"
+                                                                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                                />
+                                                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                                    <FiPercent className="h-5 w-5 text-gray-400" />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Amount Display */}
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                                Amount ({formData.gstType === 'include' ? 'incl. GST' : 'excl. GST'})
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={`₹${totalAmount.toFixed(2)}`}
+                                                                readOnly
+                                                                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100"
+                                                            />
+                                                            <p className="text-xs text-gray-500 mt-1">
+                                                                {formData.gstType === 'include' ? (
+                                                                    `(Base: ₹${baseAmount.toFixed(2)} + GST: ₹${gstAmount.toFixed(2)})`
+                                                                ) : (
+                                                                    "GST will be added separately"
+                                                                )}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+
+                                        {/* Percentage Summary */}
+                                        <div className="bg-yellow-50 p-3 rounded-lg">
+                                            <div className="flex justify-between items-center">
+                                                <span className="font-medium">Total Percentage:</span>
+                                                <span className={`font-bold ${formData.paymentDetails.reduce((sum, payment) => sum + (parseFloat(payment.percentage) || 0), 0) !== 100
+                                                    ? 'text-red-600'
+                                                    : 'text-green-600'
+                                                    }`}>
+                                                    {formData.paymentDetails.reduce((sum, payment) => sum + (parseFloat(payment.percentage) || 0), 0)}%
+                                                </span>
+                                            </div>
+                                            {error && (
+                                                <div className="mt-2 text-red-600 text-sm">{error}</div>
+                                            )}
+                                        </div>
+
+                                        {/* Total Payable Summary */}
+                                        <div className="bg-blue-50 p-4 rounded-lg">
+                                            <div className="flex justify-between items-center">
+                                                <span className="font-medium">Total Payable:</span>
+                                                <span className="font-bold text-lg">
+                                                    ₹{formData.paymentDetails.reduce((sum, payment) => sum + (parseFloat(payment.totalAmount) || 0), 0).toFixed(2)}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-blue-600 mt-1">
+                                                {formData.gstType === 'include' ? (
+                                                    `Includes GST of ₹${formData.paymentDetails.reduce((sum, payment) => sum + (parseFloat(payment.gstAmount) || 0), 0).toFixed(2)}`
+                                                ) : (
+                                                    "GST will be added to payments separately"
+                                                )}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {/* Course Information Section */}
                         {activeSection === 'course' && (
                             <div className="space-y-6">
@@ -732,8 +882,8 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                                                 type="number"
                                                                 value={course.students}
                                                                 onChange={(e) => handleCourseChange(index, "students", e.target.value)}
-                                                                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                                                min="1"
+                                                                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none"
+
                                                             />
                                                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                                                 <FiUser className="h-5 w-5 text-gray-400" />
@@ -959,47 +1109,6 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                 </div>
                             </div>
                         )}
-                        {/* Contract Section */}
-                        {activeSection === 'contract' && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Contract Start Date</label>
-                                    <div className="relative">
-                                        <input
-                                            type="date"
-                                            name="contractStartDate"
-                                            value={formData.contractStartDate}
-                                            onChange={handleChange}
-                                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                                        />
-                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <FiCalendar className="h-5 w-5 text-gray-400" />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Contract End Date</label>
-                                    <div className="relative">
-                                        <input
-                                            type="date"
-                                            name="contractEndDate"
-                                            value={formData.contractEndDate}
-                                            onChange={handleChange}
-                                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                                        />
-                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <FiCalendar className="h-5 w-5 text-gray-400" />
-                                        </div>
-                                    </div>
-                                </div>
-
-
-
-
-                            </div>
-                        )}
-
                         {/* Topics Section */}
                         {activeSection === 'topics' && (
                             <div className="space-y-6">
@@ -1042,8 +1151,8 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                                     type="number"
                                                     value={topic.hours}
                                                     onChange={(e) => handleTopicChange(index, "hours", e.target.value)}
-                                                    onBlur={calculateTotalHours}
                                                     className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                    min="0"
                                                 />
                                             </div>
 
