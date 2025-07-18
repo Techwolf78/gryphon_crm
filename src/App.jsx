@@ -64,7 +64,7 @@ const AppContent = () => {
 
 const App = () => (
   <AuthProvider>
-    <Router basename="/sync/" >
+    <Router basename="" >
       <AppContent />
     </Router>
   </AuthProvider>
