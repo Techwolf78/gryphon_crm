@@ -9,6 +9,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [activeSection, setActiveSection] = useState("basic");
+    const [showConfirmation, setShowConfirmation] = useState(false); // New state for confirmation dialog
     const sections = ['basic', 'contacts', 'course', 'topics', 'financial',];
 
     useEffect(() => {
@@ -249,6 +250,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setShowConfirmation(false); // Hide the confirmation dialog
         setLoading(true);
         setError(null);
 
@@ -268,14 +270,50 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                 console.log("Checking document:", projectDocId); // Debugging
                 const docSnap = await getDoc(trainingFormRef);
 
-                if (docSnap.exists()) {
-                    await updateDoc(trainingFormRef, {
-                        collegeName: formData.collegeName,
-                        city: formData.city,
-                        state: formData.state,
-                        // ... (rest of the fields)
-                    });
-                } else {
+               if (docSnap.exists()) {
+    await updateDoc(trainingFormRef, {
+        collegeName: formData.collegeName,
+        collegeCode: formData.collegeCode,
+        city: formData.city,
+        state: formData.state,
+        address: formData.address,
+        pincode: formData.pincode,
+        totalCost: formData.totalCost,
+        tcv: formData.tcv,
+        perStudentCost: formData.perStudentCost,
+        studentCount: formData.studentCount,
+        gstAmount: formData.gstAmount,
+        netPayableAmount: formData.netPayableAmount,
+        gstNumber: formData.gstNumber,
+        gstType: formData.gstType,
+        course: formData.course,
+        courses: formData.courses,
+        year: formData.year,
+        deliveryType: formData.deliveryType,
+        passingYear: formData.passingYear,
+        tpoName: formData.tpoName,
+        tpoEmail: formData.tpoEmail,
+        tpoPhone: formData.tpoPhone,
+        trainingName: formData.trainingName,
+        trainingEmail: formData.trainingEmail,
+        trainingPhone: formData.trainingPhone,
+        accountName: formData.accountName,
+        accountEmail: formData.accountEmail,
+        accountPhone: formData.accountPhone,
+        contractStartDate: formData.contractStartDate,
+        contractEndDate: formData.contractEndDate,
+        paymentType: formData.paymentType,
+        paymentDetails: formData.paymentDetails,
+        topics: formData.topics,
+        totalHours: formData.totalHours,
+        studentFileUrl: formData.studentFileUrl,
+        mouFileUrl: formData.mouFileUrl,
+        otherCourseText: formData.otherCourseText,
+        status: formData.status,
+        updatedAt: new Date() // Always update the timestamp
+    });
+}
+ else {
                     console.warn("Document not found:", projectDocId);
                     setError("Training form data not found in Firestore!");
                     return;
@@ -291,7 +329,6 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
             setLoading(false);
         }
     };
-
     const projectCodeToDocId = (projectCode) => projectCode.replace(/\//g, "-");
 
     const goToNextSection = () => {
@@ -310,8 +347,41 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
 
     if (!lead) return null;
 
+
     return (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-54 p-4">
+        <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-54 p-4">
+            {/* Confirmation Dialog - Add this at the beginning of your return statement */}
+            {showConfirmation && (
+                <div className="fixed inset-0  bg-opacity-30 backdrop-blur-sm flex items-center justify-center z-60">
+                    <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full">
+                        <div className="flex justify-between items-start mb-4">
+                            <h3 className="text-lg font-semibold text-gray-900">Confirm Submission</h3>
+                            <button
+                                onClick={() => setShowConfirmation(false)}
+                                className="text-gray-400 hover:text-gray-500"
+                            >
+                                <FiX className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <p className="text-gray-600 mb-6">Are you sure you want to submit these changes? This action cannot be undone.</p>
+                        <div className="flex justify-end space-x-3">
+                            <button
+                                onClick={() => setShowConfirmation(false)}
+                                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleSubmit}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                disabled={loading}
+                            >
+                                {loading ? 'Submitting...' : 'Confirm'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6">
@@ -1183,7 +1253,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                         )}
                     </div>
 
-                    {/* Footer */}
+                    {/* Footer - Modify the submit button to show confirmation */}
                     <div className="bg-gray-50 px-6 py-4 border-t flex justify-between items-center">
                         <div className="text-sm text-gray-500">
                             {loading ? "Saving changes..." : `Section ${sections.indexOf(activeSection) + 1} of ${sections.length}`}
@@ -1211,29 +1281,19 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                 </button>
                             ) : (
                                 <button
-                                    type="submit"
+                                    type="button" // Changed from "submit" to "button"
+                                    onClick={() => setShowConfirmation(true)} // Show confirmation instead of submitting directly
                                     className="px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 flex items-center disabled:opacity-70"
                                     disabled={loading}
                                 >
-                                    {loading ? (
-                                        <span className="flex items-center">
-                                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                            </svg>
-                                            Submitting...
-                                        </span>
-                                    ) : (
-                                        <>
-                                            <FiCheck className="mr-2" /> Save Changes
-                                        </>
-                                    )}
+                                    <FiCheck className="mr-2" /> Save Changes
                                 </button>
                             )}
                         </div>
                     </div>
                 </form>
             </div>
+
         </div>
     );
 };
