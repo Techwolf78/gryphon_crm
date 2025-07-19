@@ -146,10 +146,12 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
         return lead.closureType === filterType;
       })
       .filter(([, lead]) => {
-        if (selectedQuarter === "all") return true;
-        const closedQuarter = getQuarter(new Date(lead.closedDate));
-        return closedQuarter === selectedQuarter;
-      })
+  if (!lead.closedDate) return false; // Only include leads that are actually closed
+  if (selectedQuarter === "all") return true;
+  const closedQuarter = getQuarter(new Date(lead.closedDate));
+  return closedQuarter === selectedQuarter;
+})
+
       .sort(([, a], [, b]) => new Date(b.closedDate) - new Date(a.closedDate));
   }, [
     leads,

@@ -7,7 +7,7 @@ import { FaEllipsisV, FaTimes } from "react-icons/fa";
 import CompanyFilter from "./CompanyFilter";
 import ImportData from "./ImportData";
 import ExportData from "./ExportData";
-
+import StudentDataView from './StudentData'
 const statusColorMap = {
   complete: {
     bg: "bg-green-50",
@@ -88,24 +88,6 @@ const headerColorMap = {
 // Function to get college abbreviation
 const getCollegeAbbreviation = (collegeName) => {
   if (!collegeName) return null;
-  
-  const commonAbbreviations = {
-    "Indian Institute of Technology": "IIT",
-    "National Institute of Technology": "NIT",
-    "Birla Institute of Technology and Science": "BITS",
-    "Indian Institute of Science": "IISc",
-    "Delhi Technological University": "DTU",
-    "Netaji Subhas University of Technology": "NSUT",
-    "Indira Gandhi Delhi Technical University for Women": "IGDTUW"
-  };
-
-  for (const [fullName, abbreviation] of Object.entries(commonAbbreviations)) {
-    if (collegeName.includes(fullName)) {
-      return abbreviation;
-    }
-  }
-
-  // If no common abbreviation found, take first letters of each word
   return collegeName
     .split(' ')
     .map(word => word[0])
@@ -114,7 +96,7 @@ const getCollegeAbbreviation = (collegeName) => {
 };
 
 function CompanyDetails({ company, onClose, fetchStudents, students, loadingStudents, studentDataError }) {
- const [showFullStudentData, setShowFullStudentData] = useState(false);
+  const [showStudentData, setShowStudentData] = useState(false);
   return (
     <div className="fixed inset-0 flex items-center justify-center z-54">
       <div className="fixed inset-0 bg-opacity-50 backdrop-blur" onClick={onClose}></div>
@@ -234,7 +216,10 @@ function CompanyDetails({ company, onClose, fetchStudents, students, loadingStud
 
         <div className="sticky bottom-0 bg-gray-50 px-6 py-4 border-t flex justify-between">
           <button
-            onClick={fetchStudents}
+            onClick={() => {
+              fetchStudents();
+              setShowStudentData(true);
+            }}
             disabled={loadingStudents}
             className={`px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition ${
               loadingStudents ? "opacity-50 cursor-not-allowed" : ""
@@ -250,46 +235,12 @@ function CompanyDetails({ company, onClose, fetchStudents, students, loadingStud
             Close
           </button>
         </div>
-
-        {/* Student data preview */}
-        {students.length > 0 && (
-          <div className="px-6 pb-6">
-            <h3 className="text-lg font-semibold text-blue-700 mb-2">Students ({students.length})</h3>
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {students.slice(0, 3).map((student) => (
-                  <div key={student.id} className="border rounded-lg p-3 bg-white">
-                    <p className="font-medium text-gray-900">{student.accountName || "No name"}</p>
-                    <p className="text-sm text-gray-600">{student.accountEmail || "No email"}</p>
-                    <p className="text-sm text-gray-600">{student.accountPhone || "No phone"}</p>
-                  </div>
-                ))}
-                {students.length > 3 && (
-                  <div className="border rounded-lg p-3 bg-white flex items-center justify-center">
-                    <p className="text-gray-500">+{students.length - 3} more students</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {studentDataError && (
-          <div className="px-6 pb-6">
-            <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm text-red-700">{studentDataError}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+{showStudentData && students.length > 0 && (
+        <StudentDataView 
+          students={students} 
+          onClose={() => setShowStudentData(false)} 
+        />
+      )}
       </div>
     </div>
   );
@@ -385,41 +336,60 @@ function CompanyOpen() {
     }
   };
 
-  const fetchStudents = async () => {
-    if (!selectedCompany) return;
-    
-    try {
-      setLoadingStudents(true);
-      setStudentDataError(null);
-      
-      // Extract college abbreviation
-      const collegeAbbr = getCollegeAbbreviation(selectedCompany.college);
-      if (!collegeAbbr) {
-        throw new Error("College information not available");
+const fetchStudents = async () => {
+  if (!selectedCompany || !selectedCompany.college) {
+    console.error("[ERROR] selectedCompany ya college missing hai.");
+    return;
+  }
+
+  try {
+    setLoadingStudents(true);
+    setStudentDataError(null);
+
+    const collegeAbbr = getCollegeAbbreviation(selectedCompany.college);
+    console.log("[DEBUG] selectedCompany =", selectedCompany);
+    console.log("[DEBUG] collegeAbbr =", collegeAbbr);
+
+    // Yahan full trainingForms collection fetch kar rahe hain
+    const trainingFormsSnapshot = await getDocs(collection(db, "trainingForms"));
+
+    let allStudents = [];
+
+    for (const docSnap of trainingFormsSnapshot.docs) {
+      const docId = docSnap.id;
+
+      // Sirf wahi document consider karo jisme collegeAbbr match karta ho
+      if (docId.startsWith(collegeAbbr)) {
+        console.log("[DEBUG] Matching docId found:", docId);
+
+        const studentsRef = collection(doc(db, "trainingForms", docId), "students");
+        const studentsSnapshot = await getDocs(studentsRef);
+
+        const students = studentsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+
+        allStudents = [...allStudents, ...students];
       }
-      
-      // Construct the document ID pattern
-      const docId = `${collegeAbbr}-${selectedCompany.course}-${selectedCompany.passingYear}`;
-      
-      // Reference to the trainingForms collection and specific document
-      const trainingFormRef = doc(db, "trainingForms", docId);
-      const studentsCollectionRef = collection(trainingFormRef, "students");
-      
-      // Get all student documents
-      const snapshot = await getDocs(studentsCollectionRef);
-      const studentData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      
-      setStudents(studentData);
-    } catch (error) {
-      console.error("Error fetching students:", error);
-      setStudentDataError("Failed to load student data. Please try again.");
-    } finally {
-      setLoadingStudents(false);
     }
-  };
+
+    console.log("[DEBUG] Total students fetched:", allStudents.length);
+    setStudents(allStudents);
+
+    if (allStudents.length === 0) {
+      console.warn("[DEBUG] No students found for this college!");
+    }
+  } catch (error) {
+    console.error("Error fetching students:", error);
+    setStudentDataError("Failed to load student data. Please try again.");
+  } finally {
+    setLoadingStudents(false);
+    console.log("[DEBUG] Done fetching students.");
+  }
+};
+
+
 
   const updateCompanyStatus = async (companyId, newStatus) => {
     try {

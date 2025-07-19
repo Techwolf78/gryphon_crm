@@ -13,7 +13,7 @@ import {
   deleteDoc,
   updateDoc,
   arrayUnion,
-  serverTimestamp
+  serverTimestamp,
 } from "firebase/firestore";
  import EditClosedLeadModal from "./EditClosedLeadModal"; // Adjust path if needed
 

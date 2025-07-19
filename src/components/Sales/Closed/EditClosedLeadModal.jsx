@@ -240,7 +240,6 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
     };
 
     if (!lead) return null;
-
     return (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-54 p-4">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col">
