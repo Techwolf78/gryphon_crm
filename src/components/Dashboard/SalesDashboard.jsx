@@ -1344,9 +1344,10 @@ const SalesDashboard = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="mx-auto max-w-8xl">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+    <div className="min-h-screen bg-gray-50 p-2 md:p-4">
+      <div className="mx-auto max-w-8xl w-full">
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
               Sales Analytics
@@ -1492,226 +1493,232 @@ const SalesDashboard = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-          {[
-            {
-              title: selectedUserId ? "Your Revenue" : "Team Revenue",
-              value: `₹${dashboardData.revenue.toLocaleString()}`,
-              change: dashboardData.growth,
-              icon: <FiDollarSign className="text-white" size={20} />,
-              color: "bg-indigo-600",
-            },
-            {
-              title: selectedUserId ? "Your Hot Leads" : "Team Hot Leads",
-              value: dashboardData.hotLeads.toLocaleString(),
-              change:
-                ((dashboardData.hotLeads - dashboardData.hotLeadsPrevQuarter) /
-                  (dashboardData.hotLeadsPrevQuarter || 1)) *
-                100,
-              icon: <FiThermometer className="text-white" size={20} />,
-              color: "bg-red-600",
-            },
-            {
-              title: selectedUserId ? "Your Warm Leads" : "Team Warm Leads",
-              value: dashboardData.warmLeads.toLocaleString(),
-              change:
-                ((dashboardData.warmLeads -
-                  dashboardData.warmLeadsPrevQuarter) /
-                  (dashboardData.warmLeadsPrevQuarter || 1)) *
-                100,
-              icon: <FiThermometer className="text-white" size={20} />,
-              color: "bg-amber-500",
-            },
-            {
-              title: selectedUserId ? "Your Cold Leads" : "Team Cold Leads",
-              value: dashboardData.coldLeads.toLocaleString(),
-              change:
-                ((dashboardData.coldLeads -
-                  dashboardData.coldLeadsPrevQuarter) /
-                  (dashboardData.coldLeadsPrevQuarter || 1)) *
-                100,
-              icon: <FiThermometer className="text-white" size={20} />,
-              color: "bg-blue-600",
-            },
-            {
-              title: selectedUserId
-                ? "Your Projected TCV"
-                : "Team Projected TCV",
-              value: `₹${dashboardData.projectedTCV.toLocaleString()}`,
-              change:
-                ((dashboardData.projectedTCV -
-                  dashboardData.projectedTCVPrevQuarter) /
-                  (dashboardData.projectedTCVPrevQuarter || 1)) *
-                100,
-              icon: <FiTrendingUp className="text-white" size={20} />,
-              color: "bg-green-600",
-            },
-          ].map((metric, index) => (
-            <div
-              key={index}
-              className={`${metric.color} rounded-xl p-5 text-white transition-all hover:shadow-lg`}
-            >
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-sm font-medium opacity-80">
-                    {metric.title}
-                  </p>
-                  <h3 className="text-2xl font-bold mt-1">{metric.value}</h3>
+        {/* Metrics Grid */}
+        <div className="w-full overflow-x-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6 min-w-0">
+            {[
+              {
+                title: selectedUserId ? "Your Revenue" : "Team Revenue",
+                value: `₹${dashboardData.revenue.toLocaleString()}`,
+                change: dashboardData.growth,
+                icon: <FiDollarSign className="text-white" size={16} />, // changed size
+                color: "bg-indigo-600",
+              },
+              {
+                title: selectedUserId ? "Your Hot Leads" : "Team Hot Leads",
+                value: dashboardData.hotLeads.toLocaleString(),
+                change:
+                  ((dashboardData.hotLeads - dashboardData.hotLeadsPrevQuarter) /
+                    (dashboardData.hotLeadsPrevQuarter || 1)) *
+                  100,
+                icon: <FiThermometer className="text-white" size={16} />, // changed size
+                color: "bg-red-600",
+              },
+              {
+                title: selectedUserId ? "Your Warm Leads" : "Team Warm Leads",
+                value: dashboardData.warmLeads.toLocaleString(),
+                change:
+                  ((dashboardData.warmLeads - dashboardData.warmLeadsPrevQuarter) /
+                    (dashboardData.warmLeadsPrevQuarter || 1)) *
+                  100,
+                icon: <FiThermometer className="text-white" size={16} />, // changed size
+                color: "bg-amber-500",
+              },
+              {
+                title: selectedUserId ? "Your Cold Leads" : "Team Cold Leads",
+                value: dashboardData.coldLeads.toLocaleString(),
+                change:
+                  ((dashboardData.coldLeads - dashboardData.coldLeadsPrevQuarter) /
+                    (dashboardData.coldLeadsPrevQuarter || 1)) *
+                  100,
+                icon: <FiThermometer className="text-white" size={16} />, // changed size
+                color: "bg-blue-600",
+              },
+              {
+                title: selectedUserId
+                  ? "Your Projected TCV"
+                  : "Team Projected TCV",
+                value: `₹${dashboardData.projectedTCV.toLocaleString()}`,
+                change:
+                  ((dashboardData.projectedTCV -
+                    dashboardData.projectedTCVPrevQuarter) /
+                    (dashboardData.projectedTCVPrevQuarter || 1)) *
+                  100,
+                icon: <FiTrendingUp className="text-white" size={16} />, // changed size
+                color: "bg-green-600",
+              },
+            ].map((metric, index) => (
+              <div
+                key={index}
+                className={`${metric.color} rounded-xl p-5 text-white transition-all hover:shadow-lg`}
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-sm font-medium opacity-80">
+                      {metric.title}
+                    </p>
+                    <h3 className="text-2xl font-bold mt-1">{metric.value}</h3>
+                  </div>
+                  <div className="bg-black bg-opacity-20 p-1 rounded-lg"> {/* changed p-2 to p-1 */}
+                    {metric.icon}
+                  </div>
                 </div>
-                <div className="bg-black bg-opacity-20 p-2 rounded-lg">
-                  {metric.icon}
-                </div>
-              </div>
-              <div className="mt-4 flex items-center">
-                <span
-                  className={`text-xs font-medium px-2 py-1 rounded-full ${
-                    metric.change >= 0 || isNaN(metric.change)
-                      ? "bg-green-100 text-green-800"
-                      : "bg-red-100 text-red-800"
-                  }`}
-                >
-                  {isNaN(metric.change)
-                    ? "↑ 0%"
-                    : metric.change >= 0
-                    ? `↑ ${Math.abs(metric.change).toFixed(1)}%`
-                    : `↓ ${Math.abs(metric.change).toFixed(1)}%`}
-                </span>
-                <span className="text-xs opacity-80 ml-2">vs last quarter</span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm lg:col-span-2">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Revenue Trend
-              </h2>
-              <div className="flex space-x-2">
-                {["week", "month", "quarter", "year"].map((period) => (
-                  <button
-                    type="button"
-                    key={period}
-                    onClick={() => setTimePeriod(period)}
-                    className={`text-xs px-3 py-1 rounded-full ${
-                      timePeriod === period
-                        ? "bg-indigo-600 text-white"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                <div className="mt-4 flex items-center">
+                  <span
+                    className={`text-xs font-medium px-2 py-1 rounded-full ${
+                      metric.change >= 0 || isNaN(metric.change)
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
                     }`}
                   >
-                    {period.charAt(0).toUpperCase() + period.slice(1)}
-                  </button>
-                ))}
+                    {isNaN(metric.change)
+                      ? "↑ 0%"
+                      : metric.change >= 0
+                      ? `↑ ${Math.abs(metric.change).toFixed(1)}%`
+                      : `↓ ${Math.abs(metric.change).toFixed(1)}%`}
+                  </span>
+                  <span className="text-xs opacity-80 ml-2">vs last quarter</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Charts & Distribution */}
+        <div className="w-full overflow-x-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 min-w-0">
+            <div className="bg-white p-3 md:p-5 rounded-xl border border-gray-200 shadow-sm lg:col-span-2 min-w-0">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Revenue Trend
+                </h2>
+                <div className="flex space-x-2">
+                  {["week", "month", "quarter", "year"].map((period) => (
+                    <button
+                      type="button"
+                      key={period}
+                      onClick={() => setTimePeriod(period)}
+                      className={`text-xs px-3 py-1 rounded-full ${
+                        timePeriod === period
+                          ? "bg-indigo-600 text-white"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >
+                      {period.charAt(0).toUpperCase() + period.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="h-80">
+                {isLoading ? (
+                  <div className="h-full flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500" />
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={dashboardData.chartData}
+                      margin={{ top: 10, right: 30, left: 10, bottom: 0 }}
+                    >
+                      <defs>
+                        <linearGradient
+                          id="colorRevenue"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor="#4F46E5"
+                            stopOpacity={0.8}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor="#4F46E5"
+                            stopOpacity={0}
+                          />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        vertical={false}
+                        stroke="#E5E7EB"
+                      />
+                      <XAxis
+                        dataKey="name"
+                        tick={{ fill: "#6B7280" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        tick={{ fill: "#6B7280" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <Tooltip
+                        content={<CustomTooltip timePeriod={timePeriod} />}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="revenue"
+                        stroke="#4F46E5"
+                        fillOpacity={1}
+                        fill="url(#colorRevenue)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </div>
-            <div className="h-80">
-              {isLoading ? (
-                <div className="h-full flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500" />
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart
-                    data={dashboardData.chartData}
-                    margin={{ top: 10, right: 30, left: 10, bottom: 0 }}
-                  >
-                    <defs>
-                      <linearGradient
-                        id="colorRevenue"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="5%"
-                          stopColor="#4F46E5"
-                          stopOpacity={0.8}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor="#4F46E5"
-                          stopOpacity={0}
-                        />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      vertical={false}
-                      stroke="#E5E7EB"
-                    />
-                    <XAxis
-                      dataKey="name"
-                      tick={{ fill: "#6B7280" }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      tick={{ fill: "#6B7280" }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <Tooltip
-                      content={<CustomTooltip timePeriod={timePeriod} />}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="revenue"
-                      stroke="#4F46E5"
-                      fillOpacity={1}
-                      fill="url(#colorRevenue)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </div>
+            <div className="bg-white p-3 md:p-5 rounded-xl border border-gray-200 shadow-sm min-w-0">
+              {/* Lead Distribution Box */}
+              <div className="">
+                <h3 className="text-md font-semibold text-gray-800 mb-3">
+                  Lead Distribution
+                </h3>
+                <LeadDistribution
+                  leadSources={dashboardData.leadSources}
+                  isLoading={isLoading}
+                />
+              </div>
 
-          <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm  ">
-            {/* Lead Distribution Box */}
-            <div className="">
-              <h3 className="text-md font-semibold text-gray-800 mb-3">
-                Lead Distribution
-              </h3>
-              <LeadDistribution
-                leadSources={dashboardData.leadSources}
-                isLoading={isLoading}
-              />
-            </div>
-
-            {/* Education Distribution Box */}
-            <div className="">
-              <h3 className="text-md font-semibold text-gray-800 mb-3">
-                Education Distribution
-              </h3>
-              <EducationDistribution
-                leadCategories={dashboardData.leadCategories}
-                isLoading={isLoading}
-              />
+              {/* Education Distribution Box */}
+              <div className="">
+                <h3 className="text-md font-semibold text-gray-800 mb-3">
+                  Education Distribution
+                </h3>
+                <EducationDistribution
+                  leadCategories={dashboardData.leadCategories}
+                  isLoading={isLoading}
+                />
+              </div>
             </div>
           </div>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm lg:col-span-2">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              {selectedUserId ? "Your Performance" : "Team Performance"}
-            </h2>
-            <TeamPerformance
-              teamPerformance={dashboardData.teamPerformance}
-              isLoading={isLoading}
-              selectedUserId={selectedUserId}
-            />
-          </div>
 
-          <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Recent Activity
-            </h2>
-            <RecentActivity
-              recentActivity={dashboardData.recentActivity}
-              isLoading={isLoading}
-            />
+        {/* Performance & Activity */}
+        <div className="w-full overflow-x-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 min-w-0">
+            <div className="bg-white p-3 md:p-5 rounded-xl border border-gray-200 shadow-sm lg:col-span-2 min-w-0">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                {selectedUserId ? "Your Performance" : "Team Performance"}
+              </h2>
+              <TeamPerformance
+                teamPerformance={dashboardData.teamPerformance}
+                isLoading={isLoading}
+                selectedUserId={selectedUserId}
+              />
+            </div>
+            <div className="bg-white p-3 md:p-5 rounded-xl border border-gray-200 shadow-sm min-w-0">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                Recent Activity
+              </h2>
+              <RecentActivity
+                recentActivity={dashboardData.recentActivity}
+                isLoading={isLoading}
+              />
+            </div>
           </div>
         </div>
       </div>
