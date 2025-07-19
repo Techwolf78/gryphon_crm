@@ -7,6 +7,10 @@ import ClosedLeadsProgressBar from "./ClosedLeadsProgressBar";
 import ClosedLeadsTable from "./ClosedLeadsTable";
 import ClosedLeadsStats from "./ClosedLeadsStats";
 import TrainingForm from "../ClosureForm/TrainingForm";
+// 👇 Use xlsx-js-style for styling
+import * as XLSX from "xlsx-js-style";
+import Papa from "papaparse";
+
 const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
   const [filterType, setFilterType] = useState("all");
   const [quarterFilter, setQuarterFilter] = useState("current");
@@ -115,7 +119,7 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
 
   const filteredLeads = useMemo(() => {
     if (!currentUser) return [];
-
+ 
     return Object.entries(leads)
       .filter(([, lead]) => {
         if (viewMyLeadsOnly) {
@@ -146,10 +150,12 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
         return lead.closureType === filterType;
       })
       .filter(([, lead]) => {
-        if (selectedQuarter === "all") return true;
-        const closedQuarter = getQuarter(new Date(lead.closedDate));
-        return closedQuarter === selectedQuarter;
-      })
+  if (!lead.closedDate) return false; // Only include leads that are actually closed
+  if (selectedQuarter === "all") return true;
+  const closedQuarter = getQuarter(new Date(lead.closedDate));
+  return closedQuarter === selectedQuarter;
+})
+ 
       .sort(([, a], [, b]) => new Date(b.closedDate) - new Date(a.closedDate));
   }, [
     leads,
@@ -161,6 +167,8 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
     selectedTeamUserId,
     users,
   ]);
+ 
+ 
 
   // ⭐⭐ Yeh line add karo ⭐⭐
   console.log("🔥 Selected Team User ID:", selectedTeamUserId);
@@ -209,6 +217,101 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
     await fetchTargets();
   };
 
+  // ⭐️ Styled Excel Export
+  const handleExport = async () => {
+    // Get all projectCodes for filtered leads
+    const codes = filteredLeads
+      .map(([, lead]) => lead.projectCode?.replace(/\//g, "-"))
+      .filter(Boolean);
+
+    // Fetch all trainingForms in parallel
+    const formSnaps = await Promise.all(
+      codes.map((code) => getDoc(doc(db, "trainingForms", code)))
+    );
+
+    // Extract data from each trainingForm
+    const exportData = formSnaps
+      .map((snap) => (snap.exists() ? snap.data() : null))
+      .filter(Boolean);
+
+    if (exportData.length === 0) {
+      alert("No trainingForms found for filtered leads.");
+      return;
+    }
+
+    // Dynamically get all unique keys from all forms
+    const allKeys = Array.from(
+      new Set(exportData.flatMap(obj => Object.keys(obj)))
+    );
+
+    // Prepare header (prettify keys)
+    const header = allKeys.map(key =>
+      key
+        .replace(/([A-Z])/g, " $1")
+        .replace(/^./, str => str.toUpperCase())
+        .replace(/Url$/, " URL")
+        .replace(/Id$/, " ID")
+        .trim()
+    );
+
+    // Prepare rows, stringify arrays/objects
+    const rows = exportData.map(form =>
+      allKeys.map(key => {
+        const val = form[key];
+        if (Array.isArray(val) || (val && typeof val === "object")) {
+          return JSON.stringify(val);
+        }
+        return val ?? "";
+      })
+    );
+
+    // Add header row
+    rows.unshift(header);
+
+    // Create worksheet from array of arrays
+    const worksheet = XLSX.utils.aoa_to_sheet(rows);
+
+    // Style header row
+    header.forEach((_, idx) => {
+      const cellRef = XLSX.utils.encode_cell({ r: 0, c: idx });
+      worksheet[cellRef].s = {
+        font: { bold: true, color: { rgb: "FFFFFF" } },
+        fill: { fgColor: { rgb: "4F81BD" } },
+        alignment: { horizontal: "center", vertical: "center" },
+        border: {
+          top: { style: "thin", color: { rgb: "CCCCCC" } },
+          bottom: { style: "thin", color: { rgb: "CCCCCC" } },
+          left: { style: "thin", color: { rgb: "CCCCCC" } },
+          right: { style: "thin", color: { rgb: "CCCCCC" } }
+        }
+      };
+    });
+
+    // Style data rows
+    for (let r = 1; r < rows.length; r++) {
+      for (let c = 0; c < header.length; c++) {
+        const cellRef = XLSX.utils.encode_cell({ r, c });
+        if (worksheet[cellRef]) {
+          worksheet[cellRef].s = {
+            alignment: { horizontal: "left", vertical: "center" },
+            border: {
+              top: { style: "thin", color: { rgb: "EEEEEE" } },
+              bottom: { style: "thin", color: { rgb: "EEEEEE" } },
+              left: { style: "thin", color: { rgb: "EEEEEE" } },
+              right: { style: "thin", color: { rgb: "EEEEEE" } }
+            }
+          };
+        }
+      }
+    }
+
+    worksheet['!cols'] = header.map(() => ({ wch: 22 }));
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "TrainingForms");
+    XLSX.writeFile(workbook, "TrainingFormsExport.xlsx");
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden min-h-screen">
       <div className="px-6 py-5 border-b flex flex-col sm:flex-row justify-between gap-4">
@@ -242,6 +345,13 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
             <option value="Q4">Q4</option>
             <option value="all">All Quarters</option>
           </select>
+
+          <button
+            onClick={handleExport}
+            className="px-4 py-2 bg-green-600 text-white rounded-md font-medium shadow hover:bg-green-700"
+          >
+            Export
+          </button>
         </div>
       </div>
 
@@ -312,7 +422,6 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
         </div>
       )}
 
-      {/* ⭐⭐ Yeh line ab add kar ⭐⭐ */}
       <TrainingForm
         show={showClosureForm}
         onClose={() => setShowClosureForm(false)}

@@ -193,5 +193,6 @@ export const universityOptions = [
   "Indian Institute of Management Jammu",
   "Indian Institute of Management Sirmaur",
   "Indian Institute of Management Kashipur",
+  "Private University",
   "Other"
 ];
