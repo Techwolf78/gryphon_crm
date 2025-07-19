@@ -6,7 +6,11 @@ import { XIcon, PlusIcon } from "@heroicons/react/outline";
 import CourseForm from "./AddCollege/CourseForm";
 import CollegeInfoForm from "./AddCollege/CollegeInfoForm";
 import ContactInfoForm from "./AddCollege/ContactInfoForm";
+import Select from "react-select";
 
+function capitalizeWords(str) {
+  return str.replace(/(^\w|\s\w)/g, m => m.toUpperCase());
+}
 
 const courseSpecializations = {
   Engineering: [
@@ -440,6 +444,12 @@ createdAt: timestamp, // store actual time as number
     (affiliation !== "Other" ||
       (affiliation === "Other" && manualAffiliation.trim()));
 
+  // Prepare university options for react-select
+  const universitySelectOptions = universityOptions.map((u) => ({
+    value: u,
+    label: u,
+  }));
+
   if (!show) return null;
 
   return (
@@ -461,21 +471,23 @@ createdAt: timestamp, // store actual time as number
         {/* Modal Body */}
         <div className="p-6 overflow-y-auto max-h-[calc(100vh-180px)]">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <CollegeInfoForm
-              businessName={businessName}
-              setBusinessName={setBusinessName}
-              address={address}
-              setAddress={setAddress}
-              state={state}
-              setState={setState}
-              city={city}
-              setCity={setCity}
-              isFormValid={isFormValid}
-            />
+            <div className="md:col-span-2">
+              <CollegeInfoForm
+                businessName={businessName}
+                setBusinessName={val => setBusinessName(capitalizeWords(val))}
+                address={address}
+                setAddress={val => setAddress(capitalizeWords(val))}
+                state={state}
+                setState={setState}
+                city={city}
+                setCity={setCity}
+                isFormValid={isFormValid}
+              />
+            </div>
 
             <ContactInfoForm
               pocName={pocName}
-              setPocName={setPocName}
+              setPocName={val => setPocName(capitalizeWords(val))}
               phoneNo={phoneNo}
               setPhoneNo={setPhoneNo}
               email={email}
@@ -531,7 +543,7 @@ createdAt: timestamp, // store actual time as number
                   <input
                     type="text"
                     value={manualAccreditation}
-                    onChange={(e) => setManualAccreditation(e.target.value)}
+                    onChange={e => setManualAccreditation(capitalizeWords(e.target.value))}
                     placeholder="Enter custom accreditation"
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
@@ -544,88 +556,44 @@ createdAt: timestamp, // store actual time as number
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 University Affiliation
               </label>
-              <div className="relative">
-                <select
-                  value={affiliation}
-                  onChange={(e) => {
-                    setAffiliation(e.target.value);
+              <div className="flex flex-col gap-2">
+                <Select
+                  options={universitySelectOptions}
+                  value={universitySelectOptions.find((opt) => opt.value === affiliation)}
+                  onChange={(selected) => {
+                    setAffiliation(selected ? selected.value : "");
                     setManualAffiliation("");
                   }}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
-                >
-                  <option value="">Select University</option>
-                  {universityOptions.map((university) => (
-                    <option key={university} value={university}>
-                      {university}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                  <svg
-                    className="h-4 w-4"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </div>
-              </div>
-
-              {affiliation === "Other" && (
-                <div className="mt-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Please specify University Name
-                    {affiliation === "Other" &&
-                      !manualAffiliation.trim() &&
-                      isFormValid && (
+                  placeholder="Search or select university"
+                  isClearable
+                />
+                {affiliation === "Other" && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Please specify University Name
+                      {!manualAffiliation.trim() && isFormValid && (
                         <span className="text-red-500 ml-1">*</span>
                       )}
-                  </label>
-                  <div className="relative">
+                    </label>
                     <input
                       type="text"
                       value={manualAffiliation}
-                      onChange={(e) => setManualAffiliation(e.target.value)}
+                      onChange={e => setManualAffiliation(capitalizeWords(e.target.value))}
                       placeholder="Enter university name"
                       className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        affiliation === "Other" &&
-                        !manualAffiliation.trim() &&
-                        isFormValid
+                        !manualAffiliation.trim() && isFormValid
                           ? "border-red-500"
                           : "border-gray-300"
                       }`}
                     />
-                    {affiliation === "Other" &&
-                      !manualAffiliation.trim() &&
-                      isFormValid && (
-                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                          <svg
-                            className="h-5 w-5 text-red-500"
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                        </div>
-                      )}
-                  </div>
-                  {affiliation === "Other" &&
-                    !manualAffiliation.trim() &&
-                    isFormValid && (
+                    {!manualAffiliation.trim() && isFormValid && (
                       <p className="mt-1 text-sm text-red-600">
                         Please specify the university name
                       </p>
                     )}
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Courses Section */}
@@ -647,7 +615,13 @@ createdAt: timestamp, // store actual time as number
                   <CourseForm
                     course={course}
                     index={index}
-                    handleCourseChange={handleCourseChange}
+                    handleCourseChange={(idx, field, value) => {
+                      if (field === "manualCourseType" || field === "manualSpecialization") {
+                        handleCourseChange(idx, field, capitalizeWords(value));
+                      } else {
+                        handleCourseChange(idx, field, value);
+                      }
+                    }}
                     handleSpecializationChange={handleSpecializationChange}
                     courseSpecializations={courseSpecializations}
                     yearOptions={yearOptions}

@@ -1,10 +1,24 @@
 import React, { useState, useEffect } from "react";
-import {doc,setDoc, getDocs, query,orderBy, collection,} from "firebase/firestore";
+import {
+  doc,
+  setDoc,
+  getDocs,
+  query,
+  orderBy,
+  collection,
+} from "firebase/firestore";
 import { db } from "../../firebase";
 import * as XLSX from "xlsx";
-import { FiX,FiUpload, FiDownload,FiUserPlus,FiInfo,FiCheckCircle,FiAlertCircle,} from "react-icons/fi";
-import specializationOptions from './specializationOptions'
-
+import {
+  FiX,
+  FiUpload,
+  FiDownload,
+  FiUserPlus,
+  FiInfo,
+  FiCheckCircle,
+  FiAlertCircle,
+} from "react-icons/fi";
+import specializationOptions from "./specializationOptions";
 
 function AddTrainer({ onClose, onTrainerAdded }) {
   const [trainerData, setTrainerData] = useState({
@@ -68,10 +82,14 @@ function AddTrainer({ onClose, onTrainerAdded }) {
     const { name, value } = e.target;
     setTrainerData((prev) => ({ ...prev, [name]: value }));
 
-    if (name === "specialization" && value === "Others") {
-      setShowOtherSpecialization(true);
-    } else if (name === "specialization") {
-      setShowOtherSpecialization(false);
+    if (name === "specialization") {
+      if (value === "Others") {
+        setShowOtherSpecialization(true);
+      } else {
+        setShowOtherSpecialization(false);
+        // Clear other specialization when selecting a predefined option
+        setTrainerData((prev) => ({ ...prev, otherSpecialization: "" }));
+      }
     }
   };
 
@@ -96,14 +114,31 @@ function AddTrainer({ onClose, onTrainerAdded }) {
         bankAddress: trainerData.bankAddress,
         paymentType: trainerData.paymentType,
         charges: Number(trainerData.charges) || 0,
-        specialization: showOtherSpecialization
-          ? trainerData.otherSpecialization
-          : trainerData.specialization,
         createdAt: new Date(),
       };
 
+      // Validate specialization
+      if (!trainerData.specialization) {
+        setError("Please select a specialization");
+        setLoading(false);
+        return;
+      }
+
+      if (
+        trainerData.specialization === "Others" &&
+        !trainerData.otherSpecialization
+      ) {
+        setError("Please enter your specialization");
+        setLoading(false);
+        return;
+      }
+      // Handle specialization differently
       if (showOtherSpecialization) {
-        trainerToSave.otherSpecialization = trainerData.otherSpecialization;
+        trainerToSave.specialization = ""; // Store "Others" as the main specialization
+        trainerToSave.otherSpecialization = trainerData.otherSpecialization; // Store the custom value
+      } else {
+        trainerToSave.specialization = trainerData.specialization; // Store the selected specialization
+        trainerToSave.otherSpecialization = ""; // Clear other specialization if not used
       }
 
       await setDoc(doc(db, "trainers", trainerData.trainerId), trainerToSave, {
@@ -119,6 +154,7 @@ function AddTrainer({ onClose, onTrainerAdded }) {
       setLoading(false);
     }
   };
+
   const handleFileImport = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -166,6 +202,32 @@ function AddTrainer({ onClose, onTrainerAdded }) {
             trainerId = `GA-T${(maxNumber + 1).toString().padStart(3, "0")}`;
           }
 
+          // Handle comma-separated specializations
+          let specializationData = importedData["Specialization"] || "";
+          let specializations = [];
+          let otherSpecializations = [];
+
+          if (specializationData.includes(",")) {
+            // Split by comma and trim whitespace
+            const splitSpecs = specializationData
+              .split(",")
+              .map((s) => s.trim());
+
+            splitSpecs.forEach((spec) => {
+              if (specializationOptions.includes(spec)) {
+                specializations.push(spec);
+              } else {
+                otherSpecializations.push(spec);
+              }
+            });
+          } else {
+            if (specializationOptions.includes(specializationData)) {
+              specializations.push(specializationData);
+            } else {
+              otherSpecializations.push(specializationData);
+            }
+          }
+
           const trainerToSave = {
             trainerId: trainerId,
             name: importedData["Name"] || "",
@@ -181,20 +243,22 @@ function AddTrainer({ onClose, onTrainerAdded }) {
             bankAddress: importedData["Bank Address"] || "",
             paymentType: importedData["Payment Type"] || "Per Hour",
             charges: Number(importedData["Charges"]) || 0,
-            specialization: importedData["Specialization"] || "Soft Skills",
+            specialization: specializations,
+            otherSpecialization: otherSpecializations,
             createdAt: new Date(),
           };
-
-          if (!specializationOptions.includes(importedData["Specialization"])) {
-            trainerToSave.specialization = "Others";
-            trainerToSave.otherSpecialization =
-              importedData["Specialization"] || "";
-          }
 
           await setDoc(doc(db, "trainers", trainerId), trainerToSave);
 
           if (importedData === jsonData[jsonData.length - 1]) {
-            setTrainerData(trainerToSave);
+            setTrainerData((prev) => ({
+              ...prev,
+              ...trainerToSave,
+              // For the form, we'll just join them with comma if there are multiple
+              specialization:
+                specializations.length > 0 ? specializations[0] : "",
+              otherSpecialization: otherSpecializations.join(", "),
+            }));
           }
         }
 
@@ -331,21 +395,37 @@ function AddTrainer({ onClose, onTrainerAdded }) {
 
       <div className="grid grid-cols-1 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
             Specialization*
           </label>
-          <select>
-            {specializationOptions.map((option, idx) => (
-              <option key={idx} value={option}>{option}</option>
-            ))}
-          </select>
+          <div className="relative">
+            <select
+              name="specialization" // Add this
+              value={trainerData.specialization} // Add this
+              onChange={handleChange} // Add this
+              className="block w-full pl-3 pr-10 py-2.5 text-base border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/80 focus:border-blue-500 transition-all duration-150 appearance-none"
+              style={{
+                backgroundImage:
+                  "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")",
+                backgroundPosition: "right 0.5rem center",
+                backgroundRepeat: "no-repeat",
+                backgroundSize: "1.5em 1.5em",
+              }}
+            >
+              {specializationOptions.map((option, idx) => (
+                <option key={idx} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
       {showOtherSpecialization && (
-        <div className="grid grid-cols-1 gap-4">
+        <div className="grid grid-cols-1 gap-4 mt-2">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Other Specialization*
             </label>
             <input
@@ -353,8 +433,9 @@ function AddTrainer({ onClose, onTrainerAdded }) {
               name="otherSpecialization"
               value={trainerData.otherSpecialization}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/80 focus:border-blue-500 transition-all duration-150"
               required={showOtherSpecialization}
+              placeholder="Enter your specialization"
             />
           </div>
         </div>
@@ -567,7 +648,7 @@ function AddTrainer({ onClose, onTrainerAdded }) {
   );
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div className="fixed inset-0 z-54 overflow-y-auto">
       {/* Backdrop - fixed positioning and proper z-index */}
       <div
         className="fixed inset-0 transition-opacity"
@@ -664,19 +745,21 @@ function AddTrainer({ onClose, onTrainerAdded }) {
                 <nav className="flex space-x-4" aria-label="Tabs">
                   <button
                     onClick={() => setCurrentSection("basic")}
-                    className={`px-3 py-2 text-sm font-medium rounded-md ${currentSection === "basic"
+                    className={`px-3 py-2 text-sm font-medium rounded-md ${
+                      currentSection === "basic"
                         ? "bg-blue-100 text-blue-700"
                         : "text-gray-500 hover:text-gray-700"
-                      }`}
+                    }`}
                   >
                     Basic Info
                   </button>
                   <button
                     onClick={() => setCurrentSection("payment")}
-                    className={`px-3 py-2 text-sm font-medium rounded-md ${currentSection === "payment"
+                    className={`px-3 py-2 text-sm font-medium rounded-md ${
+                      currentSection === "payment"
                         ? "bg-blue-100 text-blue-700"
                         : "text-gray-500 hover:text-gray-700"
-                      }`}
+                    }`}
                   >
                     Payment & Bank
                   </button>
