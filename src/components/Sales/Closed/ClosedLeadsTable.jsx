@@ -511,10 +511,10 @@ const ClosedLeadsTable = ({
     <div className="overflow-x-auto">
       {/* Upload Modal */}
       {showUploadModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-            <div className="flex justify-between items-center border-b px-6 py-4">
-              <h3 className="text-lg font-medium text-gray-900">
+        <div className="fixed inset-0 backdrop-blur-sm bg-opacity-50  flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md ">
+            <div className="flex justify-between items-center bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6 border-b px-6 py-4">
+              <h3 className="text-lg font-medium ">
                 Upload Student List
               </h3>
               <button
@@ -612,7 +612,7 @@ const ClosedLeadsTable = ({
                 </div>
               )}
             </div>
-            <div className="bg-gray-50 px-6 py-3 flex justify-end border-t">
+            <div className="bg-gray-50 px-6 py-3 bg-gradient-to-l from-blue-600 to-blue-800 flex justify-end ">
               <button
                 type="button"
                 className="mr-3 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
@@ -644,10 +644,11 @@ const ClosedLeadsTable = ({
       )}
       {/* MOU Upload Modal */}
       {showMOUUploadModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 backdrop-blur-sm bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-            <div className="flex justify-between items-center border-b px-6 py-4">
-              <h3 className="text-lg font-medium text-gray-900">Upload MOU</h3>
+            <div className="flex justify-between items-center bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6 border-b px-6 py-4">
+              <h3 className="text-lg font-medium 
+              ">Upload MOU</h3>
               <button
                 onClick={() => {
                   setShowMOUUploadModal(false);
@@ -710,7 +711,7 @@ const ClosedLeadsTable = ({
               )}
             </div>
 
-            <div className="bg-gray-50 px-6 py-3 flex justify-end border-t">
+            <div className="bg-gray-50 px-6 py-3 flex  bg-gradient-to-l from-blue-600 to-blue-800 justify-end">
               <button
                 type="button"
                 className="mr-3 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
