@@ -34,8 +34,6 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
   const [showOtherSpecialization, setShowOtherSpecialization] = useState(false);
   const [currentSection, setCurrentSection] = useState("basic");
 
-  
-
   useEffect(() => {
     const fetchTrainer = async () => {
       try {
@@ -45,6 +43,32 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
 
         if (docSnap.exists()) {
           const data = docSnap.data();
+          // Convert specialization to array
+          const specArr = Array.isArray(data.specialization)
+            ? data.specialization
+            : typeof data.specialization === "string"
+              ? data.specialization.split(",").map(s => s.trim())
+              : [];
+          // Find custom specializations not in options
+          const customSpecs = specArr.filter(s => !specializationOptions.includes(s) && s !== "Others");
+          // If custom specs exist, add "Others" to specialization and set otherSpecialization
+          let specializationStr = specArr.join(", ");
+          let otherSpecializationStr = "";
+          let showOther = false;
+          if (customSpecs.length > 0) {
+            // Add "Others" if not present
+            if (!specArr.includes("Others")) {
+              specializationStr = [...specArr.filter(s => specializationOptions.includes(s)), "Others"].join(", ");
+            }
+            otherSpecializationStr = customSpecs.join(", ");
+            showOther = true;
+          } else if (Array.isArray(data.otherSpecialization) && data.otherSpecialization.length > 0) {
+            otherSpecializationStr = data.otherSpecialization.join(", ");
+            showOther = true;
+          } else if (specArr.includes("Others")) {
+            showOther = true;
+          }
+
           setTrainerData({
             trainerId: data.trainerId || trainerId,
             name: data.name || "",
@@ -60,14 +84,10 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
             bankAddress: data.bankAddress || "",
             paymentType: data.paymentType || "Per Hour",
             charges: data.charges || "",
-            specialization: data.specialization || "",
-            otherSpecialization: data.otherSpecialization || "",
+            specialization: specializationStr,
+            otherSpecialization: otherSpecializationStr,
           });
-
-          if (data.specialization === "Others" ||
-            !specializationOptions.includes(data.specialization)) {
-            setShowOtherSpecialization(true);
-          }
+          setShowOtherSpecialization(showOther);
         } else {
           setError("Trainer not found");
         }
@@ -86,10 +106,17 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
     const { name, value } = e.target;
     setTrainerData((prev) => ({ ...prev, [name]: value }));
 
-    if (name === "specialization" && value === "Others") {
-      setShowOtherSpecialization(true);
-    } else if (name === "specialization") {
-      setShowOtherSpecialization(false);
+    if (name === "specialization") {
+      // If "Others" is selected or not in options, show otherSpecialization
+      const selectedSpecs = value.split(",").map(s => s.trim());
+      if (
+        selectedSpecs.includes("Others") ||
+        selectedSpecs.some(s => !specializationOptions.includes(s))
+      ) {
+        setShowOtherSpecialization(true);
+      } else {
+        setShowOtherSpecialization(false);
+      }
     }
   };
 
@@ -99,6 +126,17 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
     setError("");
 
     try {
+      // Always save as arrays in Firestore
+      const specializationArr = trainerData.specialization
+        ? trainerData.specialization
+            .split(",")
+            .map(s => s.trim())
+            .filter(s => s && s !== "Others") // Remove "Others"
+        : [];
+      const otherSpecializationArr = trainerData.otherSpecialization
+        ? trainerData.otherSpecialization.split(",").map(s => s.trim()).filter(Boolean)
+        : [];
+
       const trainerToUpdate = {
         trainerId: trainerData.trainerId,
         name: trainerData.name,
@@ -114,14 +152,14 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
         bankAddress: trainerData.bankAddress,
         paymentType: trainerData.paymentType,
         charges: Number(trainerData.charges) || 0,
-        specialization: showOtherSpecialization
-          ? trainerData.otherSpecialization
-          : trainerData.specialization,
+        specialization: specializationArr,
         updatedAt: new Date(),
       };
 
       if (showOtherSpecialization) {
-        trainerToUpdate.otherSpecialization = trainerData.otherSpecialization;
+        trainerToUpdate.otherSpecialization = otherSpecializationArr;
+      } else {
+        trainerToUpdate.otherSpecialization = [];
       }
 
       await updateDoc(doc(db, "trainers", trainerId), trainerToUpdate);
@@ -218,11 +256,45 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Specialization*
           </label>
-          <select>
-            {specializationOptions.map((option, idx) => (
-              <option key={idx} value={option}>{option}</option>
+          <div className="flex flex-wrap gap-2">
+            {specializationOptions.map(opt => (
+              <label key={opt} className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  value={opt}
+                  checked={trainerData.specialization.split(",").map(s => s.trim()).includes(opt)}
+                  onChange={e => {
+                    const specs = trainerData.specialization
+                      ? trainerData.specialization.split(",").map(s => s.trim())
+                      : [];
+                    let updatedSpecs;
+                    if (e.target.checked) {
+                      updatedSpecs = [...specs, opt];
+                    } else {
+                      updatedSpecs = specs.filter(s => s !== opt);
+                    }
+                    setTrainerData(prev => ({
+                      ...prev,
+                      specialization: updatedSpecs.join(", "),
+                    }));
+                    if (
+                      updatedSpecs.includes("Others") ||
+                      updatedSpecs.some(s => !specializationOptions.includes(s))
+                    ) {
+                      setShowOtherSpecialization(true);
+                    } else {
+                      setShowOtherSpecialization(false);
+                    }
+                  }}
+                  className="form-checkbox"
+                />
+                <span>{opt}</span>
+              </label>
             ))}
-          </select>
+          </div>
+          <small className="text-gray-500">
+            Select all that apply.
+          </small>
         </div>
       </div>
 
@@ -239,12 +311,23 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
               onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               required={showOtherSpecialization}
+              placeholder="e.g. Microsoft Excel, PowerPoint"
             />
+            <small className="text-gray-500">
+              Enter comma separated values. Example: Microsoft Excel, PowerPoint
+            </small>
           </div>
         </div>
       )}
 
-      <div className="flex justify-end">
+      <div className="flex justify-between">
+        <button
+          type="submit"
+          className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+          disabled={loading}
+        >
+          {loading ? "Saving..." : "Save"}
+        </button>
         <button
           type="button"
           onClick={() => setCurrentSection("payment")}
