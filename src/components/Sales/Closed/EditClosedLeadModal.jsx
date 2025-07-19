@@ -348,6 +348,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
     if (!lead) return null;
 
 
+
     return (
         <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-54 p-4">
             {/* Confirmation Dialog - Add this at the beginning of your return statement */}

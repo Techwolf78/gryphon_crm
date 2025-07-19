@@ -155,6 +155,7 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
   const closedQuarter = getQuarter(new Date(lead.closedDate));
   return closedQuarter === selectedQuarter;
 })
+
  
       .sort(([, a], [, b]) => new Date(b.closedDate) - new Date(a.closedDate));
   }, [
@@ -216,101 +217,78 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
     // Dobara fetch karo taaki latest deficit Firestore se aaye
     await fetchTargets();
   };
+const handleExport = async () => {
+  const codes = filteredLeads
+    .map(([, lead]) => lead.projectCode?.replace(/\//g, "-"))
+    .filter(Boolean);
 
-  // ⭐️ Styled Excel Export
-  const handleExport = async () => {
-    // Get all projectCodes for filtered leads
-    const codes = filteredLeads
-      .map(([, lead]) => lead.projectCode?.replace(/\//g, "-"))
-      .filter(Boolean);
+  const formSnaps = await Promise.all(
+    codes.map((code) => getDoc(doc(db, "trainingForms", code)))
+  );
 
-    // Fetch all trainingForms in parallel
-    const formSnaps = await Promise.all(
-      codes.map((code) => getDoc(doc(db, "trainingForms", code)))
-    );
+  const exportData = formSnaps
+    .map((snap) => (snap.exists() ? snap.data() : null))
+    .filter(Boolean);
 
-    // Extract data from each trainingForm
-    const exportData = formSnaps
-      .map((snap) => (snap.exists() ? snap.data() : null))
-      .filter(Boolean);
+  if (exportData.length === 0) {
+    alert("No trainingForms found for filtered leads.");
+    return;
+  }
 
-    if (exportData.length === 0) {
-      alert("No trainingForms found for filtered leads.");
-      return;
-    }
+  const rows = exportData.map(form => {
+  const specializationText = form.courses  // yahan courses correct
+    ?.map(c => `${c.specialization}: ${c.students}`)
+    .join(", ") || "";
 
-    // Dynamically get all unique keys from all forms
-    const allKeys = Array.from(
-      new Set(exportData.flatMap(obj => Object.keys(obj)))
-    );
+  const topicsText = form.topics
+    ?.map(t => `${t.topic}: ${t.hours}`)
+    .join(", ") || "";
 
-    // Prepare header (prettify keys)
-    const header = allKeys.map(key =>
-      key
-        .replace(/([A-Z])/g, " $1")
-        .replace(/^./, str => str.toUpperCase())
-        .replace(/Url$/, " URL")
-        .replace(/Id$/, " ID")
-        .trim()
-    );
+  const paymentText = form.paymentDetails
+    ?.map(p => `${p.name}: ₹${p.totalAmount}`)
+    .join(", ") || "";
 
-    // Prepare rows, stringify arrays/objects
-    const rows = exportData.map(form =>
-      allKeys.map(key => {
-        const val = form[key];
-        if (Array.isArray(val) || (val && typeof val === "object")) {
-          return JSON.stringify(val);
-        }
-        return val ?? "";
-      })
-    );
-
-    // Add header row
-    rows.unshift(header);
-
-    // Create worksheet from array of arrays
-    const worksheet = XLSX.utils.aoa_to_sheet(rows);
-
-    // Style header row
-    header.forEach((_, idx) => {
-      const cellRef = XLSX.utils.encode_cell({ r: 0, c: idx });
-      worksheet[cellRef].s = {
-        font: { bold: true, color: { rgb: "FFFFFF" } },
-        fill: { fgColor: { rgb: "4F81BD" } },
-        alignment: { horizontal: "center", vertical: "center" },
-        border: {
-          top: { style: "thin", color: { rgb: "CCCCCC" } },
-          bottom: { style: "thin", color: { rgb: "CCCCCC" } },
-          left: { style: "thin", color: { rgb: "CCCCCC" } },
-          right: { style: "thin", color: { rgb: "CCCCCC" } }
-        }
-      };
-    });
-
-    // Style data rows
-    for (let r = 1; r < rows.length; r++) {
-      for (let c = 0; c < header.length; c++) {
-        const cellRef = XLSX.utils.encode_cell({ r, c });
-        if (worksheet[cellRef]) {
-          worksheet[cellRef].s = {
-            alignment: { horizontal: "left", vertical: "center" },
-            border: {
-              top: { style: "thin", color: { rgb: "EEEEEE" } },
-              bottom: { style: "thin", color: { rgb: "EEEEEE" } },
-              left: { style: "thin", color: { rgb: "EEEEEE" } },
-              right: { style: "thin", color: { rgb: "EEEEEE" } }
-            }
-          };
-        }
-      }
-    }
-
-    worksheet['!cols'] = header.map(() => ({ wch: 22 }));
-
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "TrainingForms");
-    XLSX.writeFile(workbook, "TrainingFormsExport.xlsx");
+  return {
+    "College Name": form.collegeName || "",
+    "College Code": form.collegeCode || "",
+    "GST Number": form.gstNumber || "",
+    "Address": form.address || "",
+    "City": form.city || "",
+    "State": form.state || "",
+    "Pincode": form.pincode || "",
+    "TPO Name": form.tpoName || "",
+    "TPO Email": form.tpoEmail || "",
+    "TPO Phone": form.tpoPhone || "",
+    "Training Name": form.trainingName || "",
+    "Training Email": form.trainingEmail || "",
+    "Training Phone": form.trainingPhone || "",
+    "Account Name": form.accountName || "",
+    "Account Email": form.accountEmail || "",
+    "Account Phone": form.accountPhone || "",
+    "Course": form.course || "",
+    "Year": form.year || "",
+    "Delivery Type": form.deliveryType || "",
+    "Passing Year": form.passingYear || "",
+    "Total Students": form.students || "",
+    "Total Hours": form.totalHours || "",
+    "Specializations": specializationText,
+    "Topics": topicsText,
+    "Payment Details": paymentText,
+    "MOU URL": form.mouFileUrl || "",
+    "Contract Start": form.contractStartDate || "",
+    "Contract End": form.contractEndDate || "",
+    "EMI Months": form.emiMonths || "",
+    "Net Payable Amount": form.netPayableAmount || "",
+    "GST Amount": form.gstAmount || ""
   };
+});
+
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "TrainingForms");
+  XLSX.writeFile(workbook, "TrainingFormsExport.xlsx");
+};
+
 
   return (
     <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden min-h-screen">
