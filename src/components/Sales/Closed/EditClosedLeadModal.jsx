@@ -16,6 +16,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
             const initialStudentCount = lead.courses?.reduce((sum, course) => sum + (course.students || 0), 0) || 0;
             setFormData({
                 ...lead,
+
                 businessName: lead.collegeName || "",
                 projectCode: lead.projectCode || "",
                 city: lead.city || "",
@@ -23,7 +24,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                 totalCost: lead.totalCost || 0,
                 tcv: lead.tcv || 0,
                 perStudentCost: lead.perStudentCost || 0,
-                studentCount: lead.studentCount || 0,
+                studentCount: initialStudentCount,
                 gstAmount: lead.gstAmount || 0,
                 netPayableAmount: lead.netPayableAmount || 0,
                 gstNumber: lead.gstNumber || "",
@@ -129,7 +130,8 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
 
     const handleCourseChange = (index, field, value) => {
         const updatedCourses = [...formData.courses];
-        updatedCourses[index][field] = field === "students" ? parseInt(value) || 0 : value;
+        updatedCourses[index][field] = field === "students"  ? Math.max(0, parseInt(value) || 0) // Ensure non-negative
+        : value;
 
         const totalStudents = updatedCourses.reduce((sum, course) => sum + (course.students || 0), 0);
         const totalAmount = (formData.perStudentCost || 0) * totalStudents;
@@ -258,12 +260,10 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
         try {
             const leadRef = doc(db, "trainingForms", lead.id);
 
-            // Recalculate to be absolutely sure
-
-            console.log("Stored studentCount:", formData.studentCount);
-            console.log("Calculated from courses:",
-                formData.courses.reduce((sum, c) => sum + (c.students || 0), 0));
+            // Calculate total students from courses
+            const totalStudents = formData.courses.reduce((sum, course) => sum + (parseInt(course.students) || 0), 0);
             const totalAmount = (formData.perStudentCost || 0) * totalStudents;
+
             // Create complete update object with all fields
             const updateData = {
                 accountEmail: formData.accountEmail || "",
@@ -278,11 +278,11 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                 contractEndDate: formData.contractEndDate || "",
                 contractStartDate: formData.contractStartDate || "",
                 course: formData.course || "",
-                courses: formData.courses.map(course => ({
-                    specialization: course.specialization || "",
-                    students: course.students || 0,
-                    othersSpecText: course.othersSpecText || ""
-                })),
+                 courses: formData.courses.map(course => ({
+                specialization: course.specialization || "",
+                students: parseInt(course.students) || 0, // Ensure number type
+                othersSpecText: course.othersSpecText || ""
+            })),
                 createdAt: lead.createdAt || new Date(), // Preserve original creation date
                 createdBy: lead.createdBy || null, // Preserve original creator
                 deliveryType: formData.deliveryType || "",
@@ -378,6 +378,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
     };
 
     if (!lead) return null;
+
 
 
     return (
@@ -532,11 +533,11 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                             <input
                                                 type="text"
                                                 name="city"
-                                                value={formData.city }
+                                                value={formData.city}
                                                 onChange={handleChange}
                                                 className="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
                                                 placeholder="Mumbai"
-                                                
+
                                             />
                                         </div>
                                         <div>
@@ -610,8 +611,8 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                         <div className="relative">
                                             <input
                                                 type="number"
-                                                value={formData.courses?.reduce((sum, course) => sum + (parseInt(course.students) || 0), 0) || 0}
-                                                className="block w-full pl-10 pr-3 py-2 border border-blue-300 rounded-lg shadow-sm bg-blue-100"
+                                                value={formData.courses.reduce((sum, course) => sum + (parseInt(course.students) || 0), 0)}
+                                                className="block w-full pl-10 pr-3 py-2 border border-blue-300 rounded-lg shadow-sm bg-blue-100 focus:ring-blue-500 focus:border-blue-500"
                                                 readOnly
                                             />
                                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -1039,7 +1040,6 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                 </div>
                             </div>
                         )}
-                        {/* Contacts Section */}
                         {/* Contacts Section */}
                         {activeSection === 'contacts' && (
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

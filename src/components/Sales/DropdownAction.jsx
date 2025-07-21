@@ -73,43 +73,44 @@ const DropdownActions = ({
     }
   };
 
-  const getAssignableUsers = () => {
-    if (!currentUserData || !users) return [];
+ const getAssignableUsers = () => {
+  if (!currentUserData || !users) return [];
 
-    const userList = Object.values(users);
-    const allSalesUsers = userList.filter((u) => u.department === "Sales");
+  const userList = Object.values(users);
+  const allSalesUsers = userList.filter(
+    (u) =>
+      ["Sales", "Admin"].includes(u.department) && u.uid !== currentUser.uid
+  );
 
-    console.log("Current user role:", currentUserData.role);
+  console.log("Current user role:", currentUserData.role);
 
-    // Director/Head can assign to all sales users
-    if (["Director", "Head"].includes(currentUserData.role)) {
-      return allSalesUsers;
-    }
+  if (["Director", "Head"].includes(currentUserData.role)) {
+    return allSalesUsers;
+  }
 
-    // Manager can assign to their team members
-    if (currentUserData.role === "Manager") {
-      return allSalesUsers.filter(
-        (u) =>
-          u.reportingManager === currentUserData.name &&
-          ["Assistant Manager", "Executive"].includes(u.role)
-      );
-    }
+  if (currentUserData.role === "Manager") {
+    return allSalesUsers.filter(
+      (u) =>
+        u.reportingManager === currentUserData.name &&
+        ["Assistant Manager", "Executive"].includes(u.role)
+    );
+  }
 
-    // Team members can assign to their manager and peers
-    if (["Assistant Manager", "Executive"].includes(currentUserData.role)) {
-      const manager = userList.find(
-        (u) => u.name === currentUserData.reportingManager
-      );
-      const peers = allSalesUsers.filter(
-        (u) =>
-          u.reportingManager === currentUserData.reportingManager &&
-          u.uid !== currentUser.uid
-      );
-      return [manager, ...peers].filter(Boolean);
-    }
+  if (["Assistant Manager", "Executive"].includes(currentUserData.role)) {
+    const manager = userList.find(
+      (u) => u.name === currentUserData.reportingManager
+    );
+    const peers = allSalesUsers.filter(
+      (u) =>
+        u.reportingManager === currentUserData.reportingManager &&
+        u.uid !== currentUser.uid
+    );
+    return [manager, ...peers].filter(Boolean);
+  }
 
-    return [];
-  };
+  return [];
+};
+
 
   const assignableUsers = getAssignableUsers();
 

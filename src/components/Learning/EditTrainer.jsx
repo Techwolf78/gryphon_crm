@@ -43,6 +43,32 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
 
         if (docSnap.exists()) {
           const data = docSnap.data();
+          // Convert specialization to array
+          const specArr = Array.isArray(data.specialization)
+            ? data.specialization
+            : typeof data.specialization === "string"
+              ? data.specialization.split(",").map(s => s.trim())
+              : [];
+          // Find custom specializations not in options
+          const customSpecs = specArr.filter(s => !specializationOptions.includes(s) && s !== "Others");
+          // If custom specs exist, add "Others" to specialization and set otherSpecialization
+          let specializationStr = specArr.join(", ");
+          let otherSpecializationStr = "";
+          let showOther = false;
+          if (customSpecs.length > 0) {
+            // Add "Others" if not present
+            if (!specArr.includes("Others")) {
+              specializationStr = [...specArr.filter(s => specializationOptions.includes(s)), "Others"].join(", ");
+            }
+            otherSpecializationStr = customSpecs.join(", ");
+            showOther = true;
+          } else if (Array.isArray(data.otherSpecialization) && data.otherSpecialization.length > 0) {
+            otherSpecializationStr = data.otherSpecialization.join(", ");
+            showOther = true;
+          } else if (specArr.includes("Others")) {
+            showOther = true;
+          }
+
           setTrainerData({
             trainerId: data.trainerId || trainerId,
             name: data.name || "",
@@ -58,25 +84,10 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
             bankAddress: data.bankAddress || "",
             paymentType: data.paymentType || "Per Hour",
             charges: data.charges || "",
-            specialization: Array.isArray(data.specialization) ? data.specialization.join(", ") : (data.specialization || ""),
-            otherSpecialization: Array.isArray(data.otherSpecialization) ? data.otherSpecialization.join(", ") : (data.otherSpecialization || ""),
+            specialization: specializationStr,
+            otherSpecialization: otherSpecializationStr,
           });
-
-          // Show Other Specialization if Firestore has values or "Others" is present
-          const specArr = Array.isArray(data.specialization)
-            ? data.specialization
-            : typeof data.specialization === "string"
-              ? data.specialization.split(",").map(s => s.trim())
-              : [];
-          if (
-            (Array.isArray(data.otherSpecialization) && data.otherSpecialization.length > 0) ||
-            specArr.includes("Others") ||
-            specArr.some(s => !specializationOptions.includes(s))
-          ) {
-            setShowOtherSpecialization(true);
-          } else {
-            setShowOtherSpecialization(false);
-          }
+          setShowOtherSpecialization(showOther);
         } else {
           setError("Trainer not found");
         }
@@ -117,7 +128,10 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
     try {
       // Always save as arrays in Firestore
       const specializationArr = trainerData.specialization
-        ? trainerData.specialization.split(",").map(s => s.trim()).filter(Boolean)
+        ? trainerData.specialization
+            .split(",")
+            .map(s => s.trim())
+            .filter(s => s && s !== "Others") // Remove "Others"
         : [];
       const otherSpecializationArr = trainerData.otherSpecialization
         ? trainerData.otherSpecialization.split(",").map(s => s.trim()).filter(Boolean)
@@ -242,17 +256,44 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Specialization*
           </label>
-          <input
-            type="text"
-            name="specialization"
-            value={trainerData.specialization}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="e.g. Power BI, Advanced Excel"
-            required
-          />
+          <div className="flex flex-wrap gap-2">
+            {specializationOptions.map(opt => (
+              <label key={opt} className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  value={opt}
+                  checked={trainerData.specialization.split(",").map(s => s.trim()).includes(opt)}
+                  onChange={e => {
+                    const specs = trainerData.specialization
+                      ? trainerData.specialization.split(",").map(s => s.trim())
+                      : [];
+                    let updatedSpecs;
+                    if (e.target.checked) {
+                      updatedSpecs = [...specs, opt];
+                    } else {
+                      updatedSpecs = specs.filter(s => s !== opt);
+                    }
+                    setTrainerData(prev => ({
+                      ...prev,
+                      specialization: updatedSpecs.join(", "),
+                    }));
+                    if (
+                      updatedSpecs.includes("Others") ||
+                      updatedSpecs.some(s => !specializationOptions.includes(s))
+                    ) {
+                      setShowOtherSpecialization(true);
+                    } else {
+                      setShowOtherSpecialization(false);
+                    }
+                  }}
+                  className="form-checkbox"
+                />
+                <span>{opt}</span>
+              </label>
+            ))}
+          </div>
           <small className="text-gray-500">
-            Enter comma separated values. Example: Power BI, Advanced Excel
+            Select all that apply.
           </small>
         </div>
       </div>
@@ -279,7 +320,14 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
         </div>
       )}
 
-      <div className="flex justify-end">
+      <div className="flex justify-between">
+        <button
+          type="submit"
+          className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+          disabled={loading}
+        >
+          {loading ? "Saving..." : "Save"}
+        </button>
         <button
           type="button"
           onClick={() => setCurrentSection("payment")}

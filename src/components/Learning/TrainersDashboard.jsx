@@ -13,6 +13,7 @@ import { db } from "../../firebase";
 import AddTrainer from "./AddTrainer.jsx";
 import EditTrainer from "./EditTrainer.jsx";
 import DeleteTrainer from "./DeleteTrainer.jsx";
+import TrainerLeadDetails from "./TrainerLeadDetails.jsx";
 import {
   FiPlusCircle,
   FiEdit,
@@ -34,6 +35,8 @@ function TrainersDashboard() {
   const [selectedTrainer, setSelectedTrainer] = useState(null);
   const [showDeleteTrainer, setShowDeleteTrainer] = useState(false);
   const [trainerToDelete, setTrainerToDelete] = useState(null);
+  const [showTrainerDetails, setShowTrainerDetails] = useState(false);
+  const [trainerDetailsData, setTrainerDetailsData] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOrder, setSortOrder] = useState("asc");
@@ -190,6 +193,7 @@ function TrainersDashboard() {
       <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 overflow-hidden">
         {/* Search + Add */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+          {/* Search Input */}
           <div className="relative w-full sm:w-64">
             <input
               type="text"
@@ -235,78 +239,87 @@ function TrainersDashboard() {
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm divide-y divide-gray-200">
-              <thead className="bg-gray-50 text-xs uppercase font-medium text-gray-500">
-                <tr>
-                  <th
-                    className="px-4 py-3 text-left cursor-pointer"
-                    onClick={toggleSortOrder}
-                  >
-                    ID{" "}
-                    <span className="inline-block ml-1">
-                      {sortOrder === "asc" ? "↑" : "↓"}
-                    </span>
-                  </th>
-                  <th className="px-4 py-3 text-left">Name</th>
-                  <th className="px-4 py-3 text-left">Domain</th>
-                  <th className="px-4 py-3 text-left">Specialization</th>
-                  <th className="px-4 py-3 text-left">Charges</th>
-                  <th className="px-4 py-3 text-left">Contact</th>
-                  <th className="px-4 py-3 text-left">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {sortedTrainers.map((trainer) => (
-                  <tr key={trainer.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-gray-900 font-medium">
-                      {trainer.trainerId}
-                    </td>
-                    <td className="px-4 py-3 text-gray-700">{trainer.name}</td>
-                    <td className="px-4 py-3 text-gray-700">
-                      {trainer.domain}
-                    </td>
-                    <td className="px-4 py-3">
-                      {renderSpecializations(trainer)}
-                    </td>
-                    <td className="px-4 py-3 text-gray-700">
-                      ₹{trainer.charges ?? "-"}{" "}
-                      {trainer.paymentType === "Per Hour"
-                        ? "/hr"
-                        : trainer.paymentType === "Per Day"
-                        ? "/day"
-                        : ""}
-                    </td>
-                    <td className="px-4 py-3 text-gray-700">
-                      {trainer.contact}
-                    </td>
-                    <td className="px-4 py-3 flex space-x-2">
-                      <button
-                        className="text-blue-600 hover:text-blue-900"
-                        onClick={() => {
-                          setSelectedTrainer(trainer);
-                          setShowEditTrainer(true);
-                        }}
-                      >
-                        <FiEdit />
-                      </button>
-                      <button
-                        className="text-red-600 hover:text-red-900"
-                        onClick={() => {
-                          setTrainerToDelete(trainer);
-                          setShowDeleteTrainer(true);
-                        }}
-                      >
-                        <FiTrash2 />
-                      </button>
-                    </td>
+          <>
+            {/* Table with horizontal scroll */}
+            <div className="overflow-x-auto mb-4" style={{ maxWidth: "100%" }}>
+              <table className="min-w-full text-sm divide-y divide-gray-200">
+                <thead className="bg-gray-50 text-xs uppercase font-medium text-gray-500">
+                  <tr>
+                    <th className="px-4 py-3 text-left cursor-pointer" onClick={toggleSortOrder}>
+                      ID{" "}
+                      <span className="inline-block ml-1">
+                        {sortOrder === "asc" ? "↑" : "↓"}
+                      </span>
+                    </th>
+                    <th className="px-4 py-3 text-left">Name</th>
+                    <th className="px-4 py-3 text-left">Domain</th>
+                    <th className="px-4 py-3 text-left">Specialization</th>
+                    <th className="px-4 py-3 text-left">Charges</th>
+                    <th className="px-4 py-3 text-left">Contact</th>
+                    {/* Remove columns after 'Contact' for basic view */}
+                    <th className="px-4 py-3 text-left">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {sortedTrainers.map((trainer) => (
+                    <tr
+                      key={trainer.id}
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => {
+                        setTrainerDetailsData(trainer);
+                        setShowTrainerDetails(true);
+                      }}
+                    >
+                      <td className="px-4 py-3 text-gray-900 font-medium">
+                        {trainer.trainerId}
+                      </td>
+                      <td className="px-4 py-3 text-gray-700">{trainer.name}</td>
+                      <td className="px-4 py-3 text-gray-700">
+                        {trainer.domain}
+                      </td>
+                      <td className="px-4 py-3">
+                        {renderSpecializations(trainer)}
+                      </td>
+                      <td className="px-4 py-3 text-gray-700">
+                        ₹{trainer.charges ?? "-"}{" "}
+                        {trainer.paymentType === "Per Hour"
+                          ? "/hr"
+                          : trainer.paymentType === "Per Day"
+                          ? "/day"
+                          : ""}
+                      </td>
+                      <td className="px-4 py-3 text-gray-700">
+                        {trainer.contact}
+                      </td>
+                      {/* Remove columns after 'Contact' for basic view */}
+                      <td className="px-4 py-3 flex space-x-2" onClick={e => e.stopPropagation()}>
+                        <button
+                          className="text-blue-600 hover:text-blue-900"
+                          onClick={() => {
+                            setSelectedTrainer(trainer);
+                            setShowEditTrainer(true);
+                          }}
+                        >
+                          <FiEdit />
+                        </button>
+                        <button
+                          className="text-red-600 hover:text-red-900"
+                          onClick={() => {
+                            setTrainerToDelete(trainer);
+                            setShowDeleteTrainer(true);
+                          }}
+                        >
+                          <FiTrash2 />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-            {/* Pagination Controls */}
-            <div className="flex justify-between items-center mt-6">
+            {/* Pagination Controls BELOW the scroll bar */}
+            <div className="flex justify-between items-center mt-2">
               <button
                 onClick={() => fetchTrainersPaginated("prev")}
                 disabled={pageStack.length === 0}
@@ -348,7 +361,13 @@ function TrainersDashboard() {
                 onTrainerDeleted={handleTrainerDeleted}
               />
             )}
-          </div>
+            {showTrainerDetails && trainerDetailsData && (
+              <TrainerLeadDetails
+                trainer={trainerDetailsData}
+                onClose={() => setShowTrainerDetails(false)}
+              />
+            )}
+          </>
         )}
       </div>
     </div>

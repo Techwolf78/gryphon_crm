@@ -7,6 +7,10 @@ import ClosedLeadsProgressBar from "./ClosedLeadsProgressBar";
 import ClosedLeadsTable from "./ClosedLeadsTable";
 import ClosedLeadsStats from "./ClosedLeadsStats";
 import TrainingForm from "../ClosureForm/TrainingForm";
+// 👇 Use xlsx-js-style for styling
+import * as XLSX from "xlsx-js-style";
+import Papa from "papaparse";
+
 const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
   const [filterType, setFilterType] = useState("all");
   const [quarterFilter, setQuarterFilter] = useState("current");
@@ -115,7 +119,7 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
 
   const filteredLeads = useMemo(() => {
     if (!currentUser) return [];
-
+ 
     return Object.entries(leads)
       .filter(([, lead]) => {
         if (viewMyLeadsOnly) {
@@ -146,10 +150,13 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
         return lead.closureType === filterType;
       })
       .filter(([, lead]) => {
-        if (selectedQuarter === "all") return true;
-        const closedQuarter = getQuarter(new Date(lead.closedDate));
-        return closedQuarter === selectedQuarter;
-      })
+  if (!lead.closedDate) return false; // Only include leads that are actually closed
+  if (selectedQuarter === "all") return true;
+  const closedQuarter = getQuarter(new Date(lead.closedDate));
+  return closedQuarter === selectedQuarter;
+})
+
+ 
       .sort(([, a], [, b]) => new Date(b.closedDate) - new Date(a.closedDate));
   }, [
     leads,
@@ -161,6 +168,8 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
     selectedTeamUserId,
     users,
   ]);
+ 
+ 
 
   // ⭐⭐ Yeh line add karo ⭐⭐
   console.log("🔥 Selected Team User ID:", selectedTeamUserId);
@@ -208,6 +217,78 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
     // Dobara fetch karo taaki latest deficit Firestore se aaye
     await fetchTargets();
   };
+const handleExport = async () => {
+  const codes = filteredLeads
+    .map(([, lead]) => lead.projectCode?.replace(/\//g, "-"))
+    .filter(Boolean);
+
+  const formSnaps = await Promise.all(
+    codes.map((code) => getDoc(doc(db, "trainingForms", code)))
+  );
+
+  const exportData = formSnaps
+    .map((snap) => (snap.exists() ? snap.data() : null))
+    .filter(Boolean);
+
+  if (exportData.length === 0) {
+    alert("No trainingForms found for filtered leads.");
+    return;
+  }
+
+  const rows = exportData.map(form => {
+  const specializationText = form.courses  // yahan courses correct
+    ?.map(c => `${c.specialization}: ${c.students}`)
+    .join(", ") || "";
+
+  const topicsText = form.topics
+    ?.map(t => `${t.topic}: ${t.hours}`)
+    .join(", ") || "";
+
+  const paymentText = form.paymentDetails
+    ?.map(p => `${p.name}: ₹${p.totalAmount}`)
+    .join(", ") || "";
+
+  return {
+    "College Name": form.collegeName || "",
+    "College Code": form.collegeCode || "",
+    "GST Number": form.gstNumber || "",
+    "Address": form.address || "",
+    "City": form.city || "",
+    "State": form.state || "",
+    "Pincode": form.pincode || "",
+    "TPO Name": form.tpoName || "",
+    "TPO Email": form.tpoEmail || "",
+    "TPO Phone": form.tpoPhone || "",
+    "Training Name": form.trainingName || "",
+    "Training Email": form.trainingEmail || "",
+    "Training Phone": form.trainingPhone || "",
+    "Account Name": form.accountName || "",
+    "Account Email": form.accountEmail || "",
+    "Account Phone": form.accountPhone || "",
+    "Course": form.course || "",
+    "Year": form.year || "",
+    "Delivery Type": form.deliveryType || "",
+    "Passing Year": form.passingYear || "",
+    "Total Students": form.students || "",
+    "Total Hours": form.totalHours || "",
+    "Specializations": specializationText,
+    "Topics": topicsText,
+    "Payment Details": paymentText,
+    "MOU URL": form.mouFileUrl || "",
+    "Contract Start": form.contractStartDate || "",
+    "Contract End": form.contractEndDate || "",
+    "EMI Months": form.emiMonths || "",
+    "Net Payable Amount": form.netPayableAmount || "",
+    "GST Amount": form.gstAmount || ""
+  };
+});
+
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "TrainingForms");
+  XLSX.writeFile(workbook, "TrainingFormsExport.xlsx");
+};
+
 
   return (
     <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden min-h-screen">
@@ -242,6 +323,13 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
             <option value="Q4">Q4</option>
             <option value="all">All Quarters</option>
           </select>
+
+          <button
+            onClick={handleExport}
+            className="px-4 py-2 bg-green-600 text-white rounded-md font-medium shadow hover:bg-green-700"
+          >
+            Export
+          </button>
         </div>
       </div>
 
@@ -312,7 +400,6 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
         </div>
       )}
 
-      {/* ⭐⭐ Yeh line ab add kar ⭐⭐ */}
       <TrainingForm
         show={showClosureForm}
         onClose={() => setShowClosureForm(false)}
