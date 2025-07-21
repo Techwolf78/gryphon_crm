@@ -140,7 +140,7 @@ const RecentActivity = ({ recentActivity, isLoading }) => {
           className="p-3 hover:bg-gray-50 rounded-lg transition-colors group"
         >
           <div className="flex justify-between items-start">
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-3 flex-1 min-w-0">
               <div className="relative">
                 <div
                   className={`p-2 rounded-lg ${
@@ -165,7 +165,11 @@ const RecentActivity = ({ recentActivity, isLoading }) => {
                     {activity.userInitials}
                   </span>
                 </div>
-                <p className="text-xs text-gray-500 mt-0.5 truncate">
+                <p
+                  className="text-xs text-gray-500 mt-0.5 truncate"
+                  style={{ maxWidth: "180px" }} // You can adjust this width as needed
+                  title={activity.company}
+                >
                   {activity.company}
                 </p>
                 {activity.amount && (
@@ -175,7 +179,7 @@ const RecentActivity = ({ recentActivity, isLoading }) => {
                 )}
               </div>
             </div>
-            <span className="text-xs text-gray-400 whitespace-nowrap ml-2">
+            <span className="text-xs text-gray-400 whitespace-nowrap ml-2 self-start">
               {activity.time}
             </span>
           </div>
@@ -1557,7 +1561,13 @@ const SalesDashboard = () => {
                     <p className="text-sm font-medium opacity-80">
                       {metric.title}
                     </p>
-                    <h3 className="text-2xl font-bold mt-1">{metric.value}</h3>
+                    <h3
+                      className="text-2xl font-bold mt-1 truncate"
+                      style={{ maxWidth: "140px", display: "block" }} // adjust width as needed
+                      title={metric.value}
+                    >
+                      {metric.value}
+                    </h3>
                   </div>
                   <div className="bg-black bg-opacity-20 p-1 rounded-lg"> {/* changed p-2 to p-1 */}
                     {metric.icon}
