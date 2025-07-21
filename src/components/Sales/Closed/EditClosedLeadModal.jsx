@@ -183,8 +183,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
 
   const handleTopicChange = (index, field, value) => {
     const updatedTopics = [...formData.topics];
-    updatedTopics[index][field] =
-      field === "hours" ? parseInt(value) || 0 : value;
+    updatedTopics[index][field] = field === "hours" ? parseInt(value) || 0 : value;
 
     // Calculate new total hours
     const total = updatedTopics.reduce(
@@ -252,7 +251,6 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
     const updatedTopics = [...formData.topics];
     updatedTopics.splice(index, 1);
 
-    // Calculate new total hours - fixed the calculation
     const total = updatedTopics.reduce(
       (sum, topic) => sum + (parseInt(topic.hours) || 0),
       0
@@ -263,6 +261,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
       topics: updatedTopics,
       totalHours: total,
     }));
+    setTopicErrors(checkDuplicateTopics(updatedTopics));
   };
 
   const handleSubmit = async (e) => {
@@ -1514,19 +1513,19 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                 </button>
               )}
 
-{activeSection !== sections[sections.length - 1] ? (
-    <button
-        type="button"
-        onClick={goToNextSection}
-        className="px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center"
-        disabled={
-            loading ||
-            (activeSection === "topics" && topicErrors.some(e => !!e))
-        }
-    >
-        Next <FiArrowRight className="ml-2" />
-    </button>
-) : (
+              {activeSection !== sections[sections.length - 1] ? (
+                <button
+                  type="button"
+                  onClick={goToNextSection}
+                  className="px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center"
+                  disabled={
+                    loading ||
+                    (activeSection === "topics" && topicErrors.some(e => !!e))
+                  }
+                >
+                  Next <FiArrowRight className="ml-2" />
+                </button>
+              ) : (
                 <button
                   type="button" // Changed from "submit" to "button"
                   onClick={() => setShowConfirmation(true)} // Show confirmation instead of submitting directly
