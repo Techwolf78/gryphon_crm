@@ -235,19 +235,19 @@ const handleExport = async () => {
       alert("No training forms found for the selected leads.");
       return;
     }
- 
+
     // Prepare data rows with NEW LINE formatting
     const rows = exportData.map(form => {
       // Specializations - One per line
       const specializationText = form.courses
         ?.map(c => ` ${c.specialization}: ${c.students} students`)
         .join("\n") || "-";
- 
+
       // Topics - One per line with bullet points
       const topicsText = form.topics
         ?.map(t => ` ${t.topic}: ${t.hours} hours`)
         .join("\n") || "-";
- 
+
       // Payment Schedule - One per line with bullet points
       const paymentText = form.paymentDetails
         ?.map(p => {
@@ -289,6 +289,7 @@ const handleExport = async () => {
         "Contract Start": form.contractStartDate || "-",
         "Contract End": form.contractEndDate || "-",
         "EMI Months": form.emiMonths || "-",
+
         "GST Type": form.gstType || "-",
         "Net Amount (₹)": form.netPayableAmount ? Number(form.netPayableAmount) : "-",
         "GST Amount (₹)": form.gstAmount ? Number(form.gstAmount) : "-",
@@ -366,7 +367,7 @@ const handleExport = async () => {
         // Check if column contains amounts
         const headerCell = XLSX.utils.encode_cell({ r: range.s.r, c: C });
         const headerText = worksheet[headerCell]?.v;
-       
+
         if (headerText && (headerText.includes("Amount") || headerText.includes("(₹)"))) {
           worksheet[cell].s = amountStyle;
         } else {
