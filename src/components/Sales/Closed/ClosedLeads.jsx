@@ -236,18 +236,26 @@ const handleExport = async () => {
       return;
     }
 
-    // Prepare data rows with proper formatting
+    // Prepare data rows with NEW LINE formatting
     const rows = exportData.map(form => {
+      // Specializations - One per line
       const specializationText = form.courses
-        ?.map(c => `${c.specialization}: ${c.students}`)
-        .join(", ") || "-";
+        ?.map(c => ` ${c.specialization}: ${c.students} students`)
+        .join("\n") || "-";
 
+      // Topics - One per line with bullet points
       const topicsText = form.topics
-        ?.map(t => `${t.topic}: ${t.hours} hrs`)
-        .join(", ") || "-";
+        ?.map(t => ` ${t.topic}: ${t.hours} hours`)
+        .join("\n") || "-";
 
+      // Payment Schedule - One per line with bullet points
       const paymentText = form.paymentDetails
-        ?.map(p => `${p.name}: ₹${Number(p.totalAmount).toLocaleString('en-IN')}`)
+        ?.map(p => {
+          const paymentInfo = [];
+          if (p.type) paymentInfo.push(p.type);
+          if (p.name) paymentInfo.push(p.name);
+          return ` ${paymentInfo.join(' | ')}: ₹${Number(p.totalAmount).toLocaleString('en-IN')}`;
+        })
         .join("\n") || "-";
 
       return {
@@ -275,11 +283,13 @@ const handleExport = async () => {
         "Total Hours": form.totalHours ? `${form.totalHours} hrs` : "-",
         "Specializations": specializationText,
         "Topics Covered": topicsText,
+        "Payment Type": form.paymentType || "-", // Added Payment Type field
         "Payment Schedule": paymentText,
         "MOU URL": form.mouFileUrl || "-",
         "Contract Start": form.contractStartDate || "-",
         "Contract End": form.contractEndDate || "-",
         "EMI Months": form.emiMonths || "-",
+        "GST Type": form.gstType || "-", 
         "Net Amount (₹)": form.netPayableAmount ? Number(form.netPayableAmount) : "-",
         "GST Amount (₹)": form.gstAmount ? Number(form.gstAmount) : "-",
         "Total Amount (₹)": form.netPayableAmount && form.gstAmount 
@@ -291,7 +301,7 @@ const handleExport = async () => {
     // Create workbook and worksheet
     const workbook = XLSX.utils.book_new();
     const worksheet = XLSX.utils.json_to_sheet(rows);
-
+ worksheet['!rows'] = rows.map(() => ({ hpx: 60 }));
     // ===== STYLING ===== //
     // Define styles
     const headerStyle = {
@@ -357,7 +367,7 @@ const handleExport = async () => {
         const headerCell = XLSX.utils.encode_cell({ r: range.s.r, c: C });
         const headerText = worksheet[headerCell]?.v;
         
-        if (headerText && headerText.includes("Amount")) {
+        if (headerText && (headerText.includes("Amount") || headerText.includes("(₹)"))) {
           worksheet[cell].s = amountStyle;
         } else {
           worksheet[cell].s = dataStyle;
@@ -391,11 +401,13 @@ const handleExport = async () => {
       { wch: 15 }, // Total Hours
       { wch: 25 }, // Specializations
       { wch: 30 }, // Topics Covered
+      { wch: 15 }, // Payment Type (NEW COLUMN)
       { wch: 25 }, // Payment Schedule
       { wch: 40 }, // MOU URL
       { wch: 15 }, // Contract Start
       { wch: 15 }, // Contract End
       { wch: 12 }, // EMI Months
+      { wch: 12 }, // GST Type (NEW COLUMN WIDTH)
       { wch: 15 }, // Net Amount (₹)
       { wch: 15 }, // GST Amount (₹)
       { wch: 15 }  // Total Amount (₹)
