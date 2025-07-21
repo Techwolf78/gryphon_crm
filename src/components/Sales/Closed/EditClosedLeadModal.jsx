@@ -11,10 +11,11 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
     const [activeSection, setActiveSection] = useState("basic");
     const [showConfirmation, setShowConfirmation] = useState(false); // New state for confirmation dialog
     const sections = ['basic', 'contacts', 'course', 'topics', 'financial',];
-
     useEffect(() => {
         if (lead) {
+            const initialStudentCount = lead.courses?.reduce((sum, course) => sum + (course.students || 0), 0) || 0;
             setFormData({
+                ...lead,
                 businessName: lead.collegeName || "",
                 projectCode: lead.projectCode || "",
                 city: lead.city || "",
@@ -130,23 +131,18 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
         const updatedCourses = [...formData.courses];
         updatedCourses[index][field] = field === "students" ? parseInt(value) || 0 : value;
 
-        // Calculate new total cost whenever student numbers change
-        const newFormData = {
-            ...formData,
-            courses: updatedCourses
-        };
+        const totalStudents = updatedCourses.reduce((sum, course) => sum + (course.students || 0), 0);
+        const totalAmount = (formData.perStudentCost || 0) * totalStudents;
 
-        if (field === "students") {
-            const totalStudents = updatedCourses.reduce((sum, course) => sum + (parseInt(course.students) || 0), 0);
-            const totalAmount = (formData.perStudentCost || 0) * totalStudents;
-
-            newFormData.totalCost = totalAmount;
-
-            // Update payment details to match new total
-            newFormData.paymentDetails = formData.paymentDetails.map(payment => {
+        setFormData(prev => ({
+            ...prev,
+            courses: updatedCourses,
+            studentCount: totalStudents, // Ensure this is always updated
+            totalCost: totalAmount,
+            paymentDetails: prev.paymentDetails.map(payment => {
                 const paymentAmount = totalAmount * ((payment.percentage || 0) / 100);
-                const gstRate = formData.gstType === 'include' ? 0.18 : 0;
-                const baseAmount = formData.gstType === 'include'
+                const gstRate = prev.gstType === 'include' ? 0.18 : 0;
+                const baseAmount = prev.gstType === 'include'
                     ? paymentAmount / (1 + gstRate)
                     : paymentAmount;
                 const gstAmount = baseAmount * gstRate;
@@ -157,12 +153,9 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                     baseAmount: baseAmount,
                     gstAmount: gstAmount
                 };
-            });
-        }
-
-        setFormData(newFormData);
+            })
+        }));
     };
-
     const handleTopicChange = (index, field, value) => {
         const updatedTopics = [...formData.topics];
         updatedTopics[index][field] = field === "hours" ? parseInt(value) || 0 : value;
@@ -189,15 +182,20 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
     };
 
     const addCourse = () => {
-        setFormData(prev => ({
-            ...prev,
-            courses: [
+        setFormData(prev => {
+            const newCourses = [
                 ...prev.courses,
                 { specialization: "", students: 0, othersSpecText: "" }
-            ]
-        }));
-    };
+            ];
+            const totalStudents = newCourses.reduce((sum, course) => sum + (course.students || 0), 0);
 
+            return {
+                ...prev,
+                courses: newCourses,
+                studentCount: totalStudents // Update with new total
+            };
+        });
+    };
     const addTopic = () => {
         setFormData(prev => ({
             ...prev,
@@ -218,14 +216,20 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
     };
 
     const removeCourse = (index) => {
-        const updatedCourses = [...formData.courses];
-        updatedCourses.splice(index, 1);
-        setFormData(prev => ({
-            ...prev,
-            courses: updatedCourses
-        }));
-    };
+        setFormData(prev => {
+            const updatedCourses = [...prev.courses];
+            const removedStudents = updatedCourses[index].students || 0;
+            updatedCourses.splice(index, 1);
 
+            const totalStudents = updatedCourses.reduce((sum, course) => sum + (course.students || 0), 0);
+
+            return {
+                ...prev,
+                courses: updatedCourses,
+                studentCount: totalStudents // Update with new total
+            };
+        });
+    };
     const removeTopic = (index) => {
         const updatedTopics = [...formData.topics];
         updatedTopics.splice(index, 1);
@@ -247,74 +251,102 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
             totalHours: total
         }));
     };
-
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setShowConfirmation(false); // Hide the confirmation dialog
         setLoading(true);
-        setError(null);
 
         try {
-            // Update the main lead document
             const leadRef = doc(db, "trainingForms", lead.id);
-            await updateDoc(leadRef, {
-                ...formData,
-                updatedAt: new Date(),
-            });
 
-            // Only proceed if projectCode exists
+            // Recalculate to be absolutely sure
+
+            console.log("Stored studentCount:", formData.studentCount);
+            console.log("Calculated from courses:",
+                formData.courses.reduce((sum, c) => sum + (c.students || 0), 0));
+            const totalAmount = (formData.perStudentCost || 0) * totalStudents;
+            // Create complete update object with all fields
+            const updateData = {
+                accountEmail: formData.accountEmail || "",
+                accountName: formData.accountName || "",
+                accountPhone: formData.accountPhone || "",
+                additionalNotes: formData.additionalNotes || "",
+                address: formData.address || "",
+                businessName: formData.businessName || "",
+                city: formData.city || "",
+                collegeCode: formData.collegeCode || "",
+                collegeName: formData.collegeName || "",
+                contractEndDate: formData.contractEndDate || "",
+                contractStartDate: formData.contractStartDate || "",
+                course: formData.course || "",
+                courses: formData.courses.map(course => ({
+                    specialization: course.specialization || "",
+                    students: course.students || 0,
+                    othersSpecText: course.othersSpecText || ""
+                })),
+                createdAt: lead.createdAt || new Date(), // Preserve original creation date
+                createdBy: lead.createdBy || null, // Preserve original creator
+                deliveryType: formData.deliveryType || "",
+                emiMonths: formData.emiMonths || 0,
+                emiSplits: formData.emiSplits || [],
+                gstAmount: formData.gstAmount || 0,
+                gstNumber: formData.gstNumber || "",
+                gstType: formData.gstType || "include",
+                invoiceNumber: formData.invoiceNumber || "",
+                lastUpdated: new Date(),
+                mouFileUrl: formData.mouFileUrl || "",
+                netPayableAmount: formData.netPayableAmount || 0,
+                otherCourseText: formData.otherCourseText || "",
+                passingYear: formData.passingYear || "",
+                paymentDetails: formData.paymentDetails.map(payment => ({
+                    name: payment.name || "",
+                    percentage: payment.percentage || 0,
+                    baseAmount: payment.baseAmount || 0,
+                    gstAmount: payment.gstAmount || 0,
+                    totalAmount: payment.totalAmount || 0,
+                    dueDate: payment.dueDate || ""
+                })),
+                paymentSplits: formData.paymentSplits || [],
+                paymentType: formData.paymentType || "",
+                perStudentCost: formData.perStudentCost || 0,
+                pincode: formData.pincode || "",
+                projectCode: formData.projectCode || "",
+                splitTotal: formData.splitTotal || 0,
+                state: formData.state || "",
+                status: formData.status || "active",
+                studentCount: totalStudents, // Calculated value
+                studentFileUrl: formData.studentFileUrl || "",
+                tcv: formData.tcv || 0,
+                topics: formData.topics.map(topic => ({
+                    topic: topic.topic || "",
+                    hours: topic.hours || "0"
+                })),
+                totalCost: totalAmount, // Calculated value
+                totalHours: formData.totalHours || 0,
+                tpoEmail: formData.tpoEmail || "",
+                tpoName: formData.tpoName || "",
+                tpoPhone: formData.tpoPhone || "",
+                trainingEmail: formData.trainingEmail || "",
+                trainingName: formData.trainingName || "",
+                trainingPhone: formData.trainingPhone || "",
+                updatedAt: new Date(),
+                year: formData.year || ""
+            };
+
+            console.log("Full update payload:", updateData); // Debug log
+
+            // First update - main document
+            await updateDoc(leadRef, updateData);
+
+            // Second update - training form document (if projectCode exists)
             if (lead.projectCode) {
                 const projectDocId = projectCodeToDocId(lead.projectCode);
                 const trainingFormRef = doc(db, "trainingForms", projectDocId);
 
-                console.log("Checking document:", projectDocId); // Debugging
                 const docSnap = await getDoc(trainingFormRef);
-
-               if (docSnap.exists()) {
-    await updateDoc(trainingFormRef, {
-        collegeName: formData.collegeName,
-        collegeCode: formData.collegeCode,
-        city: formData.city,
-        state: formData.state,
-        address: formData.address,
-        pincode: formData.pincode,
-        totalCost: formData.totalCost,
-        tcv: formData.tcv,
-        perStudentCost: formData.perStudentCost,
-        studentCount: formData.studentCount,
-        gstAmount: formData.gstAmount,
-        netPayableAmount: formData.netPayableAmount,
-        gstNumber: formData.gstNumber,
-        gstType: formData.gstType,
-        course: formData.course,
-        courses: formData.courses,
-        year: formData.year,
-        deliveryType: formData.deliveryType,
-        passingYear: formData.passingYear,
-        tpoName: formData.tpoName,
-        tpoEmail: formData.tpoEmail,
-        tpoPhone: formData.tpoPhone,
-        trainingName: formData.trainingName,
-        trainingEmail: formData.trainingEmail,
-        trainingPhone: formData.trainingPhone,
-        accountName: formData.accountName,
-        accountEmail: formData.accountEmail,
-        accountPhone: formData.accountPhone,
-        contractStartDate: formData.contractStartDate,
-        contractEndDate: formData.contractEndDate,
-        paymentType: formData.paymentType,
-        paymentDetails: formData.paymentDetails,
-        topics: formData.topics,
-        totalHours: formData.totalHours,
-        studentFileUrl: formData.studentFileUrl,
-        mouFileUrl: formData.mouFileUrl,
-        otherCourseText: formData.otherCourseText,
-        status: formData.status,
-        updatedAt: new Date() // Always update the timestamp
-    });
-}
- else {
-                    console.warn("Document not found:", projectDocId);
+                if (docSnap.exists()) {
+                    await updateDoc(trainingFormRef, updateData);
+                } else {
+                    console.warn("Training form document not found:", projectDocId);
                     setError("Training form data not found in Firestore!");
                     return;
                 }
@@ -324,7 +356,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
             onClose();
         } catch (err) {
             console.error("Error updating documents:", err);
-            setError(err.message || "Failed to update lead. Please check your connection and try again.");
+            setError(err.message || "Failed to update lead. Please try again.");
         } finally {
             setLoading(false);
         }
@@ -500,10 +532,11 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                             <input
                                                 type="text"
                                                 name="city"
-                                                value={formData.city}
+                                                value={formData.city }
                                                 onChange={handleChange}
                                                 className="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
                                                 placeholder="Mumbai"
+                                                
                                             />
                                         </div>
                                         <div>
