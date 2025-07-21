@@ -508,7 +508,7 @@ const ClosedLeadsTable = ({
   };
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto min-h-screen">
       {/* Upload Modal */}
       {showUploadModal && (
         <div className="fixed inset-0 backdrop-blur-sm bg-opacity-50  flex items-center justify-center z-50">
@@ -859,16 +859,15 @@ const ClosedLeadsTable = ({
                     {/* Elegant dropdown menu */}
                     {openDropdown === id && (
                       <div
-                        className="absolute right-0 top-full z-30 mt-1 w-56 origin-top-right rounded-xl bg-white shadow-lg ring-1 ring-gray-200/95 focus:outline-none"
+                        className="absolute right-0 top-full z-30 mt-1 w-42 origin-top-right rounded-xl bg-white shadow-lg ring-1 ring-gray-200/95 focus:outline-none"
                         style={{
                           boxShadow:
                             "0px 10px 25px -5px rgba(0, 0, 0, 0.1), 0px 5px 10px -3px rgba(0, 0, 0, 0.05)",
                         }}
                       >
-                        <div className="p-1.5">
-                          {/* Menu items with subtle hover states */}
+                        <div className="flex flex-col p-1.5">
                           <button
-                            className="flex w-full items-center rounded-lg px-3 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50/90 hover:text-primary-600"
+                            className="flex items-center rounded-lg px-3 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50/90 hover:text-primary-600"
                             onClick={() => {
                               setActiveLeadId(id);
                               setShowUploadModal(true);
@@ -880,7 +879,7 @@ const ClosedLeadsTable = ({
                           </button>
 
                           <button
-                            className="flex w-full items-center rounded-lg px-3 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50/90 hover:text-primary-600"
+                            className="flex items-center rounded-lg px-3 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50/90 hover:text-primary-600"
                             onClick={() => handleMOUMenuClick(id)}
                           >
                             <FiFileText className="mr-3 h-4 w-4 opacity-80" />
@@ -893,7 +892,7 @@ const ClosedLeadsTable = ({
                           </button>
 
                           <button
-                            className="flex w-full items-center rounded-lg px-3 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50/90 hover:text-primary-600"
+                            className="flex items-center rounded-lg px-3 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50/90 hover:text-primary-600"
                             onClick={() => handleEditClosureForm(lead)}
                           >
                             <FiEdit className="mr-3 h-4 w-4 opacity-80" />
