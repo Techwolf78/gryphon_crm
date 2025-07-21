@@ -68,27 +68,6 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
         }
     }, [lead]);
 
-    const courseOptions = ["Engineering", "MBA", "BBA", "BCA", "MCA", "Diploma", "BSC", "MSC", "Others"];
-    const courseYears = {
-        Engineering: ["1st", "2nd", "3rd", "4th"],
-        MBA: ["1st", "2nd"],
-        BBA: ["1st", "2nd", "3rd"],
-        BCA: ["1st", "2nd", "3rd"],
-        BSC: ["1st", "2nd", "3rd"],
-        MCA: ["1st", "2nd"],
-        Diploma: ["1st", "2nd", "3rd"],
-        MSC: ["1st", "2nd"],
-        Others: ["1st", "2nd"]
-    };
-
-    const deliveryTypes = [
-        { value: "TP", label: "TP - Training Placement" },
-        { value: "OT", label: "OT - Only Training" },
-        { value: "IP", label: "IP - Induction Program" },
-        { value: "DM", label: "DM - Digital Marketing" },
-        { value: "SNS", label: "SNS - SNS" }
-    ];
-
     const courseSpecializations = {
         Engineering: ["CS", "IT", "ENTC", "CS-Cyber Security", "Mechanical", "Civil", "Electrical", "Chemical", "CS-AI-ML", "CS-AI-DS", "Other"],
         MBA: ["Marketing", "Finance", "HR", "Operations", "Other"],
@@ -101,20 +80,6 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
         Others: ["Other"]
     };
     const topicOptions = ["Soft Skills", "Aptitude", "Domain Technical", "Excel - Power BI", "Looker Studio"]
-
-    const generatePassingYears = () => {
-        const currentYear = new Date().getFullYear();
-        return Array.from({ length: 16 }, (_, i) => `${currentYear - 5 + i}-${currentYear - 4 + i}`);
-    };
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: name.includes("Amount") || name.includes("Cost") || name.includes("Hours") ?
-                parseFloat(value) || 0 :
-                value
-        }));
-    };
 
     const handlePaymentDetailChange = (index, field, value) => {
         const updatedPaymentDetails = [...formData.paymentDetails];
@@ -181,17 +146,6 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
         }));
     };
 
-
-    const addPaymentDetail = () => {
-        setFormData(prev => ({
-            ...prev,
-            paymentDetails: [
-                ...prev.paymentDetails,
-                { name: "", percentage: 0, baseAmount: 0, gstAmount: 0, totalAmount: 0, dueDate: "" }
-            ]
-        }));
-    };
-
     const addCourse = () => {
         setFormData(prev => ({
             ...prev,
@@ -209,15 +163,6 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                 ...prev.topics,
                 { topic: "", hours: "" }
             ]
-        }));
-    };
-
-    const removePaymentDetail = (index) => {
-        const updatedPaymentDetails = [...formData.paymentDetails];
-        updatedPaymentDetails.splice(index, 1);
-        setFormData(prev => ({
-            ...prev,
-            paymentDetails: updatedPaymentDetails
         }));
     };
 
@@ -240,14 +185,6 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
         setFormData(prev => ({
             ...prev,
             topics: updatedTopics,
-            totalHours: total
-        }));
-    };
-
-    const calculateTotalHours = () => {
-        const total = formData.topics.reduce((sum, topic) => sum + (parseInt(topic.hours) || 0), 0);
-        setFormData(prev => ({
-            ...prev,
             totalHours: total
         }));
     };
@@ -347,6 +284,14 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
         if (currentIndex > 0) {
             setActiveSection(sections[currentIndex - 1]);
         }
+    };
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
     };
 
     if (!lead) return null;
