@@ -72,7 +72,6 @@ function Sales() {
   const [pendingPhaseChange, setPendingPhaseChange] = useState(null);
   const [leadBeingUpdated, setLeadBeingUpdated] = useState(null);
   const [expectedDate, setExpectedDate] = useState("");
-
   // Filter state with debouncing
   const [rawFilters, setRawFilters] = useState({});
   const [filters, setFilters] = useState({});
