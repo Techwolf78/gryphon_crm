@@ -18,8 +18,7 @@ import {
   getDocs,
   deleteDoc,
   updateDoc,
-  arrayUnion,
-  serverTimestamp,
+  serverTimestamp, // <-- arrayUnion removed if unused
 } from "firebase/firestore";
 import EditClosedLeadModal from "./EditClosedLeadModal"; // Adjust path if needed
 
@@ -35,7 +34,7 @@ const ClosedLeadsTable = ({
   formatDate,
   formatCurrency,
   viewMyLeadsOnly,
-  onEditClosureForm, // Add this new prop
+  // onEditClosureForm, // <-- Remove if not used
 }) => {
   const [openDropdown, setOpenDropdown] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -51,26 +50,6 @@ const ClosedLeadsTable = ({
   const [activeLeadId, setActiveLeadId] = useState(null);
   const [showEditClosureModal, setShowEditClosureModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
-
-  const handleEditClosureClick = async (projectCode) => {
-    try {
-      setIsLoadingForm(true);
-      const sanitizedCode = projectCode.replace(/\//g, "-");
-      const docRef = doc(db, "trainingForms", sanitizedCode);
-      const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        setSelectedFormData(docSnap.data());
-        setShowEditClosureForm(true);
-      } else {
-        console.error("No such form data found!");
-      }
-    } catch (err) {
-      console.error("Error fetching form data: ", err);
-    } finally {
-      setIsLoadingForm(false);
-    }
-  };
 
   const uploadToCloudinary = async (file) => {
     const formData = new FormData();
@@ -217,45 +196,6 @@ const ClosedLeadsTable = ({
     } catch (error) {
       console.error("Error fetching training form data:", error);
       alert("Failed to fetch form data");
-    }
-  };
-
-  const logAvailableProjectCodes = async () => {
-    try {
-      console.group("Debugging Project Code Mismatch");
-
-      // Log the current lead's project code
-      const currentLead = leads.find(([id]) => id === openDropdown)?.[1];
-      console.log("Current Lead:", currentLead);
-      console.log("Lead Project Code:", currentLead?.projectCode);
-      console.log(
-        "Converted Doc ID:",
-        projectCodeToDocId(currentLead?.projectCode || "")
-      );
-
-      // Log all trainingForms documents (just their IDs)
-      console.log("Fetching all trainingForms documents...");
-      const trainingFormsSnapshot = await getDocs(
-        collection(db, "trainingForms")
-      );
-      const allTrainingForms = trainingFormsSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        projectCode: doc.data().projectCode,
-      }));
-
-      console.log("All Training Forms:", allTrainingForms);
-      console.log(
-        "Matching Document:",
-        allTrainingForms.find(
-          (form) =>
-            form.id === projectCodeToDocId(currentLead?.projectCode || "") ||
-            form.projectCode === currentLead?.projectCode
-        )
-      );
-
-      console.groupEnd();
-    } catch (error) {
-      console.error("Error logging project codes:", error);
     }
   };
 
@@ -489,21 +429,6 @@ const ClosedLeadsTable = ({
       reader.onload = (e) => resolve(e.target.result);
       reader.onerror = (error) => reject(error);
       reader.readAsArrayBuffer(file);
-    });
-  };
-  const processMOUFile = (file) => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        resolve({
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          lastModified: file.lastModified,
-          data: e.target.result.split(",")[1], // Remove data URL prefix
-        });
-      };
-      reader.readAsDataURL(file);
     });
   };
 
@@ -859,7 +784,7 @@ const ClosedLeadsTable = ({
                     {/* Elegant dropdown menu */}
                     {openDropdown === id && (
                       <div
-                        className="absolute right-0 top-full z-30 mt-1 w-42 origin-top-right rounded-xl bg-white shadow-lg ring-1 ring-gray-200/95 focus:outline-none"
+                        className="absolute right-0 top-full z-30 mt-1 w-48 origin-top-right rounded-xl bg-white shadow-lg ring-1 ring-gray-200/95 focus:outline-none"
                         style={{
                           boxShadow:
                             "0px 10px 25px -5px rgba(0, 0, 0, 0.1), 0px 5px 10px -3px rgba(0, 0, 0, 0.05)",
@@ -945,6 +870,7 @@ ClosedLeadsTable.propTypes = {
   formatDate: PropTypes.func.isRequired,
   formatCurrency: PropTypes.func.isRequired,
   viewMyLeadsOnly: PropTypes.bool.isRequired,
+  // onEditClosureForm: PropTypes.func, // <-- Remove if not used
 };
 
 export default ClosedLeadsTable;

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { doc, updateDoc, getDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
@@ -9,8 +8,11 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [activeSection, setActiveSection] = useState("basic");
-    const [showConfirmation, setShowConfirmation] = useState(false); // New state for confirmation dialog
-    const sections = ['basic', 'contacts', 'course', 'topics', 'financial',];
+    const [showConfirmation, setShowConfirmation] = useState(false);
+    const sections = ['basic', 'contacts', 'course', 'topics', 'financial'];
+
+    // Add this helper function:
+    const numValue = (val) => (val === 0 || val === "0" ? "" : val);
 
     useEffect(() => {
         if (lead) {
@@ -126,11 +128,12 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
         }));
     };
 
+    // 1. Update handleCourseChange to always update studentCount
     const handleCourseChange = (index, field, value) => {
         const updatedCourses = [...formData.courses];
         updatedCourses[index][field] = field === "students" ? parseInt(value) || 0 : value;
 
-        // Calculate new total cost whenever student numbers change
+        // Calculate new total cost and student count whenever student numbers change
         const newFormData = {
             ...formData,
             courses: updatedCourses
@@ -141,6 +144,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
             const totalAmount = (formData.perStudentCost || 0) * totalStudents;
 
             newFormData.totalCost = totalAmount;
+            newFormData.studentCount = totalStudents; // <-- Ensure studentCount is always updated
 
             // Update payment details to match new total
             newFormData.paymentDetails = formData.paymentDetails.map(payment => {
@@ -351,7 +355,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
 
     return (
         <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-54 p-4">
-            {/* Confirmation Dialog - Add this at the beginning of your return statement */}
+            {/* Confirmation Dialog */}
             {showConfirmation && (
                 <div className="fixed inset-0  bg-opacity-30 backdrop-blur-sm flex items-center justify-center z-60">
                     <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full">
@@ -570,7 +574,6 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                         {/* Financial Section */}
                         {activeSection === 'financial' && (
                             <div className="space-y-6">
-                                {/* Student Count and Cost Summary */}
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                     {/* Total Students (readonly) */}
                                     <div className="bg-blue-50 p-4 rounded-lg">
@@ -578,7 +581,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                         <div className="relative">
                                             <input
                                                 type="number"
-                                                value={formData.courses?.reduce((sum, course) => sum + (parseInt(course.students) || 0), 0) || 0}
+                                                value={numValue(formData.courses?.reduce((sum, course) => sum + (parseInt(course.students) || 0), 0))}
                                                 className="block w-full pl-10 pr-3 py-2 border border-blue-300 rounded-lg shadow-sm bg-blue-100"
                                                 readOnly
                                             />
@@ -594,7 +597,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                         <div className="relative">
                                             <input
                                                 type="number"
-                                                value={formData.perStudentCost || 0}
+                                                value={numValue(formData.perStudentCost)}
                                                 onChange={(e) => {
                                                     const perStudentCost = parseFloat(e.target.value) || 0;
                                                     const totalStudents = formData.courses?.reduce((sum, course) => sum + (parseInt(course.students) || 0), 0) || 0;
@@ -604,6 +607,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                                         ...prev,
                                                         perStudentCost,
                                                         totalCost: totalAmount,
+                                                        studentCount: totalStudents,
                                                         paymentDetails: prev.paymentDetails.map(payment => {
                                                             const paymentAmount = totalAmount * ((payment.percentage || 0) / 100);
                                                             const gstRate = prev.gstType === 'include' ? 0.18 : 0;
@@ -637,7 +641,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                         <div className="relative">
                                             <input
                                                 type="number"
-                                                value={formData.totalCost.toFixed(2)}
+                                                value={formData.totalCost ? formData.totalCost.toFixed(2) : ""}
                                                 readOnly
                                                 className="block w-full pl-10 pr-3 py-2 border border-green-300 rounded-lg shadow-sm bg-green-100"
                                             />
@@ -685,7 +689,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                                             <div className="relative">
                                                                 <input
                                                                     type="number"
-                                                                    value={payment.percentage || 0}
+                                                                    value={numValue(payment.percentage)}
                                                                     onChange={(e) => {
                                                                         let newPercentage = parseInt(e.target.value) || 0;
 
@@ -837,13 +841,10 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                             <select
                                                 name="course"
                                                 value={formData.course || ""}
-                                                onChange={handleChange}
-                                                className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                                className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg shadow-sm bg-gray-100 cursor-not-allowed"
+                                                disabled
                                             >
-                                                <option value="">Select Course</option>
-                                                {courseOptions.map(option => (
-                                                    <option key={option} value={option}>{option}</option>
-                                                ))}
+                                                <option value="">{formData.course || "Not specified"}</option>
                                             </select>
                                             <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                                                 <FiChevronDown className="h-5 w-5 text-gray-400" />
@@ -907,7 +908,6 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                 {/* Specialization and student count fields */}
                                 <div>
                                     <h3 className="text-lg font-medium text-gray-900 mb-4">Course Specializations</h3>
-
                                     {formData.courses?.map((course, index) => {
                                         const isOthersSpec = course.specialization === "Other";
                                         // Get specializations based on the selected course
@@ -951,10 +951,9 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                                         <div className="relative">
                                                             <input
                                                                 type="number"
-                                                                value={course.students}
+                                                                value={numValue(course.students)}
                                                                 onChange={(e) => handleCourseChange(index, "students", e.target.value)}
                                                                 className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none"
-
                                                             />
                                                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                                                 <FiUser className="h-5 w-5 text-gray-400" />
@@ -988,14 +987,13 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                             </div>
                                         );
                                     })}
-
                                     {/* Total students count */}
                                     <div className="mt-4 bg-blue-50 p-4 rounded-lg">
                                         <label className="block text-sm font-medium text-blue-700 mb-1">Total Students</label>
                                         <div className="relative">
                                             <input
                                                 type="number"
-                                                value={formData.courses?.reduce((sum, course) => sum + (parseInt(course.students) || 0), 0)}
+                                                value={numValue(formData.studentCount)}
                                                 className="block w-full pl-10 pr-3 py-2 border border-blue-300 rounded-lg shadow-sm bg-blue-100 focus:ring-blue-500 focus:border-blue-500"
                                                 readOnly
                                             />
@@ -1220,7 +1218,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                                 <label className="block text-xs font-medium text-gray-500 mb-1">Hours</label>
                                                 <input
                                                     type="number"
-                                                    value={topic.hours}
+                                                    value={numValue(topic.hours)}
                                                     onChange={(e) => handleTopicChange(index, "hours", e.target.value)}
                                                     className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
                                                     min="0"
@@ -1245,7 +1243,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                     <input
                                         type="number"
                                         name="totalHours"
-                                        value={formData.totalHours}
+                                        value={numValue(formData.totalHours)}
                                         className="block w-full px-3 py-2 border border-blue-300 rounded-lg shadow-sm bg-blue-100 focus:ring-blue-500 focus:border-blue-500"
                                         readOnly
                                     />
