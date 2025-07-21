@@ -29,6 +29,10 @@ function LeadFilters({
   leads,
   activeTab,
 }) {
+  if (activeTab === 'closed') {
+  return null;
+}
+
   const [localFilters, setLocalFilters] = useState(filters);
   const [allLeads, setAllLeads] = useState([]);
   const [activeSection, setActiveSection] = useState(null);
