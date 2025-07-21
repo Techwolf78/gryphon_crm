@@ -19,7 +19,7 @@ const DashboardLayout = () => {
           sidebarCollapsed ? 'ml-20' : 'ml-[168px]'
         }`}
       >
-        <div className="p-8">
+        <div className="p-4">
           <Outlet />
         </div>
       </main>
