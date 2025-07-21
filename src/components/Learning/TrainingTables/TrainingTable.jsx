@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
-import { FaEllipsisV, FaUsers, FaFileContract, FaRupeeSign, FaClock, FaUniversity } from "react-icons/fa";
+import { FaEllipsisV, FaUsers, FaFileContract, FaRupeeSign, FaClock, FaUniversity, FaPlay } from "react-icons/fa";
 import { IoDocumentTextOutline } from "react-icons/io5";
 import { MdOutlineAttachMoney } from "react-icons/md";
+import InitiationModal from "./InitiationModal";
+
 
 function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouFile, onManageStudents }) {
   const [menuOpenId, setMenuOpenId] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [showInitiationModal, setShowInitiationModal] = useState(false);
+  const [selectedTraining, setSelectedTraining] = useState(null);
   const menuRefs = useRef({});
 
   const toggleMenu = (id, e) => {
@@ -13,6 +17,19 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
     setMenuOpenId(menuOpenId === id ? null : id);
   };
 
+  const handleInitiateClick = (training) => {
+    setSelectedTraining(training);
+    setShowInitiationModal(true);
+    setMenuOpenId(null);
+  };
+
+  const handleConfirmInitiation = (training) => {
+    // Here you would typically make an API call to initiate the training
+    console.log("Initiating training:", training);
+    // Close the modal
+    setShowInitiationModal(false);
+    // You might want to add a toast notification here
+  };
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
@@ -96,9 +113,8 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
         {trainingData.map((item) => (
           <div
             key={item.id}
-            className={`grid grid-cols-1 md:grid-cols-12 gap-4 px-4 md:px-6 py-4 text-sm group relative cursor-pointer transition hover:bg-blue-50/50 ${
-              menuOpenId === item.id ? 'bg-blue-50' : 'bg-white'
-            }`}
+            className={`grid grid-cols-1 md:grid-cols-12 gap-4 px-4 md:px-6 py-4 text-sm group relative cursor-pointer transition hover:bg-blue-50/50 ${menuOpenId === item.id ? 'bg-blue-50' : 'bg-white'
+              }`}
             onClick={() => onRowClick(item)}
           >
             {/* Project Code */}
@@ -153,8 +169,6 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
                   {formatCurrency(item.perStudentCost)}
                 </div>
               </div>
-
-              
             </div>
 
             {/* Total Hours & Actions */}
@@ -176,9 +190,8 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
                 <button
                   data-id={item.id}
                   onClick={(e) => toggleMenu(item.id, e)}
-                  className={`text-gray-500 hover:text-blue-600 p-2 rounded-full transition ${
-                    menuOpenId === item.id ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100'
-                  }`}
+                  className={`text-gray-500 hover:text-blue-600 p-2 rounded-full transition ${menuOpenId === item.id ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100'
+                    }`}
                 >
                   <FaEllipsisV size={16} />
                 </button>
@@ -196,9 +209,8 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
                         setMenuOpenId(null);
                       }}
                       disabled={!item.studentFileUrl}
-                      className={`w-full px-4 py-3 text-left flex items-center transition ${
-                        item.studentFileUrl ? 'hover:bg-blue-50 text-gray-700' : 'text-gray-400'
-                      }`}
+                      className={`w-full px-4 py-3 text-left flex items-center transition ${item.studentFileUrl ? 'hover:bg-blue-50 text-gray-700' : 'text-gray-400'
+                        }`}
                     >
                       <FaUsers className="mr-2 text-blue-500" />
                       View Students
@@ -209,12 +221,18 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
                         setMenuOpenId(null);
                       }}
                       disabled={!item.mouFileUrl}
-                      className={`w-full px-4 py-3 text-left flex items-center transition ${
-                        item.mouFileUrl ? 'hover:bg-blue-50 text-gray-700' : 'text-gray-400'
-                      }`}
+                      className={`w-full px-4 py-3 text-left flex items-center transition ${item.mouFileUrl ? 'hover:bg-blue-50 text-gray-700' : 'text-gray-400'
+                        }`}
                     >
                       <FaFileContract className="mr-2 text-blue-500" />
                       View MOU
+                    </button>
+                    <button
+                      onClick={() => handleInitiateClick(item)}
+                      className="w-full px-4 py-3 text-left flex items-center hover:bg-blue-50 text-gray-700 transition"
+                    >
+                      <FaPlay className="mr-2 text-blue-500" />
+                      Initiation
                     </button>
                   </div>
                 )}
@@ -230,6 +248,14 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
           <div className="text-lg font-medium mb-2">No training programs found</div>
           <p className="text-sm">Create a new training program to get started</p>
         </div>
+      )}
+      {/* Initiation Modal */}
+      {showInitiationModal && selectedTraining && (
+        <InitiationModal
+          training={selectedTraining}
+          onClose={() => setShowInitiationModal(false)}
+          onConfirm={handleConfirmInitiation}
+        />
       )}
     </div>
   );
