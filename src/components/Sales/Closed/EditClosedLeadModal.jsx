@@ -27,6 +27,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
   const [activeSection, setActiveSection] = useState("basic");
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [topicErrors, setTopicErrors] = useState([]);
+  const [paymentErrors, setPaymentErrors] = useState([]);
   const sections = ["basic", "contacts", "course", "topics", "financial"];
 
   // Add this helper function:
@@ -183,8 +184,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
 
   const handleTopicChange = (index, field, value) => {
     const updatedTopics = [...formData.topics];
-    updatedTopics[index][field] =
-      field === "hours" ? parseInt(value) || 0 : value;
+    updatedTopics[index][field] = field === "hours" ? parseInt(value) || 0 : value;
 
     // Calculate new total hours
     const total = updatedTopics.reduce(
@@ -252,7 +252,6 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
     const updatedTopics = [...formData.topics];
     updatedTopics.splice(index, 1);
 
-    // Calculate new total hours - fixed the calculation
     const total = updatedTopics.reduce(
       (sum, topic) => sum + (parseInt(topic.hours) || 0),
       0
@@ -263,6 +262,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
       topics: updatedTopics,
       totalHours: total,
     }));
+    setTopicErrors(checkDuplicateTopics(updatedTopics));
   };
 
   const handleSubmit = async (e) => {
@@ -780,91 +780,77 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                   type="number"
                                   value={numValue(payment.percentage)}
                                   onChange={(e) => {
-                                    let newPercentage =
-                                      parseInt(e.target.value) || 0;
+                                    let newPercentage = parseInt(e.target.value) || 0;
+                                    const details = [...formData.paymentDetails];
+                                    const errors = [...paymentErrors];
 
-                                    // Validate the new percentage
-                                    if (newPercentage < 0) {
-                                      newPercentage = 0;
-                                    } else if (newPercentage > 100) {
-                                      newPercentage = 100;
+                                    // Error if 0 (manual input)
+                                    if (newPercentage <= 0) {
+                                      errors[index] = "Percentage must be greater than 0";
+                                    } else {
+                                      errors[index] = "";
                                     }
 
-                                    // Calculate how much we can actually adjust
-                                    const currentTotal =
-                                      formData.paymentDetails.reduce(
-                                        (sum, p) => sum + (p.percentage || 0),
-                                        0
-                                      );
-                                    const otherPaymentsTotal =
-                                      currentTotal - (payment.percentage || 0);
-                                    const maxAllowed = 100 - otherPaymentsTotal;
-
-                                    if (newPercentage > maxAllowed) {
-                                      newPercentage = maxAllowed;
-                                    }
-
-                                    // Update all payment details
-                                    const newDetails = [
-                                      ...formData.paymentDetails,
-                                    ];
-                                    newDetails[index].percentage =
-                                      newPercentage;
-
-                                    // Calculate remaining percentage to distribute
-                                    let remaining = 100 - newPercentage;
-                                    const otherPayments = newDetails.filter(
-                                      (_, i) => i !== index
-                                    );
-
-                                    // Distribute remaining percentage proportionally to other payments
-                                    if (otherPayments.length > 0) {
-                                      const otherPaymentsTotal =
-                                        otherPayments.reduce(
-                                          (sum, p) => sum + (p.percentage || 0),
-                                          0
-                                        );
-                                      const scaleFactor =
-                                        remaining / otherPaymentsTotal;
-
-                                      newDetails.forEach((p, i) => {
-                                        if (i !== index) {
-                                          newDetails[i].percentage = Math.round(
-                                            p.percentage * scaleFactor
-                                          );
+                                    // Adjust others so total is always 100
+                                    if (details.length === 1) {
+                                      details[0].percentage = 100;
+                                      errors[0] = ""; // Clear error if auto-adjusted
+                                    } else {
+                                      if (index === details.length - 1) {
+                                        // If last field edited, adjust first
+                                        details[index].percentage = newPercentage;
+                                        let sumOthers = details
+                                          .slice(1, details.length - 1)
+                                          .reduce((sum, p) => sum + (p.percentage || 0), 0);
+                                        details[0].percentage = 100 - sumOthers - newPercentage;
+                                        // Clear error if auto-adjusted to >0
+                                        if (details[0].percentage <= 0) {
+                                          details[0].percentage = 1;
+                                          details[index].percentage = 99 - sumOthers;
                                         }
-                                      });
-
-                                      // Fix any rounding errors by adjusting the last payment
-                                      const finalTotal = newDetails.reduce(
-                                        (sum, p) => sum + (p.percentage || 0),
-                                        0
-                                      );
-                                      if (finalTotal !== 100) {
-                                        newDetails[
-                                          newDetails.length - 1
-                                        ].percentage += 100 - finalTotal;
+                                        errors[0] = details[0].percentage > 0 ? "" : "Percentage must be greater than 0";
+                                      } else {
+                                        // If not last, adjust last field
+                                        details[index].percentage = newPercentage;
+                                        let sumOthers = details
+                                          .slice(0, details.length - 1)
+                                          .reduce(
+                                            (sum, p, i) =>
+                                              i === index ? sum + newPercentage : sum + (p.percentage || 0),
+                                            0
+                                          );
+                                        details[details.length - 1].percentage = 100 - sumOthers;
+                                        // Clear error if auto-adjusted to >0
+                                        if (details[details.length - 1].percentage <= 0) {
+                                          details[details.length - 1].percentage = 1;
+                                          details[index].percentage =
+                                            99 -
+                                            details
+                                              .slice(0, details.length - 1)
+                                              .reduce(
+                                                (sum, p, i) =>
+                                                  i === index ? sum : sum + (p.percentage || 0),
+                                                0
+                                              );
+                                        }
+                                        errors[details.length - 1] =
+                                          details[details.length - 1].percentage > 0
+                                            ? ""
+                                            : "Percentage must be greater than 0";
                                       }
                                     }
 
-                                    // Recalculate all amounts
+                                    // Recalculate amounts
                                     const totalCost =
                                       formData.perStudentCost *
-                                      formData.courses?.reduce(
-                                        (sum, course) =>
-                                          sum +
-                                          (parseInt(course.students) || 0),
+                                      (formData.courses?.reduce(
+                                        (sum, course) => sum + (parseInt(course.students) || 0),
                                         0
-                                      );
+                                      ) || 0);
 
-                                    newDetails.forEach((payment) => {
-                                      const paymentAmount =
-                                        totalCost *
-                                        ((payment.percentage || 0) / 100);
-                                      const gstRate =
-                                        formData.gstType === "include"
-                                          ? 0.18
-                                          : 0;
+                                    details.forEach((payment) => {
+                                      const paymentAmount = totalCost * ((payment.percentage || 0) / 100);
+                                      const gstRate = formData.gstType === "include" ? 0.18 : 0;
                                       const baseAmount =
                                         formData.gstType === "include"
                                           ? paymentAmount / (1 + gstRate)
@@ -878,11 +864,12 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
 
                                     setFormData((prev) => ({
                                       ...prev,
-                                      paymentDetails: newDetails,
+                                      paymentDetails: details,
                                       totalCost: totalCost,
                                     }));
+                                    setPaymentErrors(errors);
                                   }}
-                                  min="0"
+                                  min="1"
                                   max="100"
                                   step="1"
                                   className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
@@ -891,6 +878,9 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                   <FiPercent className="h-5 w-5 text-gray-400" />
                                 </div>
                               </div>
+                              {paymentErrors[index] && (
+                                <p className="text-red-600 text-xs mt-1">{paymentErrors[index]}</p>
+                              )}
                             </div>
 
                             {/* Amount Display */}
@@ -1463,21 +1453,21 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                         <button
                           type="button"
                           onClick={() => removeTopic(index)}
-                          className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-full shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                          className="p-2 text-red-600 hover:text-red-800 rounded-full hover:bg-red-50 transition-colors"
+                          title="Remove topic"
                         >
-                          Remove
+                          <FiTrash2 className="h-5 w-5" />
                         </button>
                       </div>
                     </div>
                     {topicErrors[index] && (
-                      <p className="text-red-600 text-xs mt-2">
-                        {topicErrors[index]}
-                      </p>
+                      <p className="text-red-600 text-xs mt-1">{topicErrors[index]}</p>
                     )}
                   </div>
                 ))}
 
-                <div className="bg-blue-50 p-4 rounded-lg">
+                {/* Total Training Hours */}
+                <div className="mt-4 bg-blue-50 p-4 rounded-lg">
                   <label className="block text-sm font-medium text-blue-700 mb-1">
                     Total Training Hours
                   </label>
@@ -1514,19 +1504,19 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                 </button>
               )}
 
-{activeSection !== sections[sections.length - 1] ? (
-    <button
-        type="button"
-        onClick={goToNextSection}
-        className="px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center"
-        disabled={
-            loading ||
-            (activeSection === "topics" && topicErrors.some(e => !!e))
-        }
-    >
-        Next <FiArrowRight className="ml-2" />
-    </button>
-) : (
+              {activeSection !== sections[sections.length - 1] ? (
+                <button
+                  type="button"
+                  onClick={goToNextSection}
+                  className="px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center"
+                  disabled={
+                    loading ||
+                    (activeSection === "topics" && topicErrors.some(e => !!e))
+                  }
+                >
+                  Next <FiArrowRight className="ml-2" />
+                </button>
+              ) : (
                 <button
                   type="button" // Changed from "submit" to "button"
                   onClick={() => setShowConfirmation(true)} // Show confirmation instead of submitting directly
