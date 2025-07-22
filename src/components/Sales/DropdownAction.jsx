@@ -89,13 +89,15 @@ const DropdownActions = ({
   }
 
   if (currentUserData.role === "Manager") {
-    return allSalesUsers.filter(
-      (u) =>
-        u.reportingManager === currentUserData.name &&
-        ["Assistant Manager", "Executive"].includes(u.role)
+    return allSalesUsers.filter(u => 
+      // Include their own team
+      u.reportingManager === currentUserData.name ||
+      // Include other managers (same level)
+      u.role === "Manager" ||
+      // Include executives from other teams (optional)
+      ["Assistant Manager", "Executive"].includes(u.role)
     );
   }
-
   if (["Assistant Manager", "Executive"].includes(currentUserData.role)) {
     const manager = userList.find(
       (u) => u.name === currentUserData.reportingManager

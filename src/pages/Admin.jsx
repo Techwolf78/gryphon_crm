@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState,  } from "react";
 import {
   FiSearch,
   FiUser,
@@ -10,7 +10,8 @@ import {
   FiAlertCircle,
   FiCalendar,
   FiActivity,
-  FiClock
+  FiClock,
+  FiEdit
 } from "react-icons/fi";
 import {
   collection,
@@ -28,11 +29,13 @@ import NewUser from "../components/Admin/NewUser";
 import AuditLogs from "../components/Admin/AuditLogs";
 import LoginAnalytics from "../components/Admin/LoginAnalytics";
 import UserAvatar from "../components/Admin/UserAvatar";
+import EditUser from "../components/Admin/EditUserModle"; // New component
 
 const Admin = () => {
   const [users, setUsers] = useState([]);
   const [logs, setLogs] = useState([]);
   const [deleteUser, setDeleteUser] = useState(null);
+  const [editUser, setEditUser] = useState(null); // New state for edit
   const [loadingDelete, setLoadingDelete] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState("");
@@ -54,49 +57,49 @@ const Admin = () => {
     handleRefresh();
   }, []);
 
-const handleRefresh = async () => {
-  setRefreshing(true);
-  try {
-    const [usersSnap, logsSnap] = await Promise.all([
-      getDocs(collection(db, "users")),
-      getDocs(query(collection(db, "audit_logs"), orderBy("date", "desc"), limit(50)))
-    ]);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const [usersSnap, logsSnap] = await Promise.all([
+        getDocs(collection(db, "users")),
+        getDocs(query(collection(db, "audit_logs"), orderBy("date", "desc"), limit(50)))
+      ]);
 
-    const userData = await Promise.all(
-      usersSnap.docs.map(async (userDoc) => {
-        try {
-          const userProfile = await getDoc(doc(db, "userprofile", userDoc.data().uid));
-          return {
-            id: userDoc.id,
-            ...userDoc.data(),
-            profilePicUrl: userProfile.exists() ? userProfile.data().profilePicUrl : null,
-          };
-        } catch (error) {
-          console.error(`Error fetching profile for user ${userDoc.id}:`, error);
-          return {
-            id: userDoc.id,
-            ...userDoc.data(),
-            profilePicUrl: null,
-          };
-        }
-      })
-    );
+      const userData = await Promise.all(
+        usersSnap.docs.map(async (userDoc) => {
+          try {
+            const userProfile = await getDoc(doc(db, "userprofile", userDoc.data().uid));
+            return {
+              id: userDoc.id,
+              ...userDoc.data(),
+              profilePicUrl: userProfile.exists() ? userProfile.data().profilePicUrl : null,
+            };
+          } catch (error) {
+            console.error(`Error fetching profile for user ${userDoc.id}:`, error);
+            return {
+              id: userDoc.id,
+              ...userDoc.data(),
+              profilePicUrl: null,
+            };
+          }
+        })
+      );
 
-    const logData = logsSnap.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+      const logData = logsSnap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
 
-    setUsers(userData);
-    setLogs(logData);
+      setUsers(userData);
+      setLogs(logData);
 
-    sessionStorage.setItem("userList", JSON.stringify(userData));
-    sessionStorage.setItem("auditLogs", JSON.stringify(logData));
-  } catch (error) {
-    console.error("Refresh error:", error);
-  }
-  setRefreshing(false);
-};
+      sessionStorage.setItem("userList", JSON.stringify(userData));
+      sessionStorage.setItem("auditLogs", JSON.stringify(logData));
+    } catch (error) {
+      console.error("Refresh error:", error);
+    }
+    setRefreshing(false);
+  };
 
   const handleDeleteUserConfirm = async () => {
     if (!deleteUser) return;
@@ -114,6 +117,11 @@ const handleRefresh = async () => {
       console.error("Error deleting user:", error);
     }
     setLoadingDelete(false);
+  };
+
+  const handleUserUpdated = () => {
+    handleRefresh();
+    setEditUser(null);
   };
 
   const filteredUsers = users.filter((u) => {
@@ -301,7 +309,27 @@ const handleRefresh = async () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-gray-500">{user.department}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <td className="px-6 py-4 whitespace-nowrap text-right space-x-2">
+                          <button
+onClick={async () => {
+  try {
+    const docRef = doc(db, "users", user.id);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const fullUserData = { id: docSnap.id, ...docSnap.data() };
+      setEditUser(fullUserData);
+    } else {
+      console.error("User not found");
+    }
+  } catch (err) {
+    console.error("Error fetching full user data:", err);
+  }
+}}
+                            className="text-blue-500 hover:text-blue-700 p-1 rounded-full hover:bg-blue-50"
+                            aria-label={`Edit user ${user.name}`}
+                          >
+                            <FiEdit className="w-4 h-4" />
+                          </button>
                         <button
                           onClick={() => setDeleteUser(user)}
                           className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-50"
@@ -371,9 +399,8 @@ const handleRefresh = async () => {
         </div>
       </motion.section>
 
-        <LoginAnalytics logs={logs} />
-        <AuditLogs logs={logs} />
-
+      <LoginAnalytics logs={logs} />
+      <AuditLogs logs={logs} />
 
       {/* Delete Confirmation Modal */}
       {deleteUser && (
@@ -418,6 +445,23 @@ const handleRefresh = async () => {
                 )}
               </button>
             </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Edit User Modal */}
+      {editUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 p-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-xl shadow-lg max-w-md w-full p-6"
+          >
+            <EditUser 
+              user={editUser} 
+              onCancel={() => setEditUser(null)} 
+              onSuccess={handleUserUpdated}
+            />
           </motion.div>
         </div>
       )}
