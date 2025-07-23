@@ -33,25 +33,29 @@ const isAdminOrDirector = ["Admin", "Director"].includes(userObj?.role);
   let teamMembers = [];
 if (isAdminOrDirector) {
   teamMembers = Object.values(users).filter((u) =>
-    ["Head", "Manager", "Assistant Manager", "Executive"].includes(u.role)
+    ["Head", "Manager", "Assistant Manager", "Executive"].includes(u.role) &&
+    u.department === "Sales"
   );
 }
 else if (isAdminOrDirector) {
   allUids = Object.values(users)
     .filter((u) =>
-      ["Head", "Manager", "Assistant Manager", "Executive"].includes(u.role)
+      ["Head", "Manager", "Assistant Manager", "Executive"].includes(u.role) &&
+      u.department === "Sales"
     )
     .map((u) => u.uid);
 }
  else if (isHead) {
   teamMembers = Object.values(users).filter((u) =>
-    ["Manager"].includes(u.role)
+    ["Manager"].includes(u.role) &&
+    u.department === "Sales"
   );
 } else if (isManager) {
   teamMembers = Object.values(users).filter(
     (u) =>
       ["Assistant Manager", "Executive"].includes(u.role) &&
-      u.reportingManager === userObj.name
+      u.reportingManager === userObj.name &&
+      u.department === "Sales"
   );
 }
 
@@ -172,7 +176,8 @@ else if (isAdminOrDirector) {
     const managerTeamMembers = Object.values(users).filter(
       (u) =>
         ["Assistant Manager", "Executive"].includes(u.role) &&
-        u.reportingManager === targetUser?.name
+        u.reportingManager === targetUser?.name &&
+        u.department === "Sales"
     );
     const allManagerTeam = [targetUser, ...managerTeamMembers];
     allUids = allManagerTeam.map((u) => u.uid);
@@ -193,11 +198,12 @@ else if (isAdminOrDirector) {
   if (isAdminOrDirector) {
     allUids = Object.values(users)
       .filter((u) =>
-        ["Head", "Manager", "Assistant Manager", "Executive"].includes(u.role)
+        ["Head", "Manager", "Assistant Manager", "Executive"].includes(u.role) &&
+        u.department === "Sales"
       )
       .map((u) => u.uid);
   } else if (isHead) {
-    let managers = teamMembers.filter((u) => u.role === "Manager");
+    let managers = teamMembers.filter((u) => u.role === "Manager" && u.department === "Sales");
 
     managers.forEach((manager) => {
       allUids.push(manager.uid);
@@ -205,7 +211,8 @@ else if (isAdminOrDirector) {
       const subordinates = Object.values(users).filter(
         (u) =>
           ["Assistant Manager", "Executive"].includes(u.role) &&
-          u.reportingManager === manager.name
+          u.reportingManager === manager.name &&
+          u.department === "Sales"
       );
 
       subordinates.forEach((sub) => {
@@ -218,7 +225,8 @@ else if (isAdminOrDirector) {
     const subordinates = Object.values(users).filter(
       (u) =>
         ["Assistant Manager", "Executive"].includes(u.role) &&
-        u.reportingManager === userObj.name
+        u.reportingManager === userObj.name &&
+        u.department === "Sales"
     );
 
     subordinates.forEach((sub) => {

@@ -48,6 +48,7 @@
     "react-toastify": "^11.0.5",
     "recharts": "^3.0.2",
     "tailwindcss": "^4.1.8",
+    "together-ai": "^0.20.0",
     "xlsx": "^0.18.5",
     "xlsx-js-style": "^1.2.0"
   },
