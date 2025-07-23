@@ -100,7 +100,6 @@ const DropdownActions = ({
         )
     );
   }
-
   if (["Assistant Manager", "Executive"].includes(currentUserData.role)) {
     const manager = userList.find(
       (u) => u.name === currentUserData.reportingManager

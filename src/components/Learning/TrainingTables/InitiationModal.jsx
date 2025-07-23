@@ -546,6 +546,13 @@ function InitiationModal({ training, onClose, onConfirm }) {
                       />
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={addBatch}
+                    className="mt-3 px-3 py-1.5 bg-blue-100 text-blue-700 text-sm rounded-md flex items-center hover:bg-blue-200 transition-colors"
+                  >
+                    <FaPlus className="mr-1" /> Add Batch
+                  </button>
                 </div>
               )}
             </>

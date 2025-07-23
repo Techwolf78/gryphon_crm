@@ -43,14 +43,28 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
 
         if (docSnap.exists()) {
           const data = docSnap.data();
+
+                const allSpecializations = [
+          ...(data.specialization || []),
+          ...(data.otherSpecialization || [])
+        ];
+           const standardSpecs = allSpecializations.filter(s => 
+          specializationOptions.includes(s)
+        );
+        const customSpecs = allSpecializations.filter(s => 
+          !specializationOptions.includes(s)
+        );
           // Convert specialization to array
           const specArr = Array.isArray(data.specialization)
             ? data.specialization
             : typeof data.specialization === "string"
               ? data.specialization.split(",").map(s => s.trim())
               : [];
+                  const showOthers = customSpecs.length > 0;
+        const finalStandardSpecs = showOthers 
+          ? [...standardSpecs, "Others"]
+          : standardSpecs;
           // Find custom specializations not in options
-          const customSpecs = specArr.filter(s => !specializationOptions.includes(s) && s !== "Others");
           // If custom specs exist, add "Others" to specialization and set otherSpecialization
           let specializationStr = specArr.join(", ");
           let otherSpecializationStr = "";
@@ -84,10 +98,10 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
             bankAddress: data.bankAddress || "",
             paymentType: data.paymentType || "Per Hour",
             charges: data.charges || "",
-            specialization: specializationStr,
-            otherSpecialization: otherSpecializationStr,
+             specialization: finalStandardSpecs.join(", "),
+          otherSpecialization: customSpecs.join(", "),
           });
-          setShowOtherSpecialization(showOther);
+        setShowOtherSpecialization(showOthers);
         } else {
           setError("Trainer not found");
         }
@@ -119,23 +133,29 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
       }
     }
   };
+// In the handleSubmit function:
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  setError("");
+  try {
+    // Process specializations
+ const specializationArr = (trainerData.specialization || "")
+  .split(",")
+  .map(s => s.trim())
+  .filter(s => s);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
+const hasOthers = specializationArr.includes("Others");
 
-    try {
-      // Always save as arrays in Firestore
-      const specializationArr = trainerData.specialization
-        ? trainerData.specialization
-            .split(",")
-            .map(s => s.trim())
-            .filter(s => s && s !== "Others") // Remove "Others"
-        : [];
-      const otherSpecializationArr = trainerData.otherSpecialization
-        ? trainerData.otherSpecialization.split(",").map(s => s.trim()).filter(Boolean)
-        : [];
+const otherSpecializationArr =
+  hasOthers && trainerData.otherSpecialization
+    ? trainerData.otherSpecialization.split(",").map(s => s.trim()).filter(Boolean)
+    : [];
+
+const finalSpecialization = [
+  ...specializationArr.filter(s => s !== "Others"),
+  ...otherSpecializationArr,
+];
 
       const trainerToUpdate = {
         trainerId: trainerData.trainerId,
@@ -154,6 +174,8 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
         charges: Number(trainerData.charges) || 0,
         specialization: specializationArr,
         updatedAt: new Date(),
+specialization: specializationArr.filter(s => s !== "Others"), // ✅ pure specialization
+  otherSpecialization: hasOthers ? otherSpecializationArr : [],
       };
 
       if (showOtherSpecialization) {
@@ -162,16 +184,16 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
         trainerToUpdate.otherSpecialization = [];
       }
 
-      await updateDoc(doc(db, "trainers", trainerId), trainerToUpdate);
-      onTrainerUpdated();
-      onClose();
-    } catch (err) {
-      console.error("Error updating trainer:", err);
-      setError(`Failed to update trainer: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
+    await updateDoc(doc(db, "trainers", trainerId), trainerToUpdate);
+    onTrainerUpdated();
+    onClose();
+  } catch (err) {
+    console.error("Error updating trainer:", err);
+    setError(`Failed to update trainer: ${err.message}`);
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Add these functions to the EditTrainer component
   const renderBasicInfoSection = () => (
@@ -252,74 +274,66 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
       </div>
 
       <div className="grid grid-cols-1 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Specialization*
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {specializationOptions.map(opt => (
-              <label key={opt} className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  value={opt}
-                  checked={trainerData.specialization.split(",").map(s => s.trim()).includes(opt)}
-                  onChange={e => {
-                    const specs = trainerData.specialization
-                      ? trainerData.specialization.split(",").map(s => s.trim())
-                      : [];
-                    let updatedSpecs;
-                    if (e.target.checked) {
-                      updatedSpecs = [...specs, opt];
-                    } else {
-                      updatedSpecs = specs.filter(s => s !== opt);
-                    }
-                    setTrainerData(prev => ({
-                      ...prev,
-                      specialization: updatedSpecs.join(", "),
-                    }));
-                    if (
-                      updatedSpecs.includes("Others") ||
-                      updatedSpecs.some(s => !specializationOptions.includes(s))
-                    ) {
-                      setShowOtherSpecialization(true);
-                    } else {
-                      setShowOtherSpecialization(false);
-                    }
-                  }}
-                  className="form-checkbox"
-                />
-                <span>{opt}</span>
-              </label>
-            ))}
-          </div>
-          <small className="text-gray-500">
-            Select all that apply.
-          </small>
-        </div>
-      </div>
-
-      {showOtherSpecialization && (
-        <div className="grid grid-cols-1 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Other Specialization*
-            </label>
-            <input
-              type="text"
-              name="otherSpecialization"
-              value={trainerData.otherSpecialization}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              required={showOtherSpecialization}
-              placeholder="e.g. Microsoft Excel, PowerPoint"
-            />
-            <small className="text-gray-500">
-              Enter comma separated values. Example: Microsoft Excel, PowerPoint
-            </small>
-          </div>
-        </div>
-      )}
-
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-1">
+      Specialization*
+    </label>
+    <div className="flex flex-wrap gap-2">
+      {specializationOptions.map(opt => (
+        <label key={opt} className="flex items-center space-x-2">
+          <input
+            type="checkbox"
+            value={opt}
+            checked={trainerData.specialization.split(",").map(s => s.trim()).includes(opt)}
+            onChange={e => {
+              const specs = trainerData.specialization
+                .split(",")
+                .map(s => s.trim())
+                .filter(s => s);
+              
+              let updatedSpecs;
+              if (e.target.checked) {
+                updatedSpecs = [...specs, opt];
+              } else {
+                updatedSpecs = specs.filter(s => s !== opt);
+              }
+              
+              setTrainerData(prev => ({
+                ...prev,
+                specialization: updatedSpecs.join(", "),
+              }));
+              
+              setShowOtherSpecialization(updatedSpecs.includes("Others"));
+            }}
+            className="form-checkbox h-4 w-4 text-blue-600 focus:ring-blue-500"
+          />
+          <span className="text-sm text-gray-700">{opt}</span>
+        </label>
+      ))}
+    </div>
+  </div>
+</div>
+{showOtherSpecialization && (
+  <div className="grid grid-cols-1 gap-4">
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        Other Specialization*
+      </label>
+      <input
+        type="text"
+        name="otherSpecialization"
+        value={trainerData.otherSpecialization}
+        onChange={handleChange}
+        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        required={showOtherSpecialization}
+        placeholder="e.g. Microsoft Excel, PowerPoint"
+      />
+      <small className="text-gray-500">
+        Enter comma separated values. Example: Microsoft Excel, PowerPoint
+      </small>
+    </div>
+  </div>
+)}
       <div className="flex justify-between">
         <button
           type="submit"
