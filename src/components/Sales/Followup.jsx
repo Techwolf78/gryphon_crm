@@ -11,6 +11,7 @@ import {
   FaChevronUp,
   FaChevronDown,
   FaTrash,
+  FaSync,
 } from "react-icons/fa";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
@@ -20,37 +21,45 @@ import { InteractionRequiredAuthError } from "@azure/msal-browser";
 
 const FollowUp = ({ lead, onClose }) => {
   const [date, setDate] = useState(dayjs().format("YYYY-MM-DD"));
-  // To this:
   const [time, setTime] = useState({
-    hours: 0, // 0 for 00:00 AM
-    minutes: 0, // 00 minutes
-    ampm: "AM", // AM period
+    hours: 0,
+    minutes: 0,
+    ampm: "AM",
   });
   const [remarks, setRemarks] = useState("");
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [loading, setLoading] = useState(false);
   const [pastFollowups, setPastFollowups] = useState([]);
+  const [syncStatus, setSyncStatus] = useState(null);
+  const [isFirstReminder, setIsFirstReminder] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const timePickerRef = useRef(null);
 
   const { instance, accounts } = useMsal();
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const graphScopes = ["User.Read", "Calendars.ReadWrite"];
 
-  // Close time picker when clicking outside
+  useEffect(() => {
+    const checkFirstReminder = async () => {
+      const reminders = await db.collection(`leads/${lead.id}/followups`)
+        .where('createdAt', '>', new Date(Date.now() - 24 * 60 * 60 * 1000))
+        .get();
+      
+      setIsFirstReminder(reminders.empty);
+    };
+
+    if (lead?.id) checkFirstReminder();
+  }, [lead]);
+
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (
-        timePickerRef.current &&
-        !timePickerRef.current.contains(event.target)
-      ) {
+      if (timePickerRef.current && !timePickerRef.current.contains(event.target)) {
         setShowTimePicker(false);
       }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const fetchPastFollowups = useCallback(async () => {
@@ -77,9 +86,9 @@ const FollowUp = ({ lead, onClose }) => {
     }
   }, [lead?.id]);
 
-    const handleDeleteFollowup = async (followupKey) => {
+  const handleDeleteFollowup = async (followupKey) => {
     if (!lead?.id) return;
-    
+
     try {
       const docRef = doc(db, "leads", lead.id);
       const snapshot = await getDoc(docRef);
@@ -89,7 +98,7 @@ const FollowUp = ({ lead, onClose }) => {
       delete existing[followupKey];
 
       await updateDoc(docRef, { followup: existing });
-      fetchPastFollowups(); // Refresh the list
+      fetchPastFollowups();
     } catch (err) {
       console.error("Error deleting followup:", err);
       alert("Failed to delete follow-up.\n" + err.message);
@@ -116,18 +125,33 @@ const FollowUp = ({ lead, onClose }) => {
           scopes: graphScopes,
         });
         return response.accessToken;
-      } else {
-        throw err;
       }
+      throw err;
+    }
+  };
+
+  const verifyTeamsConnection = async () => {
+    try {
+      const token = await getAccessToken();
+      const response = await fetch('https://graph.microsoft.com/v1.0/me', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      return response.ok;
+    } catch (error) {
+      console.error("Teams connection verification failed:", error);
+      return false;
     }
   };
 
   const createCalendarEvent = async () => {
     try {
-      if (!accounts[0]) {
-        await instance.loginPopup({ scopes: graphScopes });
+      setSyncStatus('verifying');
+      
+      if (!await verifyTeamsConnection()) {
+        throw new Error("Teams integration not ready");
       }
 
+      setSyncStatus('creating');
       const accessToken = await getAccessToken();
       const time24 = get24HourTime();
       const eventStart = dayjs(`${date} ${time24}`);
@@ -148,21 +172,19 @@ const FollowUp = ({ lead, onClose }) => {
           timeZone: timezone,
         },
         attendees: lead.email
-          ? [
-              {
-                emailAddress: {
-                  address: lead.email,
-                  name: lead.pocName || "Client",
-                },
-                type: "required",
+          ? [{
+              emailAddress: {
+                address: lead.email,
+                name: lead.pocName || "Client",
               },
-            ]
+              type: "required",
+            }]
           : [],
         isReminderOn: true,
         reminderMinutesBeforeStart: 10,
       };
 
-      await fetch("https://graph.microsoft.com/v1.0/me/events", {
+      const response = await fetch("https://graph.microsoft.com/v1.0/me/events", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -171,9 +193,22 @@ const FollowUp = ({ lead, onClose }) => {
         body: JSON.stringify(event),
       });
 
-      console.log("Event created in Microsoft 365 calendar.");
+      if (!response.ok) throw new Error("Failed to create event");
+      
+      const eventData = await response.json();
+      setSyncStatus('success');
+      return eventData.id;
     } catch (err) {
-      console.error("Failed to create calendar event:", err);
+      console.error("Calendar event creation failed:", err);
+      setSyncStatus('failed');
+      
+      if (retryCount < 3) {
+        setRetryCount(c => c + 1);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        return createCalendarEvent();
+      }
+      
+      throw err;
     }
   };
 
@@ -203,16 +238,31 @@ const FollowUp = ({ lead, onClose }) => {
         remarks,
         timestamp: Date.now(),
         formattedDate: dayjs(date).format("MMM D, YYYY"),
+        syncStatus: 'pending'
       };
 
       await updateDoc(docRef, { followup: existing });
-      await createCalendarEvent();
+      
+      try {
+        const eventId = await createCalendarEvent();
+        existing[newKey].teamsEventId = eventId;
+        existing[newKey].syncStatus = 'synced';
+      } catch (error) {
+        existing[newKey].syncStatus = 'failed';
+        if (isFirstReminder) {
+          alert(`Reminder created! Teams sync failed. It will retry automatically.`);
+        }
+      }
+
+      await updateDoc(docRef, { followup: existing });
       onClose();
     } catch (err) {
       console.error("Error saving followup:", err);
       alert("Failed to save follow-up.\n" + err.message);
     } finally {
       setLoading(false);
+      setSyncStatus(null);
+      setRetryCount(0);
     }
   };
 
@@ -226,18 +276,15 @@ const FollowUp = ({ lead, onClose }) => {
       let newValue = Number(value);
 
       if (field === "hours") {
-        // Handle looping for direct input
         if (newValue > 12) newValue = 1;
         if (newValue < 1) newValue = 12;
         if (isNaN(newValue)) newValue = 12;
       }
 
       if (field === "minutes") {
-        // Handle looping for direct input
         if (newValue > 59) newValue = 0;
         if (newValue < 0) newValue = 55;
         if (isNaN(newValue)) newValue = 0;
-        // Round to nearest 5
         newValue = Math.round(newValue / 5) * 5;
       }
 
@@ -250,11 +297,9 @@ const FollowUp = ({ lead, onClose }) => {
 
   const increment = (field) => {
     if (field === "hours") {
-      // For hours: 1→2→...→12→1→2...
       const newValue = time.hours === 12 ? 1 : time.hours + 1;
       handleTimeChange("hours", newValue);
     } else {
-      // For minutes: 0→5→...→55→0→5...
       const newValue = time.minutes === 55 ? 0 : time.minutes + 5;
       handleTimeChange("minutes", newValue);
     }
@@ -262,11 +307,9 @@ const FollowUp = ({ lead, onClose }) => {
 
   const decrement = (field) => {
     if (field === "hours") {
-      // For hours: 12→11→...→1→12→11...
       const newValue = time.hours === 1 ? 12 : time.hours - 1;
       handleTimeChange("hours", newValue);
     } else {
-      // For minutes: 0→55→50→...→5→0→55...
       const newValue = time.minutes === 0 ? 55 : time.minutes - 5;
       handleTimeChange("minutes", newValue);
     }
@@ -296,6 +339,15 @@ const FollowUp = ({ lead, onClose }) => {
     return `${formatTimeValue(hours)}:${formatTimeValue(time.minutes)}`;
   };
 
+  const getSyncStatusBadge = (status) => {
+    switch (status) {
+      case 'synced': return <span className="bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded-full">Synced</span>;
+      case 'failed': return <span className="bg-red-100 text-red-800 text-xs font-semibold px-2 py-1 rounded-full">Sync Failed</span>;
+      case 'pending': return <span className="bg-yellow-100 text-yellow-800 text-xs font-semibold px-2 py-1 rounded-full">Pending</span>;
+      default: return null;
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-lg flex items-center justify-center z-[9999] px-4 py-6">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-fadeIn">
@@ -320,6 +372,14 @@ const FollowUp = ({ lead, onClose }) => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
+          {isFirstReminder && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 col-span-2">
+              <p className="text-blue-700 text-sm">
+                <strong>Note:</strong> First reminders may take a moment to sync with Teams calendar.
+              </p>
+            </div>
+          )}
+
           <div>
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <FaStickyNote className="text-indigo-600" />
@@ -462,60 +522,71 @@ const FollowUp = ({ lead, onClose }) => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="bg-gradient-to-r from-blue-600 to-indigo-700 hover:opacity-90 text-white px-6 py-2.5 rounded-xl"
+                  className="bg-gradient-to-r from-blue-600 to-indigo-700 hover:opacity-90 text-white px-6 py-2.5 rounded-xl flex items-center gap-2"
                 >
-                  {loading ? "Saving..." : "Schedule Meeting"}
+                  {loading ? (
+                    <>
+                      {syncStatus === 'verifying' && 'Verifying...'}
+                      {syncStatus === 'creating' && 'Creating...'}
+                      {!syncStatus && 'Saving...'}
+                      <FaSync className="animate-spin" />
+                    </>
+                  ) : (
+                    'Schedule Meeting'
+                  )}
                 </button>
               </div>
             </form>
           </div>
 
-    <div className="border-l border-gray-200 pl-6 md:pl-8">
-      <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-        <FaRegClock className="text-indigo-600" />
-        Previous Meetings
-      </h3>
+          <div className="border-l border-gray-200 pl-6 md:pl-8">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <FaRegClock className="text-indigo-600" />
+              Previous Meetings
+            </h3>
 
-      {pastFollowups.map((followup, index) => (
-        <div
-          key={followup.key}
-          className="bg-white border border-gray-200 rounded-xl p-4 relative"
-        >
-          <button
-            onClick={() => handleDeleteFollowup(followup.key)}
-            className="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition"
-            title="Delete this meeting"
-          >
-            <FaTrash className="text-sm" />
-          </button>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-gray-800">
-                {followup.formattedDate ||
-                  dayjs(followup.date).format("MMM D, YYYY")}
-              </span>
-              <span className="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full">
-                {followup.time}
-              </span>
-            </div>
-            <p className="text-gray-600 mt-2">{followup.remarks}</p>
-            <div className="mt-4">
-              {index === 0 ? (
-                <span className="bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded-full">
-                  Latest
-                </span>
-              ) : (
-                <span className="bg-red-100 text-red-800 text-xs font-medium px-2 py-1 rounded-full">
-                  {followup.relativeTime}
-                </span>
-              )}
-            </div>
+            {pastFollowups.map((followup, index) => (
+              <div
+                key={followup.key}
+                className="bg-white border border-gray-200 rounded-xl p-4 relative mb-3"
+              >
+                <button
+                  onClick={() => handleDeleteFollowup(followup.key)}
+                  className="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition"
+                  title="Delete this meeting"
+                >
+                  <FaTrash className="text-sm" />
+                </button>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-800">
+                      {followup.formattedDate ||
+                        dayjs(followup.date).format("MMM D, YYYY")}
+                    </span>
+                    <span className="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full">
+                      {followup.time}
+                    </span>
+                    {followup.teamsEventId && getSyncStatusBadge('synced')}
+                    {followup.syncStatus === 'failed' && getSyncStatusBadge('failed')}
+                  </div>
+                  <p className="text-gray-600 mt-2">{followup.remarks}</p>
+                  <div className="mt-2">
+                    {index === 0 ? (
+                      <span className="bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded-full">
+                        Latest
+                      </span>
+                    ) : (
+                      <span className="text-gray-500 text-xs">
+                        {followup.relativeTime}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-      ))}
-    </div>
-  </div>
-</div>
+      </div>
 
       <style>{`
         .animate-fadeIn {

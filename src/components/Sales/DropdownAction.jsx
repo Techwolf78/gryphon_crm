@@ -89,10 +89,15 @@ const DropdownActions = ({
   }
 
   if (currentUserData.role === "Manager") {
+    // Get Assistant Managers, Executives, and Managers (excluding self)
     return allSalesUsers.filter(
       (u) =>
-        u.reportingManager === currentUserData.name &&
-        ["Assistant Manager", "Executive"].includes(u.role)
+        (
+          (u.reportingManager === currentUserData.name &&
+            ["Assistant Manager", "Executive"].includes(u.role))
+          ||
+          (u.role === "Manager" && u.uid !== currentUser.uid)
+        )
     );
   }
 
