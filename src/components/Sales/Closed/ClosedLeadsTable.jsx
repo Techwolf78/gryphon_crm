@@ -21,6 +21,7 @@ import {
   serverTimestamp, // <-- arrayUnion removed if unused
 } from "firebase/firestore";
 import EditClosedLeadModal from "./EditClosedLeadModal"; // Adjust path if needed
+import ViewClosedLeadDetails from "./ClosedLeadDetailModel"; // Adjust path if needed
 
 // Project Code Conversion Utilities
 const projectCodeToDocId = (projectCode) =>
@@ -50,6 +51,7 @@ const ClosedLeadsTable = ({
   const [activeLeadId, setActiveLeadId] = useState(null);
   const [showEditClosureModal, setShowEditClosureModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
+  const [selectedLeadDetails, setSelectedLeadDetails] = useState(null);
 
   const uploadToCloudinary = async (file) => {
     const formData = new FormData();
@@ -134,7 +136,7 @@ const ClosedLeadsTable = ({
       const docId = leadData.projectCode
         ? projectCodeToDocId(leadData.projectCode)
         : leadData.businessName?.toLowerCase().replace(/\s+/g, "-") ||
-          "default-id";
+        "default-id";
 
       const docRef = doc(db, "trainingForms", docId);
 
@@ -457,9 +459,8 @@ const ClosedLeadsTable = ({
             </div>
             <div className="px-6 py-4">
               <div
-                className={`border-2 border-dashed rounded-lg p-8 text-center ${
-                  isDragging ? "border-blue-500 bg-blue-50" : "border-gray-300"
-                }`}
+                className={`border-2 border-dashed rounded-lg p-8 text-center ${isDragging ? "border-blue-500 bg-blue-50" : "border-gray-300"
+                  }`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
@@ -553,11 +554,10 @@ const ClosedLeadsTable = ({
               </button>
               <button
                 type="button"
-                className={`px-4 py-2 text-sm font-medium text-white rounded-md ${
-                  selectedFile && !uploading
-                    ? "bg-blue-600 hover:bg-blue-700"
-                    : "bg-blue-300 cursor-not-allowed"
-                }`}
+                className={`px-4 py-2 text-sm font-medium text-white rounded-md ${selectedFile && !uploading
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : "bg-blue-300 cursor-not-allowed"
+                  }`}
                 disabled={!selectedFile || uploading}
                 onClick={handleUploadClick}
               >
@@ -650,11 +650,10 @@ const ClosedLeadsTable = ({
               </button>
               <button
                 type="button"
-                className={`px-4 py-2 text-sm font-medium text-white rounded-md ${
-                  mouFile && !mouUploading
-                    ? "bg-blue-600 hover:bg-blue-700"
-                    : "bg-blue-300 cursor-not-allowed"
-                }`}
+                className={`px-4 py-2 text-sm font-medium text-white rounded-md ${mouFile && !mouUploading
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : "bg-blue-300 cursor-not-allowed"
+                  }`}
                 disabled={!mouFile || mouUploading}
                 onClick={handleMOUUpload}
               >
@@ -697,7 +696,33 @@ const ClosedLeadsTable = ({
         <tbody className="bg-white divide-y divide-gray-200">
           {leads.length > 0 ? (
             leads.map(([id, lead]) => (
-              <tr key={id} className="hover:bg-gray-50 transition-colors align-top">
+              <tr
+                key={id}
+                className="hover:bg-gray-50 transition-colors align-top cursor-pointer"
+                onClick={async () => {
+                  try {
+                    const projectCode = lead.projectCode;
+                    if (!projectCode) {
+                      console.error("No project code found for this lead");
+                      return;
+                    }
+
+                    const docId = projectCodeToDocId(projectCode);
+                    const docRef = doc(db, "trainingForms", docId);
+                    const docSnap = await getDoc(docRef);
+
+                    if (docSnap.exists()) {
+                      setSelectedLeadDetails({ id: docSnap.id, ...docSnap.data() });
+                    } else {
+                      console.error("No training form found for this lead");
+                      setSelectedLeadDetails(lead);
+                    }
+                  } catch (error) {
+                    console.error("Error fetching training form:", error);
+                    setSelectedLeadDetails(lead);
+                  }
+                }}
+              >
                 <td
                   className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 overflow-hidden truncate max-w-[120px]"
                   title={`DocID: ${projectCodeToDocId(
@@ -765,14 +790,16 @@ const ClosedLeadsTable = ({
                 <td className="px-2 py-3 whitespace-nowrap w-[60px]">
                   <div className="flex justify-center items-center h-full relative"> {/* <-- Add relative here */}
                     <button
-                      onClick={() => toggleDropdown(id)}
+                      onClick={(e) => {
+                        e.stopPropagation(); // ✋ prevents row click
+                        toggleDropdown(id);
+                      }}
                       aria-label="Action menu"
                       aria-expanded={openDropdown === id}
-                      className={`p-1.5 rounded-full transition-all duration-150 ${
-                        openDropdown === id
-                          ? "bg-gray-100/80 text-primary-600"
-                          : "text-gray-500 hover:bg-gray-100/50 hover:text-gray-700"
-                      }`}
+                      className={`p-1.5 rounded-full transition-all duration-150 ${openDropdown === id
+                        ? "bg-gray-100/80 text-primary-600"
+                        : "text-gray-500 hover:bg-gray-100/50 hover:text-gray-700"
+                        }`}
                     >
                       {openDropdown === id ? (
                         <FiX className="h-5 w-5" aria-hidden="true" />
@@ -793,7 +820,8 @@ const ClosedLeadsTable = ({
                         <div className="flex flex-col p-1.5">
                           <button
                             className="flex items-center rounded-lg px-3 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50/90 hover:text-primary-600"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setActiveLeadId(id);
                               setShowUploadModal(true);
                               setOpenDropdown(null);
@@ -805,7 +833,10 @@ const ClosedLeadsTable = ({
 
                           <button
                             className="flex items-center rounded-lg px-3 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50/90 hover:text-primary-600"
-                            onClick={() => handleMOUMenuClick(id)}
+                            onClick={(e) => {
+                              e.stopPropagation(); // ✋
+                              handleMOUMenuClick(id);
+                            }}
                           >
                             <FiFileText className="mr-3 h-4 w-4 opacity-80" />
                             <span>
@@ -818,7 +849,10 @@ const ClosedLeadsTable = ({
 
                           <button
                             className="flex items-center rounded-lg px-3 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50/90 hover:text-primary-600"
-                            onClick={() => handleEditClosureForm(lead)}
+                            onClick={(e) => {
+                              e.stopPropagation(); // ✋
+                              handleEditClosureForm(lead);
+                            }}
                           >
                             <FiEdit className="mr-3 h-4 w-4 opacity-80" />
                             <span>Edit Details</span>
@@ -838,9 +872,8 @@ const ClosedLeadsTable = ({
                   No closed deals found
                 </h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  {`There are currently no ${
-                    viewMyLeadsOnly ? "your" : "team"
-                  } closed deals.`}
+                  {`There are currently no ${viewMyLeadsOnly ? "your" : "team"
+                    } closed deals.`}
                 </p>
               </td>
             </tr>
@@ -861,6 +894,13 @@ const ClosedLeadsTable = ({
           }}
         />
       )}
+      {selectedLeadDetails && (
+        <ViewClosedLeadDetails
+          lead={selectedLeadDetails}
+          onClose={() => setSelectedLeadDetails(null)}
+        />
+      )}
+
     </div>
   );
 };
