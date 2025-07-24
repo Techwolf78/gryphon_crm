@@ -1,344 +1,550 @@
-import React, { useState } from "react";
-import {
-  FaTimes,
-  FaCalendarAlt,
-  FaClock,
-  FaUserAlt,
-  FaChalkboardTeacher,
-  FaPlus,
-  FaChevronDown,
-} from "react-icons/fa";
+import React, { useState, useEffect } from 'react';
+import { db } from '../../../firebase';
+import { doc, collection, setDoc, serverTimestamp } from 'firebase/firestore';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 
-const InitiationModal = ({ training, onClose, onConfirm }) => {
-  const [formData, setFormData] = useState({
-    phase: "phase1",
-    domain: "technical",
-    startDate: "",
-    endDate: "",
-    startTime: "",
-    endTime: "",
-    lunchTime: "",
-    specializations: [],
-    studentCount: "",
-    trainingHours: "",
-    batches: [{ name: "B1", count: "" }],
-  });
+const PHASE_OPTIONS = ['phase-1', 'phase-2'];
+const DOMAIN_OPTIONS = ['Technical', 'Soft skills', 'Aptitude', 'Tools'];
+const DAY_DURATION_OPTIONS = ['AM', 'PM'];
 
-  const [openDropdown, setOpenDropdown] = useState(null);
+function InitiationModal({ training, onClose, onConfirm }) {
+  const [selectedPhases, setSelectedPhases] = useState([]);
+  const [details, setDetails] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  
+  // Main form fields (common to both phases)
+  const [trainingStartDate, setTrainingStartDate] = useState(null);
+  const [trainingEndDate, setTrainingEndDate] = useState(null);
+  const [collegeStartTime, setCollegeStartTime] = useState('');
+  const [collegeEndTime, setCollegeEndTime] = useState('');
+  const [lunchTime, setLunchTime] = useState('');
+  const [selectedDomain, setSelectedDomain] = useState('');
+  
+  // Phase 2 specific fields
+  const [phase2StartDate, setPhase2StartDate] = useState(null);
+  const [phase2EndDate, setPhase2EndDate] = useState(null);
+  
+  // Table 1 data - auto-generated based on specializations
+  const [table1Data, setTable1Data] = useState([]);
+  
+  // Table 2 data
+  const [table2Data, setTable2Data] = useState([
+    { 
+      batchCode: '', 
+      startDate: null, 
+      endDate: null, 
+      trainerName: '', 
+      dayDuration: '', 
+      cost: '', 
+      travelFoodStay: '', 
+      totalAmount: '', 
+      totalHours: '', 
+      remainingHrs: '' 
+    }
+  ]);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+  // Effect to auto-generate Table 1 rows when domain is selected
+  useEffect(() => {
+    if (selectedDomain && training?.courses) {
+      const generatedRows = training.courses.map(course => ({
+        batch: course.specialization,
+        stdCount: course.students,
+        hrs: '',
+        batchPerStdCount: '',
+        batchCode: generateBatchCode(course.specialization),
+        assignedHours: ''
+      }));
+      setTable1Data(generatedRows);
+    } else {
+      setTable1Data([]);
+    }
+  }, [selectedDomain, training]);
+
+  const generateBatchCode = (specialization) => {
+    if (!training?.collegeCode || !training?.year) return '';
+    return `${training.collegeCode}-${specialization}-${training.year}`;
   };
 
-  const handleMultiSelect = (e) => {
-    const { value, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      specializations: checked
-        ? [...prev.specializations, value]
-        : prev.specializations.filter((item) => item !== value),
-    }));
-  };
-
-  const toggleDropdown = (dropdownName) => {
-    setOpenDropdown(openDropdown === dropdownName ? null : dropdownName);
-  };
-
-  const handleBatchChange = (index, value) => {
-    const newBatches = [...formData.batches];
-    newBatches[index].count = value;
-    setFormData((prev) => ({ ...prev, batches: newBatches }));
-  };
-
-  const addBatch = () => {
-    const newBatchNumber = formData.batches.length + 1;
-    setFormData((prev) => ({
-      ...prev,
-      batches: [...prev.batches, { name: `B${newBatchNumber}`, count: "" }],
-    }));
-  };
-
-  const getRemainingCount = () => {
-    const enteredTotal = formData.batches.reduce(
-      (sum, b) => sum + Number(b.count || 0),
-      0
+  const handlePhaseChange = (phase) => {
+    setSelectedPhases(prev => 
+      prev.includes(phase)
+        ? prev.filter(p => p !== phase)
+        : [...prev, phase]
     );
-    return Number(formData.studentCount || 0) - enteredTotal;
+    
+    // Clear domain if phase-1 is deselected
+    if (phase === 'phase-1' && !selectedPhases.includes(phase)) {
+      setSelectedDomain('');
+    }
   };
 
-  const handleSubmit = (e) => {
+  const handleDomainChange = (domain) => {
+    setSelectedDomain(domain);
+  };
+
+  const handleTable1Change = (index, field, value) => {
+    const updatedData = [...table1Data];
+    updatedData[index][field] = value;
+    setTable1Data(updatedData);
+  };
+
+  const handleTable2Change = (index, field, value) => {
+    const updatedData = [...table2Data];
+    updatedData[index][field] = value;
+    setTable2Data(updatedData);
+  };
+
+  const addTable2Row = () => {
+    setTable2Data([
+      ...table2Data,
+      { 
+        batchCode: '', 
+        startDate: null, 
+        endDate: null, 
+        trainerName: '', 
+        dayDuration: '', 
+        cost: '', 
+        travelFoodStay: '', 
+        totalAmount: '', 
+        totalHours: '', 
+        remainingHrs: '' 
+      }
+    ]);
+  };
+
+  const removeTable2Row = (index) => {
+    if (table2Data.length <= 1) return;
+    const updatedData = [...table2Data];
+    updatedData.splice(index, 1);
+    setTable2Data(updatedData);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onConfirm({
-      ...training,
-      ...formData,
-    });
+    
+    if (selectedPhases.length === 0) {
+      setError('Please select at least one phase');
+      return;
+    }
+    
+    if (selectedPhases.includes('phase-1') && !selectedDomain) {
+      setError('Please select a domain for phase 1');
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Save each selected phase
+      const batchPromises = selectedPhases.map(async (phase) => {
+        const phaseData = {
+          details,
+          createdAt: serverTimestamp(),
+          createdBy: training.createdBy || {},
+          trainingStartDate,
+          trainingEndDate,
+          collegeStartTime,
+          collegeEndTime,
+          lunchTime,
+          table1Data,
+          table2Data,
+        };
+        
+        // Add phase-specific data
+        if (phase === 'phase-1') {
+          phaseData.domain = selectedDomain;
+        }
+        
+        if (phase === 'phase-2') {
+          phaseData.phase2StartDate = phase2StartDate;
+          phaseData.phase2EndDate = phase2EndDate;
+        }
+        
+        const phaseRef = doc(
+          collection(db, 'trainingForms', training.id, 'trainings'),
+          phase
+        );
+        
+        return setDoc(phaseRef, phaseData);
+      });
+      
+      await Promise.all(batchPromises);
+      
+      setLoading(false);
+      if (onConfirm) onConfirm({ 
+        phases: selectedPhases,
+        details, 
+        trainingStartDate,
+        trainingEndDate,
+        collegeStartTime,
+        collegeEndTime,
+        lunchTime,
+        domain: selectedDomain,
+        table1Data,
+        table2Data,
+        phase2StartDate,
+        phase2EndDate
+      });
+      
+      if (onClose) onClose();
+    } catch (err) {
+      console.error('Error saving phase data:', err);
+      setError('Failed to save phase data');
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 backdrop-blur-sm  flex items-center justify-center z-500 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Sticky Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 flex justify-between items-center sticky top-0 z-10">
-          <div className="flex items-center">
-            <h3 className="font-semibold text-lg mr-4">
-              PROJECT CODE: {training.projectCode}
-            </h3>
-            <span className="bg-blue-500 text-xs px-2 py-1 rounded">
-              {formData.phase.replace("phase", "Phase ")}
-            </span>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-white hover:text-blue-200 transition-colors"
-          >
-            <FaTimes className="text-xl" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="overflow-y-auto flex-1">
-          <div className="p-6 space-y-6">
-            {/* Row 1: Phase & Domain */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Phase Dropdown */}
-              <div className="relative">
-                <label className="block text-gray-700 mb-2 flex items-center">
-                  <FaUserAlt className="mr-2 text-blue-500" /> Select Phase
-                </label>
-                <div
-                  className="bg-gray-50 p-3 rounded-lg border border-gray-300 flex justify-between items-center cursor-pointer"
-                  onClick={() => toggleDropdown("phase")}
-                >
-                  <span className="capitalize">
-                    {formData.phase.replace("phase", "Phase ")}
-                  </span>
-                  <FaChevronDown
-                    className={`transition-transform ${
-                      openDropdown === "phase" ? "transform rotate-180" : ""
-                    }`}
+    <div className="fixed inset-0 backdrop-blur-sm bg-opacity-30 flex items-center justify-center z-50 overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-4xl my-8 max-h-screen overflow-y-auto">
+        <h2 className="text-xl font-bold mb-4">Initiate Training Phase</h2>
+        <form onSubmit={handleSubmit}>
+          {/* Phase Selection */}
+          <div className="mb-6 p-4 border rounded">
+            <label className="block font-medium mb-2">Select Phase(s)</label>
+            <div className="flex gap-4">
+              {PHASE_OPTIONS.map((phase) => (
+                <label key={phase} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={selectedPhases.includes(phase)}
+                    onChange={() => handlePhaseChange(phase)}
+                    className="h-4 w-4"
                   />
-                </div>
-                {openDropdown === "phase" && (
-                  <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg">
-                    {["phase1", "phase2", "phase3"].map((ph) => (
-                      <div
-                        key={ph}
-                        className={`p-3 hover:bg-blue-50 cursor-pointer ${
-                          formData.phase === ph ? "bg-blue-100" : ""
-                        }`}
-                        onClick={() => {
-                          setFormData((prev) => ({ ...prev, phase: ph }));
-                          setOpenDropdown(null);
-                        }}
-                      >
-                        <span className="capitalize">
-                          {ph.replace("phase", "Phase ")}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Domain Dropdown */}
-              <div className="relative">
-                <label className="block text-gray-700 mb-2 flex items-center">
-                  <FaChalkboardTeacher className="mr-2 text-blue-500" /> Select Domain
+                  <span className="capitalize">{phase.replace('-', ' ')}</span>
                 </label>
-                <div
-                  className="bg-gray-50 p-3 rounded-lg border border-gray-300 flex justify-between items-center cursor-pointer"
-                  onClick={() => toggleDropdown("domain")}
-                >
-                  <span className="capitalize">
-                    {formData.domain === "splitSkills"
-                      ? "Split Skills"
-                      : formData.domain}
-                  </span>
-                  <FaChevronDown
-                    className={`transition-transform ${
-                      openDropdown === "domain" ? "transform rotate-180" : ""
-                    }`}
-                  />
-                </div>
-                {openDropdown === "domain" && (
-                  <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg">
-                    {["technical", "splitSkills", "aptitude", "tools"].map((domain) => (
-                      <div
-                        key={domain}
-                        className={`p-3 hover:bg-blue-50 cursor-pointer ${
-                          formData.domain === domain ? "bg-blue-100" : ""
-                        }`}
-                        onClick={() => {
-                          setFormData((prev) => ({ ...prev, domain }));
-                          setOpenDropdown(null);
-                        }}
-                      >
-                        <span className="capitalize">
-                          {domain === "splitSkills" ? "Split Skills" : domain}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              ))}
             </div>
+          </div>
 
-            {/* Row 2: Dates & Times */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Dates */}
-              <div className="space-y-4">
-                {["startDate", "endDate"].map((field, i) => (
-                  <div key={field}>
-                    <label className="block text-gray-700 mb-2 flex items-center">
-                      <FaCalendarAlt className="mr-2 text-blue-500" />
-                      {i === 0 ? "Training Start Date" : "Training End Date"}
-                    </label>
-                    <input
-                      type="date"
-                      name={field}
-                      value={formData[field]}
-                      onChange={handleChange}
-                      className="w-full p-3 bg-gray-50 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                      required
+          {(selectedPhases.includes('phase-1') || selectedPhases.includes('phase-2')) && (
+            <>
+              {/* Common Fields (Main Form) */}
+              <div className="mb-6 p-4 border rounded">
+                <h3 className="font-medium mb-3">Training Details</h3>
+                
+                {/* Details */}
+                <div className="mb-4">
+                  <label className="block font-medium mb-1">Details</label>
+                  <textarea
+                    className="w-full border rounded px-3 py-2"
+                    placeholder="Enter training details"
+                    value={details}
+                    onChange={(e) => setDetails(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+                
+                {/* Training Dates and Times */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Training Start Date</label>
+                    <DatePicker
+                      selected={trainingStartDate}
+                      onChange={(date) => setTrainingStartDate(date)}
+                      className="w-full border rounded px-3 py-2"
+                      placeholderText="Select start date"
                     />
                   </div>
-                ))}
-              </div>
-
-              {/* Times */}
-              <div className="space-y-4">
-                {["startTime", "endTime", "lunchTime"].map((field, i) => (
-                  <div key={field}>
-                    <label className="block text-gray-700 mb-2 flex items-center">
-                      <FaClock className="mr-2 text-blue-500" />
-                      {field === "startTime"
-                        ? "College Start Time"
-                        : field === "endTime"
-                        ? "College End Time"
-                        : "Lunch Time"}
-                    </label>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Training End Date</label>
+                    <DatePicker
+                      selected={trainingEndDate}
+                      onChange={(date) => setTrainingEndDate(date)}
+                      className="w-full border rounded px-3 py-2"
+                      placeholderText="Select end date"
+                      minDate={trainingStartDate}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">College Start Time</label>
                     <input
                       type="time"
-                      name={field}
-                      value={formData[field]}
-                      onChange={handleChange}
-                      className="w-full p-3 bg-gray-50 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                      required={field !== "lunchTime"}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Row 3: Specializations & Counts */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Specializations Dropdown */}
-              <div className="relative">
-                <label className="block text-gray-700 mb-2 flex items-center">
-                  <FaChalkboardTeacher className="mr-2 text-blue-500" />
-                  Specializations
-                </label>
-                <div
-                  className="bg-gray-50 p-3 rounded-lg border border-gray-300 flex justify-between items-center cursor-pointer"
-                  onClick={() => toggleDropdown("specializations")}
-                >
-                  <span>
-                    {formData.specializations.length > 0
-                      ? formData.specializations.join(", ")
-                      : "Select Specializations"}
-                  </span>
-                  <FaChevronDown
-                    className={`transition-transform ${
-                      openDropdown === "specializations" ? "transform rotate-180" : ""
-                    }`}
-                  />
-                </div>
-                {openDropdown === "specializations" && (
-                  <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg p-2">
-                    {["CS", "AIDS", "AIDS-ML", "MECH", "CIVIL"].map((spec) => (
-                      <div key={spec} className="flex items-center p-2 hover:bg-blue-50">
-                        <input
-                          type="checkbox"
-                          id={spec}
-                          name="specializations"
-                          value={spec}
-                          checked={formData.specializations.includes(spec)}
-                          onChange={handleMultiSelect}
-                          className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500"
-                        />
-                        <label htmlFor={spec} className="cursor-pointer">
-                          {spec}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Counts & Batches */}
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-gray-700 mb-2">
-                      Student Count
-                    </label>
-                    <input
-                      type="number"
-                      name="studentCount"
-                      value={formData.studentCount}
-                      onChange={handleChange}
-                      className="w-full p-3 bg-gray-50 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                      min="1"
-                      required
+                      className="w-full border rounded px-3 py-2"
+                      value={collegeStartTime}
+                      onChange={(e) => setCollegeStartTime(e.target.value)}
                     />
                   </div>
                   <div>
-                    <label className="block text-gray-700 mb-2">
-                      Training Hours
-                    </label>
+                    <label className="block text-sm font-medium mb-1">College End Time</label>
                     <input
-                      type="number"
-                      name="trainingHours"
-                      value={formData.trainingHours}
-                      onChange={handleChange}
-                      className="w-full p-3 bg-gray-50 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                      min="1"
-                      required
+                      type="time"
+                      className="w-full border rounded px-3 py-2"
+                      value={collegeEndTime}
+                      onChange={(e) => setCollegeEndTime(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Lunch Time</label>
+                    <input
+                      type="time"
+                      className="w-full border rounded px-3 py-2"
+                      value={lunchTime}
+                      onChange={(e) => setLunchTime(e.target.value)}
                     />
                   </div>
                 </div>
-
-                {/* Batches */}
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  <div className="flex justify-between items-center mb-3">
-                    <span className="text-gray-800 font-medium">Batch Breakdown</span>
-                    <span
-                      className={`text-sm font-medium ${
-                        getRemainingCount() < 0
-                          ? "text-red-500"
-                          : getRemainingCount() > 0
-                          ? "text-yellow-500"
-                          : "text-green-500"
-                      }`}
-                    >
-                      Remaining: {getRemainingCount()}
-                    </span>
-                  </div>
-                  <div className="space-y-2">
-                    {formData.batches.map((batch, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <span className="w-10 font-medium text-gray-700">
-                          {batch.name}:
-                        </span>
-                        <input
-                          type="number"
-                          min="0"
-                          value={batch.count}
-                          onChange={(e) => handleBatchChange(index, e.target.value)}
-                          className="flex-1 p-2 bg-white border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                        />
-                      </div>
+                
+                {/* Domain Selection */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-1">Domain</label>
+                  <select
+                    className="w-full border rounded px-3 py-2"
+                    value={selectedDomain}
+                    onChange={(e) => handleDomainChange(e.target.value)}
+                  >
+                    <option value="">Select Domain</option>
+                    {DOMAIN_OPTIONS.map((domain) => (
+                      <option key={domain} value={domain}>{domain}</option>
                     ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Phase 1 Tables (show when domain is selected) */}
+              {selectedDomain && (
+                <>
+                  {/* Table 1 - Auto-generated based on specializations */}
+                  <div className="mb-6 p-4 border rounded">
+                    <h3 className="font-medium mb-3">Batch Details</h3>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full border">
+                        <thead>
+                          <tr className="bg-gray-100">
+                            <th className="border px-4 py-2">Batch (Specialization)</th>
+                            <th className="border px-4 py-2">Std Count</th>
+                            <th className="border px-4 py-2">Hrs</th>
+                            <th className="border px-4 py-2">Batch per Std Count</th>
+                            <th className="border px-4 py-2">Batch Code</th>
+                            <th className="border px-4 py-2">Assigned Hours</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {table1Data.map((row, index) => (
+                            <tr key={index}>
+                              <td className="border px-4 py-2">
+                                <input
+                                  type="text"
+                                  className="w-full px-2 py-1 bg-gray-100"
+                                  value={row.batch}
+                                  readOnly
+                                />
+                              </td>
+                              <td className="border px-4 py-2">
+                                <input
+                                  type="number"
+                                  className="w-full px-2 py-1 bg-gray-100"
+                                  value={row.stdCount}
+                                  readOnly
+                                />
+                              </td>
+                              <td className="border px-4 py-2">
+                                <input
+                                  type="number"
+                                  className="w-full px-2 py-1"
+                                  value={row.hrs}
+                                  onChange={(e) => handleTable1Change(index, 'hrs', e.target.value)}
+                                />
+                              </td>
+                              <td className="border px-4 py-2">
+                                <input
+                                  type="number"
+                                  className="w-full px-2 py-1"
+                                  value={row.batchPerStdCount}
+                                  onChange={(e) => handleTable1Change(index, 'batchPerStdCount', e.target.value)}
+                                />
+                              </td>
+                              <td className="border px-4 py-2">
+                                <input
+                                  type="text"
+                                  className="w-full px-2 py-1"
+                                  value={row.batchCode}
+                                  onChange={(e) => handleTable1Change(index, 'batchCode', e.target.value)}
+                                />
+                              </td>
+                              <td className="border px-4 py-2">
+                                <input
+                                  type="number"
+                                  className="w-full px-2 py-1"
+                                  value={row.assignedHours}
+                                  onChange={(e) => handleTable1Change(index, 'assignedHours', e.target.value)}
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Table 2 */}
+                  <div className="mb-6 p-4 border rounded">
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="font-medium">Training Schedule</h3>
+                      <button
+                        type="button"
+                        onClick={addTable2Row}
+                        className="px-3 py-1 bg-blue-500 text-white rounded"
+                      >
+                        Add Row
+                      </button>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full border">
+                        <thead>
+                          <tr className="bg-gray-100">
+                            <th className="border px-4 py-2 min-w-[140px]">Batch Code</th>
+                            <th className="border px-4 py-2 min-w-[140px]">Start Date</th>
+                            <th className="border px-4 py-2 min-w-[140px]">End Date</th>
+                            <th className="border px-4 py-2 min-w-[160px]">Trainer Name</th>
+                            <th className="border px-4 py-2 min-w-[120px]">Day Duration</th>
+                            <th className="border px-4 py-2 min-w-[120px]">Cost</th>
+                            <th className="border px-4 py-2 min-w-[160px]">Travel/Food/Stay</th>
+                            <th className="border px-4 py-2 min-w-[140px]">Total Amount</th>
+                            <th className="border px-4 py-2 min-w-[120px]">Total Hours</th>
+                            <th className="border px-4 py-2 min-w-[140px]">Remaining Hrs</th>
+                            <th className="border px-4 py-2 min-w-[100px]">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {table2Data.map((row, index) => (
+                            <tr key={index}>
+                              <td className="border px-4 py-2 min-w-[140px]">
+                                <select
+                                  className="w-full px-2 py-1"
+                                  value={row.batchCode}
+                                  onChange={(e) => handleTable2Change(index, 'batchCode', e.target.value)}
+                                >
+                                  <option value="">Select Batch</option>
+                                  {table1Data.map((batch, i) => (
+                                    <option key={i} value={batch.batchCode}>{batch.batchCode}</option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="border px-4 py-2 min-w-[140px]">
+                                <DatePicker
+                                  selected={row.startDate}
+                                  onChange={(date) => handleTable2Change(index, 'startDate', date)}
+                                  className="w-full px-2 py-1"
+                                  placeholderText="Select date"
+                                />
+                              </td>
+                              <td className="border px-4 py-2 min-w-[140px]">
+                                <DatePicker
+                                  selected={row.endDate}
+                                  onChange={(date) => handleTable2Change(index, 'endDate', date)}
+                                  className="w-full px-2 py-1"
+                                  placeholderText="Select date"
+                                  minDate={row.startDate}
+                                />
+                              </td>
+                              <td className="border px-4 py-2 min-w-[160px]">
+                                <input
+                                  type="text"
+                                  className="w-full px-2 py-1"
+                                  value={row.trainerName}
+                                  onChange={(e) => handleTable2Change(index, 'trainerName', e.target.value)}
+                                />
+                              </td>
+                              <td className="border px-4 py-2 min-w-[120px]">
+                                <select
+                                  className="w-full px-2 py-1"
+                                  value={row.dayDuration}
+                                  onChange={(e) => handleTable2Change(index, 'dayDuration', e.target.value)}
+                                >
+                                  <option value="">Select</option>
+                                  {DAY_DURATION_OPTIONS.map((option) => (
+                                    <option key={option} value={option}>{option}</option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="border px-4 py-2 min-w-[120px]">
+                                <input
+                                  type="number"
+                                  className="w-full px-2 py-1"
+                                  value={row.cost}
+                                  onChange={(e) => handleTable2Change(index, 'cost', e.target.value)}
+                                />
+                              </td>
+                              <td className="border px-4 py-2 min-w-[160px]">
+                                <input
+                                  type="text"
+                                  className="w-full px-2 py-1"
+                                  value={row.travelFoodStay}
+                                  onChange={(e) => handleTable2Change(index, 'travelFoodStay', e.target.value)}
+                                />
+                              </td>
+                              <td className="border px-4 py-2 min-w-[140px]">
+                                <input
+                                  type="number"
+                                  className="w-full px-2 py-1"
+                                  value={row.totalAmount}
+                                  onChange={(e) => handleTable2Change(index, 'totalAmount', e.target.value)}
+                                />
+                              </td>
+                              <td className="border px-4 py-2 min-w-[120px]">
+                                <input
+                                  type="number"
+                                  className="w-full px-2 py-1"
+                                  value={row.totalHours}
+                                  onChange={(e) => handleTable2Change(index, 'totalHours', e.target.value)}
+                                />
+                              </td>
+                              <td className="border px-4 py-2 min-w-[140px]">
+                                <input
+                                  type="number"
+                                  className="w-full px-2 py-1"
+                                  value={row.remainingHrs}
+                                  onChange={(e) => handleTable2Change(index, 'remainingHrs', e.target.value)}
+                                />
+                              </td>
+                              <td className="border px-4 py-2 min-w-[100px] text-center">
+                                {table2Data.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeTable2Row(index)}
+                                    className="text-red-500 hover:text-red-700"
+                                  >
+                                    Remove
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Phase 2 Dates (only when both phases are selected) */}
+              {selectedPhases.includes('phase-1') && selectedPhases.includes('phase-2') && (
+                <div className="mb-6 p-4 border rounded">
+                  <h3 className="font-medium mb-3">Phase 2 Dates</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Phase 2 Start Date</label>
+                      <DatePicker
+                        selected={phase2StartDate}
+                        onChange={(date) => setPhase2StartDate(date)}
+                        className="w-full border rounded px-3 py-2"
+                        placeholderText="Select start date"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Phase 2 End Date</label>
+                      <DatePicker
+                        selected={phase2EndDate}
+                        onChange={(date) => setPhase2EndDate(date)}
+                        className="w-full border rounded px-3 py-2"
+                        placeholderText="Select end date"
+                        minDate={phase2StartDate}
+                      />
+                    </div>
                   </div>
                   <button
                     type="button"
@@ -348,31 +554,37 @@ const InitiationModal = ({ training, onClose, onConfirm }) => {
                     <FaPlus className="mr-1" /> Add Batch
                   </button>
                 </div>
-              </div>
-            </div>
-          </div>
+              )}
+            </>
+          )}
 
-          {/* Footer Buttons */}
-          <div className="bg-gray-50 px-6 py-4 flex justify-end space-x-3 border-t sticky bottom-0">
+          {error && (
+            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
+              {error}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-4 border-t">
             <button
               type="button"
+              className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
               onClick={onClose}
-              className="px-5 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+              disabled={loading}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={getRemainingCount() !== 0}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-400"
+              disabled={loading || selectedPhases.length === 0}
             >
-              Initiate Training
+              {loading ? 'Saving...' : 'Submit'}
             </button>
           </div>
         </form>
       </div>
     </div>
   );
-};
+}
 
 export default InitiationModal;

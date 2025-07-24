@@ -37,15 +37,7 @@ if (isAdminOrDirector) {
     u.department === "Sales"
   );
 }
-else if (isAdminOrDirector) {
-  allUids = Object.values(users)
-    .filter((u) =>
-      ["Head", "Manager", "Assistant Manager", "Executive"].includes(u.role) &&
-      u.department === "Sales"
-    )
-    .map((u) => u.uid);
-}
- else if (isHead) {
+else if (isHead) {
   teamMembers = Object.values(users).filter((u) =>
     ["Manager"].includes(u.role) &&
     u.department === "Sales"

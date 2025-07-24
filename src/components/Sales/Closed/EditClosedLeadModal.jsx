@@ -738,6 +738,182 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                     </p>
                   </div>
                 </div>
+
+                {/* Payment Type Selection */}
+                <div className="bg-yellow-50 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-yellow-700 mb-2">
+                    Payment Type
+                  </label>
+                  <select
+                    value={formData.paymentType || ""}
+                    onChange={(e) => {
+                      const newPaymentType = e.target.value;
+                      const totalCost = formData.totalCost || 0;
+                      
+                      // Define payment fields for each type
+                      const paymentFields = {
+                        AT: ["Advance", "Training"],
+                        ATP: ["Advance", "Training", "Placement"],
+                        ATTP: ["Advance", "Training", "Training", "Placement"],
+                        ATTT: ["Advance", "Training", "Training", "Training"],
+                        EMI: []
+                      };
+
+                      const fields = paymentFields[newPaymentType] || [];
+                      let newPaymentDetails = [];
+
+                      if (newPaymentType === "EMI") {
+                        // For EMI, ask for number of installments
+                        const emiCount = prompt("Enter number of EMI installments:", "3");
+                        const emiMonths = parseInt(emiCount) || 3;
+                        
+                        // Create equal installments
+                        const percentagePerEmi = 100 / emiMonths;
+                        newPaymentDetails = Array(emiMonths).fill().map((_, i) => {
+                          const paymentAmount = totalCost * (percentagePerEmi / 100);
+                          const gstRate = formData.gstType === "include" ? 0.18 : 0;
+                          const baseAmount = formData.gstType === "include" 
+                            ? paymentAmount / (1 + gstRate) 
+                            : paymentAmount;
+                          const gstAmount = baseAmount * gstRate;
+
+                          return {
+                            name: `Installment ${i + 1}`,
+                            percentage: percentagePerEmi.toFixed(2),
+                            baseAmount: baseAmount.toFixed(2),
+                            gstAmount: gstAmount.toFixed(2),
+                            totalAmount: paymentAmount.toFixed(2)
+                          };
+                        });
+                      } else {
+                        // For other payment types, create equal splits
+                        const percentagePerField = 100 / fields.length;
+                        newPaymentDetails = fields.map(fieldName => {
+                          const paymentAmount = totalCost * (percentagePerField / 100);
+                          const gstRate = formData.gstType === "include" ? 0.18 : 0;
+                          const baseAmount = formData.gstType === "include" 
+                            ? paymentAmount / (1 + gstRate) 
+                            : paymentAmount;
+                          const gstAmount = baseAmount * gstRate;
+
+                          return {
+                            name: fieldName,
+                            percentage: percentagePerField.toFixed(2),
+                            baseAmount: baseAmount.toFixed(2),
+                            gstAmount: gstAmount.toFixed(2),
+                            totalAmount: paymentAmount.toFixed(2)
+                          };
+                        });
+                      }
+
+                      setFormData(prev => ({
+                        ...prev,
+                        paymentType: newPaymentType,
+                        paymentDetails: newPaymentDetails
+                      }));
+                    }}
+                    className="block w-full px-3 py-2 border border-yellow-300 rounded-lg shadow-sm focus:ring-yellow-500 focus:border-yellow-500 bg-white"
+                  >
+                    <option value="">Select Payment Type</option>
+                    <option value="AT">AT - Advanced Training</option>
+                    <option value="ATP">ATP - Advanced Training Placement</option>
+                    <option value="ATTP">ATTP - Advanced Training Technical Placement</option>
+                    <option value="ATTT">ATTT - Advanced Technical Training & Placement</option>
+                    <option value="EMI">EMI - Easy Monthly Installments</option>
+                  </select>
+                  <p className="text-xs text-yellow-600 mt-1">
+                    Current: {formData.paymentType ? `${formData.paymentType} (${formData.paymentDetails?.length || 0} payments)` : "Not selected"}
+                  </p>
+                </div>
+
+                {/* GST Type Selection */}
+                <div className="bg-purple-50 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-purple-700 mb-2">
+                    GST Type
+                  </label>
+                  <div className="flex space-x-4">
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        name="gstType"
+                        value="include"
+                        checked={formData.gstType === "include"}
+                        onChange={(e) => {
+                          const newGstType = e.target.value;
+                          const totalCost = formData.totalCost || 0;
+                          
+                          // Recalculate all payment details with new GST type
+                          const updatedPaymentDetails = formData.paymentDetails.map(payment => {
+                            const percentage = parseFloat(payment.percentage) || 0;
+                            const paymentAmount = totalCost * (percentage / 100);
+                            const gstRate = newGstType === "include" ? 0.18 : 0;
+                            const baseAmount = newGstType === "include" 
+                              ? paymentAmount / (1 + gstRate) 
+                              : paymentAmount;
+                            const gstAmount = baseAmount * gstRate;
+
+                            return {
+                              ...payment,
+                              baseAmount: baseAmount.toFixed(2),
+                              gstAmount: gstAmount.toFixed(2),
+                              totalAmount: paymentAmount.toFixed(2)
+                            };
+                          });
+
+                          setFormData(prev => ({
+                            ...prev,
+                            gstType: newGstType,
+                            paymentDetails: updatedPaymentDetails
+                          }));
+                        }}
+                        className="mr-2"
+                      />
+                      <span className="text-sm">Include GST (18%)</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        name="gstType"
+                        value="exclude"
+                        checked={formData.gstType === "exclude"}
+                        onChange={(e) => {
+                          const newGstType = e.target.value;
+                          const totalCost = formData.totalCost || 0;
+                          
+                          // Recalculate all payment details with new GST type
+                          const updatedPaymentDetails = formData.paymentDetails.map(payment => {
+                            const percentage = parseFloat(payment.percentage) || 0;
+                            const paymentAmount = totalCost * (percentage / 100);
+                            const gstRate = newGstType === "include" ? 0.18 : 0;
+                            const baseAmount = newGstType === "include" 
+                              ? paymentAmount / (1 + gstRate) 
+                              : paymentAmount;
+                            const gstAmount = baseAmount * gstRate;
+
+                            return {
+                              ...payment,
+                              baseAmount: baseAmount.toFixed(2),
+                              gstAmount: gstAmount.toFixed(2),
+                              totalAmount: paymentAmount.toFixed(2)
+                            };
+                          });
+
+                          setFormData(prev => ({
+                            ...prev,
+                            gstType: newGstType,
+                            paymentDetails: updatedPaymentDetails
+                          }));
+                        }}
+                        className="mr-2"
+                      />
+                      <span className="text-sm">Exclude GST</span>
+                    </label>
+                  </div>
+                  <p className="text-xs text-purple-600 mt-1">
+                    Current: {formData.gstType === "include" ? "GST Included" : formData.gstType === "exclude" ? "GST Excluded" : "Not selected"}
+                  </p>
+                </div>
+
                 {/* Payment Breakdown */}
                 {formData.paymentDetails?.length > 0 && (
                   <div className="space-y-4">

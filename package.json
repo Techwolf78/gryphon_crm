@@ -39,6 +39,7 @@
     "react-bootstrap": "^2.10.10",
     "react-chartjs-2": "^5.3.0",
     "react-csv": "^2.2.2",
+    "react-datepicker": "^8.4.0",
     "react-dom": "^19.1.0",
     "react-icons": "^5.5.0",
     "react-router-dom": "^7.6.2",
@@ -47,6 +48,7 @@
     "react-toastify": "^11.0.5",
     "recharts": "^3.0.2",
     "tailwindcss": "^4.1.8",
+    "together-ai": "^0.20.0",
     "xlsx": "^0.18.5",
     "xlsx-js-style": "^1.2.0"
   },

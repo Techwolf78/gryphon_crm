@@ -28,8 +28,8 @@ const CollegeInfoForm = ({
   return (
     <>
       {/* College Name */}
-      <div className="col-span-2 mb-2">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+      <div className="col-span-full lg:col-span-2 mb-3">
+        <label className="block text-xs font-medium text-gray-700 mb-1">
           College/University Name
           <span className="text-red-500 ml-1">*</span>
         </label>
@@ -39,12 +39,14 @@ const CollegeInfoForm = ({
             value={businessName}
             onChange={(e) => setBusinessName(e.target.value)}
             placeholder="e.g. Acme College"
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+            className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition ${
+              !businessName.trim() && isFormValid ? "border-red-500" : ""
+            }`}
           />
           {!businessName.trim() && isFormValid && (
             <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
               <svg
-                className="h-5 w-5 text-red-500"
+                className="h-4 w-4 text-red-500"
                 fill="currentColor"
                 viewBox="0 0 20 20"
               >
@@ -60,8 +62,8 @@ const CollegeInfoForm = ({
       </div>
 
       {/* Address */}
-      <div className="col-span-2 mb-2">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+      <div className="col-span-full lg:col-span-2 mb-3">
+        <label className="block text-xs font-medium text-gray-700 mb-1">
           Address
         </label>
         <input
@@ -69,14 +71,14 @@ const CollegeInfoForm = ({
           value={address}
           onChange={(e) => setAddress(e.target.value)}
           placeholder="e.g. 123 Main St"
-          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
         />
       </div>
 
       {/* State & City side by side */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+      <div className="col-span-full grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-xs font-medium text-gray-700 mb-1">
             State
           </label>
           <Select
@@ -86,21 +88,70 @@ const CollegeInfoForm = ({
               setState(selected ? selected.value : "");
               setCity(""); // Reset city when state changes
             }}
-            placeholder="Search or select state"
+            placeholder="Search state"
             isClearable
+            styles={{
+              control: (provided) => ({
+                ...provided,
+                minHeight: '34px',
+                fontSize: '14px',
+                borderRadius: '6px'
+              }),
+              placeholder: (provided) => ({
+                ...provided,
+                fontSize: '14px'
+              }),
+              option: (provided) => ({
+                ...provided,
+                fontSize: '14px'
+              }),
+              input: (provided) => ({
+                ...provided,
+                fontSize: '14px'
+              }),
+              singleValue: (provided) => ({
+                ...provided,
+                fontSize: '14px'
+              })
+            }}
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-xs font-medium text-gray-700 mb-1">
             City
           </label>
           <Select
             options={cityOptions}
             value={cityOptions.find((opt) => opt.value === city)}
             onChange={(selected) => setCity(selected ? selected.value : "")}
-            placeholder="Search or select city"
+            placeholder="Search city"
             isClearable
             isDisabled={!state}
+            styles={{
+              control: (provided, state) => ({
+                ...provided,
+                minHeight: '34px',
+                fontSize: '14px',
+                borderRadius: '6px',
+                backgroundColor: state.isDisabled ? '#f9fafb' : provided.backgroundColor
+              }),
+              placeholder: (provided) => ({
+                ...provided,
+                fontSize: '14px'
+              }),
+              option: (provided) => ({
+                ...provided,
+                fontSize: '14px'
+              }),
+              input: (provided) => ({
+                ...provided,
+                fontSize: '14px'
+              }),
+              singleValue: (provided) => ({
+                ...provided,
+                fontSize: '14px'
+              })
+            }}
           />
         </div>
       </div>

@@ -453,11 +453,11 @@ createdAt: timestamp, // store actual time as number
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 z-52 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-3xl rounded-xl shadow-2xl overflow-hidden">
-        {/* Modal Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center">
-          <h2 className="text-xl font-semibold text-white">
+    <div className="fixed inset-0 z-52 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-white w-full max-w-4xl max-h-[95vh] rounded-lg shadow-2xl overflow-hidden">
+        {/* Modal Header - More compact */}
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-4 py-3 flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-white">
             Add College/University
           </h2>
           <button
@@ -468,204 +468,214 @@ createdAt: timestamp, // store actual time as number
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div className="p-6 overflow-y-auto max-h-[calc(100vh-180px)]">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="md:col-span-2">
-              <CollegeInfoForm
-                businessName={businessName}
-                setBusinessName={val => setBusinessName(capitalizeWords(val))}
-                address={address}
-                setAddress={val => setAddress(capitalizeWords(val))}
-                state={state}
-                setState={setState}
-                city={city}
-                setCity={setCity}
-                isFormValid={isFormValid}
-              />
-            </div>
-
-            <ContactInfoForm
-              pocName={pocName}
-              setPocName={val => setPocName(capitalizeWords(val))}
-              phoneNo={phoneNo}
-              setPhoneNo={setPhoneNo}
-              email={email}
-              setEmail={setEmail}
-              expectedClosureDate={expectedClosureDate}
-              setExpectedClosureDate={setExpectedClosureDate}
-              contactMethod={contactMethod}
-              setContactMethod={setContactMethod}
-              isFormValid={isFormValid}
-            />
-
-            {/* Accreditation */}
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                NAAC Accrediation
-              </label>
-              <div className="relative">
-                <select
-                  value={accreditation}
-                  onChange={(e) => {
-                    setAccreditation(e.target.value);
-                    setManualAccreditation("");
-                  }}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
-                >
-                  <option value="">Select Accreditation</option>
-                  {accreditationOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                  <svg
-                    className="h-4 w-4"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </div>
-              </div>
-
-              {accreditation === "Other" && (
-                <div className="mt-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Please specify Accreditation
-                  </label>
-                  <input
-                    type="text"
-                    value={manualAccreditation}
-                    onChange={e => setManualAccreditation(capitalizeWords(e.target.value))}
-                    placeholder="Enter custom accreditation"
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Affiliation */}
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                University Affiliation
-              </label>
-              <div className="flex flex-col gap-2">
-                <Select
-                  options={universitySelectOptions}
-                  value={universitySelectOptions.find((opt) => opt.value === affiliation)}
-                  onChange={(selected) => {
-                    setAffiliation(selected ? selected.value : "");
-                    setManualAffiliation("");
-                  }}
-                  placeholder="Search or select university"
-                  isClearable
+        {/* Modal Body - Improved spacing and responsiveness */}
+        <div className="p-4 sm:p-6 overflow-y-auto max-h-[calc(95vh-120px)]">
+          <div className="space-y-4">
+            {/* College Info Section */}
+            <div className="bg-gray-50 p-3 sm:p-4 rounded-lg">
+              <h3 className="text-sm font-medium text-gray-900 mb-3">College Information</h3>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <CollegeInfoForm
+                  businessName={businessName}
+                  setBusinessName={val => setBusinessName(capitalizeWords(val))}
+                  address={address}
+                  setAddress={val => setAddress(capitalizeWords(val))}
+                  state={state}
+                  setState={setState}
+                  city={city}
+                  setCity={setCity}
+                  isFormValid={isFormValid}
                 />
-                {affiliation === "Other" && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Please specify University Name
-                      {!manualAffiliation.trim() && isFormValid && (
-                        <span className="text-red-500 ml-1">*</span>
-                      )}
-                    </label>
-                    <input
-                      type="text"
-                      value={manualAffiliation}
-                      onChange={e => setManualAffiliation(capitalizeWords(e.target.value))}
-                      placeholder="Enter university name"
-                      className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        !manualAffiliation.trim() && isFormValid
-                          ? "border-red-500"
-                          : "border-gray-300"
-                      }`}
+              </div>
+            </div>
+
+            {/* Contact Info Section */}
+            <div className="bg-gray-50 p-3 sm:p-4 rounded-lg">
+              <h3 className="text-sm font-medium text-gray-900 mb-3">Contact Information</h3>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <ContactInfoForm
+                  pocName={pocName}
+                  setPocName={val => setPocName(capitalizeWords(val))}
+                  phoneNo={phoneNo}
+                  setPhoneNo={setPhoneNo}
+                  email={email}
+                  setEmail={setEmail}
+                  expectedClosureDate={expectedClosureDate}
+                  setExpectedClosureDate={setExpectedClosureDate}
+                  contactMethod={contactMethod}
+                  setContactMethod={setContactMethod}
+                  isFormValid={isFormValid}
+                />
+              </div>
+            </div>
+
+            {/* Accreditation & Affiliation Section */}
+            <div className="bg-gray-50 p-3 sm:p-4 rounded-lg">
+              <h3 className="text-sm font-medium text-gray-900 mb-3">Accreditation & Affiliation</h3>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {/* Accreditation */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    NAAC Accreditation
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={accreditation}
+                      onChange={(e) => {
+                        setAccreditation(e.target.value);
+                        setManualAccreditation("");
+                      }}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
+                    >
+                      <option value="">Select Accreditation</option>
+                      {accreditationOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                      <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path
+                          fillRule="evenodd"
+                          d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+
+                  {accreditation === "Other" && (
+                    <div className="mt-2">
+                      <input
+                        type="text"
+                        value={manualAccreditation}
+                        onChange={e => setManualAccreditation(capitalizeWords(e.target.value))}
+                        placeholder="Enter custom accreditation"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Affiliation */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    University Affiliation
+                  </label>
+                  <div className="space-y-2">
+                    <Select
+                      options={universitySelectOptions}
+                      value={universitySelectOptions.find((opt) => opt.value === affiliation)}
+                      onChange={(selected) => {
+                        setAffiliation(selected ? selected.value : "");
+                        setManualAffiliation("");
+                      }}
+                      placeholder="Search university"
+                      isClearable
+                      styles={{
+                        control: (provided) => ({
+                          ...provided,
+                          minHeight: '34px',
+                          fontSize: '14px'
+                        }),
+                        option: (provided) => ({
+                          ...provided,
+                          fontSize: '14px'
+                        })
+                      }}
                     />
-                    {!manualAffiliation.trim() && isFormValid && (
-                      <p className="mt-1 text-sm text-red-600">
-                        Please specify the university name
-                      </p>
+                    {affiliation === "Other" && (
+                      <input
+                        type="text"
+                        value={manualAffiliation}
+                        onChange={e => setManualAffiliation(capitalizeWords(e.target.value))}
+                        placeholder="Enter university name"
+                        className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                          !manualAffiliation.trim() && isFormValid
+                            ? "border-red-500"
+                            : "border-gray-300"
+                        }`}
+                      />
                     )}
                   </div>
-                )}
+                </div>
               </div>
             </div>
 
             {/* Courses Section */}
-            <div className="col-span-2">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="text-lg font-medium text-gray-900">Courses</h3>
+            <div className="bg-gray-50 p-3 sm:p-4 rounded-lg">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-3 gap-2">
+                <h3 className="text-sm font-medium text-gray-900">Courses</h3>
                 <button
                   type="button"
                   onClick={handleAddCourse}
-                  className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-full shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 self-start sm:self-auto"
                 >
-                  <PlusIcon className="-ml-1 mr-1 h-4 w-4" />
+                  <PlusIcon className="-ml-1 mr-1 h-3 w-3" />
                   Add Course
                 </button>
               </div>
 
-              {courses.map((course, index) => (
-                <div key={index} className="mb-6 border-b border-gray-200 pb-6">
-                  <CourseForm
-                    course={course}
-                    index={index}
-                    handleCourseChange={(idx, field, value) => {
-                      if (field === "manualCourseType" || field === "manualSpecialization") {
-                        handleCourseChange(idx, field, capitalizeWords(value));
-                      } else {
-                        handleCourseChange(idx, field, value);
-                      }
-                    }}
-                    handleSpecializationChange={handleSpecializationChange}
-                    courseSpecializations={courseSpecializations}
-                    yearOptions={yearOptions}
-                    isFormValid={isFormValid}
-                    onRemove={() => handleRemoveCourse(index)}
-                    showRemoveButton={courses.length > 1}
-                  />
-                </div>
-              ))}
+              <div className="space-y-4">
+                {courses.map((course, index) => (
+                  <div key={index} className="bg-white p-3 rounded-md border border-gray-200">
+                    <CourseForm
+                      course={course}
+                      index={index}
+                      handleCourseChange={(idx, field, value) => {
+                        if (field === "manualCourseType" || field === "manualSpecialization") {
+                          handleCourseChange(idx, field, capitalizeWords(value));
+                        } else {
+                          handleCourseChange(idx, field, value);
+                        }
+                      }}
+                      handleSpecializationChange={handleSpecializationChange}
+                      courseSpecializations={courseSpecializations}
+                      yearOptions={yearOptions}
+                      isFormValid={isFormValid}
+                      onRemove={() => handleRemoveCourse(index)}
+                      showRemoveButton={courses.length > 1}
+                    />
+                  </div>
+                ))}
+              </div>
 
-              {/* Total Contract Value Display - Enhanced */}
-              <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
-                <div className="flex justify-between items-center">
+              {/* Total Contract Value Display - More compact */}
+              <div className="mt-4 p-3 bg-blue-50 rounded-md border border-blue-100">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                   <div>
-                    <span className="text-lg font-medium text-gray-700">
+                    <span className="text-sm font-medium text-gray-700">
                       Total Contract Value (TCV)
                     </span>
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="text-xs text-gray-500">
                       Sum of all course values
                     </p>
                   </div>
-                  <div className="text-right">
-                    <span className="text-xl font-semibold text-blue-600">
+                  <div className="text-left sm:text-right">
+                    <span className="text-lg font-semibold text-blue-600">
                       ₹{tcv.toLocaleString()}
                     </span>
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="text-xs text-gray-500">
                       {courses.filter((c) => c.courseTCV > 0).length} course(s)
-                      included
                     </p>
                   </div>
                 </div>
                 {courses.filter((c) => c.courseTCV > 0).length > 0 && (
-                  <div className="mt-2 text-sm text-gray-600">
-                    <p>Breakdown:</p>
-                    <ul className="list-disc pl-5 mt-1">
-                      {courses
-                        .filter((c) => c.courseTCV > 0)
-                        .map((course, idx) => (
-                          <li key={idx}>
-                            {course.courseType || course.manualCourseType}: ₹
-                            {course.courseTCV.toLocaleString()}
-                          </li>
-                        ))}
-                    </ul>
+                  <div className="mt-2 text-xs text-gray-600">
+                    <details className="cursor-pointer">
+                      <summary className="font-medium">View Breakdown</summary>
+                      <ul className="list-disc pl-4 mt-1 space-y-1">
+                        {courses
+                          .filter((c) => c.courseTCV > 0)
+                          .map((course, idx) => (
+                            <li key={idx} className="text-xs">
+                              {course.courseType || course.manualCourseType}: ₹
+                              {course.courseTCV.toLocaleString()}
+                            </li>
+                          ))}
+                      </ul>
+                    </details>
                   </div>
                 )}
               </div>
@@ -673,27 +683,25 @@ createdAt: timestamp, // store actual time as number
           </div>
         </div>
 
-        {/* Modal Footer */}
-        <div className="bg-gray-50 px-6 py-4 flex justify-end">
-          <div className="flex space-x-3">
-            <button
-              onClick={handleClose}
-              className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleAddBusiness}
-              disabled={!isFormValid || loading}
-              className={`px-6 py-2.5 rounded-lg text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition ${
-                isFormValid && !loading
-                  ? "bg-blue-600 hover:bg-blue-700"
-                  : "bg-gray-400 cursor-not-allowed"
-              }`}
-            >
-              {loading ? "Adding..." : "Add College Lead"}
-            </button>
-          </div>
+        {/* Modal Footer - More compact */}
+        <div className="bg-gray-50 px-4 py-3 flex flex-col sm:flex-row sm:justify-end gap-2">
+          <button
+            onClick={handleClose}
+            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition order-2 sm:order-1"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleAddBusiness}
+            disabled={!isFormValid || loading}
+            className={`px-4 py-2 rounded-md text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition order-1 sm:order-2 ${
+              isFormValid && !loading
+                ? "bg-blue-600 hover:bg-blue-700"
+                : "bg-gray-400 cursor-not-allowed"
+            }`}
+          >
+            {loading ? "Adding..." : "Add College Lead"}
+          </button>
         </div>
       </div>
     </div>

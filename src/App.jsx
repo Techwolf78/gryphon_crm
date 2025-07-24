@@ -6,6 +6,7 @@ import {
   useLocation,
 } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import MsalProviderWrapper from "./context/MsalProviderWrapper";
 import Navbar from "./components/Navbar";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -20,7 +21,7 @@ import DigitalMarketing from "./pages/Marketing";
 import Footer from "./pages/footer";
 import UpdateProfile from "./components/UpdateProfile";
 import Help from "./pages/Help";
-import SessionManager from "./components/SessionManager"; // Add this import
+import SessionManager from "./components/SessionManager";
 import TrainersDashboard from "./components/Learning/TrainersDashboard";
 
 const AppContent = () => {
@@ -29,7 +30,7 @@ const AppContent = () => {
   return (
     <>
       <Navbar />
-      <SessionManager /> {/* Add this line */}
+      <SessionManager />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
@@ -42,7 +43,7 @@ const AppContent = () => {
             </ProtectedRoute>
           }
         >
-          <Route index element={<Dashboard />} /> {/* /dashboard */}
+          <Route index element={<Dashboard />} />
           <Route path="profile" element={<UpdateProfile />} />
           <Route path="admin" element={<Admin />} />
           <Route path="sales" element={<Sales />} />
@@ -61,11 +62,13 @@ const AppContent = () => {
 };
 
 const App = () => (
-  <AuthProvider>
-    <Router>
-      <AppContent />
-    </Router>
-  </AuthProvider>
+  <MsalProviderWrapper>
+    <AuthProvider>
+      <Router>
+        <AppContent />
+      </Router>
+    </AuthProvider>
+  </MsalProviderWrapper>
 );
 
 export default App;

@@ -89,13 +89,15 @@ const DropdownActions = ({
   }
 
   if (currentUserData.role === "Manager") {
-    return allSalesUsers.filter(u => 
-      // Include their own team
-      u.reportingManager === currentUserData.name ||
-      // Include other managers (same level)
-      u.role === "Manager" ||
-      // Include executives from other teams (optional)
-      ["Assistant Manager", "Executive"].includes(u.role)
+    // Get Assistant Managers, Executives, and Managers (excluding self)
+    return allSalesUsers.filter(
+      (u) =>
+        (
+          (u.reportingManager === currentUserData.name &&
+            ["Assistant Manager", "Executive"].includes(u.role))
+          ||
+          (u.role === "Manager" && u.uid !== currentUser.uid)
+        )
     );
   }
   if (["Assistant Manager", "Executive"].includes(currentUserData.role)) {
