@@ -21,15 +21,15 @@ const ClosedLeadsStats = ({
   selectedTeamUserId,        
   setSelectedTeamUserId
 }) => {
-
+ 
   const [selectedFY, setSelectedFY] = useState(propSelectedFY || getCurrentFinancialYear());
-
+ 
   const userObj = Object.values(users).find((u) => u.uid === currentUser?.uid);
  const isHead = userObj?.role === "Head";
 const isAdminOrDirector = ["Admin", "Director"].includes(userObj?.role);
-
+ 
   const isManager = userObj?.role === "Manager";
-
+ 
   let teamMembers = [];
 if (isAdminOrDirector) {
   teamMembers = Object.values(users).filter((u) =>
@@ -37,15 +37,7 @@ if (isAdminOrDirector) {
     u.department === "Sales"
   );
 }
-else if (isAdminOrDirector) {
-  allUids = Object.values(users)
-    .filter((u) =>
-      ["Head", "Manager", "Assistant Manager", "Executive"].includes(u.role) &&
-      u.department === "Sales"
-    )
-    .map((u) => u.uid);
-}
- else if (isHead) {
+else if (isHead) {
   teamMembers = Object.values(users).filter((u) =>
     ["Manager"].includes(u.role) &&
     u.department === "Sales"
@@ -58,13 +50,13 @@ else if (isAdminOrDirector) {
       u.department === "Sales"
   );
 }
-
-
-
+ 
+ 
+ 
   let targetUser;
-
+ 
   const isAssistant = ["Assistant Manager", "Executive"].includes(userObj?.role);
-  
+ 
   if (isAssistant) {
     viewMyLeadsOnly = true;
   }
@@ -81,9 +73,9 @@ else if (isAdminOrDirector) {
   } else {
     targetUser = userObj;
   }
-
+ 
   const targetUid = targetUser?.uid;
-
+ 
   const getQuarter = (date) => {
     const m = date.getMonth() + 1;
     if (m >= 4 && m <= 6) return "Q1";
@@ -91,7 +83,7 @@ else if (isAdminOrDirector) {
     if (m >= 10 && m <= 12) return "Q3";
     return "Q4";
   };
-
+ 
   const getAchievedAmount = (uid, quarter) => {
     return Object.values(leads)
       .filter((l) => l.assignedTo?.uid === uid && l.phase === "closed")
@@ -102,8 +94,8 @@ else if (isAdminOrDirector) {
       })
       .reduce((sum, l) => sum + (l.totalCost || 0), 0);
   };
-
-
+ 
+ 
   const getQuarterTargetWithCarryForward = (uid) => {
     if (activeQuarter === "all") {
       const totalTarget = ["Q1", "Q2", "Q3", "Q4"].reduce((sum, q) => {
@@ -115,17 +107,17 @@ else if (isAdminOrDirector) {
         );
         return sum + (t ? t.target_amount : 0);
       }, 0);
-
+ 
       const achieved = getAchievedAmount(uid, "all");
       const deficit = Math.max(totalTarget - achieved, 0);
-
+ 
       return { adjustedTarget: totalTarget, achieved, deficit };
     }
-
+ 
     // Existing logic for single quarter
     let deficit = 0;
     const quarters = ["Q1", "Q2", "Q3", "Q4"];
-
+ 
     for (const q of quarters) {
       const t = targets.find(
         (t) =>
@@ -134,43 +126,43 @@ else if (isAdminOrDirector) {
           t.assignedTo === uid
       );
       const baseTarget = t ? t.target_amount : 0;
-
+ 
       const adjustedTarget = baseTarget + deficit;
       const achieved = getAchievedAmount(uid, q);
-
+ 
       deficit = Math.max(adjustedTarget - achieved, 0);
-
+ 
       if (q === activeQuarter) {
         return { adjustedTarget, achieved, deficit };
       }
     }
-
+ 
     return { adjustedTarget: 0, achieved: 0, deficit: 0 };
   };
-
-
+ 
+ 
   const getTotalAchievedAmount = (uids, quarter) => {
     return uids.reduce((sum, uid) => sum + getAchievedAmount(uid, quarter), 0);
   };
-
+ 
   const getCombinedQuarterTarget = (uids) => {
     let totalAdjustedTarget = 0;
     let totalAchieved = 0;
     let totalDeficit = 0;
-
+ 
     uids.forEach((uid) => {
       const quarterData = getQuarterTargetWithCarryForward(uid);
       totalAdjustedTarget += quarterData.adjustedTarget;
       totalAchieved += quarterData.achieved;
       totalDeficit += quarterData.deficit;
     });
-
+ 
     return { adjustedTarget: totalAdjustedTarget, achieved: totalAchieved, deficit: totalDeficit };
   };
-
+ 
   const isHeadViewingManager =
     isHead && selectedTeamUserId !== "all" && targetUser?.role === "Manager";
-
+ 
   let allUids = [];
   if (isHeadViewingManager) {
     const managerTeamMembers = Object.values(users).filter(
@@ -182,7 +174,7 @@ else if (isAdminOrDirector) {
     const allManagerTeam = [targetUser, ...managerTeamMembers];
     allUids = allManagerTeam.map((u) => u.uid);
   }
-
+ 
   // Calculate aggregate values for "All Team Members"
   const allTeamMembers = [userObj, ...teamMembers];
   const uniqueTeamMembers = allTeamMembers.filter(
@@ -192,9 +184,9 @@ else if (isAdminOrDirector) {
   if (selectedTeamUserId !== "all" || viewMyLeadsOnly) {
     return null;
   }
-
+ 
   let allUids = [];
-
+ 
   if (isAdminOrDirector) {
     allUids = Object.values(users)
       .filter((u) =>
@@ -204,48 +196,48 @@ else if (isAdminOrDirector) {
       .map((u) => u.uid);
   } else if (isHead) {
     let managers = teamMembers.filter((u) => u.role === "Manager" && u.department === "Sales");
-
+ 
     managers.forEach((manager) => {
       allUids.push(manager.uid);
-
+ 
       const subordinates = Object.values(users).filter(
         (u) =>
           ["Assistant Manager", "Executive"].includes(u.role) &&
           u.reportingManager === manager.name &&
           u.department === "Sales"
       );
-
+ 
       subordinates.forEach((sub) => {
         allUids.push(sub.uid);
       });
     });
   } else if (isManager) {
     allUids.push(userObj.uid);
-
+ 
     const subordinates = Object.values(users).filter(
       (u) =>
         ["Assistant Manager", "Executive"].includes(u.role) &&
         u.reportingManager === userObj.name &&
         u.department === "Sales"
     );
-
+ 
     subordinates.forEach((sub) => {
       allUids.push(sub.uid);
     });
   }
-
+ 
   let totalAdjustedTarget = 0;
   let totalAchieved = 0;
   let totalDeficit = 0;
   let totalAnnualTarget = 0;
-
+ 
   allUids.forEach((uid) => {
     const quarterData = getQuarterTargetWithCarryForward(uid);
-
+ 
     totalAdjustedTarget += quarterData.adjustedTarget;
     totalAchieved += quarterData.achieved;
     totalDeficit += quarterData.deficit;
-
+ 
     const memberAnnualTarget = ["Q1", "Q2", "Q3", "Q4"].reduce((total, q) => {
       const t = targets.find(
         (t) =>
@@ -255,10 +247,10 @@ else if (isAdminOrDirector) {
       );
       return total + (t ? t.target_amount : 0);
     }, 0);
-
+ 
     totalAnnualTarget += memberAnnualTarget;
   });
-
+ 
   return {
     adjustedTarget: totalAdjustedTarget,
     achieved: totalAchieved,
@@ -274,20 +266,20 @@ else if (isAdminOrDirector) {
   leads,
   users,
 ]);
-
+ 
   // Display targets and achieved values
   const displayQuarterTarget = isHeadViewingManager
     ? getCombinedQuarterTarget(allUids)
     : selectedTeamUserId === "all" && !viewMyLeadsOnly && aggregateValues
       ? aggregateValues
       : getQuarterTargetWithCarryForward(targetUid);
-
+ 
   const achievedValue = isHeadViewingManager
     ? getTotalAchievedAmount(allUids, activeQuarter)
     : selectedTeamUserId === "all" && !viewMyLeadsOnly && aggregateValues
       ? aggregateValues.achieved
       : getAchievedAmount(targetUid, activeQuarter);
-
+ 
   const annualTarget = selectedTeamUserId === "all" && !viewMyLeadsOnly && aggregateValues
     ? aggregateValues.annualTarget
     : ["Q1", "Q2", "Q3", "Q4"].reduce((total, q) => {
@@ -299,18 +291,18 @@ else if (isAdminOrDirector) {
       );
       return total + (t ? t.target_amount : 0);
     }, 0);
-
+ 
   const displayDeficit = displayQuarterTarget.deficit;
   const achievementPercentage =
     displayQuarterTarget.adjustedTarget > 0
       ? Math.min(Math.round((achievedValue / displayQuarterTarget.adjustedTarget) * 100), 100)
       : 0;
-
+ 
   const completionStatus = achievementPercentage >= 100 ? "Ahead" : "Behind";
   const statusColor = achievementPercentage >= 100 ? "text-green-600" : "text-red-600";
-
-  
-
+ 
+ 
+ 
   return (
     // ... your existing UI (cards) as is, no change needed ...
     <>
@@ -334,7 +326,7 @@ else if (isAdminOrDirector) {
               </span>
             </div>
           </div>
-
+ 
           {!viewMyLeadsOnly && teamMembers.length > 0 && (
             <div className="mt-3 sm:mt-0 w-full sm:w-auto">
               <label className="block text-sm font-medium text-gray-700 mb-1">Team Member</label>
@@ -360,7 +352,7 @@ else if (isAdminOrDirector) {
             </div>
           )}
         </div>
-
+ 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-gray-100">
           {/* Achieved Card */}
@@ -395,7 +387,7 @@ else if (isAdminOrDirector) {
               )}
             </div>
           </div>
-
+ 
           {/* Target Card */}
           <div className="p-6 hover:bg-gray-50 transition-colors duration-200">
             <div className="flex flex-col items-center">
@@ -438,7 +430,7 @@ else if (isAdminOrDirector) {
               </div>
             </div>
           </div>
-
+ 
           {/* Deficit Card */}
           <div className="p-6 hover:bg-gray-50 transition-colors duration-200">
             <div className="flex flex-col items-center">
@@ -482,7 +474,7 @@ else if (isAdminOrDirector) {
     </>
   );
 };
-
+ 
 ClosedLeadsStats.propTypes = {
   leads: PropTypes.object.isRequired,
   targets: PropTypes.array.isRequired,
@@ -496,6 +488,7 @@ ClosedLeadsStats.propTypes = {
   selectedTeamUserId: PropTypes.string.isRequired,
   setSelectedTeamUserId: PropTypes.func.isRequired,
 };
-
-
+ 
+ 
 export default ClosedLeadsStats;
+ 
