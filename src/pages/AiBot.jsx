@@ -18,7 +18,7 @@ const AiBot = ({ isOpen, onClose }) => {
   const [chatMessages, setChatMessages] = useState([
     { 
       type: "bot", 
-      message: "👋 Hello! I'm your AI assistant. I can help you with educational research, college information, placement statistics, and much more!",
+      message: "🇮🇳 नमस्ते! I'm your AI assistant specialized in Indian higher education. I can help you with:\n\n• Indian college placement statistics & packages (in INR)\n• IIT/NIT/IIIT admission processes & cutoffs\n• AICTE/UGC approved institutions\n• TPO contact details for Indian colleges\n• JEE/NEET/CAT/GATE exam information\n• State quota vs All-India quota details\n\nWhat would you like to know about Indian education?",
       timestamp: new Date()
     },
   ]);
@@ -106,36 +106,40 @@ const AiBot = ({ isOpen, onClose }) => {
     }
   };
 
-  // ✅ IMPROVED - Enhanced fallback responses
+  // ✅ IMPROVED - Enhanced fallback responses with India focus
   const getSimpleResponse = (question) => {
     const lowerQuestion = question.toLowerCase();
     
-    if (lowerQuestion.includes("hello") || lowerQuestion.includes("hi")) {
-      return "Hello! I'm your AI assistant specialized in educational research. I can help you with:\n\n• College placement statistics\n• Admission processes and deadlines\n• TPO contact information\n• Technology curriculum trends\n• Skills gap analysis\n\nWhat would you like to know?";
+    if (lowerQuestion.includes("hello") || lowerQuestion.includes("hi") || lowerQuestion.includes("namaste")) {
+      return "🇮🇳 नमस्ते! I'm your AI assistant specialized in Indian higher education. I can help you with:\n\n• Indian college placement data & salary packages (INR)\n• IIT/NIT/IIIT admission processes & cutoffs\n• AICTE/UGC approved institutions & rankings\n• TPO contact information for Indian colleges\n• JEE/NEET/CAT/GATE exam guidance\n• Reservation policies & state quota details\n\nWhat specific information about Indian education do you need?";
     }
     
     if (lowerQuestion.includes("help")) {
-      return "I'm here to help with educational research! Try asking me about:\n\n• Specific colleges (e.g., 'ICEM Pune placement statistics')\n• Admission deadlines (e.g., 'engineering admissions 2025')\n• Technology trends (e.g., 'AI courses in Indian colleges')\n• Placement data (e.g., 'IIT Delhi placement packages')\n\nWhat information do you need?";
+      return "🇮🇳 I'm here to help with Indian educational research! Try asking me about:\n\n• Specific Indian colleges (e.g., 'IIT Delhi placement statistics')\n• Admission processes (e.g., 'JEE Advanced cutoff 2025')\n• Indian technology trends (e.g., 'AI courses in Indian engineering colleges')\n• Placement packages (e.g., 'average package at NIT Trichy')\n• Contact details (e.g., 'TPO contact IIT Bombay')\n\nWhat Indian educational information do you need?";
     }
     
     if (lowerQuestion.includes("what") && lowerQuestion.includes("you")) {
-      return "I'm an AI assistant specialized in educational market intelligence. I can search and analyze information about:\n\n• Indian colleges and universities\n• Placement statistics and salary data\n• Admission processes and deadlines\n• Industry-academia partnerships\n• Technology curriculum and skills gaps\n\nI'm particularly good at finding current data about engineering colleges, placement records, and contact information for college officials.";
+      return "🇮🇳 I'm an AI assistant specialized in Indian higher education market intelligence. I focus on:\n\n• Indian colleges, universities & deemed institutions\n• NIRF rankings & NAAC accreditation status\n• Placement statistics with INR salary packages\n• Indian admission processes & cutoff trends\n• AICTE/UGC guidelines & government policies\n• TPO contacts & college administration details\n\nI'm particularly good at finding current data about Indian engineering colleges, medical colleges, management institutes, and their placement records.";
     }
     
-    if (lowerQuestion.includes("college") || lowerQuestion.includes("university")) {
-      return "I can help you research colleges and universities! Try asking specific questions like:\n\n• 'MIT Manipal placement statistics'\n• 'VIT Vellore admission process 2025'\n• 'Top engineering colleges for AI courses'\n• 'NIRF ranking engineering colleges'\n\nWhat specific college information do you need?";
+    if (lowerQuestion.includes("college") || lowerQuestion.includes("university") || lowerQuestion.includes("iit") || lowerQuestion.includes("nit")) {
+      return "🇮🇳 I can help you research Indian colleges and universities! Try asking specific questions like:\n\n• 'IIT Delhi placement statistics 2025'\n• 'NIT Trichy admission process'\n• 'Top engineering colleges in Maharashtra'\n• 'AIIMS Delhi cutoff marks'\n• 'VIT Vellore fees structure'\n• 'BITS Pilani placement packages'\n\nWhich specific Indian institution interests you?";
     }
     
-    if (lowerQuestion.includes("placement") || lowerQuestion.includes("job")) {
-      return "I can provide placement statistics and career information! Ask me about:\n\n• College-specific placement data\n• Average salary packages\n• Top recruiting companies\n• Skills gap in engineering\n• Campus recruitment trends\n\nWhich college or topic interests you?";
+    if (lowerQuestion.includes("placement") || lowerQuestion.includes("job") || lowerQuestion.includes("salary") || lowerQuestion.includes("package")) {
+      return "🇮🇳 I can provide Indian placement statistics and career information! Ask me about:\n\n• College-specific placement data with INR packages\n• Top Indian recruiting companies (TCS, Infosys, Wipro, etc.)\n• Average vs highest packages at Indian colleges\n• Skills gap in Indian engineering market\n• Campus recruitment trends in India\n• TPO contact details for placement inquiries\n\nWhich Indian college or placement topic interests you?";
     }
     
-    // Enhanced generic responses
+    if (lowerQuestion.includes("jee") || lowerQuestion.includes("neet") || lowerQuestion.includes("cat") || lowerQuestion.includes("gate")) {
+      return "🇮🇳 I can help with Indian competitive exams! Ask about:\n\n• JEE Main/Advanced cutoffs & trends\n• NEET cutoff for medical colleges\n• CAT cutoff for IIMs\n• GATE cutoff for M.Tech admissions\n• State quota vs All-India quota\n• Reservation policies (SC/ST/OBC/EWS)\n\nWhich exam or college admission process do you want to know about?";
+    }
+    
+    // Enhanced generic responses with Indian focus
     const genericResponses = [
-      "I'd be happy to help you research that topic! Could you be more specific about which college or educational topic you're interested in?",
-      "That's an interesting question about education. Can you tell me more about what specific information you're looking for?",
-      "I specialize in educational research and college information. What particular aspect would you like me to investigate?",
-      "I can help you find detailed information about colleges, placements, and educational trends. What specific data do you need?"
+      "🇮🇳 I'd be happy to help you research Indian educational topics! Could you be more specific about which Indian college or exam you're interested in?",
+      "🇮🇳 That's an interesting question about Indian education. Can you tell me more about what specific information you're looking for?",
+      "🇮🇳 I specialize in Indian higher education research. What particular aspect of Indian colleges or exams would you like me to investigate?",
+      "🇮🇳 I can help you find detailed information about Indian colleges, placements, and educational trends. What specific Indian educational data do you need?"
     ];
     
     return genericResponses[Math.floor(Math.random() * genericResponses.length)];
@@ -272,9 +276,9 @@ const AiBot = ({ isOpen, onClose }) => {
             </div>
             <div>
               <h3 id="chat-title" className="text-base font-semibold text-slate-900">
-                AI Assistant
+                🇮🇳 Indian Education AI
               </h3>
-              <p className="text-xs text-slate-500">Educational Research • Ready to help</p>
+              <p className="text-xs text-slate-500">Indian Higher Education • Ready to help</p>
             </div>
           </div>
           <div className="flex items-center space-x-2">
@@ -299,7 +303,7 @@ const AiBot = ({ isOpen, onClose }) => {
         <div className="flex-1 overflow-hidden">
           <div className="h-full overflow-y-auto p-4 space-y-4 scroll-smooth">
             <div id="chat-description" className="sr-only">
-              Chat conversation with AI assistant specialized in educational research
+              Chat conversation with AI assistant specialized in Indian higher education research
             </div>
             {chatMessages.map((msg, index) => (
               <div
@@ -421,7 +425,7 @@ const AiBot = ({ isOpen, onClose }) => {
                     handleSendMessage();
                   }
                 }}
-                placeholder="Ask about colleges, placements, admissions..."
+                placeholder="Ask about IIT/NIT, placements, JEE cutoffs..."
                 disabled={isLoading}
                 rows="1"
                 className="w-full px-4 py-3 pr-12 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-100 disabled:cursor-not-allowed resize-none transition-colors text-sm leading-relaxed"
@@ -443,7 +447,7 @@ const AiBot = ({ isOpen, onClose }) => {
             </button>
           </div>
           <div className="text-xs text-slate-500 mt-2 text-center">
-            Ask about college placements, admissions, or educational trends • Press Enter to send
+            Ask about Indian colleges, IIT/NIT placements, JEE/NEET cutoffs • Press Enter to send
           </div>
         </div>
       </div>
