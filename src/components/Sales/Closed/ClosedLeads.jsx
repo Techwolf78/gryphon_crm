@@ -535,38 +535,47 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
       {shouldShowDepartmentToggle && (
         <div className="px-6 py-3 border-b bg-gray-50">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-4">
               <span className="text-sm font-medium text-gray-700">
-                Department View:
+                Include Admin Directors:
               </span>
-              <div className="flex items-center bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
+              
+              {/* Cool Toggle Switch */}
+              <div className="flex items-center">
                 <button
-                  onClick={() => setShowDirectorLeads(false)}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                    !showDirectorLeads
-                      ? "bg-blue-600 text-white shadow-sm"
-                      : "text-gray-600 hover:text-gray-800"
-                  }`}
-                >
-                  Sales Only
-                </button>
-                <button
-                  onClick={() => setShowDirectorLeads(true)}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  onClick={() => setShowDirectorLeads(!showDirectorLeads)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
                     showDirectorLeads
-                      ? "bg-blue-600 text-white shadow-sm"
-                      : "text-gray-600 hover:text-gray-800"
+                      ? "bg-blue-600"
+                      : "bg-gray-200"
+                  }`}
+                  role="switch"
+                  aria-checked={showDirectorLeads}
+                  aria-labelledby="director-toggle-label"
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition-transform duration-200 ease-in-out ${
+                      showDirectorLeads ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+                
+                <span 
+                  id="director-toggle-label"
+                  className={`ml-3 text-sm font-medium transition-colors duration-200 ${
+                    showDirectorLeads ? "text-blue-600" : "text-gray-500"
                   }`}
                 >
-                  Sales + Directors
-                </button>
+                  {showDirectorLeads ? "ON" : "OFF"}
+                </span>
               </div>
             </div>
-            <div className="text-xs text-gray-500">
-              Showing leads from{" "}
-              {showDirectorLeads
-                ? "Sales department and Admin Directors"
-                : "Sales department only"}
+            
+            <div className="text-xs text-gray-500 bg-white px-3 py-1 rounded-full border border-gray-200">
+              {showDirectorLeads 
+                ? "📊 Sales + Admin Directors" 
+                : "💼 Sales Only"
+              }
             </div>
           </div>
         </div>
