@@ -24,6 +24,7 @@
     "@mui/x-date-pickers": "^8.5.2",
     "@tailwindcss/vite": "^4.1.8",
     "axios": "^1.9.0",
+    "cheerio": "^1.1.2",
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.13",
     "emailjs-com": "^3.2.0",

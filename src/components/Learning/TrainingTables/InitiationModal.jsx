@@ -197,6 +197,25 @@ function InitiationModal({ training, onClose, onConfirm }) {
     }
   };
 
+  // Add Batch handler for Phase 2
+  const addBatch = () => {
+    setTable2Data([
+      ...table2Data,
+      { 
+        batchCode: '', 
+        startDate: null, 
+        endDate: null, 
+        trainerName: '', 
+        dayDuration: '', 
+        cost: '', 
+        travelFoodStay: '', 
+        totalAmount: '', 
+        totalHours: '', 
+        remainingHrs: '' 
+      }
+    ]);
+  };
+
   return (
     <div className="fixed inset-0 backdrop-blur-sm bg-opacity-30 flex items-center justify-center z-50 overflow-y-auto">
       <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-4xl my-8 max-h-screen overflow-y-auto">
@@ -386,10 +405,10 @@ function InitiationModal({ training, onClose, onConfirm }) {
                       <h3 className="font-medium">Training Schedule</h3>
                       <button
                         type="button"
-                        onClick={addTable2Row}
+                        onClick={addBatch}
                         className="px-3 py-1 bg-blue-500 text-white rounded"
                       >
-                        Add Row
+                        Add Batch
                       </button>
                     </div>
                     <div className="overflow-x-auto">
@@ -546,13 +565,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
                       />
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={addBatch}
-                    className="mt-3 px-3 py-1.5 bg-blue-100 text-blue-700 text-sm rounded-md flex items-center hover:bg-blue-200 transition-colors"
-                  >
-                    <FaPlus className="mr-1" /> Add Batch
-                  </button>
                 </div>
               )}
             </>

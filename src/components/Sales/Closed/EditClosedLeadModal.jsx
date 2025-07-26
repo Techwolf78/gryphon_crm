@@ -840,17 +840,30 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                         checked={formData.gstType === "include"}
                         onChange={(e) => {
                           const newGstType = e.target.value;
-                          const totalCost = formData.totalCost || 0;
+                          const currentTotalCost = formData.totalCost || 0;
+                          let newTotalCost;
                           
-                          // Recalculate all payment details with new GST type
+                          // Adjust total cost based on GST type change
+                          if (formData.gstType === "include" && newGstType === "exclude") {
+                            // Converting from "include" to "exclude" - remove GST from total
+                            newTotalCost = currentTotalCost / 1.18;
+                          } else if (formData.gstType === "exclude" && newGstType === "include") {
+                            // Converting from "exclude" to "include" - add GST to total
+                            newTotalCost = currentTotalCost * 1.18;
+                          } else {
+                            // No change needed
+                            newTotalCost = currentTotalCost;
+                          }
+                          
+                          // Recalculate all payment details with new total and GST type
                           const updatedPaymentDetails = formData.paymentDetails.map(payment => {
                             const percentage = parseFloat(payment.percentage) || 0;
-                            const paymentAmount = totalCost * (percentage / 100);
+                            const paymentAmount = newTotalCost * (percentage / 100);
                             const gstRate = newGstType === "include" ? 0.18 : 0;
                             const baseAmount = newGstType === "include" 
                               ? paymentAmount / (1 + gstRate) 
                               : paymentAmount;
-                            const gstAmount = baseAmount * gstRate;
+                            const gstAmount = newGstType === "exclude" ? baseAmount * 0.18 : baseAmount * gstRate;
 
                             return {
                               ...payment,
@@ -863,6 +876,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                           setFormData(prev => ({
                             ...prev,
                             gstType: newGstType,
+                            totalCost: newTotalCost,
                             paymentDetails: updatedPaymentDetails
                           }));
                         }}
@@ -878,17 +892,30 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                         checked={formData.gstType === "exclude"}
                         onChange={(e) => {
                           const newGstType = e.target.value;
-                          const totalCost = formData.totalCost || 0;
+                          const currentTotalCost = formData.totalCost || 0;
+                          let newTotalCost;
                           
-                          // Recalculate all payment details with new GST type
+                          // Adjust total cost based on GST type change
+                          if (formData.gstType === "include" && newGstType === "exclude") {
+                            // Converting from "include" to "exclude" - remove GST from total
+                            newTotalCost = currentTotalCost / 1.18;
+                          } else if (formData.gstType === "exclude" && newGstType === "include") {
+                            // Converting from "exclude" to "include" - add GST to total
+                            newTotalCost = currentTotalCost * 1.18;
+                          } else {
+                            // No change needed
+                            newTotalCost = currentTotalCost;
+                          }
+                          
+                          // Recalculate all payment details with new total and GST type
                           const updatedPaymentDetails = formData.paymentDetails.map(payment => {
                             const percentage = parseFloat(payment.percentage) || 0;
-                            const paymentAmount = totalCost * (percentage / 100);
+                            const paymentAmount = newTotalCost * (percentage / 100);
                             const gstRate = newGstType === "include" ? 0.18 : 0;
                             const baseAmount = newGstType === "include" 
                               ? paymentAmount / (1 + gstRate) 
                               : paymentAmount;
-                            const gstAmount = baseAmount * gstRate;
+                            const gstAmount = newGstType === "exclude" ? baseAmount * 0.18 : baseAmount * gstRate;
 
                             return {
                               ...payment,
@@ -901,6 +928,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                           setFormData(prev => ({
                             ...prev,
                             gstType: newGstType,
+                            totalCost: newTotalCost,
                             paymentDetails: updatedPaymentDetails
                           }));
                         }}
@@ -1048,7 +1076,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                   min="1"
                                   max="100"
                                   step="1"
-                                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 />
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                   <FiPercent className="h-5 w-5 text-gray-400" />

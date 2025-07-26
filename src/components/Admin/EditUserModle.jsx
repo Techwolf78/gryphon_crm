@@ -6,7 +6,7 @@ import { FiX } from "react-icons/fi";
 const departments = ["Sales", "Placement", "L & D", "DM", "Admin"];
 const roles = ["Director", "Head", "Manager", "Assistant Manager", "Executive"];
 
-const EditUser = ({ user, onCancel, onSuccess }) => {  // Changed prop names to match Admin component
+const EditUser = ({ user, onCancel, onSuccess }) => {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -48,7 +48,6 @@ const EditUser = ({ user, onCancel, onSuccess }) => {  // Changed prop names to 
         updatedAt: new Date(),
       });
 
-      // Call onSuccess to trigger refresh in parent
       onSuccess();
     } catch (err) {
       setError("Failed to update user: " + err.message);
@@ -59,114 +58,112 @@ const EditUser = ({ user, onCancel, onSuccess }) => {  // Changed prop names to 
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-      <div 
-        className="bg-white p-6 rounded-lg shadow-lg w-[90%] max-w-md relative max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="w-full max-w-md mx-auto">
+      <div className="flex items-center justify-between mb-4 sm:mb-6">
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+          Edit User
+        </h2>
         <button
           onClick={onCancel}
-          className="absolute top-3 right-3 text-gray-500 hover:text-red-600"
+          className="p-2 text-gray-500 hover:text-red-600 rounded-full hover:bg-gray-100"
         >
-          <FiX size={20} />
+          <FiX className="w-5 h-5" />
         </button>
-
-        <h2 className="text-xl font-bold mb-4">Edit User</h2>
-
-        {error && (
-          <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Name
-            </label>
-            <input
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              className="w-full p-2 border rounded focus:ring-2 focus:ring-indigo-500"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email
-            </label>
-            <input
-              name="email"
-              type="email"
-              value={formData.email}
-              onChange={handleChange}
-              className="w-full p-2 border rounded focus:ring-2 focus:ring-indigo-500"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Role
-            </label>
-            <select
-              name="role"
-              value={formData.role}
-              onChange={handleChange}
-              className="w-full p-2 border rounded focus:ring-2 focus:ring-indigo-500"
-              required
-            >
-              <option value="">Select Role</option>
-              {roles.map((role) => (
-                <option key={role} value={role}>
-                  {role}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Department
-            </label>
-            <select
-              name="department"
-              value={formData.department}
-              onChange={handleChange}
-              className="w-full p-2 border rounded focus:ring-2 focus:ring-indigo-500"
-              required
-            >
-              <option value="">Select Department</option>
-              {departments.map((dept) => (
-                <option key={dept} value={dept}>
-                  {dept}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4">
-            <button
-              type="button"
-              onClick={onCancel}
-              className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className={`px-4 py-2 text-sm text-white rounded-lg ${
-                loading ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"
-              }`}
-            >
-              {loading ? "Saving..." : "Save Changes"}
-            </button>
-          </div>
-        </form>
       </div>
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Name
+          </label>
+          <input
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            className="w-full p-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Email
+          </label>
+          <input
+            name="email"
+            type="email"
+            value={formData.email}
+            onChange={handleChange}
+            className="w-full p-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Role
+          </label>
+          <select
+            name="role"
+            value={formData.role}
+            onChange={handleChange}
+            className="w-full p-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            required
+          >
+            <option value="">Select Role</option>
+            {roles.map((role) => (
+              <option key={role} value={role}>
+                {role}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Department
+          </label>
+          <select
+            name="department"
+            value={formData.department}
+            onChange={handleChange}
+            className="w-full p-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            required
+          >
+            <option value="">Select Department</option>
+            {departments.map((dept) => (
+              <option key={dept} value={dept}>
+                {dept}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="w-full sm:w-auto px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className={`w-full sm:w-auto px-4 py-2 text-sm text-white rounded-lg ${
+              loading ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"
+            }`}
+          >
+            {loading ? "Saving..." : "Save Changes"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 };

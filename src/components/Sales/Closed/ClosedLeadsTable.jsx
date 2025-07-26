@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   FiFilter,
   FiMoreVertical,
@@ -35,7 +35,6 @@ const ClosedLeadsTable = ({
   formatDate,
   formatCurrency,
   viewMyLeadsOnly,
-  // onEditClosureForm, // <-- Remove if not used
 }) => {
   const [openDropdown, setOpenDropdown] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -52,6 +51,28 @@ const ClosedLeadsTable = ({
   const [showEditClosureModal, setShowEditClosureModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
   const [selectedLeadDetails, setSelectedLeadDetails] = useState(null);
+
+  // Add ref for dropdown container
+  const dropdownRef = useRef(null);
+
+  // Add click outside listener
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setOpenDropdown(null);
+      }
+    };
+
+    // Add event listener when dropdown is open
+    if (openDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [openDropdown]);
 
   const uploadToCloudinary = async (file) => {
     const formData = new FormData();
@@ -788,18 +809,19 @@ const ClosedLeadsTable = ({
                   </div>
                 </td>
                 <td className="px-2 py-3 whitespace-nowrap w-[60px]">
-                  <div className="flex justify-center items-center h-full relative"> {/* <-- Add relative here */}
+                  <div className="flex justify-center items-center h-full relative" ref={dropdownRef}>
                     <button
                       onClick={(e) => {
-                        e.stopPropagation(); // ✋ prevents row click
+                        e.stopPropagation();
                         toggleDropdown(id);
                       }}
                       aria-label="Action menu"
                       aria-expanded={openDropdown === id}
-                      className={`p-1.5 rounded-full transition-all duration-150 ${openDropdown === id
-                        ? "bg-gray-100/80 text-primary-600"
-                        : "text-gray-500 hover:bg-gray-100/50 hover:text-gray-700"
-                        }`}
+                      className={`p-1.5 rounded-full transition-all duration-150 ${
+                        openDropdown === id
+                          ? "bg-gray-100/80 text-primary-600"
+                          : "text-gray-500 hover:bg-gray-100/50 hover:text-gray-700"
+                      }`}
                     >
                       {openDropdown === id ? (
                         <FiX className="h-5 w-5" aria-hidden="true" />
@@ -808,7 +830,7 @@ const ClosedLeadsTable = ({
                       )}
                     </button>
 
-                    {/* Elegant dropdown menu */}
+                    {/* Dropdown menu */}
                     {openDropdown === id && (
                       <div
                         className="absolute right-0 top-full z-30 mt-1 w-48 origin-top-right rounded-xl bg-white shadow-lg ring-1 ring-gray-200/95 focus:outline-none"
@@ -834,7 +856,7 @@ const ClosedLeadsTable = ({
                           <button
                             className="flex items-center rounded-lg px-3 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50/90 hover:text-primary-600"
                             onClick={(e) => {
-                              e.stopPropagation(); // ✋
+                              e.stopPropagation();
                               handleMOUMenuClick(id);
                             }}
                           >
@@ -850,7 +872,7 @@ const ClosedLeadsTable = ({
                           <button
                             className="flex items-center rounded-lg px-3 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50/90 hover:text-primary-600"
                             onClick={(e) => {
-                              e.stopPropagation(); // ✋
+                              e.stopPropagation();
                               handleEditClosureForm(lead);
                             }}
                           >
