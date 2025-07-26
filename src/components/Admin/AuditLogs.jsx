@@ -81,7 +81,53 @@ const AuditLogs = ({ logs, className = "" }) => {
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-lg border border-gray-100">
+        {/* Mobile Card View */}
+        <div className="block lg:hidden">
+          <div className="space-y-4 p-4">
+            {currentLogs.length > 0 ? (
+              currentLogs.map((log) => {
+                const dateObj = log.date?.toDate ? log.date.toDate() : new Date(log.date);
+                const dateFormatted = format(dateObj, "MMM dd, yyyy");
+                const timeFormatted = format(dateObj, "hh:mm a");
+
+                return (
+                  <div key={log.id} className="border border-gray-200 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {getActionIcon(log.action)}
+                        <span className="font-medium text-gray-900">{log.action}</span>
+                      </div>
+                      <span className="text-sm text-gray-500">{timeFormatted}</span>
+                    </div>
+                    <div className="space-y-2 text-sm">
+                      <div>
+                        <span className="text-gray-500">User: </span>
+                        <span className="font-medium">{log.user}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Date: </span>
+                        <span>{dateFormatted}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-gray-500">IP: </span>
+                        <FiGlobe className="w-4 h-4 text-gray-500" />
+                        <span>{log.ip || "—"}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                <FiAlertCircle className="w-8 h-8 mb-2" />
+                <p>No audit logs found</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="hidden lg:block">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">

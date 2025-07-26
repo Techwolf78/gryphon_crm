@@ -7,7 +7,6 @@ import {
   query,
   where,
   orderBy,
-  limit,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
@@ -480,7 +479,7 @@ function Sales() {
           return updateDoc(doc(db, "leads", id), dataToUpdate);
         } else {
           // Create new lead - don't include id field at all
-          const { id, ...newLeadData } = lead;
+          const { id: _id, ...newLeadData } = lead;
           return addDoc(collection(db, "leads"), {
             ...newLeadData,
             createdAt: serverTimestamp(),

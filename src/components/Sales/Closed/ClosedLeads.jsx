@@ -22,6 +22,8 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
   const [selectedLead, setSelectedLead] = useState(null);
   const [isLoadingForm, setIsLoadingForm] = useState(false);
   const [selectedTeamUserId, setSelectedTeamUserId] = useState("all");
+  // 🆕 Add department toggle state
+  const [showDirectorLeads, setShowDirectorLeads] = useState(false);
 
   const handleEditClosureForm = async (lead) => {
     try {
@@ -85,6 +87,12 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
   );
   const currentRole = currentUserObj?.role;
 
+  // 🆕 Check if user should see the department toggle
+  const shouldShowDepartmentToggle =
+    !viewMyLeadsOnly &&
+    currentUserObj?.department === "Admin" &&
+    currentRole === "Director";
+
   const isUserInTeam = (uid) => {
     if (!uid) return false;
 
@@ -119,30 +127,49 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
 
   const filteredLeads = useMemo(() => {
     if (!currentUser) return [];
- 
+
     return Object.entries(leads)
       .filter(([, lead]) => {
         if (viewMyLeadsOnly) {
           return lead.assignedTo?.uid === currentUser.uid;
-        } else if (selectedTeamUserId !== "all") {
-          return lead.assignedTo?.uid === selectedTeamUserId;
-        } else {
-          if (currentRole === "Director") {
-            return true;
-          }
-          if (currentRole === "Head") {
-            return isUserInTeam(lead.assignedTo?.uid);
-          } else if (currentRole === "Manager") {
+        }
+
+        // 👇 Add this to exclude own leads in "My Team"
+        if (lead.assignedTo?.uid === currentUser.uid) return false;
+
+        // 🆕 Department filtering for Admin Directors
+        if (shouldShowDepartmentToggle) {
+          const leadUser = Object.values(users).find(
+            (u) => u.uid === lead.assignedTo?.uid
+          );
+          if (!leadUser) return false;
+
+          if (showDirectorLeads) {
+            // Show both Sales department and Admin Directors
             return (
-              isUserInTeam(lead.assignedTo?.uid) ||
-              lead.assignedTo?.uid === currentUser.uid
+              leadUser.department === "Sales" ||
+              (leadUser.department === "Admin" && leadUser.role === "Director")
             );
           } else {
-            return (
-              isUserInTeam(lead.assignedTo?.uid) ||
-              lead.assignedTo?.uid === currentUser.uid
-            );
+            // Show only Sales department
+            return leadUser.department === "Sales";
           }
+        }
+
+        if (selectedTeamUserId !== "all") {
+          return lead.assignedTo?.uid === selectedTeamUserId;
+        }
+
+        // Default Team filtering by role
+        if (currentRole === "Director") {
+          return true;
+        }
+        if (currentRole === "Head") {
+          return isUserInTeam(lead.assignedTo?.uid);
+        } else if (currentRole === "Manager") {
+          return isUserInTeam(lead.assignedTo?.uid);
+        } else {
+          return isUserInTeam(lead.assignedTo?.uid);
         }
       })
       .filter(([, lead]) => {
@@ -150,13 +177,11 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
         return lead.closureType === filterType;
       })
       .filter(([, lead]) => {
-  if (!lead.closedDate) return false; // Only include leads that are actually closed
-  if (selectedQuarter === "all") return true;
-  const closedQuarter = getQuarter(new Date(lead.closedDate));
-  return closedQuarter === selectedQuarter;
-})
-
- 
+        if (!lead.closedDate) return false;
+        if (selectedQuarter === "all") return true;
+        const closedQuarter = getQuarter(new Date(lead.closedDate));
+        return closedQuarter === selectedQuarter;
+      })
       .sort(([, a], [, b]) => new Date(b.closedDate) - new Date(a.closedDate));
   }, [
     leads,
@@ -167,9 +192,9 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
     viewMyLeadsOnly,
     selectedTeamUserId,
     users,
+    shouldShowDepartmentToggle,
+    showDirectorLeads,
   ]);
- 
- 
 
   // ⭐⭐ Yeh line add karo ⭐⭐
   console.log("🔥 Selected Team User ID:", selectedTeamUserId);
@@ -217,225 +242,229 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
     // Dobara fetch karo taaki latest deficit Firestore se aaye
     await fetchTargets();
   };
-const handleExport = async () => {
-  try {
-    const codes = filteredLeads
-      .map(([, lead]) => lead.projectCode?.replace(/\//g, "-"))
-      .filter(Boolean);
- 
-    const formSnaps = await Promise.all(
-      codes.map((code) => getDoc(doc(db, "trainingForms", code)))
-    );
- 
-    const exportData = formSnaps
-      .map((snap) => (snap.exists() ? snap.data() : null))
-      .filter(Boolean);
- 
-    if (exportData.length === 0) {
-      alert("No training forms found for the selected leads.");
-      return;
-    }
+  const handleExport = async () => {
+    try {
+      const codes = filteredLeads
+        .map(([, lead]) => lead.projectCode?.replace(/\//g, "-"))
+        .filter(Boolean);
 
-    // Prepare data rows with NEW LINE formatting
-    const rows = exportData.map(form => {
-      // Specializations - One per line
-      const specializationText = form.courses
-        ?.map(c => ` ${c.specialization}: ${c.students} students`)
-        .join("\n") || "-";
+      const formSnaps = await Promise.all(
+        codes.map((code) => getDoc(doc(db, "trainingForms", code)))
+      );
 
-      // Topics - One per line with bullet points
-      const topicsText = form.topics
-        ?.map(t => ` ${t.topic}: ${t.hours} hours`)
-        .join("\n") || "-";
+      const exportData = formSnaps
+        .map((snap) => (snap.exists() ? snap.data() : null))
+        .filter(Boolean);
 
-      // Payment Schedule - One per line with bullet points
-      const paymentText = form.paymentDetails
-        ?.map(p => {
-          const paymentInfo = [];
-          if (p.type) paymentInfo.push(p.type);
-          if (p.name) paymentInfo.push(p.name);
-          return ` ${paymentInfo.join(' | ')}: ₹${Number(p.totalAmount).toLocaleString('en-IN')}`;
-        })
-        .join("\n") || "-";
- 
-      return {
-        "College Name": form.collegeName || "-",
-        "College Code": form.collegeCode || "-",
-        "GST Number": form.gstNumber || "-",
-        "Address": form.address || "-",
-        "City": form.city || "-",
-        "State": form.state || "-",
-        "Pincode": form.pincode || "-",
-        "TPO Name": form.tpoName || "-",
-        "TPO Email": form.tpoEmail || "-",
-        "TPO Phone": form.tpoPhone || "-",
-        "Training Coordinator": form.trainingName || "-",
-        "Training Email": form.trainingEmail || "-",
-        "Training Phone": form.trainingPhone || "-",
-        "Account Contact": form.accountName || "-",
-        "Account Email": form.accountEmail || "-",
-        "Account Phone": form.accountPhone || "-",
-        "Course": form.course || "-",
-        "Year": form.year || "-",
-        "Delivery Mode": form.deliveryType || "-",
-        "Passing Year": form.passingYear || "-",
-        "Total Students": form.studentCount || "-",
-        "Total Hours": form.totalHours ? `${form.totalHours} hrs` : "-",
-        "Specializations": specializationText,
-        "Topics Covered": topicsText,
-        "Payment Type": form.paymentType || "-", // Added Payment Type field
-        "Payment Schedule": paymentText,
-        "MOU URL": form.mouFileUrl || "-",
-        "Contract Start": form.contractStartDate || "-",
-        "Contract End": form.contractEndDate || "-",
-        "EMI Months": form.emiMonths || "-",
+      if (exportData.length === 0) {
+        alert("No training forms found for the selected leads.");
+        return;
+      }
 
-        "GST Type": form.gstType || "-",
-        "Net Amount (₹)": form.netPayableAmount ? Number(form.netPayableAmount) : "-",
-        "GST Amount (₹)": form.gstAmount ? Number(form.gstAmount) : "-",
-        "Total Amount (₹)": form.netPayableAmount && form.gstAmount
-          ? Number(form.netPayableAmount) + Number(form.gstAmount)
-          : "-"
+      // Prepare data rows with NEW LINE formatting
+      const rows = exportData.map((form) => {
+        // Specializations - One per line
+        const specializationText =
+          form.courses
+            ?.map((c) => ` ${c.specialization}: ${c.students} students`)
+            .join("\n") || "-";
+
+        // Topics - One per line with bullet points
+        const topicsText =
+          form.topics?.map((t) => ` ${t.topic}: ${t.hours} hours`).join("\n") ||
+          "-";
+
+        // Payment Schedule - One per line with bullet points
+        const paymentText =
+          form.paymentDetails
+            ?.map((p) => {
+              const paymentInfo = [];
+              if (p.type) paymentInfo.push(p.type);
+              if (p.name) paymentInfo.push(p.name);
+              return ` ${paymentInfo.join(" | ")}: ₹${Number(
+                p.totalAmount
+              ).toLocaleString("en-IN")}`;
+            })
+            .join("\n") || "-";
+
+        return {
+          "College Name": form.collegeName || "-",
+          "College Code": form.collegeCode || "-",
+          "GST Number": form.gstNumber || "-",
+          Address: form.address || "-",
+          City: form.city || "-",
+          State: form.state || "-",
+          Pincode: form.pincode || "-",
+          "TPO Name": form.tpoName || "-",
+          "TPO Email": form.tpoEmail || "-",
+          "TPO Phone": form.tpoPhone || "-",
+          "Training Coordinator": form.trainingName || "-",
+          "Training Email": form.trainingEmail || "-",
+          "Training Phone": form.trainingPhone || "-",
+          "Account Contact": form.accountName || "-",
+          "Account Email": form.accountEmail || "-",
+          "Account Phone": form.accountPhone || "-",
+          Course: form.course || "-",
+          Year: form.year || "-",
+          "Delivery Mode": form.deliveryType || "-",
+          "Passing Year": form.passingYear || "-",
+          "Total Students": form.studentCount || "-",
+          "Total Hours": form.totalHours ? `${form.totalHours} hrs` : "-",
+          Specializations: specializationText,
+          "Topics Covered": topicsText,
+          "Payment Type": form.paymentType || "-", // Added Payment Type field
+          "Payment Schedule": paymentText,
+          "MOU URL": form.mouFileUrl || "-",
+          "Contract Start": form.contractStartDate || "-",
+          "Contract End": form.contractEndDate || "-",
+          "EMI Months": form.emiMonths || "-",
+
+          "GST Type": form.gstType || "-",
+          "Net Amount (₹)": form.netPayableAmount
+            ? Number(form.netPayableAmount)
+            : "-",
+          "GST Amount (₹)": form.gstAmount ? Number(form.gstAmount) : "-",
+          "Total Amount (₹)":
+            form.netPayableAmount && form.gstAmount
+              ? Number(form.netPayableAmount) + Number(form.gstAmount)
+              : "-",
+        };
+      });
+
+      // Create workbook and worksheet
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+      worksheet["!rows"] = rows.map(() => ({ hpx: 60 }));
+      // ===== STYLING ===== //
+      // Define styles
+      const headerStyle = {
+        font: {
+          bold: true,
+          color: { rgb: "FFFFFF" },
+          sz: 12,
+        },
+        fill: {
+          fgColor: { rgb: "2F5597" }, // Dark blue
+        },
+        alignment: {
+          horizontal: "center",
+          vertical: "center",
+          wrapText: true,
+        },
+        border: {
+          top: { style: "thin", color: { rgb: "000000" } },
+          bottom: { style: "thin", color: { rgb: "000000" } },
+          left: { style: "thin", color: { rgb: "000000" } },
+          right: { style: "thin", color: { rgb: "000000" } },
+        },
       };
-    });
- 
-    // Create workbook and worksheet
-    const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.json_to_sheet(rows);
- worksheet['!rows'] = rows.map(() => ({ hpx: 60 }));
-    // ===== STYLING ===== //
-    // Define styles
-    const headerStyle = {
-      font: {
-        bold: true,
-        color: { rgb: "FFFFFF" },
-        sz: 12
-      },
-      fill: {
-        fgColor: { rgb: "2F5597" } // Dark blue
-      },
-      alignment: {
-        horizontal: "center",
-        vertical: "center",
-        wrapText: true
-      },
-      border: {
-        top: { style: "thin", color: { rgb: "000000" } },
-        bottom: { style: "thin", color: { rgb: "000000" } },
-        left: { style: "thin", color: { rgb: "000000" } },
-        right: { style: "thin", color: { rgb: "000000" } }
-      }
-    };
- 
-    const dataStyle = {
-      font: {
-        sz: 11
-      },
-      alignment: {
-        vertical: "top",
-        wrapText: true
-      },
-      border: {
-        top: { style: "thin", color: { rgb: "D9D9D9" } },
-        bottom: { style: "thin", color: { rgb: "D9D9D9" } },
-        left: { style: "thin", color: { rgb: "D9D9D9" } },
-        right: { style: "thin", color: { rgb: "D9D9D9" } }
-      }
-    };
- 
-    const amountStyle = {
-      ...dataStyle,
-      numFmt: '"₹"#,##0.00'
-    };
- 
-    // Apply styles
-    const range = XLSX.utils.decode_range(worksheet['!ref']);
-   
-    // Style headers (first row)
-    for (let C = range.s.c; C <= range.e.c; ++C) {
-      const cell = XLSX.utils.encode_cell({ r: range.s.r, c: C });
-      if (!worksheet[cell]) continue;
-      worksheet[cell].s = headerStyle;
-    }
- 
-    // Style data cells
-    for (let R = range.s.r + 1; R <= range.e.r; ++R) {
-      for (let C = range.s.c; C <= range.e.c; ++C) {
-        const cell = XLSX.utils.encode_cell({ r: R, c: C });
-        if (!worksheet[cell]) continue;
-       
-        // Check if column contains amounts
-        const headerCell = XLSX.utils.encode_cell({ r: range.s.r, c: C });
-        const headerText = worksheet[headerCell]?.v;
 
-        if (headerText && (headerText.includes("Amount") || headerText.includes("(₹)"))) {
-          worksheet[cell].s = amountStyle;
-        } else {
-          worksheet[cell].s = dataStyle;
+      const dataStyle = {
+        font: {
+          sz: 11,
+        },
+        alignment: {
+          vertical: "top",
+          wrapText: true,
+        },
+        border: {
+          top: { style: "thin", color: { rgb: "D9D9D9" } },
+          bottom: { style: "thin", color: { rgb: "D9D9D9" } },
+          left: { style: "thin", color: { rgb: "D9D9D9" } },
+          right: { style: "thin", color: { rgb: "D9D9D9" } },
+        },
+      };
+
+      const amountStyle = {
+        ...dataStyle,
+        numFmt: '"₹"#,##0.00',
+      };
+
+      // Apply styles
+      const range = XLSX.utils.decode_range(worksheet["!ref"]);
+
+      // Style headers (first row)
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cell = XLSX.utils.encode_cell({ r: range.s.r, c: C });
+        if (!worksheet[cell]) continue;
+        worksheet[cell].s = headerStyle;
+      }
+
+      // Style data cells
+      for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const cell = XLSX.utils.encode_cell({ r: R, c: C });
+          if (!worksheet[cell]) continue;
+
+          // Check if column contains amounts
+          const headerCell = XLSX.utils.encode_cell({ r: range.s.r, c: C });
+          const headerText = worksheet[headerCell]?.v;
+
+          if (
+            headerText &&
+            (headerText.includes("Amount") || headerText.includes("(₹)"))
+          ) {
+            worksheet[cell].s = amountStyle;
+          } else {
+            worksheet[cell].s = dataStyle;
+          }
         }
       }
-    }
- 
-    // Set column widths
-    worksheet['!cols'] = [
-      { wch: 25 }, // College Name
-      { wch: 15 }, // College Code
-      { wch: 20 }, // GST Number
-      { wch: 30 }, // Address
-      { wch: 15 }, // City
-      { wch: 15 }, // State
-      { wch: 10 }, // Pincode
-      { wch: 20 }, // TPO Name
-      { wch: 25 }, // TPO Email
-      { wch: 15 }, // TPO Phone
-      { wch: 20 }, // Training Coordinator
-      { wch: 25 }, // Training Email
-      { wch: 15 }, // Training Phone
-      { wch: 20 }, // Account Contact
-      { wch: 25 }, // Account Email
-      { wch: 15 }, // Account Phone
-      { wch: 20 }, // Course
-      { wch: 10 }, // Year
-      { wch: 15 }, // Delivery Mode
-      { wch: 15 }, // Passing Year
-      { wch: 15 }, // Total Students
-      { wch: 15 }, // Total Hours
-      { wch: 25 }, // Specializations
-      { wch: 30 }, // Topics Covered
-      { wch: 15 }, // Payment Type (NEW COLUMN)
-      { wch: 25 }, // Payment Schedule
-      { wch: 40 }, // MOU URL
-      { wch: 15 }, // Contract Start
-      { wch: 15 }, // Contract End
-      { wch: 12 }, // EMI Months
-      { wch: 12 }, // GST Type (NEW COLUMN WIDTH)
-      { wch: 15 }, // Net Amount (₹)
-      { wch: 15 }, // GST Amount (₹)
-      { wch: 15 }  // Total Amount (₹)
-    ];
- 
-    // Freeze header row
-    worksheet['!freeze'] = { ySplit: 1 };
- 
-    // Add worksheet to workbook
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Training Forms");
- 
-    // Generate timestamp for filename
-    const timestamp = new Date().toISOString()
-      .replace(/[:.]/g, "-")
-      .replace("T", "_")
-      .slice(0, 19);
- 
-    // Export the workbook
-    XLSX.writeFile(workbook, `Training_Forms_${timestamp}.xlsx`);
- 
-  } catch (error) {
-    console.error("Export failed:", error);
-    alert("Failed to generate export. Please try again.");
-  }
-};
- 
 
+      // Set column widths
+      worksheet["!cols"] = [
+        { wch: 25 }, // College Name
+        { wch: 15 }, // College Code
+        { wch: 20 }, // GST Number
+        { wch: 30 }, // Address
+        { wch: 15 }, // City
+        { wch: 15 }, // State
+        { wch: 10 }, // Pincode
+        { wch: 20 }, // TPO Name
+        { wch: 25 }, // TPO Email
+        { wch: 15 }, // TPO Phone
+        { wch: 20 }, // Training Coordinator
+        { wch: 25 }, // Training Email
+        { wch: 15 }, // Training Phone
+        { wch: 20 }, // Account Contact
+        { wch: 25 }, // Account Email
+        { wch: 15 }, // Account Phone
+        { wch: 20 }, // Course
+        { wch: 10 }, // Year
+        { wch: 15 }, // Delivery Mode
+        { wch: 15 }, // Passing Year
+        { wch: 15 }, // Total Students
+        { wch: 15 }, // Total Hours
+        { wch: 25 }, // Specializations
+        { wch: 30 }, // Topics Covered
+        { wch: 15 }, // Payment Type (NEW COLUMN)
+        { wch: 25 }, // Payment Schedule
+        { wch: 40 }, // MOU URL
+        { wch: 15 }, // Contract Start
+        { wch: 15 }, // Contract End
+        { wch: 12 }, // EMI Months
+        { wch: 12 }, // GST Type (NEW COLUMN WIDTH)
+        { wch: 15 }, // Net Amount (₹)
+        { wch: 15 }, // GST Amount (₹)
+        { wch: 15 }, // Total Amount (₹)
+      ];
+
+      // Freeze header row
+      worksheet["!freeze"] = { ySplit: 1 };
+
+      // Add worksheet to workbook
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Training Forms");
+
+      // Generate date for filename (without time)
+      const dateStr = new Date().toISOString().split("T")[0]; // This gives YYYY-MM-DD format
+
+      // Export the workbook with updated filename
+      XLSX.writeFile(workbook, `Client_Onboarded_Data_${dateStr}.xlsx`);
+    } catch (error) {
+      console.error("Export failed:", error);
+      alert("Failed to generate export. Please try again.");
+    }
+  };
 
   return (
     <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden min-h-screen">
@@ -501,6 +530,47 @@ const handleExport = async () => {
         quarterTarget={0}
         formatCurrency={formatCurrency}
       />
+
+      {/* 🆕 Department Toggle - Only visible for Admin Directors in My Team view */}
+      {shouldShowDepartmentToggle && (
+        <div className="px-6 py-3 border-b bg-gray-50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <span className="text-sm font-medium text-gray-700">
+                Department View:
+              </span>
+              <div className="flex items-center bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
+                <button
+                  onClick={() => setShowDirectorLeads(false)}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                    !showDirectorLeads
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "text-gray-600 hover:text-gray-800"
+                  }`}
+                >
+                  Sales Only
+                </button>
+                <button
+                  onClick={() => setShowDirectorLeads(true)}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                    showDirectorLeads
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "text-gray-600 hover:text-gray-800"
+                  }`}
+                >
+                  Sales + Directors
+                </button>
+              </div>
+            </div>
+            <div className="text-xs text-gray-500">
+              Showing leads from{" "}
+              {showDirectorLeads
+                ? "Sales department and Admin Directors"
+                : "Sales department only"}
+            </div>
+          </div>
+        </div>
+      )}
 
       <ClosedLeadsTable
         leads={currentRows}

@@ -1022,63 +1022,35 @@ const SalesDashboard = () => {
 
   const fetchAllUsers = async () => {
     setIsLoadingUsers(true);
-    console.log("[DEBUG] Starting fetchAllUsers..."); // Debug 1
-
+    
     try {
-      console.log("[DEBUG] Current user:", {
-        uid: currentUser?.uid,
-        department: currentUser?.department,
-      }); // Debug 2
-
       const usersRef = collection(db, "users");
-      console.log("[DEBUG] usersRef created"); // Debug 3
-
+      
       let usersQuery;
       if (currentUser?.department === "sales") {
-        console.log("[DEBUG] Building query for sales team"); // Debug 4
         usersQuery = query(usersRef, where("department", "==", "sales"));
       } else if (currentUser?.department === "Admin") {
-        console.log("[DEBUG] Building query for Admin"); // Debug 5
         usersQuery = query(usersRef);
       } else {
-        console.log(
-          "[DEBUG] Building query for department:",
-          currentUser?.department
-        ); // Debug 6
         usersQuery = query(
           usersRef,
           where("department", "==", currentUser?.department || "")
         );
       }
 
-      console.log("[DEBUG] Query to be executed:", usersQuery); // Debug 7
       const usersSnapshot = await getDocs(usersQuery);
-      console.log("[DEBUG] Query executed, snapshot:", usersSnapshot); // Debug 8
+      
+      const usersData = usersSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
 
-      const usersData = usersSnapshot.docs.map((doc) => {
-        console.log("[DEBUG] Processing doc:", doc.id); // Debug 9
-        return {
-          id: doc.id,
-          ...doc.data(),
-        };
-      });
-
-      console.log("[DEBUG] Raw users data:", usersData); // Debug 10
-
-      // Replace the filteredUsers line with:
       const filteredUsers = usersData;
-
-      console.log("[DEBUG] Final users list:", filteredUsers); // Debug 12
       setUsers(filteredUsers);
     } catch (error) {
-      console.error("[ERROR] in fetchAllUsers:", {
-        error: error.message,
-        code: error.code,
-        stack: error.stack,
-      }); // Debug 13
+      console.error("Error fetching users:", error.message);
       setUsers([]);
     } finally {
-      console.log("[DEBUG] Fetch completed, setting loading false"); // Debug 14
       setIsLoadingUsers(false);
     }
   };
