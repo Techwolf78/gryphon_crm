@@ -37,7 +37,15 @@ if (isAdminOrDirector) {
     u.department === "Sales"
   );
 }
-else if (isHead) {
+else if (isAdminOrDirector) {
+  allUids = Object.values(users)
+    .filter((u) =>
+      ["Head", "Manager", "Assistant Manager", "Executive"].includes(u.role) &&
+      u.department === "Sales"
+    )
+    .map((u) => u.uid);
+}
+ else if (isHead) {
   teamMembers = Object.values(users).filter((u) =>
     ["Manager"].includes(u.role) &&
     u.department === "Sales"
@@ -488,7 +496,5 @@ ClosedLeadsStats.propTypes = {
   selectedTeamUserId: PropTypes.string.isRequired,
   setSelectedTeamUserId: PropTypes.func.isRequired,
 };
- 
- 
 export default ClosedLeadsStats;
  
