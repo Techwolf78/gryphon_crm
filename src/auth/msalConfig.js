@@ -21,30 +21,14 @@ export const msalConfig = {
   system: {
     loggerOptions: {
       loggerCallback: (level, message, containsPii) => {
+        // Never log PII
         if (containsPii) return;
         
-        // Different logging for production vs development
-        if (isProduction) {
-          if (level === LogLevel.Error) {
-            console.error(message);
-          }
-        } else {
-          switch (level) {
-            case LogLevel.Error:
-              console.error(message);
-              return;
-            case LogLevel.Info:
-              console.info(message);
-              return;
-            case LogLevel.Verbose:
-              console.debug(message);
-              return;
-            case LogLevel.Warning:
-              console.warn(message);
-              return;
-          }
-        }
-      }
+        // Suppress ALL console logs in both development and production
+        return;
+      },
+      piiLoggingEnabled: false,
+      logLevel: LogLevel.Error
     }
   }
 };

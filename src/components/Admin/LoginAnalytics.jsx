@@ -273,8 +273,8 @@ const LoginAnalytics = ({ logs, className = "" }) => {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="flex items-center bg-gray-50 rounded-lg p-1">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <div className="flex items-center bg-gray-50 rounded-lg p-1 w-full sm:w-auto overflow-x-auto">
               {TIME_RANGES.map((range) => (
                 <TimeRangeButton
                   key={range}

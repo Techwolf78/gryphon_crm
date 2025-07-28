@@ -2,6 +2,16 @@ import React, { useEffect } from 'react';
 
 const BatchDetailsTable = ({ table1Data, setTable1Data, selectedDomain, topics, courses = [] }) => {
   // Effect to update hours when domain changes
+    // Handle assigned hours change with max hours limit
+  const handleAssignedHoursChange = (rowIndex, value) => {
+    const updatedData = [...table1Data];
+    const max = updatedData[rowIndex].hrs;
+    const inputValue = Number(value);
+
+    updatedData[rowIndex].assignedHours = inputValue > max ? max : inputValue;
+    setTable1Data(updatedData);
+  };
+
   useEffect(() => {
     if (selectedDomain && courses.length > 0) {
       const domainTopic = topics.find(t => t.topic === `Domain ${selectedDomain}`);
@@ -64,17 +74,27 @@ const BatchDetailsTable = ({ table1Data, setTable1Data, selectedDomain, topics, 
 
   // Handle changes in batch inputs
   const handleBatchChange = (rowIndex, batchIndex, field, value) => {
-    const updatedData = [...table1Data];
-    updatedData[rowIndex].batches[batchIndex][field] = value;
-    setTable1Data(updatedData);
-  };
+  const updatedData = [...table1Data];
+  const currentRow = updatedData[rowIndex];
 
-  // Handle assigned hours change
-  const handleAssignedHoursChange = (rowIndex, value) => {
-    const updatedData = [...table1Data];
-    updatedData[rowIndex].assignedHours = Number(value);
-    setTable1Data(updatedData);
-  };
+  if (field === 'batchPerStdCount') {
+    const inputValue = Number(value);
+    const otherBatchTotal = currentRow.batches.reduce((acc, batch, idx) => {
+      return idx === batchIndex ? acc : acc + Number(batch.batchPerStdCount || 0);
+    }, 0);
+
+    const maxAllowed = currentRow.stdCount - otherBatchTotal;
+
+    // Cap input if it exceeds
+    const finalValue = inputValue > maxAllowed ? maxAllowed : inputValue;
+
+    currentRow.batches[batchIndex][field] = finalValue;
+  } else {
+    currentRow.batches[batchIndex][field] = value;
+  }
+
+  setTable1Data(updatedData);
+};
 
   // Calculate remaining hours
   const calculateRemainingHours = (row) => {

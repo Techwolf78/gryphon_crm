@@ -39,19 +39,22 @@ const TrainingScheduleTable = ({ table2Data, setTable2Data, table1Data }) => {
     return table1Data.flatMap(row => row.batches?.map(batch => batch.batchCode) || []);
   };
 
-  const calculateRemainingHours = (batchCode) => {
-    const batchRow = table1Data.find(row => 
-      row.batches?.some(batch => batch.batchCode === batchCode)
-    );
-    
-    if (!batchRow) return 0;
-    
-    const totalAssigned = table2Data
-      .filter(row => row.batchCode === batchCode)
-      .reduce((sum, row) => sum + (parseFloat(row.totalHours) || 0), 0);
-      
-    return (batchRow.hrs || 0) - totalAssigned;
-  };
+const calculateRemainingHours = (batchCode) => {
+  const batchRow = table1Data.find(row => 
+    row.batches?.some(batch => batch.batchCode === batchCode)
+  );
+
+  if (!batchRow) return 0;
+
+  const assigned = batchRow.assignedHours || 0;
+
+  const totalAssigned = table2Data
+    .filter(row => row.batchCode === batchCode)
+    .reduce((sum, row) => sum + (parseFloat(row.totalHours) || 0), 0);
+
+  return assigned - totalAssigned;
+};
+
 
   const calculateDurationHours = (start, end, duration) => {
     if (!start || !end || !duration) return 0;
@@ -59,33 +62,55 @@ const TrainingScheduleTable = ({ table2Data, setTable2Data, table1Data }) => {
     return dayCount * HOURS_PER_SESSION[duration];
   };
 
-  const handleChange = (index, field, value) => {
-    const updated = [...table2Data];
-    updated[index][field] = value;
+const handleChange = (index, field, value) => {
+  const updated = [...table2Data];
+  updated[index][field] = value;
 
-    const { startDate, endDate, dayDuration, trainerId, travelFoodStay } = updated[index];
-    const selectedTrainer = trainers.find(t => t.trainerId === trainerId);
+  const row = updated[index];
+  const { startDate, endDate, dayDuration, batchCode, trainerId } = row;
 
-    const totalHours = calculateDurationHours(startDate, endDate, dayDuration);
-    updated[index].totalHours = totalHours;
+  // 1. Set trainerName if trainerId is selected
+  if (field === 'trainerId') {
+    const trainer = trainers.find(t => t.trainerId === value);
+    updated[index].trainerName = trainer?.name || '';
+  }
 
-    if (selectedTrainer) {
-      const costPerHour = selectedTrainer.charges || 0;
-      const travel = parseFloat(updated[index].travel) || 0;
-      const foodStay = parseFloat(travelFoodStay) || 0;
-      updated[index].cost = costPerHour * totalHours;
-      updated[index].totalAmount = updated[index].cost + foodStay + travel;
+  // 2. Set cost when dayDuration and trainer are selected
+  if ((field === 'dayDuration' || field === 'trainerId') && trainerId && dayDuration) {
+    const trainer = trainers.find(t => t.trainerId === trainerId);
+    if (trainer?.charges) {
+      const cost = trainer.charges * (dayDuration === 'AM & PM' ? 1 : 0.5);
+      updated[index].cost = cost;
     }
+  }
 
-    // Update remaining hours for all rows with this batch code
-    updated.forEach(row => {
-      if (row.batchCode === updated[index].batchCode) {
-        row.remainingHrs = calculateRemainingHours(row.batchCode);
-      }
-    });
+  // 3. Set totalHours and remainingHrs
+  if (startDate && endDate && dayDuration && batchCode) {
+    const hours = calculateDurationHours(startDate, endDate, dayDuration);
+    updated[index].totalHours = hours;
 
-    setTable2Data(updated);
-  };
+    // Sum all rows with same batchCode
+    const sameBatchRows = updated.filter((r, i) => r.batchCode === batchCode && i !== index);
+    const totalSoFar = sameBatchRows.reduce((sum, r) => sum + (parseFloat(r.totalHours) || 0), 0);
+    
+    const batchRow = table1Data.find(row =>
+      row.batches?.some(batch => batch.batchCode === batchCode)
+    );
+    const assigned = batchRow?.assignedHours || 0;
+
+    const finalRemaining = assigned - totalSoFar - hours;
+    updated[index].remainingHrs = Math.max(finalRemaining, 0);
+  }
+
+  // 4. Recalculate totalAmount
+  const cost = parseFloat(updated[index].cost) || 0;
+  const travel = parseFloat(updated[index].travel) || 0;
+  const food = parseFloat(updated[index].travelFoodStay) || 0;
+  updated[index].totalAmount = cost + travel + food;
+
+  setTable2Data(updated);
+};
+
 
   const addBatch = () => {
     setTable2Data([...table2Data, {

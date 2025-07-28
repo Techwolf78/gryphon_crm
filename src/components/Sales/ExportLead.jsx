@@ -155,6 +155,9 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
         leadInfo["Total TCV"] = lead.tcv || "";
         leadInfo["Expected Closure"] = parseDate(lead.expectedClosureDate);
         leadInfo["Meetings"] = getAllFollowUps(lead.followup);
+        
+        // ✅ NEW: Add "Assigned To" column at the end
+        leadInfo["Assigned To"] = lead.assignedTo?.name || "";
 
         result[phase].push(leadInfo);
       }
@@ -165,9 +168,25 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
   const handleExport = (option) => {
     const leadsToExport =
       option === "all"
-        ? filterOutClosed(allLeads || [])
-        : filterOutClosed(filteredLeads || []);
-    const grouped = groupByPhase(leadsToExport);
+        ? filterOutClosed(allLeads || [])  // ✅ Keep filtering out closed leads for "All Leads"
+        : filterOutClosed(filteredLeads || []); // ✅ Filter for "Current View"
+    
+    // Check if there are any leads to export
+    if (!leadsToExport || leadsToExport.length === 0) {
+      alert("No leads available to export. Please check your data.");
+      setMenuOpen(false);
+      return;
+    }
+
+    const grouped = groupByPhase(leadsToExport); // ✅ Use existing function for both options
+
+    // Check if any phase has data
+    const hasData = Object.values(grouped).some(phaseData => phaseData.length > 0);
+    if (!hasData) {
+      alert("No leads found in Hot, Warm, or Cold phases. Only open leads can be exported.");
+      setMenuOpen(false);
+      return;
+    }
 
     const wb = XLSX.utils.book_new();
 
@@ -177,8 +196,10 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
       cold: "CCECFF",
     };
 
+    let sheetsAdded = 0;
+
     Object.entries(grouped).forEach(([phase, data]) => {
-      if (data.length === 0) return;
+      if (data.length === 0) return; // Skip empty phases
 
       const headers = Object.keys(data[0]);
       const sheetData = [
@@ -201,6 +222,10 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
         }
         if (header.includes("Type") || header.includes("Course")) {
           return { wch: 15 };
+        }
+        // ✅ NEW: Set width for "Assigned To" column
+        if (header === "Assigned To") {
+          return { wch: 18 };
         }
         return { wch: 12 };
       });
@@ -271,18 +296,33 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
         ws,
         `${phase[0].toUpperCase()}${phase.slice(1)} Leads`
       );
+      
+      sheetsAdded++;
     });
+
+    // Final check before writing - this should never happen now, but just in case
+    if (sheetsAdded === 0) {
+      alert("No valid data found to export.");
+      setMenuOpen(false);
+      return;
+    }
 
     const fileName =
       option === "all"
-        ? "All Leads.xlsx"
+        ? "All_Leads.xlsx"
         : Object.keys(grouped)
             .filter((key) => grouped[key].length > 0)
-            .map((key) => `${key[0].toUpperCase()}${key.slice(1)} Leads`)
-            .join(" & ") + ".xlsx";
+            .map((key) => `${key[0].toUpperCase()}${key.slice(1)}_Leads`)
+            .join("_") + ".xlsx";
 
-    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    saveAs(new Blob([wbout], { type: "application/octet-stream" }), fileName);
+    try {
+      const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      saveAs(new Blob([wbout], { type: "application/octet-stream" }), fileName);
+      console.log(`Export successful: ${fileName} with ${sheetsAdded} sheets`);
+    } catch (error) {
+      console.error("Export error:", error);
+      alert("Export failed. Please try again or contact support.");
+    }
 
     setMenuOpen(false);
   };

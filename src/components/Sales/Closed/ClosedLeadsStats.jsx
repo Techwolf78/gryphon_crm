@@ -135,14 +135,20 @@ else if (isAdminOrDirector) {
       );
       const baseTarget = t ? t.target_amount : 0;
  
-      const adjustedTarget = baseTarget + deficit;
-      const achieved = getAchievedAmount(uid, q);
- 
-      deficit = Math.max(adjustedTarget - achieved, 0);
- 
-      if (q === activeQuarter) {
-        return { adjustedTarget, achieved, deficit };
-      }
+ const adjustedTarget = baseTarget + deficit;
+const achieved = getAchievedAmount(uid, q);
+
+const diff = adjustedTarget - achieved;
+deficit = Math.max(diff, 0); // carry forward only if underachieved
+
+if (q === activeQuarter) {
+  return {
+    adjustedTarget,
+    achieved,
+    deficit: diff, // ← send raw value (can be negative for surplus)
+  };
+}
+
     }
  
     return { adjustedTarget: 0, achieved: 0, deficit: 0 };
@@ -342,7 +348,7 @@ else if (isAdminOrDirector) {
                 <select
                   value={selectedTeamUserId}
                   onChange={(e) => setSelectedTeamUserId(e.target.value)}
-                  className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white shadow-sm"
+                  className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white shadow-sm appearance-none"
                 >
                   <option value="all">All Team Members</option>
                   {teamMembers.map((u) => (
@@ -406,11 +412,20 @@ else if (isAdminOrDirector) {
               </div>
               <h3 className="text-lg font-medium text-gray-700 mb-1">Annual Target</h3>
               <div className="min-h-[48px] flex items-center justify-center mb-3">
-                {selectedTeamUserId === "all" && !viewMyLeadsOnly ? (
+                {annualTarget > 0 ? (
                   <p className="text-2xl font-bold text-gray-900">
                     {formatCurrency(annualTarget)}
                   </p>
                 ) : (
+                  <p className="text-2xl font-bold text-gray-500">
+                    Not Assigned
+                  </p>
+                )}
+              </div>
+              
+              {/* Show edit button only for individual users, not for "All Team Members" */}
+              {selectedTeamUserId !== "all" || viewMyLeadsOnly ? (
+                <div className="mb-3">
                   <TargetWithEdit
                     value={annualTarget}
                     fy={selectedFY}
@@ -420,8 +435,9 @@ else if (isAdminOrDirector) {
                     onUpdate={handleTargetUpdate}
                     viewMyLeadsOnly={viewMyLeadsOnly}
                   />
-                )}
-              </div>
+                </div>
+              ) : null}
+              
               <div className="w-full max-w-xs bg-gray-50 rounded-lg p-3 border border-gray-200">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">Quarter Target:</span>
@@ -497,4 +513,3 @@ ClosedLeadsStats.propTypes = {
   setSelectedTeamUserId: PropTypes.func.isRequired,
 };
 export default ClosedLeadsStats;
- 

@@ -171,6 +171,25 @@ function InitiationModal({ training, onClose, onConfirm }) {
     }
   };
 
+  // Add Batch handler for Phase 2
+  const addBatch = () => {
+    setTable2Data([
+      ...table2Data,
+      { 
+        batchCode: '', 
+        startDate: null, 
+        endDate: null, 
+        trainerName: '', 
+        dayDuration: '', 
+        cost: '', 
+        travelFoodStay: '', 
+        totalAmount: '', 
+        totalHours: '', 
+        remainingHrs: '' 
+      }
+    ]);
+  };
+
   return (
     <div className="fixed inset-0 backdrop-blur-sm bg-opacity-30 flex items-center justify-center z-500 overflow-y-auto">
       <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-4xl my-8 max-h-screen overflow-y-auto">
@@ -207,6 +226,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                     setTable2Data={setTable2Data}
                     table1Data={table1Data}
                   />
+
                 </>
               )}
 
@@ -215,6 +235,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                   phase2Dates={phase2Dates}
                   setPhase2Dates={setPhase2Dates}
                 />
+
               )}
             </>
           )}

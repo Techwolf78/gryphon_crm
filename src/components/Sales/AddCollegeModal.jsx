@@ -79,7 +79,8 @@ function AddCollegeModal({ show, onClose }) {
   const [accreditation, setAccreditation] = useState("");
   const [manualAffiliation, setManualAffiliation] = useState("");
   const [manualAccreditation, setManualAccreditation] = useState("");
-  const [tcv, setTcv] = useState(0); // Changed from totalContractValue to tcv
+  const [tcv, setTcv] = useState(0);
+  const [remarks, setRemarks] = useState(""); // Add remarks state
   const [loading, setLoading] = useState(false);
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -241,6 +242,7 @@ function AddCollegeModal({ show, onClose }) {
     setManualAffiliation("");
     setManualAccreditation("");
     setTcv(0);
+    setRemarks(""); // Reset remarks
     onClose();
   };
 
@@ -394,24 +396,25 @@ if (isDuplicate) {
             courseType: finalCourseType,
             specializations: finalSpecializations,
             passingYear: course.passingYear || null,
-            year: course.year || null, // Add this line
+            year: course.year || null,
             studentCount: parseInt(course.studentCount) || 0,
             perStudentCost: parseFloat(course.perStudentCost) || 0,
             courseTCV: course.courseTCV || 0,
           },
-        ], // Note: courses is now an array with just one course
-        tcv: course.courseTCV || 0, // TCV is just for this single course
+        ],
+        tcv: course.courseTCV || 0,
         phase,
         affiliation: finalAffiliation || null,
         accreditation: finalAccreditation || null,
         contactMethod,
+        remarks: remarks.trim() || null, // Add remarks to the lead object
         assignedTo: {
           uid: user.uid,
           name: user.displayName?.trim() || "No Name Provided",
           email: user.email || "No Email Provided",
         },
-createdAt: timestamp, // store actual time as number
-        openedDate: serverTimestamp(), // Set openedDate as well if needed
+        createdAt: timestamp,
+        openedDate: serverTimestamp(),
         lastUpdatedAt: serverTimestamp(),
         lastUpdatedBy: user.uid,
         firestoreTimestamp: serverTimestamp(),
@@ -678,6 +681,26 @@ createdAt: timestamp, // store actual time as number
                     </details>
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Remarks Section - Add this new section */}
+            <div className="bg-gray-50 p-3 sm:p-4 rounded-lg">
+              <h3 className="text-sm font-medium text-gray-900 mb-3">Remarks</h3>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Additional Notes/Remarks
+                </label>
+                <textarea
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
+                  placeholder="Enter any additional notes, observations, or remarks about this lead..."
+                  rows={4}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-vertical"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Optional field for any additional information or observations
+                </p>
               </div>
             </div>
           </div>
