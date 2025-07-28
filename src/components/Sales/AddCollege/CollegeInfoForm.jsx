@@ -79,7 +79,7 @@ const CollegeInfoForm = ({
       <div className="col-span-full grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">
-            State
+            State <span className="text-red-500">*</span>
           </label>
           <Select
             options={stateOptions}
@@ -116,9 +116,10 @@ const CollegeInfoForm = ({
             }}
           />
         </div>
+        
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">
-            City
+            City <span className="text-red-500">*</span>
           </label>
           <Select
             options={cityOptions}

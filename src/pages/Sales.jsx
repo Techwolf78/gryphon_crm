@@ -82,6 +82,7 @@ function Sales() {
     return saved !== null ? JSON.parse(saved) : null;
   });
   const [isViewModeLoading, setIsViewModeLoading] = useState(true);
+  const [closedLeadsCount, setClosedLeadsCount] = useState(0); // Add this state
 
   // Persist view mode to localStorage
   useEffect(() => {
@@ -102,7 +103,7 @@ function Sales() {
   // Memoized computations
   const computePhaseCounts = useCallback(() => {
     const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
-    const counts = { hot: 0, warm: 0, cold: 0, closed: 0 };
+    const counts = { hot: 0, warm: 0, cold: 0, closed: closedLeadsCount }; // Use the actual closed count
 
     if (!user) return counts;
 
@@ -115,77 +116,80 @@ function Sales() {
       const isOwnLead = lead.assignedTo?.uid === currentUser?.uid;
       let shouldInclude = false;
 
-      if (user.role === "Director") {
-        if (viewMyLeadsOnly) {
-          shouldInclude = isOwnLead;
-        } else {
-          shouldInclude = true;
-        }
-      } else if (isSalesDept && isHigherRole) {
-        if (viewMyLeadsOnly) {
-          shouldInclude = isOwnLead;
-        } else {
-          if (user.role === "Manager") {
-            const subordinates = Object.values(users).filter(
-              (u) =>
-                u.reportingManager === user.name &&
-                ["Assistant Manager", "Executive"].includes(u.role)
-            );
-            const teamUids = subordinates.map((u) => u.uid);
-            shouldInclude = teamUids.includes(lead.assignedTo?.uid);
-          } else if (user.role === "Head") {
-            const leadUser = Object.values(users).find(
-              (u) => u.uid === lead.assignedTo?.uid
-            );
-            if (leadUser) {
-              if (leadUser.role === "Manager") {
-                shouldInclude = true;
-              } else if (
-                ["Assistant Manager", "Executive"].includes(leadUser.role) &&
-                leadUser.reportingManager &&
-                Object.values(users).some(
-                  (mgr) =>
-                    mgr.role === "Manager" &&
-                    mgr.name === leadUser.reportingManager
-                )
-              ) {
-                shouldInclude = true;
-              }
-            }
+      // Only process non-closed leads here since closed leads are handled separately
+      if (phase !== "closed") {
+        if (user.role === "Director") {
+          if (viewMyLeadsOnly) {
+            shouldInclude = isOwnLead;
           } else {
             shouldInclude = true;
           }
+        } else if (isSalesDept && isHigherRole) {
+          if (viewMyLeadsOnly) {
+            shouldInclude = isOwnLead;
+          } else {
+            if (user.role === "Manager") {
+              const subordinates = Object.values(users).filter(
+                (u) =>
+                  u.reportingManager === user.name &&
+                  ["Assistant Manager", "Executive"].includes(u.role)
+              );
+              const teamUids = subordinates.map((u) => u.uid);
+              shouldInclude = teamUids.includes(lead.assignedTo?.uid);
+            } else if (user.role === "Head") {
+              const leadUser = Object.values(users).find(
+                (u) => u.uid === lead.assignedTo?.uid
+              );
+              if (leadUser) {
+                if (leadUser.role === "Manager") {
+                  shouldInclude = true;
+                } else if (
+                  ["Assistant Manager", "Executive"].includes(leadUser.role) &&
+                  leadUser.reportingManager &&
+                  Object.values(users).some(
+                    (mgr) =>
+                      mgr.role === "Manager" &&
+                      mgr.name === leadUser.reportingManager
+                  )
+                ) {
+                  shouldInclude = true;
+                }
+              }
+            } else {
+              shouldInclude = true;
+            }
+          }
+        } else if (isSalesDept && isLowerRole) {
+          shouldInclude = isOwnLead;
         }
-      } else if (isSalesDept && isLowerRole) {
-        shouldInclude = isOwnLead;
-      }
 
-      // Add filter conditions here
-      const matchesFilters =
-        (!filters.city || lead.city?.includes(filters.city)) &&
-        (!filters.assignedTo || lead.assignedTo?.uid === filters.assignedTo) &&
-        (!filters.dateRange?.start ||
-          lead.createdAt >= new Date(filters.dateRange.start).getTime()) &&
-        (!filters.dateRange?.end ||
-          lead.createdAt <= new Date(filters.dateRange.end).getTime()) &&
-        (!filters.pocName ||
-          lead.pocName
-            ?.toLowerCase()
-            .includes(filters.pocName.toLowerCase())) &&
-        (!filters.phoneNo || lead.phoneNo?.includes(filters.phoneNo)) &&
-        (!filters.email ||
-          lead.email?.toLowerCase().includes(filters.email.toLowerCase())) &&
-        (!filters.contactMethod ||
-          lead.contactMethod?.toLowerCase() ===
-            filters.contactMethod.toLowerCase());
+        // Add filter conditions here
+        const matchesFilters =
+          (!filters.city || lead.city?.includes(filters.city)) &&
+          (!filters.assignedTo || lead.assignedTo?.uid === filters.assignedTo) &&
+          (!filters.dateRange?.start ||
+            lead.createdAt >= new Date(filters.dateRange.start).getTime()) &&
+          (!filters.dateRange?.end ||
+            lead.createdAt <= new Date(filters.dateRange.end).getTime()) &&
+          (!filters.pocName ||
+            lead.pocName
+              ?.toLowerCase()
+              .includes(filters.pocName.toLowerCase())) &&
+          (!filters.phoneNo || lead.phoneNo?.includes(filters.phoneNo)) &&
+          (!filters.email ||
+            lead.email?.toLowerCase().includes(filters.email.toLowerCase())) &&
+          (!filters.contactMethod ||
+            lead.contactMethod?.toLowerCase() ===
+              filters.contactMethod.toLowerCase());
 
-      if (shouldInclude && matchesFilters && counts[phase] !== undefined) {
-        counts[phase]++;
+        if (shouldInclude && matchesFilters && counts[phase] !== undefined) {
+          counts[phase]++;
+        }
       }
     });
 
     return counts;
-  }, [users, currentUser, leads, viewMyLeadsOnly, filters]);
+  }, [users, currentUser, leads, viewMyLeadsOnly, filters, closedLeadsCount]); // Add closedLeadsCount dependency
 
   const phaseCounts = useMemo(() => computePhaseCounts(), [computePhaseCounts]);
 
@@ -535,7 +539,7 @@ function Sales() {
   };
 
   return (
-    <div className="bg-gradient-to-br from-gray-50 to-gray-100  font-sans">
+    <div className="bg-gradient-to-br from-gray-50 to-gray-100 font-sans">
       <div className="mx-auto">
         {/* Sticky Header Section */}
         <div className="sticky top-0 z-20 bg-gradient-to-br from-gray-50 to-gray-100 pb-2 border-b border-gray-200">
@@ -685,6 +689,7 @@ function Sales() {
           leads={leads}
           viewMyLeadsOnly={viewMyLeadsOnly}
           currentUser={currentUser}
+          onClosedLeadsCountChange={setClosedLeadsCount} // Add this prop
         />
       </div>
 

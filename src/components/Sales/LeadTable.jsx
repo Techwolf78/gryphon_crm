@@ -40,6 +40,7 @@ export default function LeadsTable({
   viewMyLeadsOnly,
   currentUser,
   gridColumns,
+  onClosedLeadsCountChange, // Add this prop
 }) {
   const [selectedLeadForDetails, setSelectedLeadForDetails] = useState(null);
   const [visibleLeadsCount, setVisibleLeadsCount] = useState(10);
@@ -130,6 +131,7 @@ export default function LeadsTable({
         users={users}
         viewMyLeadsOnly={viewMyLeadsOnly}
         currentUser={currentUser}
+        onCountChange={onClosedLeadsCountChange} // Pass the callback
       />
     );
   }

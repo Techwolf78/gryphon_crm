@@ -11,7 +11,7 @@ import TrainingForm from "../ClosureForm/TrainingForm";
 import * as XLSX from "xlsx-js-style";
 import Papa from "papaparse";
 
-const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
+const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange }) => {
   const [filterType, setFilterType] = useState("all");
   const [quarterFilter, setQuarterFilter] = useState("current");
   const [targets, setTargets] = useState([]);
@@ -134,8 +134,19 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
           return lead.assignedTo?.uid === currentUser.uid;
         }
 
-        // 👇 Add this to exclude own leads in "My Team"
-        if (lead.assignedTo?.uid === currentUser.uid) return false;
+        // 🔥 FIX: Handle individual team member selection FIRST
+        if (selectedTeamUserId !== "all") {
+          return lead.assignedTo?.uid === selectedTeamUserId;
+        }
+
+        // 🔥 SAFE: Only exclude current user's leads when showing "All Team Members"
+        // This line is IMPORTANT for team views - keeps it but in the right place
+        if (
+          selectedTeamUserId === "all" &&
+          lead.assignedTo?.uid === currentUser.uid
+        ) {
+          return false;
+        }
 
         // 🆕 Department filtering for Admin Directors
         if (shouldShowDepartmentToggle) {
@@ -154,10 +165,6 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
             // Show only Sales department
             return leadUser.department === "Sales";
           }
-        }
-
-        if (selectedTeamUserId !== "all") {
-          return lead.assignedTo?.uid === selectedTeamUserId;
         }
 
         // Default Team filtering by role
@@ -466,6 +473,13 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users }) => {
     }
   };
 
+  // Add effect to report count changes
+  useEffect(() => {
+    if (onCountChange) {
+      onCountChange(filteredLeads.length);
+    }
+  }, [filteredLeads.length, onCountChange]);
+
   return (
     <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden min-h-screen">
       <div className="px-6 py-5 border-b flex flex-col sm:flex-row justify-between gap-4">
@@ -642,6 +656,7 @@ ClosedLeads.propTypes = {
   viewMyLeadsOnly: PropTypes.bool.isRequired,
   currentUser: PropTypes.shape({ uid: PropTypes.string }),
   users: PropTypes.object.isRequired,
+  onCountChange: PropTypes.func, // Add this prop type
 };
 
 export default ClosedLeads;
