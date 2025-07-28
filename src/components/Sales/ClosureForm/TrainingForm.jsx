@@ -209,7 +209,17 @@ const TrainingForm = ({
       const coursePart = course === "Engineering" ? "ENGG" : course;
       const code = `${collegeCode}/${coursePart}/${year}/${deliveryType}/${shortPassYear}`;
       setFormData((prev) => ({ ...prev, projectCode: code }));
-      setDuplicateProjectCode(false); // Reset duplicate flag when project code changes
+      
+      // Check for duplicate immediately when project code is generated (only for new forms)
+      if (!isEdit) {
+        checkDuplicateProjectCode(code).then((isDuplicate) => {
+          setDuplicateProjectCode(isDuplicate);
+        }).catch(() => {
+          setDuplicateProjectCode(false);
+        });
+      } else {
+        setDuplicateProjectCode(false);
+      }
     }
   }, [
     formData.collegeCode,
@@ -217,7 +227,7 @@ const TrainingForm = ({
     formData.year,
     formData.deliveryType,
     formData.passingYear,
-    [formData.projectCode],
+    isEdit,
   ]);
 
   const validatePaymentSection = () => {
