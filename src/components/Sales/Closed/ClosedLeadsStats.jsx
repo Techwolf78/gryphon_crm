@@ -32,7 +32,6 @@ const ClosedLeadsStats = ({
   const isManager = userObj?.role === "Manager";
 
   let teamMembers = [];
-
   if (isAdminOrDirector) {
     teamMembers = Object.values(users).filter(
       (u) =>
@@ -127,7 +126,6 @@ const ClosedLeadsStats = ({
           t.assignedTo === uid
       );
       const baseTarget = t ? t.target_amount : 0;
-
 
       const adjustedTarget = baseTarget + deficit;
 
