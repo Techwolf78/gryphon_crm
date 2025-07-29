@@ -51,6 +51,34 @@ function InitiationModal({ training, onClose, onConfirm }) {
     }
   ]);
 
+  // Helper function to calculate total assigned students
+  const getTotalAssignedStudents = (row) => {
+    if (!row?.batches) return 0;
+    return row.batches.reduce((total, batch) => {
+      return total + (Number(batch.batchPerStdCount) || 0);
+    }, 0);
+  };
+
+  // Get domain hours
+  const getDomainHours = (domain) => {
+    if (!domain) return 0;
+    
+    const topicMap = {
+      Technical: "Domain Technical",
+      NonTechnical: "Soft Skills",
+      'Soft skills': "Soft Skills",
+      Aptitude: "Aptitude",
+      Tools: "Tools"
+    };
+    
+    const topicName = topicMap[domain] || domain;
+    const topicObj = topics?.find(t => 
+      t?.topic?.trim().toLowerCase() === topicName?.toLowerCase()
+    );
+    
+    return topicObj?.hours || 0;
+  };
+
   useEffect(() => {
     const fetchTrainingDetails = async () => {
       if (!training?.id) return;
@@ -66,27 +94,21 @@ function InitiationModal({ training, onClose, onConfirm }) {
   }, [training]);
 
   useEffect(() => {
-    if (selectedDomain && courses.length > 0 && table1Data.length === 0) {
-      const domainTopic = topics.find(t => t.topic === `Domain ${selectedDomain}`);
-      const domainHours = domainTopic?.hours || 0;
-
+    if (selectedDomain && courses.length > 0) {
+      const domainHours = getDomainHours(selectedDomain);
       const rows = courses.map(course => ({
         batch: course.specialization,
         stdCount: course.students,
-        hrs: course.hours || domainHours,
-        batchPerStdCount: '',
-        batchCode: generateBatchCode(course.specialization),
-        assignedHours: '',
-        batches: [
-          {
-            batchPerStdCount: '',
-            batchCode: `${course.specialization}1`
-          }
-        ]
+        hrs: domainHours,
+        assignedHours: domainHours,
+        batches: [{
+          batchPerStdCount: '',
+          batchCode: `${course.specialization}1`
+        }]
       }));
       setTable1Data(rows);
     }
-  }, [selectedDomain, courses, topics, table1Data.length]);
+  }, [selectedDomain, courses, topics]);
 
   const generateBatchCode = (specialization) => {
     if (!training?.collegeCode || !training?.year) return '';
@@ -165,8 +187,8 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
         if (phase === 'phase-1') {
           phaseData.domain = selectedDomain;
+          phaseData.domainHours = getDomainHours(selectedDomain);
         }
-
         if (phase === 'phase-2') {
           phaseData.phase2Dates = phase2Dates;
         }
@@ -219,7 +241,13 @@ function InitiationModal({ training, onClose, onConfirm }) {
     switch(currentStep) {
       case 1: return selectedPhases.length > 0;
       case 2: return selectedDomain && commonFields.trainingStartDate && commonFields.trainingEndDate;
-      case 3: return table1Data.length > 0 && table1Data.every(row => row.assignedHours);
+      case 3:
+        return table1Data.length > 0 &&
+               table1Data.every(row => 
+                 row.assignedHours && 
+                 getTotalAssignedStudents(row) === row.stdCount &&
+                 row.assignedHours <= getDomainHours(selectedDomain)
+               );
       case 4: return table2Data.length > 0 && table2Data.every(row => row.batchCode && row.trainerId);
       default: return true;
     }
@@ -435,6 +463,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                 selectedDomain={selectedDomain}
                 topics={topics}
                 courses={courses}
+                getDomainHours={getDomainHours}
               />
             )}
 

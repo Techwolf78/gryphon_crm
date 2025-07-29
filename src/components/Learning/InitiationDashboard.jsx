@@ -1,10 +1,35 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  School, CheckCircle, PlayCircle, Search, FilterList, MoreVert,
-  TrendingUp, Groups, Schedule, Assignment, Analytics, Refresh,
-  Download, CalendarToday, Email, Phone, LocationOn, Grade,
-  KeyboardArrowDown
+  Box,
+  Typography,
+  Tabs,
+  Tab,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Chip,
+  LinearProgress,
+  Avatar,
+  IconButton,
+  Tooltip,
+  useTheme,
+  useMediaQuery,
+} from "@mui/material";
+import {
+  School,
+  CheckCircle,
+  Pending,
+  PlayCircle,
+  Notifications,
+  Settings,
+  Person,
+  Search,
+  FilterList,
 } from "@mui/icons-material";
 
 const phaseData = [
