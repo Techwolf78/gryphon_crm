@@ -199,7 +199,7 @@ const DigitalMarketing = () => {
                       </div>
                     </div>
 
-                    {/* Timeline Item */}
+                    {/* Timeline Item - Initial Testing Phase */}
                     <div className="relative pl-12">
                       <div className="absolute left-0 top-0 flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 ring-8 ring-indigo-50">
                         <svg
@@ -219,8 +219,8 @@ const DigitalMarketing = () => {
                           <span className="text-sm font-semibold text-indigo-600">
                             July (2nd Half) 2025
                           </span>
-                          <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
-                            In Progress
+                          <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
+                            Completed
                           </span>
                         </div>
                         <h4 className="text-lg font-medium text-gray-900 mb-2">
@@ -228,6 +228,40 @@ const DigitalMarketing = () => {
                         </h4>
                         <p className="text-gray-600">
                           Core functionality testing with select clients.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Timeline Item - Learning & Development */}
+                    <div className="relative pl-12">
+                      <div className="absolute left-0 top-0 flex h-8 w-8 items-center justify-center rounded-full bg-amber-500 ring-8 ring-amber-50">
+                        <svg
+                          className="h-5 w-5 text-white"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </div>
+                      <div className="bg-gray-50 p-5 rounded-xl border border-gray-100">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm font-semibold text-amber-600">
+                            July - August 2025
+                          </span>
+                          <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                            In Progress
+                          </span>
+                        </div>
+                        <h4 className="text-lg font-medium text-gray-900 mb-2">
+                          Learning & Development
+                        </h4>
+                        <p className="text-gray-600">
+                          Team training and feature development based on initial
+                          feedback.
                         </p>
                       </div>
                     </div>

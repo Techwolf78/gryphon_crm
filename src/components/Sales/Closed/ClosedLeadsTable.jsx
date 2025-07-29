@@ -55,24 +55,23 @@ const ClosedLeadsTable = ({
   // Add ref for dropdown container
   const dropdownRef = useRef(null);
 
-  // Add click outside listener
+  // Update the useEffect for click outside handling
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+      // Only close if we're clicking outside ALL dropdowns
+      if (!event.target.closest('[data-dropdown-container]')) {
         setOpenDropdown(null);
       }
     };
 
-    // Add event listener when dropdown is open
-    if (openDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
+    // Add event listener
+    document.addEventListener('mousedown', handleClickOutside);
+    
     // Cleanup
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [openDropdown]);
+  }, []); // Remove openDropdown dependency
 
   const uploadToCloudinary = async (file) => {
     const formData = new FormData();
@@ -236,7 +235,10 @@ const ClosedLeadsTable = ({
     await handleUpload(projectCode);
   };
 
-  const toggleDropdown = (id) => {
+  // Update the toggleDropdown function
+  const toggleDropdown = (id, e) => {
+    e.preventDefault();
+    e.stopPropagation();
     setOpenDropdown(openDropdown === id ? null : id);
   };
 
@@ -809,12 +811,12 @@ const ClosedLeadsTable = ({
                   </div>
                 </td>
                 <td className="px-2 py-3 whitespace-nowrap w-[60px]">
-                  <div className="flex justify-center items-center h-full relative" ref={dropdownRef}>
+                  <div 
+                    className="flex justify-center items-center h-full relative" 
+                    data-dropdown-container // Add this data attribute
+                  >
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleDropdown(id);
-                      }}
+                      onClick={(e) => toggleDropdown(id, e)} // Pass event to toggleDropdown
                       aria-label="Action menu"
                       aria-expanded={openDropdown === id}
                       className={`p-1.5 rounded-full transition-all duration-150 ${
@@ -834,6 +836,8 @@ const ClosedLeadsTable = ({
                     {openDropdown === id && (
                       <div
                         className="absolute right-0 top-full z-30 mt-1 w-48 origin-top-right rounded-xl bg-white shadow-lg ring-1 ring-gray-200/95 focus:outline-none"
+                        data-dropdown-container // Add this data attribute here too
+                        onClick={(e) => e.stopPropagation()} // Prevent clicks inside dropdown from bubbling
                         style={{
                           boxShadow:
                             "0px 10px 25px -5px rgba(0, 0, 0, 0.1), 0px 5px 10px -3px rgba(0, 0, 0, 0.05)",

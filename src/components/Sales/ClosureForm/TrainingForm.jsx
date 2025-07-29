@@ -56,12 +56,11 @@ const TrainingForm = ({
     accountEmail: "",
     accountPhone: "",
     course: "",
-    otherCourseText: "",
     year: "",
     deliveryType: "",
     passingYear: "",
     studentList: [],
-    courses: [{ specialization: "", othersSpecText: "", students: "" }],
+    courses: [{ specialization: "", students: "" }], // Remove specializationText
     topics: [{ topic: "", hours: "" }],
     paymentType: "",
     gstType: "",
@@ -140,10 +139,7 @@ const TrainingForm = ({
 
   useEffect(() => {
     if (existingFormData) {
-      setFormData((prev) => ({
-        ...prev,
-        ...existingFormData,
-      }));
+      setFormData(prev => ({ ...prev, ...existingFormData }));
       setContractStartDate(existingFormData.contractStartDate || "");
       setContractEndDate(existingFormData.contractEndDate || "");
     } else if (lead) {
@@ -210,7 +206,6 @@ const TrainingForm = ({
       const code = `${collegeCode}/${coursePart}/${year}/${deliveryType}/${shortPassYear}`;
       setFormData((prev) => ({ ...prev, projectCode: code }));
       
-      // Check for duplicate immediately when project code is generated (only for new forms)
       if (!isEdit) {
         checkDuplicateProjectCode(code).then((isDuplicate) => {
           setDuplicateProjectCode(isDuplicate);
@@ -424,48 +419,47 @@ const TrainingForm = ({
             ]);
  
             const assignedUser = users?.[lead?.assignedTo?.uid] || {};
-            const { studentList, ...formDataWithoutStudents } = formData;
- 
-            // Prepare payment details for Firestore
+            const { studentList, ...formDataWithoutStudents } = formData; // Only remove studentList
+
+            // No more cleaning - use data as-is
             const paymentDetails = formData.paymentDetails.map(detail => ({
-                ...detail,
-                baseAmount: parseFloat(detail.baseAmount),
-                gstAmount: parseFloat(detail.gstAmount),
-                totalAmount: parseFloat(detail.totalAmount),
-                percentage: parseFloat(detail.percentage),
+              ...detail,
+              baseAmount: parseFloat(detail.baseAmount),
+              gstAmount: parseFloat(detail.gstAmount),
+              totalAmount: parseFloat(detail.totalAmount),
+              percentage: parseFloat(detail.percentage),
             }));
- 
+
             const sanitizedProjectCode = rawProjectCode.replace(/\//g, "-");
- 
-            // Save form data\
+
             const formDocData = {
-  ...formDataWithoutStudents,
-  paymentDetails,
-  studentFileUrl: studentUrl,
-  mouFileUrl: mouUrl,
-  contractStartDate,
-  contractEndDate,
-  totalCost: parseFloat(formData.totalCost),
-  perStudentCost: parseFloat(formData.perStudentCost),
-  gstAmount: parseFloat(formData.gstAmount),
-  netPayableAmount: parseFloat(formData.netPayableAmount),
-  studentCount: parseInt(formData.studentCount),
-  createdAt: serverTimestamp(),
-  createdBy: {
-    email: lead?.assignedTo?.email || assignedUser?.email || "Unknown",
-    uid: lead?.assignedTo?.uid || "",
-    name: lead?.assignedTo?.name || assignedUser?.name || "",
-  },
-  status: "active",
-  lastUpdated: serverTimestamp()
-};
-try {
-  await setDoc(doc(db, "trainingForms", sanitizedProjectCode), formDocData);
-  await setDoc(doc(db, "placementData", sanitizedProjectCode), formDocData);
-  console.log("Both documents saved successfully ✅");
-} catch (error) {
-  console.error("Error while saving to placementData: ", error);
-}
+              ...formDataWithoutStudents, // Direct use without cleaning
+              paymentDetails,
+              studentFileUrl: studentUrl,
+              mouFileUrl: mouUrl,
+              contractStartDate,
+              contractEndDate,
+              totalCost: parseFloat(formData.totalCost),
+              perStudentCost: parseFloat(formData.perStudentCost),
+              gstAmount: parseFloat(formData.gstAmount),
+              netPayableAmount: parseFloat(formData.netPayableAmount),
+              studentCount: parseInt(formData.studentCount),
+              createdAt: serverTimestamp(),
+              createdBy: {
+                email: lead?.assignedTo?.email || assignedUser?.email || "Unknown",
+                uid: lead?.assignedTo?.uid || "",
+                name: lead?.assignedTo?.name || assignedUser?.name || "",
+              },
+              status: "active",
+              lastUpdated: serverTimestamp()
+            };
+            try {
+              await setDoc(doc(db, "trainingForms", sanitizedProjectCode), formDocData);
+              await setDoc(doc(db, "placementData", sanitizedProjectCode), formDocData);
+              console.log("Both documents saved successfully ✅");
+            } catch (error) {
+              console.error("Error while saving to placementData: ", error);
+            }
  
             // Upload students (if student list exists)
             if (studentList && studentList.length > 0) {
