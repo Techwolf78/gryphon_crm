@@ -64,7 +64,7 @@ const AppContent = () => {
 const App = () => (
   <MsalProviderWrapper>
     <AuthProvider>
-      <Router>
+      <Router basename="">
         <AppContent />
       </Router>
     </AuthProvider>
