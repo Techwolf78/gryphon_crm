@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -24,106 +24,10 @@ import {
   CheckCircle,
   Pending,
   PlayCircle,
-  Notifications,
-  Settings,
-  Person,
-  Search,
   FilterList,
 } from "@mui/icons-material";
-
-const phaseData = [
-  {
-    id: 1,
-    name: "Initiation",
-    status: "active",
-    colleges: [
-      {
-        id: 101,
-        name: "ABC College",
-        students: 45,
-        progress: 35,
-        contact: "john@abccollege.edu",
-        joinedDate: "2023-09-01",
-      },
-      {
-        id: 102,
-        name: "XYZ University",
-        students: 32,
-        progress: 28,
-        contact: "priya@xyz.edu",
-        joinedDate: "2023-09-05",
-      },
-      {
-        id: 103,
-        name: "PQR Institute",
-        students: 28,
-        progress: 42,
-        contact: "rahul@pqr.edu",
-        joinedDate: "2023-08-28",
-      },
-    ],
-  },
-  {
-    id: 2,
-    name: "TP - I",
-    status: "upcoming",
-    colleges: [
-      {
-        id: 201,
-        name: "LMN College",
-        students: 60,
-        progress: 0,
-        contact: "admin@lmn.edu",
-        joinedDate: "2023-10-10",
-      },
-      {
-        id: 202,
-        name: "DEF University",
-        students: 40,
-        progress: 0,
-        contact: "dean@def.edu",
-        joinedDate: "2023-10-15",
-      },
-    ],
-  },
-  {
-    id: 3,
-    name: "TP - II",
-    status: "upcoming",
-    colleges: [],
-  },
-  {
-    id: 4,
-    name: "TP - III",
-    status: "upcoming",
-    colleges: [],
-  },
-  {
-    id: 5,
-    name: "Closed",
-    status: "completed",
-    colleges: [
-      {
-        id: 501,
-        name: "GHI College",
-        students: 50,
-        progress: 100,
-        contact: "info@ghi.edu",
-        joinedDate: "2023-05-01",
-        completedDate: "2023-08-30",
-      },
-      {
-        id: 502,
-        name: "JKL Institute",
-        students: 35,
-        progress: 100,
-        contact: "director@jkl.edu",
-        joinedDate: "2023-05-10",
-        completedDate: "2023-08-25",
-      },
-    ],
-  },
-];
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../../firebase"; // Import your Firebase configuration
 
 const statusConfig = {
   active: { color: "#4CAF50", icon: <PlayCircle fontSize="small" /> },
@@ -133,8 +37,94 @@ const statusConfig = {
 
 const TrainingDashboard = () => {
   const [value, setValue] = useState(0);
+  const [trainingData, setTrainingData] = useState([]);
+  const [loading, setLoading] = useState(true);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
+  useEffect(() => {
+    const fetchTrainingData = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "trainingForms"));
+        const data = [];
+        
+        for (const doc of querySnapshot.docs) {
+          const trainingForm = doc.data();
+          const trainingsSnapshot = await getDocs(collection(db, `trainingForms/${doc.id}/trainings`));
+          const phases = [];
+          
+          trainingsSnapshot.forEach(phaseDoc => {
+            phases.push({
+              id: phaseDoc.id,
+              ...phaseDoc.data()
+            });
+          });
+          
+          data.push({
+            id: doc.id,
+            ...trainingForm,
+            phases
+          });
+        }
+        
+        setTrainingData(data);
+        setLoading(false);
+      } catch (error) {
+        console.error("Error fetching training data:", error);
+        setLoading(false);
+      }
+    };
+    
+    fetchTrainingData();
+  }, []);
+
+  const phaseData = [
+    {
+      id: 1,
+      name: "Initiation",
+      status: "active",
+      colleges: trainingData.map(training => ({
+        id: training.collegeCode || training.id,
+        name: training.collegeName || "Unknown College",
+        students: training.studentCount || 0,
+        progress: calculateProgress(training), // You'll need to implement this
+        contact: training.tpoEmail || training.accountEmail || "No contact",
+        joinedDate: training.contractStartDate || "N/A",
+        completedDate: training.contractEndDate || "N/A",
+        details: training // Store all details for potential expansion
+      }))
+    },
+    {
+      id: 2,
+      name: "TP - I",
+      status: "upcoming",
+      colleges: [] // You can add logic to filter upcoming trainings
+    },
+    {
+      id: 3,
+      name: "TP - II",
+      status: "upcoming",
+      colleges: []
+    },
+    {
+      id: 4,
+      name: "TP - III",
+      status: "upcoming",
+      colleges: []
+    },
+    {
+      id: 5,
+      name: "Closed",
+      status: "completed",
+      colleges: [] // You can add logic to filter completed trainings
+    }
+  ];
+
+  function calculateProgress(training) {
+    // Implement your progress calculation logic here
+    // For example, based on training dates or phase completion
+    return 35; // Default value for now
+  }
 
   const handleChange = (event, newValue) => {
     setValue(newValue);
@@ -142,76 +132,44 @@ const TrainingDashboard = () => {
 
   const currentPhase = phaseData[value];
 
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <Typography>Loading data...</Typography>
+      </Box>
+    );
+  }
+
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        backgroundColor: "#f8f9fa",
-        p: isMobile ? 1 : 3,
-      }}
-    >
+    <Box sx={{ minHeight: "100vh", backgroundColor: "#f8f9fa", p: isMobile ? 1 : 3 }}>
       {/* Header */}
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 3,
-        }}
-      >
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
         <Box>
-          <Typography
-            variant="h5"
-            component="h1"
-            sx={{
-              fontWeight: 600,
-              color: theme.palette.text.primary,
-            }}
-          >
+          <Typography variant="h5" component="h1" sx={{ fontWeight: 600, color: theme.palette.text.primary }}>
             College Training Program
           </Typography>
-          <Typography
-            variant="body2"
-            sx={{
-              color: theme.palette.text.secondary,
-            }}
-          >
+          <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
             Manage training phases and participating colleges
           </Typography>
         </Box>
       </Box>
 
       {/* Phase Tabs */}
-      <Paper
-        sx={{
-          mb: 3,
-          borderRadius: 2,
-          boxShadow: theme.shadows[1],
-        }}
-      >
+      <Paper sx={{ mb: 3, borderRadius: 2, boxShadow: theme.shadows[1] }}>
         <Tabs
           value={value}
           onChange={handleChange}
           variant={isMobile ? "scrollable" : "fullWidth"}
           scrollButtons="auto"
           sx={{
-            "& .MuiTabs-indicator": {
-              height: 3,
-              backgroundColor: theme.palette.primary.main,
-            },
+            "& .MuiTabs-indicator": { height: 3, backgroundColor: theme.palette.primary.main },
           }}
         >
-          {phaseData.map((phase, index) => (
+          {phaseData.map((phase) => (
             <Tab
               key={phase.id}
               label={
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 1,
-                  }}
-                >
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   {statusConfig[phase.status].icon}
                   <span>{phase.name}</span>
                   {phase.colleges.length > 0 && (
@@ -221,34 +179,21 @@ const TrainingDashboard = () => {
                       sx={{
                         height: 20,
                         fontSize: "0.7rem",
-                        backgroundColor: `${
-                          statusConfig[phase.status].color
-                        }20`,
+                        backgroundColor: `${statusConfig[phase.status].color}20`,
                         color: statusConfig[phase.status].color,
                       }}
                     />
                   )}
                 </Box>
               }
-              sx={{
-                minHeight: 48,
-                fontSize: "0.875rem",
-                fontWeight: 500,
-                textTransform: "none",
-              }}
+              sx={{ minHeight: 48, fontSize: "0.875rem", fontWeight: 500, textTransform: "none" }}
             />
           ))}
         </Tabs>
       </Paper>
 
       {/* Phase Content */}
-      <Paper
-        sx={{
-          borderRadius: 2,
-          boxShadow: theme.shadows[1],
-          overflow: "hidden",
-        }}
-      >
+      <Paper sx={{ borderRadius: 2, boxShadow: theme.shadows[1], overflow: "hidden" }}>
         <Box
           sx={{
             p: 2,
@@ -291,9 +236,7 @@ const TrainingDashboard = () => {
                   <TableCell sx={{ fontWeight: 600 }}>Progress</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Contact</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>
-                    {currentPhase.status === "completed"
-                      ? "Completed Date"
-                      : "Joined Date"}
+                    {currentPhase.status === "completed" ? "Completed Date" : "Joined Date"}
                   </TableCell>
                 </TableRow>
               </TableHead>
@@ -301,9 +244,7 @@ const TrainingDashboard = () => {
                 {currentPhase.colleges.map((college) => (
                   <TableRow key={college.id} hover>
                     <TableCell>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1.5 }}
-                      >
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
                         <Avatar
                           sx={{
                             width: 32,
@@ -327,34 +268,22 @@ const TrainingDashboard = () => {
                           borderRadius: 3,
                           backgroundColor: theme.palette.grey[200],
                           "& .MuiLinearProgress-bar": {
-                            backgroundColor:
-                              statusConfig[currentPhase.status].color,
+                            backgroundColor: statusConfig[currentPhase.status].color,
                             borderRadius: 3,
                           },
                         }}
                       />
-                      <Typography
-                        variant="caption"
-                        sx={{ mt: 0.5, display: "block" }}
-                      >
+                      <Typography variant="caption" sx={{ mt: 0.5, display: "block" }}>
                         {college.progress}% complete
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontFamily: "monospace",
-                          fontSize: "0.8rem",
-                        }}
-                      >
+                      <Typography variant="body2" sx={{ fontFamily: "monospace", fontSize: "0.8rem" }}>
                         {college.contact}
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      {currentPhase.status === "completed"
-                        ? college.completedDate
-                        : college.joinedDate}
+                      {currentPhase.status === "completed" ? college.completedDate : college.joinedDate}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -362,16 +291,8 @@ const TrainingDashboard = () => {
             </Table>
           </TableContainer>
         ) : (
-          <Box
-            sx={{
-              p: 4,
-              textAlign: "center",
-              color: theme.palette.text.secondary,
-            }}
-          >
-            <School
-              sx={{ fontSize: 48, mb: 1, color: theme.palette.grey[400] }}
-            />
+          <Box sx={{ p: 4, textAlign: "center", color: theme.palette.text.secondary }}>
+            <School sx={{ fontSize: 48, mb: 1, color: theme.palette.grey[400] }} />
             <Typography variant="h6" sx={{ mb: 1 }}>
               No colleges in this phase
             </Typography>
