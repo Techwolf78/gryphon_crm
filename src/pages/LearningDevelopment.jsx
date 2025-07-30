@@ -5,7 +5,7 @@ import TrainingTable from "../components/Learning/TrainingTables/TrainingTable";
 import TrainingDetailModal from "../components/Learning/TrainingTables/TrainingDetailModal";
 import FilePreviewModal from "../components/Learning/TrainingTables/FilePreviewModal";
 import StudentDataPage from "../components/Learning/StudentDataPage";
-import InitiationDashboard from "../components/Learning/InitiationDashboard"; // New component
+import InitiationDashboard from "../components/Learning/InitiationDashboard";
 import { useNavigate } from "react-router-dom";
 
 function LearningDevelopment() {
@@ -18,7 +18,7 @@ function LearningDevelopment() {
   const [studentPageData, setStudentPageData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState("newContact"); // 'newContact' or 'initiation'
+  const [activeTab, setActiveTab] = useState("newContact");
   const navigate = useNavigate();
 
   const fetchTrainings = async () => {
@@ -95,93 +95,95 @@ function LearningDevelopment() {
   }
 
   return (
-    <div className=" bg-gray-50 min-h-screen">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-blue-800">
-          Training Onboarding Submissions
-        </h1>
-        <button
-          onClick={handleViewTrainers}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
-          View Trainers
-        </button>
-      </div>
-
-      {/* Tab Navigation */}
-      <div className="flex mb-6 border-b">
-        <button
-          className={`px-4 py-2 font-medium ${
-            activeTab === "newContact"
-              ? "border-b-2 border-blue-500 text-blue-600"
-              : "text-gray-500"
-          }`}
-          onClick={() => setActiveTab("newContact")}
-        >
-          New Contact
-        </button>
-        <button
-          className={`px-4 py-2 font-medium ${
-            activeTab === "initiation"
-              ? "border-b-2 border-blue-500 text-blue-600"
-              : "text-gray-500"
-          }`}
-          onClick={() => setActiveTab("initiation")}
-        >
-          Initiation
-        </button>
-      </div>
-
-      {error && (
-        <div className="mb-4 p-4 bg-red-100 border-l-4 border-red-500 text-red-700">
-          {error}
+    <>
+      <div className="bg-gray-50 min-h-screen">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold text-blue-800">
+            Training Onboarding Submissions
+          </h1>
           <button
-            onClick={fetchTrainings}
-            className="ml-4 text-blue-600 hover:text-blue-800"
+            onClick={handleViewTrainers}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
           >
-            Retry
+            View Trainers
           </button>
         </div>
-      )}
 
-      {/* Tab Content */}
-      {activeTab === "newContact" ? (
-        <>
-          {loading ? (
-            <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-            </div>
-          ) : (
-            <>
-              <TrainingTable
-                trainingData={trainings}
-                onRowClick={setSelectedTraining}
-                onViewStudentData={handleViewStudentData}
-                onViewMouFile={handleViewMouFile}
-              />
+        {/* Tab Navigation */}
+        <div className="flex mb-6 border-b">
+          <button
+            className={`px-4 py-2 font-medium ${
+              activeTab === "newContact"
+                ? "border-b-2 border-blue-500 text-blue-600"
+                : "text-gray-500"
+            }`}
+            onClick={() => setActiveTab("newContact")}
+          >
+            New Contract ({trainings.length})
+          </button>
+          <button
+            className={`px-4 py-2 font-medium ${
+              activeTab === "initiation"
+                ? "border-b-2 border-blue-500 text-blue-600"
+                : "text-gray-500"
+            }`}
+            onClick={() => setActiveTab("initiation")}
+          >
+            Initiation
+          </button>
+        </div>
 
-              {selectedTraining && (
-                <TrainingDetailModal
-                  training={selectedTraining}
-                  onClose={() => setSelectedTraining(null)}
+        {error && (
+          <div className="mb-4 p-4 bg-red-100 border-l-4 border-red-500 text-red-700">
+            {error}
+            <button
+              onClick={fetchTrainings}
+              className="ml-4 text-blue-600 hover:text-blue-800"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {/* Tab Content */}
+        {activeTab === "newContact" ? (
+          <>
+            {loading ? (
+              <div className="flex justify-center items-center h-64">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+              </div>
+            ) : (
+              <>
+                <TrainingTable
+                  trainingData={trainings}
+                  onRowClick={setSelectedTraining}
+                  onViewStudentData={handleViewStudentData}
+                  onViewMouFile={handleViewMouFile}
                 />
-              )}
 
-              {showFileModal && fileType === "mou" && (
-                <FilePreviewModal
-                  fileUrl={fileUrl}
-                  type={fileType}
-                  trainingId={modalTrainingId}
-                  onClose={() => setShowFileModal(false)}
-                />
-              )}
-            </>
-          )}
-        </>
-      ) : (
-        <InitiationDashboard />
-      )}
-    </div>
+                {selectedTraining && (
+                  <TrainingDetailModal
+                    training={selectedTraining}
+                    onClose={() => setSelectedTraining(null)}
+                  />
+                )}
+
+                {showFileModal && fileType === "mou" && (
+                  <FilePreviewModal
+                    fileUrl={fileUrl}
+                    type={fileType}
+                    trainingId={modalTrainingId}
+                    onClose={() => setShowFileModal(false)}
+                  />
+                )}
+              </>
+            )}
+          </>
+        ) : (
+          <InitiationDashboard />
+        )}
+      </div>
+    </>
   );
 }
 

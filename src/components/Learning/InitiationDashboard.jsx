@@ -1,25 +1,21 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Box,
-  Typography,
-  Tabs,
-  Tab,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Chip,
-  LinearProgress,
-  Avatar,
-  IconButton,
-  Tooltip,
-  useTheme,
-  useMediaQuery,
-} from "@mui/material";
+
+  TrendingUp,
+  LocationOn,
+  MoreVert,
+  Groups,
+  Assignment,
+  Analytics,
+  Grade,
+  Email,
+  Phone,
+  CalendarToday,
+  Refresh,
+  Download,
+  KeyboardArrowDown
+} from "@mui/icons-material";
 import {
   School,
   CheckCircle,
@@ -30,6 +26,7 @@ import {
   Person,
   Search,
   FilterList,
+  Schedule // Add this import
 } from "@mui/icons-material";
 
 const phaseData = [

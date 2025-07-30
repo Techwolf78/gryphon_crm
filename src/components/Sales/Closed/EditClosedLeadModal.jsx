@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { doc, updateDoc, getDoc } from "firebase/firestore";
+import { doc, updateDoc, getDoc, setDoc, query, where, getDocs, collection } from "firebase/firestore";
 import { db } from "../../../firebase";
 import {
   FiX,
@@ -48,12 +48,12 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
         netPayableAmount: lead.netPayableAmount || 0,
         gstNumber: lead.gstNumber || "",
         gstType: lead.gstType || "include",
-        course: lead.course || "", // Changed from array to string
+        course: lead.course || "",
         courses: lead.courses || [
           {
             specialization: "",
             students: 0,
-            othersSpecText: "",
+            othersSpecText: "", // Add this field for custom specializations
           },
         ],
         year: lead.year || "",
@@ -86,7 +86,8 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
         totalHours: lead.totalHours || 0,
         studentFileUrl: lead.studentFileUrl || "",
         mouFileUrl: lead.mouFileUrl || "",
-        otherCourseText: lead.otherCourseText || "",
+        otherCourseText: lead.otherCourseText || "", // Add this field for custom courses
+        isCustomCourse: !courseSpecializations.hasOwnProperty(lead.course || ""), // Determine if it's a custom course
       });
     }
   }, [lead]);
@@ -141,9 +142,19 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
   // 1. Update handleCourseChange to always update studentCount
   const handleCourseChange = (index, field, value) => {
     const updatedCourses = [...formData.courses];
-    updatedCourses[index][field] =
-      field === "students" ? parseInt(value) || 0 : value;
-
+    if (field === "specialization" && value === "") {
+      // If clearing specialization, also clear othersSpecText
+      updatedCourses[index].specialization = "";
+      updatedCourses[index].othersSpecText = "";
+    } else if (field === "othersSpecText") {
+      updatedCourses[index].othersSpecText = value;
+      updatedCourses[index].specialization = ""; // Keep specialization empty when typing custom
+    } else {
+      updatedCourses[index][field] = field === "students" ? parseInt(value) || 0 : value;
+      if (field === "specialization") {
+        updatedCourses[index].othersSpecText = "";
+      }
+    }
     // Calculate new total cost and student count whenever student numbers change
     const newFormData = {
       ...formData,
@@ -225,7 +236,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
       ...prev,
       courses: [
         ...prev.courses,
-        { specialization: "", students: 0, othersSpecText: "" },
+        { specialization: "", students: 0, othersSpecText: "" }, // Include othersSpecText
       ],
     }));
   };
@@ -329,11 +340,79 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
             status: formData.status,
             updatedAt: new Date(), // Always update the timestamp
           });
+
+          // --- PlacementData update or create ---
+          const placementRef = doc(db, "placementData", projectDocId);
+          const placementSnap = await getDoc(placementRef);
+          const placementData = {
+            projectCode: formData.projectCode, // <-- Add this line
+            collegeName: formData.collegeName,
+            collegeCode: formData.collegeCode,
+            city: formData.city,
+            state: formData.state,
+            address: formData.address,
+            pincode: formData.pincode,
+            totalCost: formData.totalCost,
+            tcv: formData.tcv,
+            perStudentCost: formData.perStudentCost,
+            studentCount: formData.studentCount,
+            gstAmount: formData.gstAmount,
+            netPayableAmount: formData.netPayableAmount,
+            gstNumber: formData.gstNumber,
+            gstType: formData.gstType,
+            course: formData.course,
+            courses: formData.courses,
+            year: formData.year,
+            deliveryType: formData.deliveryType,
+            passingYear: formData.passingYear,
+            tpoName: formData.tpoName,
+            tpoEmail: formData.tpoEmail,
+            tpoPhone: formData.tpoPhone,
+            trainingName: formData.trainingName,
+            trainingEmail: formData.trainingEmail,
+            trainingPhone: formData.trainingPhone,
+            accountName: formData.accountName,
+            accountEmail: formData.accountEmail,
+            accountPhone: formData.accountPhone,
+            contractStartDate: formData.contractStartDate,
+            contractEndDate: formData.contractEndDate,
+            paymentType: formData.paymentType,
+            paymentDetails: formData.paymentDetails,
+            topics: formData.topics,
+            totalHours: formData.totalHours,
+            studentFileUrl: formData.studentFileUrl,
+            mouFileUrl: formData.mouFileUrl,
+            otherCourseText: formData.otherCourseText,
+            status: formData.status,
+            updatedAt: new Date(),
+          };
+
+          if (placementSnap.exists()) {
+            await updateDoc(placementRef, placementData);
+          } else {
+            await setDoc(placementRef, placementData);
+          }
+          // --- END PlacementData update or create ---
         } else {
           console.warn("Document not found:", projectDocId);
           setError("Training form data not found in Firestore!");
           return;
         }
+      }
+
+      // Update totalCost in leads collection based on projectCode
+      if (formData.projectCode) {
+        const leadsQuery = query(
+          collection(db, "leads"),
+          where("projectCode", "==", formData.projectCode)
+        );
+        const leadsSnapshot = await getDocs(leadsQuery);
+        leadsSnapshot.forEach(async (docSnap) => {
+          await updateDoc(docSnap.ref, {
+            totalCost: formData.totalCost,
+            updatedAt: new Date(),
+          });
+        });
       }
 
       onSave();
@@ -1178,29 +1257,86 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
             {/* Course Information Section */}
             {activeSection === "course" && (
               <div className="space-y-6">
-                {/* First row with course, year, delivery type, and passing year (disabled) */}
+                {/* First row with course, year, delivery type, and passing year */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Course
                     </label>
                     <div className="relative">
-                      <select
-                        name="course"
-                        value={formData.course || ""}
-                        className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg shadow-sm bg-gray-100 cursor-not-allowed"
-                        disabled
-                      >
-                        <option value="">
-                          {formData.course || "Not specified"}
-                        </option>
-                      </select>
-                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                        <FiChevronDown className="h-5 w-5 text-gray-400" />
-                      </div>
+                      {formData.isCustomCourse ? (
+                        <input
+                          type="text"
+                          name="course"
+                          value={formData.course || ""}
+                          onChange={handleChange}
+                          className="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="Enter custom course"
+                        />
+                      ) : (
+                        <select
+                          name="course"
+                          value={formData.course || ""}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === "Others") {
+                              setFormData(prev => ({
+                                ...prev,
+                                course: "",
+                                isCustomCourse: true,
+                                courses: prev.courses.map(course => ({
+                                  ...course,
+                                  specialization: "",
+                                  othersSpecText: ""
+                                }))
+                              }));
+                            } else {
+                              handleChange(e);
+                              setFormData(prev => ({
+                                ...prev,
+                                isCustomCourse: false
+                              }));
+                            }
+                          }}
+                          className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                        >
+                          <option value="">Select Course</option>
+                          {Object.keys(courseSpecializations).map((course) => (
+                            <option key={course} value={course}>
+                              {course}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      {!formData.isCustomCourse && (
+                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                          <FiChevronDown className="h-5 w-5 text-gray-400" />
+                        </div>
+                      )}
                     </div>
+                    {formData.isCustomCourse && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData(prev => ({
+                            ...prev,
+                            isCustomCourse: false,
+                            course: "",
+                            courses: prev.courses.map(course => ({
+                              ...course,
+                              specialization: "",
+                              othersSpecText: ""
+                            }))
+                          }));
+                        }}
+                        className="mt-1 text-xs text-blue-600 hover:text-blue-800"
+                      >
+                        Switch to predefined courses
+                      </button>
+                    )}
                   </div>
 
+                  {/* Year dropdown */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Year
@@ -1209,12 +1345,14 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                       <select
                         name="year"
                         value={formData.year || ""}
-                        className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg shadow-sm bg-gray-100 cursor-not-allowed"
-                        disabled
+                        onChange={handleChange}
+                        className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
                       >
-                        <option value="">
-                          {formData.year || "Not specified"}
-                        </option>
+                        <option value="">Select Year</option>
+                        <option value="1st">1st</option>
+                        <option value="2nd">2nd</option>
+                        <option value="3rd">3rd</option>
+                        <option value="4th">4th</option>
                       </select>
                       <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                         <FiChevronDown className="h-5 w-5 text-gray-400" />
@@ -1222,6 +1360,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                     </div>
                   </div>
 
+                  {/* Delivery Type dropdown */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Delivery Type
@@ -1230,12 +1369,15 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                       <select
                         name="deliveryType"
                         value={formData.deliveryType || ""}
-                        className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg shadow-sm bg-gray-100 cursor-not-allowed"
-                        disabled
+                        onChange={handleChange}
+                        className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
                       >
-                        <option value="">
-                          {formData.deliveryType || "Not specified"}
-                        </option>
+                        <option value="">Select Delivery Type</option>
+                        <option value="TP">TP - Training Placement</option>
+                        <option value="OT">OT - Only Training</option>
+                        <option value="IP">IP - Induction Program</option>
+                        <option value="DM">DM - Digital Marketing</option>
+                        <option value="SNS">SNS - SNS</option>
                       </select>
                       <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                         <FiChevronDown className="h-5 w-5 text-gray-400" />
@@ -1243,6 +1385,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                     </div>
                   </div>
 
+                  {/* Passing Year dropdown */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Passing Year
@@ -1251,12 +1394,20 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                       <select
                         name="passingYear"
                         value={formData.passingYear || ""}
-                        className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg shadow-sm bg-gray-100 cursor-not-allowed"
-                        disabled
+                        onChange={handleChange}
+                        className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
                       >
-                        <option value="">
-                          {formData.passingYear || "Not specified"}
-                        </option>
+                        <option value="">Select Passing Year</option>
+                        {Array.from({ length: 16 }, (_, i) => {
+                          const currentYear = new Date().getFullYear();
+                          const year = currentYear - 5 + i;
+                          const yearRange = `${year}-${year + 1}`;
+                          return (
+                            <option key={yearRange} value={yearRange}>
+                              {yearRange}
+                            </option>
+                          );
+                        })}
                       </select>
                       <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                         <FiChevronDown className="h-5 w-5 text-gray-400" />
@@ -1271,11 +1422,13 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                     Course Specializations
                   </h3>
                   {formData.courses?.map((course, index) => {
-                    const isOthersSpec = course.specialization === "Other";
+                    const isOthersSpec = course.specialization === "Other" || (!course.specialization && course.othersSpecText);
+                    const isCustomSpecialization = !courseSpecializations[formData.course]?.includes(course.specialization) && course.specialization && course.specialization !== "Other";
+                    
                     // Get specializations based on the selected course
-                    const currentSpecializations = formData.course
-                      ? courseSpecializations[formData.course] || []
-                      : [];
+                    const currentSpecializations = formData.isCustomCourse 
+                      ? ["Other"] 
+                      : (courseSpecializations[formData.course] || []);
 
                     return (
                       <div
@@ -1287,43 +1440,65 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                             <label className="block text-xs font-medium text-gray-500 mb-1">
                               Specialization
                             </label>
-                            <select
-                              value={course.specialization}
-                              onChange={(e) =>
-                                handleCourseChange(
-                                  index,
-                                  "specialization",
-                                  e.target.value
-                                )
-                              }
-                              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
-                            >
-                              <option value="">Select Specialization</option>
-                              {currentSpecializations.map((spec) => (
-                                <option key={spec} value={spec}>
-                                  {spec}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-
-                          {isOthersSpec && (
-                            <div>
-                              <label className="block text-xs font-medium text-gray-500 mb-1">
-                                Other Specialization
-                              </label>
+                            {formData.isCustomCourse || isCustomSpecialization ? (
                               <input
                                 type="text"
-                                value={course.othersSpecText}
+                                value={course.specialization || course.othersSpecText || ""}
                                 onChange={(e) =>
                                   handleCourseChange(
                                     index,
-                                    "othersSpecText",
+                                    formData.isCustomCourse || isCustomSpecialization ? "specialization" : "othersSpecText",
                                     e.target.value
                                   )
                                 }
                                 className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
                                 placeholder="Enter specialization"
+                              />
+                            ) : (
+                              <div className="relative">
+                                <select
+                                  value={isOthersSpec ? "Other" : course.specialization || ""}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    if (value === "Other") {
+                                      // Set specialization to empty, show input for othersSpecText
+                                      handleCourseChange(index, "specialization", "");
+                                      handleCourseChange(index, "othersSpecText", "");
+                                    } else {
+                                      handleCourseChange(index, "specialization", value);
+                                      handleCourseChange(index, "othersSpecText", "");
+                                    }
+                                  }}
+                                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                >
+                                  <option value="">Select Specialization</option>
+                                  {currentSpecializations.map((spec) => (
+                                    <option key={spec} value={spec}>
+                                      {spec}
+                                    </option>
+                                  ))}
+                                </select>
+                                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                  <FiChevronDown className="h-5 w-5 text-gray-400" />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Show custom input for "Other" specialization */}
+                          {isOthersSpec && !formData.isCustomCourse && !isCustomSpecialization && (
+                            <div>
+                              <label className="block text-xs font-medium text-gray-500 mb-1">
+                                Custom Specialization
+                              </label>
+                              <input
+                                type="text"
+                                value={course.othersSpecText || ""}
+                                onChange={(e) =>
+                                  handleCourseChange(index, "othersSpecText", e.target.value)
+                                }
+                                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                placeholder="Enter custom specialization"
                               />
                             </div>
                           )}
@@ -1343,7 +1518,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                     e.target.value
                                   )
                                 }
-                                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none"
+                                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               />
                               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                 <FiUser className="h-5 w-5 text-gray-400" />
@@ -1377,6 +1552,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                       </div>
                     );
                   })}
+
                   {/* Total students count */}
                   <div className="mt-4 bg-blue-50 p-4 rounded-lg">
                     <label className="block text-sm font-medium text-blue-700 mb-1">
@@ -1686,7 +1862,6 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
               </div>
             )}
           </div>
-
           {/* Footer - Modify the submit button to show confirmation */}
           <div className="bg-gray-50 px-6 py-4 border-t flex justify-between items-center">
             <div className="text-sm text-gray-500">
@@ -1722,12 +1897,34 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                 </button>
               ) : (
                 <button
-                  type="button" // Changed from "submit" to "button"
-                  onClick={() => setShowConfirmation(true)} // Show confirmation instead of submitting directly
-                  className="px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 flex items-center disabled:opacity-70"
+                  type="button"
+                  onClick={() => setShowConfirmation(true)}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center"
                   disabled={loading}
                 >
-                  <FiCheck className="mr-2" /> Save Changes
+                  Submit Changes
+                  {loading && (
+                    <svg
+                      className="animate-spin h-5 w-5 ml-2 -mr-1 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4.93 4.93a10 10 0 0114.14 14.14M2.05 12a9.95 9.95 0 001.88 5.66M12 22c-5.52 0-10-4.48-10-10S6.48 2 12 2s10 4.48 10 10-4.48 10-10 10z"
+                      />
+                    </svg>
+                  )}
                 </button>
               )}
             </div>

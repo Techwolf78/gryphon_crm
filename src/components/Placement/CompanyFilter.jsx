@@ -50,14 +50,7 @@ function CompanyFilter({
     jobTypes: [
       ...new Set(
         companies
-          .map((company) => company.jobType)
-          .filter(Boolean)
-      ),
-    ],
-    jobTypes: [
-      ...new Set(
-        companies
-          .map((company) => company.jobType)
+          .flatMap((c) => c.jobTypes || [])
           .filter(Boolean)
       ),
     ],
