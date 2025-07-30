@@ -3,7 +3,8 @@ import { db } from '../../../firebase';
 import { doc, collection, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { FiX, FiChevronRight, FiCheck, FiClock, FiAlertCircle } from 'react-icons/fi';
 import BatchDetailsTable from './Initiate/BatchDetailsTable';
-import TrainingScheduleTable from './Initiate/TrainingScheduleTalbe';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 
 const PHASE_OPTIONS = ['phase-1', 'phase-2'];
 const DOMAIN_OPTIONS = ['Technical', 'Soft skills', 'Aptitude', 'Tools'];
@@ -34,22 +35,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
   });
 
   const [table1Data, setTable1Data] = useState([]);
-  const [table2Data, setTable2Data] = useState([
-    {
-      batchCode: '',
-      startDate: null,
-      endDate: null,
-      trainerId: '',
-      trainerName: '',
-      dayDuration: '',
-      cost: '',
-      travel: '',
-      travelFoodStay: '',
-      totalAmount: '',
-      totalHours: '',
-      remainingHrs: ''
-    }
-  ]);
 
   // Helper function to calculate total assigned students
   const getTotalAssignedStudents = (row) => {
@@ -62,7 +47,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
   // Get domain hours
   const getDomainHours = (domain) => {
     if (!domain) return 0;
-    
     const topicMap = {
       Technical: "Domain Technical",
       NonTechnical: "Soft Skills",
@@ -70,12 +54,10 @@ function InitiationModal({ training, onClose, onConfirm }) {
       Aptitude: "Aptitude",
       Tools: "Tools"
     };
-    
     const topicName = topicMap[domain] || domain;
-    const topicObj = topics?.find(t => 
+    const topicObj = topics?.find(t =>
       t?.topic?.trim().toLowerCase() === topicName?.toLowerCase()
     );
-    
     return topicObj?.hours || 0;
   };
 
@@ -110,18 +92,12 @@ function InitiationModal({ training, onClose, onConfirm }) {
     }
   }, [selectedDomain, courses, topics]);
 
-  const generateBatchCode = (specialization) => {
-    if (!training?.collegeCode || !training?.year) return '';
-    return `${training.collegeCode}-${specialization}-${training.year}`;
-  };
-
   const handlePhaseChange = (phase) => {
     setSelectedPhases(prev =>
       prev.includes(phase)
         ? prev.filter(p => p !== phase)
         : [...prev, phase]
     );
-
     if (phase === 'phase-1' && !selectedPhases.includes(phase)) {
       setSelectedDomain('');
     }
@@ -147,30 +123,24 @@ function InitiationModal({ training, onClose, onConfirm }) {
       setError('Please select at least one phase');
       return false;
     }
-
     if (selectedPhases.includes('phase-1') && !selectedDomain) {
       setError('Please select a domain for phase 1');
       return false;
     }
-
     if (!commonFields.trainingStartDate || !commonFields.trainingEndDate) {
       setError('Please select training start and end dates');
       return false;
     }
-
     if (!commonFields.collegeStartTime || !commonFields.collegeEndTime) {
       setError('Please enter college start and end times');
       return false;
     }
-
     return true;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!validateForm()) return;
-
     setLoading(true);
     setError(null);
 
@@ -182,9 +152,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
           createdBy: training.createdBy || {},
           ...commonFields,
           table1Data,
-          table2Data,
         };
-
         if (phase === 'phase-1') {
           phaseData.domain = selectedDomain;
           phaseData.domainHours = getDomainHours(selectedDomain);
@@ -192,12 +160,10 @@ function InitiationModal({ training, onClose, onConfirm }) {
         if (phase === 'phase-2') {
           phaseData.phase2Dates = phase2Dates;
         }
-
         const phaseRef = doc(
           collection(db, 'trainingForms', training.id, 'trainings'),
           phase
         );
-
         return setDoc(phaseRef, phaseData);
       });
 
@@ -205,7 +171,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
       setSuccess('Training phases initiated successfully!');
       setLoading(false);
-      
+
       setTimeout(() => {
         if (onConfirm) onConfirm({
           phases: selectedPhases,
@@ -213,10 +179,8 @@ function InitiationModal({ training, onClose, onConfirm }) {
           ...commonFields,
           domain: selectedDomain,
           table1Data,
-          table2Data,
           ...phase2Dates
         });
-
         if (onClose) onClose();
       }, 1500);
 
@@ -229,28 +193,14 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
   const getStepTitle = (step) => {
     switch(step) {
-      case 1: return 'Select Phases';
-      case 2: return 'Configure Details';
-      case 3: return 'Batch Setup';
-      case 4: return 'Schedule Training';
+      case 1: return 'Training Details';
+      case 2: return 'Batch & Trainer Assignment';
       default: return 'Setup';
     }
   };
 
   const canProceedToNextStep = () => {
-    switch(currentStep) {
-      case 1: return selectedPhases.length > 0;
-      case 2: return selectedDomain && commonFields.trainingStartDate && commonFields.trainingEndDate;
-      case 3:
-        return table1Data.length > 0 &&
-               table1Data.every(row => 
-                 row.assignedHours && 
-                 getTotalAssignedStudents(row) === row.stdCount &&
-                 row.assignedHours <= getDomainHours(selectedDomain)
-               );
-      case 4: return table2Data.length > 0 && table2Data.every(row => row.batchCode && row.trainerId);
-      default: return true;
-    }
+    return true;
   };
 
   return (
@@ -277,7 +227,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
           {/* Progress Steps */}
           <div className="mt-8">
             <div className="flex items-center justify-between relative">
-              {[1, 2, 3, 4].map((step) => (
+              {[1, 2].map((step) => (
                 <div key={step} className="flex flex-col items-center z-10">
                   <button
                     type="button"
@@ -299,7 +249,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
               <div className="absolute top-5 left-10 right-10 h-1 bg-gray-200">
                 <div 
                   className="h-full bg-blue-500 transition-all duration-300 ease-in-out" 
-                  style={{ width: `${(currentStep - 1) * 33.33}%` }}
+                  style={{ width: `${(currentStep - 1) * 100}%` }}
                 />
               </div>
             </div>
@@ -309,171 +259,181 @@ function InitiationModal({ training, onClose, onConfirm }) {
         {/* Modal Content */}
         <div className="flex-1 overflow-y-auto p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Step 1: Phase Selection */}
+            {/* Step 1: Phase Selection + Common Details */}
             {currentStep === 1 && (
-              <div className="space-y-6">
-                <h3 className="text-lg font-medium text-gray-900">Select Training Phases</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {PHASE_OPTIONS.map((phase) => (
-                    <div 
-                      key={phase}
-                      onClick={() => handlePhaseChange(phase)}
-                      className={`p-4 border rounded-lg cursor-pointer transition-all
-                        ${selectedPhases.includes(phase) ? 
-                          'border-blue-500 bg-blue-50 ring-2 ring-blue-100' : 
-                          'border-gray-200 hover:border-gray-300'}
-                      `}
-                    >
-                      <div className="flex items-center">
-                        <div className={`w-5 h-5 rounded-full border flex items-center justify-center mr-3
+              <div className="space-y-8">
+                {/* Phase Selection */}
+                <div className="space-y-6">
+                  <h3 className="text-lg font-medium text-gray-900">Select Training Phases</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {PHASE_OPTIONS.map((phase) => (
+                      <div 
+                        key={phase}
+                        onClick={() => handlePhaseChange(phase)}
+                        className={`p-4 border rounded-lg cursor-pointer transition-all
                           ${selectedPhases.includes(phase) ? 
-                            'bg-blue-500 border-blue-500' : 
-                            'bg-white border-gray-300'}
-                        `}>
-                          {selectedPhases.includes(phase) && (
-                            <FiCheck className="w-3 h-3 text-white" />
-                          )}
-                        </div>
-                        <span className="font-medium text-gray-800 capitalize">
-                          {phase.replace('-', ' ')}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Step 2: Common Details */}
-            {currentStep === 2 && (
-              <div className="space-y-6">
-                <h3 className="text-lg font-medium text-gray-900">Training Configuration</h3>
-                
-                {selectedPhases.includes('phase-1') && (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Training Domain</label>
-                      <select
-                        value={selectedDomain}
-                        onChange={(e) => setSelectedDomain(e.target.value)}
-                        className="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                            'border-blue-500 bg-blue-50 ring-2 ring-blue-100' : 
+                            'border-gray-200 hover:border-gray-300'}
+                        `}
                       >
-                        <option value="">Select a domain</option>
-                        {DOMAIN_OPTIONS.map((domain) => (
-                          <option key={domain} value={domain}>{domain}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-                    <input
-                      type="date"
-                      value={commonFields.trainingStartDate || ''}
-                      onChange={(e) => setCommonFields({...commonFields, trainingStartDate: e.target.value})}
-                      className="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
-                    <input
-                      type="date"
-                      value={commonFields.trainingEndDate || ''}
-                      onChange={(e) => setCommonFields({...commonFields, trainingEndDate: e.target.value})}
-                      className="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                    />
+                        <div className="flex items-center">
+                          <div className={`w-5 h-5 rounded-full border flex items-center justify-center mr-3
+                            ${selectedPhases.includes(phase) ? 
+                              'bg-blue-500 border-blue-500' : 
+                              'bg-white border-gray-300'}
+                          `}>
+                            {selectedPhases.includes(phase) && (
+                              <FiCheck className="w-3 h-3 text-white" />
+                            )}
+                          </div>
+                          <span className="font-medium text-gray-800 capitalize">
+                            {phase.replace('-', ' ')}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">College Start Time</label>
-                    <input
-                      type="time"
-                      value={commonFields.collegeStartTime}
-                      onChange={(e) => setCommonFields({...commonFields, collegeStartTime: e.target.value})}
-                      className="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">College End Time</label>
-                    <input
-                      type="time"
-                      value={commonFields.collegeEndTime}
-                      onChange={(e) => setCommonFields({...commonFields, collegeEndTime: e.target.value})}
-                      className="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Lunch Start Time</label>
-                    <input
-                      type="time"
-                      value={commonFields.lunchStartTime}
-                      onChange={(e) => setCommonFields({...commonFields, lunchStartTime: e.target.value})}
-                      className="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Lunch End Time</label>
-                    <input
-                      type="time"
-                      value={commonFields.lunchEndTime}
-                      onChange={(e) => setCommonFields({...commonFields, lunchEndTime: e.target.value})}
-                      className="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-
-                {selectedPhases.includes('phase-1') && selectedPhases.includes('phase-2') && (
-                  <div className="space-y-4 pt-4 border-t border-gray-200">
-                    <h4 className="text-md font-medium text-gray-900">Phase 2 Dates</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Phase 2 Start Date</label>
-                        <input
-                          type="date"
-                          value={phase2Dates.startDate || ''}
-                          onChange={(e) => setPhase2Dates({...phase2Dates, startDate: e.target.value})}
-                          className="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Phase 2 End Date</label>
-                        <input
-                          type="date"
-                          value={phase2Dates.endDate || ''}
-                          onChange={(e) => setPhase2Dates({...phase2Dates, endDate: e.target.value})}
-                          className="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                        />
-                      </div>
+                {/* Common Details */}
+                <div className="space-y-6">
+                  <h3 className="text-lg font-medium text-gray-900">Training Configuration</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                      <DatePicker
+                        selected={commonFields.trainingStartDate ? new Date(commonFields.trainingStartDate) : null}
+                        onChange={date => setCommonFields({...commonFields, trainingStartDate: date ? date.toISOString().slice(0,10) : ''})}
+                        dateFormat="yyyy-MM-dd"
+                        placeholderText="Select date"
+                        className="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                      <DatePicker
+                        selected={commonFields.trainingEndDate ? new Date(commonFields.trainingEndDate) : null}
+                        onChange={date => setCommonFields({...commonFields, trainingEndDate: date ? date.toISOString().slice(0,10) : ''})}
+                        dateFormat="yyyy-MM-dd"
+                        placeholderText="Select date"
+                        className="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                      />
                     </div>
                   </div>
-                )}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">College Start Time</label>
+                      <DatePicker
+                        selected={commonFields.collegeStartTime ? new Date(`1970-01-01T${commonFields.collegeStartTime}`) : null}
+                        onChange={date => setCommonFields({...commonFields, collegeStartTime: date ? date.toTimeString().slice(0,5) : ''})}
+                        showTimeSelect
+                        showTimeSelectOnly
+                        timeIntervals={15}
+                        timeCaption="Time"
+                        dateFormat="HH:mm"
+                        placeholderText="Select time"
+                        className="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">College End Time</label>
+                      <DatePicker
+                        selected={commonFields.collegeEndTime ? new Date(`1970-01-01T${commonFields.collegeEndTime}`) : null}
+                        onChange={date => setCommonFields({...commonFields, collegeEndTime: date ? date.toTimeString().slice(0,5) : ''})}
+                        showTimeSelect
+                        showTimeSelectOnly
+                        timeIntervals={15}
+                        timeCaption="Time"
+                        dateFormat="HH:mm"
+                        placeholderText="Select time"
+                        className="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Lunch Start Time</label>
+                      <DatePicker
+                        selected={commonFields.lunchStartTime ? new Date(`1970-01-01T${commonFields.lunchStartTime}`) : null}
+                        onChange={date => setCommonFields({...commonFields, lunchStartTime: date ? date.toTimeString().slice(0,5) : ''})}
+                        showTimeSelect
+                        showTimeSelectOnly
+                        timeIntervals={15}
+                        timeCaption="Time"
+                        dateFormat="HH:mm"
+                        placeholderText="Select time"
+                        className="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Lunch End Time</label>
+                      <DatePicker
+                        selected={commonFields.lunchEndTime ? new Date(`1970-01-01T${commonFields.lunchEndTime}`) : null}
+                        onChange={date => setCommonFields({...commonFields, lunchEndTime: date ? date.toTimeString().slice(0,5) : ''})}
+                        showTimeSelect
+                        showTimeSelectOnly
+                        timeIntervals={15}
+                        timeCaption="Time"
+                        dateFormat="HH:mm"
+                        placeholderText="Select time"
+                        className="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                  {selectedPhases.includes('phase-1') && selectedPhases.includes('phase-2') && (
+                    <div className="space-y-4 pt-4 border-t border-gray-200">
+                      <h4 className="text-md font-medium text-gray-900">Phase 2 Dates</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Phase 2 Start Date</label>
+                          <input
+                            type="date"
+                            value={phase2Dates.startDate || ''}
+                            onChange={(e) => setPhase2Dates({...phase2Dates, startDate: e.target.value})}
+                            className="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Phase 2 End Date</label>
+                          <input
+                            type="date"
+                            value={phase2Dates.endDate || ''}
+                            onChange={(e) => setPhase2Dates({...phase2Dates, endDate: e.target.value})}
+                            className="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
-            {/* Step 3: Batch Details */}
-            {currentStep === 3 && (
-              <BatchDetailsTable 
-                table1Data={table1Data}
-                setTable1Data={setTable1Data}
-                selectedDomain={selectedDomain}
-                topics={topics}
-                courses={courses}
-                getDomainHours={getDomainHours}
-              />
-            )}
-
-            {/* Step 4: Training Schedule */}
-            {currentStep === 4 && (
-              <TrainingScheduleTable 
-                table2Data={table2Data}
-                setTable2Data={setTable2Data}
-                table1Data={table1Data}
-              />
+            {/* Step 2: Training Domain + Batch Details */}
+            {currentStep === 2 && (
+              <>
+                {selectedPhases.includes('phase-1') && (
+                  <div className="mb-8">
+                    <label className="block text-lg font-medium text-gray-900 mb-2">Training Domain</label>
+                    <select
+                      value={selectedDomain}
+                      onChange={(e) => setSelectedDomain(e.target.value)}
+                      className="w-full max-w-xs rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    >
+                      <option value="">Select a domain</option>
+                      {DOMAIN_OPTIONS.map((domain) => (
+                        <option key={domain} value={domain}>{domain}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <BatchDetailsTable 
+                  table1Data={table1Data}
+                  setTable1Data={setTable1Data}
+                  selectedDomain={selectedDomain}
+                  topics={topics}
+                  courses={courses}
+                  getDomainHours={getDomainHours}
+                  commonFields={commonFields} // <-- pass this prop
+                />
+              </>
             )}
 
             {/* Status Messages */}
@@ -516,9 +476,8 @@ function InitiationModal({ training, onClose, onConfirm }) {
             >
               {currentStep > 1 ? 'Back' : 'Cancel'}
             </button>
-
             <div className="flex items-center space-x-3">
-              {currentStep < 4 && (
+              {currentStep < 2 && (
                 <button
                   type="button"
                   onClick={() => setCurrentStep(prev => prev + 1)}
@@ -527,16 +486,15 @@ function InitiationModal({ training, onClose, onConfirm }) {
                     ${!canProceedToNextStep() ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}
                   `}
                 >
-                  Continue
+                  Next
                   <FiChevronRight className="ml-2 -mr-1 w-5 h-5" />
                 </button>
               )}
-
-              {currentStep === 4 && (
+              {currentStep === 2 && (
                 <button
                   type="submit"
                   onClick={handleSubmit}
-                  disabled={loading || selectedPhases.length === 0}
+                  disabled={loading || !canProceedToNextStep()}
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-green-400 disabled:cursor-not-allowed"
                 >
                   {loading ? (
@@ -544,7 +502,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                       <FiClock className="animate-spin -ml-1 mr-2 h-4 w-4" />
                       Processing...
                     </>
-                  ) : 'Complete Setup'}
+                  ) : 'Submit'}
                 </button>
               )}
             </div>

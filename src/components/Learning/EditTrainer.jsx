@@ -172,10 +172,9 @@ const finalSpecialization = [
         bankAddress: trainerData.bankAddress,
         paymentType: trainerData.paymentType,
         charges: Number(trainerData.charges) || 0,
-        specialization: specializationArr,
+        specialization: specializationArr.filter(s => s !== "Others"), // keep only one key
         updatedAt: new Date(),
-specialization: specializationArr.filter(s => s !== "Others"), // ✅ pure specialization
-  otherSpecialization: hasOthers ? otherSpecializationArr : [],
+        otherSpecialization: hasOthers ? otherSpecializationArr : [],
       };
 
       if (showOtherSpecialization) {

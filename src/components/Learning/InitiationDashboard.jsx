@@ -1,25 +1,21 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Box,
-  Typography,
-  Tabs,
-  Tab,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Chip,
-  LinearProgress,
-  Avatar,
-  IconButton,
-  Tooltip,
-  useTheme,
-  useMediaQuery,
-} from "@mui/material";
+
+  TrendingUp,
+  LocationOn,
+  MoreVert,
+  Groups,
+  Assignment,
+  Analytics,
+  Grade,
+  Email,
+  Phone,
+  CalendarToday,
+  Refresh,
+  Download,
+  KeyboardArrowDown
+} from "@mui/icons-material";
 import {
   School,
   CheckCircle,
@@ -30,6 +26,7 @@ import {
   Person,
   Search,
   FilterList,
+  Schedule // Add this import
 } from "@mui/icons-material";
 
 const phaseData = [
@@ -89,20 +86,20 @@ const TrainingDashboard = () => {
     <div className={`bg-white rounded-2xl border border-gray-200 ${className}`}>{children}</div>
   );
 
-  const StatCard = ({ icon: Icon, title, value, color, trend }) => (
-    <motion.div whileHover={{ scale: 1.02, y: -2 }}>
-      <Card className={`bg-gradient-to-br from-${color}-50 to-${color}-25 border-${color}-200 p-6 hover:shadow-2xl transition-all duration-300`}>
-        <div className="flex justify-between items-center">
+  const StatCard = ({ icon: Icon, title, value, color, trend, small }) => (
+    <motion.div whileHover={{ scale: 1.01, y: -1 }}>
+      <Card className={`bg-gradient-to-br from-${color}-50 to-${color}-25 border-${color}-200 ${small ? 'p-1' : 'p-6'} hover:shadow transition-all duration-300`}>
+        <div className="flex justify-between items-center gap-1">
           <div className="flex-1">
-            <p className="text-gray-600 text-sm mb-2">{title}</p>
-            <p className={`text-3xl font-bold text-${color}-600 mb-2`}>{value}</p>
-            <div className={`bg-${color}-100 text-${color}-600 px-2 py-1 rounded-full text-xs font-semibold flex items-center w-fit ml-0`}>
-              <TrendingUp className="w-3 h-3 mr-1" />{trend}
+            <p className={`text-gray-600 ${small ? 'text-[9px] mb-0.5' : 'text-sm mb-2'}`}>{title}</p>
+            <p className={`font-bold text-${color}-600 ${small ? 'text-xs mb-0.5' : 'text-3xl mb-2'}`}>{value}</p>
+            <div className={`bg-${color}-100 text-${color}-600 ${small ? 'px-1 py-0.5 text-[9px]' : 'px-2 py-1 text-xs'} rounded-full font-semibold flex items-center w-fit ml-0`}>
+              <TrendingUp className={small ? "w-2 h-2 mr-0.5" : "w-3 h-3 mr-1"} />{trend}
             </div>
           </div>
           <div className="flex items-center justify-center">
-            <div className={`bg-gradient-to-br from-${color}-500 to-${color}-600 rounded-lg p-3 text-white`}>
-              <Icon className="w-6 h-6" />
+            <div className={`bg-gradient-to-br from-${color}-500 to-${color}-600 rounded ${small ? 'p-1' : 'p-3'} text-white`}>
+              <Icon className={small ? "w-3 h-3" : "w-6 h-6"} />
             </div>
           </div>
         </div>
@@ -110,32 +107,32 @@ const TrainingDashboard = () => {
     </motion.div>
   );
 
-  const PhaseTab = ({ phase, index, isActive }) => {
+  const PhaseTab = ({ phase, index, isActive, small }) => {
     const config = statusConfig[phase.status];
     return (
-      <motion.div whileHover={{ scale: 1.02 }} onClick={() => setActivePhase(index)}>
-        <Card className={`cursor-pointer p-4 transition-all duration-300 hover:shadow-xl ${
+      <motion.div whileHover={{ scale: 1.01 }}>
+        <Card className={`cursor-pointer ${small ? 'p-1' : 'p-4'} transition-all duration-300 hover:shadow-xl ${
           isActive ? `bg-gradient-to-br ${config.gradient} text-white border-2 border-${config.color}-500` : 'hover:border-gray-200'
         }`}>
-          <div className="flex items-center gap-3 mb-3">
-            <div className={`rounded-lg p-2 ${isActive ? 'bg-white/20' : `bg-${config.color}-50`}`}>
-              <config.icon className={`w-5 h-5 ${isActive ? 'text-white' : `text-${config.color}-600`}`} />
+          <div className={`flex items-center ${small ? 'gap-1 mb-1' : 'gap-3 mb-3'}`}>
+            <div className={`rounded-lg ${small ? 'p-0.5' : 'p-2'} ${isActive ? 'bg-white/20' : `bg-${config.color}-50`}`}>
+              <config.icon className={small ? "w-3 h-3" : "w-5 h-5"} />
             </div>
             <div className="flex-1">
-              <h3 className={`font-semibold ${isActive ? 'text-white' : 'text-gray-900'}`}>{phase.name}</h3>
-              <p className={`text-sm ${isActive ? 'text-white/80' : 'text-gray-500'}`}>{phase.description}</p>
+              <h3 className={`font-semibold ${isActive ? 'text-white' : 'text-gray-900'} ${small ? 'text-xs' : ''}`}>{phase.name}</h3>
+              <p className={`text-[9px] ${isActive ? 'text-white/80' : 'text-gray-500'}`}>{phase.description}</p>
             </div>
             {phase.colleges.length > 0 && (
-              <div className={`rounded-full px-2 py-1 text-xs font-semibold ${isActive ? 'bg-white/20 text-white' : `bg-${config.color}-50 text-${config.color}-600`}`}>
+              <div className={`rounded-full ${small ? 'px-1 py-0.5 text-[9px]' : 'px-2 py-1 text-xs'} font-semibold ${isActive ? 'bg-white/20 text-white' : `bg-${config.color}-50 text-${config.color}-600`}`}>
                 {phase.colleges.length}
               </div>
             )}
           </div>
           <div className="flex justify-between items-center">
-            <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${isActive ? 'bg-white/20 text-white' : `bg-${config.color}-50 text-${config.color}-600`}`}>
+            <span className={`rounded-full font-medium capitalize ${small ? 'px-1 py-0.5 text-[9px]' : 'px-2 py-1 text-xs'} ${isActive ? 'bg-white/20 text-white' : `bg-${config.color}-50 text-${config.color}-600`}`}>
               {phase.status}
             </span>
-            <span className={`text-xs font-medium ${isActive ? 'text-white/80' : 'text-gray-500'}`}>{phase.duration}</span>
+            <span className={`font-medium ${small ? 'text-[9px]' : 'text-xs'} ${isActive ? 'text-white/80' : 'text-gray-500'}`}>{phase.duration}</span>
           </div>
         </Card>
       </motion.div>
@@ -234,39 +231,87 @@ const TrainingDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 p-4 lg:p-6">
-      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-        <div className="mb-8">
-          <div className="flex justify-between items-start mb-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 p-4">
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+        <div className="mb-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
             <div>
-              <h1 className="text-4xl font-black bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent mb-2">Training Dashboard</h1>
-              <p className="text-xl text-gray-600">Monitor and manage your college training programs</p>
+              <h1 className="text-lg sm:text-2xl font-black bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent mb-1">Training Dashboard</h1>
+              <p className="text-xs sm:text-base text-gray-600">Monitor and manage your college training programs</p>
             </div>
             <div className="flex gap-2">
-              <button className="p-3 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"><Refresh className="w-5 h-5" /></button>
-              <button className="p-3 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"><Download className="w-5 h-5" /></button>
+              <button className="p-2 bg-white border border-gray-200 rounded-xl shadow hover:bg-gray-50 transition-colors"><Refresh className="w-5 h-5" /></button>
+              <button className="p-2 bg-white border border-gray-200 rounded-xl shadow hover:bg-gray-50 transition-colors"><Download className="w-5 h-5" /></button>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {statData.map(stat => <StatCard key={stat.key} {...stat} value={stat.key === 'totalStudents' ? stats[stat.key].toLocaleString() : stats[stat.key]} />)}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+            {statData.map(stat => (
+              <Card key={stat.key} className="p-4 shadow border border-gray-200 flex flex-col items-start">
+                <div className="flex items-center gap-3 mb-2">
+                  <span className={`bg-gradient-to-br from-${stat.color}-500 to-${stat.color}-600 rounded-lg p-2 text-white`}>
+                    <stat.icon className="w-6 h-6" />
+                  </span>
+                  <span className="font-semibold text-gray-700 text-base">{stat.title}</span>
+                </div>
+                <div className="flex items-end gap-2">
+                  <span className={`font-bold text-${stat.color}-600 text-2xl`}>{stat.key === 'totalStudents' ? stats[stat.key].toLocaleString() : stats[stat.key]}</span>
+                  <span className={`bg-${stat.color}-100 text-${stat.color}-600 px-2 py-1 rounded-full font-semibold text-xs flex items-center`}>
+                    <TrendingUp className="w-4 h-4 mr-1" />{stat.trend}
+                  </span>
+                </div>
+              </Card>
+            ))}
           </div>
         </div>
       </motion.div>
 
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }}>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-          {phaseData.map((phase, index) => <PhaseTab key={phase.id} phase={phase} index={index} isActive={activePhase === index} />)}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }}>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-6">
+          {phaseData.map((phase, index) => (
+            <Card
+              key={phase.id}
+              className={`cursor-pointer p-4 transition-all duration-300 shadow border-2 ${activePhase === index ? `border-${statusConfig[phase.status].color}-500` : 'border-gray-200'} ${activePhase === index ? `bg-gradient-to-br ${statusConfig[phase.status].gradient} text-white` : 'bg-white hover:border-gray-300'}`}
+              onClick={() => setActivePhase(index)}
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <span className={`rounded-lg p-2 ${activePhase === index ? 'bg-white/20' : `bg-${statusConfig[phase.status].color}-50`}`}>
+                  {React.createElement(statusConfig[phase.status].icon, { className: "w-5 h-5" })}
+                </span>
+                <div>
+                  <h3 className={`font-semibold ${activePhase === index ? 'text-white' : 'text-gray-900'} text-base`}>{phase.name}</h3>
+                  <p className={`text-xs ${activePhase === index ? 'text-white/80' : 'text-gray-500'}`}>{phase.description}</p>
+                </div>
+                {phase.colleges.length > 0 && (
+                  <span className={`rounded-full px-2 py-1 text-xs font-semibold ml-auto ${activePhase === index ? 'bg-white/20 text-white' : `bg-${statusConfig[phase.status].color}-50 text-${statusConfig[phase.status].color}-600`}`}>
+                    {phase.colleges.length}
+                  </span>
+                )}
+              </div>
+              <div className="flex justify-between items-center">
+                <span className={`rounded-full font-medium capitalize px-2 py-1 text-xs ${activePhase === index ? 'bg-white/20 text-white' : `bg-${statusConfig[phase.status].color}-50 text-${statusConfig[phase.status].color}-600`}`}>
+                  {phase.status}
+                </span>
+                <span className={`font-medium text-xs ${activePhase === index ? 'text-white/80' : 'text-gray-500'}`}>{phase.duration}</span>
+              </div>
+            </Card>
+          ))}
         </div>
       </motion.div>
 
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.4 }}>
-        <Card className="p-6 mb-8">
-          <div className="flex flex-wrap gap-4 items-center">
-            <div className="flex-1 min-w-64 relative">
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2 }}>
+        <Card className="p-4 mb-6 shadow border border-gray-200">
+          <div className="flex flex-col sm:flex-row flex-wrap gap-2 items-center">
+            <div className="flex-1 min-w-0 relative w-full sm:w-auto">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input type="text" placeholder="Search colleges or locations..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              <input
+                type="text"
+                placeholder="Search colleges or locations..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              />
             </div>
-            <button className="px-4 py-3 border border-gray-200 rounded-xl hover:border-gray-300 transition-colors flex items-center gap-2">
+            <button className="px-4 py-2 border border-gray-200 rounded-xl bg-white hover:border-gray-300 shadow transition-colors flex items-center gap-2 text-sm font-semibold">
               <FilterList className="w-5 h-5" />Filter<KeyboardArrowDown className="w-4 h-4" />
             </button>
           </div>
@@ -275,20 +320,47 @@ const TrainingDashboard = () => {
 
       <AnimatePresence mode="wait">
         {filteredColleges.length > 0 ? (
-          <motion.div key={activePhase} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }}>
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-              {filteredColleges.map((college, index) => <CollegeCard key={college.id} college={college} index={index} />)}
+          <motion.div key={activePhase} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+            <div className="overflow-x-auto bg-white rounded-2xl border border-gray-200 shadow-lg mt-4">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gray-100 sticky top-0 z-10">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700 uppercase">College Name</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700 uppercase">Location</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700 uppercase">Students</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700 uppercase">Contact</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700 uppercase">Phone</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700 uppercase">{currentPhase.status === "completed" ? "Completed Date" : "Joined Date"}</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-100">
+                  {filteredColleges.map((college, idx) => (
+                    <tr key={college.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50 hover:bg-indigo-50 transition"}>
+                      <td className="px-4 py-3 font-medium text-gray-900">{college.name}</td>
+                      <td className="px-4 py-3 text-gray-700">{college.location}</td>
+                      <td className="px-4 py-3 text-gray-700">{college.students}</td>
+                      <td className="px-4 py-3 text-gray-700">{college.contact}</td>
+                      <td className="px-4 py-3 text-gray-700">{college.phone}</td>
+                      <td className="px-4 py-3 text-gray-700">
+                        {currentPhase.status === "completed" ? college.completedDate : college.joinedDate}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </motion.div>
         ) : (
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4 }}>
-            <Card className="border-2 border-dashed border-gray-300 text-center py-16">
-              <School className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">No colleges in this phase</h3>
-              <p className="text-gray-600 mb-6">
-                {currentPhase.status === "upcoming" ? "Colleges will appear here when this phase begins" : "Start by adding colleges to this training phase"}
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }}>
+            <Card className="border-2 border-dashed border-gray-300 text-center py-4 sm:py-8">
+              <School className="w-8 h-8 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-2" />
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1">No colleges in this phase</h3>
+              <p className="text-gray-600 mb-3 text-xs sm:text-sm">
+                {currentPhase.status === "upcoming"
+                  ? "Colleges will appear here when this phase begins"
+                  : "Start by adding colleges to this training phase"}
               </p>
-              <button className={`bg-gradient-to-r ${statusConfig[currentPhase.status].gradient} text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all`}>Add College</button>
+              <button className={`bg-gradient-to-r ${statusConfig[currentPhase.status].gradient} text-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold hover:shadow-lg transition-all text-xs sm:text-sm`}>Add College</button>
             </Card>
           </motion.div>
         )}
