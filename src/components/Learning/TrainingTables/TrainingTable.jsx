@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { FaEllipsisV, FaUsers, FaFileContract, FaRupeeSign, FaClock, FaUniversity, FaPlay } from "react-icons/fa";
+import { FaEllipsisV, FaUsers, FaFileContract, FaRupeeSign, FaClock, FaUniversity, FaPlay, FaTimes } from "react-icons/fa";
 import { IoDocumentTextOutline } from "react-icons/io5";
 import { MdOutlineAttachMoney } from "react-icons/md";
 import InitiationModal from "./InitiationModal";
@@ -10,11 +10,30 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [showInitiationModal, setShowInitiationModal] = useState(false);
   const [selectedTraining, setSelectedTraining] = useState(null);
+  const [dropdownDirection, setDropdownDirection] = useState({});
   const menuRefs = useRef({});
 
   const toggleMenu = (id, e) => {
     e.stopPropagation();
-    setMenuOpenId(menuOpenId === id ? null : id);
+    if (menuOpenId === id) {
+      setMenuOpenId(null);
+      setDropdownDirection({});
+    } else {
+      setMenuOpenId(id);
+      // Check if there's enough space below
+      setTimeout(() => {
+        const btn = document.querySelector(`button[data-id="${id}"]`);
+        if (btn) {
+          const rect = btn.getBoundingClientRect();
+          const spaceBelow = window.innerHeight - rect.bottom;
+          if (spaceBelow < 200) { // 200px is approx dropdown height
+            setDropdownDirection((prev) => ({ ...prev, [id]: 'up' }));
+          } else {
+            setDropdownDirection((prev) => ({ ...prev, [id]: 'down' }));
+          }
+        }
+      }, 0);
+    }
   };
 
   const handleInitiateClick = (training) => {
@@ -55,14 +74,10 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
 
     if (menuOpenId !== null) {
       document.addEventListener('mousedown', handleClickOutside);
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
-      document.body.style.overflow = "";
     };
   }, [menuOpenId]);
 
@@ -135,7 +150,7 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
                   onClick={(e) => toggleMenu(item.id, e)}
                   className={`ml-2 p-2 rounded-full transition ${menuOpenId === item.id ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-gray-100'}`}
                 >
-                  <FaEllipsisV size={12} />
+                  {menuOpenId === item.id ? <FaTimes size={12} /> : <FaEllipsisV size={12} />}
                 </button>
               </div>
 
@@ -180,7 +195,7 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
                   onClick={(e) => toggleMenu(item.id, e)}
                   className={`p-2 rounded-full transition ${menuOpenId === item.id ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-gray-100'}`}
                 >
-                  <FaEllipsisV size={12} />
+                  {menuOpenId === item.id ? <FaTimes size={12} /> : <FaEllipsisV size={12} />}
                 </button>
               </div>
             </div>
@@ -190,7 +205,7 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
               <div
                 ref={(el) => setMenuRef(item.id, el)}
                 onClick={(e) => e.stopPropagation()}
-                className="absolute right-4 mt-1 bg-white rounded-lg shadow-lg text-sm w-44 border border-gray-200 z-20 overflow-hidden"
+                className={`absolute right-4 ${dropdownDirection[item.id] === 'up' ? 'bottom-10 mb-2' : 'mt-1'} bg-white rounded-lg shadow-lg text-sm w-44 border border-gray-200 z-20 overflow-hidden`}
               >
                 <button
                   onClick={() => {
