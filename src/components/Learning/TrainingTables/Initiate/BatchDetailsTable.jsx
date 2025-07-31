@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../../../firebase';
-import { FiPlus, FiTrash2, FiChevronDown, FiChevronUp, FiUser, FiClock } from 'react-icons/fi';
+import { FiPlus, FiTrash2, FiChevronDown, FiChevronUp, FiUser, FiClock, FiLayers } from 'react-icons/fi';
 
 const DAY_DURATION_OPTIONS = ['AM', 'PM', 'AM & PM'];
 
@@ -11,7 +11,10 @@ const BatchDetailsTable = ({
   selectedDomain,
   topics,
   courses = [],
-  commonFields
+  commonFields,
+  canMergeBatches,
+  maxAssignableHours,         // <-- add this
+  onAssignedHoursChange,      // <-- add this
 }) => {
   const [mergeModal, setMergeModal] = useState({
     open: false,
@@ -103,20 +106,19 @@ const BatchDetailsTable = ({
 
     const targetRow = updatedData[targetRowIndex];
 
+    // Only add students, keep hours same as domain
     const combinedStudents = sourceRow.stdCount + targetRow.stdCount;
-    const combinedHours = sourceRow.hrs + targetRow.hrs;
+    const domainHours = targetRow.hrs; // Keep hours as per domain
 
-    const newBatchIndex = targetRow.batches.length + 1;
-    const mergedBatchCode = `${sourceRow.batch}-${targetRow.batch}-${newBatchIndex}`;
+    const mergedBatchCode = `${sourceRow.batch}-${targetRow.batch}-1`;
 
     const mergedRow = {
       ...targetRow,
       batch: `${sourceRow.batch}+${targetRow.batch}`,
       stdCount: combinedStudents,
-      hrs: combinedHours,
-      assignedHours: null,
+      hrs: domainHours,
+      assignedHours: domainHours,
       batches: [
-        ...targetRow.batches,
         {
           batchPerStdCount: combinedStudents,
           batchCode: mergedBatchCode,
@@ -126,6 +128,7 @@ const BatchDetailsTable = ({
             source: sourceRow,
             target: targetRow
           },
+          assignedHours: domainHours,
           trainers: []
         }
       ]
@@ -230,6 +233,7 @@ const BatchDetailsTable = ({
       else if (trainer.dayDuration === 'AM' || trainer.dayDuration === 'PM') perDayHours = +(perDay / 2).toFixed(2);
 
       const dateList = getDateListExcludingSundays(trainer.startDate, trainer.endDate);
+      trainer.activeDates = dateList; // <-- store the dates
       trainer.dailyHours = dateList.map(() => perDayHours);
       trainer.assignedHours = trainer.dailyHours.reduce((a, b) => a + Number(b || 0), 0);
     }
@@ -420,6 +424,7 @@ const BatchDetailsTable = ({
                           ({remainingHours > 0 ? `${remainingHours} hrs left` : remainingHours < 0 ? `${-remainingHours} hrs extra` : 'Done'})
                         </span>
                       </div>
+                      {/* Add Batch Button */}
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
@@ -431,6 +436,20 @@ const BatchDetailsTable = ({
                       >
                         <FiPlus />
                       </button>
+                      {/* --- MERGE BUTTON --- */}
+                      {canMergeBatches && table1Data.length > 1 && (
+                        <button
+                          onClick={e => {
+                            e.stopPropagation();
+                            setMergeModal({ open: true, sourceRowIndex: rowIndex, targetSpecialization: '' });
+                          }}
+                          className="p-1.5 rounded-lg hover:bg-indigo-50 text-indigo-500 hover:text-indigo-700 transition-colors"
+                          title="Merge with another specialization"
+                          type="button"
+                        >
+                          <FiLayers />
+                        </button>
+                      )}
                       {isExpanded ? (
                         <FiChevronUp className="text-gray-400" />
                       ) : (
@@ -501,10 +520,16 @@ const BatchDetailsTable = ({
                                   inputMode="numeric"
                                   pattern="[0-9]*"
                                   className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
-                                  value={batch.assignedHours ?? (batchIndex === 0 ? 0 : row.batches[0]?.assignedHours ?? 0)}
-                                  onChange={e => batchIndex === 0 ? handleBatchChange(rowIndex, batchIndex, 'assignedHours', e.target.value.replace(/\D/g, '')) : undefined}
+                                  value={batch.assignedHours === undefined || batch.assignedHours === null ? '' : batch.assignedHours}
+                                  onChange={e => {
+                                    if (batchIndex === 0) {
+                                      let val = e.target.value.replace(/\D/g, '');
+                                      handleBatchChange(rowIndex, batchIndex, 'assignedHours', val);
+                                      if (onAssignedHoursChange) onAssignedHoursChange(val);
+                                    }
+                                  }}
                                   min="0"
-                                  max={row.hrs}
+                                  max={maxAssignableHours}
                                   placeholder="0"
                                   disabled={batchIndex !== 0}
                                 />
@@ -672,11 +697,11 @@ const BatchDetailsTable = ({
                                                       </tr>
                                                     </thead>
                                                     <tbody>
-                                                      {dateList.map((date, idx) => (
+                                                      {(trainer.activeDates || []).map((date, idx) => (
                                                         <tr key={idx} className="border-b border-gray-200 last:border-0">
                                                           <td className="px-3 py-2">{date.toLocaleDateString()}</td>
                                                           <td className="px-3 py-2">{date.toLocaleDateString(undefined, { weekday: 'short' })}</td>
-                                                          <td className="px-3 py-2">
+                                                          <td className="px-3 py-2 flex items-center space-x-2">
                                                             <input
                                                               type="text"
                                                               inputMode="decimal"
@@ -685,6 +710,35 @@ const BatchDetailsTable = ({
                                                               value={trainer.dailyHours?.[idx] || ''}
                                                               onChange={e => handleDayHourChange(rowIndex, batchIndex, trainerIdx, idx, e.target.value.replace(/[^0-9.]/g, ''))}
                                                             />
+                                                            <button
+                                                              type="button"
+                                                              className="ml-1 text-rose-500 hover:text-rose-700"
+                                                              title="Remove this day"
+                                                              onClick={() => {
+                                                                // Remove the date and hour at idx
+                                                                const updated = [...table1Data];
+                                                                const t = updated[rowIndex].batches[batchIndex].trainers[trainerIdx];
+                                                                if (t.activeDates && t.dailyHours) {
+                                                                  t.activeDates.splice(idx, 1);
+                                                                  t.dailyHours.splice(idx, 1);
+                                                                  // Re-distribute total assignedHours equally
+                                                                  const total = t.dailyHours.reduce((a, b) => a + Number(b || 0), 0);
+                                                                  const days = t.dailyHours.length;
+                                                                  if (days > 0) {
+                                                                    const equal = Math.floor(total / days);
+                                                                    const remainder = total - (equal * days);
+                                                                    t.dailyHours = Array(days).fill(equal);
+                                                                    t.dailyHours[days - 1] += remainder;
+                                                                    t.assignedHours = t.dailyHours.reduce((a, b) => a + Number(b || 0), 0);
+                                                                  } else {
+                                                                    t.assignedHours = 0;
+                                                                  }
+                                                                }
+                                                                setTable1Data(updated);
+                                                              }}
+                                                            >
+                                                              <FiTrash2 size={14} />
+                                                            </button>
                                                           </td>
                                                         </tr>
                                                       ))}
