@@ -30,7 +30,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
   const [paymentErrors, setPaymentErrors] = useState([]);
   const sections = ["basic", "contacts", "course", "topics", "financial"];
 
-  // Add this helper function:
+  // Helper for number display
   const numValue = (val) => (val === 0 || val === "0" ? "" : val);
 
   useEffect(() => {
@@ -142,18 +142,15 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
   // 1. Update handleCourseChange to always update studentCount
   const handleCourseChange = (index, field, value) => {
     const updatedCourses = [...formData.courses];
-    if (field === "specialization" && value === "") {
-      // If clearing specialization, also clear othersSpecText
-      updatedCourses[index].specialization = "";
-      updatedCourses[index].othersSpecText = "";
-    } else if (field === "othersSpecText") {
-      updatedCourses[index].othersSpecText = value;
-      updatedCourses[index].specialization = ""; // Keep specialization empty when typing custom
-    } else {
-      updatedCourses[index][field] = field === "students" ? parseInt(value) || 0 : value;
-      if (field === "specialization") {
+    if (field === "specialization") {
+      updatedCourses[index].specialization = value;
+      if (value !== "Other") {
         updatedCourses[index].othersSpecText = "";
       }
+    } else if (field === "othersSpecText") {
+      updatedCourses[index].othersSpecText = value;
+    } else {
+      updatedCourses[index][field] = field === "students" ? parseInt(value) || 0 : value;
     }
     // Calculate new total cost and student count whenever student numbers change
     const newFormData = {
@@ -813,7 +810,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                             (formData.totalCost * 0.18) /
                             1.18
                           ).toFixed(2)})`
-                        : "GST will be added separately"}
+                        : "No GST applied"}
                     </p>
                   </div>
                 </div>
@@ -905,7 +902,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                   </p>
                 </div>
 
-                {/* GST Type Selection */}
+                {/* --- GST Type Selection (UI & Logic) --- */}
                 <div className="bg-purple-50 p-4 rounded-lg">
                   <label className="block text-sm font-medium text-purple-700 mb-2">
                     GST Type
@@ -917,33 +914,18 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                         name="gstType"
                         value="include"
                         checked={formData.gstType === "include"}
-                        onChange={(e) => {
-                          const newGstType = e.target.value;
+                        onChange={() => {
+                          // If switching from exclude to include, add GST
                           const currentTotalCost = formData.totalCost || 0;
-                          let newTotalCost;
-                          
-                          // Adjust total cost based on GST type change
-                          if (formData.gstType === "include" && newGstType === "exclude") {
-                            // Converting from "include" to "exclude" - remove GST from total
-                            newTotalCost = currentTotalCost / 1.18;
-                          } else if (formData.gstType === "exclude" && newGstType === "include") {
-                            // Converting from "exclude" to "include" - add GST to total
-                            newTotalCost = currentTotalCost * 1.18;
-                          } else {
-                            // No change needed
-                            newTotalCost = currentTotalCost;
-                          }
-                          
-                          // Recalculate all payment details with new total and GST type
+                          const newTotalCost = formData.gstType === "exclude"
+                            ? currentTotalCost * 1.18
+                            : currentTotalCost;
                           const updatedPaymentDetails = formData.paymentDetails.map(payment => {
                             const percentage = parseFloat(payment.percentage) || 0;
                             const paymentAmount = newTotalCost * (percentage / 100);
-                            const gstRate = newGstType === "include" ? 0.18 : 0;
-                            const baseAmount = newGstType === "include" 
-                              ? paymentAmount / (1 + gstRate) 
-                              : paymentAmount;
-                            const gstAmount = newGstType === "exclude" ? baseAmount * 0.18 : baseAmount * gstRate;
-
+                            const gstRate = 0.18;
+                            const baseAmount = paymentAmount / (1 + gstRate);
+                            const gstAmount = baseAmount * gstRate;
                             return {
                               ...payment,
                               baseAmount: baseAmount.toFixed(2),
@@ -951,10 +933,9 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                               totalAmount: paymentAmount.toFixed(2)
                             };
                           });
-
                           setFormData(prev => ({
                             ...prev,
-                            gstType: newGstType,
+                            gstType: "include",
                             totalCost: newTotalCost,
                             paymentDetails: updatedPaymentDetails
                           }));
@@ -969,59 +950,80 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                         name="gstType"
                         value="exclude"
                         checked={formData.gstType === "exclude"}
-                        onChange={(e) => {
-                          const newGstType = e.target.value;
+                        onChange={() => {
+                          // If switching from include to exclude, remove GST
                           const currentTotalCost = formData.totalCost || 0;
-                          let newTotalCost;
-                          
-                          // Adjust total cost based on GST type change
-                          if (formData.gstType === "include" && newGstType === "exclude") {
-                            // Converting from "include" to "exclude" - remove GST from total
-                            newTotalCost = currentTotalCost / 1.18;
-                          } else if (formData.gstType === "exclude" && newGstType === "include") {
-                            // Converting from "exclude" to "include" - add GST to total
-                            newTotalCost = currentTotalCost * 1.18;
-                          } else {
-                            // No change needed
-                            newTotalCost = currentTotalCost;
-                          }
-                          
-                          // Recalculate all payment details with new total and GST type
+                          const newTotalCost = formData.gstType === "include"
+                            ? currentTotalCost / 1.18
+                            : currentTotalCost;
                           const updatedPaymentDetails = formData.paymentDetails.map(payment => {
                             const percentage = parseFloat(payment.percentage) || 0;
                             const paymentAmount = newTotalCost * (percentage / 100);
-                            const gstRate = newGstType === "include" ? 0.18 : 0;
-                            const baseAmount = newGstType === "include" 
-                              ? paymentAmount / (1 + gstRate) 
-                              : paymentAmount;
-                            const gstAmount = newGstType === "exclude" ? baseAmount * 0.18 : baseAmount * gstRate;
-
                             return {
                               ...payment,
-                              baseAmount: baseAmount.toFixed(2),
-                              gstAmount: gstAmount.toFixed(2),
+                              baseAmount: paymentAmount.toFixed(2),
+                              gstAmount: "0.00",
                               totalAmount: paymentAmount.toFixed(2)
                             };
                           });
-
                           setFormData(prev => ({
                             ...prev,
-                            gstType: newGstType,
+                            gstType: "exclude",
                             totalCost: newTotalCost,
                             paymentDetails: updatedPaymentDetails
                           }));
                         }}
                         className="mr-2"
                       />
-                      <span className="text-sm">Exclude GST</span>
+                      <span className="text-sm">No GST</span>
                     </label>
                   </div>
                   <p className="text-xs text-purple-600 mt-1">
-                    Current: {formData.gstType === "include" ? "GST Included" : formData.gstType === "exclude" ? "GST Excluded" : "Not selected"}
+                    Current: {formData.gstType === "include"
+                      ? "GST Included"
+                      : formData.gstType === "exclude"
+                      ? "No GST"
+                      : "Not selected"}
                   </p>
                 </div>
 
-                {/* Payment Breakdown */}
+                {/* --- Total Amount Display --- */}
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-green-700 mb-1">
+                    Total Amount (
+                    {formData.gstType === "include"
+                      ? "incl. GST"
+                      : "excl. GST"}
+                    )
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={
+                        formData.totalCost
+                          ? formData.totalCost.toFixed(2)
+                          : ""
+                      }
+                      readOnly
+                      className="block w-full pl-10 pr-3 py-2 border border-green-300 rounded-lg shadow-sm bg-green-100"
+                    />
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <FiDollarSign className="h-5 w-5 text-green-400" />
+                    </div>
+                  </div>
+                  <p className="text-xs text-green-600 mt-1">
+                    {formData.gstType === "include"
+                      ? `(Base: ₹${(formData.totalCost / 1.18).toFixed(
+                          2
+                        )} + GST: ₹${(
+                          (formData.totalCost * 0.18) /
+                          1.18
+                        ).toFixed(2)})`
+                      : "No GST applied"}
+                  </p>
+                </div>
+
+                {/* --- Payment Breakdown --- */}
                 {formData.paymentDetails?.length > 0 && (
                   <div className="space-y-4">
                     <h3 className="text-lg font-medium text-gray-900">
@@ -1186,7 +1188,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                   ? `(Base: ₹${baseAmount.toFixed(
                                       2
                                     )} + GST: ₹${gstAmount.toFixed(2)})`
-                                  : "GST will be added separately"}
+                                  : "No GST applied"}
                               </p>
                             </div>
                           </div>
@@ -1246,7 +1248,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                 0
                               )
                               .toFixed(2)}`
-                          : "GST will be added to payments separately"}
+                          : "No GST applied"}
                       </p>
                     </div>
                   </div>
@@ -1284,17 +1286,14 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                                 ...prev,
                                 course: "",
                                 isCustomCourse: true,
-                                courses: prev.courses.map(course => ({
-                                  ...course,
-                                  specialization: "",
-                                  othersSpecText: ""
-                                }))
+                                courses: [{ specialization: "", students: 0, othersSpecText: "" }]
                               }));
                             } else {
-                              handleChange(e);
                               setFormData(prev => ({
                                 ...prev,
-                                isCustomCourse: false
+                                course: value,
+                                isCustomCourse: false,
+                                courses: [{ specialization: "", students: 0, othersSpecText: "" }]
                               }));
                             }
                           }}
@@ -1422,34 +1421,24 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                     Course Specializations
                   </h3>
                   {formData.courses?.map((course, index) => {
-                    const isOthersSpec = course.specialization === "Other" || (!course.specialization && course.othersSpecText);
-                    const isCustomSpecialization = !courseSpecializations[formData.course]?.includes(course.specialization) && course.specialization && course.specialization !== "Other";
-                    
-                    // Get specializations based on the selected course
-                    const currentSpecializations = formData.isCustomCourse 
-                      ? ["Other"] 
+                    const isOthersSpec = course.specialization === "Other";
+                    const currentSpecializations = formData.isCustomCourse
+                      ? ["Other"]
                       : (courseSpecializations[formData.course] || []);
 
                     return (
-                      <div
-                        key={index}
-                        className="bg-gray-50 p-4 rounded-lg mb-4"
-                      >
+                      <div key={index} className="bg-gray-50 p-4 rounded-lg mb-4">
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                           <div>
                             <label className="block text-xs font-medium text-gray-500 mb-1">
                               Specialization
                             </label>
-                            {formData.isCustomCourse || isCustomSpecialization ? (
+                            {formData.isCustomCourse ? (
                               <input
                                 type="text"
-                                value={course.specialization || course.othersSpecText || ""}
-                                onChange={(e) =>
-                                  handleCourseChange(
-                                    index,
-                                    formData.isCustomCourse || isCustomSpecialization ? "specialization" : "othersSpecText",
-                                    e.target.value
-                                  )
+                                value={course.specialization ?? ""}
+                                onChange={e =>
+                                  handleCourseChange(index, "specialization", e.target.value)
                                 }
                                 className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
                                 placeholder="Enter specialization"
@@ -1457,22 +1446,19 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                             ) : (
                               <div className="relative">
                                 <select
-                                  value={isOthersSpec ? "Other" : course.specialization || ""}
-                                  onChange={(e) => {
+                                  value={course.specialization ?? ""}
+                                  onChange={e => {
                                     const value = e.target.value;
                                     if (value === "Other") {
-                                      // Set specialization to empty, show input for othersSpecText
-                                      handleCourseChange(index, "specialization", "");
-                                      handleCourseChange(index, "othersSpecText", "");
+                                      handleCourseChange(index, "specialization", "Other");
                                     } else {
                                       handleCourseChange(index, "specialization", value);
-                                      handleCourseChange(index, "othersSpecText", "");
                                     }
                                   }}
                                   className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
                                 >
                                   <option value="">Select Specialization</option>
-                                  {currentSpecializations.map((spec) => (
+                                  {currentSpecializations.map(spec => (
                                     <option key={spec} value={spec}>
                                       {spec}
                                     </option>
@@ -1486,15 +1472,15 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                           </div>
 
                           {/* Show custom input for "Other" specialization */}
-                          {isOthersSpec && !formData.isCustomCourse && !isCustomSpecialization && (
+                          {isOthersSpec && !formData.isCustomCourse && (
                             <div>
                               <label className="block text-xs font-medium text-gray-500 mb-1">
                                 Custom Specialization
                               </label>
                               <input
                                 type="text"
-                                value={course.othersSpecText || ""}
-                                onChange={(e) =>
+                                value={course.othersSpecText ?? ""}
+                                onChange={e =>
                                   handleCourseChange(index, "othersSpecText", e.target.value)
                                 }
                                 className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"

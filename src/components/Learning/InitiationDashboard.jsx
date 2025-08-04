@@ -1,372 +1,192 @@
-import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import {
+import React, { useEffect, useState } from "react";
+import { collection, getDocs, doc, getDoc } from "firebase/firestore";
+import { db } from "../../firebase";
+import { FiChevronDown, FiChevronUp, FiUser, FiClock, FiUsers, FiBookOpen, FiLayers } from "react-icons/fi";
 
-  TrendingUp,
-  LocationOn,
-  MoreVert,
-  Groups,
-  Assignment,
-  Analytics,
-  Grade,
-  Email,
-  Phone,
-  CalendarToday,
-  Refresh,
-  Download,
-  KeyboardArrowDown
-} from "@mui/icons-material";
-import {
-  School,
-  CheckCircle,
-  Pending,
-  PlayCircle,
-  Notifications,
-  Settings,
-  Person,
-  Search,
-  FilterList,
-  Schedule // Add this import
-} from "@mui/icons-material";
-
-const phaseData = [
-  {
-    id: 1, name: "Initiation", status: "active", description: "Onboarding and setup phase", duration: "4 weeks",
-    colleges: [
-      { id: 101, name: "ABC College of Engineering", shortName: "ABC", students: 245, progress: 75, contact: "john.doe@abccollege.edu", phone: "+91 98765 43210", location: "Mumbai, Maharashtra", joinedDate: "2025-06-15", rating: 4.8, specialty: "Engineering", metrics: { attendance: 92, assignments: 85, engagement: 88 } },
-      { id: 102, name: "XYZ University", shortName: "XYZ", students: 189, progress: 68, contact: "priya.sharma@xyz.edu", phone: "+91 87654 32109", location: "Delhi, India", joinedDate: "2025-06-20", rating: 4.6, specialty: "Business", metrics: { attendance: 88, assignments: 82, engagement: 90 } },
-      { id: 103, name: "PQR Institute of Technology", shortName: "PQR", students: 156, progress: 82, contact: "rahul.tech@pqr.edu", phone: "+91 76543 21098", location: "Bangalore, Karnataka", joinedDate: "2025-06-10", rating: 4.9, specialty: "Technology", metrics: { attendance: 95, assignments: 90, engagement: 92 } }
-    ]
-  },
-  { id: 2, name: "Training Phase I", status: "upcoming", description: "Core curriculum delivery", duration: "8 weeks", colleges: [{ id: 201, name: "LMN College", shortName: "LMN", students: 203, progress: 0, contact: "admin@lmn.edu", phone: "+91 65432 10987", location: "Chennai, Tamil Nadu", joinedDate: "2025-08-01", rating: 4.5, specialty: "Arts & Science", metrics: { attendance: 0, assignments: 0, engagement: 0 } }] },
-  { id: 3, name: "Training Phase II", status: "upcoming", description: "Advanced skills development", duration: "6 weeks", colleges: [] },
-  { id: 4, name: "Training Phase III", status: "upcoming", description: "Specialization & certification", duration: "4 weeks", colleges: [] },
-  { id: 5, name: "Completed", status: "completed", description: "Successfully graduated programs", duration: "Completed", colleges: [{ id: 501, name: "GHI College of Excellence", shortName: "GHI", students: 178, progress: 100, contact: "info@ghi.edu", phone: "+91 54321 09876", location: "Pune, Maharashtra", joinedDate: "2025-03-01", completedDate: "2025-07-15", rating: 4.7, specialty: "Engineering", metrics: { attendance: 94, assignments: 96, engagement: 93 } }] }
-];
-
-const statusConfig = {
-  active: { color: "indigo", gradient: "from-indigo-500 to-indigo-600", icon: PlayCircle },
-  upcoming: { color: "blue", gradient: "from-blue-500 to-blue-600", icon: Schedule },
-  completed: { color: "emerald", gradient: "from-emerald-500 to-emerald-600", icon: CheckCircle }
+const PHASE_LABELS = {
+  "phase-1": "Phase 1",
+  "phase-2": "Phase 2",
+  "phase-3": "Phase 3"
 };
 
-const statData = [
-  { icon: Groups, title: "Total Students", key: "totalStudents", color: "blue", trend: "+12%" },
-  { icon: School, title: "Active Colleges", key: "activeColleges", color: "indigo", trend: "+3" },
-  { icon: Assignment, title: "Completed Programs", key: "completedPrograms", color: "emerald", trend: "+1" },
-  { icon: Analytics, title: "Average Progress", key: "avgProgress", color: "amber", trend: "+5%" }
-];
+const Dashboard = ({ onRowClick }) => {
+  const [trainings, setTrainings] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-const TrainingDashboard = () => {
-  const [activePhase, setActivePhase] = useState(0);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(false);
-
+  // Fetch all trainingForms and their phases
   useEffect(() => {
-    setLoading(true);
-    setTimeout(() => setLoading(false), 1000);
-  }, [activePhase]);
+    const fetchData = async () => {
+      setLoading(true);
+      const formsSnap = await getDocs(collection(db, "trainingForms"));
+      const allTrainings = [];
 
-  const currentPhase = phaseData[activePhase];
-  const filteredColleges = currentPhase.colleges.filter(college =>
-    college.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    college.location.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const stats = {
-    totalStudents: phaseData.reduce((sum, phase) => sum + phase.colleges.reduce((s, c) => s + c.students, 0), 0),
-    activeColleges: phaseData.filter(p => p.status === 'active').reduce((s, p) => s + p.colleges.length, 0),
-    completedPrograms: phaseData.filter(p => p.status === 'completed').reduce((s, p) => s + p.colleges.length, 0),
-    avgProgress: "73%"
-  };
-
-  const getProgressColor = (p) => p >= 80 ? "bg-emerald-500" : p >= 60 ? "bg-amber-500" : p >= 40 ? "bg-red-500" : "bg-gray-500";
-
-  const Card = ({ children, className = "" }) => (
-    <div className={`bg-white rounded-2xl border border-gray-200 ${className}`}>{children}</div>
-  );
-
-  const StatCard = ({ icon: Icon, title, value, color, trend, small }) => (
-    <motion.div whileHover={{ scale: 1.01, y: -1 }}>
-      <Card className={`bg-gradient-to-br from-${color}-50 to-${color}-25 border-${color}-200 ${small ? 'p-1' : 'p-6'} hover:shadow transition-all duration-300`}>
-        <div className="flex justify-between items-center gap-1">
-          <div className="flex-1">
-            <p className={`text-gray-600 ${small ? 'text-[9px] mb-0.5' : 'text-sm mb-2'}`}>{title}</p>
-            <p className={`font-bold text-${color}-600 ${small ? 'text-xs mb-0.5' : 'text-3xl mb-2'}`}>{value}</p>
-            <div className={`bg-${color}-100 text-${color}-600 ${small ? 'px-1 py-0.5 text-[9px]' : 'px-2 py-1 text-xs'} rounded-full font-semibold flex items-center w-fit ml-0`}>
-              <TrendingUp className={small ? "w-2 h-2 mr-0.5" : "w-3 h-3 mr-1"} />{trend}
-            </div>
-          </div>
-          <div className="flex items-center justify-center">
-            <div className={`bg-gradient-to-br from-${color}-500 to-${color}-600 rounded ${small ? 'p-1' : 'p-3'} text-white`}>
-              <Icon className={small ? "w-3 h-3" : "w-6 h-6"} />
-            </div>
-          </div>
-        </div>
-      </Card>
-    </motion.div>
-  );
-
-  const PhaseTab = ({ phase, index, isActive, small }) => {
-    const config = statusConfig[phase.status];
-    return (
-      <motion.div whileHover={{ scale: 1.01 }}>
-        <Card className={`cursor-pointer ${small ? 'p-1' : 'p-4'} transition-all duration-300 hover:shadow-xl ${
-          isActive ? `bg-gradient-to-br ${config.gradient} text-white border-2 border-${config.color}-500` : 'hover:border-gray-200'
-        }`}>
-          <div className={`flex items-center ${small ? 'gap-1 mb-1' : 'gap-3 mb-3'}`}>
-            <div className={`rounded-lg ${small ? 'p-0.5' : 'p-2'} ${isActive ? 'bg-white/20' : `bg-${config.color}-50`}`}>
-              <config.icon className={small ? "w-3 h-3" : "w-5 h-5"} />
-            </div>
-            <div className="flex-1">
-              <h3 className={`font-semibold ${isActive ? 'text-white' : 'text-gray-900'} ${small ? 'text-xs' : ''}`}>{phase.name}</h3>
-              <p className={`text-[9px] ${isActive ? 'text-white/80' : 'text-gray-500'}`}>{phase.description}</p>
-            </div>
-            {phase.colleges.length > 0 && (
-              <div className={`rounded-full ${small ? 'px-1 py-0.5 text-[9px]' : 'px-2 py-1 text-xs'} font-semibold ${isActive ? 'bg-white/20 text-white' : `bg-${config.color}-50 text-${config.color}-600`}`}>
-                {phase.colleges.length}
-              </div>
-            )}
-          </div>
-          <div className="flex justify-between items-center">
-            <span className={`rounded-full font-medium capitalize ${small ? 'px-1 py-0.5 text-[9px]' : 'px-2 py-1 text-xs'} ${isActive ? 'bg-white/20 text-white' : `bg-${config.color}-50 text-${config.color}-600`}`}>
-              {phase.status}
-            </span>
-            <span className={`font-medium ${small ? 'text-[9px]' : 'text-xs'} ${isActive ? 'text-white/80' : 'text-gray-500'}`}>{phase.duration}</span>
-          </div>
-        </Card>
-      </motion.div>
-    );
-  };
-
-  const CollegeCard = ({ college, index }) => {
-    const config = statusConfig[currentPhase.status];
-    return (
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }} whileHover={{ scale: 1.02, y: -4 }}>
-        <Card className="overflow-hidden hover:shadow-xl transition-all duration-300">
-          <div className={`bg-gradient-to-br ${config.gradient} p-6 text-white`}>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center border-3 border-white/30">
-                <School className="w-6 h-6 text-white" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-lg">{college.name}</h3>
-                <div className="flex items-center gap-1 opacity-90">
-                  <LocationOn className="w-4 h-4" />
-                  <span className="text-sm">{college.location}</span>
-                </div>
-              </div>
-              <MoreVert className="w-5 h-5 text-white/80 hover:text-white cursor-pointer" />
-            </div>
-            <div className="mb-4">
-              <div className="flex justify-between mb-2">
-                <span className="text-sm opacity-90">Progress</span>
-                <span className="text-sm font-semibold">{college.progress}%</span>
-              </div>
-              <div className="h-2 bg-white/30 rounded-full overflow-hidden">
-                <motion.div initial={{ width: 0 }} animate={{ width: `${college.progress}%` }} transition={{ duration: 1, delay: index * 0.2 }} className="h-full bg-white/90 rounded-full" />
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1">
-                <Groups className="w-4 h-4" />
-                <span className="text-sm font-semibold">{college.students} Students</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Grade className="w-4 h-4" />
-                <span className="text-sm font-semibold">{college.rating} ★</span>
-              </div>
-            </div>
-          </div>
-          <div className="p-6">
-            <h4 className="font-semibold text-gray-900 mb-4">Performance Metrics</h4>
-            <div className="space-y-3">
-              {Object.entries(college.metrics).map(([key, value]) => (
-                <div key={key} className="flex items-center gap-3">
-                  <span className="text-sm text-gray-600 capitalize w-20">{key}</span>
-                  <div className="flex-1 flex items-center gap-2">
-                    <div className="flex-1 h-1 bg-gray-200 rounded-full overflow-hidden">
-                      <div className={`h-full ${getProgressColor(value)} rounded-full`} style={{ width: `${value}%` }} />
-                    </div>
-                    <span className="text-sm font-semibold w-8">{value}%</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <hr className="my-4" />
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <Email className="w-4 h-4" />
-                <span>{college.contact}</span>
-              </div>
-              {college.phone && (
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Phone className="w-4 h-4" />
-                  <span>{college.phone}</span>
-                </div>
-              )}
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <CalendarToday className="w-4 h-4" />
-                <span>
-                  {currentPhase.status === "completed" ? "Completed: " : "Joined: "}
-                  {currentPhase.status === "completed" ? college.completedDate : college.joinedDate}
-                </span>
-              </div>
-            </div>
-          </div>
-        </Card>
-      </motion.div>
-    );
-  };
-
-  if (loading) {
-    return (
-      <div className="p-6">
-        <div className="h-48 bg-gray-200 rounded-2xl mb-6 animate-pulse"></div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3].map(i => <div key={i} className="h-72 bg-gray-200 rounded-2xl animate-pulse"></div>)}
-        </div>
-      </div>
-    );
-  }
+      for (const formDoc of formsSnap.docs) {
+        const formData = formDoc.data();
+        const phasesSnap = await getDocs(collection(db, "trainingForms", formDoc.id, "trainings"));
+        for (const phaseDoc of phasesSnap.docs) {
+          const phaseData = phaseDoc.data();
+          allTrainings.push({
+            id: `${formDoc.id}_${phaseDoc.id}`,
+            trainingId: formDoc.id,
+            phaseId: phaseDoc.id,
+            collegeName: formData.collegeName,
+            collegeCode: formData.collegeCode,
+            ...phaseData
+          });
+        }
+      }
+      setTrainings(allTrainings);
+      setLoading(false);
+    };
+    fetchData();
+  }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 p-4">
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-        <div className="mb-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
-            <div>
-              <h1 className="text-lg sm:text-2xl font-black bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent mb-1">Training Dashboard</h1>
-              <p className="text-xs sm:text-base text-gray-600">Monitor and manage your college training programs</p>
-            </div>
-            <div className="flex gap-2">
-              <button className="p-2 bg-white border border-gray-200 rounded-xl shadow hover:bg-gray-50 transition-colors"><Refresh className="w-5 h-5" /></button>
-              <button className="p-2 bg-white border border-gray-200 rounded-xl shadow hover:bg-gray-50 transition-colors"><Download className="w-5 h-5" /></button>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-            {statData.map(stat => (
-              <Card key={stat.key} className="p-4 shadow border border-gray-200 flex flex-col items-start">
-                <div className="flex items-center gap-3 mb-2">
-                  <span className={`bg-gradient-to-br from-${stat.color}-500 to-${stat.color}-600 rounded-lg p-2 text-white`}>
-                    <stat.icon className="w-6 h-6" />
-                  </span>
-                  <span className="font-semibold text-gray-700 text-base">{stat.title}</span>
-                </div>
-                <div className="flex items-end gap-2">
-                  <span className={`font-bold text-${stat.color}-600 text-2xl`}>{stat.key === 'totalStudents' ? stats[stat.key].toLocaleString() : stats[stat.key]}</span>
-                  <span className={`bg-${stat.color}-100 text-${stat.color}-600 px-2 py-1 rounded-full font-semibold text-xs flex items-center`}>
-                    <TrendingUp className="w-4 h-4 mr-1" />{stat.trend}
-                  </span>
-                </div>
-              </Card>
-            ))}
-          </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 p-6">
+      <h1 className="text-2xl font-bold mb-6 text-gray-800">Training Initiation Dashboard</h1>
+      {loading ? (
+        <div className="text-center py-12 text-gray-500">Loading...</div>
+      ) : (
+        <div className="bg-white rounded-xl shadow border border-gray-200 overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700">College</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700">Phase</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700">Domain</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700">Start Date</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700">End Date</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700">Batches</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-100">
+              {trainings.map((t, idx) => (
+                <tr
+                  key={t.id}
+                  className="hover:bg-indigo-50 cursor-pointer transition"
+                  onClick={() => onRowClick && onRowClick(t)}
+                >
+                  <td className="px-4 py-3 font-medium text-gray-900">{t.collegeName} <span className="text-xs text-gray-400">({t.collegeCode})</span></td>
+                  <td className="px-4 py-3">{PHASE_LABELS[t.phaseId] || t.phaseId}</td>
+                  <td className="px-4 py-3">{t.domain || "-"}</td>
+                  <td className="px-4 py-3">{t.trainingStartDate || "-"}</td>
+                  <td className="px-4 py-3">{t.trainingEndDate || "-"}</td>
+                  <td className="px-4 py-3">{t.table1Data ? t.table1Data.length : 0}</td>
+                  <td className="px-4 py-3 text-indigo-600 flex items-center">
+                    View
+                  </td>
+                </tr>
+              ))}
+              {trainings.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="text-center py-8 text-gray-400">No trainings found.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      </motion.div>
-
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }}>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-6">
-          {phaseData.map((phase, index) => (
-            <Card
-              key={phase.id}
-              className={`cursor-pointer p-4 transition-all duration-300 shadow border-2 ${activePhase === index ? `border-${statusConfig[phase.status].color}-500` : 'border-gray-200'} ${activePhase === index ? `bg-gradient-to-br ${statusConfig[phase.status].gradient} text-white` : 'bg-white hover:border-gray-300'}`}
-              onClick={() => setActivePhase(index)}
-            >
-              <div className="flex items-center gap-3 mb-2">
-                <span className={`rounded-lg p-2 ${activePhase === index ? 'bg-white/20' : `bg-${statusConfig[phase.status].color}-50`}`}>
-                  {React.createElement(statusConfig[phase.status].icon, { className: "w-5 h-5" })}
-                </span>
-                <div>
-                  <h3 className={`font-semibold ${activePhase === index ? 'text-white' : 'text-gray-900'} text-base`}>{phase.name}</h3>
-                  <p className={`text-xs ${activePhase === index ? 'text-white/80' : 'text-gray-500'}`}>{phase.description}</p>
-                </div>
-                {phase.colleges.length > 0 && (
-                  <span className={`rounded-full px-2 py-1 text-xs font-semibold ml-auto ${activePhase === index ? 'bg-white/20 text-white' : `bg-${statusConfig[phase.status].color}-50 text-${statusConfig[phase.status].color}-600`}`}>
-                    {phase.colleges.length}
-                  </span>
-                )}
-              </div>
-              <div className="flex justify-between items-center">
-                <span className={`rounded-full font-medium capitalize px-2 py-1 text-xs ${activePhase === index ? 'bg-white/20 text-white' : `bg-${statusConfig[phase.status].color}-50 text-${statusConfig[phase.status].color}-600`}`}>
-                  {phase.status}
-                </span>
-                <span className={`font-medium text-xs ${activePhase === index ? 'text-white/80' : 'text-gray-500'}`}>{phase.duration}</span>
-              </div>
-            </Card>
-          ))}
-        </div>
-      </motion.div>
-
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2 }}>
-        <Card className="p-4 mb-6 shadow border border-gray-200">
-          <div className="flex flex-col sm:flex-row flex-wrap gap-2 items-center">
-            <div className="flex-1 min-w-0 relative w-full sm:w-auto">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Search colleges or locations..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-              />
-            </div>
-            <button className="px-4 py-2 border border-gray-200 rounded-xl bg-white hover:border-gray-300 shadow transition-colors flex items-center gap-2 text-sm font-semibold">
-              <FilterList className="w-5 h-5" />Filter<KeyboardArrowDown className="w-4 h-4" />
-            </button>
-          </div>
-        </Card>
-      </motion.div>
-
-      <AnimatePresence mode="wait">
-        {filteredColleges.length > 0 ? (
-          <motion.div key={activePhase} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-            <div className="overflow-x-auto bg-white rounded-2xl border border-gray-200 shadow-lg mt-4">
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
-                <thead className="bg-gray-100 sticky top-0 z-10">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700 uppercase">College Name</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700 uppercase">Location</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700 uppercase">Students</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700 uppercase">Contact</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700 uppercase">Phone</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700 uppercase">{currentPhase.status === "completed" ? "Completed Date" : "Joined Date"}</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-100">
-                  {filteredColleges.map((college, idx) => (
-                    <tr key={college.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50 hover:bg-indigo-50 transition"}>
-                      <td className="px-4 py-3 font-medium text-gray-900">{college.name}</td>
-                      <td className="px-4 py-3 text-gray-700">{college.location}</td>
-                      <td className="px-4 py-3 text-gray-700">{college.students}</td>
-                      <td className="px-4 py-3 text-gray-700">{college.contact}</td>
-                      <td className="px-4 py-3 text-gray-700">{college.phone}</td>
-                      <td className="px-4 py-3 text-gray-700">
-                        {currentPhase.status === "completed" ? college.completedDate : college.joinedDate}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </motion.div>
-        ) : (
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }}>
-            <Card className="border-2 border-dashed border-gray-300 text-center py-4 sm:py-8">
-              <School className="w-8 h-8 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-2" />
-              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1">No colleges in this phase</h3>
-              <p className="text-gray-600 mb-3 text-xs sm:text-sm">
-                {currentPhase.status === "upcoming"
-                  ? "Colleges will appear here when this phase begins"
-                  : "Start by adding colleges to this training phase"}
-              </p>
-              <button className={`bg-gradient-to-r ${statusConfig[currentPhase.status].gradient} text-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold hover:shadow-lg transition-all text-xs sm:text-sm`}>Add College</button>
-            </Card>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      )}
     </div>
   );
 };
 
-export default TrainingDashboard;
+// Details panel for a single training phase
+function TrainingDetailsPanel({ training }) {
+  return (
+    <div>
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold text-indigo-700 mb-1">
+          {training.collegeName} ({training.collegeCode}) - {training.domain || "No Domain"}
+        </h2>
+        <div className="text-gray-600 text-sm mb-2">
+          <span className="mr-4"><FiClock className="inline mr-1" />{training.trainingStartDate} to {training.trainingEndDate}</span>
+          {training.details && <span className="ml-4">{training.details}</span>}
+        </div>
+        <div className="flex flex-wrap gap-4 text-xs text-gray-500">
+          <span><FiLayers className="inline mr-1" />Phase: {PHASE_LABELS[training.phaseId] || training.phaseId}</span>
+          <span><FiBookOpen className="inline mr-1" />Domain Hours: {training.domainHours || "-"}</span>
+          {training.phase2Dates && (
+            <span>
+              Phase 2: {training.phase2Dates.startDate} to {training.phase2Dates.endDate}
+            </span>
+          )}
+        </div>
+      </div>
+      <div>
+        <h3 className="font-semibold text-gray-800 mb-2">Batches & Trainers</h3>
+        {Array.isArray(training.table1Data) && training.table1Data.length > 0 ? (
+          <div className="space-y-6">
+            {training.table1Data.map((row, idx) => (
+              <div key={idx} className="bg-white rounded-lg border border-gray-200 shadow p-4">
+                <div className="flex items-center gap-4 mb-2">
+                  <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold">{idx + 1}</div>
+                  <div>
+                    <div className="font-medium text-gray-900">{row.batch}</div>
+                    <div className="text-xs text-gray-500">{row.stdCount} students • {row.hrs} hours</div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {row.batches && row.batches.map((batch, bidx) => (
+                    <div key={bidx} className="border rounded p-3 mb-2 bg-gray-50">
+                      <div className="flex flex-wrap gap-4 items-center mb-2">
+                        <span className="text-xs font-semibold text-gray-700">Batch Code: {batch.batchCode}</span>
+                        <span className="text-xs text-gray-600">Students: {batch.batchPerStdCount || 0}</span>
+                        <span className="text-xs text-gray-600">Assigned Hours: {batch.assignedHours || 0}</span>
+                        {batch.isMerged && (
+                          <span className="text-xs text-rose-600 font-semibold">Merged: {batch.mergedFrom}</span>
+                        )}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-xs text-gray-700 mb-1">Trainers:</div>
+                        {batch.trainers && batch.trainers.length > 0 ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {batch.trainers.map((trainer, tidx) => (
+                              <div key={tidx} className="bg-white border rounded p-2">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <FiUser className="text-indigo-500" />
+                                  <span className="font-medium">{trainer.trainerName || "Unassigned"}</span>
+                                  <span className="text-xs text-gray-500 ml-2">{trainer.trainerId}</span>
+                                </div>
+                                <div className="text-xs text-gray-600 mb-1">
+                                  {trainer.dayDuration && <span className="mr-2">Duration: {trainer.dayDuration}</span>}
+                                  {trainer.startDate && <span className="mr-2">From: {trainer.startDate}</span>}
+                                  {trainer.endDate && <span>To: {trainer.endDate}</span>}
+                                </div>
+                                <div className="text-xs text-gray-600 mb-1">
+                                  Assigned Hours: <span className="font-semibold">{trainer.assignedHours || 0}</span>
+                                </div>
+                                {trainer.dailyHours && trainer.dailyHours.length > 0 && (
+                                  <div className="mt-1">
+                                    <div className="font-semibold text-xs text-gray-700 mb-1">Daily Hours:</div>
+                                    <div className="flex flex-wrap gap-2">
+                                      {(trainer.activeDates || []).map((date, didx) => (
+                                        <span key={didx} className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-xs">
+                                          {typeof date === "string" ? date : (date?.toDateString?.() || "")}: {trainer.dailyHours[didx] || 0}h
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-gray-400">No trainers assigned</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-gray-400 text-sm">No batch data available.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default Dashboard;

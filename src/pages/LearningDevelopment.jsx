@@ -6,6 +6,7 @@ import TrainingDetailModal from "../components/Learning/TrainingTables/TrainingD
 import FilePreviewModal from "../components/Learning/TrainingTables/FilePreviewModal";
 import StudentDataPage from "../components/Learning/StudentDataPage";
 import InitiationDashboard from "../components/Learning/InitiationDashboard";
+import InitiationTrainingDetails from "../components/Learning/InitiationTrainingDetails"; // <-- create this
 import { useNavigate } from "react-router-dom";
 
 function LearningDevelopment() {
@@ -19,6 +20,7 @@ function LearningDevelopment() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("newContact");
+  const [selectedInitiationTraining, setSelectedInitiationTraining] = useState(null);
   const navigate = useNavigate();
 
   const fetchTrainings = async () => {
@@ -180,7 +182,14 @@ function LearningDevelopment() {
             )}
           </>
         ) : (
-          <InitiationDashboard />
+          selectedInitiationTraining ? (
+            <InitiationTrainingDetails
+              training={selectedInitiationTraining}
+              onBack={() => setSelectedInitiationTraining(null)}
+            />
+          ) : (
+            <InitiationDashboard onRowClick={setSelectedInitiationTraining} />
+          )
         )}
       </div>
     </>
