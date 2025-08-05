@@ -42,7 +42,7 @@ const Dashboard = ({ onRowClick }) => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200">
       <h1 className="text-2xl font-bold mb-6 text-gray-800">Training Initiation Dashboard</h1>
       {loading ? (
         <div className="text-center py-12 text-gray-500">Loading...</div>

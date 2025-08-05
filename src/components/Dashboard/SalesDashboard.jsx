@@ -664,29 +664,33 @@ const SalesDashboard = () => {
     return { start: newStart, end: newEnd };
   };
 
-  const getPreviousQuarterDateRange = () => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
+const getPreviousQuarterDateRange = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
 
-    let start, end;
+  let start, end;
 
-    if (month >= 3 && month <= 5) {
-      start = new Date(year - 1, 0, 1);
-      end = new Date(year - 1, 2, 31);
-    } else if (month >= 6 && month <= 8) {
-      start = new Date(year, 3, 1);
-      end = new Date(year, 5, 30);
-    } else if (month >= 9 && month <= 11) {
-      start = new Date(year, 6, 1);
-      end = new Date(year, 8, 30);
-    } else {
-      start = new Date(year, 9, 1);
-      end = new Date(year, 11, 31);
-    }
+  if (month >= 3 && month <= 5) {
+    // Apr-Jun, previous is Jan-Mar of current year
+    start = new Date(year, 0, 1);
+    end = new Date(year, 2, 31);
+  } else if (month >= 6 && month <= 8) {
+    // Jul-Sep, previous is Apr-Jun
+    start = new Date(year, 3, 1);
+    end = new Date(year, 5, 30);
+  } else if (month >= 9 && month <= 11) {
+    // Oct-Dec, previous is Jul-Sep
+    start = new Date(year, 6, 1);
+    end = new Date(year, 8, 30);
+  } else {
+    // Jan-Mar, previous is Oct-Dec of previous year
+    start = new Date(year - 1, 9, 1);
+    end = new Date(year - 1, 11, 31);
+  }
 
-    return { start, end };
-  };
+  return { start, end };
+};
   const updatePeriodInfo = (range, isCurrentPeriod = true) => {
     const { start, end } = range;
     let info = "";
@@ -800,12 +804,13 @@ const SalesDashboard = () => {
     forEachFn((doc) => {
       const lead = docs === input ? doc : doc.data();
 
-      if (selectedUserId) {
-        const selectedUserObj = users.find((u) => u.id === selectedUserId);
-        if (lead.assignedTo?.uid !== selectedUserObj?.uid) {
-          return;
-        }
-      }
+if (selectedUserId) {
+  const selectedUserObj = users.find((u) => u.id === selectedUserId);
+  if (!selectedUserObj) return; // skip if user not found
+  if (lead.assignedTo?.uid !== selectedUserObj?.uid) {
+    return;
+  }
+}
       if (lead.courseType) {
         if (lead.courseType.includes("Engineering")) {
           leadCategories.Engineering++;
@@ -854,21 +859,28 @@ const SalesDashboard = () => {
                 Math.floor((firstDay.getDay() + pastDaysOfMonth) / 7) + 1
               }`;
             } else if (timePeriod === "quarter") {
-              dateKey = [
-                "Jan",
-                "Feb",
-                "Mar",
-                "Apr",
-                "May",
-                "Jun",
-                "Jul",
-                "Aug",
-                "Sep",
-                "Oct",
-                "Nov",
-                "Dec",
-              ][closedDate.getMonth()];
-            } else {
+  const startMonth = currentDateRange?.start?.getMonth?.() ?? 3; // Default to April
+  let months;
+  if (startMonth === 3) {
+    months = ["Apr", "May", "Jun"];
+  } else if (startMonth === 6) {
+    months = ["Jul", "Aug", "Sep"];
+  } else if (startMonth === 9) {
+    months = ["Oct", "Nov", "Dec"];
+  } else if (startMonth === 0) {
+    months = ["Jan", "Feb", "Mar"];
+  } else {
+    const quarterStart = Math.floor(startMonth / 3) * 3;
+    months = [
+      new Date(2000, quarterStart, 1).toLocaleString("default", { month: "short" }),
+      new Date(2000, quarterStart + 1, 1).toLocaleString("default", { month: "short" }),
+      new Date(2000, quarterStart + 2, 1).toLocaleString("default", { month: "short" }),
+    ];
+  }
+  let monthIdx = closedDate.getMonth() - startMonth;
+  if (monthIdx < 0 || monthIdx > 2) monthIdx = 0; // fallback to first month
+  dateKey = months[monthIdx];
+} else {
               const month = closedDate.getMonth();
               dateKey = [
                 "Apr",
@@ -901,10 +913,10 @@ const SalesDashboard = () => {
         projectedTCV += lead.tcv;
       }
 
-      if (lead.assignedTo && lead.assignedTo.uid) {
-        const user = users.find((u) => u.uid === lead.assignedTo.uid);
-        const memberId = user ? user.id : lead.assignedTo.uid;
-        const memberName = lead.assignedTo.name;
+if (lead.assignedTo && lead.assignedTo.uid) {
+  const user = users.find((u) => u.uid === lead.assignedTo.uid);
+  const memberId = user ? user.id : lead.assignedTo.uid;
+  const memberName = lead.assignedTo.name || "Unknown";
 
         if (!teamPerformance[memberId]) {
           teamPerformance[memberId] = {
@@ -916,6 +928,9 @@ const SalesDashboard = () => {
         teamPerformance[memberId].value++;
       }
 
+      let createdDate = new Date(lead.createdAt);
+      let timeStr = Number.isNaN(createdDate.getTime()) ? "" : createdDate.toLocaleDateString();
+
       recentActivity.push({
         id: doc.id,
         action: lead.phase === "closed" ? "Closed deal" : "New lead",
@@ -923,12 +938,9 @@ const SalesDashboard = () => {
         company: lead.businessName,
         user: lead.assignedTo?.name || "Unassigned",
         userInitials: lead.assignedTo?.name
-          ? lead.assignedTo.name
-              .split(" ")
-              .map((n) => n[0])
-              .join("")
+          ? lead.assignedTo.name.split(" ").map((n) => n[0]).join("")
           : "NA",
-        time: new Date(lead.createdAt).toLocaleDateString(),
+        time: timeStr,
       });
     });
 
@@ -940,17 +952,33 @@ const SalesDashboard = () => {
       } else if (timePeriod === "month") {
         dateKey = `Week ${i + 1}`;
       } else if (timePeriod === "quarter") {
-        const now = new Date();
-        const quarterMonth = now.getMonth();
-        if (quarterMonth >= 3 && quarterMonth <= 5) {
-          dateKey = ["Apr", "May", "Jun"][i];
-        } else if (quarterMonth >= 6 && quarterMonth <= 8) {
-          dateKey = ["Jul", "Aug", "Sep"][i];
-        } else if (quarterMonth >= 9 && quarterMonth <= 11) {
-          dateKey = ["Oct", "Nov", "Dec"][i];
+        // Use currentDateRange.start to determine the quarter months
+        const startMonth = currentDateRange?.start?.getMonth?.() ?? 3; // Default to April
+        let months;
+        if (startMonth === 3) {
+          months = ["Apr", "May", "Jun"];
+        } else if (startMonth === 6) {
+          months = ["Jul", "Aug", "Sep"];
+        } else if (startMonth === 9) {
+          months = ["Oct", "Nov", "Dec"];
+        } else if (startMonth === 0) {
+          months = ["Jan", "Feb", "Mar"];
         } else {
-          dateKey = ["Jan", "Feb", "Mar"][i];
+          // Fallback: calculate quarter dynamically
+          const quarterStart = Math.floor(startMonth / 3) * 3;
+          months = [
+            new Date(2000, quarterStart, 1).toLocaleString("default", {
+              month: "short",
+            }),
+            new Date(2000, quarterStart + 1, 1).toLocaleString("default", {
+              month: "short",
+            }),
+            new Date(2000, quarterStart + 2, 1).toLocaleString("default", {
+              month: "short",
+            }),
+          ];
         }
+        dateKey = months[i];
       } else {
         const fiscalMonths = [
           "Apr",
@@ -1059,10 +1087,10 @@ const SalesDashboard = () => {
     setIsLoading(true);
 
     // Define calculateGrowth here so it's available in all code paths
-    const calculateGrowth = (current, previous) => {
-      if (previous === 0) return current === 0 ? 0 : 100;
-      return ((current - previous) / previous) * 100;
-    };
+const calculateGrowth = (current, previous) => {
+  if (previous === 0) return current === 0 ? 0 : 100;
+  return ((current - previous) / previous) * 100;
+};
 
     try {
       const { start, end } = range;
@@ -1289,11 +1317,12 @@ const SalesDashboard = () => {
   }, []);
 
   useEffect(() => {
+    if (users.length === 0) return; // wait for users
     const newRange = getDateRange(timePeriod);
     setCurrentDateRange(newRange);
     updatePeriodInfo(newRange);
     fetchDataForRange(newRange);
-  }, [timePeriod, selectedUserId]);
+  }, [timePeriod, selectedUserId, users]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -1318,6 +1347,12 @@ const SalesDashboard = () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  // Define calculateGrowth for metrics grid
+  const calculateGrowth = (current, previous) => {
+    if (previous === 0) return current === 0 ? 0 : 100;
+    return ((current - previous) / previous) * 100;
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 p-2 md:p-4">
@@ -1350,8 +1385,6 @@ const SalesDashboard = () => {
               >
                 <FiChevronRight className="h-4 w-4" />
               </button>
-              <span className="mx-2">|</span>
-              <span>Today: {new Date().toLocaleDateString()}</span>
             </div>
           </div>
 
@@ -1483,30 +1516,21 @@ const SalesDashboard = () => {
               {
                 title: selectedUserId ? "Your Hot Leads" : "Team Hot Leads",
                 value: dashboardData.hotLeads.toLocaleString(),
-                change:
-                  ((dashboardData.hotLeads - dashboardData.hotLeadsPrevQuarter) /
-                    (dashboardData.hotLeadsPrevQuarter || 1)) *
-                  100,
+                change: calculateGrowth(dashboardData.hotLeads, dashboardData.hotLeadsPrevQuarter),
                 icon: <FiThermometer className="text-white" size={16} />, // changed size
                 color: "bg-red-600",
               },
               {
                 title: selectedUserId ? "Your Warm Leads" : "Team Warm Leads",
                 value: dashboardData.warmLeads.toLocaleString(),
-                change:
-                  ((dashboardData.warmLeads - dashboardData.warmLeadsPrevQuarter) /
-                    (dashboardData.warmLeadsPrevQuarter || 1)) *
-                  100,
+                change: calculateGrowth(dashboardData.warmLeads, dashboardData.warmLeadsPrevQuarter),
                 icon: <FiThermometer className="text-white" size={16} />, // changed size
                 color: "bg-amber-500",
               },
               {
                 title: selectedUserId ? "Your Cold Leads" : "Team Cold Leads",
                 value: dashboardData.coldLeads.toLocaleString(),
-                change:
-                  ((dashboardData.coldLeads - dashboardData.coldLeadsPrevQuarter) /
-                    (dashboardData.coldLeadsPrevQuarter || 1)) *
-                  100,
+                change: calculateGrowth(dashboardData.coldLeads, dashboardData.coldLeadsPrevQuarter),
                 icon: <FiThermometer className="text-white" size={16} />, // changed size
                 color: "bg-blue-600",
               },
