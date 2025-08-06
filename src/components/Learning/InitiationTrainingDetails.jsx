@@ -107,17 +107,49 @@ function InitiationTrainingDetails({ training, onBack }) {
                                         )}
                                       </button>
                                       {expanded[key] && (
-                                        <div className="mt-2">
-                                          <div className="font-semibold text-xs text-gray-700 mb-1">Daily Hours:</div>
-                                          <div className="flex flex-wrap gap-2">
-                                            {(trainer.activeDates || []).map((date, didx) => (
-                                              <span key={didx} className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-xs">
-                                                {typeof date === "string" ? date : (date?.toDateString?.() || "")}: {trainer.dailyHours[didx] || 0}h
-                                              </span>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      )}
+  <div className="mt-2">
+    <div className="font-semibold text-xs text-gray-700 mb-1">Daily Hours Breakdown (Batch-wise):</div>
+    <div className="overflow-x-auto">
+      {/* Group by batchCode */}
+      {(() => {
+        // Group breakdown by batchCode
+        const breakdown = {};
+        (trainer.activeDates || []).forEach((date, didx) => {
+          const batchCode = trainer.slotInfo?.[didx]?.batchCode || batch.batchCode;
+          if (!breakdown[batchCode]) breakdown[batchCode] = [];
+          breakdown[batchCode].push({
+            date,
+            hours: trainer.dailyHours?.[didx] || 0,
+            slot: trainer.slotInfo?.[didx]?.slot || trainer.dayDuration,
+          });
+        });
+        return Object.entries(breakdown).map(([batchCode, rows]) => (
+          <div key={batchCode} className="mb-3">
+            <div className="font-semibold text-indigo-700 text-xs mb-1">Batch: {batchCode}</div>
+            <table className="w-full text-xs mb-2">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-2 py-1 text-left">Date</th>
+                  <th className="px-2 py-1 text-left">Hours</th>
+                  <th className="px-2 py-1 text-left">Slot</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, ridx) => (
+                  <tr key={ridx}>
+                    <td className="px-2 py-1">{typeof row.date === "string" ? row.date : (row.date?.toLocaleDateString?.() || "")}</td>
+                    <td className="px-2 py-1">{row.hours}</td>
+                    <td className="px-2 py-1">{row.slot}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ));
+      })()}
+    </div>
+  </div>
+)}
                                     </div>
                                   )}
                                 </div>

@@ -2,14 +2,11 @@ import React, { useState, useEffect, useRef } from "react";
 import { FaEllipsisV, FaUsers, FaFileContract, FaRupeeSign, FaClock, FaUniversity, FaPlay, FaTimes } from "react-icons/fa";
 import { IoDocumentTextOutline } from "react-icons/io5";
 import { MdOutlineAttachMoney } from "react-icons/md";
-import InitiationModal from "./InitiationModal";
 
 
-function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouFile, onManageStudents }) {
+function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouFile, onManageStudents, onInitiate }) {
   const [menuOpenId, setMenuOpenId] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [showInitiationModal, setShowInitiationModal] = useState(false);
-  const [selectedTraining, setSelectedTraining] = useState(null);
   const [dropdownDirection, setDropdownDirection] = useState({});
   const menuRefs = useRef({});
 
@@ -36,19 +33,6 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
     }
   };
 
-  const handleInitiateClick = (training) => {
-    setSelectedTraining(training);
-    setShowInitiationModal(true);
-    setMenuOpenId(null);
-  };
-
-  const handleConfirmInitiation = (training) => {
-    // Here you would typically make an API call to initiate the training
-    console.log("Initiating training:", training);
-    // Close the modal
-    setShowInitiationModal(false);
-    // You might want to add a toast notification here
-  };
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
@@ -232,7 +216,7 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
                   View MOU
                 </button>
                 <button
-                  onClick={() => handleInitiateClick(item)}
+                  onClick={() => onInitiate(item)}
                   className="w-full px-3 py-2 text-left flex items-center hover:bg-gray-50 text-gray-700 transition"
                 >
                   <FaPlay className="mr-2 text-blue-500 text-xs" />
@@ -250,14 +234,6 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
           <div className="text-lg font-medium mb-2">No training programs found</div>
           <p className="text-sm">Create a new training program to get started</p>
         </div>
-      )}
-      {/* Initiation Modal */}
-      {showInitiationModal && selectedTraining && (
-        <InitiationModal
-          training={selectedTraining}
-          onClose={() => setShowInitiationModal(false)}
-          onConfirm={handleConfirmInitiation}
-        />
       )}
     </div>
   );

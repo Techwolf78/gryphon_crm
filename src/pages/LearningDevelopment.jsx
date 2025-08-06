@@ -7,6 +7,7 @@ import FilePreviewModal from "../components/Learning/TrainingTables/FilePreviewM
 import StudentDataPage from "../components/Learning/StudentDataPage";
 import InitiationDashboard from "../components/Learning/InitiationDashboard";
 import InitiationTrainingDetails from "../components/Learning/InitiationTrainingDetails"; // <-- create this
+import InitiationModal from "../components/Learning/TrainingTables/InitiationModal"; // <-- import InitiationModal
 import { useNavigate } from "react-router-dom";
 
 function LearningDevelopment() {
@@ -21,6 +22,8 @@ function LearningDevelopment() {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("newContact");
   const [selectedInitiationTraining, setSelectedInitiationTraining] = useState(null);
+  const [showInitiationSection, setShowInitiationSection] = useState(false);
+  const [selectedTrainingForInitiation, setSelectedTrainingForInitiation] = useState(null);
   const navigate = useNavigate();
 
   const fetchTrainings = async () => {
@@ -85,6 +88,12 @@ function LearningDevelopment() {
     navigate("trainers");
   };
 
+  // When Initiation button is clicked
+  const handleInitiateClick = (training) => {
+    setSelectedTrainingForInitiation(training);
+    setShowInitiationSection(true);
+  };
+
   if (studentPageData) {
     return (
       <StudentDataPage
@@ -114,21 +123,19 @@ function LearningDevelopment() {
         {/* Tab Navigation */}
         <div className="flex mb-6 border-b">
           <button
-            className={`px-4 py-2 font-medium ${
-              activeTab === "newContact"
-                ? "border-b-2 border-blue-500 text-blue-600"
-                : "text-gray-500"
-            }`}
+            className={`px-4 py-2 font-medium ${activeTab === "newContact"
+              ? "border-b-2 border-blue-500 text-blue-600"
+              : "text-gray-500"
+              }`}
             onClick={() => setActiveTab("newContact")}
           >
             New Contract ({trainings.length})
           </button>
           <button
-            className={`px-4 py-2 font-medium ${
-              activeTab === "initiation"
-                ? "border-b-2 border-blue-500 text-blue-600"
-                : "text-gray-500"
-            }`}
+            className={`px-4 py-2 font-medium ${activeTab === "initiation"
+              ? "border-b-2 border-blue-500 text-blue-600"
+              : "text-gray-500"
+              }`}
             onClick={() => setActiveTab("initiation")}
           >
             Initiation
@@ -161,6 +168,7 @@ function LearningDevelopment() {
                   onRowClick={setSelectedTraining}
                   onViewStudentData={handleViewStudentData}
                   onViewMouFile={handleViewMouFile}
+                  onInitiate={handleInitiateClick} // <-- yeh prop pass karo
                 />
 
                 {selectedTraining && (
@@ -177,6 +185,17 @@ function LearningDevelopment() {
                     trainingId={modalTrainingId}
                     onClose={() => setShowFileModal(false)}
                   />
+                )}
+
+                {/* Render embedded InitiationModal section */}
+                {showInitiationSection && selectedTrainingForInitiation && (
+                  <div className="my-8">
+                    <InitiationModal
+                      training={selectedTrainingForInitiation}
+                      onClose={() => setShowInitiationSection(false)}
+                      onConfirm={() => setShowInitiationSection(false)}
+                    />
+                  </div>
                 )}
               </>
             )}
