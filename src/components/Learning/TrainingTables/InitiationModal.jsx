@@ -919,43 +919,304 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
                 {/* Custom Hours for Selected Phases */}
                 {selectedPhases.length > 0 && (
-                  <div className="space-y-4">
-                    <div className="pb-3 border-b border-gray-200">
-                      <h2 className="text-lg font-semibold text-gray-900">
-                        Phase Training Hours
-                      </h2>
-                      <p className="mt-1 text-sm text-gray-600">
-                        Set custom training hours for each selected phase. This will override the default database hours.
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {selectedPhases.map((phase) => (
-                        <div key={phase} className="space-y-2">
-                          <label className="block text-sm font-medium text-gray-700">
-                            {phase.replace("-", " ").toUpperCase()} Hours
-                          </label>
-                          <div className="relative">
-                            <input
-                              type="number"
-                              min="0"
-                              max="1000"
-                              value={customPhaseHours[phase]}
-                              onChange={(e) =>
-                                setCustomPhaseHours((prev) => ({
-                                  ...prev,
-                                  [phase]: e.target.value,
-                                }))
-                              }
-                              placeholder={`Default: ${getDomainHours("Technical")} hrs`}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-blue-500 text-sm"
-                            />
-                            <span className="absolute right-3 top-2 text-xs text-gray-400">hrs</span>
-                          </div>
-                          <p className="text-xs text-gray-500">
-                            Leave empty to use default hours from database
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    {/* Header with Summary */}
+                    <div className="px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+                            <FiClock className="mr-2 text-indigo-600" />
+                            Phase Training Hours
+                          </h2>
+                          <p className="mt-1 text-sm text-gray-600">
+                            Distribute training hours across selected phases
                           </p>
                         </div>
-                      ))}
+                        
+                        {/* Total Hours Overview */}
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-indigo-600">
+                            {totalTrainingHours}
+                          </div>
+                          <div className="text-xs text-gray-500 uppercase tracking-wide">
+                            Total Hours
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Hours Distribution Progress */}
+                      <div className="mt-4">
+                        {(() => {
+                          // Calculate allocated hours for each phase
+                          const totalAllocated = selectedPhases.reduce((sum, phase) => {
+                            const phaseHours = Number(customPhaseHours[phase]) || getDomainHours("Technical", phase);
+                            return sum + phaseHours;
+                          }, 0);
+                          
+                          // Calculate remaining hours (Total - Allocated)
+                          const remaining = totalTrainingHours - totalAllocated;
+                          const progressPercent = totalTrainingHours > 0 ? Math.min(100, (totalAllocated / totalTrainingHours) * 100) : 0;
+                          
+                          return (
+                            <div>
+                              {/* Summary Stats */}
+                              <div className="grid grid-cols-3 gap-4 mb-3">
+                                <div className="text-center">
+                                  <div className="text-lg font-bold text-gray-900">{totalTrainingHours}</div>
+                                  <div className="text-xs text-gray-500">Total Hours</div>
+                                </div>
+                                <div className="text-center">
+                                  <div className="text-lg font-bold text-indigo-600">{totalAllocated}</div>
+                                  <div className="text-xs text-gray-500">Allocated</div>
+                                </div>
+                                <div className="text-center">
+                                  <div className={`text-lg font-bold ${
+                                    remaining === 0 ? 'text-emerald-600' : 
+                                    remaining < 0 ? 'text-red-600' : 'text-amber-600'
+                                  }`}>
+                                    {remaining}
+                                  </div>
+                                  <div className="text-xs text-gray-500">Remaining</div>
+                                </div>
+                              </div>
+                              
+                              {/* Calculation Display */}
+                              <div className="bg-gray-50 rounded-lg p-3 mb-3">
+                                <div className="text-xs text-gray-600 mb-1">Calculation:</div>
+                                <div className="flex items-center justify-center text-sm font-mono">
+                                  <span className="text-gray-900">{totalTrainingHours}</span>
+                                  <span className="mx-2 text-gray-500">−</span>
+                                  <span className="text-indigo-600">{totalAllocated}</span>
+                                  <span className="mx-2 text-gray-500">=</span>
+                                  <span className={`font-bold ${
+                                    remaining === 0 ? 'text-emerald-600' : 
+                                    remaining < 0 ? 'text-red-600' : 'text-amber-600'
+                                  }`}>
+                                    {remaining}
+                                  </span>
+                                  <span className="ml-1 text-gray-500">hrs</span>
+                                </div>
+                                <div className="text-xs text-gray-500 text-center mt-1">
+                                  (Total Training Hours − Phase Hours = Remaining Hours)
+                                </div>
+                              </div>
+
+                              {/* Progress Bar */}
+                              <div className="flex justify-between text-sm mb-2">
+                                <span className="text-gray-600">Hours Distribution</span>
+                                <span className={`font-medium ${
+                                  remaining === 0 ? 'text-emerald-600' : 
+                                  remaining < 0 ? 'text-red-600' : 'text-amber-600'
+                                }`}>
+                                  {totalAllocated} / {totalTrainingHours} hrs
+                                </span>
+                              </div>
+                              <div className="w-full bg-gray-200 rounded-full h-3">
+                                <div
+                                  className={`h-3 rounded-full transition-all duration-300 ${
+                                    progressPercent === 100 ? 'bg-emerald-500' :
+                                    progressPercent > 100 ? 'bg-red-500' : 'bg-amber-500'
+                                  }`}
+                                  style={{ width: `${Math.min(100, progressPercent)}%` }}
+                                />
+                              </div>
+                              <div className={`text-xs mt-2 font-medium ${
+                                remaining === 0 ? 'text-emerald-600' : 
+                                remaining < 0 ? 'text-red-600' : 'text-amber-600'
+                              }`}>
+                                {remaining === 0 ? '✅ Perfect! All hours allocated' :
+                                 remaining < 0 ? `⚠️ Over-allocated by ${Math.abs(remaining)} hours` :
+                                 `📝 ${remaining} hours still available for allocation`}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* Phase Hours Configuration */}
+                    <div className="p-6">
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {selectedPhases.map((phase) => {
+                          const phaseOrder = ["phase-1", "phase-2", "phase-3"];
+                          const phaseIndex = phaseOrder.indexOf(phase);
+                          
+                          // Calculate total allocated by previous phases
+                          const previousPhasesTotal = phaseOrder.slice(0, phaseIndex).reduce((sum, prevPhase) => {
+                            if (selectedPhases.includes(prevPhase)) {
+                              return sum + (Number(customPhaseHours[prevPhase]) || getDomainHours("Technical", prevPhase));
+                            }
+                            return sum;
+                          }, 0);
+                          
+                          // Available hours for this phase = Total - Previous phases
+                          const availableForThisPhase = totalTrainingHours - previousPhasesTotal;
+                          
+                          const currentValue = customPhaseHours[phase] || "";
+                          const defaultValue = getDomainHours("Technical", phase);
+                          const actualValue = currentValue !== "" ? Number(currentValue) : defaultValue;
+                          
+                          // Remaining after this phase allocation
+                          const remainingAfterThisPhase = availableForThisPhase - actualValue;
+                          
+                          return (
+                            <div key={phase} className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:border-indigo-300 transition-colors">
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center">
+                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
+                                    phaseIndex === 0 ? 'bg-blue-100 text-blue-700' :
+                                    phaseIndex === 1 ? 'bg-purple-100 text-purple-700' :
+                                    'bg-green-100 text-green-700'
+                                  }`}>
+                                    {phaseIndex + 1}
+                                  </div>
+                                  <div className="ml-3">
+                                    <label className="block text-sm font-semibold text-gray-800">
+                                      {phase.replace("-", " ").toUpperCase()}
+                                    </label>
+                                    <div className="text-xs text-gray-500">
+                                      Default: {defaultValue} hrs
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className={`text-lg font-bold ${
+                                    actualValue > availableForThisPhase ? 'text-red-600' : 'text-gray-700'
+                                  }`}>
+                                    {actualValue}
+                                  </div>
+                                  <div className="text-xs text-gray-500">hours</div>
+                                </div>
+                              </div>
+                              
+                              {/* Hours Calculation for this phase */}
+                              <div className="bg-white rounded p-3 mb-3 border border-gray-200">
+                                <div className="text-xs text-gray-600 mb-1">Available for this phase:</div>
+                                <div className="flex items-center justify-center text-xs font-mono mb-2">
+                                  <span className="text-gray-900">{totalTrainingHours}</span>
+                                  <span className="mx-1 text-gray-500">−</span>
+                                  <span className="text-gray-600">{previousPhasesTotal}</span>
+                                  <span className="mx-1 text-gray-500">=</span>
+                                  <span className="font-bold text-indigo-600">{availableForThisPhase}</span>
+                                  <span className="ml-1 text-gray-500">hrs</span>
+                                </div>
+                                {previousPhasesTotal > 0 && (
+                                  <div className="text-xs text-gray-500 text-center">
+                                    (Total − Previous phases = Available)
+                                  </div>
+                                )}
+                              </div>
+                              
+                              <div className="space-y-3">
+                                <div className="relative">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max={availableForThisPhase}
+                                    value={currentValue}
+                                    onChange={(e) =>
+                                      setCustomPhaseHours((prev) => ({
+                                        ...prev,
+                                        [phase]: e.target.value,
+                                      }))
+                                    }
+                                    placeholder={`Default: ${defaultValue}`}
+                                    className={`w-full px-3 py-2.5 border rounded-lg text-sm font-medium transition-colors ${
+                                      actualValue > availableForThisPhase 
+                                        ? 'border-red-300 focus:border-red-500 focus:ring-red-500 bg-red-50' 
+                                        : 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white'
+                                    }`}
+                                  />
+                                  <span className="absolute right-3 top-2.5 text-xs text-gray-400 font-medium">hrs</span>
+                                </div>
+                                
+                                {/* Available vs Allocated */}
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-gray-500">Available for this phase:</span>
+                                  <span className={`font-semibold ${
+                                    availableForThisPhase < actualValue ? 'text-red-600' : 'text-emerald-600'
+                                  }`}>
+                                    {availableForThisPhase} hrs
+                                  </span>
+                                </div>
+                                
+                                {/* Remaining after this phase */}
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-gray-500">After this phase:</span>
+                                  <span className={`font-semibold ${
+                                    remainingAfterThisPhase < 0 ? 'text-red-600' : 'text-blue-600'
+                                  }`}>
+                                    {remainingAfterThisPhase} hrs remaining
+                                  </span>
+                                </div>
+                                
+                                {/* Warning if over-allocated */}
+                                {actualValue > availableForThisPhase && (
+                                  <div className="flex items-center text-xs text-red-600 bg-red-50 px-2 py-1 rounded">
+                                    <FiAlertCircle className="mr-1 flex-shrink-0" />
+                                    <span>Exceeds available hours by {actualValue - availableForThisPhase}</span>
+                                  </div>
+                                )}
+                                
+                                {/* Quick Actions */}
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setCustomPhaseHours((prev) => ({
+                                      ...prev,
+                                      [phase]: Math.min(defaultValue, availableForThisPhase).toString(),
+                                    }))}
+                                    className="flex-1 px-2 py-1 text-xs bg-white border border-gray-300 rounded text-gray-600 hover:bg-gray-50 transition-colors"
+                                  >
+                                    Use Default
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setCustomPhaseHours((prev) => ({
+                                      ...prev,
+                                      [phase]: availableForThisPhase.toString(),
+                                    }))}
+                                    className="flex-1 px-2 py-1 text-xs bg-indigo-50 border border-indigo-200 rounded text-indigo-600 hover:bg-indigo-100 transition-colors"
+                                  >
+                                    Use All
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setCustomPhaseHours((prev) => ({
+                                      ...prev,
+                                      [phase]: "",
+                                    }))}
+                                    className="flex-1 px-2 py-1 text-xs bg-white border border-gray-300 rounded text-gray-600 hover:bg-gray-50 transition-colors"
+                                  >
+                                    Clear
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      
+                      {/* Summary at bottom */}
+                      <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <div className="flex items-start">
+                          <div className="flex-shrink-0">
+                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                              <FiCheck className="w-4 h-4 text-blue-600" />
+                            </div>
+                          </div>
+                          <div className="ml-3">
+                            <h3 className="text-sm font-medium text-blue-900">Quick Tips</h3>
+                            <div className="mt-1 text-sm text-blue-700">
+                              <ul className="list-disc list-inside space-y-1">
+                                <li>Leave fields empty to use default database hours</li>
+                                <li>Ensure total allocated hours don't exceed {totalTrainingHours} hours</li>
+                                <li>Phase 2 and Phase 3 can be configured separately in later steps</li>
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}

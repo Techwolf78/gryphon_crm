@@ -4,9 +4,9 @@ import { IoDocumentTextOutline } from "react-icons/io5";
 import { MdOutlineAttachMoney } from "react-icons/md";
 
 
-function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouFile, onManageStudents, onInitiate }) {
+function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouFile, onInitiate }) {
   const [menuOpenId, setMenuOpenId] = useState(null);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [ setIsMobile] = useState(window.innerWidth < 768);
   const [dropdownDirection, setDropdownDirection] = useState({});
   const menuRefs = useRef({});
 
