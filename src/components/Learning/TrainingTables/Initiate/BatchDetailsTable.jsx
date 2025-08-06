@@ -499,13 +499,10 @@ const BatchDetailsTable = ({
                         }`}>
                         {totalAssignedStudents}/{row.stdCount} students
                       </div>
-                      <div className={`px-3 py-1 rounded-full text-xs font-medium ${Number(row.batches[0]?.assignedHours || 0) === Number(row.hrs) ? colors.success :
-                        Number(row.batches[0]?.assignedHours || 0) > Number(row.hrs) ? colors.danger : colors.warning
+                      <div className={`px-3 py-1 rounded-full text-xs font-medium ${totalAssignedHours === row.hrs ? colors.success :
+                        totalAssignedHours > row.hrs ? colors.danger : colors.warning
                         }`}>
-                        {(row.batches[0]?.assignedHours || 0)}/{row.hrs} hours
-                        <span className="ml-2 text-xs text-gray-500">
-                          ({remainingHours > 0 ? `${remainingHours} hrs left` : remainingHours < 0 ? `${-remainingHours} hrs extra` : 'Done'})
-                        </span>
+                        {totalAssignedHours}/{row.hrs} hours
                       </div>
                       {/* Add Batch Button */}
                       <button
