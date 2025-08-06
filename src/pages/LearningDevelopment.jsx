@@ -79,11 +79,6 @@ function LearningDevelopment() {
     setModalTrainingId(item.id);
     setShowFileModal(true);
   };
-
-  const handleRefresh = () => {
-    fetchTrainings();
-  };
-
   const handleViewTrainers = () => {
     navigate("trainers");
   };
