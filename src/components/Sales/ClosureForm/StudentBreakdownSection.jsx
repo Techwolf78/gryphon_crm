@@ -47,6 +47,7 @@ const StudentBreakdownSection = ({ formData, setFormData, studentFile, setStuden
   // Add state to track when "Others"/"Other" was selected
   const [isCustomCourse, setIsCustomCourse] = useState(false);
   const [customSpecializations, setCustomSpecializations] = useState([]);
+  const [isCustomDeliveryType, setIsCustomDeliveryType] = useState(false);
 
   const isOtherCourse = formData.course === "Others" || isCustomCourse;
   
@@ -112,6 +113,17 @@ const StudentBreakdownSection = ({ formData, setFormData, studentFile, setStuden
     setFormData(prev => ({ ...prev, courses: updated }));
   };
 
+  const handleDeliveryTypeChange = (e) => {
+    const value = e.target.value;
+    if (value === "Other") {
+      setIsCustomDeliveryType(true);
+      setFormData(prev => ({ ...prev, deliveryType: "" }));
+    } else {
+      setIsCustomDeliveryType(false);
+      setFormData(prev => ({ ...prev, deliveryType: value }));
+    }
+  };
+
   return (
     <section>
       <div className="p-5 bg-white shadow-lg rounded-xl border border-gray-200 space-y-4">
@@ -165,11 +177,31 @@ const StudentBreakdownSection = ({ formData, setFormData, studentFile, setStuden
 
           <div className="space-y-1">
             <label className="font-medium">Delivery Type <span className="text-red-500">*</span></label>
-            <select className={selectClass} value={formData.deliveryType} onChange={(e) => handleChange("deliveryType", e.target.value)} required>
+            <select
+              className={selectClass}
+              value={isCustomDeliveryType ? "Other" : formData.deliveryType}
+              onChange={handleDeliveryTypeChange}
+              required
+            >
               <option value="">Delivery Type</option>
               {deliveryTypes.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
+              <option value="Other">Other</option>
             </select>
           </div>
+
+          {isCustomDeliveryType && (
+            <div className="space-y-1">
+              <label className="font-medium">Specify Delivery Type <span className="text-red-500">*</span></label>
+              <input
+                type="text"
+                className={inputClass}
+                value={formData.deliveryType}
+                onChange={e => setFormData(prev => ({ ...prev, deliveryType: e.target.value }))}
+                placeholder="Enter delivery type"
+                required
+              />
+            </div>
+          )}
 
           <div className="space-y-1">
             <label className="font-medium">Passing Year <span className="text-red-500">*</span></label>

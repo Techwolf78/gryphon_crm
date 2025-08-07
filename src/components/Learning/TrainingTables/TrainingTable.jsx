@@ -3,17 +3,14 @@ import { FaEllipsisV, FaUsers, FaFileContract, FaRupeeSign, FaClock, FaUniversit
 import { IoDocumentTextOutline } from "react-icons/io5";
 import { MdOutlineAttachMoney } from "react-icons/md";
 import InitiationModal from "./InitiationModal";
-import { db } from "../../../firebase";
-import { collection, getDocs } from "firebase/firestore";
 
 
-function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouFile, onManageStudents }) {
+function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouFile, onInitiateTraining }) {
   const [menuOpenId, setMenuOpenId] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [showInitiationModal, setShowInitiationModal] = useState(false);
   const [selectedTraining, setSelectedTraining] = useState(null);
   const [dropdownDirection, setDropdownDirection] = useState({});
-  const [initiatedIds, setInitiatedIds] = useState([]);
   const menuRefs = useRef({});
 
   const toggleMenu = (id, e) => {
@@ -40,8 +37,9 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
   };
 
   const handleInitiateClick = (training) => {
-    setSelectedTraining(training);
-    setShowInitiationModal(true);
+    if (onInitiateTraining) {
+      onInitiateTraining(training);
+    }
     setMenuOpenId(null);
   };
 
@@ -52,7 +50,6 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
     setShowInitiationModal(false);
     // You might want to add a toast notification here
   };
-
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
@@ -84,19 +81,6 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [menuOpenId]);
-
-  useEffect(() => {
-    // Fetch initiated trainings from Firestore
-    const fetchInitiatedTrainings = async () => {
-      const snapshot = await getDocs(collection(db, "trainingForms"));
-      const ids = [];
-      snapshot.forEach(doc => {
-        ids.push(doc.id);
-      });
-      setInitiatedIds(ids);
-    };
-    fetchInitiatedTrainings();
-  }, [trainingData]);
 
   const formatCurrency = (amount) => {
     return amount ? `₹${amount.toLocaleString('en-IN')}` : '-';
@@ -140,129 +124,125 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
 
       {/* Data Rows */}
       <div className="divide-y divide-gray-100">
-        {trainingData.map((item) => {
-          const isInitiated = initiatedIds.includes(item.id);
-          return (
-            <div
-              key={item.id}
-              className={`cursor-pointer transition-colors hover:bg-gray-50 ${menuOpenId === item.id ? 'bg-blue-50' : 'bg-white'}`}
-              onClick={() => onRowClick(item)}
-            >
-              {/* Mobile Card Layout */}
-              <div className="md:hidden p-4 space-y-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center mb-1">
-                      <IoDocumentTextOutline className="mr-2 text-blue-500 flex-shrink-0" />
-                      <span className="font-semibold text-blue-600 truncate">{item.projectCode}</span>
-                    </div>
-                    <div className="flex items-center text-gray-600">
-                      <FaUniversity className="mr-2 text-blue-500 flex-shrink-0" />
-                      <span className="truncate">{item.collegeName}</span>
-                    </div>
-                    {item.city && (
-                      <div className="text-xs text-gray-500 mt-1 ml-6">{item.city}</div>
-                    )}
+        {trainingData.map((item) => (
+          <div
+            key={item.id}
+            className={`cursor-pointer transition-colors hover:bg-gray-50 ${menuOpenId === item.id ? 'bg-blue-50' : 'bg-white'}`}
+            onClick={() => onRowClick(item)}
+          >
+            {/* Mobile Card Layout */}
+            <div className="md:hidden p-4 space-y-3">
+              <div className="flex items-start justify-between">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center mb-1">
+                    <IoDocumentTextOutline className="mr-2 text-blue-500 flex-shrink-0" />
+                    <span className="font-semibold text-blue-600 truncate">{item.projectCode}</span>
                   </div>
-                  <button
-                    data-id={item.id}
-                    onClick={(e) => toggleMenu(item.id, e)}
-                    className={`ml-2 p-2 rounded-full transition ${menuOpenId === item.id ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-gray-100'}`}
-                  >
-                    {menuOpenId === item.id ? <FaTimes size={12} /> : <FaEllipsisV size={12} />}
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3 text-sm">
-                  <div className="flex items-center">
-                    <FaUsers className="mr-1 text-blue-500 text-xs" />
-                    <span className="font-medium">{item.studentCount}</span>
+                  <div className="flex items-center text-gray-600">
+                    <FaUniversity className="mr-2 text-blue-500 flex-shrink-0" />
+                    <span className="truncate">{item.collegeName}</span>
                   </div>
-                  <div className="flex items-center">
-                    <MdOutlineAttachMoney className="mr-1 text-blue-500 text-xs" />
-                    <span className="font-medium text-xs">{formatCurrency(item.perStudentCost)}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <FaClock className="mr-1 text-blue-500 text-xs" />
-                    <span className="font-medium">{item.totalHours || "-"}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Desktop Grid Layout */}
-              <div className="hidden md:grid grid-cols-12 gap-2 px-4 py-3 text-sm items-center">
-                <div className="col-span-3 truncate">
-                  <span className="font-medium text-blue-600">{item.projectCode}</span>
-                </div>
-                <div className="col-span-3 truncate">
-                  <span className="font-medium text-gray-800">{item.collegeName}</span>
                   {item.city && (
-                    <div className="text-xs text-gray-500 mt-1">{item.city}</div>
+                    <div className="text-xs text-gray-500 mt-1 ml-6">{item.city}</div>
                   )}
                 </div>
-                <div className="col-span-2">
-                  <span className="font-medium">{item.studentCount}</span>
-                  <span className="text-xs text-gray-500 ml-1">students</span>
-                </div>
-                <div className="col-span-2 font-medium text-gray-800">
-                  {formatCurrency(item.perStudentCost)}
-                </div>
-                <div className="col-span-2 flex items-center justify-between">
-                  <span className="font-medium">{item.totalHours || "-"}</span>
-                  <button
-                    data-id={item.id}
-                    onClick={(e) => toggleMenu(item.id, e)}
-                    className={`p-2 rounded-full transition ${menuOpenId === item.id ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-gray-100'}`}
-                  >
-                    {menuOpenId === item.id ? <FaTimes size={12} /> : <FaEllipsisV size={12} />}
-                  </button>
-                </div>
+                <button
+                  data-id={item.id}
+                  onClick={(e) => toggleMenu(item.id, e)}
+                  className={`ml-2 p-2 rounded-full transition ${menuOpenId === item.id ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-gray-100'}`}
+                >
+                  {menuOpenId === item.id ? <FaTimes size={12} /> : <FaEllipsisV size={12} />}
+                </button>
               </div>
 
-              {/* Dropdown Menu */}
-              {menuOpenId === item.id && (
-                <div
-                  ref={(el) => setMenuRef(item.id, el)}
-                  onClick={(e) => e.stopPropagation()}
-                  className={`absolute right-4 ${dropdownDirection[item.id] === 'up' ? 'bottom-10 mb-2' : 'mt-1'} bg-white rounded-lg shadow-lg text-sm w-44 border border-gray-200 z-20 overflow-hidden`}
-                >
-                  <button
-                    onClick={() => {
-                      onViewStudentData(item);
-                      setMenuOpenId(null);
-                    }}
-                    disabled={!item.studentFileUrl}
-                    className={`w-full px-3 py-2 text-left flex items-center transition ${item.studentFileUrl ? 'hover:bg-gray-50 text-gray-700' : 'text-gray-400'
-                      }`}
-                  >
-                    <FaUsers className="mr-2 text-blue-500 text-xs" />
-                    View Students
-                  </button>
-                  <button
-                    onClick={() => {
-                      onViewMouFile(item);
-                      setMenuOpenId(null);
-                    }}
-                    disabled={!item.mouFileUrl}
-                    className={`w-full px-3 py-2 text-left flex items-center transition ${item.mouFileUrl ? 'hover:bg-gray-50 text-gray-700' : 'text-gray-400'
-                      }`}
-                  >
-                    <FaFileContract className="mr-2 text-blue-500 text-xs" />
-                    View MOU
-                  </button>
-                  <button
-                    onClick={() => !isInitiated && handleInitiateClick(item)}
-                    className={`w-full px-3 py-2 text-left flex items-center transition ${isInitiated ? 'text-gray-400 cursor-not-allowed bg-gray-50' : 'hover:bg-gray-50 text-gray-700'}`}
-                    disabled={isInitiated}
-                  >
-                    <FaPlay className="mr-2 text-blue-500 text-xs" />
-                    {isInitiated ? "Initiated Already" : "Initiation"}
-                  </button>
+              <div className="grid grid-cols-3 gap-3 text-sm">
+                <div className="flex items-center">
+                  <FaUsers className="mr-1 text-blue-500 text-xs" />
+                  <span className="font-medium">{item.studentCount}</span>
                 </div>
-              )}
+                <div className="flex items-center">
+                  <MdOutlineAttachMoney className="mr-1 text-blue-500 text-xs" />
+                  <span className="font-medium text-xs">{formatCurrency(item.perStudentCost)}</span>
+                </div>
+                <div className="flex items-center">
+                  <FaClock className="mr-1 text-blue-500 text-xs" />
+                  <span className="font-medium">{item.totalHours || "-"}</span>
+                </div>
+              </div>
             </div>
-          );
-        })}
+
+            {/* Desktop Grid Layout */}
+            <div className="hidden md:grid grid-cols-12 gap-2 px-4 py-3 text-sm items-center">
+              <div className="col-span-3 truncate">
+                <span className="font-medium text-blue-600">{item.projectCode}</span>
+              </div>
+              <div className="col-span-3 truncate">
+                <span className="font-medium text-gray-800">{item.collegeName}</span>
+                {item.city && (
+                  <div className="text-xs text-gray-500 mt-1">{item.city}</div>
+                )}
+              </div>
+              <div className="col-span-2">
+                <span className="font-medium">{item.studentCount}</span>
+                <span className="text-xs text-gray-500 ml-1">students</span>
+              </div>
+              <div className="col-span-2 font-medium text-gray-800">
+                {formatCurrency(item.perStudentCost)}
+              </div>
+              <div className="col-span-2 flex items-center justify-between">
+                <span className="font-medium">{item.totalHours || "-"}</span>
+                <button
+                  data-id={item.id}
+                  onClick={(e) => toggleMenu(item.id, e)}
+                  className={`p-2 rounded-full transition ${menuOpenId === item.id ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-gray-100'}`}
+                >
+                  {menuOpenId === item.id ? <FaTimes size={12} /> : <FaEllipsisV size={12} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Dropdown Menu */}
+            {menuOpenId === item.id && (
+              <div
+                ref={(el) => setMenuRef(item.id, el)}
+                onClick={(e) => e.stopPropagation()}
+                className={`absolute right-4 ${dropdownDirection[item.id] === 'up' ? 'bottom-10 mb-2' : 'mt-1'} bg-white rounded-lg shadow-lg text-sm w-44 border border-gray-200 z-20 overflow-hidden`}
+              >
+                <button
+                  onClick={() => {
+                    onViewStudentData(item);
+                    setMenuOpenId(null);
+                  }}
+                  disabled={!item.studentFileUrl}
+                  className={`w-full px-3 py-2 text-left flex items-center transition ${item.studentFileUrl ? 'hover:bg-gray-50 text-gray-700' : 'text-gray-400'
+                    }`}
+                >
+                  <FaUsers className="mr-2 text-blue-500 text-xs" />
+                  View Students
+                </button>
+                <button
+                  onClick={() => {
+                    onViewMouFile(item);
+                    setMenuOpenId(null);
+                  }}
+                  disabled={!item.mouFileUrl}
+                  className={`w-full px-3 py-2 text-left flex items-center transition ${item.mouFileUrl ? 'hover:bg-gray-50 text-gray-700' : 'text-gray-400'
+                    }`}
+                >
+                  <FaFileContract className="mr-2 text-blue-500 text-xs" />
+                  View MOU
+                </button>
+                <button
+                  onClick={() => handleInitiateClick(item)}
+                  className="w-full px-3 py-2 text-left flex items-center hover:bg-gray-50 text-gray-700 transition"
+                >
+                  <FaPlay className="mr-2 text-blue-500 text-xs" />
+                  Initiation
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
 
       {/* Empty State */}

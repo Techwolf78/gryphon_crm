@@ -7,6 +7,7 @@ import FilePreviewModal from "../components/Learning/TrainingTables/FilePreviewM
 import StudentDataPage from "../components/Learning/StudentDataPage";
 import InitiationDashboard from "../components/Learning/InitiationDashboard";
 import InitiationTrainingDetails from "../components/Learning/InitiationTrainingDetails"; // <-- create this
+import InitiationModal from "../components/Learning/TrainingTables/InitiationModal";
 import { useNavigate } from "react-router-dom";
 
 function LearningDevelopment() {
@@ -21,6 +22,7 @@ function LearningDevelopment() {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("newContact");
   const [selectedInitiationTraining, setSelectedInitiationTraining] = useState(null);
+  const [initiationTraining, setInitiationTraining] = useState(null);
   const navigate = useNavigate();
 
   const fetchTrainings = async () => {
@@ -147,49 +149,64 @@ function LearningDevelopment() {
           </div>
         )}
 
-        {/* Tab Content */}
-        {activeTab === "newContact" ? (
+        {/* Initiation Section as a dummy page */}
+        {initiationTraining ? (
+          <InitiationModal
+            training={initiationTraining}
+            onBack={() => setInitiationTraining(null)}
+            onConfirm={(training) => {
+              // Add your confirm logic here
+              setInitiationTraining(null);
+            }}
+          />
+        ) : (
           <>
-            {loading ? (
-              <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-              </div>
-            ) : (
+            {/* Tab Content */}
+            {activeTab === "newContact" ? (
               <>
-                <TrainingTable
-                  trainingData={trainings}
-                  onRowClick={setSelectedTraining}
-                  onViewStudentData={handleViewStudentData}
-                  onViewMouFile={handleViewMouFile}
-                />
+                {loading ? (
+                  <div className="flex justify-center items-center h-64">
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+                  </div>
+                ) : (
+                  <>
+                    <TrainingTable
+                      trainingData={trainings}
+                      onRowClick={setSelectedTraining}
+                      onViewStudentData={handleViewStudentData}
+                      onViewMouFile={handleViewMouFile}
+                      onInitiateTraining={setInitiationTraining}
+                    />
 
-                {selectedTraining && (
-                  <TrainingDetailModal
-                    training={selectedTraining}
-                    onClose={() => setSelectedTraining(null)}
-                  />
-                )}
+                    {selectedTraining && (
+                      <TrainingDetailModal
+                        training={selectedTraining}
+                        onClose={() => setSelectedTraining(null)}
+                      />
+                    )}
 
-                {showFileModal && fileType === "mou" && (
-                  <FilePreviewModal
-                    fileUrl={fileUrl}
-                    type={fileType}
-                    trainingId={modalTrainingId}
-                    onClose={() => setShowFileModal(false)}
-                  />
+                    {showFileModal && fileType === "mou" && (
+                      <FilePreviewModal
+                        fileUrl={fileUrl}
+                        type={fileType}
+                        trainingId={modalTrainingId}
+                        onClose={() => setShowFileModal(false)}
+                      />
+                    )}
+                  </>
                 )}
               </>
+            ) : (
+              selectedInitiationTraining ? (
+                <InitiationTrainingDetails
+                  training={selectedInitiationTraining}
+                  onBack={() => setSelectedInitiationTraining(null)}
+                />
+              ) : (
+                <InitiationDashboard onRowClick={setSelectedInitiationTraining} />
+              )
             )}
           </>
-        ) : (
-          selectedInitiationTraining ? (
-            <InitiationTrainingDetails
-              training={selectedInitiationTraining}
-              onBack={() => setSelectedInitiationTraining(null)}
-            />
-          ) : (
-            <InitiationDashboard onRowClick={setSelectedInitiationTraining} />
-          )
         )}
       </div>
     </>

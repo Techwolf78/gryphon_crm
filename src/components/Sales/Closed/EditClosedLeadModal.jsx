@@ -28,6 +28,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [topicErrors, setTopicErrors] = useState([]);
   const [paymentErrors, setPaymentErrors] = useState([]);
+  const [isCustomDeliveryType, setIsCustomDeliveryType] = useState(false);
   const sections = ["basic", "contacts", "course", "topics", "financial"];
 
   // Helper for number display
@@ -35,6 +36,8 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
 
   useEffect(() => {
     if (lead) {
+      const deliveryTypes = ["TP", "OT", "IP", "DM", "SNS"];
+      setIsCustomDeliveryType(lead.deliveryType && !deliveryTypes.includes(lead.deliveryType));
       setFormData({
         businessName: lead.collegeName || "",
         projectCode: lead.projectCode || "",
@@ -1359,29 +1362,22 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                     </div>
                   </div>
 
-                  {/* Delivery Type dropdown */}
+                  {/* Delivery Type dropdown and custom input */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Delivery Type
                     </label>
-                    <div className="relative">
-                      <select
-                        name="deliveryType"
-                        value={formData.deliveryType || ""}
-                        onChange={handleChange}
-                        className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        <option value="">Select Delivery Type</option>
-                        <option value="TP">TP - Training Placement</option>
-                        <option value="OT">OT - Only Training</option>
-                        <option value="IP">IP - Induction Program</option>
-                        <option value="DM">DM - Digital Marketing</option>
-                        <option value="SNS">SNS - SNS</option>
-                      </select>
-                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                        <FiChevronDown className="h-5 w-5 text-gray-400" />
-                      </div>
-                    </div>
+                    <input
+                      type="text"
+                      value={
+                        formData.deliveryType
+                          ? formData.deliveryType
+                          : ""
+                      }
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm bg-gray-100 cursor-not-allowed"
+                      readOnly
+                      disabled
+                    />
                   </div>
 
                   {/* Passing Year dropdown */}
@@ -1389,29 +1385,13 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Passing Year
                     </label>
-                    <div className="relative">
-                      <select
-                        name="passingYear"
-                        value={formData.passingYear || ""}
-                        onChange={handleChange}
-                        className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        <option value="">Select Passing Year</option>
-                        {Array.from({ length: 16 }, (_, i) => {
-                          const currentYear = new Date().getFullYear();
-                          const year = currentYear - 5 + i;
-                          const yearRange = `${year}-${year + 1}`;
-                          return (
-                            <option key={yearRange} value={yearRange}>
-                              {yearRange}
-                            </option>
-                          );
-                        })}
-                      </select>
-                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                        <FiChevronDown className="h-5 w-5 text-gray-400" />
-                      </div>
-                    </div>
+                    <input
+                      type="text"
+                      value={formData.passingYear || ""}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm bg-gray-100 cursor-not-allowed"
+                      readOnly
+                      disabled
+                    />
                   </div>
                 </div>
 
