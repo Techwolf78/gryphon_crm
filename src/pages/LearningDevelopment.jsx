@@ -7,7 +7,8 @@ import FilePreviewModal from "../components/Learning/TrainingTables/FilePreviewM
 import StudentDataPage from "../components/Learning/StudentDataPage";
 import InitiationDashboard from "../components/Learning/InitiationDashboard";
 import InitiationTrainingDetails from "../components/Learning/InitiationTrainingDetails"; // <-- create this
-import InitiationModal from "../components/Learning/TrainingTables/InitiationModal";
+import InitiationModal from "../components/Learning/TrainingTables/InitiationModal"; // <-- import InitiationModal
+
 import { useNavigate } from "react-router-dom";
 
 function LearningDevelopment() {
@@ -22,7 +23,9 @@ function LearningDevelopment() {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("newContact");
   const [selectedInitiationTraining, setSelectedInitiationTraining] = useState(null);
-  const [initiationTraining, setInitiationTraining] = useState(null);
+  const [showInitiationModal, setShowInitiationModal] = useState(false);
+  const [selectedTrainingForInitiation, setSelectedTrainingForInitiation] = useState(null);
+
   const navigate = useNavigate();
 
   const fetchTrainings = async () => {
@@ -79,12 +82,14 @@ function LearningDevelopment() {
     setShowFileModal(true);
   };
 
-  const handleRefresh = () => {
-    fetchTrainings();
-  };
-
   const handleViewTrainers = () => {
     navigate("trainers");
+  };
+
+  // When Initiation button is clicked
+  const handleInitiateClick = (training) => {
+    setSelectedTrainingForInitiation(training);
+    setShowInitiationModal(true);
   };
 
   if (studentPageData) {
@@ -94,6 +99,22 @@ function LearningDevelopment() {
         trainingId={studentPageData.trainingId}
         trainingName={studentPageData.trainingName}
         onBack={() => setStudentPageData(null)}
+      />
+    );
+  }
+
+  if (showInitiationModal && selectedTrainingForInitiation) {
+    return (
+      <InitiationModal
+        training={selectedTrainingForInitiation}
+        onClose={() => {
+          setShowInitiationModal(false);
+          setSelectedTrainingForInitiation(null);
+        }}
+        onConfirm={() => {
+          setShowInitiationModal(false);
+          setSelectedTrainingForInitiation(null);
+        }}
       />
     );
   }
@@ -116,21 +137,19 @@ function LearningDevelopment() {
         {/* Tab Navigation */}
         <div className="flex mb-6 border-b">
           <button
-            className={`px-4 py-2 font-medium ${
-              activeTab === "newContact"
-                ? "border-b-2 border-blue-500 text-blue-600"
-                : "text-gray-500"
-            }`}
+            className={`px-4 py-2 font-medium ${activeTab === "newContact"
+              ? "border-b-2 border-blue-500 text-blue-600"
+              : "text-gray-500"
+              }`}
             onClick={() => setActiveTab("newContact")}
           >
             New Contract ({trainings.length})
           </button>
           <button
-            className={`px-4 py-2 font-medium ${
-              activeTab === "initiation"
-                ? "border-b-2 border-blue-500 text-blue-600"
-                : "text-gray-500"
-            }`}
+            className={`px-4 py-2 font-medium ${activeTab === "initiation"
+              ? "border-b-2 border-blue-500 text-blue-600"
+              : "text-gray-500"
+              }`}
             onClick={() => setActiveTab("initiation")}
           >
             Initiation
@@ -164,37 +183,31 @@ function LearningDevelopment() {
             {/* Tab Content */}
             {activeTab === "newContact" ? (
               <>
-                {loading ? (
-                  <div className="flex justify-center items-center h-64">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-                  </div>
-                ) : (
-                  <>
-                    <TrainingTable
-                      trainingData={trainings}
-                      onRowClick={setSelectedTraining}
-                      onViewStudentData={handleViewStudentData}
-                      onViewMouFile={handleViewMouFile}
-                      onInitiateTraining={setInitiationTraining}
-                    />
+                <TrainingTable
+                  trainingData={trainings}
+                  onRowClick={setSelectedTraining}
+                  onViewStudentData={handleViewStudentData}
+                  onViewMouFile={handleViewMouFile}
+                  onInitiate={handleInitiateClick} // <-- yeh prop pass karo
+                />
 
-                    {selectedTraining && (
-                      <TrainingDetailModal
-                        training={selectedTraining}
-                        onClose={() => setSelectedTraining(null)}
-                      />
-                    )}
-
-                    {showFileModal && fileType === "mou" && (
-                      <FilePreviewModal
-                        fileUrl={fileUrl}
-                        type={fileType}
-                        trainingId={modalTrainingId}
-                        onClose={() => setShowFileModal(false)}
-                      />
-                    )}
-                  </>
+                {selectedTraining && (
+                  <TrainingDetailModal
+                    training={selectedTraining}
+                    onClose={() => setSelectedTraining(null)}
+                  />
                 )}
+
+                {showFileModal && fileType === "mou" && (
+                  <FilePreviewModal
+                    fileUrl={fileUrl}
+                    type={fileType}
+                    trainingId={modalTrainingId}
+                    onClose={() => setShowFileModal(false)}
+                  />
+
+                )}
+
               </>
             ) : (
               selectedInitiationTraining ? (
