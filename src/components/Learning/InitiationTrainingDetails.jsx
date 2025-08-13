@@ -82,6 +82,7 @@ function InitiationTrainingDetails({ training, onBack }) {
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 to-gray-200 p-6">
+
       <button
         className="mb-6 flex items-center text-blue-600 hover:underline"
         onClick={onBack}
@@ -89,6 +90,7 @@ function InitiationTrainingDetails({ training, onBack }) {
         <FiArrowLeft className="mr-2" /> Back to Dashboard
       </button>
       <div className="w-full mx-auto bg-white rounded-xl shadow border border-gray-200 p-8">
+
         <h2 className="text-2xl font-bold text-indigo-800 mb-2">
           {training.collegeName}{" "}
           <span className="text-gray-400">({training.collegeCode})</span>

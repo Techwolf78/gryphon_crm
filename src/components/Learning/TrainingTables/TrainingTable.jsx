@@ -5,6 +5,7 @@ import { MdOutlineAttachMoney } from "react-icons/md";
 
 
 function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouFile, onManageStudents, onInitiate }) {
+
   const [menuOpenId, setMenuOpenId] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [dropdownDirection, setDropdownDirection] = useState({});
@@ -32,6 +33,7 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
       }, 0);
     }
   };
+
 
   useEffect(() => {
     const handleResize = () => {

@@ -77,6 +77,7 @@ const Dashboard = ({ onRowClick }) => {
       <h1 className="text-2xl font-bold mb-6 text-gray-800">
         Training Initiation Dashboard
       </h1>
+
       {loading ? (
         <div className="text-center py-12 text-gray-500">Loading...</div>
       ) : (

@@ -19,8 +19,60 @@ import BatchDetailsTable from "./Initiate/BatchDetailsTable";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
-const PHASE_OPTIONS = ["phase-1", "phase-2", "phase-3"];
-const DOMAIN_OPTIONS = ["Technical", "Soft skills", "Aptitude", "Tools"];
+
+  if (!open) return null;
+  return (
+<div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent backdrop-blur-lg">
+  <div className="bg-white/50 rounded-lg shadow-lg p-6 min-w-[300px] border border-white/30">
+    <h3 className="text-sm font-semibold mb-4">Select Start & End Time</h3>
+    <div className="mb-3">
+      <label className="block text-xs mb-1">Start Time</label>
+      <select
+        className="w-full border rounded px-2 py-1 text-xs"
+        value={start}
+        onChange={(e) => onChange("start", e.target.value)}
+      >
+        <option value="">--:--</option>
+        {timeOptions.map((t) => (
+          <option key={t} value={t}>
+            {t}
+          </option>
+        ))}
+      </select>
+    </div>
+    <div className="mb-3">
+      <label className="block text-xs mb-1">End Time</label>
+      <select
+        className="w-full border rounded px-2 py-1 text-xs"
+        value={end}
+        onChange={(e) => onChange("end", e.target.value)}
+      >
+        <option value="">--:--</option>
+        {timeOptions.map((t) => (
+          <option key={t} value={t}>
+            {t}
+          </option>
+        ))}
+      </select>
+    </div>
+    <div className="flex justify-end gap-2 mt-4">
+      <button
+        className="px-3 py-1 text-xs rounded bg-gray-200 hover:bg-gray-300"
+        onClick={onClose}
+      >
+        Cancel
+      </button>
+      <button
+        className="px-3 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700"
+        onClick={onClose}
+      >
+        Done
+      </button>
+    </div>
+  </div>
+</div>
+  );
+};
 
 function InitiationModal({ training, onClose, onConfirm }) {
   const [selectedPhases, setSelectedPhases] = useState([]);
@@ -44,8 +96,17 @@ function InitiationModal({ training, onClose, onConfirm }) {
     endDate: null,
   });
   const [phase3Dates, setPhase3Dates] = useState({
+
     startDate: "",
     endDate: "",
+    collegeStartTime: "",
+    collegeEndTime: "",
+    lunchStartTime: "",
+    lunchEndTime: "",
+    phase2StartDate: "",
+    phase2EndDate: "",
+    phase3StartDate: "",
+    phase3EndDate: "",
   });
   const [phaseHours, setPhaseHours] = useState({
     "phase-1": 0,
@@ -91,14 +152,9 @@ function InitiationModal({ training, onClose, onConfirm }) {
     return null;
   }, [selectedPhases]);
 
-  const getRemainingHours = (phase) => {
-    const phaseOrder = ["phase-1", "phase-2", "phase-3"];
-    const idx = phaseOrder.indexOf(phase);
-    let used = 0;
-    for (let i = 0; i < idx; i++) {
-      used += Number(phaseHours[phaseOrder[i]] || 0);
-    }
-    return Math.max(0, totalTrainingHours - used);
+
+  const deleteSessionRow = (rowIdx) => {
+    setSessions(sessions.filter((_, idx) => idx !== rowIdx));
   };
 
   useEffect(() => {
@@ -162,8 +218,30 @@ function InitiationModal({ training, onClose, onConfirm }) {
     });
     if (phase === "phase-1" && !selectedPhases.includes(phase)) {
       setSelectedDomain("");
+
     }
-    setError(null);
+    acc[campus].batches += 1;
+    acc[campus].hrs += Number(session.hrs) || 0;
+    if (session.domain === "Softskills")
+      acc[campus].softskills += Number(session.hrs) || 0;
+    if (session.domain === "Aptitude")
+      acc[campus].aptitude += Number(session.hrs) || 0;
+    if (session.domain === "Technical")
+      acc[campus].technical += Number(session.hrs) || 0;
+    acc[campus].trainingCost += Number(session.costPerHrs) || 0;
+    acc[campus].foodStay += Number(session.foodLodging) || 0;
+    acc[campus].travel += Number(session.travel) || 0;
+    acc[campus].totalCost +=
+      (Number(session.costPerHrs) || 0) +
+      (Number(session.foodLodging) || 0) +
+      (Number(session.travel) || 0);
+    acc[campus].phase = session.phase || "";
+    return acc;
+  }, {});
+
+  // Handler for time popup change
+  const handleTimePopupChange = (field, value) => {
+    setTimePopup((prev) => ({ ...prev, [field]: value }));
   };
 
   // Update currentPhase when selectedPhases changes
@@ -183,35 +261,13 @@ function InitiationModal({ training, onClose, onConfirm }) {
     if (success) {
       const timer = setTimeout(() => setSuccess(null), 3000);
       return () => clearTimeout(timer);
-    }
-  }, [success]);
 
-  const validateForm = () => {
-    if (selectedPhases.length === 0) {
-      setError("Please select at least one phase");
-      return false;
     }
-    if (!selectedDomain) {
-      setError("Please select a domain");
-      return false;
-    }
-    if (!commonFields.trainingStartDate || !commonFields.trainingEndDate) {
-      setError("Please select training start and end dates");
-      return false;
-    }
-    if (!commonFields.collegeStartTime || !commonFields.collegeEndTime) {
-      setError("Please enter college start and end times");
-      return false;
-    }
-    return true;
+    setTimePopup({ open: false, idx: null, start: "", end: "" });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validateForm()) return;
-    setLoading(true);
-    setError(null);
-
+  // Save to Firestore
+  const handleSaveToFirestore = async () => {
     try {
       const serializeTable1Data = (data) => {
         return data.map((row) => ({
@@ -317,10 +373,8 @@ function InitiationModal({ training, onClose, onConfirm }) {
       } else {
         setShowReusePrompt(false);
         setReuseBatchData(null);
+
       }
-    };
-    checkForTechnicalBatch();
-  }, [selectedDomain, training, hasRejectedReuse]);
 
   const handleReuseDecision = (reuse) => {
     setShowReusePrompt(false);
@@ -469,6 +523,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
     fetchExistingPhases();
   }, [training?.id]);
 
+
   const swapTrainers = (source, target) => {
     const newTable1Data = [...table1Data];
     const sourceTrainer = newTable1Data[source.rowIdx].batches[source.batchIdx].trainers[source.trainerIdx];
@@ -501,35 +556,122 @@ function InitiationModal({ training, onClose, onConfirm }) {
   };
 
   return (
-    <>
-      {/* Reuse Prompt Modal */}
-      {showReusePrompt && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center bg-gray-900 bg-opacity-30">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Use Technical Batch Setup?
-            </h3>
-            <p className="mb-4 text-gray-700">
-              A Technical batch setup already exists. Do you want to use it for
-              Soft skills (hours will be updated)?
-            </p>
-            <div className="flex justify-end space-x-3">
+    <div className="min-h-screen bg-gray-50 ">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-2">
+        <button
+          onClick={onBack}
+          className="flex items-center text-sm font-medium text-blue-600 hover:text-blue-800"
+        >
+          <FiArrowLeft className="mr-2" />
+          Back to Contracts
+        </button>
+        <h1 className="text-2xl font-semibold text-gray-800">
+          Training Initiation
+        </h1>
+        <div className="w-8"></div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        {/* Training Details */}
+        <div className="p-6 border-b border-gray-100">
+          <h2 className="text-lg font-semibold text-gray-800 mb-3">
+            Training Parameters
+          </h2>
+          {/* Compact single-row layout for parameters */}
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            {/* Phases */}
+            <label className="text-sm font-medium text-gray-700 mr-2">Phases:</label>
+            {["phase-1", "phase-2", "phase-3"].map((phase, idx) => (
               <button
-                onClick={() => handleReuseDecision(false)}
-                className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                key={phase}
+                type="button"
+                onClick={() => togglePhase(phase)}
+                className={`px-2 py-1 text-xs rounded-full border ${
+                  form.phase.includes(phase)
+                    ? "bg-blue-50 border-blue-200 text-blue-700"
+                    : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
+                }`}
+                style={{ minWidth: "32px" }}
               >
-                No, create new
+                {`P${idx + 1}`}
               </button>
-              <button
-                onClick={() => handleReuseDecision(true)}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+            ))}
+            {/* Domain */}
+            <label className="text-sm font-medium text-gray-700 ml-4 mr-2">Domain:</label>
+            <select
+              id="domain"
+              name="domain"
+              value={form.domain}
+              onChange={handleChange}
+              className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs"
+              style={{ minWidth: "110px" }}
+            >
+              <option value="">Select</option>
+              <option value="Technical">Technical</option>
+              <option value="Softskills">Softskills</option>
+              <option value="Aptitude">Aptitude</option>
+              <option value="Tools">Tools</option>
+            </select>
+            {/* Start Date */}
+            <label className="text-sm font-medium text-gray-700 ml-4 mr-2">Start:</label>
+            <input
+              type="date"
+              id="startDate"
+              name="startDate"
+              value={form.startDate}
+              onChange={handleChange}
+              className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs"
+              style={{ minWidth: "110px" }}
+            />
+            {/* End Date */}
+            <label className="text-sm font-medium text-gray-700 ml-4 mr-2">End:</label>
+            <input
+              type="date"
+              id="endDate"
+              name="endDate"
+              value={form.endDate}
+              onChange={handleChange}
+              className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs"
+              style={{ minWidth: "110px" }}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+            {/* Date Range */}
+            <div>
+              <label
+                htmlFor="startDate"
+                className="block text-sm font-medium text-gray-700 mb-1"
               >
-                Yes, use existing
-              </button>
+                Start Date
+              </label>
+              <input
+                type="date"
+                id="startDate"
+                name="startDate"
+                value={form.startDate}
+                onChange={handleChange}
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="endDate"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                End Date
+              </label>
+              <input
+                type="date"
+                id="endDate"
+                name="endDate"
+                value={form.endDate}
+                onChange={handleChange}
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+              />
             </div>
           </div>
-        </div>
-      )}
 
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
         {/* Page Header */}
@@ -552,7 +694,35 @@ function InitiationModal({ training, onClose, onConfirm }) {
                   {training?.collegeName} • {training?.collegeCode}
                 </p>
               </div>
+
             </div>
+          )}
+
+          {/* Time Settings */}
+          <h3 className="text-md font-medium text-gray-800 mb-2">
+            Daily Schedule
+          </h3>
+          <div className="grid grid-cols-4 gap-2 mb-4">
+            <TimePicker
+              label="College Start Time"
+              value={form.collegeStartTime}
+              onChange={(t) => setForm({ ...form, collegeStartTime: t })}
+            />
+            <TimePicker
+              label="College End Time"
+              value={form.collegeEndTime}
+              onChange={(t) => setForm({ ...form, collegeEndTime: t })}
+            />
+            <TimePicker
+              label="Lunch Start Time"
+              value={form.lunchStartTime}
+              onChange={(t) => setForm({ ...form, lunchStartTime: t })}
+            />
+            <TimePicker
+              label="Lunch End Time"
+              value={form.lunchEndTime}
+              onChange={(t) => setForm({ ...form, lunchEndTime: t })}
+            />
           </div>
         </div>
 
@@ -994,11 +1164,61 @@ function InitiationModal({ training, onClose, onConfirm }) {
                 </button>
               </div>
             </div>
+
           </div>
         </div>
       </div>
-    </>
+
+      {/* Footer Actions */}
+      <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3">
+        <button
+          onClick={onBack}
+          className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        >
+          <FiX className="mr-2" />
+          Cancel
+        </button>
+<button
+  onClick={handleSaveToFirestore}
+  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+>
+  <FiCheck className="mr-2" />
+  Confirm Initiation
+</button>
+      </div>
+
+      <TimeRangePopup
+        open={timePopup.open}
+        start={timePopup.start}
+        end={timePopup.end}
+        onChange={handleTimePopupChange}
+        onClose={handleTimePopupDone}
+      />
+    </div>
   );
-}
+};
+
+const blankSession = {
+  domain: "",
+  topics: "",
+  year: "",
+  trainer: "",
+  date: "",
+  campus: "",
+  batch: "",
+  studentCount: "",
+  time: "",
+  hrs: "",
+  costPerHrs: "",
+  costPerDay: "",
+  foodLodging: "",
+  travel: "",
+  totalAmount: "",
+  particular: "",
+  total: "",
+  status: "",
+  topicCovered: "",
+  actualStudentCount: "",
+};
 
 export default InitiationModal;

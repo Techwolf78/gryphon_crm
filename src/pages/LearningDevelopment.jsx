@@ -8,6 +8,7 @@ import StudentDataPage from "../components/Learning/StudentDataPage";
 import InitiationDashboard from "../components/Learning/InitiationDashboard";
 import InitiationTrainingDetails from "../components/Learning/InitiationTrainingDetails"; // <-- create this
 import InitiationModal from "../components/Learning/TrainingTables/InitiationModal"; // <-- import InitiationModal
+
 import { useNavigate } from "react-router-dom";
 
 function LearningDevelopment() {
@@ -24,6 +25,7 @@ function LearningDevelopment() {
   const [selectedInitiationTraining, setSelectedInitiationTraining] = useState(null);
   const [showInitiationModal, setShowInitiationModal] = useState(false);
   const [selectedTrainingForInitiation, setSelectedTrainingForInitiation] = useState(null);
+
   const navigate = useNavigate();
 
   const fetchTrainings = async () => {
@@ -166,14 +168,20 @@ function LearningDevelopment() {
           </div>
         )}
 
-        {/* Tab Content */}
-        {activeTab === "newContact" ? (
+        {/* Initiation Section as a dummy page */}
+        {initiationTraining ? (
+          <InitiationModal
+            training={initiationTraining}
+            onBack={() => setInitiationTraining(null)}
+            onConfirm={(training) => {
+              // Add your confirm logic here
+              setInitiationTraining(null);
+            }}
+          />
+        ) : (
           <>
-            {loading ? (
-              <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-              </div>
-            ) : (
+            {/* Tab Content */}
+            {activeTab === "newContact" ? (
               <>
                 <TrainingTable
                   trainingData={trainings}
@@ -197,20 +205,21 @@ function LearningDevelopment() {
                     trainingId={modalTrainingId}
                     onClose={() => setShowFileModal(false)}
                   />
+
                 )}
 
               </>
+            ) : (
+              selectedInitiationTraining ? (
+                <InitiationTrainingDetails
+                  training={selectedInitiationTraining}
+                  onBack={() => setSelectedInitiationTraining(null)}
+                />
+              ) : (
+                <InitiationDashboard onRowClick={setSelectedInitiationTraining} />
+              )
             )}
           </>
-        ) : (
-          selectedInitiationTraining ? (
-            <InitiationTrainingDetails
-              training={selectedInitiationTraining}
-              onBack={() => setSelectedInitiationTraining(null)}
-            />
-          ) : (
-            <InitiationDashboard onRowClick={setSelectedInitiationTraining} />
-          )
         )}
       </div>
     </>
