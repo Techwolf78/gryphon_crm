@@ -22,7 +22,7 @@ function LearningDevelopment() {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("newContact");
   const [selectedInitiationTraining, setSelectedInitiationTraining] = useState(null);
-  const [showInitiationSection, setShowInitiationSection] = useState(false);
+  const [showInitiationModal, setShowInitiationModal] = useState(false);
   const [selectedTrainingForInitiation, setSelectedTrainingForInitiation] = useState(null);
   const navigate = useNavigate();
 
@@ -79,14 +79,15 @@ function LearningDevelopment() {
     setModalTrainingId(item.id);
     setShowFileModal(true);
   };
-   const handleViewTrainers = () => {
+
+  const handleViewTrainers = () => {
     navigate("trainers");
   };
 
   // When Initiation button is clicked
   const handleInitiateClick = (training) => {
     setSelectedTrainingForInitiation(training);
-    setShowInitiationSection(true);
+    setShowInitiationModal(true);
   };
 
   if (studentPageData) {
@@ -96,6 +97,22 @@ function LearningDevelopment() {
         trainingId={studentPageData.trainingId}
         trainingName={studentPageData.trainingName}
         onBack={() => setStudentPageData(null)}
+      />
+    );
+  }
+
+  if (showInitiationModal && selectedTrainingForInitiation) {
+    return (
+      <InitiationModal
+        training={selectedTrainingForInitiation}
+        onClose={() => {
+          setShowInitiationModal(false);
+          setSelectedTrainingForInitiation(null);
+        }}
+        onConfirm={() => {
+          setShowInitiationModal(false);
+          setSelectedTrainingForInitiation(null);
+        }}
       />
     );
   }
@@ -182,16 +199,6 @@ function LearningDevelopment() {
                   />
                 )}
 
-                {/* Render embedded InitiationModal section */}
-                {showInitiationSection && selectedTrainingForInitiation && (
-                  <div className="my-8">
-                    <InitiationModal
-                      training={selectedTrainingForInitiation}
-                      onClose={() => setShowInitiationSection(false)}
-                      onConfirm={() => setShowInitiationSection(false)}
-                    />
-                  </div>
-                )}
               </>
             )}
           </>

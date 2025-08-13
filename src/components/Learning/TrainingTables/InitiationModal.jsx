@@ -2,16 +2,14 @@ import React, { useState, useEffect, useCallback } from "react";
 import { db } from "../../../firebase";
 import {
   doc,
-  collection,
   getDoc,
   setDoc,
   serverTimestamp,
   getDocs,
   collection as fbCollection,
+  collection,
 } from "firebase/firestore";
 import {
-  FiX,
-  FiChevronRight,
   FiChevronLeft,
   FiCheck,
   FiClock,
@@ -26,7 +24,6 @@ const DOMAIN_OPTIONS = ["Technical", "Soft skills", "Aptitude", "Tools"];
 
 function InitiationModal({ training, onClose, onConfirm }) {
   const [selectedPhases, setSelectedPhases] = useState([]);
-  const [details] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -34,7 +31,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
   const [topics, setTopics] = useState([]);
   const [courses, setCourses] = useState([]);
   const [currentPhase, setCurrentPhase] = useState("");
-
   const [commonFields, setCommonFields] = useState({
     trainingStartDate: null,
     trainingEndDate: null,
@@ -43,33 +39,25 @@ function InitiationModal({ training, onClose, onConfirm }) {
     lunchStartTime: "",
     lunchEndTime: "",
   });
-
   const [phase2Dates, setPhase2Dates] = useState({
     startDate: null,
     endDate: null,
   });
-
   const [phase3Dates, setPhase3Dates] = useState({
     startDate: "",
     endDate: "",
   });
-
-  // --- Dynamic Hours Logic ---
   const [phaseHours, setPhaseHours] = useState({
     "phase-1": 0,
     "phase-2": 0,
     "phase-3": 0,
   });
-
-  // Custom hours for each phase set by user in step 1
   const [customPhaseHours, setCustomPhaseHours] = useState({
     "phase-1": "",
     "phase-2": "",
     "phase-3": "",
   });
-
   const [totalTrainingHours, setTotalTrainingHours] = useState(0);
-
   const [table1Data, setTable1Data] = useState([]);
   const [showReusePrompt, setShowReusePrompt] = useState(false);
   const [reuseBatchData, setReuseBatchData] = useState(null);
@@ -78,12 +66,9 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
   // Get domain hours - use custom hours if set, otherwise default from database
   const getDomainHours = useCallback((domain, phase = null) => {
-    // If phase is provided and custom hours are set for that phase, use custom hours
     if (phase && customPhaseHours[phase] && customPhaseHours[phase] !== "") {
       return Number(customPhaseHours[phase]);
     }
-    
-    // Otherwise use default database hours
     if (!domain) return 0;
     const topicMap = {
       Technical: "Domain Technical",
@@ -99,7 +84,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
     return topicObj?.hours || 0;
   }, [customPhaseHours, topics]);
 
-  // --- Dynamic Remaining Hours Calculation ---
   const getMainPhase = useCallback(() => {
     if (selectedPhases.includes("phase-1")) return "phase-1";
     if (selectedPhases.includes("phase-2")) return "phase-2";
@@ -117,7 +101,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
     return Math.max(0, totalTrainingHours - used);
   };
 
-  // --- Fetch topics/courses and set totalTrainingHours ---
   useEffect(() => {
     const fetchTrainingDetails = async () => {
       if (!training?.id) return;
@@ -133,7 +116,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
     fetchTrainingDetails();
   }, [training]);
 
-  // --- When domain changes, reset batch table and assigned hours for main phase ---
   useEffect(() => {
     if (selectedDomain && courses.length > 0) {
       const mainPhase = getMainPhase();
@@ -153,7 +135,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
         ],
       }));
       setTable1Data(rows);
-      // Set assigned hours for main phase
       setPhaseHours((prev) => ({
         ...prev,
         [mainPhase]: 0,
@@ -161,7 +142,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
     }
   }, [selectedDomain, courses, topics, customPhaseHours, getDomainHours, getMainPhase]);
 
-  // Update this function to accept phase as argument
   const handleAssignedHoursChange = (hours, phase) => {
     setPhaseHours((prev) => ({
       ...prev,
@@ -172,15 +152,12 @@ function InitiationModal({ training, onClose, onConfirm }) {
   const handlePhaseChange = (phase) => {
     setSelectedPhases((prev) => {
       const newPhases = prev.includes(phase) ? prev.filter((p) => p !== phase) : [...prev, phase];
-      
-      // Clear custom hours for deselected phases
       if (prev.includes(phase) && !newPhases.includes(phase)) {
         setCustomPhaseHours((prevHours) => ({
           ...prevHours,
           [phase]: "",
         }));
       }
-      
       return newPhases;
     });
     if (phase === "phase-1" && !selectedPhases.includes(phase)) {
@@ -188,6 +165,12 @@ function InitiationModal({ training, onClose, onConfirm }) {
     }
     setError(null);
   };
+
+  // Update currentPhase when selectedPhases changes
+  useEffect(() => {
+    const mainPhase = getMainPhase();
+    setCurrentPhase(mainPhase);
+  }, [selectedPhases, getMainPhase]);
 
   useEffect(() => {
     if (error) {
@@ -230,7 +213,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
     setError(null);
 
     try {
-      // Prepare batch/trainer data for Firestore
       const serializeTable1Data = (data) => {
         return data.map((row) => ({
           ...row,
@@ -254,7 +236,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
       const batchPromises = selectedPhases.map(async (phase) => {
         let phaseData = {
-          details: details || "",
           createdAt: serverTimestamp(),
           createdBy: training.createdBy || {},
           ...commonFields,
@@ -263,7 +244,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
           assignedHours: phaseHours[phase] || 0,
         };
 
-        // Only save domain and batch assignment for the main phase
         if (phase === mainPhase) {
           phaseData = {
             ...phaseData,
@@ -273,11 +253,9 @@ function InitiationModal({ training, onClose, onConfirm }) {
             isMainPhase: true,
           };
         } else {
-          // For non-main phases, mark as secondary
           phaseData.isMainPhase = false;
         }
 
-        // Add phase-specific dates for non-main phases
         if (phase === "phase-2" && phase !== mainPhase) {
           phaseData.phase2Dates = phase2Dates;
         }
@@ -301,7 +279,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
         if (onConfirm)
           onConfirm({
             phases: selectedPhases,
-            details,
             ...commonFields,
             domain: selectedDomain,
             table1Data,
@@ -316,11 +293,8 @@ function InitiationModal({ training, onClose, onConfirm }) {
     }
   };
 
-  const canProceedToNextStep = () => {
-    return true;
-  };
+  const canProceedToNextStep = () => true;
 
-  // When domain changes to Soft skills, check for Technical batch
   useEffect(() => {
     const checkForTechnicalBatch = async () => {
       if (
@@ -328,7 +302,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
         training?.id &&
         !hasRejectedReuse
       ) {
-        // Check Firestore for phase-1 with domain "Technical"
         const techPhaseRef = doc(
           db,
           "trainingForms",
@@ -349,11 +322,9 @@ function InitiationModal({ training, onClose, onConfirm }) {
     checkForTechnicalBatch();
   }, [selectedDomain, training, hasRejectedReuse]);
 
-  // Handler for user response to reuse prompt
   const handleReuseDecision = (reuse) => {
     setShowReusePrompt(false);
     if (reuse && reuseBatchData) {
-      // Only import batch assignments, set assigned hours to 0, and clear trainers
       const mainPhase = getMainPhase();
       const softSkillsHours = getDomainHours("Soft skills", mainPhase);
       const updated = reuseBatchData.map((row) => ({
@@ -391,7 +362,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
     checkTrainingsCollection();
   }, [training]);
 
-  // Fetch and prefill commonFields if any phase exists
   useEffect(() => {
     const prefillCommonFields = async () => {
       if (!training?.id) return;
@@ -420,11 +390,9 @@ function InitiationModal({ training, onClose, onConfirm }) {
     prefillCommonFields();
   }, [training?.id]);
 
-  // Fetch and prefill phase2Dates and phase3Dates if they exist in backend
   useEffect(() => {
     if (!training?.id) return;
     const fetchPhaseDates = async () => {
-      // Phase 2
       const phase2Ref = doc(
         db,
         "trainingForms",
@@ -447,7 +415,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
           });
         }
       }
-      // Phase 3
       const phase3Ref = doc(
         db,
         "trainingForms",
@@ -502,45 +469,36 @@ function InitiationModal({ training, onClose, onConfirm }) {
     fetchExistingPhases();
   }, [training?.id]);
 
-  // Swap trainers between AM and PM slots for selected batches
- const swapTrainers = (source, target) => {
-  const newTable1Data = [...table1Data];
-
-  const sourceTrainer = newTable1Data[source.rowIdx].batches[source.batchIdx].trainers[source.trainerIdx];
-  const targetTrainer = newTable1Data[target.rowIdx].batches[target.batchIdx].trainers[target.trainerIdx];
-
-  // Ensure slotInfo exists as array of objects
-  if (!sourceTrainer.slotInfo) sourceTrainer.slotInfo = (sourceTrainer.activeDates || []).map(() => ({
-    slot: sourceTrainer.dayDuration,
-    batchCode: newTable1Data[source.rowIdx].batches[source.batchIdx].batchCode
-  }));
-  if (!targetTrainer.slotInfo) targetTrainer.slotInfo = (targetTrainer.activeDates || []).map(() => ({
-    slot: targetTrainer.dayDuration,
-    batchCode: newTable1Data[target.rowIdx].batches[target.batchIdx].batchCode
-  }));
-
-  // Add target's slot details to sourceTrainer (swap slot)
-  (targetTrainer.activeDates || []).forEach((date, idx) => {
-    sourceTrainer.activeDates.push(date);
-    sourceTrainer.dailyHours.push(targetTrainer.dailyHours?.[idx] || 0);
-    sourceTrainer.slotInfo.push({
-      slot: targetTrainer.dayDuration === "AM" ? "PM" : "AM",
-      batchCode: newTable1Data[target.rowIdx].batches[target.batchIdx].batchCode
-    });
-  });
-
-  // Add source's slot details to targetTrainer (swap slot)
-  (sourceTrainer.activeDates.slice(0, sourceTrainer.activeDates.length - (targetTrainer.activeDates?.length || 0)) || []).forEach((date, idx) => {
-    targetTrainer.activeDates.push(date);
-    targetTrainer.dailyHours.push(sourceTrainer.dailyHours?.[idx] || 0);
-    targetTrainer.slotInfo.push({
-      slot: sourceTrainer.dayDuration === "AM" ? "PM" : "AM",
+  const swapTrainers = (source, target) => {
+    const newTable1Data = [...table1Data];
+    const sourceTrainer = newTable1Data[source.rowIdx].batches[source.batchIdx].trainers[source.trainerIdx];
+    const targetTrainer = newTable1Data[target.rowIdx].batches[target.batchIdx].trainers[target.trainerIdx];
+    if (!sourceTrainer.slotInfo) sourceTrainer.slotInfo = (sourceTrainer.activeDates || []).map(() => ({
+      slot: sourceTrainer.dayDuration,
       batchCode: newTable1Data[source.rowIdx].batches[source.batchIdx].batchCode
+    }));
+    if (!targetTrainer.slotInfo) targetTrainer.slotInfo = (targetTrainer.activeDates || []).map(() => ({
+      slot: targetTrainer.dayDuration,
+      batchCode: newTable1Data[target.rowIdx].batches[target.batchIdx].batchCode
+    }));
+    (targetTrainer.activeDates || []).forEach((date, idx) => {
+      sourceTrainer.activeDates.push(date);
+      sourceTrainer.dailyHours.push(targetTrainer.dailyHours?.[idx] || 0);
+      sourceTrainer.slotInfo.push({
+        slot: targetTrainer.dayDuration === "AM" ? "PM" : "AM",
+        batchCode: newTable1Data[target.rowIdx].batches[target.batchIdx].batchCode
+      });
     });
-  });
-
-  setTable1Data(newTable1Data);
-};
+    (sourceTrainer.activeDates.slice(0, sourceTrainer.activeDates.length - (targetTrainer.activeDates?.length || 0)) || []).forEach((date, idx) => {
+      targetTrainer.activeDates.push(date);
+      targetTrainer.dailyHours.push(sourceTrainer.dailyHours?.[idx] || 0);
+      targetTrainer.slotInfo.push({
+        slot: sourceTrainer.dayDuration === "AM" ? "PM" : "AM",
+        batchCode: newTable1Data[source.rowIdx].batches[source.batchIdx].batchCode
+      });
+    });
+    setTable1Data(newTable1Data);
+  };
 
   return (
     <>
@@ -917,310 +875,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
                     )}
                 </div>
 
-                {/* Custom Hours for Selected Phases */}
-                {selectedPhases.length > 0 && (
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    {/* Header with Summary */}
-                    <div className="px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-                            <FiClock className="mr-2 text-indigo-600" />
-                            Phase Training Hours
-                          </h2>
-                          <p className="mt-1 text-sm text-gray-600">
-                            Distribute training hours across selected phases
-                          </p>
-                        </div>
-                        
-                        {/* Total Hours Overview */}
-                        <div className="text-right">
-                          <div className="text-2xl font-bold text-indigo-600">
-                            {totalTrainingHours}
-                          </div>
-                          <div className="text-xs text-gray-500 uppercase tracking-wide">
-                            Total Hours
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Hours Distribution Progress */}
-                      <div className="mt-4">
-                        {(() => {
-                          // Calculate allocated hours for each phase
-                          const totalAllocated = selectedPhases.reduce((sum, phase) => {
-                            const phaseHours = Number(customPhaseHours[phase]) || getDomainHours("Technical", phase);
-                            return sum + phaseHours;
-                          }, 0);
-                          
-                          // Calculate remaining hours (Total - Allocated)
-                          const remaining = totalTrainingHours - totalAllocated;
-                          const progressPercent = totalTrainingHours > 0 ? Math.min(100, (totalAllocated / totalTrainingHours) * 100) : 0;
-                          
-                          return (
-                            <div>
-                              {/* Summary Stats */}
-                              <div className="grid grid-cols-3 gap-4 mb-3">
-                                <div className="text-center">
-                                  <div className="text-lg font-bold text-gray-900">{totalTrainingHours}</div>
-                                  <div className="text-xs text-gray-500">Total Hours</div>
-                                </div>
-                                <div className="text-center">
-                                  <div className="text-lg font-bold text-indigo-600">{totalAllocated}</div>
-                                  <div className="text-xs text-gray-500">Allocated</div>
-                                </div>
-                                <div className="text-center">
-                                  <div className={`text-lg font-bold ${
-                                    remaining === 0 ? 'text-emerald-600' : 
-                                    remaining < 0 ? 'text-red-600' : 'text-amber-600'
-                                  }`}>
-                                    {remaining}
-                                  </div>
-                                  <div className="text-xs text-gray-500">Remaining</div>
-                                </div>
-                              </div>
-                              
-                              {/* Calculation Display */}
-                              <div className="bg-gray-50 rounded-lg p-3 mb-3">
-                                <div className="text-xs text-gray-600 mb-1">Calculation:</div>
-                                <div className="flex items-center justify-center text-sm font-mono">
-                                  <span className="text-gray-900">{totalTrainingHours}</span>
-                                  <span className="mx-2 text-gray-500">−</span>
-                                  <span className="text-indigo-600">{totalAllocated}</span>
-                                  <span className="mx-2 text-gray-500">=</span>
-                                  <span className={`font-bold ${
-                                    remaining === 0 ? 'text-emerald-600' : 
-                                    remaining < 0 ? 'text-red-600' : 'text-amber-600'
-                                  }`}>
-                                    {remaining}
-                                  </span>
-                                  <span className="ml-1 text-gray-500">hrs</span>
-                                </div>
-                                <div className="text-xs text-gray-500 text-center mt-1">
-                                  (Total Training Hours − Phase Hours = Remaining Hours)
-                                </div>
-                              </div>
-
-                              {/* Progress Bar */}
-                              <div className="flex justify-between text-sm mb-2">
-                                <span className="text-gray-600">Hours Distribution</span>
-                                <span className={`font-medium ${
-                                  remaining === 0 ? 'text-emerald-600' : 
-                                  remaining < 0 ? 'text-red-600' : 'text-amber-600'
-                                }`}>
-                                  {totalAllocated} / {totalTrainingHours} hrs
-                                </span>
-                              </div>
-                              <div className="w-full bg-gray-200 rounded-full h-3">
-                                <div
-                                  className={`h-3 rounded-full transition-all duration-300 ${
-                                    progressPercent === 100 ? 'bg-emerald-500' :
-                                    progressPercent > 100 ? 'bg-red-500' : 'bg-amber-500'
-                                  }`}
-                                  style={{ width: `${Math.min(100, progressPercent)}%` }}
-                                />
-                              </div>
-                              <div className={`text-xs mt-2 font-medium ${
-                                remaining === 0 ? 'text-emerald-600' : 
-                                remaining < 0 ? 'text-red-600' : 'text-amber-600'
-                              }`}>
-                                {remaining === 0 ? '✅ Perfect! All hours allocated' :
-                                 remaining < 0 ? `⚠️ Over-allocated by ${Math.abs(remaining)} hours` :
-                                 `📝 ${remaining} hours still available for allocation`}
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    </div>
-
-                    {/* Phase Hours Configuration */}
-                    <div className="p-6">
-                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {selectedPhases.map((phase) => {
-                          const phaseOrder = ["phase-1", "phase-2", "phase-3"];
-                          const phaseIndex = phaseOrder.indexOf(phase);
-                          
-                          // Calculate total allocated by previous phases
-                          const previousPhasesTotal = phaseOrder.slice(0, phaseIndex).reduce((sum, prevPhase) => {
-                            if (selectedPhases.includes(prevPhase)) {
-                              return sum + (Number(customPhaseHours[prevPhase]) || getDomainHours("Technical", prevPhase));
-                            }
-                            return sum;
-                          }, 0);
-                          
-                          // Available hours for this phase = Total - Previous phases
-                          const availableForThisPhase = totalTrainingHours - previousPhasesTotal;
-                          
-                          const currentValue = customPhaseHours[phase] || "";
-                          const defaultValue = getDomainHours("Technical", phase);
-                          const actualValue = currentValue !== "" ? Number(currentValue) : defaultValue;
-                          
-                          // Remaining after this phase allocation
-                          const remainingAfterThisPhase = availableForThisPhase - actualValue;
-                          
-                          return (
-                            <div key={phase} className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:border-indigo-300 transition-colors">
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center">
-                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
-                                    phaseIndex === 0 ? 'bg-blue-100 text-blue-700' :
-                                    phaseIndex === 1 ? 'bg-purple-100 text-purple-700' :
-                                    'bg-green-100 text-green-700'
-                                  }`}>
-                                    {phaseIndex + 1}
-                                  </div>
-                                  <div className="ml-3">
-                                    <label className="block text-sm font-semibold text-gray-800">
-                                      {phase.replace("-", " ").toUpperCase()}
-                                    </label>
-                                    <div className="text-xs text-gray-500">
-                                      Default: {defaultValue} hrs
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <div className={`text-lg font-bold ${
-                                    actualValue > availableForThisPhase ? 'text-red-600' : 'text-gray-700'
-                                  }`}>
-                                    {actualValue}
-                                  </div>
-                                  <div className="text-xs text-gray-500">hours</div>
-                                </div>
-                              </div>
-                              
-                              {/* Hours Calculation for this phase */}
-                              <div className="bg-white rounded p-3 mb-3 border border-gray-200">
-                                <div className="text-xs text-gray-600 mb-1">Available for this phase:</div>
-                                <div className="flex items-center justify-center text-xs font-mono mb-2">
-                                  <span className="text-gray-900">{totalTrainingHours}</span>
-                                  <span className="mx-1 text-gray-500">−</span>
-                                  <span className="text-gray-600">{previousPhasesTotal}</span>
-                                  <span className="mx-1 text-gray-500">=</span>
-                                  <span className="font-bold text-indigo-600">{availableForThisPhase}</span>
-                                  <span className="ml-1 text-gray-500">hrs</span>
-                                </div>
-                                {previousPhasesTotal > 0 && (
-                                  <div className="text-xs text-gray-500 text-center">
-                                    (Total − Previous phases = Available)
-                                  </div>
-                                )}
-                              </div>
-                              
-                              <div className="space-y-3">
-                                <div className="relative">
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    max={availableForThisPhase}
-                                    value={currentValue}
-                                    onChange={(e) =>
-                                      setCustomPhaseHours((prev) => ({
-                                        ...prev,
-                                        [phase]: e.target.value,
-                                      }))
-                                    }
-                                    placeholder={`Default: ${defaultValue}`}
-                                    className={`w-full px-3 py-2.5 border rounded-lg text-sm font-medium transition-colors ${
-                                      actualValue > availableForThisPhase 
-                                        ? 'border-red-300 focus:border-red-500 focus:ring-red-500 bg-red-50' 
-                                        : 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white'
-                                    }`}
-                                  />
-                                  <span className="absolute right-3 top-2.5 text-xs text-gray-400 font-medium">hrs</span>
-                                </div>
-                                
-                                {/* Available vs Allocated */}
-                                <div className="flex items-center justify-between text-xs">
-                                  <span className="text-gray-500">Available for this phase:</span>
-                                  <span className={`font-semibold ${
-                                    availableForThisPhase < actualValue ? 'text-red-600' : 'text-emerald-600'
-                                  }`}>
-                                    {availableForThisPhase} hrs
-                                  </span>
-                                </div>
-                                
-                                {/* Remaining after this phase */}
-                                <div className="flex items-center justify-between text-xs">
-                                  <span className="text-gray-500">After this phase:</span>
-                                  <span className={`font-semibold ${
-                                    remainingAfterThisPhase < 0 ? 'text-red-600' : 'text-blue-600'
-                                  }`}>
-                                    {remainingAfterThisPhase} hrs remaining
-                                  </span>
-                                </div>
-                                
-                                {/* Warning if over-allocated */}
-                                {actualValue > availableForThisPhase && (
-                                  <div className="flex items-center text-xs text-red-600 bg-red-50 px-2 py-1 rounded">
-                                    <FiAlertCircle className="mr-1 flex-shrink-0" />
-                                    <span>Exceeds available hours by {actualValue - availableForThisPhase}</span>
-                                  </div>
-                                )}
-                                
-                                {/* Quick Actions */}
-                                <div className="flex gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => setCustomPhaseHours((prev) => ({
-                                      ...prev,
-                                      [phase]: Math.min(defaultValue, availableForThisPhase).toString(),
-                                    }))}
-                                    className="flex-1 px-2 py-1 text-xs bg-white border border-gray-300 rounded text-gray-600 hover:bg-gray-50 transition-colors"
-                                  >
-                                    Use Default
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setCustomPhaseHours((prev) => ({
-                                      ...prev,
-                                      [phase]: availableForThisPhase.toString(),
-                                    }))}
-                                    className="flex-1 px-2 py-1 text-xs bg-indigo-50 border border-indigo-200 rounded text-indigo-600 hover:bg-indigo-100 transition-colors"
-                                  >
-                                    Use All
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setCustomPhaseHours((prev) => ({
-                                      ...prev,
-                                      [phase]: "",
-                                    }))}
-                                    className="flex-1 px-2 py-1 text-xs bg-white border border-gray-300 rounded text-gray-600 hover:bg-gray-50 transition-colors"
-                                  >
-                                    Clear
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      
-                      {/* Summary at bottom */}
-                      <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <div className="flex items-start">
-                          <div className="flex-shrink-0">
-                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                              <FiCheck className="w-4 h-4 text-blue-600" />
-                            </div>
-                          </div>
-                          <div className="ml-3">
-                            <h3 className="text-sm font-medium text-blue-900">Quick Tips</h3>
-                            <div className="mt-1 text-sm text-blue-700">
-                              <ul className="list-disc list-inside space-y-1">
-                                <li>Leave fields empty to use default database hours</li>
-                                <li>Ensure total allocated hours don't exceed {totalTrainingHours} hours</li>
-                                <li>Phase 2 and Phase 3 can be configured separately in later steps</li>
-                              </ul>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 {/* Training Domain + Batch Details */}
                 {getMainPhase() && (
                   <>
@@ -1249,29 +903,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
                         </select>
                       </div>
                     </div>
-                    
-                    {selectedPhases.length > 1 && (
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Select Phase to Configure
-                          </label>
-                          <div className="max-w-md">
-                            <select
-                              value={currentPhase}
-                              onChange={(e) => setCurrentPhase(e.target.value)}
-                              className="w-full px-4 py-3 text-base rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500 shadow-sm"
-                            >
-                              {selectedPhases.map((phase) => (
-                                <option key={phase} value={phase}>
-                                  {phase.replace("-", " ").toUpperCase()}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-                    )}
                     
                     {/* Batch Details Table */}
                     <div className="space-y-4">
