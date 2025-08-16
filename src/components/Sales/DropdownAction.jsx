@@ -32,14 +32,14 @@ const DropdownActions = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Debug logs
-  useEffect(() => {
-    console.group("DropdownActions Debug");
-    console.log("Firebase Auth User:", currentUser);
-    console.log("Firestore Users Collection:", users);
-    console.log("Current User Data:", currentUserData);
-    console.log("Is Admin:", currentUserData?.department === "Admin");
-    console.groupEnd();
-  }, [currentUser, users, currentUserData]);
+  // useEffect(() => {
+  //   console.group("DropdownActions Debug");
+  //   console.log("Firebase Auth User:", currentUser);
+  //   console.log("Firestore Users Collection:", users);
+  //   console.log("Current User Data:", currentUserData);
+  //   console.log("Is Admin:", currentUserData?.department === "Admin");
+  //   console.groupEnd();
+  // }, [currentUser, users, currentUserData]);
 
   // Get complete user data from Firestore
   useEffect(() => {
@@ -51,9 +51,9 @@ const DropdownActions = ({
 
       if (userDoc) {
         setCurrentUserData(userDoc);
-        console.log("Found user document:", userDoc);
+        // console.log("Found user document:", userDoc);
       } else {
-        console.warn("User document not found in Firestore");
+        // console.warn("User document not found in Firestore");
         setCurrentUserData(null);
       }
     }
@@ -63,9 +63,9 @@ const DropdownActions = ({
     setIsDeleting(true);
     try {
       await deleteDoc(doc(db, "leads", leadId));
-      console.log("Lead deleted successfully");
+      // console.log("Lead deleted successfully");
     } catch (error) {
-      console.error("Error deleting lead:", error);
+      // console.error("Error deleting lead:", error);
     } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);
@@ -73,48 +73,47 @@ const DropdownActions = ({
     }
   };
 
- const getAssignableUsers = () => {
-  if (!currentUserData || !users) return [];
+  const getAssignableUsers = () => {
+    if (!currentUserData || !users) return [];
 
-  const userList = Object.values(users);
-  const allSalesUsers = userList.filter(
-    (u) =>
-      ["Sales", "Admin"].includes(u.department) && u.uid !== currentUser.uid
-  );
-
-  console.log("Current user role:", currentUserData.role);
-
-  if (["Director", "Head"].includes(currentUserData.role)) {
-    return allSalesUsers;
-  }
-
-  if (currentUserData.role === "Manager") {
-    // Get Assistant Managers, Executives, and Managers (excluding self)
-    return allSalesUsers.filter(
+    const userList = Object.values(users);
+    const allSalesUsers = userList.filter(
       (u) =>
-        (
-          (u.reportingManager === currentUserData.name &&
-            ["Assistant Manager", "Executive"].includes(u.role))
-          ||
-          (u.role === "Manager" && u.uid !== currentUser.uid)
-        )
+        ["Sales", "Admin"].includes(u.department) && u.uid !== currentUser.uid
     );
-  }
-  if (["Assistant Manager", "Executive"].includes(currentUserData.role)) {
-    const manager = userList.find(
-      (u) => u.name === currentUserData.reportingManager
-    );
-    const peers = allSalesUsers.filter(
-      (u) =>
-        u.reportingManager === currentUserData.reportingManager &&
-        u.uid !== currentUser.uid
-    );
-    return [manager, ...peers].filter(Boolean);
-  }
 
-  return [];
-};
+    // console.log("Current user role:", currentUserData.role);
 
+    if (["Director", "Head"].includes(currentUserData.role)) {
+      return allSalesUsers;
+    }
+
+    if (currentUserData.role === "Manager") {
+      // Get Assistant Managers, Executives, and Managers (excluding self)
+      return allSalesUsers.filter(
+        (u) =>
+          (
+            (u.reportingManager === currentUserData.name &&
+              ["Assistant Manager", "Executive"].includes(u.role))
+            ||
+            (u.role === "Manager" && u.uid !== currentUser.uid)
+          )
+      );
+    }
+    if (["Assistant Manager", "Executive"].includes(currentUserData.role)) {
+      const manager = userList.find(
+        (u) => u.name === currentUserData.reportingManager
+      );
+      const peers = allSalesUsers.filter(
+        (u) =>
+          u.reportingManager === currentUserData.reportingManager &&
+          u.uid !== currentUser.uid
+      );
+      return [manager, ...peers].filter(Boolean);
+    }
+
+    return [];
+  };
 
   const assignableUsers = getAssignableUsers();
 

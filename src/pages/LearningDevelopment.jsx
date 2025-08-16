@@ -5,9 +5,9 @@ import TrainingTable from "../components/Learning/TrainingTables/TrainingTable";
 import TrainingDetailModal from "../components/Learning/TrainingTables/TrainingDetailModal";
 import FilePreviewModal from "../components/Learning/TrainingTables/FilePreviewModal";
 import StudentDataPage from "../components/Learning/StudentDataPage";
-import InitiationDashboard from "../components/Learning/InitiationDashboard";
-import InitiationTrainingDetails from "../components/Learning/InitiationTrainingDetails"; // <-- create this
-import InitiationModal from "../components/Learning/TrainingTables/InitiationModal"; // <-- import InitiationModal
+import InitiationDashboard from "../components/Learning/Initiate/InitiationDashboard";
+import InitiationTrainingDetails from "../components/Learning/Initiate/InitiationTrainingDetails"; // <-- create this
+import InitiationModal from "../components/Learning/Initiate/InitiationModal"; // <-- import InitiationModal
 
 import { useNavigate } from "react-router-dom";
 
@@ -19,7 +19,6 @@ function LearningDevelopment() {
   const [fileUrl, setFileUrl] = useState("");
   const [modalTrainingId, setModalTrainingId] = useState(null);
   const [studentPageData, setStudentPageData] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("newContact");
   const [selectedInitiationTraining, setSelectedInitiationTraining] = useState(null);
@@ -30,7 +29,6 @@ function LearningDevelopment() {
 
   const fetchTrainings = async () => {
     try {
-      setLoading(true);
       setError(null);
 
       const q = query(
@@ -48,8 +46,6 @@ function LearningDevelopment() {
     } catch (err) {
       console.error("Error fetching trainings:", err);
       setError("Failed to load training data. Please try again.");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -168,58 +164,42 @@ function LearningDevelopment() {
           </div>
         )}
 
-        {/* Initiation Section as a dummy page */}
-        {initiationTraining ? (
-          <InitiationModal
-            training={initiationTraining}
-            onBack={() => setInitiationTraining(null)}
-            onConfirm={(training) => {
-              // Add your confirm logic here
-              setInitiationTraining(null);
-            }}
-          />
-        ) : (
+        {/* Tab Content */}
+        {activeTab === "newContact" ? (
           <>
-            {/* Tab Content */}
-            {activeTab === "newContact" ? (
-              <>
-                <TrainingTable
-                  trainingData={trainings}
-                  onRowClick={setSelectedTraining}
-                  onViewStudentData={handleViewStudentData}
-                  onViewMouFile={handleViewMouFile}
-                  onInitiate={handleInitiateClick} // <-- yeh prop pass karo
-                />
+            <TrainingTable
+              trainingData={trainings}
+              onRowClick={setSelectedTraining}
+              onViewStudentData={handleViewStudentData}
+              onViewMouFile={handleViewMouFile}
+              onInitiate={handleInitiateClick}
+            />
 
-                {selectedTraining && (
-                  <TrainingDetailModal
-                    training={selectedTraining}
-                    onClose={() => setSelectedTraining(null)}
-                  />
-                )}
+            {selectedTraining && (
+              <TrainingDetailModal
+                training={selectedTraining}
+                onClose={() => setSelectedTraining(null)}
+              />
+            )}
 
-                {showFileModal && fileType === "mou" && (
-                  <FilePreviewModal
-                    fileUrl={fileUrl}
-                    type={fileType}
-                    trainingId={modalTrainingId}
-                    onClose={() => setShowFileModal(false)}
-                  />
-
-                )}
-
-              </>
-            ) : (
-              selectedInitiationTraining ? (
-                <InitiationTrainingDetails
-                  training={selectedInitiationTraining}
-                  onBack={() => setSelectedInitiationTraining(null)}
-                />
-              ) : (
-                <InitiationDashboard onRowClick={setSelectedInitiationTraining} />
-              )
+            {showFileModal && fileType === "mou" && (
+              <FilePreviewModal
+                fileUrl={fileUrl}
+                type={fileType}
+                trainingId={modalTrainingId}
+                onClose={() => setShowFileModal(false)}
+              />
             )}
           </>
+        ) : (
+          selectedInitiationTraining ? (
+            <InitiationTrainingDetails
+              training={selectedInitiationTraining}
+              onBack={() => setSelectedInitiationTraining(null)}
+            />
+          ) : (
+            <InitiationDashboard onRowClick={setSelectedInitiationTraining} />
+          )
         )}
       </div>
     </>
