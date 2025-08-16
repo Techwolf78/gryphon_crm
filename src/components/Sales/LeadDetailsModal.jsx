@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 
 const statusColorMap = {
   hot: {
@@ -105,6 +105,27 @@ const getLatestFollowup = (lead) => {
   return `${latest.date || "-"} ${latest.time || ""} - ${latest.remarks || ""}`;
 };
 
+const copyToClipboard = (text) => {
+  if (!text) return;
+  navigator.clipboard.writeText(text);
+  // Optionally, you can show a toast or feedback here
+};
+
+const CopyIcon = ({ text, label }) => (
+  <button
+    type="button"
+    onClick={() => copyToClipboard(text)}
+    title={`Copy ${label}`}
+    className="ml-2 text-gray-400 hover:text-blue-500 transition-colors p-1 rounded-full"
+    tabIndex={-1}
+  >
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <rect x="9" y="9" width="13" height="13" rx="2" strokeWidth="2" stroke="currentColor" />
+      <rect x="3" y="3" width="13" height="13" rx="2" strokeWidth="2" stroke="currentColor" />
+    </svg>
+  </button>
+);
+
 export default function LeadDetailsModal({
   selectedLead,
   onClose,
@@ -171,9 +192,9 @@ export default function LeadDetailsModal({
         {/* Main Content */}
         <div className="p-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Column 1 - Contact Information */}
-            <div className="space-y-5">
-              {/* Contact Card with subtle animation */}
+            {/* Column 1 - Contact, Location, Remarks */}
+            <div className="space-y-5 flex flex-col h-full">
+              {/* Contact Card */}
               <div
                 className={`bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:border-gray-200 ${statusColors.ring} hover:ring-2`}
               >
@@ -204,35 +225,28 @@ export default function LeadDetailsModal({
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider col-span-1">
                       Contact Person
                     </p>
-                    <p className="mt-0 text-gray-900 font-medium col-span-3">
+                    <p className="mt-0 text-gray-900 font-medium col-span-3 flex items-center">
                       {selectedLead.pocName || "-"}
+                      {selectedLead.pocName && (
+                        <CopyIcon text={selectedLead.pocName} label="Contact Person" />
+                      )}
                     </p>
                   </div>
                   <div className="grid grid-cols-4 gap-4 items-center">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider col-span-1">
                       Phone
                     </p>
-                    <p className="mt-0 text-gray-900 font-medium col-span-3">
+                    <p className="mt-0 text-gray-900 font-medium col-span-3 flex items-center">
                       {selectedLead.phoneNo ? (
-                        <a
-                          href={`tel:${selectedLead.phoneNo}`}
-                          className="hover:text-blue-600 transition-colors flex items-center group"
-                        >
-                          {selectedLead.phoneNo}
-                          <svg
-                            className="w-4 h-4 ml-2 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                        <>
+                          <a
+                            href={`tel:${selectedLead.phoneNo}`}
+                            className="hover:text-blue-600 transition-colors flex items-center group"
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-                            />
-                          </svg>
-                        </a>
+                            {selectedLead.phoneNo}
+                          </a>
+                          <CopyIcon text={selectedLead.phoneNo} label="Phone" />
+                        </>
                       ) : (
                         "-"
                       )}
@@ -242,27 +256,17 @@ export default function LeadDetailsModal({
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider col-span-1">
                       Email
                     </p>
-                    <p className="mt-0 text-gray-900 font-medium col-span-3 break-all">
+                    <p className="mt-0 text-gray-900 font-medium col-span-3 flex items-center break-all">
                       {selectedLead.email ? (
-                        <a
-                          href={`mailto:${selectedLead.email}`}
-                          className="hover:text-blue-600 transition-colors flex items-center group"
-                        >
-                          {selectedLead.email}
-                          <svg
-                            className="w-4 h-4 ml-2 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                        <>
+                          <a
+                            href={`mailto:${selectedLead.email}`}
+                            className="hover:text-blue-600 transition-colors flex items-center group"
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                            />
-                          </svg>
-                        </a>
+                            {selectedLead.email}
+                          </a>
+                          <CopyIcon text={selectedLead.email} label="Email" />
+                        </>
                       ) : (
                         "-"
                       )}
@@ -355,8 +359,11 @@ export default function LeadDetailsModal({
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider col-span-1">
                       Address
                     </p>
-                    <p className="mt-0 text-gray-900 font-medium col-span-3">
+                    <p className="mt-0 text-gray-900 font-medium col-span-3 flex items-center">
                       {selectedLead.address || "-"}
+                      {selectedLead.address && (
+                        <CopyIcon text={selectedLead.address} label="Address" />
+                      )}
                     </p>
                   </div>
                   <div className="grid grid-cols-4 gap-4">
@@ -382,10 +389,48 @@ export default function LeadDetailsModal({
                   </div>
                 </div>
               </div>
+
+              {/* Remarks Card */}
+              <div
+                className={`bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:border-gray-200 ${statusColors.ring} hover:ring-2`}
+              >
+                <h3 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100 flex items-center">
+                  <span
+                    className={`inline-block w-2 h-2 rounded-full ${statusColors.accent} mr-2`}
+                  ></span>
+                  <span className="flex items-center">
+                    <svg
+                      className="w-5 h-5 mr-2 text-gray-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M17 8h2a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2v-8a2 2 0 012-2h2"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 3h-6a2 2 0 00-2 2v2a2 2 0 002 2h6a2 2 0 002-2V5a2 2 0 00-2-2z"
+                      />
+                    </svg>
+                    Lead Remarks
+                  </span>
+                </h3>
+                <div className="min-h-[40px] text-gray-900 font-medium">
+                  {selectedLead.remarks || (
+                    <span className="text-gray-400">No remarks added.</span>
+                  )}
+                </div>
+              </div>
             </div>
 
-            {/* Column 2 - Lead Details */}
-            <div className="space-y-5">
+            {/* Column 2 - Accreditation, Courses, Summary */}
+            <div className="space-y-5 flex flex-col h-full">
               {/* Accreditation & Affiliation Card */}
               <div
                 className={`bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:border-gray-200 ${statusColors.ring} hover:ring-2`}
@@ -542,141 +587,136 @@ export default function LeadDetailsModal({
                 </div>
               </div>
 
-              {/* Financial Summary Card */}
+              {/* Combined Summary Card */}
               <div
-                className={`bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:border-gray-200 ${statusColors.ring} hover:ring-2`}
+                className={`bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:border-gray-200 ${statusColors.ring} hover:ring-2 flex flex-col gap-6`}
               >
-                <h3 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100 flex items-center">
-                  <span
-                    className={`inline-block w-2 h-2 rounded-full ${statusColors.accent} mr-2`}
-                  ></span>
-                  <span className="flex items-center">
-                    <svg
-                      className="w-5 h-5 mr-2 text-gray-500"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                    Financial Summary
-                  </span>
-                </h3>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Total TCV
-                    </p>
-                    <p className="mt-1 text-gray-900 font-bold text-lg">
-                      {selectedLead.tcv ? (
-                        <span className="text-green-600">
-                          ₹{selectedLead.tcv.toLocaleString()}
-                        </span>
-                      ) : (
-                        "-"
-                      )}
-                    </p>
-                  </div>
-                  <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Total Students
-                    </p>
-                    <p className="mt-1 text-gray-900 font-bold text-lg">
-                      {selectedLead.courses && selectedLead.courses.length > 0
-                        ? selectedLead.courses
-                            .reduce(
-                              (sum, course) =>
-                                sum + (parseInt(course.studentCount) || 0),
-                              0
-                            )
-                            .toLocaleString()
-                        : "-"}
-                    </p>
+                {/* Financial Summary */}
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100 flex items-center">
+                    <span
+                      className={`inline-block w-2 h-2 rounded-full ${statusColors.accent} mr-2`}
+                    ></span>
+                    <span className="flex items-center">
+                      <svg
+                        className="w-5 h-5 mr-2 text-gray-500"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                      Financial Summary
+                    </span>
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        Total TCV
+                      </p>
+                      <p className="mt-1 text-gray-900 font-bold text-lg">
+                        {selectedLead.tcv ? (
+                          <span className="text-green-600">
+                            ₹{selectedLead.tcv.toLocaleString()}
+                          </span>
+                        ) : (
+                          "-"
+                        )}
+                      </p>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        Total Students
+                      </p>
+                      <p className="mt-1 text-gray-900 font-bold text-lg">
+                        {selectedLead.courses && selectedLead.courses.length > 0
+                          ? selectedLead.courses
+                              .reduce(
+                                (sum, course) =>
+                                  sum + (parseInt(course.studentCount) || 0),
+                                0
+                              )
+                              .toLocaleString()
+                          : "-"}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              {/* Timeline Card */}
-              <div
-                className={`bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:border-gray-200 ${statusColors.ring} hover:ring-2`}
-              >
-                <h3 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100 flex items-center">
-                  <span
-                    className={`inline-block w-2 h-2 rounded-full ${statusColors.accent} mr-2`}
-                  ></span>
-                  <span className="flex items-center">
-                    <svg
-                      className="w-5 h-5 mr-2 text-gray-500"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                      />
-                    </svg>
-                    Timeline
-                  </span>
-                </h3>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Created Date
-                    </p>
-                    <p className="mt-1 text-gray-900 font-medium">
-                      {formatDate(selectedLead.createdAt)}
-                    </p>
-                  </div>
-                  <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Expected Closure
-                    </p>
-                    <p className="mt-1 text-gray-900 font-medium">
-                      {formatDate(selectedLead.expectedClosureDate)}
-                    </p>
+                {/* Timeline */}
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100 flex items-center">
+                    <span
+                      className={`inline-block w-2 h-2 rounded-full ${statusColors.accent} mr-2`}
+                    ></span>
+                    <span className="flex items-center">
+                      <svg
+                        className="w-5 h-5 mr-2 text-gray-500"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        />
+                      </svg>
+                      Timeline
+                    </span>
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        Created Date
+                      </p>
+                      <p className="mt-1 text-gray-900 font-medium">
+                        {formatDate(selectedLead.createdAt)}
+                      </p>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        Expected Closure
+                      </p>
+                      <p className="mt-1 text-gray-900 font-medium">
+                        {formatDate(selectedLead.expectedClosureDate)}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              {/* Followup Card */}
-              <div
-                className={`bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:border-gray-200 ${statusColors.ring} hover:ring-2`}
-              >
-                <h3 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100 flex items-center">
-                  <span
-                    className={`inline-block w-2 h-2 rounded-full ${statusColors.accent} mr-2`}
-                  ></span>
-                  <span className="flex items-center">
-                    <svg
-                      className="w-5 h-5 mr-2 text-gray-500"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-                      />
-                    </svg>
-                    Latest Meeting
-                  </span>
-                </h3>
-                <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-                  <p className="text-gray-900 font-medium">
-                    {getLatestFollowup(selectedLead)}
-                  </p>
+                {/* Followup */}
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100 flex items-center">
+                    <span
+                      className={`inline-block w-2 h-2 rounded-full ${statusColors.accent} mr-2`}
+                    ></span>
+                    <span className="flex items-center">
+                      <svg
+                        className="w-5 h-5 mr-2 text-gray-500"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
+                        />
+                      </svg>
+                      Latest Meeting
+                    </span>
+                  </h3>
+                  <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                    <p className="text-gray-900 font-medium">
+                      {getLatestFollowup(selectedLead)}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
