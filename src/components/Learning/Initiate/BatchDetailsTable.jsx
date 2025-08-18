@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../../../firebase";
 import {
@@ -81,6 +81,8 @@ const BatchDetailsTable = ({
 
   const [trainers, setTrainers] = useState([]);
   const [expandedTrainer, setExpandedTrainer] = useState({});
+  const didAutoExpand = useRef(false);
+
   const [expandedBatch, setExpandedBatch] = useState({});
   const [swapModal, setSwapModal] = useState({ open: false, source: null });
 
@@ -578,23 +580,25 @@ const BatchDetailsTable = ({
   }, [table1Data]);
 
   useEffect(() => {
-    // Auto-expand all trainers if they have prefilled data
-    const expanded = {};
-    table1Data.forEach((row, rowIdx) => {
-      row.batches.forEach((batch, batchIdx) => {
-        (batch.trainers || []).forEach((trainer, trainerIdx) => {
-          // Expand if trainer has assignedHours or activeDates (prefilled)
-          if (
-            trainer &&
-            (trainer.assignedHours > 0 ||
-              (trainer.activeDates && trainer.activeDates.length > 0))
-          ) {
-            expanded[`${rowIdx}-${batchIdx}-${trainerIdx}`] = true;
-          }
+    // Only auto-expand ONCE (on first load)
+    if (!didAutoExpand.current && table1Data && table1Data.length > 0) {
+      const expanded = {};
+      table1Data.forEach((row, rowIdx) => {
+        row.batches.forEach((batch, batchIdx) => {
+          (batch.trainers || []).forEach((trainer, trainerIdx) => {
+            if (
+              trainer &&
+              (trainer.assignedHours > 0 ||
+                (trainer.activeDates && trainer.activeDates.length > 0))
+            ) {
+              expanded[`${rowIdx}-${batchIdx}-${trainerIdx}`] = true;
+            }
+          });
         });
       });
-    });
-    setExpandedTrainer(expanded);
+      setExpandedTrainer(expanded);
+      didAutoExpand.current = true;
+    }
     // eslint-disable-next-line
   }, [table1Data]);
 
