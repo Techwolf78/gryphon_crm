@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../../../firebase";
 import {
@@ -81,6 +81,8 @@ const BatchDetailsTable = ({
 
   const [trainers, setTrainers] = useState([]);
   const [expandedTrainer, setExpandedTrainer] = useState({});
+  const didAutoExpand = useRef(false);
+
   const [expandedBatch, setExpandedBatch] = useState({});
   const [swapModal, setSwapModal] = useState({ open: false, source: null });
 
@@ -509,6 +511,59 @@ const handleTrainerField = (rowIndex, batchIndex, trainerIdx, field, value) => {
     });
     return list;
   };
+
+  useEffect(() => {
+    // Convert all trainer.activeDates from string to Date objects if needed
+    if (!table1Data || table1Data.length === 0) return;
+
+    let changed = false;
+    const updated = table1Data.map(row => ({
+      ...row,
+      batches: row.batches.map(batch => ({
+        ...batch,
+        trainers: (batch.trainers || []).map(trainer => {
+          if (
+            trainer.activeDates &&
+            typeof trainer.activeDates[0] === "string"
+          ) {
+            changed = true;
+            return {
+              ...trainer,
+              activeDates: trainer.activeDates.map(d => new Date(d)),
+            };
+          }
+          return trainer;
+        }),
+      })),
+    }));
+
+    if (changed) setTable1Data(updated);
+    // eslint-disable-next-line
+  }, [table1Data]);
+
+  useEffect(() => {
+    // Only auto-expand ONCE (on first load)
+    if (!didAutoExpand.current && table1Data && table1Data.length > 0) {
+      const expanded = {};
+      table1Data.forEach((row, rowIdx) => {
+        row.batches.forEach((batch, batchIdx) => {
+          (batch.trainers || []).forEach((trainer, trainerIdx) => {
+            if (
+              trainer &&
+              (trainer.assignedHours > 0 ||
+                (trainer.activeDates && trainer.activeDates.length > 0))
+            ) {
+              expanded[`${rowIdx}-${batchIdx}-${trainerIdx}`] = true;
+            }
+          });
+        });
+      });
+      setExpandedTrainer(expanded);
+      didAutoExpand.current = true;
+    }
+    // eslint-disable-next-line
+  }, [table1Data]);
+
 
   return (
     <div className="space-y-6">
