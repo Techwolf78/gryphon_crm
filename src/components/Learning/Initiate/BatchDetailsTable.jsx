@@ -96,48 +96,38 @@ const BatchDetailsTable = ({
     info: "bg-blue-100 text-blue-800",
     accent: "bg-indigo-50 text-indigo-700",
   };
-  const isTrainerAvailable = (
-    trainerId,
-    date,
-    dayDuration,
-    excludeTrainerKey = null,
-    currentBatchKey = null
-  ) => {
-    // Check if this trainer is already assigned to any batch (including current batch)
-    for (let rowIdx = 0; rowIdx < table1Data.length; rowIdx++) {
-      const row = table1Data[rowIdx];
-      for (let batchIdx = 0; batchIdx < row.batches.length; batchIdx++) {
-        const batch = row.batches[batchIdx];
-        const batchKey = `${rowIdx}-${batchIdx}`;
-
-        // Skip checking same batch if currentBatchKey is provided
-        if (currentBatchKey && batchKey === currentBatchKey) continue;
-
-        for (
-          let trainerIdx = 0;
-          trainerIdx < batch.trainers.length;
-          trainerIdx++
+const isTrainerAvailable = (trainerId, date, dayDuration, excludeTrainerKey = null, currentBatchKey = null) => {
+  // Check if this trainer is already assigned to any batch (including current batch)
+  for (let rowIdx = 0; rowIdx < table1Data.length; rowIdx++) {
+    const row = table1Data[rowIdx];
+    for (let batchIdx = 0; batchIdx < row.batches.length; batchIdx++) {
+      const batch = row.batches[batchIdx];
+      const batchKey = `${rowIdx}-${batchIdx}`;
+      
+      // Skip checking same batch if currentBatchKey is provided
+      if (currentBatchKey && batchKey === currentBatchKey) continue;
+      
+      for (let trainerIdx = 0; trainerIdx < batch.trainers.length; trainerIdx++) {
+        const trainer = batch.trainers[trainerIdx];
+        const currentKey = `${rowIdx}-${batchIdx}-${trainerIdx}`;
+        
+        if (excludeTrainerKey === currentKey) continue;
+        
+        if (
+          trainer.trainerId === trainerId &&
+          trainer.dayDuration === dayDuration &&
+          trainer.startDate &&
+          trainer.endDate &&
+          new Date(date) >= new Date(trainer.startDate) &&
+          new Date(date) <= new Date(trainer.endDate)
         ) {
-          const trainer = batch.trainers[trainerIdx];
-          const currentKey = `${rowIdx}-${batchIdx}-${trainerIdx}`;
-
-          if (excludeTrainerKey === currentKey) continue;
-
-          if (
-            trainer.trainerId === trainerId &&
-            trainer.dayDuration === dayDuration &&
-            trainer.startDate &&
-            trainer.endDate &&
-            new Date(date) >= new Date(trainer.startDate) &&
-            new Date(date) <= new Date(trainer.endDate)
-          ) {
-            return false; // Trainer is already booked
-          }
+          return false; // Trainer is already booked
         }
       }
     }
-    return true;
-  };
+  }
+  return true;
+};
   useEffect(() => {
     const fetchTrainers = async () => {
       try {
@@ -162,22 +152,18 @@ const BatchDetailsTable = ({
   const addBatch = (rowIndex) => {
     const updatedData = [...table1Data];
     const batches = updatedData[rowIndex].batches;
+    const batch1AssignedHours =
+      batches.length > 0 ? batches[0].assignedHours : 0;
     const newBatchIndex = batches.length;
-    const firstBatchHours = batches[0]?.assignedHours || 0;
-
-    // Add new batch with assignedHours same as first batch
-    batches.push({
+    updatedData[rowIndex].batches.push({
       batchPerStdCount: "",
-      batchCode: generateBatchCode(updatedData[rowIndex].batch, newBatchIndex + 1),
-      assignedHours: firstBatchHours,
+      batchCode: generateBatchCode(
+        updatedData[rowIndex].batch,
+        newBatchIndex + 1
+      ),
+      assignedHours: batch1AssignedHours, // always match batch 1's assigned hours
       trainers: [],
     });
-
-    // Ensure all batches have the same assignedHours as the first batch
-    batches.forEach((batch) => {
-      batch.assignedHours = firstBatchHours;
-    });
-
     setTable1Data(updatedData);
   };
 
@@ -278,22 +264,22 @@ const BatchDetailsTable = ({
     setTable1Data(updatedData);
   };
 
-  const addTrainer = (rowIndex, batchIndex) => {
-    const updated = [...table1Data];
-    const batch = updated[rowIndex].batches[batchIndex];
-    if (!batch.trainers) batch.trainers = [];
-
-    batch.trainers.push({
-      trainerId: "",
-      trainerName: "",
-      assignedHours: "",
-      dayDuration: "",
-      startDate: "",
-      endDate: "",
-      dailyHours: [],
-    });
-    setTable1Data(updated);
-  };
+const addTrainer = (rowIndex, batchIndex) => {
+  const updated = [...table1Data];
+  const batch = updated[rowIndex].batches[batchIndex];
+  if (!batch.trainers) batch.trainers = [];
+  
+  batch.trainers.push({
+    trainerId: "",
+    trainerName: "",
+    assignedHours: "",
+    dayDuration: "",
+    startDate: "",
+    endDate: "",
+    dailyHours: [],
+  });
+  setTable1Data(updated);
+};
   const removeTrainer = (rowIndex, batchIndex, trainerIdx) => {
     const updated = [...table1Data];
     const batch = updated[rowIndex].batches[batchIndex];
@@ -324,93 +310,69 @@ const BatchDetailsTable = ({
     return total > 0 ? +(total / 60).toFixed(2) : 0;
   };
 
-  const handleTrainerField = (
-    rowIndex,
-    batchIndex,
-    trainerIdx,
-    field,
-    value
-  ) => {
-    const updated = [...table1Data];
-    const batch = updated[rowIndex].batches[batchIndex];
-    const trainer = batch.trainers[trainerIdx];
+const handleTrainerField = (rowIndex, batchIndex, trainerIdx, field, value) => {
+  const updated = [...table1Data];
+  const batch = updated[rowIndex].batches[batchIndex];
+  const trainer = batch.trainers[trainerIdx];
 
-    // Create tempTrainer with new value
-    const tempTrainer = { ...trainer, [field]: value };
+  // Create tempTrainer with new value
+  const tempTrainer = { ...trainer, [field]: value };
 
-    if (["dayDuration", "startDate", "endDate"].includes(field)) {
-      if (
-        !tempTrainer.dayDuration ||
-        !tempTrainer.startDate ||
-        !tempTrainer.endDate
-      ) {
-        // Not enough data yet to check conflict
-        trainer[field] = value;
-        setTable1Data(updated);
-        return;
-      }
-
-      // Prepare dates
-      const normalizeDate = (dateStr) =>
-        new Date(dateStr).toISOString().slice(0, 10);
-      const newTrainerDates = getDateListExcludingSundays(
-        tempTrainer.startDate,
-        tempTrainer.endDate
-      );
-      const newTrainerDatesNormalized = newTrainerDates.map(normalizeDate);
-
-      const hasConflict = batch.trainers.some((t, idx) => {
-        if (idx === trainerIdx) return false;
-        if (t.dayDuration !== tempTrainer.dayDuration) return false;
-
-        const existingDates =
-          t.activeDates || getDateListExcludingSundays(t.startDate, t.endDate);
-        const existingDatesNormalized = existingDates.map(normalizeDate);
-
-        return newTrainerDatesNormalized.some((date) =>
-          existingDatesNormalized.includes(date)
-        );
-      });
-
-      if (hasConflict) {
-        alert(
-          `This batch already has a trainer for ${tempTrainer.dayDuration} slot on overlapping dates.`
-        );
-        return;
-      }
+  if (["dayDuration", "startDate", "endDate"].includes(field)) {
+    if (!tempTrainer.dayDuration || !tempTrainer.startDate || !tempTrainer.endDate) {
+      // Not enough data yet to check conflict
+      trainer[field] = value;
+      setTable1Data(updated);
+      return;
     }
 
-    // No conflict, update the field
-    trainer[field] = value;
+    // Prepare dates
+    const normalizeDate = (dateStr) => new Date(dateStr).toISOString().slice(0,10);
+    const newTrainerDates = getDateListExcludingSundays(tempTrainer.startDate, tempTrainer.endDate);
+    const newTrainerDatesNormalized = newTrainerDates.map(normalizeDate);
 
-    // Then update derived fields if needed
-    if (["dayDuration", "startDate", "endDate"].includes(field)) {
-      const perDay = getTrainingHoursPerDay(commonFields);
-      let perDayHours = 0;
-      if (trainer.dayDuration === "AM & PM") perDayHours = perDay;
-      else if (trainer.dayDuration === "AM" || trainer.dayDuration === "PM")
-        perDayHours = +(perDay / 2).toFixed(2);
+    const hasConflict = batch.trainers.some((t, idx) => {
+      if (idx === trainerIdx) return false;
+      if (t.dayDuration !== tempTrainer.dayDuration) return false;
 
-      const dateList = getDateListExcludingSundays(
-        trainer.startDate,
-        trainer.endDate
-      );
-      trainer.activeDates = dateList;
-      trainer.dailyHours = dateList.map(() => perDayHours);
-      trainer.assignedHours = trainer.dailyHours.reduce(
-        (a, b) => a + Number(b || 0),
-        0
-      );
+      const existingDates = t.activeDates || getDateListExcludingSundays(t.startDate, t.endDate);
+      const existingDatesNormalized = existingDates.map(normalizeDate);
+
+      return newTrainerDatesNormalized.some(date => existingDatesNormalized.includes(date));
+    });
+
+    if (hasConflict) {
+      alert(`This batch already has a trainer for ${tempTrainer.dayDuration} slot on overlapping dates.`);
+      return;
     }
+  }
 
-    if (field === "trainerId") {
-      const tr = trainers.find((t) => t.trainerId === value);
-      trainer.trainerName = tr?.name || "";
-      trainer.perHourCost = tr?.paymentType === "Per Hour" ? tr?.charges : 0;
-    }
+  // No conflict, update the field
+  trainer[field] = value;
 
-    setTable1Data(updated);
-  };
+  // Then update derived fields if needed
+  if (["dayDuration", "startDate", "endDate"].includes(field)) {
+    const perDay = getTrainingHoursPerDay(commonFields);
+    let perDayHours = 0;
+    if (trainer.dayDuration === "AM & PM") perDayHours = perDay;
+    else if (trainer.dayDuration === "AM" || trainer.dayDuration === "PM")
+      perDayHours = +(perDay / 2).toFixed(2);
+
+    const dateList = getDateListExcludingSundays(trainer.startDate, trainer.endDate);
+    trainer.activeDates = dateList;
+    trainer.dailyHours = dateList.map(() => perDayHours);
+    trainer.assignedHours = trainer.dailyHours.reduce((a, b) => a + Number(b || 0), 0);
+  }
+
+  if (field === "trainerId") {
+    const tr = trainers.find((t) => t.trainerId === value);
+    trainer.trainerName = tr?.name || "";
+    trainer.perHourCost = tr?.paymentType === "Per Hour" ? tr?.charges : 0;
+  }
+
+  setTable1Data(updated);
+};
+
 
   const getAvailableSpecializations = (sourceRowIndex) => {
     return table1Data
@@ -602,6 +564,7 @@ const BatchDetailsTable = ({
     // eslint-disable-next-line
   }, [table1Data]);
 
+
   return (
     <div className="space-y-6">
       {/* Merge Modal */}
@@ -622,7 +585,7 @@ const BatchDetailsTable = ({
                   onChange={(e) =>
                     setMergeModal((prev) => ({
                       ...prev,
-                      targetSpecialization: e.target.value
+                      targetSpecialization: e.target.value,
                     }))
                   }
                 >
@@ -673,743 +636,829 @@ const BatchDetailsTable = ({
 
       {/* Swap Modal */}
       {/* Swap Modal */}
-      {swapModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-2xl">
-            {" "}
-            {/* Increased max width */}
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Select AM Trainer to Swap With
-            </h3>
-            <ul className="mb-4 max-h-96 overflow-y-auto">
-              {getAMTrainers().map((t, idx) => {
-                // Get the trainer's details
-                const trainerDetails =
-                  table1Data[t.rowIdx].batches[t.batchIdx].trainers[
-                    t.trainerIdx
-                  ];
-                const startDate = trainerDetails.startDate
-                  ? new Date(trainerDetails.startDate).toLocaleDateString()
-                  : "No start date";
-                const endDate = trainerDetails.endDate
-                  ? new Date(trainerDetails.endDate).toLocaleDateString()
-                  : "No end date";
-
-                return (
-                  <li
-                    key={idx}
-                    className="flex justify-between items-center py-3 px-4 border-b hover:bg-gray-50"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-3">
-                        <span className="font-medium truncate">
-                          {t.trainerName} ({t.trainerId})
-                        </span>
-                        <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded">
-                          {trainerDetails.dayDuration}
-                        </span>
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        <span className="block sm:inline">
-                          Batch: {t.batchCode}
-                        </span>
-                        <span className="hidden sm:inline mx-2">•</span>
-                        <span className="block sm:inline">
-                          Dates: {startDate} to {endDate}
-                        </span>
-                      </div>
-                    </div>
-                    <button
-                      className="ml-4 px-3 py-1 bg-indigo-600 text-white rounded text-sm whitespace-nowrap hover:bg-indigo-700 transition-colors"
-                      onClick={() => handleSwap(t)}
-                    >
-                      Swap
-                    </button>
-                  </li>
-                );
-              })}
-              {getAMTrainers().length === 0 && (
-                <li className="text-gray-400 py-4 text-center">
-                  No other AM trainers available for swapping.
-                </li>
-              )}
-            </ul>
-            <div className="flex justify-end">
+{swapModal.open && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
+    <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-2xl"> {/* Increased max width */}
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+        Select AM Trainer to Swap With
+      </h3>
+      <ul className="mb-4 max-h-96 overflow-y-auto">
+        {getAMTrainers().map((t, idx) => {
+          // Get the trainer's details
+          const trainerDetails = table1Data[t.rowIdx].batches[t.batchIdx].trainers[t.trainerIdx];
+          const startDate = trainerDetails.startDate ? new Date(trainerDetails.startDate).toLocaleDateString() : 'No start date';
+          const endDate = trainerDetails.endDate ? new Date(trainerDetails.endDate).toLocaleDateString() : 'No end date';
+          
+          return (
+            <li key={idx} className="flex justify-between items-center py-3 px-4 border-b hover:bg-gray-50">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center space-x-3">
+                  <span className="font-medium truncate">
+                    {t.trainerName} ({t.trainerId})
+                  </span>
+                  <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded">
+                    {trainerDetails.dayDuration}
+                  </span>
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  <span className="block sm:inline">Batch: {t.batchCode}</span>
+                  <span className="hidden sm:inline mx-2">•</span>
+                  <span className="block sm:inline">
+                    Dates: {startDate} to {endDate}
+                  </span>
+                </div>
+              </div>
               <button
-                className="mt-2 px-4 py-2 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
-                onClick={closeSwapModal}
+                className="ml-4 px-3 py-1 bg-indigo-600 text-white rounded text-sm whitespace-nowrap hover:bg-indigo-700 transition-colors"
+                onClick={() => handleSwap(t)}
               >
-                Cancel
+                Swap
               </button>
+            </li>
+          );
+        })}
+        {getAMTrainers().length === 0 && (
+          <li className="text-gray-400 py-4 text-center">
+            No other AM trainers available for swapping.
+          </li>
+        )}
+      </ul>
+      <div className="flex justify-end">
+        <button
+          className="mt-2 px-4 py-2 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
+          onClick={closeSwapModal}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+      {/* Main Batch Table */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Batch Management
+              </h3>
+              <p className="text-sm text-gray-500 mt-1">
+                {selectedDomain
+                  ? `${selectedDomain} domain`
+                  : "Select a domain to configure batches"}
+              </p>
             </div>
           </div>
         </div>
-      )}
 
-      <div className="space-y-3">
-        {/* Main Batch Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-4 py-2 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-semibold text-gray-900">
-                  Batch Management
-                </h3>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  {selectedDomain
-                    ? `${selectedDomain} domain`
-                    : "Select a domain to configure batches"}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="divide-y divide-gray-200">
-            {table1Data.length > 0 ? (
-              table1Data.map((row, rowIndex) => {
-                const totalAssignedStudents = row.batches.reduce(
-                  (sum, b) => sum + Number(b.batchPerStdCount || 0),
-                  0
-                );
-                const totalAssignedHours =
-                  row.batches.length > 0 ? Number(row.batches[0].assignedHours || 0) : 0;
-                const isExpanded = expandedBatch[rowIndex];
-
-                // Show message if no hours for this specialization
-                if (row.hrs === 0) {
-                  return (
-                    <div
-                      key={rowIndex}
-                      className="px-4 py-4 border-b border-gray-100 bg-yellow-50 rounded flex items-center space-x-3"
-                    >
-                      <div className="w-7 h-7 rounded-full bg-yellow-200 text-yellow-800 flex items-center justify-center text-xs font-bold">
+        <div className="divide-y divide-gray-200">
+          {table1Data.length > 0 ? (
+            table1Data.map((row, rowIndex) => {
+              const totalAssignedStudents = row.batches.reduce(
+                (sum, b) => sum + Number(b.batchPerStdCount || 0),
+                0
+              );
+              const totalAssignedHours = row.batches.reduce(
+                (sum, b) => sum + Number(b.assignedHours || 0),
+                0
+              );
+              const isExpanded = expandedBatch[rowIndex];
+              return (
+                <div key={rowIndex} className="transition-all duration-200">
+                  {/* Batch Header */}
+                  <div
+                    className={`px-6 py-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 ${
+                      isExpanded ? "bg-gray-50" : ""
+                    }`}
+                    onClick={() => toggleBatchExpansion(rowIndex)}
+                  >
+                    <div className="flex items-center space-x-4">
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                          getColorsForBatch(row.batch).accent
+                        }`}
+                      >
                         {rowIndex + 1}
                       </div>
                       <div>
-                        <div className="font-medium text-sm text-yellow-800">
+                        <h4
+                          className={`font-medium ${
+                            getColorsForBatch(row.batch).text
+                          }`}
+                        >
                           {row.batch}
-                        </div>
-                        <div className="text-xs text-yellow-700 mt-1">
-                          No hours configured for this specialization. Please set hours in the training domain setup.
+                        </h4>
+                        <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
+                          <span className="flex items-center">
+                            <FiUser className="mr-1.5" /> {row.stdCount}{" "}
+                            students
+                          </span>
+                          <span className="flex items-center">
+                            <FiClock className="mr-1.5" /> {row.hrs} hours
+                          </span>
                         </div>
                       </div>
                     </div>
-                  );
-                }
-
-                return (
-                  <div key={rowIndex} className="transition-all duration-200">
-                    {/* Batch Header */}
-                    <div
-                      className={`px-4 py-2 flex items-center justify-between cursor-pointer hover:bg-gray-50 ${
-                        isExpanded ? "bg-gray-50" : ""
-                      }`}
-                      onClick={() => toggleBatchExpansion(rowIndex)}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div
-                          className={`w-7 h-7 rounded-full flex items-center justify-center ${
-                            getColorsForBatch(row.batch).accent
-                          } text-xs`}
-                        >
-                          {rowIndex + 1}
-                        </div>
-                        <div>
-                          <h4
-                            className={`font-medium text-xs ${
-                              getColorsForBatch(row.batch).text
-                            }`}
-                          >
-                            {row.batch}
-                          </h4>
-                          <div className="flex items-center space-x-2 text-xs text-gray-500 mt-0.5">
-                            <span className="flex items-center">
-                              <FiUser className="mr-1" /> {row.stdCount} students
-                            </span>
-                            <span className="flex items-center">
-                              <FiClock className="mr-1" /> {row.hrs} hours
-                            </span>
-                          </div>
-                        </div>
+                    <div className="flex items-center space-x-3">
+                      <div
+                        className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          getColorsForBatch(row.batch).badge
+                        }`}
+                      >
+                        {totalAssignedStudents}/{row.stdCount} students
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <div
-                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                            getColorsForBatch(row.batch).badge
-                          }`}
-                        >
-                          {totalAssignedStudents}/{row.stdCount} students
-                        </div>
-                        <div
-                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                            getColorsForBatch(row.batch).badge
-                          }`}
-                        >
-                          {totalAssignedHours}/{row.hrs} hours
-                        </div>
-                        {/* ...rest of buttons... */}
+                      <div
+                        className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          getColorsForBatch(row.batch).badge
+                        }`}
+                      >
+                        {totalAssignedHours}/{row.hrs} hours
                       </div>
-                      <div className="flex items-center space-x-2">
-                        {/* Dropdown icon for expand/collapse */}
-                        {isExpanded ? (
-                          <FiChevronUp className="text-gray-500" size={18} />
-                        ) : (
-                          <FiChevronDown className="text-gray-500" size={18} />
-                        )}
-                        {/* ...status badges and buttons... */}
-                      </div>
+                      {/* ... rest of buttons ... */}
                     </div>
+                    <div className="flex items-center space-x-3">
+                      <div
+                        className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          totalAssignedStudents === row.stdCount
+                            ? colors.success
+                            : totalAssignedStudents > row.stdCount
+                            ? colors.danger
+                            : colors.warning
+                        }`}
+                      >
+                        {totalAssignedStudents}/{row.stdCount} students
+                      </div>
+                      <div
+                        className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          totalAssignedHours === row.hrs
+                            ? colors.success
+                            : totalAssignedHours > row.hrs
+                            ? colors.danger
+                            : colors.warning
+                        }`}
+                      >
+                        {totalAssignedHours}/{row.hrs} hours
+                      </div>
+                      {/* Add Batch Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addBatch(rowIndex);
+                        }}
+                        className={`p-1.5 rounded-lg hover:bg-gray-100 ${
+                          getColorsForBatch(row.batch).text
+                        } hover:text-indigo-600 transition-colors`}
+                        title="Add Batch"
+                        type="button"
+                      >
+                        <FiPlus />
+                      </button>
+                      {/* --- MERGE BUTTON --- */}
+                      {canMergeBatches && table1Data.length > 1 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMergeModal({
+                              open: true,
+                              sourceRowIndex: rowIndex,
+                              targetSpecialization: "",
+                            });
+                          }}
+                          className={`p-1.5 rounded-lg hover:bg-gray-100 ${
+                            getColorsForBatch(row.batch).text
+                          } hover:text-indigo-600 transition-colors`}
+                          title="Merge with another specialization"
+                          type="button"
+                        >
+                          <FiLayers />
+                        </button>
+                      )}
+                      {isExpanded ? (
+                        <FiChevronUp className="text-gray-400" />
+                      ) : (
+                        <FiChevronDown className="text-gray-400" />
+                      )}
+                    </div>
+                  </div>
 
-                    {/* Expanded Batch Content */}
-                    {isExpanded && (
-                      <div className="px-4 py-2 bg-gray-50 border-t border-gray-200 space-y-3">
-                        {row.batches.map((batch, batchIndex) => (
+                  {/* Expanded Batch Content */}
+                  {isExpanded && (
+                    <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 space-y-6">
+                      {row.batches.map((batch, batchIndex) => (
+                        <div
+                          className={`bg-white rounded-lg border ${
+                            getColorsForBatch(row.batch).border
+                          } shadow-xs overflow-hidden`}
+                        >
                           <div
-                            className={`bg-white rounded-lg border ${
+                            className={`px-4 py-3 ${
+                              getColorsForBatch(row.batch).accent
+                            } border-b ${
                               getColorsForBatch(row.batch).border
-                            } shadow-xs overflow-hidden`}
-                            key={batchIndex}
+                            } flex justify-between items-center`}
                           >
-                            <div
-                              className={`px-3 py-2 ${
-                                getColorsForBatch(row.batch).accent
-                              } border-b ${
-                                getColorsForBatch(row.batch).border
-                              } flex justify-between items-center`}
+                            <span
+                              className={`font-medium text-sm ${
+                                getColorsForBatch(row.batch).text
+                              }`}
                             >
-                              <span
-                                className={`font-medium text-xs ${
-                                  getColorsForBatch(row.batch).text
-                                }`}
-                              >
-                                Batch {batchIndex + 1}
-                              </span>
-                              <div className="flex space-x-1">
-                                {row.batches.length > 1 && (
-                                  <button
-                                    onClick={() => removeBatch(rowIndex, batchIndex)}
-                                    className="p-1 rounded hover:bg-rose-50 text-rose-500 transition-colors text-xs"
-                                    title="Remove Batch"
-                                    type="button"
-                                  >
-                                    <FiTrash2 size={12} />
-                                  </button>
-                                )}
+                              Batch {batchIndex + 1}
+                            </span>
+                            <div className="flex space-x-2">
+                              {row.batches.length > 1 && (
+                                <button
+                                  onClick={() =>
+                                    removeBatch(rowIndex, batchIndex)
+                                  }
+                                  className="p-1.5 rounded-lg hover:bg-rose-50 text-rose-500 transition-colors"
+                                  title="Remove Batch"
+                                  type="button"
+                                >
+                                  <FiTrash2 size={14} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="p-4 space-y-4">
+                            {/* Batch Details */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                                  Students
+                                </label>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  pattern="[0-9]*"
+                                  className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
+                                  value={batch.batchPerStdCount || ""}
+                                  onChange={(e) =>
+                                    handleBatchChange(
+                                      rowIndex,
+                                      batchIndex,
+                                      "batchPerStdCount",
+                                      e.target.value.replace(/\D/g, "")
+                                    )
+                                  }
+                                  min="0"
+                                  max={row.stdCount}
+                                  placeholder="0"
+                                  disabled={batch.isMerged}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                                  Batch Code
+                                </label>
+                                <input
+                                  type="text"
+                                  className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
+                                  value={batch.batchCode || ""}
+                                  onChange={(e) =>
+                                    handleBatchChange(
+                                      rowIndex,
+                                      batchIndex,
+                                      "batchCode",
+                                      e.target.value
+                                    )
+                                  }
+                                  disabled={batch.isMerged}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                                  Assigned Hours
+                                </label>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  pattern="[0-9]*"
+                                  className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
+                                  value={
+                                    batch.assignedHours === undefined ||
+                                    batch.assignedHours === null
+                                      ? ""
+                                      : batch.assignedHours
+                                  }
+                                  onChange={(e) => {
+                                    if (batchIndex === 0) {
+                                      let val = e.target.value.replace(
+                                        /\D/g,
+                                        ""
+                                      );
+                                      handleBatchChange(
+                                        rowIndex,
+                                        batchIndex,
+                                        "assignedHours",
+                                        val
+                                      );
+                                      if (onAssignedHoursChange)
+                                        onAssignedHoursChange(val);
+                                    }
+                                  }}
+                                  min="0"
+                                  max={maxAssignableHours}
+                                  placeholder="0"
+                                  disabled={batchIndex !== 0}
+                                />
                               </div>
                             </div>
 
-                            <div className="p-3 space-y-2">
-                              {/* Batch Details */}
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-0.5">
-                                    Students
-                                  </label>
-                                  <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    pattern="[0-9]*"
-                                    className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
-                                    value={batch.batchPerStdCount || ""}
-                                    onChange={(e) =>
-                                      handleBatchChange(
-                                        rowIndex,
-                                        batchIndex,
-                                        "batchPerStdCount",
-                                        e.target.value.replace(/\D/g, "")
-                                      )
-                                    }
-                                    min="0"
-                                    max={row.stdCount}
-                                    placeholder="0"
-                                    disabled={batch.isMerged}
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-0.5">
-                                    Batch Code
-                                  </label>
-                                  <input
-                                    type="text"
-                                    className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
-                                    value={batch.batchCode || ""}
-                                    onChange={(e) =>
-                                      handleBatchChange(
-                                        rowIndex,
-                                        batchIndex,
-                                        "batchCode",
-                                        e.target.value
-                                      )
-                                    }
-                                    disabled={batch.isMerged}
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-0.5">
-                                    Assigned Hours
-                                  </label>
-                                  <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    pattern="[0-9]*"
-                                    className={`w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2 ${
-                                      batchIndex !== 0 ? "bg-gray-100 cursor-not-allowed" : ""
-                                    }`}
-                                    value={
-                                      batch.assignedHours === undefined ||
-                                      batch.assignedHours === null
-                                        ? ""
-                                        : batch.assignedHours
-                                    }
-                                    onChange={(e) => {
-                                      if (batchIndex === 0) {
-                                        let val = e.target.value.replace(/\D/g, "");
-                                        handleBatchChange(
-                                          rowIndex,
-                                          batchIndex,
-                                          "assignedHours",
-                                          val
-                                        );
-                                        if (onAssignedHoursChange) onAssignedHoursChange(val);
-                                      }
-                                    }}
-                                    min="0"
-                                    max={maxAssignableHours}
-                                    placeholder="0"
-                                    disabled={batchIndex !== 0}
-                                  />
-                                </div>
+                            {/* Trainers Section */}
+                            <div>
+                              <div className="flex justify-between items-center mb-3 ">
+                                <h5 className="text-sm font-medium text-gray-700">
+                                  Trainers
+                                </h5>
+                                <button
+                                  onClick={() =>
+                                    addTrainer(rowIndex, batchIndex)
+                                  }
+                                  className="text-xs flex items-center text-indigo-600 hover:text-indigo-800 font-medium"
+                                  type="button"
+                                >
+                                  <FiPlus className="mr-1" size={12} /> Add
+                                  Trainer
+                                </button>
                               </div>
 
-                              {/* Trainers Section */}
-                              <div>
-                                <div className="flex justify-between items-center mb-2 ">
-                                  <h5 className="text-sm font-medium text-gray-700">
-                                    Trainers
-                                  </h5>
-                                  <button
-                                    onClick={() =>
-                                      addTrainer(rowIndex, batchIndex)
-                                    }
-                                    className="text-xs flex items-center text-indigo-600 hover:text-indigo-800 font-medium"
-                                    type="button"
-                                  >
-                                    <FiPlus className="mr-1" size={12} /> Add
-                                    Trainer
-                                  </button>
-                                </div>
-
-                                {batch.trainers && batch.trainers.length > 0 && (
-                                  <div className="mb-2">
-                                    {(() => {
-                                      const assigned = Number(
-                                        batch.assignedHours || 0
-                                      );
-                                      const trainersTotal = (
-                                        batch.trainers || []
-                                      ).reduce(
-                                        (sum, t) =>
-                                          sum + Number(t.assignedHours || 0),
-                                        0
-                                      );
-                                      const percent =
-                                        assigned > 0
-                                          ? Math.min(
-                                              100,
-                                              Math.round(
-                                                (trainersTotal / assigned) * 100
-                                              )
+                              {batch.trainers && batch.trainers.length > 0 && (
+                                <div className="mb-2">
+                                  {(() => {
+                                    const assigned = Number(
+                                      batch.assignedHours || 0
+                                    );
+                                    const trainersTotal = (
+                                      batch.trainers || []
+                                    ).reduce(
+                                      (sum, t) =>
+                                        sum + Number(t.assignedHours || 0),
+                                      0
+                                    );
+                                    const percent =
+                                      assigned > 0
+                                        ? Math.min(
+                                            100,
+                                            Math.round(
+                                              (trainersTotal / assigned) * 100
                                             )
-                                          : 0;
-                                      const remaining = assigned - trainersTotal;
-                                      return (
-                                        <div>
-                                          <div className="w-full bg-gray-200 rounded-full h-2.5 mb-1">
-                                            <div
-                                              className={`h-2.5 rounded-full transition-all duration-300 ${
-                                                percent === 100
-                                                  ? "bg-emerald-500"
-                                                  : percent > 100
-                                                  ? "bg-rose-500"
-                                                  : "bg-amber-500"
-                                              }`}
-                                              style={{ width: `${percent}%` }}
-                                            />
-                                          </div>
+                                          )
+                                        : 0;
+                                    const remaining = assigned - trainersTotal;
+                                    return (
+                                      <div>
+                                        <div className="w-full bg-gray-200 rounded-full h-2.5 mb-1">
                                           <div
-                                            className={`text-xs font-medium ${
-                                              remaining > 0
-                                                ? "text-amber-600"
-                                                : remaining < 0
-                                                ? "text-rose-600"
-                                                : "text-emerald-700"
+                                            className={`h-2.5 rounded-full transition-all duration-300 ${
+                                              percent === 100
+                                                ? "bg-emerald-500"
+                                                : percent > 100
+                                                ? "bg-rose-500"
+                                                : "bg-amber-500"
                                             }`}
-                                          >
-                                            {remaining > 0
-                                              ? `${remaining} hrs remaining to assign to trainers`
-                                              : remaining < 0
-                                              ? `${-remaining} hrs extra assigned to trainers`
-                                              : "All assigned hours distributed to trainers"}
-                                          </div>
+                                            style={{ width: `${percent}%` }}
+                                          />
                                         </div>
-                                      );
-                                    })()}
-                                  </div>
-                                )}
+                                        <div
+                                          className={`text-xs font-medium ${
+                                            remaining > 0
+                                              ? "text-amber-600"
+                                              : remaining < 0
+                                              ? "text-rose-600"
+                                              : "text-emerald-700"
+                                          }`}
+                                        >
+                                          {remaining > 0
+                                            ? `${remaining} hrs remaining to assign to trainers`
+                                            : remaining < 0
+                                            ? `${-remaining} hrs extra assigned to trainers`
+                                            : "All assigned hours distributed to trainers"}
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
+                              )}
 
-                                {(batch.trainers || []).length > 0 ? (
-                                  <div className="space-y-3">
-                                    {(batch.trainers || []).map(
-                                      (trainer, trainerIdx) => {
-                                        const trainerKey = `${rowIndex}-${batchIndex}-${trainerIdx}`;
-                                        const isTrainerExpanded =
-                                          expandedTrainer[trainerKey];
-                                        const dateList =
-                                          getDateListExcludingSundays(
-                                            trainer.startDate,
-                                            trainer.endDate
-                                          );
+                              {(batch.trainers || []).length > 0 ? (
+                                <div className="space-y-3">
+                                  {(batch.trainers || []).map(
+                                    (trainer, trainerIdx) => {
+                                      const trainerKey = `${rowIndex}-${batchIndex}-${trainerIdx}`;
+                                      const isTrainerExpanded =
+                                        expandedTrainer[trainerKey];
+                                      const dateList =
+                                        getDateListExcludingSundays(
+                                          trainer.startDate,
+                                          trainer.endDate
+                                        );
 
-                                        return (
+                                      return (
+                                        <div
+                                          key={trainerIdx}
+                                          className={`border border-gray-200 rounded-lg overflow-hidden ${
+                                            getColorsForBatch(row.batch).border
+                                          } rounded-lg overflow-hidden`}
+                                        >
                                           <div
-                                            key={trainerIdx}
-                                            className={`border border-gray-200 rounded-lg overflow-hidden ${
-                                              getColorsForBatch(row.batch).border
-                                            } rounded-lg overflow-hidden`}
+                                            className={`px-3 py-2 ${
+                                              getColorsForBatch(row.batch)
+                                                .accent
+                                            } flex items-center justify-between`}
                                           >
-                                            <div
-                                              className={`px-3 py-2 ${
-                                                getColorsForBatch(row.batch)
-                                                  .accent
-                                              } flex items-center justify-between`}
-                                            >
-                                              {" "}
-                                              <div className="flex items-center space-x-2">
-                                                <FiUser
-                                                  className="text-gray-500"
-                                                  size={14}
-                                                />
-                                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                                                  <div>
-                                                    <select
-                                                      value={
-                                                        trainer.trainerId || ""
-                                                      }
-                                                      onChange={(e) =>
-                                                        handleTrainerField(
-                                                          rowIndex,
-                                                          batchIndex,
-                                                          trainerIdx,
-                                                          "trainerId",
-                                                          e.target.value
-                                                        )
-                                                      }
-                                                      className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
-                                                    >
-                                                      <option value="">
-                                                        Select Trainer
-                                                      </option>
-                                                      {trainers
-                                                        .filter(
-                                                          (tr) =>
-                                                            tr.domain &&
-                                                            typeof tr.domain ===
-                                                              "string" &&
-                                                            tr.domain
-                                                              .toLowerCase()
-                                                              .trim() ===
-                                                              selectedDomain
-                                                                .toLowerCase()
-                                                                .trim()
-                                                        )
-                                                        .map((tr) => {
-                                                          const isAvailable =
-                                                            isTrainerAvailable(
-                                                              tr.trainerId,
-                                                              trainer.startDate,
-                                                              trainer.dayDuration,
-                                                              `${rowIndex}-${batchIndex}-${trainerIdx}`
-                                                            );
-
-                                                          return (
-                                                            <option
-                                                              key={tr.trainerId}
-                                                              value={tr.trainerId}
-                                                              disabled={
-                                                                !isAvailable
-                                                              }
-                                                              className={
-                                                                !isAvailable
-                                                                  ? "text-gray-400"
-                                                                  : ""
-                                                              }
-                                                            >
-                                                              {tr.name} (
-                                                              {tr.trainerId})
-                                                              {!isAvailable &&
-                                                                " (Already booked)"}
-                                                            </option>
-                                                          );
-                                                        })}
-                                                    </select>
-                                                  </div>
-                                                </div>
-                                              </div>
-                                              <div className="flex items-center space-x-2">
-                                                <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded">
-                                                  {trainer.assignedHours || 0} hrs
-                                                </span>
-                                                {/* --- SWAP BUTTON --- */}
-                                                {trainer.dayDuration === "AM" && (
-                                                  <button
-                                                    type="button"
-                                                    className="px-2 py-1 text-xs bg-black text-white rounded hover:bg-gray-800"
-                                                    onClick={() =>
-                                                      openSwapModal(
+                                            {" "}
+                                            <div className="flex items-center space-x-2">
+                                              <FiUser
+                                                className="text-gray-500"
+                                                size={14}
+                                              />
+                                              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                                <div>
+                                                  <select
+                                                    value={
+                                                      trainer.trainerId || ""
+                                                    }
+                                                    onChange={(e) =>
+                                                      handleTrainerField(
                                                         rowIndex,
                                                         batchIndex,
-                                                        trainerIdx
+                                                        trainerIdx,
+                                                        "trainerId",
+                                                        e.target.value
                                                       )
                                                     }
-                                                    title="Swap Trainer"
+                                                    className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
                                                   >
-                                                    Swap Trainer
-                                                  </button>
-                                                )}
-                                                <button
-                                                  onClick={() =>
-                                                    toggleTrainerExpansion(
-                                                      trainerKey
-                                                    )
-                                                  }
-                                                  className="p-1 text-gray-500 hover:text-gray-700"
-                                                  type="button"
-                                                >
-                                                  {isTrainerExpanded ? (
-                                                    <FiChevronUp size={16} />
-                                                  ) : (
-                                                    <FiChevronDown size={16} />
-                                                  )}
-                                                </button>
+                                                    <option value="">
+                                                      Select Trainer
+                                                    </option>
+                                                    {trainers
+                                                      .filter(
+                                                        (tr) =>
+                                                          tr.domain &&
+                                                          typeof tr.domain ===
+                                                            "string" &&
+                                                          tr.domain
+                                                            .toLowerCase()
+                                                            .trim() ===
+                                                            selectedDomain
+                                                              .toLowerCase()
+                                                              .trim()
+                                                      )
+                                                      .map((tr) => {
+                                                        const isAvailable =
+                                                          isTrainerAvailable(
+                                                            tr.trainerId,
+                                                            trainer.startDate,
+                                                            trainer.dayDuration,
+                                                            `${rowIndex}-${batchIndex}-${trainerIdx}`
+                                                          );
+
+                                                        return (
+                                                          <option
+                                                            key={tr.trainerId}
+                                                            value={tr.trainerId}
+                                                            disabled={
+                                                              !isAvailable
+                                                            }
+                                                            className={
+                                                              !isAvailable
+                                                                ? "text-gray-400"
+                                                                : ""
+                                                            }
+                                                          >
+                                                            {tr.name} (
+                                                            {tr.trainerId})
+                                                            {!isAvailable &&
+                                                              " (Already booked)"}
+                                                          </option>
+                                                        );
+                                                      })}
+                                                  </select>
+                                                </div>
                                               </div>
                                             </div>
-
-                                            {isTrainerExpanded && (
-                                              <div className="p-3 bg-white space-y-3">
-                                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                                                  {trainer.trainerId &&
-                                                    trainer.dayDuration &&
-                                                    trainer.startDate &&
-                                                    trainer.endDate &&
-                                                    !isTrainerAvailable(
-                                                      trainer.trainerId,
-                                                      trainer.startDate,
-                                                      trainer.dayDuration,
-                                                      `${rowIndex}-${batchIndex}-${trainerIdx}`
-                                                    ) && (
-                                                      <div className="text-xs text-rose-600 mt-1 bg-rose-50 p-2 rounded border border-rose-200">
-                                                        ⚠️ This trainer is already
-                                                        booked for{" "}
-                                                        {trainer.dayDuration} slot
-                                                        between{" "}
-                                                        {trainer.startDate} to{" "}
-                                                        {trainer.endDate}
-                                                      </div>
-                                                    )}
-                                                  <div>
-                                                    <label className="block text-xs text-gray-500 mb-1">
-                                                      Duration
-                                                    </label>
-                                                    <select
-                                                      value={
-                                                        trainer.dayDuration || ""
-                                                      }
-                                                      onChange={(e) =>
-                                                        handleTrainerField(
-                                                          rowIndex,
-                                                          batchIndex,
-                                                          trainerIdx,
-                                                          "dayDuration",
-                                                          e.target.value
-                                                        )
-                                                      }
-                                                      className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
-                                                    >
-                                                      <option value="">
-                                                        Select
-                                                      </option>
-                                                      {DAY_DURATION_OPTIONS.map(
-                                                        (opt) => (
-                                                          <option
-                                                            key={opt}
-                                                            value={opt}
-                                                          >
-                                                            {opt}
-                                                          </option>
-                                                        )
-                                                      )}
-                                                    </select>
-                                                  </div>
-                                                  <div>
-                                                    <label className="block text-xs text-gray-500 mb-1">
-                                                      Start Date
-                                                    </label>
-                                                    <input
-                                                      type="date"
-                                                      value={
-                                                        trainer.startDate || ""
-                                                      }
-                                                      onChange={(e) =>
-                                                        handleTrainerField(
-                                                          rowIndex,
-                                                          batchIndex,
-                                                          trainerIdx,
-                                                          "startDate",
-                                                          e.target.value
-                                                        )
-                                                      }
-                                                      className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
-                                                    />
-                                                  </div>
-                                                  <div>
-                                                    <label className="block text-xs text-gray-500 mb-1">
-                                                      End Date
-                                                    </label>
-                                                    <input
-                                                      type="date"
-                                                      value={
-                                                        trainer.endDate || ""
-                                                      }
-                                                      onChange={(e) =>
-                                                        handleTrainerField(
-                                                          rowIndex,
-                                                          batchIndex,
-                                                          trainerIdx,
-                                                          "endDate",
-                                                          e.target.value
-                                                        )
-                                                      }
-                                                      className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
-                                                    />
-                                                  </div>
-                                                  {/* Move Total Hours here, after all schedule fields */}
-                                                </div>
-
-                                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                                                  <div>
-                                                    <label className="block text-xs text-gray-500 mb-1">
-                                                      Per Hour Cost
-                                                    </label>
-                                                    <input
-                                                      type="text"
-                                                      value={
-                                                        trainer.perHourCost || ""
-                                                      }
-                                                      disabled
-                                                      className="w-full rounded-lg border-gray-300 bg-gray-100 text-sm py-2 px-3"
-                                                    />
-                                                  </div>
-                                                  <div>
-                                                    <label className="block text-xs text-gray-500 mb-1">
-                                                      Total Cost
-                                                    </label>
-                                                    <input
-                                                      type="text"
-                                                      value={
-                                                        trainer.perHourCost &&
-                                                        trainer.assignedHours
-                                                          ? Number(
-                                                              trainer.perHourCost
-                                                            ) *
-                                                            Number(
-                                                              trainer.assignedHours
-                                                            )
-                                                          : ""
-                                                      }
-                                                      disabled
-                                                      className="w-full rounded-lg border-gray-300 bg-gray-100 text-sm py-2 px-3"
-                                                    />
-                                                  </div>
-                                                  <div>
-                                                    <label className=" text-xs text-gray-500 mb-1">
-                                                      Total Hours
-                                                    </label>
-                                                    <input
-                                                      type="text"
-                                                      inputMode="numeric"
-                                                      pattern="[0-9]*"
-                                                      value={
-                                                        trainer.assignedHours ||
-                                                        ""
-                                                      }
-                                                      onChange={(e) =>
-                                                        handleTotalHoursChange(
-                                                          rowIndex,
-                                                          batchIndex,
-                                                          trainerIdx,
-                                                          e.target.value.replace(
-                                                            /\D/g,
-                                                            ""
-                                                          )
-                                                        )
-                                                      }
-                                                      className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
-                                                      min="0"
-                                                      max={batch.assignedHours}
-                                                    />
-                                                  </div>
-                                                </div>
-
-                                                {trainer.mergedBreakdown && (
-                                                  <table>
-                                                    <thead>
-                                                      <tr>
-                                                        <th>Date</th>
-                                                        <th>Day</th>
-                                                        <th>Total Hours</th>
-                                                        <th>Slots</th>
-                                                      </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                      {trainer.mergedBreakdown.map(
-                                                        (item, idx) => (
-                                                          <tr key={idx}>
-                                                            <td>
-                                                              {item.date instanceof
-                                                              Date
-                                                                ? item.date.toLocaleDateString()
-                                                                : item.date}
-                                                            </td>
-                                                            <td>
-                                                              {item.date instanceof
-                                                              Date
-                                                                ? item.date.toLocaleDateString(
-                                                                    undefined,
-                                                                    {
-                                                                      weekday:
-                                                                        "short",
-                                                                    }
-                                                                  )
-                                                                : ""}
-                                                            </td>
-                                                            <td>{item.hours}</td>
-                                                            <td>
-                                                              {item.sources.join(
-                                                                ", "
-                                                              )}
-                                                            </td>
-                                                          </tr>
-                                                        )
-                                                      )}
-                                                    </tbody>
-                                                  </table>
+                                            <div className="flex items-center space-x-2">
+                                              <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded">
+                                                {trainer.assignedHours || 0} hrs
+                                              </span>
+                                              {/* --- SWAP BUTTON --- */}
+                                              {trainer.dayDuration === "AM" && (
+                                                <button
+                                                  type="button"
+                                                  className="px-2 py-1 text-xs bg-black text-white rounded hover:bg-gray-800"
+                                                  onClick={() =>
+                                                    openSwapModal(
+                                                      rowIndex,
+                                                      batchIndex,
+                                                      trainerIdx
+                                                    )
+                                                  }
+                                                  title="Swap Trainer"
+                                                >
+                                                  Swap Trainer
+                                                </button>
+                                              )}
+                                              <button
+                                                onClick={() =>
+                                                  toggleTrainerExpansion(
+                                                    trainerKey
+                                                  )
+                                                }
+                                                className="p-1 text-gray-500 hover:text-gray-700"
+                                                type="button"
+                                              >
+                                                {isTrainerExpanded ? (
+                                                  <FiChevronUp size={16} />
+                                                ) : (
+                                                  <FiChevronDown size={16} />
                                                 )}
+                                              </button>
+                                            </div>
+                                          </div>
 
-                                                {trainer.mergedBreakdown ? (
+                                          {isTrainerExpanded && (
+                                            <div className="p-3 bg-white space-y-3">
+                                              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                                {trainer.trainerId &&
+                                                  trainer.dayDuration &&
+                                                  trainer.startDate &&
+                                                  trainer.endDate &&
+                                                  !isTrainerAvailable(
+                                                    trainer.trainerId,
+                                                    trainer.startDate,
+                                                    trainer.dayDuration,
+                                                    `${rowIndex}-${batchIndex}-${trainerIdx}`
+                                                  ) && (
+                                                    <div className="text-xs text-rose-600 mt-1 bg-rose-50 p-2 rounded border border-rose-200">
+                                                      ⚠️ This trainer is already
+                                                      booked for{" "}
+                                                      {trainer.dayDuration} slot
+                                                      between{" "}
+                                                      {trainer.startDate} to{" "}
+                                                      {trainer.endDate}
+                                                    </div>
+                                                  )}
+                                                <div>
+                                                  <label className="block text-xs text-gray-500 mb-1">
+                                                    Duration
+                                                  </label>
+                                                  <select
+                                                    value={
+                                                      trainer.dayDuration || ""
+                                                    }
+                                                    onChange={(e) =>
+                                                      handleTrainerField(
+                                                        rowIndex,
+                                                        batchIndex,
+                                                        trainerIdx,
+                                                        "dayDuration",
+                                                        e.target.value
+                                                      )
+                                                    }
+                                                    className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
+                                                  >
+                                                    <option value="">
+                                                      Select
+                                                    </option>
+                                                    {DAY_DURATION_OPTIONS.map(
+                                                      (opt) => (
+                                                        <option
+                                                          key={opt}
+                                                          value={opt}
+                                                        >
+                                                          {opt}
+                                                        </option>
+                                                      )
+                                                    )}
+                                                  </select>
+                                                </div>
+                                                <div>
+                                                  <label className="block text-xs text-gray-500 mb-1">
+                                                    Start Date
+                                                  </label>
+                                                  <input
+                                                    type="date"
+                                                    value={
+                                                      trainer.startDate || ""
+                                                    }
+                                                    onChange={(e) =>
+                                                      handleTrainerField(
+                                                        rowIndex,
+                                                        batchIndex,
+                                                        trainerIdx,
+                                                        "startDate",
+                                                        e.target.value
+                                                      )
+                                                    }
+                                                    className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
+                                                  />
+                                                </div>
+                                                <div>
+                                                  <label className="block text-xs text-gray-500 mb-1">
+                                                    End Date
+                                                  </label>
+                                                  <input
+                                                    type="date"
+                                                    value={
+                                                      trainer.endDate || ""
+                                                    }
+                                                    onChange={(e) =>
+                                                      handleTrainerField(
+                                                        rowIndex,
+                                                        batchIndex,
+                                                        trainerIdx,
+                                                        "endDate",
+                                                        e.target.value
+                                                      )
+                                                    }
+                                                    className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
+                                                  />
+                                                </div>
+                                                {/* Move Total Hours here, after all schedule fields */}
+                                              </div>
+
+                                              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                                <div>
+                                                  <label className="block text-xs text-gray-500 mb-1">
+                                                    Per Hour Cost
+                                                  </label>
+                                                  <input
+                                                    type="text"
+                                                    value={
+                                                      trainer.perHourCost || ""
+                                                    }
+                                                    disabled
+                                                    className="w-full rounded-lg border-gray-300 bg-gray-100 text-sm py-2 px-3"
+                                                  />
+                                                </div>
+                                                <div>
+                                                  <label className="block text-xs text-gray-500 mb-1">
+                                                    Total Cost
+                                                  </label>
+                                                  <input
+                                                    type="text"
+                                                    value={
+                                                      trainer.perHourCost &&
+                                                      trainer.assignedHours
+                                                        ? Number(
+                                                            trainer.perHourCost
+                                                          ) *
+                                                          Number(
+                                                            trainer.assignedHours
+                                                          )
+                                                        : ""
+                                                    }
+                                                    disabled
+                                                    className="w-full rounded-lg border-gray-300 bg-gray-100 text-sm py-2 px-3"
+                                                  />
+                                                </div>
+                                                <div>
+                                                  <label className=" text-xs text-gray-500 mb-1">
+                                                    Total Hours
+                                                  </label>
+                                                  <input
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    pattern="[0-9]*"
+                                                    value={
+                                                      trainer.assignedHours ||
+                                                      ""
+                                                    }
+                                                    onChange={(e) =>
+                                                      handleTotalHoursChange(
+                                                        rowIndex,
+                                                        batchIndex,
+                                                        trainerIdx,
+                                                        e.target.value.replace(
+                                                          /\D/g,
+                                                          ""
+                                                        )
+                                                      )
+                                                    }
+                                                    className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
+                                                    min="0"
+                                                    max={batch.assignedHours}
+                                                  />
+                                                </div>
+                                              </div>
+
+                                              {trainer.mergedBreakdown && (
+                                                <table>
+                                                  <thead>
+                                                    <tr>
+                                                      <th>Date</th>
+                                                      <th>Day</th>
+                                                      <th>Total Hours</th>
+                                                      <th>Slots</th>
+                                                    </tr>
+                                                  </thead>
+                                                  <tbody>
+                                                    {trainer.mergedBreakdown.map(
+                                                      (item, idx) => (
+                                                        <tr key={idx}>
+                                                          <td>
+                                                            {item.date instanceof
+                                                            Date
+                                                              ? item.date.toLocaleDateString()
+                                                              : item.date}
+                                                          </td>
+                                                          <td>
+                                                            {item.date instanceof
+                                                            Date
+                                                              ? item.date.toLocaleDateString(
+                                                                  undefined,
+                                                                  {
+                                                                    weekday:
+                                                                      "short",
+                                                                  }
+                                                                )
+                                                              : ""}
+                                                          </td>
+                                                          <td>{item.hours}</td>
+                                                          <td>
+                                                            {item.sources.join(
+                                                              ", "
+                                                            )}
+                                                          </td>
+                                                        </tr>
+                                                      )
+                                                    )}
+                                                  </tbody>
+                                                </table>
+                                              )}
+
+                                              {trainer.mergedBreakdown ? (
+                                                <div className="mt-3">
+                                                  <h6 className="text-xs font-medium text-gray-700 mb-2">
+                                                    Daily Hours Breakdown
+                                                    (Merged)
+                                                  </h6>
+                                                  <div className="overflow-x-auto">
+                                                    <table className="w-full text-xs">
+                                                      <thead className="bg-gray-50">
+                                                        <tr>
+                                                          <th className="px-3 py-1 text-left">
+                                                            Date
+                                                          </th>
+                                                          <th className="px-3 py-1 text-left">
+                                                            Day
+                                                          </th>
+                                                          <th className="px-3 py-1 text-left">
+                                                            Total Hours
+                                                          </th>
+                                                          <th className="px-3 py-1 text-left">
+                                                            Slots
+                                                          </th>
+                                                        </tr>
+                                                      </thead>
+                                                      <tbody>
+                                                        {trainer.mergedBreakdown.map(
+                                                          (item, idx) => (
+                                                            <tr
+                                                              key={idx}
+                                                              className="border-b border-gray-200 last:border-0"
+                                                            >
+                                                              <td className="px-3 py-2">
+                                                                {item.date instanceof
+                                                                Date
+                                                                  ? item.date.toLocaleDateString()
+                                                                  : item.date}
+                                                              </td>
+                                                              <td className="px-3 py-2">
+                                                                {item.date instanceof
+                                                                Date
+                                                                  ? item.date.toLocaleDateString(
+                                                                      undefined,
+                                                                      {
+                                                                        weekday:
+                                                                          "short",
+                                                                      }
+                                                                    )
+                                                                  : ""}
+                                                              </td>
+                                                              <td className="px-3 py-2">
+                                                                {item.hours}
+                                                              </td>
+                                                              <td className="px-3 py-2">
+                                                                {item.sources.join(
+                                                                  ", "
+                                                                )}
+                                                              </td>
+                                                            </tr>
+                                                          )
+                                                        )}
+                                                      </tbody>
+                                                    </table>
+                                                  </div>
+                                                </div>
+                                              ) : (
+                                                dateList.length > 0 && (
                                                   <div className="mt-3">
                                                     <h6 className="text-xs font-medium text-gray-700 mb-2">
                                                       Daily Hours Breakdown
-                                                      (Merged)
                                                     </h6>
                                                     <div className="overflow-x-auto">
                                                       <table className="w-full text-xs">
@@ -1422,176 +1471,124 @@ const BatchDetailsTable = ({
                                                               Day
                                                             </th>
                                                             <th className="px-3 py-1 text-left">
-                                                              Total Hours
-                                                            </th>
-                                                            <th className="px-3 py-1 text-left">
-                                                              Slots
+                                                              Hours
                                                             </th>
                                                           </tr>
                                                         </thead>
                                                         <tbody>
-                                                          {trainer.mergedBreakdown.map(
-                                                            (item, idx) => (
-                                                              <tr
-                                                                key={idx}
-                                                                className="border-b border-gray-200 last:border-0"
-                                                              >
-                                                                <td className="px-3 py-2">
-                                                                  {item.date instanceof
-                                                                  Date
-                                                                    ? item.date.toLocaleDateString()
-                                                                    : item.date}
-                                                                </td>
-                                                                <td className="px-3 py-2">
-                                                                  {item.date instanceof
-                                                                  Date
-                                                                    ? item.date.toLocaleDateString(
-                                                                        undefined,
-                                                                        {
-                                                                          weekday:
-                                                                            "short",
-                                                                        }
-                                                                      )
-                                                                    : ""}
-                                                                </td>
-                                                                <td className="px-3 py-2">
-                                                                  {item.hours}
-                                                                </td>
-                                                                <td className="px-3 py-2">
-                                                                  {item.sources.join(
-                                                                    ", "
-                                                                  )}
-                                                                </td>
-                                                              </tr>
-                                                            )
-                                                          )}
+                                                          {(
+                                                            trainer.activeDates ||
+                                                            []
+                                                          ).map((date, idx) => (
+                                                            <tr key={idx}>
+                                                              <td>
+                                                                {date.toLocaleDateString()}
+                                                              </td>
+                                                              <td>
+                                                                {date.toLocaleDateString(
+                                                                  undefined,
+                                                                  {
+                                                                    weekday:
+                                                                      "short",
+                                                                  }
+                                                                )}
+                                                              </td>
+                                                              <td>
+                                                                {trainer
+                                                                  .dailyHours?.[
+                                                                  idx
+                                                                ] || ""}
+                                                              </td>
+                                                              <td>
+                                                                {trainer
+                                                                  .slotInfo?.[
+                                                                  idx
+                                                                ]?.slot ||
+                                                                  trainer.dayDuration}
+                                                              </td>
+                                                              <td>
+                                                                {trainer
+                                                                  .slotInfo?.[
+                                                                  idx
+                                                                ]?.batchCode ||
+                                                                  ""}
+                                                              </td>
+                                                            </tr>
+                                                          ))}
                                                         </tbody>
                                                       </table>
                                                     </div>
                                                   </div>
-                                                ) : (
-                                                  dateList.length > 0 && (
-                                                    <div className="mt-3">
-                                                      <h6 className="text-xs font-medium text-gray-700 mb-2">
-                                                        Daily Hours Breakdown
-                                                      </h6>
-                                                      <div className="overflow-x-auto">
-                                                        <table className="w-full text-xs">
-                                                          <thead className="bg-gray-50">
-                                                            <tr>
-                                                              <th className="px-3 py-1 text-left">
-                                                                Date
-                                                              </th>
-                                                              <th className="px-3 py-1 text-left">
-                                                                Day
-                                                              </th>
-                                                              <th className="px-3 py-1 text-left">
-                                                                Hours
-                                                              </th>
-                                                            </tr>
-                                                          </thead>
-                                                          <tbody>
-                                                            {(
-                                                              trainer.activeDates ||
-                                                              []
-                                                            ).map((date, idx) => {
-                                                              const d = typeof date === "string" ? new Date(date) : date;
-                                                              return (
-                                                                <tr key={idx}>
-                                                                  <td>{d.toLocaleDateString()}</td>
-                                                                  <td>{d.toLocaleDateString(undefined, { weekday: "short" })}</td>
-                                                                  <td>{trainer.dailyHours?.[idx] || ""}</td>
-                                                                  <td>{trainer.slotInfo?.[idx]?.slot || trainer.dayDuration}</td>
-                                                                  <td>{trainer.slotInfo?.[idx]?.batchCode || ""}</td>
-                                                                </tr>
-                                                              );
-                                                            })}
-                                                          </tbody>
-                                                        </table>
-                                                      </div>
-                                                    </div>
-                                                  )
-                                                )}
+                                                )
+                                              )}
 
-                                                <div className="flex justify-end">
-                                                  <button
-                                                    onClick={() =>
-                                                      removeTrainer(
-                                                        rowIndex,
-                                                        batchIndex,
-                                                        trainerIdx
-                                                      )
-                                                    }
-                                                    className="text-xs flex items-center text-rose-600 hover:text-rose-800 font-medium"
-                                                    type="button"
-                                                  >
-                                                    <FiTrash2
-                                                      className="mr-1"
-                                                      size={12}
-                                                    />{" "}
-                                                    Remove Trainer
-                                                  </button>
-                                                </div>
+                                              <div className="flex justify-end">
+                                                <button
+                                                  onClick={() =>
+                                                    removeTrainer(
+                                                      rowIndex,
+                                                      batchIndex,
+                                                      trainerIdx
+                                                    )
+                                                  }
+                                                  className="text-xs flex items-center text-rose-600 hover:text-rose-800 font-medium"
+                                                  type="button"
+                                                >
+                                                  <FiTrash2
+                                                    className="mr-1"
+                                                    size={12}
+                                                  />{" "}
+                                                  Remove Trainer
+                                                </button>
                                               </div>
-                                            )}
-                                          </div>
-                                        );
-                                      }
-                                    )}
-                                  </div>
-                                ) : (
-                                  <div className="text-center py-6 bg-gray-50 rounded-lg">
-                                    <FiUser
-                                      className="mx-auto text-gray-400"
-                                      size={20}
-                                    />
-                                    <p className="text-sm text-gray-500 mt-2">
-                                      No trainers assigned
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    }
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="text-center py-6 bg-gray-50 rounded-lg">
+                                  <FiUser
+                                    className="mx-auto text-gray-400"
+                                    size={20}
+                                  />
+                                  <p className="text-sm text-gray-500 mt-2">
+                                    No trainers assigned
+                                  </p>
+                                </div>
+                              )}
                             </div>
                           </div>
-                        ))}
-                        {/* --- Add Batch Button at the bottom --- */}
-                        <div className="flex justify-end mt-1">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              addBatch(rowIndex);
-                            }}
-                            className={`flex items-center px-2 py-1 rounded border border-indigo-500 bg-indigo-50 text-indigo-700 text-xs font-medium shadow-sm hover:bg-indigo-100 hover:border-indigo-600 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-200 ${
-                              getColorsForBatch(row.batch).text
-                            }`}
-                            title={`Add Batch to ${row.batch}`}
-                            aria-label={`Add Batch to ${row.batch}`}
-                            data-testid={`add-batch-bottom-${row.batch}`}
-                            type="button"
-                          >
-                            <FiPlus className="mr-1" size={12} /> Add Batch
-                          </button>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            ) : (
-              <div className="text-center py-8">
-                <div className="mx-auto h-10 w-10 text-gray-300">
-                  {/* ...icon... */}
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <h3 className="mt-2 text-xs font-medium text-gray-900">
-                  No batches configured
-                </h3>
-                <p className="mt-1 text-xs text-gray-500 max-w-md mx-auto">
-                  Select a domain and add batches to begin assigning students and
-                  trainers.
-                </p>
+              );
+            })
+          ) : (
+            <div className="text-center py-12">
+              <div className="mx-auto h-12 w-12 text-gray-300">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                  />
+                </svg>
               </div>
-            )}
-          </div>
+              <h3 className="mt-3 text-sm font-medium text-gray-900">
+                No batches configured
+              </h3>
+              <p className="mt-1 text-sm text-gray-500 max-w-md mx-auto">
+                Select a domain and add batches to begin assigning students and
+                trainers.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
