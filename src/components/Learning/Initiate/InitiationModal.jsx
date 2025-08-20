@@ -85,6 +85,9 @@ function InitiationModal({ training, onClose, onConfirm }) {
   const [deselectingZeroDomains, setDeselectingZeroDomains] = useState(false);
   // totalTrainingHours removed (was used only for allocation)
   const [canMergeBatches, setCanMergeBatches] = useState(false);
+  
+  // Validation state for duplicate trainers
+  const [validationByDomain, setValidationByDomain] = useState({});
 
   // Get domain hours - use custom hours if set, otherwise default from database
   const getDomainHours = useCallback((domain, phase = null) => {
@@ -381,7 +384,20 @@ function InitiationModal({ training, onClose, onConfirm }) {
     }
   };
 
-  const canProceedToNextStep = () => true;
+  // Handle validation changes from BatchDetailsTable
+  const handleValidationChange = useCallback((domain, validationStatus) => {
+    setValidationByDomain(prev => ({
+      ...prev,
+      [domain]: validationStatus
+    }));
+  }, []);
+
+  // Check if there are any validation errors across all domains
+  const hasValidationErrors = () => {
+    return Object.values(validationByDomain).some(validation => validation?.hasErrors);
+  };
+
+  const canProceedToNextStep = () => !hasValidationErrors();
 
   useEffect(() => {
     const checkTrainingsCollection = async () => {
@@ -1279,6 +1295,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                               mainPhase={currentPhase}
                               onSwapTrainer={swapTrainers}
                               customHours={customPhaseHours[currentPhase]}
+                              onValidationChange={(validationStatus) => handleValidationChange(domain, validationStatus)}
                             />
                           )}
                         </div>
@@ -1364,6 +1381,40 @@ function InitiationModal({ training, onClose, onConfirm }) {
                      </div>
                    </div>
                  )}
+
+                {/* Duplicate trainers validation error */}
+                {hasValidationErrors() && (
+                  <div className="rounded bg-red-50 border border-red-200 p-3">
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0">
+                        <FiAlertCircle className="h-4 w-4 text-red-400" />
+                      </div>
+                      <div className="ml-3">
+                        <h3 className="text-xs font-medium text-red-800 mb-1">
+                          Duplicate Trainer Assignments Detected
+                        </h3>
+                        <div className="text-xs text-red-700">
+                          {Object.entries(validationByDomain).map(([domain, validation]) => {
+                            if (!validation?.hasErrors) return null;
+                            return (
+                              <div key={domain} className="mb-2">
+                                <strong>{domain} domain:</strong>
+                                <ul className="list-disc ml-4 mt-1">
+                                  {validation.errors.map((error, index) => (
+                                    <li key={index}>{error.message}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            );
+                          })}
+                          <p className="mt-2 font-medium">
+                            Please remove duplicate assignments or modify trainer details (dates, duration) before proceeding.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </form>
             </div>
 

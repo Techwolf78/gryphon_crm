@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback, useLayoutEffect } from "react";
 import {
   collection,
   getDocs,
@@ -18,7 +18,505 @@ import {
 } from "react-icons/fi";
 
 const DAY_DURATION_OPTIONS = ["AM", "PM", "AM & PM"];
+
 // Color palette options (can be expanded)
+const COLOR_PALETTE = [
+  {
+    primary: "bg-blue-600 text-white",
+    accent: "bg-blue-50 text-blue-700",
+    border: "border-blue-200",
+    text: "text-blue-600",
+    badge: "bg-blue-100 text-blue-800",
+  },
+  {
+    primary: "bg-green-600 text-white",
+    accent: "bg-green-50 text-green-700",
+    border: "border-green-200",
+    text: "text-green-600",
+    badge: "bg-green-100 text-green-800",
+  },
+  {
+    primary: "bg-purple-600 text-white",
+    accent: "bg-purple-50 text-purple-700",
+    border: "border-purple-200",
+    text: "text-purple-600",
+    badge: "bg-purple-100 text-purple-800",
+  },
+  // Add more color options as needed
+];
+
+// Default color scheme
+const DEFAULT_COLORS = {
+  primary: "bg-gray-600 text-white",
+  accent: "bg-gray-50 text-gray-700",
+  border: "border-gray-200",
+  text: "text-gray-600",
+  badge: "bg-gray-100 text-gray-800",
+};
+
+// ✅ 1. Memoized Trainer Row Component
+const TrainerRow = React.memo(({ 
+  trainer, 
+  trainerIdx, 
+  rowIndex, 
+  batchIndex, 
+  batch,
+  row,
+  trainers, 
+  selectedDomain, 
+  handleTrainerField, 
+  handleTotalHoursChange, 
+  removeTrainer, 
+  openSwapModal, 
+  isTrainerAvailable,
+  isDuplicate = false
+}) => {
+  console.log(`🔄 [MEMOIZED] TrainerRow ${trainerIdx} rendering for ${trainer.trainerName || 'unnamed'}`);
+
+  return (
+    <tr className={`border-b last:border-0 ${isDuplicate ? 'bg-red-50 border-red-200' : ''}`}>
+      {/* Trainer Name/Select */}
+      <td className="px-2 py-1">
+        {isDuplicate && (
+          <div className="text-xs text-red-600 font-medium mb-1 flex items-center">
+            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            Duplicate
+          </div>
+        )}
+        <select
+          value={trainer.trainerId || ""}
+          onChange={(e) =>
+            handleTrainerField(
+              rowIndex,
+              batchIndex,
+              trainerIdx,
+              "trainerId",
+              e.target.value
+            )
+          }
+          className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
+        >
+          <option value="">Select Trainer</option>
+          {trainers.map((tr) => {
+            const isAvailable = isTrainerAvailable(
+              tr.trainerId,
+              trainer.startDate,
+              trainer.dayDuration,
+              `${rowIndex}-${batchIndex}-${trainerIdx}`
+            );
+            return (
+              <option
+                key={tr.trainerId}
+                value={tr.trainerId}
+                disabled={!isAvailable}
+                className={!isAvailable ? "text-gray-400" : ""}
+              >
+                {tr.name} ({tr.trainerId})
+                {!isAvailable && " (Already booked)"}
+              </option>
+            );
+          })}
+        </select>
+      </td>
+
+      {/* Duration dropdown */}
+      <td className="px-2 py-1">
+        <select
+          value={trainer.dayDuration || ""}
+          onChange={(e) =>
+            handleTrainerField(
+              rowIndex,
+              batchIndex,
+              trainerIdx,
+              "dayDuration",
+              e.target.value
+            )
+          }
+          className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
+        >
+          <option value="">Select Duration</option>
+          {DAY_DURATION_OPTIONS.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      </td>
+
+      {/* Start Date */}
+      <td className="px-2 py-1">
+        <input
+          type="date"
+          value={trainer.startDate || ""}
+          onChange={(e) =>
+            handleTrainerField(
+              rowIndex,
+              batchIndex,
+              trainerIdx,
+              "startDate",
+              e.target.value
+            )
+          }
+          className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
+        />
+      </td>
+
+      {/* End Date */}
+      <td className="px-2 py-1">
+        <input
+          type="date"
+          value={trainer.endDate || ""}
+          onChange={(e) =>
+            handleTrainerField(
+              rowIndex,
+              batchIndex,
+              trainerIdx,
+              "endDate",
+              e.target.value
+            )
+          }
+          className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
+        />
+      </td>
+
+      {/* Per Hour Cost */}
+      <td className="px-2 py-1">
+        <input
+          type="number"
+          value={trainer.perHourCost || ""}
+          onChange={(e) =>
+            handleTrainerField(
+              rowIndex,
+              batchIndex,
+              trainerIdx,
+              "perHourCost",
+              parseFloat(e.target.value) || 0
+            )
+          }
+          className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
+          placeholder="Cost"
+        />
+      </td>
+
+      {/* Total Cost */}
+      <td className="px-2 py-1 text-xs">
+        ₹{((trainer.assignedHours || 0) * (trainer.perHourCost || 0)).toFixed(2)}
+      </td>
+
+      {/* Total Hours */}
+      <td className="px-2 py-1">
+        <input
+          type="number"
+          value={trainer.assignedHours || ""}
+          onChange={(e) =>
+            handleTotalHoursChange(
+              rowIndex,
+              batchIndex,
+              trainerIdx,
+              e.target.value
+            )
+          }
+          className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
+          placeholder="Hours"
+        />
+      </td>
+
+      {/* Daily Hours */}
+      <td className="px-2 py-1 text-xs">
+        {trainer.dailyHours && trainer.dailyHours.length > 0 
+          ? trainer.dailyHours.reduce((sum, hours) => sum + Number(hours || 0), 0).toFixed(2) 
+          : (trainer.assignedHours || 0)
+        }h
+      </td>
+
+      {/* Actions */}
+      <td className="px-2 py-1">
+        <div className="flex space-x-1">
+          <button
+            type="button"
+            className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
+            onClick={() => removeTrainer(rowIndex, batchIndex, trainerIdx)}
+            title="Remove Trainer"
+          >
+            ×
+          </button>
+          {trainer.dayDuration === "AM" && (
+            <button
+              type="button"
+              className="ml-2 px-2 py-1 text-xs bg-black text-white rounded hover:bg-gray-800"
+              onClick={() => {
+                console.log("🔴 [SWAP] Swap button clicked for trainer:", {
+                  rowIndex,
+                  batchIndex,
+                  trainerIdx,
+                  trainerData: trainer,
+                  batchCode: batch.batchCode,
+                  specialization: row.batch,
+                  domain: selectedDomain,
+                });
+                openSwapModal(rowIndex, batchIndex, trainerIdx);
+              }}
+              title="Swap Trainer"
+            >
+              Swap
+            </button>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+});
+
+TrainerRow.displayName = 'TrainerRow';
+
+// ✅ 2. Memoized Trainers Table Component
+const TrainersTable = React.memo(({ 
+  trainers, 
+  rowIndex, 
+  batchIndex, 
+  batch, 
+  row, 
+  allTrainers, 
+  selectedDomain, 
+  addTrainer, 
+  handleTrainerField, 
+  handleTotalHoursChange, 
+  removeTrainer, 
+  openSwapModal, 
+  isTrainerAvailable,
+  duplicates = []
+}) => {
+  console.log(`🔄 [MEMOIZED] TrainersTable rendering for batch ${batchIndex} with ${trainers.length} trainers`);
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-2 ">
+        <h5 className="text-sm font-medium text-gray-700">Trainers</h5>
+        <button
+          onClick={() => addTrainer(rowIndex, batchIndex)}
+          className="text-xs flex items-center text-indigo-600 hover:text-indigo-800 font-medium"
+          type="button"
+        >
+          <FiPlus className="mr-1" size={12} /> Add Trainer
+        </button>
+      </div>
+
+      {trainers.length > 0 ? (
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-xs border border-gray-200 rounded">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-2 py-1 text-left">Trainer</th>
+                <th className="px-2 py-1 text-left">Duration</th>
+                <th className="px-2 py-1 text-left">Start Date</th>
+                <th className="px-2 py-1 text-left">End Date</th>
+                <th className="px-2 py-1 text-left">Per Hour Cost</th>
+                <th className="px-2 py-1 text-left">Total Cost</th>
+                <th className="px-2 py-1 text-left">Total Hours</th>
+                <th className="px-2 py-1 text-left">Daily Hours</th>
+                <th className="px-2 py-1 text-left">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {trainers.map((trainer, trainerIdx) => {
+                const duplicateKey = `${rowIndex}-${batchIndex}-${trainerIdx}`;
+                const isDuplicate = duplicates.includes(duplicateKey);
+                
+                return (
+                  <TrainerRow
+                    key={`trainer-${rowIndex}-${batchIndex}-${trainerIdx}`}
+                    trainer={trainer}
+                    trainerIdx={trainerIdx}
+                    rowIndex={rowIndex}
+                    batchIndex={batchIndex}
+                    batch={batch}
+                    row={row}
+                    trainers={allTrainers}
+                    selectedDomain={selectedDomain}
+                    handleTrainerField={handleTrainerField}
+                    handleTotalHoursChange={handleTotalHoursChange}
+                    removeTrainer={removeTrainer}
+                    openSwapModal={openSwapModal}
+                    isTrainerAvailable={isTrainerAvailable}
+                    isDuplicate={isDuplicate}
+                  />
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="text-center py-6 bg-gray-50 rounded-lg">
+          <FiUser className="mx-auto text-gray-400" size={20} />
+          <p className="text-sm text-gray-500 mt-2">No trainers assigned</p>
+        </div>
+      )}
+    </div>
+  );
+});
+
+TrainersTable.displayName = 'TrainersTable';
+
+// ✅ 3. Memoized Batch Component  
+const BatchComponent = React.memo(({ 
+  batch, 
+  batchIndex, 
+  rowIndex, 
+  row, 
+  trainers, 
+  selectedDomain, 
+  memoizedGetColorsForBatch, 
+  handleBatchChange, 
+  removeBatch, 
+  addTrainer, 
+  handleTrainerField, 
+  handleTotalHoursChange, 
+  removeTrainer, 
+  openSwapModal, 
+  isTrainerAvailable,
+  duplicates = []
+}) => {
+  console.log(`🔄 [MEMOIZED] BatchComponent ${batchIndex} rendering for ${row.batch}`);
+
+  return (
+    <div className={`bg-white rounded-lg border ${memoizedGetColorsForBatch(row.batch).border} shadow-xs overflow-hidden`}>
+      <div className={`px-4 py-3 ${memoizedGetColorsForBatch(row.batch).accent} border-b ${memoizedGetColorsForBatch(row.batch).border} flex justify-between items-center`}>
+        <span className={`font-medium text-sm ${memoizedGetColorsForBatch(row.batch).text}`}>
+          Batch {batchIndex + 1}
+        </span>
+        <div className="flex space-x-2">
+          {row.batches.length > 1 && (
+            <button
+              onClick={() => removeBatch(rowIndex, batchIndex)}
+              className="p-1.5 rounded-lg hover:bg-rose-50 text-rose-500 transition-colors"
+              title="Remove Batch"
+              type="button"
+            >
+              <FiTrash2 size={14} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="p-3 space-y-2">
+        {/* Batch Details */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-0.5">
+              Students
+            </label>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
+              value={batch.batchPerStdCount || ""}
+              onChange={(e) =>
+                handleBatchChange(
+                  rowIndex,
+                  batchIndex,
+                  "batchPerStdCount",
+                  e.target.value.replace(/\D/g, "")
+                )
+              }
+              min="0"
+              max={row.stdCount}
+              placeholder="0"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-0.5">
+              Batch Code
+            </label>
+            <input
+              type="text"
+              className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
+              value={batch.batchCode || ""}
+              onChange={(e) =>
+                handleBatchChange(rowIndex, batchIndex, "batchCode", e.target.value)
+              }
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-0.5">
+              Assigned Hours
+            </label>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              className={`w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2 ${
+                batchIndex !== 0 ? "bg-gray-100 cursor-not-allowed" : ""
+              }`}
+              value={
+                batch.assignedHours === undefined || batch.assignedHours === null
+                  ? ""
+                  : batch.assignedHours
+              }
+              onChange={(e) => {
+                if (batchIndex === 0) {
+                  let val = e.target.value.replace(/\D/g, "");
+                  handleBatchChange(rowIndex, batchIndex, "assignedHours", val);
+                }
+              }}
+              min="0"
+              placeholder="0"
+              disabled={batchIndex !== 0}
+            />
+          </div>
+        </div>
+
+        {/* Progress Bar */}
+        {batch.assignedHours > 0 && (
+          <div className="mb-2">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-xs text-gray-600 font-medium">
+                Assigned Trainer Hours:{" "}
+                {batch.trainers.reduce((sum, t) => sum + Number(t.assignedHours || 0), 0)} / {batch.assignedHours}
+              </span>
+              <span className="text-xs text-gray-500">
+                {batch.assignedHours - batch.trainers.reduce((sum, t) => sum + Number(t.assignedHours || 0), 0)} hours left
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 rounded h-2">
+              <div
+                className="bg-indigo-500 h-2 rounded"
+                style={{
+                  width: `${Math.min(
+                    100,
+                    (batch.trainers.reduce((sum, t) => sum + Number(t.assignedHours || 0), 0) / (batch.assignedHours || 1)) * 100
+                  )}%`,
+                }}
+              ></div>
+            </div>
+          </div>
+        )}
+
+        {/* Trainers Table */}
+        <TrainersTable
+          trainers={batch.trainers || []}
+          rowIndex={rowIndex}
+          batchIndex={batchIndex}
+          batch={batch}
+          row={row}
+          allTrainers={trainers}
+          selectedDomain={selectedDomain}
+          addTrainer={addTrainer}
+          handleTrainerField={handleTrainerField}
+          handleTotalHoursChange={handleTotalHoursChange}
+          removeTrainer={removeTrainer}
+          openSwapModal={openSwapModal}
+          isTrainerAvailable={isTrainerAvailable}
+          duplicates={duplicates}
+        />
+      </div>
+    </div>
+  );
+});
+
+BatchComponent.displayName = 'BatchComponent';
 
 const BatchDetailsTable = ({
   table1Data,
@@ -29,7 +527,19 @@ const BatchDetailsTable = ({
   onSwapTrainer,
   mergeFirestoreConfig,
   courses,
+  onValidationChange,
 }) => {
+  // ✅ FIXED: Use useRef to ensure consistent timer name across renders
+  const renderTimerRef = useRef(null);
+  const startTimeRef = useRef(null);
+  
+  // ✅ FIXED: Initialize timer only once per render cycle
+  if (!renderTimerRef.current) {
+    renderTimerRef.current = `BatchDetailsTable Render ${Date.now()}-${Math.random()}`;
+    startTimeRef.current = performance.now();
+    console.time(renderTimerRef.current);
+  }
+  
   // Add logging when props change
   useEffect(() => {
     console.log("🔄 [BATCH DETAILS TABLE] Props updated:", {
@@ -73,42 +583,9 @@ const BatchDetailsTable = ({
     sourceRowIndex: null,
     targetRowIndex: null,
   });
-  const COLOR_PALETTE = [
-    {
-      primary: "bg-blue-600 text-white",
-      accent: "bg-blue-50 text-blue-700",
-      border: "border-blue-200",
-      text: "text-blue-600",
-      badge: "bg-blue-100 text-blue-800",
-    },
-    {
-      primary: "bg-green-600 text-white",
-      accent: "bg-green-50 text-green-700",
-      border: "border-green-200",
-      text: "text-green-600",
-      badge: "bg-green-100 text-green-800",
-    },
-    {
-      primary: "bg-purple-600 text-white",
-      accent: "bg-purple-50 text-purple-700",
-      border: "border-purple-200",
-      text: "text-purple-600",
-      badge: "bg-purple-100 text-purple-800",
-    },
-    // Add more color options as needed
-  ];
-
-  // Default color scheme
-  const DEFAULT_COLORS = {
-    primary: "bg-gray-600 text-white",
-    accent: "bg-gray-50 text-gray-700",
-    border: "border-gray-200",
-    text: "text-gray-600",
-    badge: "bg-gray-100 text-gray-800",
-  };
 
   // Helper function to generate consistent colors for specializations
-  const getSpecializationColors = (specialization, courses) => {
+  const getSpecializationColors = useCallback((specialization, courses) => {
     if (!courses || !specialization) return DEFAULT_COLORS;
 
     // Find the course index to assign consistent color
@@ -117,17 +594,54 @@ const BatchDetailsTable = ({
     );
 
     return COLOR_PALETTE[courseIndex % COLOR_PALETTE.length] || DEFAULT_COLORS;
-  };
-  const getColorsForBatch = (batchName) => {
-    return getSpecializationColors(batchName, courses);
-  };
-
+  }, []);
+  
   const [trainers, setTrainers] = useState([]);
-  const [expandedTrainer, setExpandedTrainer] = useState({});
   const didAutoExpand = useRef(false);
 
   const [expandedBatch, setExpandedBatch] = useState({});
   const [swapModal, setSwapModal] = useState({ open: false, source: null });
+  const [duplicateTrainers, setDuplicateTrainers] = useState([]);
+
+  // ✅ 4. Memoize filtered trainers to prevent unnecessary re-filtering
+  const filteredTrainers = useMemo(() => {
+    console.log("🔄 [MEMOIZED] Recalculating filtered trainers");
+    return trainers.filter(
+      (tr) =>
+        tr.domain &&
+        typeof tr.domain === "string" &&
+        tr.domain.toLowerCase().trim() === selectedDomain.toLowerCase().trim()
+    );
+  }, [trainers, selectedDomain]);
+
+  // ✅ 5. Memoize batch statistics to prevent recalculation on every render
+  const batchStatistics = useMemo(() => {
+    console.log("🔄 [MEMOIZED] Recalculating batch statistics");
+    return table1Data.map((row, rowIndex) => {
+      const totalAssignedStudents = row.batches.reduce(
+        (sum, b) => sum + Number(b.batchPerStdCount || 0),
+        0
+      );
+      const totalAssignedHours = row.batches.length > 0 ? Number(row.batches[0].assignedHours || 0) : 0;
+      
+      return {
+        rowIndex,
+        totalAssignedStudents,
+        totalAssignedHours,
+        trainerCount: row.batches.reduce((sum, batch) => sum + (batch.trainers?.length || 0), 0),
+        totalTrainerHours: row.batches.reduce(
+          (sum, batch) => sum + (batch.trainers || []).reduce(
+            (bSum, trainer) => bSum + Number(trainer.assignedHours || 0), 0
+          ), 0
+        )
+      };
+    });
+  }, [table1Data]);
+
+  // ✅ 7. Memoize colors for batch to prevent recalculation
+  const memoizedGetColorsForBatch = useCallback((batchName) => {
+    return getSpecializationColors(batchName, courses);
+  }, [courses, getSpecializationColors]);
 
   // color helpers (colors constant removed because not used)
   const isTrainerAvailable = (
@@ -372,7 +886,6 @@ const BatchDetailsTable = ({
     const batch = updated[rowIndex].batches[batchIndex];
     if (!batch.trainers) batch.trainers = [];
 
-    const newTrainerIndex = batch.trainers.length;
     batch.trainers.push({
       trainerId: "",
       trainerName: "",
@@ -382,13 +895,6 @@ const BatchDetailsTable = ({
       endDate: "",
       dailyHours: [],
     });
-
-    // Optional: Auto-expand only the newly added trainer
-    const trainerKey = `${rowIndex}-${batchIndex}-${newTrainerIndex}`;
-    setExpandedTrainer((prev) => ({
-      ...prev,
-      [trainerKey]: false, // Keep new trainers collapsed too
-    }));
 
     setTable1Data(updated);
   };
@@ -548,6 +1054,8 @@ const BatchDetailsTable = ({
     }
 
     setTable1Data(updated);
+    
+    // Duplicate detection will be handled automatically by useEffect when table1Data changes
   }; // ✅ ADDED: Missing closing brace for the function
 
   // 1) getAvailableSpecializations (replace existing)
@@ -637,13 +1145,6 @@ const BatchDetailsTable = ({
     setExpandedBatch((prev) => ({
       ...prev,
       [rowIndex]: !prev[rowIndex],
-    }));
-  };
-
-  const toggleTrainerExpansion = (trainerKey) => {
-    setExpandedTrainer((prev) => ({
-      ...prev,
-      [trainerKey]: !prev[trainerKey],
     }));
   };
 
@@ -1049,12 +1550,9 @@ const BatchDetailsTable = ({
     // Only auto-expand ONCE (on first load) - REMOVE the auto-expansion for existing trainers
     if (!didAutoExpand.current && table1Data && table1Data.length > 0) {
       // Remove auto-expansion logic - keep trainers collapsed by default
-      const expanded = {}; // Start with empty - no auto-expansion
-
       // Only auto-expand if it's a completely new trainer being added
       // (This part can be handled in addTrainer function if needed)
 
-      setExpandedTrainer(expanded);
       didAutoExpand.current = true;
     }
   }, [table1Data]);
@@ -1125,6 +1623,76 @@ const BatchDetailsTable = ({
       }
     }
   };
+
+  // ✅ FIXED: Use useLayoutEffect to ensure cleanup happens synchronously
+  useLayoutEffect(() => {
+    return () => {
+      if (renderTimerRef.current && startTimeRef.current) {
+        const endTime = performance.now();
+        const renderTime = endTime - startTimeRef.current;
+        console.log(`⚡ [PERFORMANCE] BatchDetailsTable render completed in ${renderTime.toFixed(2)}ms`);
+        
+        try {
+          console.timeEnd(renderTimerRef.current);
+        } catch {
+          // Timer doesn't exist, ignore the error
+        }
+        
+        // Reset for next render
+        renderTimerRef.current = null;
+        startTimeRef.current = null;
+      }
+    };
+  });
+
+  // Monitor for duplicate trainers whenever table1Data changes
+  useEffect(() => {
+    if (!table1Data || table1Data.length === 0) {
+      setDuplicateTrainers([]);
+      if (onValidationChange) {
+        onValidationChange(selectedDomain, { hasDuplicates: false, duplicates: [] });
+      }
+      return;
+    }
+
+    // Inline duplicate detection to avoid useCallback dependency cycle
+    const duplicates = [];
+    const trainerMap = new Map();
+
+    table1Data.forEach((row, rowIndex) => {
+      row.batches?.forEach((batch, batchIndex) => {
+        batch.trainers?.forEach((trainer, trainerIdx) => {
+          if (!trainer.trainerId || !trainer.dayDuration || !trainer.startDate) {
+            return; // Skip incomplete trainer data
+          }
+
+          const key = `${trainer.trainerId}-${trainer.dayDuration}-${trainer.startDate}`;
+          const trainerKey = `${rowIndex}-${batchIndex}-${trainerIdx}`;
+
+          if (trainerMap.has(key)) {
+            // Found duplicate - add both current and existing to duplicates
+            const existingKey = trainerMap.get(key);
+            if (!duplicates.includes(existingKey)) {
+              duplicates.push(existingKey);
+            }
+            duplicates.push(trainerKey);
+          } else {
+            trainerMap.set(key, trainerKey);
+          }
+        });
+      });
+    });
+
+    setDuplicateTrainers(duplicates);
+    
+    // Notify parent component about validation status
+    if (onValidationChange) {
+      onValidationChange(selectedDomain, {
+        hasDuplicates: duplicates.length > 0,
+        duplicates: duplicates,
+      });
+    }
+  }, [table1Data, selectedDomain, onValidationChange]);
 
   return (
     <div className="space-y-6">
@@ -1333,14 +1901,7 @@ const BatchDetailsTable = ({
         <div className="divide-y divide-gray-200">
           {table1Data.length > 0 ? (
             table1Data.map((row, rowIndex) => {
-              const totalAssignedStudents = row.batches.reduce(
-                (sum, b) => sum + Number(b.batchPerStdCount || 0),
-                0
-              );
-              const totalAssignedHours =
-                row.batches.length > 0
-                  ? Number(row.batches[0].assignedHours || 0)
-                  : 0;
+              const stats = batchStatistics[rowIndex];
               const isExpanded = expandedBatch[rowIndex];
 
               // Show message if no hours for this specialization
@@ -1378,7 +1939,7 @@ const BatchDetailsTable = ({
                     <div className="flex items-center space-x-3">
                       <div
                         className={`w-7 h-7 rounded-full flex items-center justify-center ${
-                          getColorsForBatch(row.batch).accent
+                          memoizedGetColorsForBatch(row.batch).accent
                         } text-xs`}
                       >
                         {rowIndex + 1}
@@ -1386,7 +1947,7 @@ const BatchDetailsTable = ({
                       <div>
                         <h4
                           className={`font-medium text-xs ${
-                            getColorsForBatch(row.batch).text
+                            memoizedGetColorsForBatch(row.batch).text
                           }`}
                         >
                           {row.batch}
@@ -1404,17 +1965,17 @@ const BatchDetailsTable = ({
                     <div className="flex items-center space-x-2">
                       <div
                         className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                          getColorsForBatch(row.batch).badge
+                          memoizedGetColorsForBatch(row.batch).badge
                         }`}
                       >
-                        {totalAssignedStudents}/{row.stdCount} students
+                        {stats.totalAssignedStudents}/{row.stdCount} students
                       </div>
                       <div
                         className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                          getColorsForBatch(row.batch).badge
+                          memoizedGetColorsForBatch(row.batch).badge
                         }`}
                       >
-                        {totalAssignedHours}/{row.hrs} hours
+                        {stats.totalAssignedHours}/{row.hrs} hours
                       </div>
 
                       {/* Merge button - always visible */}
@@ -1477,508 +2038,27 @@ const BatchDetailsTable = ({
                   {isExpanded && (
                     <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 space-y-6">
                       {row.batches.map((batch, batchIndex) => (
-                        <div
-                          key={`batch-${rowIndex}-${batchIndex}`} // Add unique key here
-                          className={`bg-white rounded-lg border ${
-                            getColorsForBatch(row.batch).border
-                          } shadow-xs overflow-hidden`}
-                        >
-                          <div
-                            className={`px-4 py-3 ${
-                              getColorsForBatch(row.batch).accent
-                            } border-b ${
-                              getColorsForBatch(row.batch).border
-                            } flex justify-between items-center`}
-                          >
-                            <span
-                              className={`font-medium text-sm ${
-                                getColorsForBatch(row.batch).text
-                              }`}
-                            >
-                              Batch {batchIndex + 1}
-                            </span>
-                            <div className="flex space-x-2">
-                              {row.batches.length > 1 && (
-                                <button
-                                  onClick={() =>
-                                    removeBatch(rowIndex, batchIndex)
-                                  }
-                                  className="p-1.5 rounded-lg hover:bg-rose-50 text-rose-500 transition-colors"
-                                  title="Remove Batch"
-                                  type="button"
-                                >
-                                  <FiTrash2 size={14} />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="p-3 space-y-2">
-                            {/* Batch Details */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                              <div>
-                                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-0.5">
-                                  Students
-                                </label>
-                                <input
-                                  type="text"
-                                  inputMode="numeric"
-                                  pattern="[0-9]*"
-                                  className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
-                                  value={batch.batchPerStdCount || ""}
-                                  onChange={(e) =>
-                                    handleBatchChange(
-                                      rowIndex,
-                                      batchIndex,
-                                      "batchPerStdCount",
-                                      e.target.value.replace(/\D/g, "")
-                                    )
-                                  }
-                                  min="0"
-                                  max={row.stdCount}
-                                  placeholder="0"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-0.5">
-                                  Batch Code
-                                </label>
-                                <input
-                                  type="text"
-                                  className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
-                                  value={batch.batchCode || ""}
-                                  onChange={(e) =>
-                                    handleBatchChange(
-                                      rowIndex,
-                                      batchIndex,
-                                      "batchCode",
-                                      e.target.value
-                                    )
-                                  }
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-0.5">
-                                  Assigned Hours
-                                </label>
-                                <input
-                                  type="text"
-                                  inputMode="numeric"
-                                  pattern="[0-9]*"
-                                  className={`w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2 ${
-                                    batchIndex !== 0
-                                      ? "bg-gray-100 cursor-not-allowed"
-                                      : ""
-                                  }`}
-                                  value={
-                                    batch.assignedHours === undefined ||
-                                    batch.assignedHours === null
-                                      ? ""
-                                      : batch.assignedHours
-                                  }
-                                  onChange={(e) => {
-                                    if (batchIndex === 0) {
-                                      let val = e.target.value.replace(
-                                        /\D/g,
-                                        ""
-                                      );
-                                      handleBatchChange(
-                                        rowIndex,
-                                        batchIndex,
-                                        "assignedHours",
-                                        val
-                                      );
-                                    }
-                                  }}
-                                  min="0"
-                                  placeholder="0"
-                                  disabled={batchIndex !== 0}
-                                />
-                              </div>
-                            </div>
-
-                            {/* Assigned Hours Progress Bar */}
-                            {batch.assignedHours > 0 && (
-                              <div className="mb-2">
-                                <div className="flex justify-between items-center mb-1">
-                                  <span className="text-xs text-gray-600 font-medium">
-                                    Assigned Trainer Hours:{" "}
-                                    {batch.trainers.reduce(
-                                      (sum, t) =>
-                                        sum + Number(t.assignedHours || 0),
-                                      0
-                                    )}{" "}
-                                    / {batch.assignedHours}
-                                  </span>
-                                  <span className="text-xs text-gray-500">
-                                    {batch.assignedHours -
-                                      batch.trainers.reduce(
-                                        (sum, t) =>
-                                          sum + Number(t.assignedHours || 0),
-                                        0
-                                      )}{" "}
-                                    hours left
-                                  </span>
-                                </div>
-                                <div className="w-full bg-gray-200 rounded h-2">
-                                  <div
-                                    className="bg-indigo-500 h-2 rounded"
-                                    style={{
-                                      width: `${Math.min(
-                                        100,
-                                        (batch.trainers.reduce(
-                                          (sum, t) =>
-                                            sum + Number(t.assignedHours || 0),
-                                          0
-                                        ) /
-                                          (batch.assignedHours || 1)) *
-                                          100
-                                      )}%`,
-                                    }}
-                                  ></div>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Trainers Section */}
-                            <div>
-                              <div className="flex justify-between items-center mb-2 ">
-                                <h5 className="text-sm font-medium text-gray-700">
-                                  Trainers
-                                </h5>
-                                <button
-                                  onClick={() =>
-                                    addTrainer(rowIndex, batchIndex)
-                                  }
-                                  className="text-xs flex items-center text-indigo-600 hover:text-indigo-800 font-medium"
-                                  type="button"
-                                >
-                                  <FiPlus className="mr-1" size={12} /> Add
-                                  Trainer
-                                </button>
-                              </div>
-
-                              {(batch.trainers || []).length > 0 ? (
-                                <div className="overflow-x-auto">
-                                  <table className="min-w-full text-xs border border-gray-200 rounded">
-                                    <thead className="bg-gray-50">
-                                      <tr>
-                                        <th className="px-2 py-1 text-left">
-                                          Trainer
-                                        </th>
-                                        <th className="px-2 py-1 text-left">
-                                          Duration
-                                        </th>
-                                        <th className="px-2 py-1 text-left">
-                                          Start Date
-                                        </th>
-                                        <th className="px-2 py-1 text-left">
-                                          End Date
-                                        </th>
-                                        <th className="px-2 py-1 text-left">
-                                          Per Hour Cost
-                                        </th>
-                                        <th className="px-2 py-1 text-left">
-                                          Total Cost
-                                        </th>
-                                        <th className="px-2 py-1 text-left">
-                                          Total Hours
-                                        </th>
-                                        <th className="px-2 py-1 text-left">
-                                          Daily Hours
-                                        </th>
-                                        <th className="px-2 py-1 text-left">
-                                          Actions
-                                        </th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {(batch.trainers || []).map(
-                                        (trainer, trainerIdx) => {
-                                          // Add logging for each trainer render
-                                          console.log(
-                                            `🔄 [UI RENDER] Rendering trainer ${trainerIdx} in batch ${batchIndex}, row ${rowIndex}:`,
-                                            {
-                                              trainerId: trainer.trainerId,
-                                              trainerName: trainer.trainerName,
-                                              dayDuration: trainer.dayDuration,
-                                              batchCode: batch.batchCode,
-                                              specialization: row.batch,
-                                            }
-                                          );
-
-                                          return (
-                                            <React.Fragment key={trainerIdx}>
-                                              <tr className="border-b last:border-0">
-                                                {/* Trainer Name/Select */}
-                                                <td className="px-2 py-1">
-                                                  <select
-                                                    value={trainer.trainerId || ""} // ✅ This is correct
-                                                    onChange={(e) =>
-                                                      handleTrainerField(
-                                                        rowIndex,
-                                                        batchIndex,
-                                                        trainerIdx,
-                                                        "trainerId",
-                                                        e.target.value
-                                                      )
-                                                    }
-                                                    className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
-                                                  >
-                                                    <option value="">Select Trainer</option>
-                                                    {trainers
-                                                      .filter(
-                                                        (tr) =>
-                                                          tr.domain &&
-                                                          typeof tr.domain ===
-                                                            "string" &&
-                                                          tr.domain
-                                                            .toLowerCase()
-                                                            .trim() ===
-                                                            selectedDomain
-                                                              .toLowerCase()
-                                                              .trim()
-                                                      )
-                                                      .map((tr) => {
-                                                        const isAvailable =
-                                                          isTrainerAvailable(
-                                                            tr.trainerId,
-                                                            trainer.startDate,
-                                                            trainer.dayDuration,
-                                                            `${rowIndex}-${batchIndex}-${trainerIdx}`
-                                                          );
-                                                        return (
-                                                          <option
-                                                            key={tr.trainerId}
-                                                            value={tr.trainerId}
-                                                            disabled={
-                                                              !isAvailable
-                                                            }
-                                                            className={
-                                                              !isAvailable
-                                                                ? "text-gray-400"
-                                                                : ""
-                                                            }
-                                                          >
-                                                            {tr.name} (
-                                                            {tr.trainerId})
-                                                            {!isAvailable &&
-                                                              " (Already booked)"}
-                                                          </option>
-                                                        );
-                                                      })}
-                                                  </select>
-                                                </td>
-
-                                                {/* Duration dropdown */}
-                                                <td className="px-2 py-1">
-                                                  <select
-                                                    value={
-                                                      trainer.dayDuration || ""
-                                                    }
-                                                    onChange={(e) =>
-                                                      handleTrainerField(
-                                                        rowIndex,
-                                                        batchIndex,
-                                                        trainerIdx,
-                                                        "dayDuration",
-                                                        e.target.value
-                                                      )
-                                                    }
-                                                    className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
-                                                  >
-                                                    <option value="">
-                                                      Select Duration
-                                                    </option>
-                                                    {DAY_DURATION_OPTIONS.map(
-                                                      (option) => (
-                                                        <option
-                                                          key={option}
-                                                          value={option}
-                                                        >
-                                                          {option}
-                                                        </option>
-                                                      )
-                                                    )}
-                                                  </select>
-                                                </td>
-
-                                                {/* Start Date */}
-                                                <td className="px-2 py-1">
-                                                  <input
-                                                    type="date"
-                                                    value={
-                                                      trainer.startDate || ""
-                                                    }
-                                                    onChange={(e) =>
-                                                      handleTrainerField(
-                                                        rowIndex,
-                                                        batchIndex,
-                                                        trainerIdx,
-                                                        "startDate",
-                                                        e.target.value
-                                                      )
-                                                    }
-                                                    className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
-                                                  />
-                                                </td>
-                                                {/* End Date */}
-                                                <td className="px-2 py-1">
-                                                  <input
-                                                    type="date"
-                                                    value={
-                                                      trainer.endDate || ""
-                                                    }
-                                                    onChange={(e) =>
-                                                      handleTrainerField(
-                                                        rowIndex,
-                                                        batchIndex,
-                                                        trainerIdx,
-                                                        "endDate",
-                                                        e.target.value
-                                                      )
-                                                    }
-                                                    className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
-                                                  />
-                                                </td>
-
-                                                {/* Per Hour Cost */}
-                                                <td className="px-2 py-1">
-                                                  <input
-                                                    type="number"
-                                                    value={
-                                                      trainer.perHourCost || ""
-                                                    }
-                                                    onChange={(e) =>
-                                                      handleTrainerField(
-                                                        rowIndex,
-                                                        batchIndex,
-                                                        trainerIdx,
-                                                        "perHourCost",
-                                                        parseFloat(
-                                                          e.target.value
-                                                        ) || 0
-                                                      )
-                                                    }
-                                                    className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
-                                                    placeholder="Cost"
-                                                  />
-                                                </td>
-
-                                                {/* Total Cost */}
-                                                <td className="px-2 py-1 text-xs">
-                                                  ₹
-                                                  {(
-                                                    (trainer.assignedHours || 0) * // ✅ FIXED: Use assignedHours instead of totalHours
-                                                    (trainer.perHourCost || 0)
-                                                  ).toFixed(2)}
-                                                </td>
-
-                                                {/* Total Hours */}
-                                                <td className="px-2 py-1">
-                                                  <input
-                                                    type="number"
-                                                    value={trainer.assignedHours || ""} // ✅ FIXED: Use assignedHours instead of totalHours
-                                                    onChange={(e) =>
-                                                      handleTotalHoursChange(
-                                                        rowIndex,
-                                                        batchIndex,
-                                                        trainerIdx,
-                                                        e.target.value
-                                                      )
-                                                    }
-                                                    className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
-                                                    placeholder="Hours"
-                                                  />
-                                                </td>
-
-                                                {/* Daily Hours */}
-                                                <td className="px-2 py-1 text-xs">
-                                                  {trainer.dailyHours && trainer.dailyHours.length > 0 
-                                                    ? trainer.dailyHours.reduce((sum, hours) => sum + Number(hours || 0), 0).toFixed(2) 
-                                                    : (trainer.assignedHours || 0)
-                                                  }h
-                                                </td>
-
-                                                {/* Actions */}
-                                                <td className="px-2 py-1">
-                                                  <div className="flex space-x-1">
-                                                    <button
-                                                      type="button"
-                                                      className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
-                                                      onClick={() =>
-                                                        removeTrainer(
-                                                          rowIndex,
-                                                          batchIndex,
-                                                          trainerIdx
-                                                        )
-                                                      }
-                                                      title="Remove Trainer"
-                                                    >
-                                                      ×
-                                                    </button>
-                                                    {trainer.dayDuration ===
-                                                      "AM" && (
-                                                      <button
-                                                        type="button"
-                                                        className="ml-2 px-2 py-1 text-xs bg-black text-white rounded hover:bg-gray-800"
-                                                        onClick={() => {
-                                                          console.log(
-                                                            "🔴 [SWAP] Swap button clicked for trainer:",
-                                                            {
-                                                              rowIndex:
-                                                                rowIndex,
-                                                              batchIndex:
-                                                                batchIndex,
-                                                              trainerIdx:
-                                                                trainerIdx,
-                                                              trainerData:
-                                                                trainer,
-                                                              batchCode:
-                                                                batch.batchCode,
-                                                              specialization:
-                                                                row.batch,
-                                                              domain:
-                                                                selectedDomain,
-                                                            }
-                                                          );
-                                                          openSwapModal(
-                                                            rowIndex,
-                                                            batchIndex,
-                                                            trainerIdx
-                                                          );
-                                                        }}
-                                                        title="Swap Trainer"
-                                                      >
-                                                        Swap
-                                                      </button>
-                                                    )}
-                                                  </div>
-                                                </td>
-                                              </tr>
-                                            </React.Fragment>
-                                          );
-                                        }
-                                      )}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              ) : (
-                                <div className="text-center py-6 bg-gray-50 rounded-lg">
-                                  <FiUser
-                                    className="mx-auto text-gray-400"
-                                    size={20}
-                                  />
-                                  <p className="text-sm text-gray-500 mt-2">
-                                    No trainers assigned
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
+                        <BatchComponent
+                          key={`batch-${rowIndex}-${batchIndex}`}
+                          batch={batch}
+                          batchIndex={batchIndex}
+                          rowIndex={rowIndex}
+                          row={row}
+                          trainers={filteredTrainers}
+                          selectedDomain={selectedDomain}
+                          memoizedGetColorsForBatch={memoizedGetColorsForBatch}
+                          handleBatchChange={handleBatchChange}
+                          removeBatch={removeBatch}
+                          addTrainer={addTrainer}
+                          handleTrainerField={handleTrainerField}
+                          handleTotalHoursChange={handleTotalHoursChange}
+                          removeTrainer={removeTrainer}
+                          openSwapModal={openSwapModal}
+                          isTrainerAvailable={isTrainerAvailable}
+                          duplicates={duplicateTrainers}
+                        />
                       ))}
-                      {/* --- Add Batch Button at the bottom --- */}
+                      {/* Add Batch Button */}
                       <div className="flex justify-end mt-1">
                         <button
                           onClick={(e) => {
@@ -1986,11 +2066,9 @@ const BatchDetailsTable = ({
                             addBatch(rowIndex);
                           }}
                           className={`flex items-center px-2 py-1 rounded border border-indigo-500 bg-indigo-50 text-indigo-700 text-xs font-medium shadow-sm hover:bg-indigo-100 hover:border-indigo-600 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-200 ${
-                            getColorsForBatch(row.batch).text
+                            memoizedGetColorsForBatch(row.batch).text
                           }`}
                           title={`Add Batch to ${row.batch}`}
-                          aria-label={`Add Batch to ${row.batch}`}
-                          data-testid={`add-batch-bottom-${row.batch}`}
                           type="button"
                         >
                           <FiPlus className="mr-1" size={12} /> Add Batch
