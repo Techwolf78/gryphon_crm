@@ -334,7 +334,7 @@ function InitiationTrainingDetails({ training, onBack }) {
                                   {batch.trainers && batch.trainers.length > 0 ? (
 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                                       {batch.trainers.map((trainer, tidx) => {
-                                        const uniqueKey = `${domainInfo.id}_${batch.batchCode}_${trainer.trainerId || tidx}`;
+                                        const uniqueKey = `${domainInfo.id}_${batch.batchCode}_${trainer.trainerId || 'trainer'}_${tidx}_${trainer.dayDuration || 'noslot'}_${trainer.startDate || 'nostart'}`;
                                         return (
                                           <div
                                             key={uniqueKey}

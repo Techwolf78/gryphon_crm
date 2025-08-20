@@ -1,5 +1,5 @@
 // ONLY the updated parts are modified. Remaining code is untouched.
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useCallback } from "react";
 import {
   FiHelpCircle,
   FiMail,
@@ -15,6 +15,7 @@ import {
   FiAlertCircle,
   FiCheck,
   FiArchive,
+  FiGrid,
 } from "react-icons/fi";
 import { AuthContext } from "../context/AuthContext";
 import {
@@ -32,6 +33,7 @@ import { db } from "../firebase";
 import emailjs from "@emailjs/browser";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import QRCodePage from "./QRCodePage";
 
 emailjs.init("CXYkFqg_8EWTsrN8M");
 
@@ -46,6 +48,7 @@ const Help = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [remark, setRemark] = useState("");
+  const [showQRPage, setShowQRPage] = useState(false);
 
 
 
@@ -57,9 +60,13 @@ const Help = () => {
 
   const isAdmin = user?.department === "Admin";
 
-  const handleKnowledgeItemClick = (title) => {
-    setPopupTitle(title);
-    setShowPopup(true);
+  const handleKnowledgeItemClick = (title, action) => {
+    if (action === "qr-code") {
+      setShowQRPage(true);
+    } else {
+      setPopupTitle(title);
+      setShowPopup(true);
+    }
   };
 
   const handleTicketFormChange = (e) => {
@@ -164,7 +171,7 @@ const Help = () => {
     }
   };
 
-  const fetchTickets = async () => {
+  const fetchTickets = useCallback(async () => {
     try {
       let q;
       if (isAdmin) {
@@ -200,7 +207,7 @@ const Help = () => {
         toast.error("Failed to load tickets");
       }
     }
-  };
+  }, [isAdmin, user?.email]);
 
   const updateTicketStatus = async (ticketId, status) => {
     try {
@@ -238,7 +245,7 @@ const Help = () => {
     if (user) {
       fetchTickets();
     }
-  }, [user]);
+  }, [user, fetchTickets]);
 
   const knowledgeBaseItems = [
     {
@@ -265,11 +272,25 @@ const Help = () => {
       desc: "New user onboarding guide",
       category: "Guides",
     },
+    {
+      icon: <FiGrid className="w-5 h-5" />,
+      title: "QR Code Generator",
+      desc: "Generate QR codes for easy sharing and access",
+      category: "Tools",
+      action: "qr-code",
+    },
   ];
 
   return (
     <div className="min-h-screen bg-gray-50/50">
-      {/* Under Development Popup */}
+      {/* QR Code Page */}
+      {showQRPage && (
+        <QRCodePage onBack={() => setShowQRPage(false)} />
+      )}
+
+      {!showQRPage && (
+        <>
+          {/* Under Development Popup */}
       {showPopup && (
         <div className="fixed inset-0 bg-gray-900/70 backdrop-blur-sm flex items-center justify-center z-54 p-4 animate-fadeIn">
           <div className="bg-white rounded-xl p-6 max-w-md w-full relative overflow-hidden border border-gray-100 shadow-2xl animate-scaleIn">
@@ -780,7 +801,7 @@ const Help = () => {
                 {knowledgeBaseItems.map((item, index) => (
                   <div
                     key={index}
-                    onClick={() => handleKnowledgeItemClick(item.title)}
+                    onClick={() => handleKnowledgeItemClick(item.title, item.action)}
                     className="bg-white rounded-xl p-5 border border-gray-100 shadow-xs hover:shadow-sm transition-all cursor-pointer"
                   >
                     <div className="mb-3 flex items-center gap-3">
@@ -847,6 +868,8 @@ const Help = () => {
         pauseOnHover
         theme="light"
       />
+        </>
+      )}
     </div>
   );
 };
