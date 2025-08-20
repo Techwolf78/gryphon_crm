@@ -25,6 +25,7 @@ const DropdownActions = ({
   setShowExpectedDateModal,
   setPendingPhaseChange,
   setLeadBeingUpdated,
+  isMyLead,
 }) => {
   const [assignHovered, setAssignHovered] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -64,8 +65,8 @@ const DropdownActions = ({
     try {
       await deleteDoc(doc(db, "leads", leadId));
       // console.log("Lead deleted successfully");
-    } catch (error) {
-      // console.error("Error deleting lead:", error);
+    } catch {
+      // console.error("Error deleting lead");
     } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);
@@ -92,12 +93,9 @@ const DropdownActions = ({
       // Get Assistant Managers, Executives, and Managers (excluding self)
       return allSalesUsers.filter(
         (u) =>
-          (
-            (u.reportingManager === currentUserData.name &&
-              ["Assistant Manager", "Executive"].includes(u.role))
-            ||
-            (u.role === "Manager" && u.uid !== currentUser.uid)
-          )
+          (u.reportingManager === currentUserData.name &&
+            ["Assistant Manager", "Executive"].includes(u.role)) ||
+          (u.role === "Manager" && u.uid !== currentUser.uid)
       );
     }
     if (["Assistant Manager", "Executive"].includes(currentUserData.role)) {
@@ -139,18 +137,20 @@ const DropdownActions = ({
         </button>
 
         {/* Edit */}
-        <button
-          className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition"
-          onClick={(e) => {
-            e.stopPropagation();
-            setSelectedLead({ ...leadData, id: leadId });
-            setShowDetailsModal(true);
-            closeDropdown();
-          }}
-        >
-          <FaEdit className="text-indigo-500 mr-3" />
-          Edit
-        </button>
+        {isMyLead && (
+          <button
+            className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedLead({ ...leadData, id: leadId });
+              setShowDetailsModal(true);
+              closeDropdown();
+            }}
+          >
+            <FaEdit className="text-indigo-500 mr-3" />
+            Edit
+          </button>
+        )}
 
         {/* Assign Dropdown */}
         <div

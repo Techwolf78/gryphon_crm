@@ -14,20 +14,48 @@ import {
   FiCheck,
   FiClock,
   FiAlertCircle,
+  FiX,
 } from "react-icons/fi";
 import BatchDetailsTable from "./BatchDetailsTable";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import "rc-time-picker/assets/index.css";
+
+// helper: generate time options in HH:mm at given step (15 minutes)
+function generateTimeOptions(step = 15) {
+  const opts = [];
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += step) {
+      const hh = String(h).padStart(2, "0");
+      const mm = String(m).padStart(2, "0");
+      opts.push(`${hh}:${mm}`);
+    }
+  }
+  return opts;
+}
+const TIME_OPTIONS = generateTimeOptions(15);
 
 const PHASE_OPTIONS = ["phase-1", "phase-2", "phase-3"];
 const DOMAIN_OPTIONS = ["Technical", "Soft skills", "Aptitude", "Tools"];
+
+// Add a color for each domain for visual clarity
+const DOMAIN_COLORS = {
+  Technical: "border-blue-400 bg-blue-50",
+  "Soft skills": "border-green-400 bg-green-50",
+  Aptitude: "border-purple-400 bg-purple-50",
+  Tools: "border-yellow-400 bg-yellow-50",
+};
 
 function InitiationModal({ training, onClose, onConfirm }) {
   const [selectedPhases, setSelectedPhases] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [selectedDomain, setSelectedDomain] = useState("");
+
+  // MULTI-DOMAIN SUPPORT
+  const [selectedDomains, setSelectedDomains] = useState([]); // Multiple domains
+  const [table1DataByDomain, setTable1DataByDomain] = useState({}); // { domain: table1Data }
+
   const [topics, setTopics] = useState([]);
   const [courses, setCourses] = useState([]);
   const [currentPhase, setCurrentPhase] = useState("");
@@ -47,18 +75,15 @@ function InitiationModal({ training, onClose, onConfirm }) {
     startDate: "",
     endDate: "",
   });
-  const [phaseHours, setPhaseHours] = useState({
-    "phase-1": 0,
-    "phase-2": 0,
-    "phase-3": 0,
-  });
   const [customPhaseHours, setCustomPhaseHours] = useState({
     "phase-1": "",
     "phase-2": "",
     "phase-3": "",
   });
-  const [totalTrainingHours, setTotalTrainingHours] = useState(0);
-  const [table1Data, setTable1Data] = useState([]);
+  const [zeroHourDomains, setZeroHourDomains] = useState([]);
+  const [showZeroHourWarning, setShowZeroHourWarning] = useState(false);
+  const [deselectingZeroDomains, setDeselectingZeroDomains] = useState(false);
+  // totalTrainingHours removed (was used only for allocation)
   const [canMergeBatches, setCanMergeBatches] = useState(false);
 
   // Get domain hours - use custom hours if set, otherwise default from database
@@ -88,15 +113,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
     return null;
   }, [selectedPhases]);
 
-  const getRemainingHours = (phase) => {
-    const phaseOrder = ["phase-1", "phase-2", "phase-3"];
-    const idx = phaseOrder.indexOf(phase);
-    let used = 0;
-    for (let i = 0; i < idx; i++) {
-      used += Number(phaseHours[phaseOrder[i]] || 0);
-    }
-    return Math.max(0, totalTrainingHours - used);
-  };
+  // Allocation across phases removed; remaining-hours helper removed
 
   useEffect(() => {
     const fetchTrainingDetails = async () => {
@@ -107,52 +124,46 @@ function InitiationModal({ training, onClose, onConfirm }) {
         const data = snap.data();
         setTopics(data.topics || []);
         setCourses(data.courses || []);
-        setTotalTrainingHours(Number(data.totalTrainingHours || 0));
       }
     };
     fetchTrainingDetails();
   }, [training]);
 
+  // Auto-generate table1Data for new domains
   useEffect(() => {
-    if (
-      selectedDomain &&
-      courses.length > 0 &&
-      table1Data.length === 0 // Only generate if not already filled
-    ) {
-      const mainPhase = getMainPhase();
-      const domainHours = getDomainHours(selectedDomain, mainPhase);
-      const rows = courses.map((course) => ({
-        batch: course.specialization,
-        stdCount: course.students,
-        hrs: domainHours,
-        assignedHours: 0,
-        batches: [
-          {
-            batchPerStdCount: "",
-            batchCode: `${course.specialization}1`,
+    if (courses.length === 0 || topics.length === 0) return;
+    setTable1DataByDomain((prev) => {
+      const updated = { ...prev };
+      selectedDomains.forEach((domain) => {
+        if (!updated[domain] || updated[domain].length === 0) {
+          const domainHours = getDomainHours(domain, getMainPhase());
+          updated[domain] = courses.map((course) => ({
+            batch: course.specialization,
+            stdCount: course.students,
+            hrs: domainHours,
             assignedHours: 0,
-            trainers: [],
-          },
-        ],
-      }));
-      setTable1Data(rows);
-      setPhaseHours((prev) => ({
-        ...prev,
-        [mainPhase]: 0,
-      }));
-    }
-  }, [selectedDomain, courses, topics, customPhaseHours, getDomainHours, getMainPhase, table1Data.length]);
+            batches: [
+              {
+                batchPerStdCount: "",
+                batchCode: `${course.specialization}1`,
+                assignedHours: 0,
+                trainers: [],
+              },
+            ],
+          }));
+        }
+      });
+      return updated;
+    });
+  }, [selectedDomains, courses, topics, getDomainHours, getMainPhase]);
 
-  const handleAssignedHoursChange = (hours, phase) => {
-    setPhaseHours((prev) => ({
-      ...prev,
-      [phase]: Number(hours),
-    }));
-  };
+  // Allocation logic removed — table rows are managed by domain hours and loaded data
 
   const handlePhaseChange = (phase) => {
     setSelectedPhases((prev) => {
-      const newPhases = prev.includes(phase) ? prev.filter((p) => p !== phase) : [...prev, phase];
+      const newPhases = prev.includes(phase)
+        ? prev.filter((p) => p !== phase)
+        : [...prev, phase];
       if (prev.includes(phase) && !newPhases.includes(phase)) {
         setCustomPhaseHours((prevHours) => ({
           ...prevHours,
@@ -161,9 +172,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
       }
       return newPhases;
     });
-    if (phase === "phase-1" && !selectedPhases.includes(phase)) {
-      setSelectedDomain("");
-    }
     setError(null);
   };
 
@@ -187,13 +195,25 @@ function InitiationModal({ training, onClose, onConfirm }) {
     }
   }, [success]);
 
+  // Clear zero-hour highlighting/warning whenever the selected domains change
+  useEffect(() => {
+    if (selectedDomains && selectedDomains.length > 0) {
+      setZeroHourDomains([]);
+      setShowZeroHourWarning(false);
+      setError(null);
+    } else {
+      setZeroHourDomains([]);
+      setShowZeroHourWarning(false);
+    }
+  }, [selectedDomains]);
+
   const validateForm = () => {
     if (selectedPhases.length === 0) {
       setError("Please select at least one phase");
       return false;
     }
-    if (!selectedDomain) {
-      setError("Please select a domain");
+    if (selectedDomains.length === 0) {
+      setError("Please select at least one domain");
       return false;
     }
     if (!commonFields.trainingStartDate || !commonFields.trainingEndDate) {
@@ -204,15 +224,26 @@ function InitiationModal({ training, onClose, onConfirm }) {
       setError("Please enter college start and end times");
       return false;
     }
+
+    // Detect selected domains that have zero configured hours
+    const mainPhase = getMainPhase();
+    const zeroDomains = selectedDomains.filter(
+      (d) => Number(getDomainHours(d, mainPhase) || 0) === 0
+    );
+    if (zeroDomains.length > 0) {
+      setZeroHourDomains(zeroDomains);
+      setShowZeroHourWarning(true);
+      setError(`Selected domain(s) with 0 hours: ${zeroDomains.join(", ")}.`);
+      return false;
+    }
+
     return true;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validateForm()) return;
+  // Extracted save logic so callers (auto-deselect) can pass computed domains/table data
+  const submitInternal = async (domainsToSave = null, tableDataToSave = null) => {
     setLoading(true);
     setError(null);
-
     try {
       const serializeTable1Data = (data) => {
         return data.map((row) => ({
@@ -231,58 +262,86 @@ function InitiationModal({ training, onClose, onConfirm }) {
           })),
         }));
       };
-      const table1DataToSave = serializeTable1Data(table1Data);
 
       const mainPhase = getMainPhase();
 
-      const batchPromises = selectedPhases.map(async (phase) => {
+      const phaseLevelPromises = selectedPhases.map((phase) => {
+        const phaseDocRef = doc(db, "trainingForms", training.id, "trainings", phase);
+        const phaseDocData = {
+          createdAt: serverTimestamp(),
+          createdBy: training.createdBy || {},
+          ...commonFields,
+          phase,
+        };
+        if (phase === "phase-2") phaseDocData.phase2Dates = phase2Dates;
+        if (phase === "phase-3") phaseDocData.phase3Dates = phase3Dates;
+        if (phase2Dates?.startDate && phase === "phase-2") {
+          phaseDocData.trainingStartDate = phase2Dates.startDate;
+        }
+        if (phase2Dates?.endDate && phase === "phase-2") {
+          phaseDocData.trainingEndDate = phase2Dates.endDate;
+        }
+        if (phase3Dates?.startDate && phase === "phase-3") {
+          phaseDocData.trainingStartDate = phase3Dates.startDate;
+        }
+        if (phase3Dates?.endDate && phase === "phase-3") {
+          phaseDocData.trainingEndDate = phase3Dates.endDate;
+        }
+        return setDoc(phaseDocRef, phaseDocData, { merge: true });
+      });
+
+      // Use provided domain list (if any) to avoid setState race when auto-deselecting
+      const domainsList = Array.isArray(domainsToSave) ? domainsToSave : selectedDomains;
+      const tableDataLookup = tableDataToSave || table1DataByDomain;
+      const batchPromises = domainsList.map(async (domain) => {
         let phaseData = {
           createdAt: serverTimestamp(),
           createdBy: training.createdBy || {},
           ...commonFields,
-          phase: phase,
-          customHours: customPhaseHours[phase] || "",
-          assignedHours: phaseHours[phase] || 0,
+          phase: mainPhase,
+          domain,
+          domainHours: getDomainHours(domain, mainPhase),
+          table1Data: serializeTable1Data(tableDataLookup[domain] || []),
+          isMainPhase: true,
+          customHours: customPhaseHours[mainPhase] || "",
+          allSelectedPhases: selectedPhases,
         };
-
-        if (phase === mainPhase) {
-          phaseData = {
-            ...phaseData,
-            domain: selectedDomain,
-            domainHours: getDomainHours(selectedDomain, mainPhase),
-            table1Data: table1DataToSave,
-            isMainPhase: true,
-          };
-        } else {
-          phaseData.isMainPhase = false;
-        }
-
-        if (phase === "phase-2" && phase !== mainPhase) {
+        if (mainPhase === "phase-2") {
           phaseData.phase2Dates = phase2Dates;
+          if (phase2Dates?.startDate) phaseData.trainingStartDate = phase2Dates.startDate;
+          if (phase2Dates?.endDate) phaseData.trainingEndDate = phase2Dates.endDate;
         }
-        if (phase === "phase-3" && phase !== mainPhase) {
+        if (mainPhase === "phase-3") {
           phaseData.phase3Dates = phase3Dates;
+          if (phase3Dates?.startDate) phaseData.trainingStartDate = phase3Dates.startDate;
+          if (phase3Dates?.endDate) phaseData.trainingEndDate = phase3Dates.endDate;
         }
-
-        const phaseRef = doc(
-          collection(db, "trainingForms", training.id, "trainings"),
-          phase
+        const domainRef = doc(
+          db,
+          "trainingForms",
+          training.id,
+          "trainings",
+          mainPhase,
+          "domains",
+          domain
         );
-        return setDoc(phaseRef, phaseData, { merge: true });
+        return setDoc(domainRef, phaseData, { merge: true });
       });
 
-      await Promise.all(batchPromises);
+      await Promise.all([...phaseLevelPromises, ...batchPromises]);
 
       setSuccess("Training phases initiated successfully!");
       setLoading(false);
-
       setTimeout(() => {
+        const finalDomains = Array.isArray(domainsToSave) ? domainsToSave : selectedDomains;
+        const finalTableData = tableDataToSave || table1DataByDomain;
         if (onConfirm)
           onConfirm({
             phases: selectedPhases,
             ...commonFields,
-            domain: selectedDomain,
-            table1Data,
+            domains: finalDomains,
+            table1DataByDomain: finalTableData,
+            mainPhase,
             ...phase2Dates,
           });
         if (onClose) onClose();
@@ -291,6 +350,34 @@ function InitiationModal({ training, onClose, onConfirm }) {
       console.error("Error saving phase data:", err);
       setError("Failed to save phase data. Please try again.");
       setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e?.preventDefault?.();
+    if (!validateForm()) return;
+    await submitInternal();
+  };
+
+  const handleAutoDeselectZeroHourDomains = async () => {
+    if (!zeroHourDomains || zeroHourDomains.length === 0) return;
+    try {
+      setDeselectingZeroDomains(true);
+      // compute new selections synchronously to avoid setState timing issues
+      const newSelectedDomains = selectedDomains.filter((d) => !zeroHourDomains.includes(d));
+      const newTable1Data = { ...table1DataByDomain };
+      zeroHourDomains.forEach((d) => delete newTable1Data[d]);
+
+      // update local UI immediately
+      setSelectedDomains(newSelectedDomains);
+      setTable1DataByDomain(newTable1Data);
+      setShowZeroHourWarning(false);
+      setZeroHourDomains([]);
+
+      // pass computed lists directly to submitInternal (no race)
+      await submitInternal(newSelectedDomains, newTable1Data);
+    } finally {
+      setDeselectingZeroDomains(false);
     }
   };
 
@@ -389,6 +476,26 @@ function InitiationModal({ training, onClose, onConfirm }) {
     fetchPhaseDates();
   }, [training?.id]);
 
+  // When the main phase changes to phase-2 or phase-3, ensure the modal's
+  // common start/end date fields come from that phase's specific dates so
+  // the "Start Date" / "End Date" inputs show the correct values.
+  useEffect(() => {
+    if (!currentPhase) return;
+    if (currentPhase === "phase-2") {
+      setCommonFields((prev) => ({
+        ...prev,
+        trainingStartDate: phase2Dates?.startDate || prev.trainingStartDate,
+        trainingEndDate: phase2Dates?.endDate || prev.trainingEndDate,
+      }));
+    } else if (currentPhase === "phase-3") {
+      setCommonFields((prev) => ({
+        ...prev,
+        trainingStartDate: phase3Dates?.startDate || prev.trainingStartDate,
+        trainingEndDate: phase3Dates?.endDate || prev.trainingEndDate,
+      }));
+    }
+  }, [currentPhase, phase2Dates, phase3Dates]);
+
   useEffect(() => {
     const fetchExistingPhases = async () => {
       if (!training?.id) return;
@@ -406,7 +513,16 @@ function InitiationModal({ training, onClose, onConfirm }) {
           }
         }
       });
-      setSelectedPhases(phases);
+
+      // If the modal was opened via "Start Phase" and a specific phase was passed,
+      // default the selection to only that phase so the user sees that single-phase form.
+      // Otherwise, restore all existing phases from Firestore.
+      if (training?.selectedPhase) {
+        setSelectedPhases([training.selectedPhase]);
+      } else {
+        setSelectedPhases(phases);
+      }
+
       if (Object.keys(existingCustomHours).length > 0) {
         setCustomPhaseHours((prev) => ({
           ...prev,
@@ -415,37 +531,113 @@ function InitiationModal({ training, onClose, onConfirm }) {
       }
     };
     fetchExistingPhases();
-  }, [training?.id]);
+  }, [training?.id, training?.selectedPhase]);
 
-  const swapTrainers = (source, target) => {
-    const newTable1Data = [...table1Data];
-    const sourceTrainer = newTable1Data[source.rowIdx].batches[source.batchIdx].trainers[source.trainerIdx];
-    const targetTrainer = newTable1Data[target.rowIdx].batches[target.batchIdx].trainers[target.trainerIdx];
-    if (!sourceTrainer.slotInfo) sourceTrainer.slotInfo = (sourceTrainer.activeDates || []).map(() => ({
-      slot: sourceTrainer.dayDuration,
-      batchCode: newTable1Data[source.rowIdx].batches[source.batchIdx].batchCode
-    }));
-    if (!targetTrainer.slotInfo) targetTrainer.slotInfo = (targetTrainer.activeDates || []).map(() => ({
-      slot: targetTrainer.dayDuration,
-      batchCode: newTable1Data[target.rowIdx].batches[target.batchIdx].batchCode
-    }));
-    (targetTrainer.activeDates || []).forEach((date, idx) => {
-      sourceTrainer.activeDates.push(date);
-      sourceTrainer.dailyHours.push(targetTrainer.dailyHours?.[idx] || 0);
-      sourceTrainer.slotInfo.push({
-        slot: targetTrainer.dayDuration === "AM" ? "PM" : "AM",
-        batchCode: newTable1Data[target.rowIdx].batches[target.batchIdx].batchCode
+  // Load all domains for the current phase
+  useEffect(() => {
+    if (!training?.id || !currentPhase) return;
+
+    const fetchPhaseDomains = async () => {
+      const domainsSnap = await getDocs(
+        collection(db, "trainingForms", training.id, "trainings", currentPhase, "domains")
+      );
+      const loadedDomains = [];
+      const loadedTable1Data = {};
+
+      // helper to sum assigned hours in a saved row
+      const sumAssignedInRow = (row) => {
+        let sum = 0;
+        if (row.assignedHours) sum += Number(row.assignedHours || 0);
+        if (row.batches && row.batches.length > 0) {
+          row.batches.forEach((b) => {
+            sum += Number(b.assignedHours || 0);
+            // trainers' assignedHours are usually part of batch-level allocation, skip to avoid double-counting
+          });
+        }
+        return sum;
+      };
+
+      // For each domain in the current phase, also load other phases to compute already-used hours
+      domainsSnap.forEach((docSnap) => {
+        loadedDomains.push(docSnap.id);
       });
-    });
-    (sourceTrainer.activeDates.slice(0, sourceTrainer.activeDates.length - (targetTrainer.activeDates?.length || 0)) || []).forEach((date, idx) => {
-      targetTrainer.activeDates.push(date);
-      targetTrainer.dailyHours.push(sourceTrainer.dailyHours?.[idx] || 0);
-      targetTrainer.slotInfo.push({
-        slot: sourceTrainer.dayDuration === "AM" ? "PM" : "AM",
-        batchCode: newTable1Data[source.rowIdx].batches[source.batchIdx].batchCode
-      });
-    });
-    setTable1Data(newTable1Data);
+
+      for (const domain of loadedDomains) {
+        const currentDoc = await getDoc(
+          doc(db, "trainingForms", training.id, "trainings", currentPhase, "domains", domain)
+        );
+        const currentData = currentDoc.exists() ? currentDoc.data() : null;
+
+        // compute used hours across other phases for each specialization
+        const usedBySpec = {}; // specialization -> usedHours
+        for (const phase of PHASE_OPTIONS) {
+          if (phase === currentPhase) continue; // we only want prior/other phases' usage
+          const otherDoc = await getDoc(
+            doc(db, "trainingForms", training.id, "trainings", phase, "domains", domain)
+          );
+          if (!otherDoc.exists()) continue;
+          const otherData = otherDoc.data();
+          const rows = otherData.table1Data || [];
+          rows.forEach((r) => {
+            const spec = r.batch || r.specialization || "";
+            const used = sumAssignedInRow(r);
+            usedBySpec[spec] = (usedBySpec[spec] || 0) + Number(used || 0);
+          });
+        }
+
+        // Build the table data for this domain taking into account used hours
+        const rowsForDomain = (currentData?.table1Data || []).map((row) => {
+          const spec = row.batch || row.specialization || "";
+          const totalDomainHours = getDomainHours(domain) || 0; // domain-level total
+          const used = Number(usedBySpec[spec] || 0);
+          const remaining = Math.max(0, totalDomainHours - used);
+
+          // Adjust row.hrs and batches assignedHours to not exceed remaining
+          const adjustedBatches = (row.batches || []).map((b) => ({
+            ...b,
+            assignedHours: Math.min(Number(b.assignedHours || 0), remaining),
+          }));
+
+          return {
+            ...row,
+            hrs: remaining,
+            assignedHours: Math.min(Number(row.assignedHours || 0), remaining),
+            batches: adjustedBatches,
+          };
+        });
+
+        // if there is no table data in current phase but courses exist, fallback to auto-generated rows
+        if ((!rowsForDomain || rowsForDomain.length === 0) && courses.length > 0) {
+          const domainHours = getDomainHours(domain, currentPhase);
+          loadedTable1Data[domain] = courses.map(course => ({
+            batch: course.specialization,
+            stdCount: course.students,
+            hrs: Math.max(0, domainHours - (usedBySpec[course.specialization] || 0)),
+            assignedHours: 0,
+            batches: [
+              {
+                batchPerStdCount: "",
+                batchCode: `${course.specialization}1`,
+                assignedHours: 0,
+                trainers: [],
+              },
+            ],
+          }));
+        } else {
+          loadedTable1Data[domain] = rowsForDomain;
+        }
+      }
+
+      setSelectedDomains(loadedDomains);
+      setTable1DataByDomain(loadedTable1Data);
+    };
+    fetchPhaseDomains();
+  }, [training?.id, currentPhase, courses, getDomainHours]);
+
+  const swapTrainers = () => {
+    // This function would need to be updated for multi-domain if you want cross-domain swaps
+    // For now, assume swap is within a single domain's table1Data
+    // You can pass domain as an argument if needed
   };
 
   useEffect(() => {
@@ -453,48 +645,71 @@ function InitiationModal({ training, onClose, onConfirm }) {
     console.log("Updated trainingEndDate in state:", commonFields.trainingEndDate);
   }, [commonFields.trainingStartDate, commonFields.trainingEndDate]);
 
-  useEffect(() => {
-    // Only run if training and currentPhase are set
-    if (!training?.id || !currentPhase) return;
-
-    const fetchPhaseData = async () => {
-      const docRef = doc(db, "trainingForms", training.id, "trainings", currentPhase);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        // Auto-select domain if present and not already selected
-        if (data.domain && !selectedDomain) setSelectedDomain(data.domain);
-        // Pre-fill batch/trainer table if present and not already filled
-        if (data.table1Data && data.table1Data.length > 0 && table1Data.length === 0) {
-          // Deep convert all activeDates to Date objects
-          const converted = data.table1Data.map(row => ({
-            ...row,
-            batches: row.batches.map(batch => ({
-              ...batch,
-              trainers: (batch.trainers || []).map(trainer => ({
-                ...trainer,
-                activeDates: (trainer.activeDates || []).map(d =>
-                  typeof d === "string" ? new Date(d) : d
-                ),
-              })),
-            })),
-          }));
-          setTable1Data(converted);
-        }
-      }
-    };
-    fetchPhaseData();
-    // Only run when training, currentPhase, selectedDomain, or table1Data change
-    // (prevents overwriting user changes)
-    // eslint-disable-next-line
-  }, [training?.id, currentPhase]);
-
   return (
     <>
+      {/* Inline CSS to shrink the react-datepicker popup (kept in this file) */}
+      <style>{`
+        /* Ensure the datepicker popper overlays modal/dialogs */
+        .react-datepicker-popper,
+        .small-datepicker-popper,
+        .react-datepicker,
+        .small-datepicker {
+          z-index: 99999 !important;
+        }
+
+        /* Base popup */
+        .small-datepicker-popper .react-datepicker,
+        .small-datepicker {
+          font-size: 12px;
+          width: 220px;
+          box-sizing: border-box;
+        }
+
+        /* Header / month */
+        .small-datepicker .react-datepicker__header {
+          padding: 6px 8px;
+        }
+        .small-datepicker .react-datepicker__current-month,
+        .small-datepicker .react-datepicker__day-name {
+          font-size: 11px;
+        }
+
+        /* Day cells */
+        .small-datepicker .react-datepicker__day,
+        .small-datepicker .react-datepicker__day-name {
+          width: 26px;
+          height: 26px;
+          line-height: 26px;
+          margin: 2px;
+          font-size: 11px;
+          border-radius: 4px;
+        }
+
+        /* Navigation arrows */
+        .small-datepicker .react-datepicker__navigation {
+          top: 8px;
+        }
+
+        /* Time list tweaks */
+        .small-datepicker .react-datepicker__time-box .react-datepicker__time {
+          font-size: 11px;
+          max-width: 90px;
+        }
+        .small-datepicker .react-datepicker__time-list {
+          max-height: 160px;
+          overflow: auto;
+        }
+
+        /* Responsive smaller */
+        @media (max-width: 640px) {
+          .small-datepicker-popper .react-datepicker { width: 180px; }
+          .small-datepicker .react-datepicker__day { width: 22px; height: 22px; line-height: 22px; font-size: 10px; }
+        }
+      `}</style>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
         {/* Page Header */}
         <div className="bg-white shadow-sm border-b border-gray-200">
-          <div className="mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="mx-auto p-3 ">
             <div className="flex justify-between items-start">
               <div>
                 <button
@@ -586,7 +801,10 @@ function InitiationModal({ training, onClose, onConfirm }) {
                             }}
                             dateFormat="yyyy-MM-dd"
                             placeholderText="Select date"
-                            className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
+                            /* changed: fixed width and height */
+                            className="w-56 h-10 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2"
+                            calendarClassName="small-datepicker"
+                            popperClassName="small-datepicker-popper"
                           />
                         </div>
                         <div>
@@ -610,6 +828,8 @@ function InitiationModal({ training, onClose, onConfirm }) {
                             dateFormat="yyyy-MM-dd"
                             placeholderText="Select date"
                             className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
+                            calendarClassName="small-datepicker"
+                            popperClassName="small-datepicker-popper"
                           />
                         </div>
                       </div>
@@ -632,101 +852,88 @@ function InitiationModal({ training, onClose, onConfirm }) {
                       <label className="block text-xs font-medium text-gray-700 mb-0.5">
                         College Start Time
                       </label>
-                      <DatePicker
-                        selected={
-                          commonFields.collegeStartTime
-                            ? new Date(`1970-01-01T${commonFields.collegeStartTime}`)
-                            : null
-                        }
-                        onChange={(date) =>
+                      <select
+                        value={commonFields.collegeStartTime || ""}
+                        onChange={(e) =>
                           setCommonFields({
                             ...commonFields,
-                            collegeStartTime: date ? date.toTimeString().slice(0, 5) : "",
+                            collegeStartTime: e.target.value,
                           })
                         }
-                        showTimeSelect
-                        showTimeSelectOnly
-                        timeIntervals={15}
-                        timeCaption="Time"
-                        dateFormat="HH:mm"
-                        placeholderText="Select time"
-                        className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
-                      />
+                      >
+                        <option value="">Select time</option>
+                        {TIME_OPTIONS.map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                      </select>
                     </div>
+    
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-0.5">
                         College End Time
                       </label>
-                      <DatePicker
-                        selected={
-                          commonFields.collegeEndTime
-                            ? new Date(`1970-01-01T${commonFields.collegeEndTime}`)
-                            : null
-                        }
-                        onChange={(date) =>
+                      <select
+                        value={commonFields.collegeEndTime || ""}
+                        onChange={(e) =>
                           setCommonFields({
                             ...commonFields,
-                            collegeEndTime: date ? date.toTimeString().slice(0, 5) : "",
+                            collegeEndTime: e.target.value,
                           })
                         }
-                        showTimeSelect
-                        showTimeSelectOnly
-                        timeIntervals={15}
-                        timeCaption="Time"
-                        dateFormat="HH:mm"
-                        placeholderText="Select time"
-                        className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
-                      />
+                      >
+                        <option value="">Select time</option>
+                        {TIME_OPTIONS.map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                      </select>
                     </div>
+    
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-0.5">
                         Lunch Start Time
                       </label>
-                      <DatePicker
-                        selected={
-                          commonFields.lunchStartTime
-                            ? new Date(`1970-01-01T${commonFields.lunchStartTime}`)
-                            : null
-                        }
-                        onChange={(date) =>
+                      <select
+                        value={commonFields.lunchStartTime || ""}
+                        onChange={(e) =>
                           setCommonFields({
                             ...commonFields,
-                            lunchStartTime: date ? date.toTimeString().slice(0, 5) : "",
+                            lunchStartTime: e.target.value,
                           })
                         }
-                        showTimeSelect
-                        showTimeSelectOnly
-                        timeIntervals={15}
-                        timeCaption="Time"
-                        dateFormat="HH:mm"
-                        placeholderText="Select time"
-                        className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
-                      />
+                      >
+                        <option value="">Select time</option>
+                        {TIME_OPTIONS.map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                      </select>
                     </div>
+    
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-0.5">
                         Lunch End Time
                       </label>
-                      <DatePicker
-                        selected={
-                          commonFields.lunchEndTime
-                            ? new Date(`1970-01-01T${commonFields.lunchEndTime}`)
-                            : null
-                        }
-                        onChange={(date) =>
+                      <select
+                        value={commonFields.lunchEndTime || ""}
+                        onChange={(e) =>
                           setCommonFields({
                             ...commonFields,
-                            lunchEndTime: date ? date.toTimeString().slice(0, 5) : "",
+                            lunchEndTime: e.target.value,
                           })
                         }
-                        showTimeSelect
-                        showTimeSelectOnly
-                        timeIntervals={15}
-                        timeCaption="Time"
-                        dateFormat="HH:mm"
-                        placeholderText="Select time"
-                        className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
-                      />
+                      >
+                        <option value="">Select time</option>
+                        {TIME_OPTIONS.map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 
@@ -824,64 +1031,145 @@ function InitiationModal({ training, onClose, onConfirm }) {
                 {/* Training Domain + Batch Details */}
                 {getMainPhase() && (
                   <>
-                    {/* Domain Selection */}
+                    {/* Domain Selection (Multi-select) */}
                     <div className="space-y-3">
                       <div className="pb-2 border-b border-gray-200">
                         <h2 className="text-base font-semibold text-gray-900">
-                          Training Domain
+                          Training Domains
                         </h2>
                         <p className="mt-0.5 text-xs text-gray-500">
-                          Select the domain for this training program.
+                          Select one or more domains for this training program.
                         </p>
                       </div>
-                      <div className="max-w-xs">
-                        <select
-                          value={selectedDomain}
-                          onChange={(e) => {
-                            const domain = e.target.value;
-                            setSelectedDomain(domain);
-                            if (!domain) {
-                              setTable1Data([]);
-                            }
-                          }}
-                          className="w-full px-2 py-1 text-xs rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 shadow-sm"
-                        >
-                          <option value="">Select a domain</option>
-                          {DOMAIN_OPTIONS.map((domain) => (
-                            <option key={domain} value={domain}>
+                      {/* Chips for selected domains */}
+                      <div className="flex flex-wrap gap-2 mb-2 min-h-[32px]">
+                        {selectedDomains.length === 0 && (
+                          <span className="text-xs text-gray-400">No domains selected</span>
+                        )}
+                        {selectedDomains.map(domain => (
+                          <span
+                            key={domain}
+                            className="flex items-center bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs font-medium"
+                          >
+                            {domain}
+                            <button
+                              type="button"
+                              className="ml-1 text-blue-500 hover:text-blue-700 focus:outline-none"
+                              onClick={() =>
+                                setSelectedDomains(selectedDomains.filter(d => d !== domain))
+                              }
+                              aria-label={`Remove ${domain}`}
+                            >
+                              <FiX className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                      {/* Checkbox list for all domains in a single row */}
+                      <div className="flex flex-row gap-3">
+                        {DOMAIN_OPTIONS.map(domain => {
+                          const isSelected = selectedDomains.includes(domain);
+                          const isZero = zeroHourDomains.includes(domain);
+                          // highlight classes for zero-hour domains
+                          const zeroClasses = isZero
+                            ? "ring-2 ring-yellow-400 bg-yellow-50 text-yellow-800 border-yellow-300 animate-pulse"
+                            : "";
+                          return (
+                            <label
+                              key={domain}
+                              title={isZero ? "This domain has 0 configured hours" : undefined}
+                              className={`flex items-center px-2 py-1 rounded cursor-pointer text-xs transition
+                                ${isSelected
+                                  ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                  : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"}
+                                ${zeroClasses}
+                              `}
+                            >
+                              <input
+                                type="checkbox"
+                                className="mr-2 accent-blue-600"
+                                checked={isSelected}
+                                onChange={e => {
+                                  if (e.target.checked) {
+                                    setSelectedDomains([...selectedDomains, domain]);
+                                    setTable1DataByDomain(prev => ({
+                                      ...prev,
+                                      [domain]: prev[domain] || [],
+                                    }));
+                                  } else {
+                                    setSelectedDomains(selectedDomains.filter(d => d !== domain));
+                                  }
+                                  // clear any previous zero-hour marks for this domain on user action
+                                  setZeroHourDomains(prev => prev.filter(d => d !== domain));
+                                  setShowZeroHourWarning(false);
+                                  setError(null);
+                                }}
+                              />
                               {domain}
-                            </option>
-                          ))}
-                        </select>
+                            </label>
+                          );
+                        })}
                       </div>
                     </div>
                    
-                    {/* Batch Details Table */}
-                    <div className="space-y-3">
-                      <div className="pb-2 border-b border-gray-200">
-                        <h2 className="text-base font-semibold text-gray-900">
-                          Batch & Trainer Assignment
-                        </h2>
-                        <p className="mt-0.5 text-xs text-gray-500">
-                          Configure batch details and assign trainers for the selected domain.
-                        </p>
-                      </div>
-                      <BatchDetailsTable
-                        table1Data={table1Data}
-                        setTable1Data={setTable1Data}
-                        selectedDomain={selectedDomain}
-                        topics={topics}
-                        courses={courses}
-                        getDomainHours={(domain) => getDomainHours(domain, currentPhase)}
-                        commonFields={commonFields}
-                        canMergeBatches={canMergeBatches}
-                        mainPhase={currentPhase}
-                        maxAssignableHours={getRemainingHours(currentPhase)}
-                        onAssignedHoursChange={(hours) => handleAssignedHoursChange(hours, currentPhase)}
-                        onSwapTrainer={swapTrainers}
-                        customHours={customPhaseHours[currentPhase]}
-                      />
-                    </div>
+                    {/* Batch Details Table per Domain */}
+                    {selectedDomains.map(domain => {
+                      const tableData = table1DataByDomain[domain] || [];
+                      const allNoHours = tableData.length > 0 && tableData.every(row => row.hrs === 0);
+
+                      return (
+                        <div
+                          key={domain}
+                          className={`space-y-3 mt-4 border-l-4 pl-4 rounded ${DOMAIN_COLORS[domain] || "border-gray-300 bg-gray-50"}`}
+                        >
+                          <div className="pb-2 border-b border-gray-200 flex items-center justify-between">
+                            <div>
+                              <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                                Batch & Trainer Assignment for
+                                <span
+                                  className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold uppercase ${DOMAIN_COLORS[domain] || "bg-gray-100 border-gray-300"}`}
+                                >
+                                  {domain}
+                                </span>
+                              </h2>
+                              <p className="mt-0.5 text-xs text-gray-500">
+                                Configure batch details and assign trainers for {domain}.
+                              </p>
+                            </div>
+                          </div>
+                          <div className="p-3 border-b border-gray-100">
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="text-xs text-gray-700">
+                                Domain total hours: <span className="font-semibold">{getDomainHours(domain, currentPhase)}</span>
+                              </div>
+                              {/* allocation UI removed */}
+                            </div>
+                          </div>
+
+                          {allNoHours ? (
+                            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded text-yellow-800 text-xs font-semibold">
+                              No hours configured for <b>{domain}</b>. Please set hours in the training domain setup.
+                            </div>
+                          ) : (
+                            <BatchDetailsTable
+                              table1Data={tableData}
+                              setTable1Data={data =>
+                                setTable1DataByDomain(prev => ({ ...prev, [domain]: data }))
+                              }
+                              selectedDomain={domain}
+                              topics={topics}
+                              courses={courses}
+                              getDomainHours={d => getDomainHours(d, currentPhase)}
+                              commonFields={commonFields}
+                              canMergeBatches={canMergeBatches}
+                              mainPhase={currentPhase}
+                              onSwapTrainer={swapTrainers}
+                              customHours={customPhaseHours[currentPhase]}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
                   </>
                 )}
 
@@ -915,6 +1203,53 @@ function InitiationModal({ training, onClose, onConfirm }) {
                     </div>
                   </div>
                 )}
+
+                {/* Zero-hour domains warning with auto-deselect option */}
+                {showZeroHourWarning && zeroHourDomains.length > 0 && (
+                  <div className="rounded bg-yellow-50 border border-yellow-200 p-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="text-xs font-medium text-yellow-800 mb-1">
+                          The following selected domain(s) have 0 configured hours:
+                        </div>
+                        <div className="text-xs text-yellow-700 font-semibold">
+                          {zeroHourDomains.join(", ")}
+                        </div>
+                        <div className="text-xs text-yellow-700 mt-2">
+                          You can either configure hours for these domains or auto-deselect them to continue.
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2 ml-4">
+                        <button
+                          type="button"
+                          onClick={handleAutoDeselectZeroHourDomains}
+                          disabled={deselectingZeroDomains}
+                          className={`inline-flex items-center px-3 py-1.5 bg-yellow-600 text-white text-xs font-medium rounded shadow-sm hover:bg-yellow-700 disabled:opacity-70`}
+                        >
+                          {deselectingZeroDomains ? (
+                            <>
+                              <FiClock className="animate-spin -ml-1 mr-2 h-4 w-4" />
+                              Processing...
+                            </>
+                          ) : (
+                            "Deselect and Continue"
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowZeroHourWarning(false);
+                            setZeroHourDomains([]);
+                            setError(null);
+                          }}
+                          className="inline-flex items-center px-3 py-1.5 border border-yellow-200 bg-white text-yellow-700 text-xs font-medium rounded"
+                        >
+                          Cancel
+                        </button>
+                       </div>
+                     </div>
+                   </div>
+                 )}
               </form>
             </div>
 

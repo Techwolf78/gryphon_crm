@@ -6,8 +6,8 @@ import TrainingDetailModal from "../components/Learning/TrainingTables/TrainingD
 import FilePreviewModal from "../components/Learning/TrainingTables/FilePreviewModal";
 import StudentDataPage from "../components/Learning/StudentDataPage";
 import InitiationDashboard from "../components/Learning/Initiate/InitiationDashboard";
-import InitiationTrainingDetails from "../components/Learning/Initiate/InitiationTrainingDetails"; // <-- create this
-import InitiationModal from "../components/Learning/Initiate/InitiationModal"; // <-- import InitiationModal
+import InitiationTrainingDetails from "../components/Learning/Initiate/InitiationTrainingDetails";
+import InitiationModal from "../components/Learning/Initiate/InitiationModal";
 
 import { useNavigate } from "react-router-dom";
 
@@ -82,10 +82,23 @@ function LearningDevelopment() {
     navigate("trainers");
   };
 
-  // When Initiation button is clicked
+  // When Initiation button is clicked from TrainingTable
   const handleInitiateClick = (training) => {
     setSelectedTrainingForInitiation(training);
     setShowInitiationModal(true);
+  };
+
+  // NEW: Handle "Start Phase" button click from InitiationDashboard
+  const handleStartPhase = (training) => {
+    setSelectedTrainingForInitiation(training);
+    setShowInitiationModal(true);
+  };
+
+  // NEW: Handle closing InitiationModal and refresh dashboard
+  const handleInitiationModalClose = () => {
+    setShowInitiationModal(false);
+    setSelectedTrainingForInitiation(null);
+    // Optionally refresh the dashboard data here if needed
   };
 
   if (studentPageData) {
@@ -103,14 +116,8 @@ function LearningDevelopment() {
     return (
       <InitiationModal
         training={selectedTrainingForInitiation}
-        onClose={() => {
-          setShowInitiationModal(false);
-          setSelectedTrainingForInitiation(null);
-        }}
-        onConfirm={() => {
-          setShowInitiationModal(false);
-          setSelectedTrainingForInitiation(null);
-        }}
+        onClose={handleInitiationModalClose}
+        onConfirm={handleInitiationModalClose}
       />
     );
   }
@@ -198,7 +205,10 @@ function LearningDevelopment() {
               onBack={() => setSelectedInitiationTraining(null)}
             />
           ) : (
-            <InitiationDashboard onRowClick={setSelectedInitiationTraining} />
+            <InitiationDashboard 
+              onRowClick={setSelectedInitiationTraining}
+              onStartPhase={handleStartPhase} // ADD this prop
+            />
           )
         )}
       </div>
