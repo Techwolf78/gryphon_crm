@@ -8,6 +8,7 @@ import {
   startAfter,
   endBefore,
   limitToLast,
+  where, // <-- added
 } from "firebase/firestore";
 import { db } from "../../firebase";
 import AddTrainer from "./AddTrainer.jsx";
@@ -103,9 +104,62 @@ function TrainersDashboard() {
     }
   };
 
+  async function searchTrainersFirestore(term) {
+    try {
+      setLoading(true);
+      setError(null);
+
+      if (!term) {
+        // if search cleared, go back to paginated listing
+        await fetchTrainersPaginated("initial");
+        return;
+      }
+
+      // Firestore prefix search on name (requires index for complex queries)
+      const q = query(
+        collection(db, "trainers"),
+        where("name", ">=", term),
+        where("name", "<=", term + "\uf8ff"),
+        orderBy("name"),
+        limit(1000) // adjust max results as needed
+      );
+
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      setTrainers(data);
+      // reset pagination cursors while showing search results
+      setFirstVisible(null);
+      setLastVisible(null);
+      setPageStack([]);
+    } catch (err) {
+      console.error("Search failed:", err);
+      setError("Search failed. Try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
     fetchTrainersPaginated("initial");
   }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const trimmed = searchTerm.trim();
+      if (trimmed.length > 0) {
+        searchTrainersFirestore(trimmed);
+      } else {
+        // restore paginated view
+        fetchTrainersPaginated("initial");
+      }
+    }, 300);
+
+    return () => clearTimeout(t);
+  }, [searchTerm]);
 
   const toggleSortOrder = () => {
     setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
@@ -159,13 +213,13 @@ function TrainersDashboard() {
     }
 
     return (
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1">
         {specs
           .filter((s) => s && s.length > 0)
           .map((spec, i) => (
             <span
               key={i}
-              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+              className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-800"
             >
               {spec}
             </span>
@@ -174,36 +228,69 @@ function TrainersDashboard() {
     );
   };
 
+  // Only three domains: "Soft Skills", "Aptitude", "Technical"
+  const domainBadgeClass = (domain) => {
+    const d = (domain || "").toLowerCase();
+    if (d.includes("aptitude")) return "bg-emerald-100 text-emerald-800";
+    if (d.includes("soft")) return "bg-sky-100 text-sky-800";
+    if (d.includes("tech") || d.includes("technical")) return "bg-amber-100 text-amber-800";
+    return "bg-gray-100 text-gray-800";
+  };
+
+  const renderDomains = (trainer) => {
+    const domains = [];
+    if (Array.isArray(trainer.domain)) domains.push(...trainer.domain);
+    else if (typeof trainer.domain === "string")
+      domains.push(...trainer.domain.split(",").map((s) => s.trim()));
+
+    return (
+      <div className="flex flex-wrap gap-1">
+        {domains
+          .filter((d) => d && d.length > 0)
+          .map((d, i) => (
+            <span
+              key={i}
+              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${domainBadgeClass(
+                d
+              )}`}
+            >
+              {d}
+            </span>
+          ))}
+      </div>
+    );
+  };
+
   return (
-    <div className="bg-gray-50 min-h-screen">
+    <div className="bg-gray-50 min-h-screen text-sm">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <h1 className="text-2xl sm:text-3xl font-bold text-blue-800">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-2">
+        <h1 className="text-lg sm:text-xl font-bold text-blue-800">
           Trainers Management
         </h1>
         <button
           onClick={handleBack}
-          className="flex items-center gap-2 px-3 py-1.5 bg-[#267BFD] text-white rounded-full hover:bg-[#1e60c6] transition"
+          className="flex items-center gap-2 px-2 py-1 bg-[#267BFD] text-white rounded-full hover:bg-[#1e60c6] transition text-sm"
         >
-          <FiChevronLeft className="text-lg" />
+          <FiChevronLeft className="text-base" />
           Back
         </button>
       </div>
 
-      <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 overflow-hidden">
+      <div className="bg-white rounded-lg shadow-md p-3 sm:p-4 overflow-hidden">
         {/* Search + Add */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
           {/* Search Input */}
-          <div className="relative w-full sm:w-64">
+          <div className="relative w-full sm:w-48">
             <input
               type="text"
               placeholder="Search trainers..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
             <svg
-              className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
+              className="absolute left-2 top-2 h-4 w-4 text-gray-400"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -219,45 +306,44 @@ function TrainersDashboard() {
 
           <button
             onClick={() => setShowAddTrainer(true)}
-            className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-4 py-2.5 rounded-xl font-semibold hover:opacity-90 transition-all shadow-md flex items-center"
+            className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-3 py-1.5 rounded-xl font-semibold hover:opacity-90 transition-all shadow-sm flex items-center text-sm"
           >
-            <FiPlusCircle className="h-5 w-5 mr-2" />
+            <FiPlusCircle className="h-4 w-4 mr-2" />
             Add Trainer
           </button>
         </div>
 
         {/* Error */}
         {error && (
-          <div className="mb-4 p-4 bg-red-100 border-l-4 border-red-500 text-red-700 rounded">
+          <div className="mb-3 p-2 bg-red-100 border-l-4 border-red-500 text-red-700 rounded text-sm">
             {error}
           </div>
         )}
 
         {/* Loading */}
         {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+          <div className="flex justify-center items-center h-40">
+            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
           </div>
         ) : (
           <>
             {/* Table with horizontal scroll */}
-            <div className="overflow-x-auto mb-4" style={{ maxWidth: "100%" }}>
-              <table className="min-w-full text-sm divide-y divide-gray-200">
-                <thead className="bg-gray-50 text-xs uppercase font-medium text-gray-500">
+            <div className="overflow-x-auto mb-3" style={{ maxWidth: "100%" }}>
+              <table className="min-w-full text-xs divide-y divide-gray-200">
+                <thead className="bg-gray-50 text-[10px] uppercase font-medium text-gray-500">
                   <tr>
-                    <th className="px-4 py-3 text-left cursor-pointer" onClick={toggleSortOrder}>
+                    <th className="px-2 py-1 text-left cursor-pointer" onClick={toggleSortOrder}>
                       ID{" "}
                       <span className="inline-block ml-1">
                         {sortOrder === "asc" ? "↑" : "↓"}
                       </span>
                     </th>
-                    <th className="px-4 py-3 text-left">Name</th>
-                    <th className="px-4 py-3 text-left">Domain</th>
-                    <th className="px-4 py-3 text-left">Specialization</th>
-                    <th className="px-4 py-3 text-left">Charges</th>
-                    <th className="px-4 py-3 text-left">Contact</th>
-                    {/* Remove columns after 'Contact' for basic view */}
-                    <th className="px-4 py-3 text-left">Actions</th>
+                    <th className="px-2 py-1 text-left">Name</th>
+                    <th className="px-2 py-1 text-left">Domain</th>
+                    <th className="px-2 py-1 text-left">Specialization</th>
+                    <th className="px-2 py-1 text-left">Charges</th>
+                    <th className="px-2 py-1 text-left">Contact</th>
+                    <th className="px-2 py-1 text-left">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -270,17 +356,17 @@ function TrainersDashboard() {
                         setShowTrainerDetails(true);
                       }}
                     >
-                      <td className="px-4 py-3 text-gray-900 font-medium">
+                      <td className="px-2 py-1 text-gray-900 font-medium text-sm">
                         {trainer.trainerId}
                       </td>
-                      <td className="px-4 py-3 text-gray-700">{trainer.name}</td>
-                      <td className="px-4 py-3 text-gray-700">
-                        {trainer.domain}
+                      <td className="px-2 py-1 text-gray-700">{trainer.name}</td>
+                      <td className="px-2 py-1 text-gray-700">
+                        {renderDomains(trainer)}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-2 py-1">
                         {renderSpecializations(trainer)}
                       </td>
-                      <td className="px-4 py-3 text-gray-700">
+                      <td className="px-2 py-1 text-gray-700 text-sm">
                         ₹{trainer.charges ?? "-"}{" "}
                         {trainer.paymentType === "Per Hour"
                           ? "/hr"
@@ -288,13 +374,12 @@ function TrainersDashboard() {
                           ? "/day"
                           : ""}
                       </td>
-                      <td className="px-4 py-3 text-gray-700">
+                      <td className="px-2 py-1 text-gray-700 text-sm">
                         {trainer.contact}
                       </td>
-                      {/* Remove columns after 'Contact' for basic view */}
-                      <td className="px-4 py-3 flex space-x-2" onClick={e => e.stopPropagation()}>
+                      <td className="px-2 py-1 flex space-x-1" onClick={e => e.stopPropagation()}>
                         <button
-                          className="text-blue-600 hover:text-blue-900"
+                          className="text-blue-600 hover:text-blue-900 text-sm p-1"
                           onClick={() => {
                             setSelectedTrainer(trainer);
                             setShowEditTrainer(true);
@@ -303,7 +388,7 @@ function TrainersDashboard() {
                           <FiEdit />
                         </button>
                         <button
-                          className="text-red-600 hover:text-red-900"
+                          className="text-red-600 hover:text-red-900 text-sm p-1"
                           onClick={() => {
                             setTrainerToDelete(trainer);
                             setShowDeleteTrainer(true);
@@ -319,11 +404,11 @@ function TrainersDashboard() {
             </div>
 
             {/* Pagination Controls BELOW the scroll bar */}
-            <div className="flex justify-between items-center mt-2">
+            <div className="flex justify-between items-center mt-1">
               <button
                 onClick={() => fetchTrainersPaginated("prev")}
                 disabled={pageStack.length === 0}
-                className="flex items-center gap-2 px-4 py-2 border rounded disabled:opacity-50"
+                className="flex items-center gap-2 px-3 py-1 border rounded disabled:opacity-50 text-sm"
               >
                 <FiChevronLeft />
                 Previous
@@ -332,7 +417,7 @@ function TrainersDashboard() {
               <button
                 onClick={() => fetchTrainersPaginated("next")}
                 disabled={trainers.length < TRAINERS_PER_PAGE}
-                className="flex items-center gap-2 px-4 py-2 border rounded disabled:opacity-50"
+                className="flex items-center gap-2 px-3 py-1 border rounded disabled:opacity-50 text-sm"
               >
                 Next
                 <FiChevronRight />

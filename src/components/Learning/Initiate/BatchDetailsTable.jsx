@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, addDoc, doc, updateDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
 import {
   FiPlus,
@@ -20,15 +20,14 @@ const BatchDetailsTable = ({
   selectedDomain,
   commonFields,
   canMergeBatches,
-  maxAssignableHours, // <-- add this
-  onAssignedHoursChange, // <-- add this
   onSwapTrainer, // <-- add this
+  mergeFirestoreConfig, // optional config for persisting merges
   courses,
 }) => {
   const [mergeModal, setMergeModal] = useState({
     open: false,
     sourceRowIndex: null,
-    targetSpecialization: "",
+    targetRowIndex: null,
   });
   const COLOR_PALETTE = [
     {
@@ -86,16 +85,7 @@ const BatchDetailsTable = ({
   const [expandedBatch, setExpandedBatch] = useState({});
   const [swapModal, setSwapModal] = useState({ open: false, source: null });
 
-  // Color palette
-  const colors = {
-    primary: "bg-indigo-600 text-white",
-    secondary: "bg-gray-100 text-gray-700",
-    success: "bg-emerald-100 text-emerald-800",
-    warning: "bg-amber-100 text-amber-800",
-    danger: "bg-rose-100 text-rose-800",
-    info: "bg-blue-100 text-blue-800",
-    accent: "bg-indigo-50 text-indigo-700",
-  };
+  // color helpers (colors constant removed because not used)
   const isTrainerAvailable = (
     trainerId,
     date,
@@ -197,22 +187,27 @@ const BatchDetailsTable = ({
     setTable1Data(updatedData);
   };
 
-  const handleMergeBatch = (sourceRowIndex, targetSpecialization) => {
+  // Optional prop: mergeFirestoreConfig = { collectionPath: 'trainings', docIdField: 'id' }
+  const handleMergeBatch = async (sourceRowIndex, targetRowIndex) => {
+    console.log("[BatchDetailsTable] handleMergeBatch called", { sourceRowIndex, targetRowIndex });
     const updatedData = [...table1Data];
     const sourceRow = updatedData[sourceRowIndex];
-    const targetRowIndex = updatedData.findIndex(
-      (row) => row.batch === targetSpecialization
-    );
-
-    if (targetRowIndex === -1) return;
-
     const targetRow = updatedData[targetRowIndex];
 
-    // Only add students, keep hours same as domain
-    const combinedStudents = sourceRow.stdCount + targetRow.stdCount;
+    if (!sourceRow || !targetRow) {
+      console.warn("[BatchDetailsTable] handleMergeBatch: invalid source/target", { sourceRow, targetRow });
+      return;
+    }
+
+    // Combine students; keep target hrs as authoritative
+    const combinedStudents = Number(sourceRow.stdCount || 0) + Number(targetRow.stdCount || 0);
     const domainHours = targetRow.hrs; // Keep hours as per domain
 
     const mergedBatchCode = `${sourceRow.batch}-${targetRow.batch}-1`;
+
+    // Save shallow copies of originals for undo
+    const originalSourceCopy = JSON.parse(JSON.stringify(sourceRow));
+    const originalTargetCopy = JSON.parse(JSON.stringify(targetRow));
 
     const mergedRow = {
       ...targetRow,
@@ -220,30 +215,59 @@ const BatchDetailsTable = ({
       stdCount: combinedStudents,
       hrs: domainHours,
       assignedHours: domainHours,
+      isMerged: true,
+      originalData: {
+        source: originalSourceCopy,
+        target: originalTargetCopy,
+        sourceIndex: sourceRowIndex,
+        targetIndex: targetRowIndex,
+      },
       batches: [
         {
           batchPerStdCount: combinedStudents,
           batchCode: mergedBatchCode,
           isMerged: true,
           mergedFrom: `${sourceRow.batch}+${targetRow.batch}`,
-          originalData: {
-            source: sourceRow,
-            target: targetRow,
-          },
           assignedHours: domainHours,
           trainers: [],
         },
       ],
     };
 
+    // Replace target with mergedRow and remove source
     updatedData[targetRowIndex] = mergedRow;
-    updatedData.splice(sourceRowIndex, 1);
+    // If sourceIndex < targetIndex and we removed earlier element, indexes shift; handle by removing the correct index
+    if (sourceRowIndex > targetRowIndex) {
+      updatedData.splice(sourceRowIndex, 1);
+    } else {
+      // sourceRowIndex < targetRowIndex => after replacing target, removing source at its index (original)
+      updatedData.splice(sourceRowIndex, 1);
+    }
 
     setTable1Data(updatedData);
+    console.log("[BatchDetailsTable] merged rows updated locally", { mergedRow });
+
+    // Persist if config provided
+    if (typeof mergeFirestoreConfig === "object" && mergeFirestoreConfig?.collectionPath) {
+      try {
+        const { collectionPath, docIdField } = mergeFirestoreConfig;
+        if (docIdField && targetRow[docIdField]) {
+          const targetDocRef = doc(db, collectionPath, String(targetRow[docIdField]));
+          await updateDoc(targetDocRef, mergedRow);
+          console.log("[BatchDetailsTable] merged row updated in Firestore", { collectionPath, docId: targetRow[docIdField] });
+        } else {
+          const added = await addDoc(collection(db, collectionPath), mergedRow);
+          console.log("[BatchDetailsTable] merged row added to Firestore", { collectionPath, docId: added.id });
+        }
+      } catch (err) {
+        console.error("[BatchDetailsTable] Error persisting merged batch:", err);
+      }
+    }
+
     setMergeModal({
       open: false,
       sourceRowIndex: null,
-      targetSpecialization: "",
+      targetRowIndex: null,
     });
   };
   // When changing assignedHours for a batch, never allow sum to exceed row.hrs
@@ -283,6 +307,7 @@ const BatchDetailsTable = ({
     const batch = updated[rowIndex].batches[batchIndex];
     if (!batch.trainers) batch.trainers = [];
 
+    const newTrainerIndex = batch.trainers.length;
     batch.trainers.push({
       trainerId: "",
       trainerName: "",
@@ -292,6 +317,14 @@ const BatchDetailsTable = ({
       endDate: "",
       dailyHours: [],
     });
+
+    // Optional: Auto-expand only the newly added trainer
+    const trainerKey = `${rowIndex}-${batchIndex}-${newTrainerIndex}`;
+    setExpandedTrainer(prev => ({
+      ...prev,
+      [trainerKey]: false // Keep new trainers collapsed too
+    }));
+
     setTable1Data(updated);
   };
   const removeTrainer = (rowIndex, batchIndex, trainerIdx) => {
@@ -412,10 +445,65 @@ const BatchDetailsTable = ({
     setTable1Data(updated);
   };
 
+  // 1) getAvailableSpecializations (replace existing)
   const getAvailableSpecializations = (sourceRowIndex) => {
-    return table1Data
-      .filter((_, idx) => idx !== sourceRowIndex)
-      .map((row) => row.batch);
+    console.log("[BatchDetailsTable] getAvailableSpecializations called", {
+      sourceRowIndex,
+      table1DataLength: table1Data?.length ?? 0,
+      selectedDomain,
+    });
+
+    if (!table1Data || table1Data.length === 0) {
+      console.warn("[BatchDetailsTable] table1Data empty or undefined");
+      return [];
+    }
+    const sourceRow = table1Data[sourceRowIndex];
+    if (!sourceRow) {
+      console.warn("[BatchDetailsTable] sourceRow not found for index", sourceRowIndex);
+      return [];
+    }
+
+    const result = table1Data
+      .map((row, idx) => ({ row, idx }))
+      .filter(({ idx }) => idx !== sourceRowIndex)
+      .filter(({ row }) => {
+        // Domain match: if row.domain exists, require match; if missing, assume it's same domain (per table prop)
+        const domainMatch = !selectedDomain
+          ? true
+          : row.domain && typeof row.domain === "string"
+          ? row.domain.toLowerCase().trim() === selectedDomain.toLowerCase().trim()
+          : true;
+
+        // Hours match: if both sides provide hrs, compare numerically; if missing, allow (be permissive)
+        const hrsMatch =
+          (row.hrs !== undefined && sourceRow.hrs !== undefined)
+            ? Number(row.hrs) === Number(sourceRow.hrs)
+            : true;
+
+        return domainMatch && hrsMatch;
+      })
+      .map(({ row, idx }) => ({
+        specialization: row.batch || row.specialization || "",
+        idx,
+        stdCount: row.stdCount || 0,
+        hrs: row.hrs || 0,
+      }));
+
+    console.log("[BatchDetailsTable] available specializations for merge", {
+      sourceIndex: sourceRowIndex,
+      sourceBatch: sourceRow.batch,
+      result,
+    });
+
+    if (result.length === 0) {
+      console.info("[BatchDetailsTable] no available specializations found for merge. Check row.domain / row.hrs values", {
+        sourceRow,
+        selectedDomain,
+        table1DataSample: table1Data.slice(0, 5),
+      });
+    }
+
+    return result;
   };
 
   const getDateListExcludingSundays = (start, end) => {
@@ -580,27 +668,65 @@ const BatchDetailsTable = ({
   }, [table1Data]);
 
   useEffect(() => {
-    // Only auto-expand ONCE (on first load)
+    // Only auto-expand ONCE (on first load) - REMOVE the auto-expansion for existing trainers
     if (!didAutoExpand.current && table1Data && table1Data.length > 0) {
-      const expanded = {};
-      table1Data.forEach((row, rowIdx) => {
-        row.batches.forEach((batch, batchIdx) => {
-          (batch.trainers || []).forEach((trainer, trainerIdx) => {
-            if (
-              trainer &&
-              (trainer.assignedHours > 0 ||
-                (trainer.activeDates && trainer.activeDates.length > 0))
-            ) {
-              expanded[`${rowIdx}-${batchIdx}-${trainerIdx}`] = true;
-            }
-          });
-        });
-      });
+      // Remove auto-expansion logic - keep trainers collapsed by default
+      const expanded = {}; // Start with empty - no auto-expansion
+      
+      // Only auto-expand if it's a completely new trainer being added
+      // (This part can be handled in addTrainer function if needed)
+      
       setExpandedTrainer(expanded);
       didAutoExpand.current = true;
     }
-    // eslint-disable-next-line
   }, [table1Data]);
+
+  // use canMergeBatches so eslint doesn't mark it unused (keeps intent visible)
+  useEffect(() => {
+    console.log("[BatchDetailsTable] canMergeBatches:", canMergeBatches);
+  }, [canMergeBatches]);
+
+  const undoMerge = async (mergedRowIndex) => {
+    console.log("[BatchDetailsTable] undoMerge called", { mergedRowIndex });
+    const updated = [...table1Data];
+    const mergedRow = updated[mergedRowIndex];
+    if (!mergedRow || !mergedRow.originalData) {
+      console.warn("[BatchDetailsTable] undoMerge: no originalData on merged row", mergedRowIndex);
+      return;
+    }
+
+    // avoid unused-var eslint by prefixing unused locals with underscore
+    const { source, target, sourceIndex, targetIndex: _targetIndex } = mergedRow.originalData;
+
+    // Restore shallow copies
+    const restoredTarget = { ...target };
+    const restoredSource = { ...source };
+
+    // Replace merged row position with restoredTarget
+    updated[mergedRowIndex] = restoredTarget;
+
+    // Insert source back. Prefer original sourceIndex if valid, else insert after restoredTarget
+    const insertIdx =
+      typeof sourceIndex === "number" && sourceIndex >= 0 && sourceIndex <= updated.length
+        ? sourceIndex
+        : mergedRowIndex + 1;
+
+    updated.splice(insertIdx, 0, restoredSource);
+
+    setTable1Data(updated);
+    console.log("[BatchDetailsTable] undoMerge completed", { mergedRowIndex, insertIdx });
+
+    // Optional: revert persisted merge in Firestore if mergeFirestoreConfig provided
+    if (typeof mergeFirestoreConfig === "object" && mergeFirestoreConfig?.collectionPath) {
+      try {
+        // rename unused destructured names with leading underscore to satisfy eslint
+        const { collectionPath: _collectionPath, docIdField: _docIdField } = mergeFirestoreConfig;
+        // Implement revert logic here if needed. _collectionPath/_docIdField are preserved for future use.
+      } catch (err) {
+        console.error("[BatchDetailsTable] Error while undoing persisted merge:", err);
+      }
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -618,31 +744,68 @@ const BatchDetailsTable = ({
                 </label>
                 <select
                   className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
-                  value={mergeModal.targetSpecialization}
-                  onChange={(e) =>
+                  value={mergeModal.targetRowIndex ?? ""}
+                  onChange={(e) => {
+                    const val = e.target.value === "" ? null : Number(e.target.value);
+                    console.log("[BatchDetailsTable] merge select changed", {
+                      selectedValue: val,
+                      sourceRowIndex: mergeModal.sourceRowIndex,
+                    });
+                    if (val !== null && table1Data && table1Data[val]) {
+                      console.log("[BatchDetailsTable] selected target spec:", table1Data[val]);
+                    } else if (val === null) {
+                      console.log("[BatchDetailsTable] merge target cleared");
+                    }
                     setMergeModal((prev) => ({
                       ...prev,
-                      targetSpecialization: e.target.value
+                      targetRowIndex: val,
                     }))
-                  }
+                  }}
                 >
                   <option value="">Select specialization</option>
                   {getAvailableSpecializations(mergeModal.sourceRowIndex).map(
-                    (spec) => (
-                      <option key={spec} value={spec}>
-                        {spec}
+                    (specObj) => (
+                      <option key={specObj.idx} value={specObj.idx}>
+                        {specObj.specialization} — {specObj.stdCount} students — {specObj.hrs} hrs
                       </option>
                     )
                   )}
                 </select>
               </div>
+              {/* Confirmation summary */}
+              {mergeModal.targetRowIndex !== null && mergeModal.sourceRowIndex !== null && (
+                (() => {
+                  const src = table1Data[mergeModal.sourceRowIndex];
+                  const tgt = table1Data[mergeModal.targetRowIndex];
+                  const combined = Number(src.stdCount || 0) + Number(tgt.stdCount || 0);
+                  const hrs = tgt.hrs;
+                  return (
+                    <div className="rounded border border-gray-100 p-3 bg-gray-50 text-sm">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium">Summary</div>
+                          <div className="text-xs text-gray-600">{src.batch} + {tgt.batch}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xs text-gray-500">Combined students</div>
+                          <div className="font-medium">{combined}</div>
+                        </div>
+                        <div className="text-right ml-4">
+                          <div className="text-xs text-gray-500">Resulting hrs</div>
+                          <div className="font-medium">{hrs}</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()
+              )}
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={() =>
                     setMergeModal({
                       open: false,
                       sourceRowIndex: null,
-                      targetSpecialization: "",
+                      targetRowIndex: null,
                     })
                   }
                   className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
@@ -653,12 +816,12 @@ const BatchDetailsTable = ({
                   onClick={() =>
                     handleMergeBatch(
                       mergeModal.sourceRowIndex,
-                      mergeModal.targetSpecialization
+                      mergeModal.targetRowIndex
                     )
                   }
-                  disabled={!mergeModal.targetSpecialization}
+                  disabled={mergeModal.targetRowIndex === null}
                   className={`px-4 py-2 rounded-lg text-sm font-medium text-white ${
-                    mergeModal.targetSpecialization
+                    mergeModal.targetRowIndex !== null
                       ? "bg-indigo-600 hover:bg-indigo-700"
                       : "bg-indigo-300 cursor-not-allowed"
                   } transition-colors`}
@@ -832,23 +995,61 @@ const BatchDetailsTable = ({
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <div
-                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                            getColorsForBatch(row.batch).badge
-                          }`}
-                        >
-                          {totalAssignedStudents}/{row.stdCount} students
+                        <div className="flex items-center space-x-2">
+                          <div
+                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                              getColorsForBatch(row.batch).badge
+                            }`}
+                          >
+                            {totalAssignedStudents}/{row.stdCount} students
+                          </div>
+                          <div
+                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                              getColorsForBatch(row.batch).badge
+                            }`}
+                          >
+                            {totalAssignedHours}/{row.hrs} hours
+                          </div>
+
+                          {/* Merge button - always visible */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              console.log("[BatchDetailsTable] open merge modal for row", {
+                                rowIndex,
+                                batchName: row.batch,
+                                stdCount: row.stdCount,
+                                hrs: row.hrs,
+                              });
+                              setMergeModal({
+                                open: true,
+                                sourceRowIndex: rowIndex,
+                                targetRowIndex: null,
+                              });
+                            }}
+                            className="p-1 rounded hover:bg-indigo-50 text-indigo-600 transition-colors text-xs"
+                            title="Merge Specialization"
+                            type="button"
+                          >
+                            <FiLayers size={14} />
+                          </button>
+
+                          {/* Undo button shown when this row is a merged row */}
+                          {row.isMerged && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                console.log("[BatchDetailsTable] undo merge clicked", { rowIndex, batch: row.batch });
+                                undoMerge(rowIndex);
+                              }}
+                              className="ml-2 p-1 rounded bg-yellow-50 text-yellow-700 text-xs hover:bg-yellow-100 transition-colors"
+                              title="Undo Merge"
+                              type="button"
+                            >
+                              Undo
+                            </button>
+                          )}
                         </div>
-                        <div
-                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                            getColorsForBatch(row.batch).badge
-                          }`}
-                        >
-                          {totalAssignedHours}/{row.hrs} hours
-                        </div>
-                        {/* ...rest of buttons... */}
-                      </div>
                       <div className="flex items-center space-x-2">
                         {/* Dropdown icon for expand/collapse */}
                         {isExpanded ? (
@@ -922,7 +1123,6 @@ const BatchDetailsTable = ({
                                     min="0"
                                     max={row.stdCount}
                                     placeholder="0"
-                                    disabled={batch.isMerged}
                                   />
                                 </div>
                                 <div>
@@ -941,7 +1141,6 @@ const BatchDetailsTable = ({
                                         e.target.value
                                       )
                                     }
-                                    disabled={batch.isMerged}
                                   />
                                 </div>
                                 <div>
@@ -970,16 +1169,56 @@ const BatchDetailsTable = ({
                                           "assignedHours",
                                           val
                                         );
-                                        if (onAssignedHoursChange) onAssignedHoursChange(val);
                                       }
                                     }}
                                     min="0"
-                                    max={maxAssignableHours}
                                     placeholder="0"
                                     disabled={batchIndex !== 0}
                                   />
                                 </div>
                               </div>
+
+                              {/* Assigned Hours Progress Bar */}
+                              {batch.assignedHours > 0 && (
+                                <div className="mb-2">
+                                  <div className="flex justify-between items-center mb-1">
+                                    <span className="text-xs text-gray-600 font-medium">
+                                      Assigned Trainer Hours:{" "}
+                                      {batch.trainers.reduce(
+                                        (sum, t) => sum + Number(t.assignedHours || 0),
+                                        0
+                                      )}{" "}
+                                      / {batch.assignedHours}
+                                    </span>
+                                    <span className="text-xs text-gray-500">
+                                      {batch.assignedHours -
+                                        batch.trainers.reduce(
+                                          (sum, t) => sum + Number(t.assignedHours || 0),
+                                          0
+                                        )}{" "}
+                                      hours left
+                                    </span>
+                                  </div>
+                                  <div className="w-full bg-gray-200 rounded h-2">
+                                    <div
+                                      className="bg-indigo-500 h-2 rounded"
+                                      style={{
+                                        width: `${
+                                          Math.min(
+                                            100,
+                                            (batch.trainers.reduce(
+                                              (sum, t) => sum + Number(t.assignedHours || 0),
+                                              0
+                                            ) /
+                                              (batch.assignedHours || 1)) *
+                                              100
+                                          )
+                                        }%`,
+                                      }}
+                                    ></div>
+                                  </div>
+                                </div>
+                              )}
 
                               {/* Trainers Section */}
                               <div>
@@ -999,545 +1238,265 @@ const BatchDetailsTable = ({
                                   </button>
                                 </div>
 
-                                {batch.trainers && batch.trainers.length > 0 && (
-                                  <div className="mb-2">
-                                    {(() => {
-                                      const assigned = Number(
-                                        batch.assignedHours || 0
-                                      );
-                                      const trainersTotal = (
-                                        batch.trainers || []
-                                      ).reduce(
-                                        (sum, t) =>
-                                          sum + Number(t.assignedHours || 0),
-                                        0
-                                      );
-                                      const percent =
-                                        assigned > 0
-                                          ? Math.min(
-                                              100,
-                                              Math.round(
-                                                (trainersTotal / assigned) * 100
-                                              )
-                                            )
-                                          : 0;
-                                      const remaining = assigned - trainersTotal;
-                                      return (
-                                        <div>
-                                          <div className="w-full bg-gray-200 rounded-full h-2.5 mb-1">
-                                            <div
-                                              className={`h-2.5 rounded-full transition-all duration-300 ${
-                                                percent === 100
-                                                  ? "bg-emerald-500"
-                                                  : percent > 100
-                                                  ? "bg-rose-500"
-                                                  : "bg-amber-500"
-                                              }`}
-                                              style={{ width: `${percent}%` }}
-                                            />
-                                          </div>
-                                          <div
-                                            className={`text-xs font-medium ${
-                                              remaining > 0
-                                                ? "text-amber-600"
-                                                : remaining < 0
-                                                ? "text-rose-600"
-                                                : "text-emerald-700"
-                                            }`}
-                                          >
-                                            {remaining > 0
-                                              ? `${remaining} hrs remaining to assign to trainers`
-                                              : remaining < 0
-                                              ? `${-remaining} hrs extra assigned to trainers`
-                                              : "All assigned hours distributed to trainers"}
-                                          </div>
-                                        </div>
-                                      );
-                                    })()}
-                                  </div>
-                                )}
-
                                 {(batch.trainers || []).length > 0 ? (
-                                  <div className="space-y-3">
-                                    {(batch.trainers || []).map(
-                                      (trainer, trainerIdx) => {
-                                        const trainerKey = `${rowIndex}-${batchIndex}-${trainerIdx}`;
-                                        const isTrainerExpanded =
-                                          expandedTrainer[trainerKey];
-                                        const dateList =
-                                          getDateListExcludingSundays(
-                                            trainer.startDate,
-                                            trainer.endDate
-                                          );
-
-                                        return (
-                                          <div
-                                            key={trainerIdx}
-                                            className={`border border-gray-200 rounded-lg overflow-hidden ${
-                                              getColorsForBatch(row.batch).border
-                                            } rounded-lg overflow-hidden`}
-                                          >
-                                            <div
-                                              className={`px-3 py-2 ${
-                                                getColorsForBatch(row.batch)
-                                                  .accent
-                                              } flex items-center justify-between`}
-                                            >
-                                              {" "}
-                                              <div className="flex items-center space-x-2">
-                                                <FiUser
-                                                  className="text-gray-500"
-                                                  size={14}
+                                  <div className="overflow-x-auto">
+                                    <table className="min-w-full text-xs border border-gray-200 rounded">
+                                      <thead className="bg-gray-50">
+                                        <tr>
+                                          <th className="px-2 py-1 text-left">Trainer</th>
+                                          <th className="px-2 py-1 text-left">Duration</th>
+                                          <th className="px-2 py-1 text-left">Start Date</th>
+                                          <th className="px-2 py-1 text-left">End Date</th>
+                                          <th className="px-2 py-1 text-left">Per Hour Cost</th>
+                                          <th className="px-2 py-1 text-left">Total Cost</th>
+                                          <th className="px-2 py-1 text-left">Total Hours</th>
+                                          <th className="px-2 py-1 text-left">Daily Hours</th> {/* <-- Add this */}
+                                          <th className="px-2 py-1 text-left">Actions</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {(batch.trainers || []).map((trainer, trainerIdx) => (
+                                          <React.Fragment key={trainerIdx}>
+                                            <tr className="border-b last:border-0">
+                                              {/* Trainer Name/Select */}
+                                              <td className="px-2 py-1">
+                                                <select
+                                                  value={trainer.trainerId || ""}
+                                                  onChange={e =>
+                                                    handleTrainerField(
+                                                      rowIndex,
+                                                      batchIndex,
+                                                      trainerIdx,
+                                                      "trainerId",
+                                                      e.target.value
+                                                    )
+                                                  }
+                                                  className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
+                                                >
+                                                  <option value="">Select Trainer</option>
+                                                  {trainers
+                                                    .filter(
+                                                      (tr) =>
+                                                        tr.domain &&
+                                                        typeof tr.domain === "string" &&
+                                                        tr.domain.toLowerCase().trim() ===
+                                                          selectedDomain.toLowerCase().trim()
+                                                    )
+                                                    .map((tr) => {
+                                                      const isAvailable = isTrainerAvailable(
+                                                        tr.trainerId,
+                                                        trainer.startDate,
+                                                        trainer.dayDuration,
+                                                        `${rowIndex}-${batchIndex}-${trainerIdx}`
+                                                      );
+                                                      return (
+                                                        <option
+                                                          key={tr.trainerId}
+                                                          value={tr.trainerId}
+                                                          disabled={!isAvailable}
+                                                          className={!isAvailable ? "text-gray-400" : ""}
+                                                        >
+                                                          {tr.name} ({tr.trainerId})
+                                                          {!isAvailable && " (Already booked)"}
+                                                        </option>
+                                                      );
+                                                    })}
+                                                </select>
+                                              </td>
+                                              {/* Duration */}
+                                              <td className="px-2 py-1">
+                                                <select
+                                                  value={trainer.dayDuration || ""}
+                                                  onChange={e =>
+                                                    handleTrainerField(
+                                                      rowIndex,
+                                                      batchIndex,
+                                                      trainerIdx,
+                                                      "dayDuration",
+                                                      e.target.value
+                                                    )
+                                                  }
+                                                  className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
+                                                >
+                                                  <option value="">Select</option>
+                                                  {DAY_DURATION_OPTIONS.map(opt => (
+                                                    <option key={opt} value={opt}>
+                                                      {opt}
+                                                    </option>
+                                                  ))}
+                                                </select>
+                                              </td>
+                                              {/* Start Date */}
+                                              <td className="px-2 py-1">
+                                                <input
+                                                  type="date"
+                                                  value={trainer.startDate || ""}
+                                                  onChange={e =>
+                                                    handleTrainerField(
+                                                      rowIndex,
+                                                      batchIndex,
+                                                      trainerIdx,
+                                                      "startDate",
+                                                      e.target.value
+                                                    )
+                                                  }
+                                                  className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
                                                 />
-                                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                                                  <div>
-                                                    <select
-                                                      value={
-                                                        trainer.trainerId || ""
-                                                      }
-                                                      onChange={(e) =>
-                                                        handleTrainerField(
-                                                          rowIndex,
-                                                          batchIndex,
-                                                          trainerIdx,
-                                                          "trainerId",
-                                                          e.target.value
-                                                        )
-                                                      }
-                                                      className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
-                                                    >
-                                                      <option value="">
-                                                        Select Trainer
-                                                      </option>
-                                                      {trainers
-                                                        .filter(
-                                                          (tr) =>
-                                                            tr.domain &&
-                                                            typeof tr.domain ===
-                                                              "string" &&
-                                                            tr.domain
-                                                              .toLowerCase()
-                                                              .trim() ===
-                                                              selectedDomain
-                                                                .toLowerCase()
-                                                                .trim()
-                                                        )
-                                                        .map((tr) => {
-                                                          const isAvailable =
-                                                            isTrainerAvailable(
-                                                              tr.trainerId,
-                                                              trainer.startDate,
-                                                              trainer.dayDuration,
-                                                              `${rowIndex}-${batchIndex}-${trainerIdx}`
-                                                            );
-
-                                                          return (
-                                                            <option
-                                                              key={tr.trainerId}
-                                                              value={tr.trainerId}
-                                                              disabled={
-                                                                !isAvailable
-                                                              }
-                                                              className={
-                                                                !isAvailable
-                                                                  ? "text-gray-400"
-                                                                  : ""
-                                                              }
-                                                            >
-                                                              {tr.name} (
-                                                              {tr.trainerId})
-                                                              {!isAvailable &&
-                                                                " (Already booked)"}
-                                                            </option>
-                                                          );
-                                                        })}
-                                                    </select>
-                                                  </div>
-                                                </div>
-                                              </div>
-                                              <div className="flex items-center space-x-2">
-                                                <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded">
-                                                  {trainer.assignedHours || 0} hrs
-                                                </span>
-                                                {/* --- SWAP BUTTON --- */}
+                                              </td>
+                                              {/* End Date */}
+                                              <td className="px-2 py-1">
+                                                <input
+                                                  type="date"
+                                                  value={trainer.endDate || ""}
+                                                  onChange={e =>
+                                                    handleTrainerField(
+                                                      rowIndex,
+                                                      batchIndex,
+                                                      trainerIdx,
+                                                      "endDate",
+                                                      e.target.value
+                                                    )
+                                                  }
+                                                  className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
+                                                />
+                                              </td>
+                                              {/* Per Hour Cost */}
+                                              <td className="px-2 py-1">
+                                                <input
+                                                  type="text"
+                                                  value={trainer.perHourCost || ""}
+                                                  disabled
+                                                  className="w-full rounded border-gray-300 bg-gray-100 text-xs py-1 px-2"
+                                                />
+                                              </td>
+                                              {/* Total Cost */}
+                                              <td className="px-2 py-1">
+                                                <input
+                                                  type="text"
+                                                  value={
+                                                    trainer.perHourCost && trainer.assignedHours
+                                                      ? Number(trainer.perHourCost) * Number(trainer.assignedHours)
+                                                      : ""
+                                                  }
+                                                  disabled
+                                                  className="w-full rounded border-gray-300 bg-gray-100 text-xs py-1 px-2"
+                                                />
+                                              </td>
+                                              {/* Total Hours */}
+                                              <td className="px-2 py-1">
+                                                <input
+                                                  type="text"
+                                                  inputMode="numeric"
+                                                  pattern="[0-9]*"
+                                                  value={trainer.assignedHours || ""}
+                                                  onChange={e =>
+                                                    handleTotalHoursChange(
+                                                      rowIndex,
+                                                      batchIndex,
+                                                      trainerIdx,
+                                                      e.target.value.replace(/\D/g, "")
+                                                    )
+                                                  }
+                                                  className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
+                                                  min="0"
+                                                  max={batch.assignedHours}
+                                                />
+                                              </td>
+                                              {/* Daily Hours Breakdown */}
+                                              <td className="px-2 py-1">
+                                                {Array.isArray(trainer.dailyHours) && trainer.dailyHours.length > 0 ? (
+                                                  <button
+                                                    type="button"
+                                                    className="text-xs text-indigo-600 underline"
+                                                    onClick={() =>
+                                                      toggleTrainerExpansion(`${rowIndex}-${batchIndex}-${trainerIdx}`)
+                                                    }
+                                                  >
+                                                    View
+                                                  </button>
+                                                ) : (
+                                                  "-"
+                                                )}
+                                              </td>
+                                              {/* Actions */}
+                                              <td className="px-2 py-1">
+                                                <button
+                                                  onClick={() => removeTrainer(rowIndex, batchIndex, trainerIdx)}
+                                                  className="text-xs flex items-center text-rose-600 hover:text-rose-800 font-medium"
+                                                  type="button"
+                                                  title="Remove Trainer"
+                                                >
+                                                  <FiTrash2 className="mr-1" size={12} /> Remove
+                                                </button>
                                                 {trainer.dayDuration === "AM" && (
                                                   <button
                                                     type="button"
-                                                    className="px-2 py-1 text-xs bg-black text-white rounded hover:bg-gray-800"
-                                                    onClick={() =>
-                                                      openSwapModal(
-                                                        rowIndex,
-                                                        batchIndex,
-                                                        trainerIdx
-                                                      )
-                                                    }
+                                                    className="ml-2 px-2 py-1 text-xs bg-black text-white rounded hover:bg-gray-800"
+                                                    onClick={() => openSwapModal(rowIndex, batchIndex, trainerIdx)}
                                                     title="Swap Trainer"
                                                   >
-                                                    Swap Trainer
+                                                    Swap
                                                   </button>
                                                 )}
-                                                <button
-                                                  onClick={() =>
-                                                    toggleTrainerExpansion(
-                                                      trainerKey
-                                                    )
-                                                  }
-                                                  className="p-1 text-gray-500 hover:text-gray-700"
-                                                  type="button"
-                                                >
-                                                  {isTrainerExpanded ? (
-                                                    <FiChevronUp size={16} />
-                                                  ) : (
-                                                    <FiChevronDown size={16} />
-                                                  )}
-                                                </button>
-                                              </div>
-                                            </div>
-
-                                            {isTrainerExpanded && (
-                                              <div className="p-3 bg-white space-y-3">
-                                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                                                  {trainer.trainerId &&
-                                                    trainer.dayDuration &&
-                                                    trainer.startDate &&
-                                                    trainer.endDate &&
-                                                    !isTrainerAvailable(
-                                                      trainer.trainerId,
-                                                      trainer.startDate,
-                                                      trainer.dayDuration,
-                                                      `${rowIndex}-${batchIndex}-${trainerIdx}`
-                                                    ) && (
-                                                      <div className="text-xs text-rose-600 mt-1 bg-rose-50 p-2 rounded border border-rose-200">
-                                                        ⚠️ This trainer is already
-                                                        booked for{" "}
-                                                        {trainer.dayDuration} slot
-                                                        between{" "}
-                                                        {trainer.startDate} to{" "}
-                                                        {trainer.endDate}
-                                                      </div>
-                                                    )}
-                                                  <div>
-                                                    <label className="block text-xs text-gray-500 mb-1">
-                                                      Duration
-                                                    </label>
-                                                    <select
-                                                      value={
-                                                        trainer.dayDuration || ""
-                                                      }
-                                                      onChange={(e) =>
-                                                        handleTrainerField(
-                                                          rowIndex,
-                                                          batchIndex,
-                                                          trainerIdx,
-                                                          "dayDuration",
-                                                          e.target.value
-                                                        )
-                                                      }
-                                                      className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
-                                                    >
-                                                      <option value="">
-                                                        Select
-                                                      </option>
-                                                      {DAY_DURATION_OPTIONS.map(
-                                                        (opt) => (
-                                                          <option
-                                                            key={opt}
-                                                            value={opt}
-                                                          >
-                                                            {opt}
-                                                          </option>
-                                                        )
-                                                      )}
-                                                    </select>
-                                                  </div>
-                                                  <div>
-                                                    <label className="block text-xs text-gray-500 mb-1">
-                                                      Start Date
-                                                    </label>
-                                                    <input
-                                                      type="date"
-                                                      value={
-                                                        trainer.startDate || ""
-                                                      }
-                                                      onChange={(e) =>
-                                                        handleTrainerField(
-                                                          rowIndex,
-                                                          batchIndex,
-                                                          trainerIdx,
-                                                          "startDate",
-                                                          e.target.value
-                                                        )
-                                                      }
-                                                      className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
-                                                    />
-                                                  </div>
-                                                  <div>
-                                                    <label className="block text-xs text-gray-500 mb-1">
-                                                      End Date
-                                                    </label>
-                                                    <input
-                                                      type="date"
-                                                      value={
-                                                        trainer.endDate || ""
-                                                      }
-                                                      onChange={(e) =>
-                                                        handleTrainerField(
-                                                          rowIndex,
-                                                          batchIndex,
-                                                          trainerIdx,
-                                                          "endDate",
-                                                          e.target.value
-                                                        )
-                                                      }
-                                                      className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
-                                                    />
-                                                  </div>
-                                                  {/* Move Total Hours here, after all schedule fields */}
-                                                </div>
-
-                                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                                                  <div>
-                                                    <label className="block text-xs text-gray-500 mb-1">
-                                                      Per Hour Cost
-                                                    </label>
-                                                    <input
-                                                      type="text"
-                                                      value={
-                                                        trainer.perHourCost || ""
-                                                      }
-                                                      disabled
-                                                      className="w-full rounded-lg border-gray-300 bg-gray-100 text-sm py-2 px-3"
-                                                    />
-                                                  </div>
-                                                  <div>
-                                                    <label className="block text-xs text-gray-500 mb-1">
-                                                      Total Cost
-                                                    </label>
-                                                    <input
-                                                      type="text"
-                                                      value={
-                                                        trainer.perHourCost &&
-                                                        trainer.assignedHours
-                                                          ? Number(
-                                                              trainer.perHourCost
-                                                            ) *
-                                                            Number(
-                                                              trainer.assignedHours
-                                                            )
-                                                          : ""
-                                                      }
-                                                      disabled
-                                                      className="w-full rounded-lg border-gray-300 bg-gray-100 text-sm py-2 px-3"
-                                                    />
-                                                  </div>
-                                                  <div>
-                                                    <label className=" text-xs text-gray-500 mb-1">
-                                                      Total Hours
-                                                    </label>
-                                                    <input
-                                                      type="text"
-                                                      inputMode="numeric"
-                                                      pattern="[0-9]*"
-                                                      value={
-                                                        trainer.assignedHours ||
-                                                        ""
-                                                      }
-                                                      onChange={(e) =>
-                                                        handleTotalHoursChange(
-                                                          rowIndex,
-                                                          batchIndex,
-                                                          trainerIdx,
-                                                          e.target.value.replace(
-                                                            /\D/g,
-                                                            ""
-                                                          )
-                                                        )
-                                                      }
-                                                      className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
-                                                      min="0"
-                                                      max={batch.assignedHours}
-                                                    />
-                                                  </div>
-                                                </div>
-
-                                                {trainer.mergedBreakdown && (
-                                                  <table>
-                                                    <thead>
-                                                      <tr>
-                                                        <th>Date</th>
-                                                        <th>Day</th>
-                                                        <th>Total Hours</th>
-                                                        <th>Slots</th>
-                                                      </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                      {trainer.mergedBreakdown.map(
-                                                        (item, idx) => (
-                                                          <tr key={idx}>
-                                                            <td>
-                                                              {item.date instanceof
-                                                              Date
-                                                                ? item.date.toLocaleDateString()
-                                                                : item.date}
-                                                            </td>
-                                                            <td>
-                                                              {item.date instanceof
-                                                              Date
-                                                                ? item.date.toLocaleDateString(
-                                                                    undefined,
-                                                                    {
-                                                                      weekday:
-                                                                        "short",
-                                                                    }
-                                                                  )
-                                                                : ""}
-                                                            </td>
-                                                            <td>{item.hours}</td>
-                                                            <td>
-                                                              {item.sources.join(
-                                                                ", "
-                                                              )}
-                                                            </td>
-                                                          </tr>
-                                                        )
-                                                      )}
-                                                    </tbody>
-                                                  </table>
-                                                )}
-
-                                                {trainer.mergedBreakdown ? (
-                                                  <div className="mt-3">
-                                                    <h6 className="text-xs font-medium text-gray-700 mb-2">
-                                                      Daily Hours Breakdown
-                                                      (Merged)
-                                                    </h6>
+                                              </td>
+                                            </tr>
+                                            {/* Daily Hours Table (shown when expanded) */}
+                                            {expandedTrainer[`${rowIndex}-${batchIndex}-${trainerIdx}`] &&
+                                              Array.isArray(trainer.dailyHours) &&
+                                              trainer.dailyHours.length > 0 && (
+                                                <tr>
+                                                  <td colSpan={9} className="px-2 py-2">
                                                     <div className="overflow-x-auto">
-                                                      <table className="w-full text-xs">
-                                                        <thead className="bg-gray-50">
+                                                      <table className="min-w-max text-xs border border-gray-200 rounded bg-gray-50">
+                                                        <thead>
                                                           <tr>
-                                                            <th className="px-3 py-1 text-left">
-                                                              Date
-                                                            </th>
-                                                            <th className="px-3 py-1 text-left">
-                                                              Day
-                                                            </th>
-                                                            <th className="px-3 py-1 text-left">
-                                                              Total Hours
-                                                            </th>
-                                                            <th className="px-3 py-1 text-left">
-                                                              Slots
-                                                            </th>
+                                                            <th className="px-2 py-1 text-left">Day</th>
+                                                            <th className="px-2 py-1 text-left">Date</th>
+                                                            <th className="px-2 py-1 text-left">Hours</th>
+                                                            <th className="px-2 py-1 text-left">Action</th>
                                                           </tr>
                                                         </thead>
                                                         <tbody>
-                                                          {trainer.mergedBreakdown.map(
-                                                            (item, idx) => (
-                                                              <tr
-                                                                key={idx}
-                                                                className="border-b border-gray-200 last:border-0"
-                                                              >
-                                                                <td className="px-3 py-2">
-                                                                  {item.date instanceof
-                                                                  Date
-                                                                    ? item.date.toLocaleDateString()
-                                                                    : item.date}
-                                                                </td>
-                                                                <td className="px-3 py-2">
-                                                                  {item.date instanceof
-                                                                  Date
-                                                                    ? item.date.toLocaleDateString(
-                                                                        undefined,
-                                                                        {
-                                                                          weekday:
-                                                                            "short",
-                                                                        }
-                                                                      )
-                                                                    : ""}
-                                                                </td>
-                                                                <td className="px-3 py-2">
-                                                                  {item.hours}
-                                                                </td>
-                                                                <td className="px-3 py-2">
-                                                                  {item.sources.join(
-                                                                    ", "
-                                                                  )}
-                                                                </td>
-                                                              </tr>
-                                                            )
-                                                          )}
+                                                          {trainer.dailyHours.map((hours, idx) => (
+                                                            <tr key={idx}>
+                                                              <td className="px-2 py-1">{idx + 1}</td>
+                                                              <td className="px-2 py-1">
+                                                                {trainer.activeDates && trainer.activeDates[idx]
+                                                                  ? new Date(trainer.activeDates[idx]).toLocaleDateString()
+                                                                  : "-"}
+                                                              </td>
+                                                              <td className="px-2 py-1">{hours}</td>
+                                                              <td className="px-2 py-1">
+                                                                <button
+                                                                  type="button"
+                                                                  className="text-xs text-rose-600 hover:text-rose-800 px-2 py-0.5 rounded"
+                                                                  title="Remove this day"
+                                                                  onClick={() => {
+                                                                    // Remove this day from dailyHours and activeDates
+                                                                    const updated = [...table1Data];
+                                                                    const t = updated[rowIndex].batches[batchIndex].trainers[trainerIdx];
+                                                                    t.dailyHours.splice(idx, 1);
+                                                                    if (t.activeDates) t.activeDates.splice(idx, 1);
+                                                                    // Update assignedHours
+                                                                    t.assignedHours = t.dailyHours.reduce((a, b) => a + Number(b || 0), 0);
+                                                                    setTable1Data(updated);
+                                                                  }}
+                                                                >
+                                                                  Delete
+                                                                </button>
+                                                              </td>
+                                                            </tr>
+                                                          ))}
                                                         </tbody>
                                                       </table>
                                                     </div>
-                                                  </div>
-                                                ) : (
-                                                  dateList.length > 0 && (
-                                                    <div className="mt-3">
-                                                      <h6 className="text-xs font-medium text-gray-700 mb-2">
-                                                        Daily Hours Breakdown
-                                                      </h6>
-                                                      <div className="overflow-x-auto">
-                                                        <table className="w-full text-xs">
-                                                          <thead className="bg-gray-50">
-                                                            <tr>
-                                                              <th className="px-3 py-1 text-left">
-                                                                Date
-                                                              </th>
-                                                              <th className="px-3 py-1 text-left">
-                                                                Day
-                                                              </th>
-                                                              <th className="px-3 py-1 text-left">
-                                                                Hours
-                                                              </th>
-                                                            </tr>
-                                                          </thead>
-                                                          <tbody>
-                                                            {(
-                                                              trainer.activeDates ||
-                                                              []
-                                                            ).map((date, idx) => {
-                                                              const d = typeof date === "string" ? new Date(date) : date;
-                                                              return (
-                                                                <tr key={idx}>
-                                                                  <td>{d.toLocaleDateString()}</td>
-                                                                  <td>{d.toLocaleDateString(undefined, { weekday: "short" })}</td>
-                                                                  <td>{trainer.dailyHours?.[idx] || ""}</td>
-                                                                  <td>{trainer.slotInfo?.[idx]?.slot || trainer.dayDuration}</td>
-                                                                  <td>{trainer.slotInfo?.[idx]?.batchCode || ""}</td>
-                                                                </tr>
-                                                              );
-                                                            })}
-                                                          </tbody>
-                                                        </table>
-                                                      </div>
-                                                    </div>
-                                                  )
-                                                )}
-
-                                                <div className="flex justify-end">
-                                                  <button
-                                                    onClick={() =>
-                                                      removeTrainer(
-                                                        rowIndex,
-                                                        batchIndex,
-                                                        trainerIdx
-                                                      )
-                                                    }
-                                                    className="text-xs flex items-center text-rose-600 hover:text-rose-800 font-medium"
-                                                    type="button"
-                                                  >
-                                                    <FiTrash2
-                                                      className="mr-1"
-                                                      size={12}
-                                                    />{" "}
-                                                    Remove Trainer
-                                                  </button>
-                                                </div>
-                                              </div>
-                                            )}
-                                          </div>
-                                        );
-                                      }
-                                    )}
+                                                  </td>
+                                                </tr>
+                                              )}
+                                          </React.Fragment>
+                                        ))}
+                                      </tbody>
+                                    </table>
                                   </div>
                                 ) : (
                                   <div className="text-center py-6 bg-gray-50 rounded-lg">

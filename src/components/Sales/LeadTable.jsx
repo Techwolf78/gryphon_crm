@@ -173,7 +173,7 @@ export default function LeadsTable({
 
   return (
     <>
-    <div className="min-h-screen flex flex-col overflow-hidden">
+      <div className="min-h-screen flex flex-col overflow-hidden">
         {/* Fixed Header */}
         <div
           className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-2`}
@@ -348,7 +348,7 @@ export default function LeadsTable({
                   {dropdownOpenId === id && (
                     <DropdownActions
                       leadId={id}
-                      leadData={lead}
+                      leadData={lead} // This is correct
                       closeDropdown={() => setDropdownOpenId(null)}
                       setSelectedLead={setSelectedLead}
                       setShowFollowUpModal={setShowFollowUpModal}
@@ -362,6 +362,7 @@ export default function LeadsTable({
                       setShowExpectedDateModal={setShowExpectedDateModal}
                       setPendingPhaseChange={setPendingPhaseChange}
                       setLeadBeingUpdated={setLeadBeingUpdated}
+                      isMyLead={lead.assignedTo?.uid === currentUser?.uid} // Changed from leadData to lead
                     />
                   )}
                 </div>
