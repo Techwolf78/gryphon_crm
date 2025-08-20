@@ -516,8 +516,30 @@ const BatchDetailsTable = ({
 
     if (field === "trainerId") {
       const tr = trainers.find((t) => t.trainerId === value);
-      trainer.trainerName = tr?.name || "";
+      
+      // ✅ FIXED: Debug and ensure proper trainer data mapping
+      console.log("🔍 [TRAINER FIELD] Trainer selection debug:", {
+        selectedTrainerId: value,
+        foundTrainer: tr,
+        trainerFromDatabase: tr,
+        trainerNameField: tr?.name,
+        trainerStructure: tr ? Object.keys(tr) : "not found",
+      });
+
+      // ✅ FIXED: Handle different possible field names for trainer name
+      trainer.trainerName = tr?.name || tr?.trainerName || tr?.displayName || "";
       trainer.perHourCost = tr?.paymentType === "Per Hour" ? tr?.charges : 0;
+      
+      // ✅ ADDED: Set trainerId to ensure the dropdown shows the selection
+      trainer.trainerId = value;
+
+      console.log("📊 [TRAINER FIELD] Updated trainer data:", {
+        trainerId: trainer.trainerId,
+        trainerName: trainer.trainerName,
+        perHourCost: trainer.perHourCost,
+        paymentType: tr?.paymentType,
+        charges: tr?.charges,
+      });
     }
 
     // ✅ FIXED: Ensure assignedHours is always a number
@@ -1691,9 +1713,7 @@ const BatchDetailsTable = ({
                                                 {/* Trainer Name/Select */}
                                                 <td className="px-2 py-1">
                                                   <select
-                                                    value={
-                                                      trainer.trainerId || ""
-                                                    }
+                                                    value={trainer.trainerId || ""} // ✅ This is correct
                                                     onChange={(e) =>
                                                       handleTrainerField(
                                                         rowIndex,
@@ -1705,9 +1725,7 @@ const BatchDetailsTable = ({
                                                     }
                                                     className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
                                                   >
-                                                    <option value="">
-                                                      Select Trainer
-                                                    </option>
+                                                    <option value="">Select Trainer</option>
                                                     {trainers
                                                       .filter(
                                                         (tr) =>
