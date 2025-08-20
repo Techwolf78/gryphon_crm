@@ -634,10 +634,120 @@ function InitiationModal({ training, onClose, onConfirm }) {
     fetchPhaseDomains();
   }, [training?.id, currentPhase, courses, getDomainHours]);
 
-  const swapTrainers = () => {
-    // This function would need to be updated for multi-domain if you want cross-domain swaps
-    // For now, assume swap is within a single domain's table1Data
-    // You can pass domain as an argument if needed
+  const swapTrainers = (swapData) => {
+    console.log("🔄 [INITIATION MODAL] swapTrainers called with:", {
+      swapData: swapData,
+      selectedDomainsLength: selectedDomains.length,
+      table1DataByDomainKeys: Object.keys(table1DataByDomain),
+    });
+    
+    if (!swapData || !swapData.source || !swapData.target) {
+      console.error("❌ [INITIATION MODAL] Missing swap data:", { swapData });
+      return;
+    }
+
+    const { source, target, domain } = swapData;
+
+    // Use the domain from swapData or fallback to first selected domain
+    const currentDomain = domain || selectedDomains[0];
+    
+    console.log("🔄 [INITIATION MODAL] Processing cross-batch swap for domain:", {
+      currentDomain,
+      sourceTrainer: source.trainerData?.trainerName,
+      targetTrainer: target.trainerData?.trainerName,
+      sourceOriginalBatch: table1DataByDomain[currentDomain]?.[source.rowIdx]?.batch,
+      targetOriginalBatch: table1DataByDomain[currentDomain]?.[target.rowIdx]?.batch,
+    });
+    
+    if (!table1DataByDomain[currentDomain]) {
+      console.error("❌ [INITIATION MODAL] No table data found for domain:", currentDomain);
+      return;
+    }
+
+    // Get current domain's table data
+    const currentDomainData = [...table1DataByDomain[currentDomain]];
+    
+    // Validate that the indices exist
+    if (!currentDomainData[source.rowIdx] || 
+        !currentDomainData[source.rowIdx].batches[source.batchIdx]) {
+      console.error("❌ [INITIATION MODAL] Invalid source batch path:", source);
+      return;
+    }
+
+    if (!currentDomainData[target.rowIdx] || 
+        !currentDomainData[target.rowIdx].batches[target.batchIdx]) {
+      console.error("❌ [INITIATION MODAL] Invalid target batch path:", target);
+      return;
+    }
+
+    console.log("🔄 [INITIATION MODAL] Performing CROSS-BATCH trainer swap...");
+
+    // CROSS-BATCH SWAP: Create trainers for opposite batches
+    const sourceNewTrainer = {
+      ...source.trainerData,
+      dayDuration: source.newTimeSlot
+    };
+
+    const targetNewTrainer = {
+      ...target.trainerData,
+      dayDuration: target.newTimeSlot
+    };
+
+    console.log("🔄 [INITIATION MODAL] Cross-batch swap details:", {
+      sourceTrainerMoving: {
+        name: sourceNewTrainer.trainerName,
+        fromBatch: currentDomainData[source.rowIdx].batch,
+        toBatch: currentDomainData[target.rowIdx].batch,
+        originalTimeSlot: source.trainerData.dayDuration,
+        newTimeSlot: sourceNewTrainer.dayDuration,
+      },
+      targetTrainerMoving: {
+        name: targetNewTrainer.trainerName,
+        fromBatch: currentDomainData[target.rowIdx].batch,
+        toBatch: currentDomainData[source.rowIdx].batch,
+        originalTimeSlot: target.trainerData.dayDuration,
+        newTimeSlot: targetNewTrainer.dayDuration,
+      }
+    });
+
+    // CROSS-BATCH SWAP: Add source trainer to TARGET batch, target trainer to SOURCE batch
+    currentDomainData[target.rowIdx].batches[target.batchIdx].trainers.push(sourceNewTrainer);
+    currentDomainData[source.rowIdx].batches[source.batchIdx].trainers.push(targetNewTrainer);
+
+    console.log("✅ [INITIATION MODAL] Cross-batch trainers added successfully:", {
+      sourceTrainerAddedTo: `${currentDomainData[target.rowIdx].batch} batch (${currentDomainData[target.rowIdx].batches[target.batchIdx].batchCode})`,
+      targetTrainerAddedTo: `${currentDomainData[source.rowIdx].batch} batch (${currentDomainData[source.rowIdx].batches[source.batchIdx].batchCode})`,
+      sourceBatchTrainerCount: currentDomainData[source.rowIdx].batches[source.batchIdx].trainers.length,
+      targetBatchTrainerCount: currentDomainData[target.rowIdx].batches[target.batchIdx].trainers.length,
+    });
+
+    // Update the state with the modified data
+    setTable1DataByDomain(prev => {
+      const newState = {
+        ...prev,
+        [currentDomain]: currentDomainData
+      };
+      
+      console.log("📊 [INITIATION MODAL] table1DataByDomain updated with cross-batch swap:", {
+        domain: currentDomain,
+        crossBatchSwapCompleted: {
+          sourceBatch: {
+            batchCode: newState[currentDomain][source.rowIdx].batches[source.batchIdx].batchCode,
+            trainerCount: newState[currentDomain][source.rowIdx].batches[source.batchIdx].trainers.length,
+            specialization: newState[currentDomain][source.rowIdx].batch,
+          },
+          targetBatch: {
+            batchCode: newState[currentDomain][target.rowIdx].batches[target.batchIdx].batchCode,
+            trainerCount: newState[currentDomain][target.rowIdx].batches[target.batchIdx].trainers.length,
+            specialization: newState[currentDomain][target.rowIdx].batch,
+          }
+        }
+      });
+      
+      return newState;
+    });
+
+    console.log("✅ [INITIATION MODAL] Cross-batch trainer swap completed successfully - trainers swapped batches and time slots");
   };
 
   useEffect(() => {
@@ -937,92 +1047,96 @@ function InitiationModal({ training, onClose, onConfirm }) {
                     </div>
                   </div>
 
-                  {/* Phase 2 Dates */}
-                  {selectedPhases.includes("phase-2") &&
-                    selectedPhases.length > 1 &&
-                    getMainPhase() !== "phase-2" && (
+                  {/* Phase 2 and Phase 3 Dates in Same Row */}
+                  {(selectedPhases.includes("phase-2") || selectedPhases.includes("phase-3")) &&
+                    selectedPhases.length > 1 && (
                       <div className="space-y-2 pt-2 border-t border-gray-200">
-                        <h4 className="text-sm font-medium text-gray-900">
-                          Phase 2 Dates
-                        </h4>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                              Phase 2 Start Date
-                            </label>
-                            <input
-                              type="date"
-                              value={phase2Dates.startDate || ""}
-                              onChange={(e) =>
-                                setPhase2Dates({
-                                  ...phase2Dates,
-                                  startDate: e.target.value,
-                                })
-                              }
-                              className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                              Phase 2 End Date
-                            </label>
-                            <input
-                              type="date"
-                              value={phase2Dates.endDate || ""}
-                              onChange={(e) =>
-                                setPhase2Dates({
-                                  ...phase2Dates,
-                                  endDate: e.target.value,
-                                })
-                              }
-                              className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* Phase 2 Dates */}
+                          {selectedPhases.includes("phase-2") && getMainPhase() !== "phase-2" && (
+                            <div className="space-y-2">
+                              <h4 className="text-sm font-medium text-gray-900">
+                                Phase 2 Dates
+                              </h4>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                                    Phase 2 Start Date
+                                  </label>
+                                  <input
+                                    type="date"
+                                    value={phase2Dates.startDate || ""}
+                                    onChange={(e) =>
+                                      setPhase2Dates({
+                                        ...phase2Dates,
+                                        startDate: e.target.value,
+                                      })
+                                    }
+                                    className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                                    Phase 2 End Date
+                                  </label>
+                                  <input
+                                    type="date"
+                                    value={phase2Dates.endDate || ""}
+                                    onChange={(e) =>
+                                      setPhase2Dates({
+                                        ...phase2Dates,
+                                        endDate: e.target.value,
+                                      })
+                                    }
+                                    className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
 
-                  {/* Phase 3 Dates */}
-                  {selectedPhases.includes("phase-3") &&
-                    selectedPhases.length > 1 &&
-                    getMainPhase() !== "phase-3" && (
-                      <div className="space-y-2 pt-2 border-t border-gray-200">
-                        <h4 className="text-sm font-medium text-gray-900">
-                          Phase 3 Dates
-                        </h4>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                              Phase 3 Start Date
-                            </label>
-                            <input
-                              type="date"
-                              value={phase3Dates?.startDate || ""}
-                              onChange={(e) =>
-                                setPhase3Dates({
-                                  ...phase3Dates,
-                                  startDate: e.target.value,
-                                })
-                              }
-                              className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                              Phase 3 End Date
-                            </label>
-                            <input
-                              type="date"
-                              value={phase3Dates?.endDate || ""}
-                              onChange={(e) =>
-                                setPhase3Dates({
-                                  ...phase3Dates,
-                                  endDate: e.target.value,
-                                })
-                              }
-                              className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
-                            />
-                          </div>
+                          {/* Phase 3 Dates */}
+                          {selectedPhases.includes("phase-3") && getMainPhase() !== "phase-3" && (
+                            <div className="space-y-2">
+                              <h4 className="text-sm font-medium text-gray-900">
+                                Phase 3 Dates
+                              </h4>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                                    Phase 3 Start Date
+                                  </label>
+                                  <input
+                                    type="date"
+                                    value={phase3Dates?.startDate || ""}
+                                    onChange={(e) =>
+                                      setPhase3Dates({
+                                        ...phase3Dates,
+                                        startDate: e.target.value,
+                                      })
+                                    }
+                                    className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                                    Phase 3 End Date
+                                  </label>
+                                  <input
+                                    type="date"
+                                    value={phase3Dates?.endDate || ""}
+                                    onChange={(e) =>
+                                      setPhase3Dates({
+                                        ...phase3Dates,
+                                        endDate: e.target.value,
+                                      })
+                                    }
+                                    className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -1137,7 +1251,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                               </p>
                             </div>
                           </div>
-                          <div className="p-3 border-b border-gray-100">
+                          <div className=" border-b border-gray-100">
                             <div className="flex items-center justify-between gap-4">
                               <div className="text-xs text-gray-700">
                                 Domain total hours: <span className="font-semibold">{getDomainHours(domain, currentPhase)}</span>
