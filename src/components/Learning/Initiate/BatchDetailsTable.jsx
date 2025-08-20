@@ -152,22 +152,18 @@ const BatchDetailsTable = ({
   const addBatch = (rowIndex) => {
     const updatedData = [...table1Data];
     const batches = updatedData[rowIndex].batches;
+    const batch1AssignedHours =
+      batches.length > 0 ? batches[0].assignedHours : 0;
     const newBatchIndex = batches.length;
-    const firstBatchHours = batches[0]?.assignedHours || 0;
-
-    // Add new batch with assignedHours same as first batch
-    batches.push({
+    updatedData[rowIndex].batches.push({
       batchPerStdCount: "",
-      batchCode: generateBatchCode(updatedData[rowIndex].batch, newBatchIndex + 1),
-      assignedHours: firstBatchHours,
+      batchCode: generateBatchCode(
+        updatedData[rowIndex].batch,
+        newBatchIndex + 1
+      ),
+      assignedHours: batch1AssignedHours, // always match batch 1's assigned hours
       trainers: [],
     });
-
-    // Ensure all batches have the same assignedHours as the first batch
-    batches.forEach((batch) => {
-      batch.assignedHours = firstBatchHours;
-    });
-
     setTable1Data(updatedData);
   };
 
@@ -357,93 +353,69 @@ const BatchDetailsTable = ({
     return total > 0 ? +(total / 60).toFixed(2) : 0;
   };
 
-  const handleTrainerField = (
-    rowIndex,
-    batchIndex,
-    trainerIdx,
-    field,
-    value
-  ) => {
-    const updated = [...table1Data];
-    const batch = updated[rowIndex].batches[batchIndex];
-    const trainer = batch.trainers[trainerIdx];
+const handleTrainerField = (rowIndex, batchIndex, trainerIdx, field, value) => {
+  const updated = [...table1Data];
+  const batch = updated[rowIndex].batches[batchIndex];
+  const trainer = batch.trainers[trainerIdx];
 
-    // Create tempTrainer with new value
-    const tempTrainer = { ...trainer, [field]: value };
+  // Create tempTrainer with new value
+  const tempTrainer = { ...trainer, [field]: value };
 
-    if (["dayDuration", "startDate", "endDate"].includes(field)) {
-      if (
-        !tempTrainer.dayDuration ||
-        !tempTrainer.startDate ||
-        !tempTrainer.endDate
-      ) {
-        // Not enough data yet to check conflict
-        trainer[field] = value;
-        setTable1Data(updated);
-        return;
-      }
-
-      // Prepare dates
-      const normalizeDate = (dateStr) =>
-        new Date(dateStr).toISOString().slice(0, 10);
-      const newTrainerDates = getDateListExcludingSundays(
-        tempTrainer.startDate,
-        tempTrainer.endDate
-      );
-      const newTrainerDatesNormalized = newTrainerDates.map(normalizeDate);
-
-      const hasConflict = batch.trainers.some((t, idx) => {
-        if (idx === trainerIdx) return false;
-        if (t.dayDuration !== tempTrainer.dayDuration) return false;
-
-        const existingDates =
-          t.activeDates || getDateListExcludingSundays(t.startDate, t.endDate);
-        const existingDatesNormalized = existingDates.map(normalizeDate);
-
-        return newTrainerDatesNormalized.some((date) =>
-          existingDatesNormalized.includes(date)
-        );
-      });
-
-      if (hasConflict) {
-        alert(
-          `This batch already has a trainer for ${tempTrainer.dayDuration} slot on overlapping dates.`
-        );
-        return;
-      }
+  if (["dayDuration", "startDate", "endDate"].includes(field)) {
+    if (!tempTrainer.dayDuration || !tempTrainer.startDate || !tempTrainer.endDate) {
+      // Not enough data yet to check conflict
+      trainer[field] = value;
+      setTable1Data(updated);
+      return;
     }
 
-    // No conflict, update the field
-    trainer[field] = value;
+    // Prepare dates
+    const normalizeDate = (dateStr) => new Date(dateStr).toISOString().slice(0,10);
+    const newTrainerDates = getDateListExcludingSundays(tempTrainer.startDate, tempTrainer.endDate);
+    const newTrainerDatesNormalized = newTrainerDates.map(normalizeDate);
 
-    // Then update derived fields if needed
-    if (["dayDuration", "startDate", "endDate"].includes(field)) {
-      const perDay = getTrainingHoursPerDay(commonFields);
-      let perDayHours = 0;
-      if (trainer.dayDuration === "AM & PM") perDayHours = perDay;
-      else if (trainer.dayDuration === "AM" || trainer.dayDuration === "PM")
-        perDayHours = +(perDay / 2).toFixed(2);
+    const hasConflict = batch.trainers.some((t, idx) => {
+      if (idx === trainerIdx) return false;
+      if (t.dayDuration !== tempTrainer.dayDuration) return false;
 
-      const dateList = getDateListExcludingSundays(
-        trainer.startDate,
-        trainer.endDate
-      );
-      trainer.activeDates = dateList;
-      trainer.dailyHours = dateList.map(() => perDayHours);
-      trainer.assignedHours = trainer.dailyHours.reduce(
-        (a, b) => a + Number(b || 0),
-        0
-      );
+      const existingDates = t.activeDates || getDateListExcludingSundays(t.startDate, t.endDate);
+      const existingDatesNormalized = existingDates.map(normalizeDate);
+
+      return newTrainerDatesNormalized.some(date => existingDatesNormalized.includes(date));
+    });
+
+    if (hasConflict) {
+      alert(`This batch already has a trainer for ${tempTrainer.dayDuration} slot on overlapping dates.`);
+      return;
     }
+  }
 
-    if (field === "trainerId") {
-      const tr = trainers.find((t) => t.trainerId === value);
-      trainer.trainerName = tr?.name || "";
-      trainer.perHourCost = tr?.paymentType === "Per Hour" ? tr?.charges : 0;
-    }
+  // No conflict, update the field
+  trainer[field] = value;
 
-    setTable1Data(updated);
-  };
+  // Then update derived fields if needed
+  if (["dayDuration", "startDate", "endDate"].includes(field)) {
+    const perDay = getTrainingHoursPerDay(commonFields);
+    let perDayHours = 0;
+    if (trainer.dayDuration === "AM & PM") perDayHours = perDay;
+    else if (trainer.dayDuration === "AM" || trainer.dayDuration === "PM")
+      perDayHours = +(perDay / 2).toFixed(2);
+
+    const dateList = getDateListExcludingSundays(trainer.startDate, trainer.endDate);
+    trainer.activeDates = dateList;
+    trainer.dailyHours = dateList.map(() => perDayHours);
+    trainer.assignedHours = trainer.dailyHours.reduce((a, b) => a + Number(b || 0), 0);
+  }
+
+  if (field === "trainerId") {
+    const tr = trainers.find((t) => t.trainerId === value);
+    trainer.trainerName = tr?.name || "";
+    trainer.perHourCost = tr?.paymentType === "Per Hour" ? tr?.charges : 0;
+  }
+
+  setTable1Data(updated);
+};
+
 
   // 1) getAvailableSpecializations (replace existing)
   const getAvailableSpecializations = (sourceRowIndex) => {
@@ -836,96 +808,81 @@ const BatchDetailsTable = ({
 
       {/* Swap Modal */}
       {/* Swap Modal */}
-      {swapModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-2xl">
-            {" "}
-            {/* Increased max width */}
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Select AM Trainer to Swap With
-            </h3>
-            <ul className="mb-4 max-h-96 overflow-y-auto">
-              {getAMTrainers().map((t, idx) => {
-                // Get the trainer's details
-                const trainerDetails =
-                  table1Data[t.rowIdx].batches[t.batchIdx].trainers[
-                    t.trainerIdx
-                  ];
-                const startDate = trainerDetails.startDate
-                  ? new Date(trainerDetails.startDate).toLocaleDateString()
-                  : "No start date";
-                const endDate = trainerDetails.endDate
-                  ? new Date(trainerDetails.endDate).toLocaleDateString()
-                  : "No end date";
-
-                return (
-                  <li
-                    key={idx}
-                    className="flex justify-between items-center py-3 px-4 border-b hover:bg-gray-50"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-3">
-                        <span className="font-medium truncate">
-                          {t.trainerName} ({t.trainerId})
-                        </span>
-                        <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded">
-                          {trainerDetails.dayDuration}
-                        </span>
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        <span className="block sm:inline">
-                          Batch: {t.batchCode}
-                        </span>
-                        <span className="hidden sm:inline mx-2">•</span>
-                        <span className="block sm:inline">
-                          Dates: {startDate} to {endDate}
-                        </span>
-                      </div>
-                    </div>
-                    <button
-                      className="ml-4 px-3 py-1 bg-indigo-600 text-white rounded text-sm whitespace-nowrap hover:bg-indigo-700 transition-colors"
-                      onClick={() => handleSwap(t)}
-                    >
-                      Swap
-                    </button>
-                  </li>
-                );
-              })}
-              {getAMTrainers().length === 0 && (
-                <li className="text-gray-400 py-4 text-center">
-                  No other AM trainers available for swapping.
-                </li>
-              )}
-            </ul>
-            <div className="flex justify-end">
+{swapModal.open && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
+    <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-2xl"> {/* Increased max width */}
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+        Select AM Trainer to Swap With
+      </h3>
+      <ul className="mb-4 max-h-96 overflow-y-auto">
+        {getAMTrainers().map((t, idx) => {
+          // Get the trainer's details
+          const trainerDetails = table1Data[t.rowIdx].batches[t.batchIdx].trainers[t.trainerIdx];
+          const startDate = trainerDetails.startDate ? new Date(trainerDetails.startDate).toLocaleDateString() : 'No start date';
+          const endDate = trainerDetails.endDate ? new Date(trainerDetails.endDate).toLocaleDateString() : 'No end date';
+          
+          return (
+            <li key={idx} className="flex justify-between items-center py-3 px-4 border-b hover:bg-gray-50">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center space-x-3">
+                  <span className="font-medium truncate">
+                    {t.trainerName} ({t.trainerId})
+                  </span>
+                  <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded">
+                    {trainerDetails.dayDuration}
+                  </span>
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  <span className="block sm:inline">Batch: {t.batchCode}</span>
+                  <span className="hidden sm:inline mx-2">•</span>
+                  <span className="block sm:inline">
+                    Dates: {startDate} to {endDate}
+                  </span>
+                </div>
+              </div>
               <button
-                className="mt-2 px-4 py-2 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
-                onClick={closeSwapModal}
+                className="ml-4 px-3 py-1 bg-indigo-600 text-white rounded text-sm whitespace-nowrap hover:bg-indigo-700 transition-colors"
+                onClick={() => handleSwap(t)}
               >
-                Cancel
+                Swap
               </button>
+            </li>
+          );
+        })}
+        {getAMTrainers().length === 0 && (
+          <li className="text-gray-400 py-4 text-center">
+            No other AM trainers available for swapping.
+          </li>
+        )}
+      </ul>
+      <div className="flex justify-end">
+        <button
+          className="mt-2 px-4 py-2 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
+          onClick={closeSwapModal}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+      {/* Main Batch Table */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Batch Management
+              </h3>
+              <p className="text-sm text-gray-500 mt-1">
+                {selectedDomain
+                  ? `${selectedDomain} domain`
+                  : "Select a domain to configure batches"}
+              </p>
             </div>
           </div>
         </div>
-      )}
-
-      <div className="space-y-3">
-        {/* Main Batch Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-4 py-2 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-semibold text-gray-900">
-                  Batch Management
-                </h3>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  {selectedDomain
-                    ? `${selectedDomain} domain`
-                    : "Select a domain to configure batches"}
-                </p>
-              </div>
-            </div>
-          </div>
 
           <div className="divide-y divide-gray-200">
             {table1Data.length > 0 ? (
@@ -1061,43 +1018,44 @@ const BatchDetailsTable = ({
                       </div>
                     </div>
 
-                    {/* Expanded Batch Content */}
-                    {isExpanded && (
-                      <div className="px-4 py-2 bg-gray-50 border-t border-gray-200 space-y-3">
-                        {row.batches.map((batch, batchIndex) => (
+                  {/* Expanded Batch Content */}
+                  {isExpanded && (
+                    <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 space-y-6">
+                      {row.batches.map((batch, batchIndex) => (
+                        <div
+                          className={`bg-white rounded-lg border ${
+                            getColorsForBatch(row.batch).border
+                          } shadow-xs overflow-hidden`}
+                        >
                           <div
-                            className={`bg-white rounded-lg border ${
+                            className={`px-4 py-3 ${
+                              getColorsForBatch(row.batch).accent
+                            } border-b ${
                               getColorsForBatch(row.batch).border
-                            } shadow-xs overflow-hidden`}
-                            key={batchIndex}
+                            } flex justify-between items-center`}
                           >
-                            <div
-                              className={`px-3 py-2 ${
-                                getColorsForBatch(row.batch).accent
-                              } border-b ${
-                                getColorsForBatch(row.batch).border
-                              } flex justify-between items-center`}
+                            <span
+                              className={`font-medium text-sm ${
+                                getColorsForBatch(row.batch).text
+                              }`}
                             >
-                              <span
-                                className={`font-medium text-xs ${
-                                  getColorsForBatch(row.batch).text
-                                }`}
-                              >
-                                Batch {batchIndex + 1}
-                              </span>
-                              <div className="flex space-x-1">
-                                {row.batches.length > 1 && (
-                                  <button
-                                    onClick={() => removeBatch(rowIndex, batchIndex)}
-                                    className="p-1 rounded hover:bg-rose-50 text-rose-500 transition-colors text-xs"
-                                    title="Remove Batch"
-                                    type="button"
-                                  >
-                                    <FiTrash2 size={12} />
-                                  </button>
-                                )}
-                              </div>
+                              Batch {batchIndex + 1}
+                            </span>
+                            <div className="flex space-x-2">
+                              {row.batches.length > 1 && (
+                                <button
+                                  onClick={() =>
+                                    removeBatch(rowIndex, batchIndex)
+                                  }
+                                  className="p-1.5 rounded-lg hover:bg-rose-50 text-rose-500 transition-colors"
+                                  title="Remove Batch"
+                                  type="button"
+                                >
+                                  <FiTrash2 size={14} />
+                                </button>
+                              )}
                             </div>
+                          </div>
 
                             <div className="p-3 space-y-2">
                               {/* Batch Details */}
@@ -1553,7 +1511,7 @@ const BatchDetailsTable = ({
           </div>
         </div>
       </div>
-    </div>
+    
   );
 };
 
