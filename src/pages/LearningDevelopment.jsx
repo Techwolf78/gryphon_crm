@@ -8,6 +8,7 @@ import StudentDataPage from "../components/Learning/StudentDataPage";
 import InitiationDashboard from "../components/Learning/Initiate/InitiationDashboard";
 import InitiationTrainingDetails from "../components/Learning/Initiate/InitiationTrainingDetails";
 import InitiationModal from "../components/Learning/Initiate/InitiationModal";
+import GenerateTrainerInvoice from "../components/Learning/GenerateTrainerInvoice";
 
 import { useNavigate } from "react-router-dom";
 
@@ -157,6 +158,15 @@ function LearningDevelopment() {
           >
             Initiation
           </button>
+          <button
+            className={`px-4 py-2 font-medium ${activeTab === "trainerInvoice"
+              ? "border-b-2 border-blue-500 text-blue-600"
+              : "text-gray-500"
+              }`}
+            onClick={() => setActiveTab("trainerInvoice")}
+          >
+            Trainer Invoice
+          </button>
         </div>
 
         {error && (
@@ -198,7 +208,7 @@ function LearningDevelopment() {
               />
             )}
           </>
-        ) : (
+        ) : activeTab === "initiation" ? (
           selectedInitiationTraining ? (
             <InitiationTrainingDetails
               training={selectedInitiationTraining}
@@ -210,7 +220,9 @@ function LearningDevelopment() {
               onStartPhase={handleStartPhase} // ADD this prop
             />
           )
-        )}
+        ) : activeTab === "trainerInvoice" ? (
+          <GenerateTrainerInvoice />
+        ) : null}
       </div>
     </>
   );
