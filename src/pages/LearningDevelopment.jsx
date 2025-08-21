@@ -8,7 +8,7 @@ import StudentDataPage from "../components/Learning/StudentDataPage";
 import InitiationDashboard from "../components/Learning/Initiate/InitiationDashboard";
 import InitiationTrainingDetails from "../components/Learning/Initiate/InitiationTrainingDetails";
 import InitiationModal from "../components/Learning/Initiate/InitiationModal";
-import GenerateTrainer from "../components/Learning/GenerateTrainer";
+import GenerateTrainerInvoice from "../components/Learning/GenerateTrainerInvoice";
 
 import { useNavigate } from "react-router-dom";
 
@@ -221,7 +221,7 @@ function LearningDevelopment() {
             />
           )
         ) : activeTab === "trainerInvoice" ? (
-          <GenerateTrainer />
+          <GenerateTrainerInvoice />
         ) : null}
       </div>
     </>

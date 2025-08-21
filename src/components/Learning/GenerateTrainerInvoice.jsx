@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-function GenerateTrainer() {
+function GenerateTrainerInvoice() {
   const [invoiceData, setInvoiceData] = useState({
     trainerName: "",
     trainingTitle: "",
@@ -234,4 +234,4 @@ function GenerateTrainer() {
   );
 }
 
-export default GenerateTrainer;
+export default GenerateTrainerInvoice;
