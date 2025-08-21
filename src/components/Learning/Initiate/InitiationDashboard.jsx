@@ -11,7 +11,9 @@ import {
   FiSearch,
   FiFilter,
   FiRefreshCw,
+  FiUserCheck,
 } from "react-icons/fi";
+import ChangeTrainerDashboard from "./ChangeTrainerDashboard";
 
 const PHASE_LABELS = {
   "phase-1": "Phase 1",
@@ -36,6 +38,8 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterPhase, setFilterPhase] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
+  const [changeTrainerModalOpen, setChangeTrainerModalOpen] = useState(false);
+  const [selectedTrainingForChange, setSelectedTrainingForChange] = useState(null);
 
   // Fetch all trainingForms and their phases
   const fetchData = async () => {
@@ -196,6 +200,13 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
       isEdit: true, // optional flag consumers can use to open modal in edit mode
     };
     if (onStartPhase) onStartPhase(trainingForModal);
+  };
+
+  // Change trainer handler - opens change trainer modal for specific phase
+  const handleChangeTrainer = (e, training) => {
+    e.stopPropagation(); // Prevent row click
+    setSelectedTrainingForChange(training);
+    setChangeTrainerModalOpen(true);
   };
 
   return (
@@ -489,6 +500,26 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                                       Edit
                                     </button>
                                   )}
+
+                                  {/* Change Trainer Button - Show for in-progress trainings */}
+                                  {(() => {
+                                    const status = getPhaseStatus(training);
+                                    return status.status === "In Progress";
+                                  })() && (
+                                    <button
+                                      onClick={(e) =>
+                                        handleChangeTrainer(e, training)
+                                      }
+                                      className="inline-flex items-center px-3 py-1.5 bg-orange-500 text-white text-xs font-medium rounded-lg hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 transition-all"
+                                      title={`Change Trainer for ${
+                                        PHASE_LABELS[training.phaseId] ||
+                                        training.phaseId
+                                      }`}
+                                    >
+                                      <FiUserCheck className="w-3 h-3 mr-1" />
+                                      Change Trainer
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -611,6 +642,20 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                                 Edit
                               </button>
                             )}
+
+                            {/* Change Trainer Button - Show for in-progress trainings */}
+                            {(() => {
+                              const status = getPhaseStatus(training);
+                              return status.status === "In Progress";
+                            })() && (
+                              <button
+                                onClick={(e) => handleChangeTrainer(e, training)}
+                                className="flex-1 inline-flex items-center justify-center px-3 py-2 bg-orange-500 text-white text-xs font-medium rounded-lg hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 transition-all"
+                              >
+                                <FiUserCheck className="w-3 h-3 mr-1" />
+                                Change Trainer
+                              </button>
+                            )}
                           </div>
                         </div>
                       );
@@ -639,6 +684,16 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
           </div>
         )}
       </div>
+
+      {/* Change Trainer Modal */}
+      <ChangeTrainerDashboard
+        isOpen={changeTrainerModalOpen}
+        onClose={() => {
+          setChangeTrainerModalOpen(false);
+          setSelectedTrainingForChange(null);
+        }}
+        selectedTraining={selectedTrainingForChange}
+      />
     </div>
   );
 };
