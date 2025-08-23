@@ -1,7 +1,7 @@
 import React, { useState, useRef } from "react";
 import { FaDownload, FaEye, FaTimes, FaExclamationTriangle, FaCheckCircle, FaSpinner, FaFileExcel } from "react-icons/fa";
 import * as XLSX from "xlsx-js-style";
- 
+
 const FileUploader = ({
     onFileUpload,
     onFileClear,
@@ -17,7 +17,7 @@ const FileUploader = ({
     const [previewData, setPreviewData] = useState([]);
     const [showPreview, setShowPreview] = useState(false);
     const fileInputRef = useRef(null);
- 
+
     const readFile = (file) => {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -26,7 +26,7 @@ const FileUploader = ({
             reader.readAsArrayBuffer(file);
         });
     };
- 
+
     const calculateColumnWidths = (data) => {
         const colWidths = [];
         data.forEach((row) => {
@@ -37,12 +37,12 @@ const FileUploader = ({
         });
         return colWidths.map((width) => ({ wch: width }));
     };
- 
+
     const validateStudentData = (data) => {
         // No validation rules - just check if file has data
         const errors = [];
         const cellErrors = {};
- 
+
         // Check if file has data
         if (!data || data.length === 0) {
             errors.push("File is empty or contains no data");
@@ -52,36 +52,36 @@ const FileUploader = ({
             setFileErrorMsg("File is empty or contains no data");
             return false;
         }
- 
+
         setValidationErrors(errors);
         setErrorCells(cellErrors);
         setHasFileErrors(false);
         setFileErrorMsg("");
         return true;
     };
- 
+
     const handleFileChange = async (e) => {
         const file = e.target.files[0];
         if (!file) return clearFile();
- 
+
         if (file.size > 5 * 1024 * 1024) {
             setHasFileErrors(true);
             setFileErrorMsg("File size exceeds 5MB limit");
             return;
         }
- 
+
         setIsProcessing(true);
         setFileName(file.name);
- 
+
         try {
             const data = await readFile(file);
             const workbook = XLSX.read(data, { type: "array" });
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
             const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-           
+
             // Always call onFileUpload regardless of validation status
             onFileUpload(file, jsonData);
-           
+
             // Validate but don't block upload (no validation rules now)
             validateStudentData(jsonData);
             setPreviewData(jsonData);
@@ -92,7 +92,7 @@ const FileUploader = ({
             setIsProcessing(false);
         }
     };
- 
+
     const clearFile = () => {
         setFileName("");
         setPreviewData([]);
@@ -103,10 +103,10 @@ const FileUploader = ({
         onFileClear();
         if (fileInputRef.current) fileInputRef.current.value = "";
     };
- 
+
     const generateSampleFile = () => {
         const workbook = XLSX.utils.book_new();
- 
+
         // Main Data Sheet (only headers)
         const header = [
             "SN", "FULL NAME OF STUDENT", "CURRENT COLLEGE NAME", "EMAIL ID", "MOBILE NO.", "BIRTH DATE", "GENDER",
@@ -115,12 +115,12 @@ const FileUploader = ({
             "GRADUATION COURSE", "GRADUATION SPECIALIZATION", "GRADUATION PASSING YR", "GRADUATION OVERALL MARKS %",
             "COURSE", "SPECIALIZATION", "PASSING YEAR", "OVERALL MARKS %"
         ];
- 
+
         const data = [header]; // Only headers, no sample data
- 
+
         const worksheet = XLSX.utils.aoa_to_sheet(data);
         worksheet["!cols"] = calculateColumnWidths(data);
- 
+
         // Format headers
         header.forEach((_, index) => {
             const cellAddress = XLSX.utils.encode_cell({ r: 0, c: index });
@@ -138,9 +138,9 @@ const FileUploader = ({
                 alignment: { horizontal: "center", vertical: "center" }
             };
         });
- 
+
         XLSX.utils.book_append_sheet(workbook, worksheet, "Student Data");
- 
+
         // Instructions Sheet (simplified without validation rules)
         const instructionsData = [
             ["STUDENT DATA FILE INSTRUCTIONS"],
@@ -171,13 +171,13 @@ const FileUploader = ({
             ["PASSING YEAR", "Passing year"],
             ["OVERALL MARKS %", "Overall marks percentage"]
         ];
- 
+
         const instructionsSheet = XLSX.utils.aoa_to_sheet(instructionsData);
         instructionsSheet["!cols"] = [
             { wch: 25 }, // Field Name
             { wch: 40 }  // Description
         ];
- 
+
         // Format instructions sheet
         const instructionsRange = XLSX.utils.decode_range(instructionsSheet["!ref"]);
         for (let R = 0; R <= instructionsRange.e.r; ++R) {
@@ -194,7 +194,7 @@ const FileUploader = ({
                     },
                     alignment: { vertical: "center" }
                 };
- 
+
                 if (R === 0) {
                     // Title row
                     instructionsSheet[cellAddress].s.font = { bold: true, size: 16 };
@@ -206,16 +206,16 @@ const FileUploader = ({
                 }
             }
         }
- 
+
         // Merge title row
         instructionsSheet["!merges"] = [
             { s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }
         ];
- 
+
         XLSX.utils.book_append_sheet(workbook, instructionsSheet, "Instructions");
         XLSX.writeFile(workbook, "Student_Data_Template.xlsx");
     };
- 
+
     return (
         <div className="space-y-2 mt-4">
             {/* Buttons */}
@@ -242,7 +242,7 @@ const FileUploader = ({
                     </button>
                 )}
             </div>
- 
+
             {fileName && (
                 <div className="text-sm text-gray-700 flex items-center gap-4 mt-1">
                     <div><strong>File:</strong> {fileName}</div>
@@ -255,7 +255,7 @@ const FileUploader = ({
                     </div>
                 </div>
             )}
- 
+
             {/* Status */}
             {isProcessing && (
                 <div className="flex items-center gap-2 text-sm text-blue-600">
@@ -281,7 +281,7 @@ const FileUploader = ({
                     <span>File is ready for upload</span>
                 </div>
             )}
- 
+
             {/* Preview Modal */}
             {showPreview && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -335,5 +335,5 @@ const FileUploader = ({
         </div>
     );
 };
- 
+
 export default FileUploader;
