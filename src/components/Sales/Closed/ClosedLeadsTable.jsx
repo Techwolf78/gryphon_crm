@@ -424,8 +424,8 @@ const ClosedLeadsTable = ({
         return;
       }
 
-      if (jsonData.length > 1000) {
-        setUploadError("File contains too many rows (max 1000 allowed)");
+      if (jsonData.length > 10000) {
+        setUploadError("File contains too many rows (max 10000 allowed)");
         return;
       }
 
