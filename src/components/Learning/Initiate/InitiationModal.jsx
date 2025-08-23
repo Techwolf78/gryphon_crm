@@ -8,6 +8,10 @@ import {
   getDocs,
   collection as fbCollection,
   collection,
+  onSnapshot,
+  writeBatch,
+  query,
+  where,
 } from "firebase/firestore";
 import {
   FiChevronLeft,
@@ -88,6 +92,8 @@ function InitiationModal({ training, onClose, onConfirm }) {
   
   // Validation state for duplicate trainers
   const [validationByDomain, setValidationByDomain] = useState({});
+  // Global assignments pulled from other saved trainings (used to prevent cross-college conflicts)
+  const [globalTrainerAssignments, setGlobalTrainerAssignments] = useState([]);
 
   // Get domain hours - use custom hours if set, otherwise default from database
   const getDomainHours = useCallback((domain, phase = null) => {
@@ -333,6 +339,103 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
       await Promise.all([...phaseLevelPromises, ...batchPromises]);
 
+      // --- centralized trainerAssignments update (create one doc per trainer-date) ---
+      try {
+        const normalizeDate = (d) => {
+          if (!d) return null;
+          if (typeof d === "string") {
+            const asDate = new Date(d);
+            if (!isNaN(asDate.getTime())) return asDate.toISOString().slice(0, 10);
+            return d;
+          }
+          if (d?.toDate) return d.toDate().toISOString().slice(0, 10);
+          const dt = new Date(d);
+          return isNaN(dt.getTime()) ? null : dt.toISOString().slice(0, 10);
+        };
+
+        const getDateListExcludingSundaysLocal = (start, end) => {
+          if (!start || !end) return [];
+          const s = new Date(start);
+          const e = new Date(end);
+          if (isNaN(s.getTime()) || isNaN(e.getTime()) || s > e) return [];
+          const out = [];
+          const cur = new Date(s);
+          while (cur <= e) {
+            if (cur.getDay() !== 0) out.push(cur.toISOString().slice(0, 10));
+            cur.setDate(cur.getDate() + 1);
+          }
+          return out;
+        };
+
+        // 1) delete existing assignments for this training (single source of truth)
+        const qExisting = query(collection(db, "trainerAssignments"), where("sourceTrainingId", "==", training.id));
+        const existingSnap = await getDocs(qExisting);
+        if (!existingSnap.empty) {
+          const delBatch = writeBatch(db);
+          existingSnap.forEach((docSnap) => {
+            delBatch.delete(doc(db, "trainerAssignments", docSnap.id));
+          });
+          await delBatch.commit();
+          console.log("[trainerAssignments] removed previous assignments for:", training.id);
+        }
+
+        // 2) collect new assignments from table data
+        const assignments = [];
+        const domainsListForWrite = Array.isArray(domainsToSave) ? domainsToSave : selectedDomains;
+        const tableDataLookup = tableDataToSave || table1DataByDomain;
+        domainsListForWrite.forEach((domain) => {
+          (tableDataLookup[domain] || []).forEach((row, rowIdx) => {
+            (row.batches || []).forEach((batch, batchIdx) => {
+              (batch.trainers || []).forEach((tr, trainerIdx) => {
+                if (!tr?.trainerId) return;
+                let dateStrings = [];
+                if (tr.activeDates && tr.activeDates.length > 0) {
+                  dateStrings = tr.activeDates.map(normalizeDate).filter(Boolean);
+                } else if (tr.startDate && tr.endDate) {
+                  dateStrings = getDateListExcludingSundaysLocal(tr.startDate, tr.endDate);
+                } else if (tr.startDate) {
+                  const d = normalizeDate(tr.startDate);
+                  if (d) dateStrings = [d];
+                }
+                dateStrings.forEach((dateStr) => {
+                  assignments.push({
+                    trainerId: tr.trainerId,
+                    trainerName: tr.trainerName || tr.trainer || "",
+                    date: dateStr,
+                    dayDuration: tr.dayDuration || "",
+                    sourceTrainingId: training.id,
+                    domain,
+                    batchCode: batch.batchCode || "",
+                    // Include source indices for traceability and to avoid lint unused-vars
+                    sourceRowIndex: rowIdx,
+                    sourceBatchIndex: batchIdx,
+                    sourceTrainerIndex: trainerIdx,
+                    createdAt: serverTimestamp(),
+                  });
+                });
+              });
+            });
+          });
+        });
+
+        // 3) batch write new assignments
+        if (assignments.length > 0) {
+          const wb = writeBatch(db);
+          assignments.forEach((a) => {
+            const ref = doc(collection(db, "trainerAssignments"));
+            wb.set(ref, a);
+          });
+          await wb.commit();
+          console.log("[trainerAssignments] wrote", assignments.length, "assignments for training:", training.id);
+        } else {
+          console.log("[trainerAssignments] no trainer assignments to write for training:", training.id);
+        }
+      } catch (assignmentErr) {
+        console.error("Error updating trainerAssignments:", assignmentErr);
+        // don't block main save; surface a console warning
+      }
+      // --- end trainerAssignments update ---
+      
       setSuccess("Training phases initiated successfully!");
       setLoading(false);
       setTimeout(() => {
@@ -650,6 +753,65 @@ function InitiationModal({ training, onClose, onConfirm }) {
     fetchPhaseDomains();
   }, [training?.id, currentPhase, courses, getDomainHours]);
 
+  // Fetch global trainer assignments from other trainingForms documents so we can detect cross-college conflicts
+  useEffect(() => {
+    if (!db) return;
+    let cancelled = false;
+    const normalizeDate = (d) => {
+      if (!d) return null;
+      if (typeof d === "string") return d;
+      if (d?.toDate) return d.toDate().toISOString().slice(0, 10);
+      try {
+        const dt = new Date(d);
+        if (isNaN(dt.getTime())) return null;
+        return dt.toISOString().slice(0, 10);
+      } catch {
+        return null;
+      }
+    };
+
+    // --- REPLACED: use onSnapshot for real-time updates from centralized collection ---
+    // If you use trainerAssignments collection (recommended), listen to it for realtime updates.
+    const assignmentsCol = collection(db, "trainerAssignments");
+    const unsubscribe = onSnapshot(
+      assignmentsCol,
+      (snap) => {
+        try {
+          const assignments = [];
+          snap.forEach((docSnap) => {
+            const data = docSnap.data();
+            if (!data) return;
+            const dateStr = normalizeDate(data.date);
+            if (!dateStr) return;
+            assignments.push({
+              trainerId: data.trainerId,
+              date: dateStr,
+              dayDuration: data.dayDuration || "",
+              sourceTrainingId: data.sourceTrainingId || "",
+              domain: data.domain || "",
+            });
+          });
+          // Filter out assignments that belong to the current training to avoid self-conflict
+          const filtered = assignments.filter(a => a.sourceTrainingId !== (training?.id || ""));
+          if (!cancelled) setGlobalTrainerAssignments(filtered);
+        } catch (err) {
+          console.error("Error processing trainerAssignments snapshot:", err);
+        }
+      },
+      (err) => {
+        console.error("trainerAssignments onSnapshot error:", err);
+      }
+    );
+
+    // Fallback: keep the previous scan-based fetch if trainerAssignments collection does not exist in older deployments.
+    // (Optional) you can remove the fallback if trainerAssignments is guaranteed.
+    // Cleanup
+    return () => {
+      cancelled = true;
+      if (unsubscribe) unsubscribe();
+    };
+  }, [training?.id]);
+
   const swapTrainers = (swapData) => {
     console.log("🔄 [INITIATION MODAL] swapTrainers called with:", {
       swapData: swapData,
@@ -765,11 +927,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
     console.log("✅ [INITIATION MODAL] Cross-batch trainer swap completed successfully - trainers swapped batches and time slots");
   };
-
-  useEffect(() => {
-    console.log("Updated trainingStartDate in state:", commonFields.trainingStartDate);
-    console.log("Updated trainingEndDate in state:", commonFields.trainingEndDate);
-  }, [commonFields.trainingStartDate, commonFields.trainingEndDate]);
 
   return (
     <>
@@ -1295,7 +1452,8 @@ function InitiationModal({ training, onClose, onConfirm }) {
                               mainPhase={currentPhase}
                               onSwapTrainer={swapTrainers}
                               customHours={customPhaseHours[currentPhase]}
-                              onValidationChange={(validationStatus) => handleValidationChange(domain, validationStatus)}
+                              onValidationChange={handleValidationChange}
+                              globalTrainerAssignments={globalTrainerAssignments}
                             />
                           )}
                         </div>
