@@ -17,7 +17,8 @@ import {
   FiCheckCircle,
   FiAlertCircle,
   FiXCircle,
-  FiInfo
+  FiInfo,
+  FiLayers
 } from "react-icons/fi";
 
 // Enhanced PDF generation function with robust error handling
@@ -192,11 +193,11 @@ function GenerateTrainerInvoice() {
     setPdfStatus(prev => ({...prev, [trainer.trainerId]: "downloading"}));
     
     try {
-      // Find ALL invoices for this trainer and project combination
+      // Find ALL invoices for this trainer and college combination
       const q = query(
         collection(db, "invoices"),
         where("trainerId", "==", trainer.trainerId),
-        where("projectCode", "==", trainer.projectCode)
+        where("collegeName", "==", trainer.collegeName)
       );
 
       const querySnapshot = await getDocs(q);
@@ -210,7 +211,7 @@ function GenerateTrainerInvoice() {
           const selectedInvoice = prompt(
             `Multiple invoices found for ${
               trainer.trainerName
-            }. Please enter the invoice number you want to download:\n${invoiceNumbers.join(
+            } at ${trainer.collegeName}. Please enter the invoice number you want to download:\n${invoiceNumbers.join(
               "\n"
             )}`
           );
@@ -219,11 +220,11 @@ function GenerateTrainerInvoice() {
             const selectedDoc = querySnapshot.docs.find(
               (doc) => doc.data().billNumber === selectedInvoice
             );
-           if (selectedDoc) {
-  const invoiceData = selectedDoc.data();
-  const success = await generateInvoicePDF(invoiceData);
-  setPdfStatus(prev => ({...prev, [trainer.trainerId]: success ? "success" : "error"}));
-} else {
+            if (selectedDoc) {
+              const invoiceData = selectedDoc.data();
+              const success = await generateInvoicePDF(invoiceData);
+              setPdfStatus(prev => ({...prev, [trainer.trainerId]: success ? "success" : "error"}));
+            } else {
               alert("Invalid invoice number selected");
               setPdfStatus(prev => ({...prev, [trainer.trainerId]: "error"}));
             }
@@ -236,7 +237,7 @@ function GenerateTrainerInvoice() {
           setPdfStatus(prev => ({...prev, [trainer.trainerId]: success ? "success" : "error"}));
         }
       } else {
-        alert("No invoice found for this trainer");
+        alert("No invoice found for this trainer at this college");
         setPdfStatus(prev => ({...prev, [trainer.trainerId]: "not_found"}));
       }
     } catch (error) {
@@ -248,7 +249,7 @@ function GenerateTrainerInvoice() {
     }
   };
 
-  // Data fetch function
+  // Enhanced data fetch function with proper college-based grouping
   const fetchTrainers = useCallback(async () => {
     setLoading(true);
     let trainersList = [];
@@ -298,8 +299,8 @@ function GenerateTrainerInvoice() {
                     batches: batch.batches || [],
                     mergedBreakdown: trainer.mergedBreakdown || [],
                     activeDates: trainer.activeDates || [],
-                    assignedHours: trainer.assignedHours || 0,
-                    perHourCost: trainer.perHourCost || 0,
+                    assignedHours: parseFloat(trainer.assignedHours) || 0,
+                    perHourCost: parseFloat(trainer.perHourCost) || 0,
                     dailyHours: trainer.dailyHours || [],
                     dayDuration: trainer.dayDuration || "",
                     stdCount: trainer.stdCount || 0,
@@ -314,14 +315,59 @@ function GenerateTrainerInvoice() {
         }
       }
 
-      // Check invoices for each trainer
+      // Enhanced grouping by college and trainer
+      const collegeBasedGrouping = {};
+      
+      trainersList.forEach(trainer => {
+        // Create a unique key for each trainer-college combination
+        const collegeKey = `${trainer.collegeName}_${trainer.trainerId}`;
+        
+        if (!collegeBasedGrouping[collegeKey]) {
+          collegeBasedGrouping[collegeKey] = {
+            ...trainer,
+            totalCollegeHours: trainer.assignedHours,
+            allBatches: [trainer],
+            earliestStartDate: trainer.startDate,
+            latestEndDate: trainer.endDate,
+            // Keep track of all projects for this trainer at this college
+            allProjects: [trainer.projectCode],
+            // Keep track of all domains for this trainer at this college
+            allDomains: [trainer.domain]
+          };
+        } else {
+          // Add hours from this batch to total
+          collegeBasedGrouping[collegeKey].totalCollegeHours += trainer.assignedHours;
+          collegeBasedGrouping[collegeKey].allBatches.push(trainer);
+          
+          // Update dates to show the full range
+          if (new Date(trainer.startDate) < new Date(collegeBasedGrouping[collegeKey].earliestStartDate)) {
+            collegeBasedGrouping[collegeKey].earliestStartDate = trainer.startDate;
+          }
+          if (new Date(trainer.endDate) > new Date(collegeBasedGrouping[collegeKey].latestEndDate)) {
+            collegeBasedGrouping[collegeKey].latestEndDate = trainer.endDate;
+          }
+          
+          // Add unique projects and domains
+          if (!collegeBasedGrouping[collegeKey].allProjects.includes(trainer.projectCode)) {
+            collegeBasedGrouping[collegeKey].allProjects.push(trainer.projectCode);
+          }
+          
+          if (!collegeBasedGrouping[collegeKey].allDomains.includes(trainer.domain)) {
+            collegeBasedGrouping[collegeKey].allDomains.push(trainer.domain);
+          }
+        }
+      });
+
+      const collegeBasedTrainers = Object.values(collegeBasedGrouping);
+
+      // Check invoices for each trainer-college combination
       const updatedTrainersList = await Promise.all(
-        trainersList.map(async (trainer) => {
+        collegeBasedTrainers.map(async (trainer) => {
           try {
             const q = query(
               collection(db, "invoices"),
               where("trainerId", "==", trainer.trainerId),
-              where("projectCode", "==", trainer.projectCode)
+              where("collegeName", "==", trainer.collegeName)
             );
 
             const querySnapshot = await getDocs(q);
@@ -546,195 +592,200 @@ function GenerateTrainerInvoice() {
           )}
         </div>
 
-        {/* Content */}
-        <div className="p-4 sm:p-6">
-          {loading ? (
-            <div className="flex flex-col justify-center items-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
-              <p className="text-gray-500">Loading trainer data...</p>
-            </div>
-          ) : trainerData.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded-lg">
-              <FiUser className="mx-auto text-4xl text-gray-300 mb-4" />
-              <h3 className="text-lg font-medium text-gray-700 mb-1">
-                No trainer data found
-              </h3>
-              <p className="text-gray-500">
-                Training data will appear here once available
-              </p>
-            </div>
-          ) : Object.keys(filteredGroupedData).length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded-lg">
-              <FiSearch className="mx-auto text-4xl text-gray-300 mb-4" />
-              <h3 className="text-lg font-medium text-gray-700 mb-1">
-                No matching trainers
-              </h3>
-              <p className="text-gray-500 mb-4">
-                Try adjusting your search or filter criteria
-              </p>
-              <button
-                onClick={clearFilters}
-                className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+       <div className="p-4 sm:p-6">
+        {loading ? (
+          <div className="flex flex-col justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+            <p className="text-gray-500">Loading trainer data...</p>
+          </div>
+        ) : trainerData.length === 0 ? (
+          <div className="text-center py-12 bg-gray-50 rounded-lg">
+            <FiUser className="mx-auto text-4xl text-gray-300 mb-4" />
+            <h3 className="text-lg font-medium text-gray-700 mb-1">
+              No trainer data found
+            </h3>
+            <p className="text-gray-500">
+              Training data will appear here once available
+            </p>
+          </div>
+        ) : Object.keys(filteredGroupedData).length === 0 ? (
+          <div className="text-center py-12 bg-gray-50 rounded-lg">
+            <FiSearch className="mx-auto text-4xl text-gray-300 mb-4" />
+            <h3 className="text-lg font-medium text-gray-700 mb-1">
+              No matching trainers
+            </h3>
+            <p className="text-gray-500 mb-4">
+              Try adjusting your search or filter criteria
+            </p>
+            <button
+              onClick={clearFilters}
+              className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Clear Filters
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {Object.keys(filteredGroupedData).map((phase) => (
+              <div
+                key={phase}
+                className="border border-gray-200 rounded-lg overflow-hidden transition-all hover:shadow-sm"
               >
-                Clear Filters
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {Object.keys(filteredGroupedData).map((phase) => (
+                {/* Phase Header */}
                 <div
-                  key={phase}
-                  className="border border-gray-200 rounded-lg overflow-hidden transition-all hover:shadow-sm"
+                  className="bg-gray-50 p-4 flex justify-between items-center cursor-pointer hover:bg-gray-100 transition-colors"
+                  onClick={() => togglePhase(phase)}
+                  aria-expanded={expandedPhases[phase]}
                 >
-                  {/* Phase Header */}
-                  <div
-                    className="bg-gray-50 p-4 flex justify-between items-center cursor-pointer hover:bg-gray-100 transition-colors"
-                    onClick={() => togglePhase(phase)}
-                    aria-expanded={expandedPhases[phase]}
-                  >
-                    <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-                      {expandedPhases[phase] ? (
-                        <FiChevronUp className="text-gray-500" />
-                      ) : (
-                        <FiChevronDown className="text-gray-500" />
-                      )}
-                      {phase.toUpperCase()} Trainers
-                      <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-1 rounded-full ml-2">
-                        {filteredGroupedData[phase].length} {filteredGroupedData[phase].length === 1 ? 'trainer' : 'trainers'}
-                      </span>
-                    </h3>
-                    <span className="text-sm text-gray-500">
-                      {expandedPhases[phase] ? 'Collapse' : 'Expand'}
+                  <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                    {expandedPhases[phase] ? (
+                      <FiChevronUp className="text-gray-500" />
+                    ) : (
+                      <FiChevronDown className="text-gray-500" />
+                    )}
+                    {phase.toUpperCase()} Trainers
+                    <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-1 rounded-full ml-2">
+                      {filteredGroupedData[phase].length} {filteredGroupedData[phase].length === 1 ? 'trainer' : 'trainers'}
                     </span>
-                  </div>
-
-                  {/* Trainer Table */}
-                  {expandedPhases[phase] && (
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Trainer
-                            </th>
-                            <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Domain & Project
-                            </th>
-                            <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              College
-                            </th>
-                            <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Dates & Hours
-                            </th>
-                            <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Actions
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                          {filteredGroupedData[phase].map((item, idx) => (
-                            <tr
-                              key={idx}
-                              className="hover:bg-gray-50/50 transition-colors"
-                            >
-                              <td className="px-4 sm:px-6 py-4">
-                                <div className="flex items-center">
-                                  <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
-                                    <FiUser className="text-blue-600" />
-                                  </div>
-                                  <div className="ml-4">
-                                    <div className="text-sm font-medium text-gray-900">
-                                      {item.trainerName}
-                                    </div>
-                                    <div className="text-sm text-gray-500">
-                                      ID: {item.trainerId}
-                                    </div>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="px-4 sm:px-6 py-4">
-                                <div className="text-sm text-gray-900 font-medium">
-                                  {item.domain}
-                                </div>
-                                <div className="text-sm text-gray-500">
-                                  {item.projectCode}
-                                </div>
-                              </td>
-                              <td className="px-4 sm:px-6 py-4">
-                                <div className="text-sm text-gray-900 max-w-xs truncate">
-                                  {item.collegeName}
-                                </div>
-                              </td>
-                              <td className="px-4 sm:px-6 py-4">
-                                <div className="flex items-center gap-1 text-sm text-gray-500">
-                                  <FiCalendar className="text-gray-400 flex-shrink-0" />
-                                  <span>
-                                    {formatDate(item.startDate)} - {formatDate(item.endDate)}
-                                  </span>
-                                </div>
-                                <div className="text-xs text-gray-500 mt-1 flex items-center">
-                                  <FiDollarSign className="text-gray-400 mr-1 flex-shrink-0" />
-                                  <span>
-                                    {item.assignedHours} hrs •{" "}
-                                    {item.perHourCost
-                                      ? `₹${item.perHourCost}/hr`
-                                      : "Rate not set"}
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="px-4 sm:px-6 py-4">
-                                <div className="flex flex-col gap-2 min-w-[180px]">
-                                  {!item.hasExistingInvoice ? (
-                                    <button
-                                      onClick={() => handleGenerateInvoice(item)}
-                                      className="inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                      disabled={
-                                        !item.perHourCost ||
-                                        item.perHourCost === 0
-                                      }
-                                      aria-label={`Generate invoice for ${item.trainerName}`}
-                                    >
-                                      <FiFileText className="mr-2" />
-                                      Generate Invoice
-                                    </button>
-                                  ) : (
-                                    <div className="flex flex-col">
-                                      <button
-                                        onClick={() =>
-                                          handleDownloadInvoice(item)
-                                        }
-                                        className="inline-flex items-center justify-center px-3 py-2 border border-gray-200 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                                        disabled={
-                                          downloadingInvoice === item.trainerId
-                                        }
-                                        aria-label={`Download invoice for ${item.trainerName}`}
-                                      >
-                                        <FiDownload className="mr-2" />
-                                        {downloadingInvoice === item.trainerId
-                                          ? "Downloading..."
-                                          : item.invoiceCount > 1
-                                          ? `Download (${item.invoiceCount})`
-                                          : "Download Invoice"}
-                                      </button>
-                                      {getDownloadStatus(item.trainerId)}
-                                    </div>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                  </h3>
+                  <span className="text-sm text-gray-500">
+                    {expandedPhases[phase] ? 'Collapse' : 'Expand'}
+                  </span>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+
+                {/* Trainer Table */}
+                {expandedPhases[phase] && (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Trainer
+                          </th>
+                          <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            College & Projects
+                          </th>
+                          <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Domains
+                          </th>
+                          <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Dates & Hours
+                          </th>
+                          <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {filteredGroupedData[phase].map((item, idx) => (
+                          <tr
+                            key={idx}
+                            className="hover:bg-gray-50/50 transition-colors"
+                          >
+                            <td className="px-4 sm:px-6 py-4">
+                              <div className="flex items-center">
+                                <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                  <FiUser className="text-blue-600" />
+                                </div>
+                                <div className="ml-4">
+                                  <div className="text-sm font-medium text-gray-900">
+                                    {item.trainerName}
+                                  </div>
+                                  <div className="text-sm text-gray-500">
+                                    ID: {item.trainerId}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 sm:px-6 py-4">
+                              <div className="text-sm text-gray-900 font-medium max-w-xs truncate">
+                                {item.collegeName}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {item.allProjects.join(", ")}
+                              </div>
+                            </td>
+                            <td className="px-4 sm:px-6 py-4">
+                              <div className="text-sm text-gray-900">
+                                {item.allDomains.join(", ")}
+                              </div>
+                            </td>
+                            <td className="px-4 sm:px-6 py-4">
+                              <div className="flex items-center gap-1 text-sm text-gray-500">
+                                <FiCalendar className="text-gray-400 flex-shrink-0" />
+                                <span>
+                                  {formatDate(item.earliestStartDate)} - {formatDate(item.latestEndDate)}
+                                </span>
+                              </div>
+                              <div className="text-xs text-gray-500 mt-1 flex items-center">
+                                <FiDollarSign className="text-gray-400 mr-1 flex-shrink-0" />
+                                <span>
+                                  {item.totalCollegeHours} hrs •{" "}
+                                  {item.perHourCost
+                                    ? `₹${item.perHourCost}/hr`
+                                    : "Rate not set"}
+                                </span>
+                              </div>
+                              {item.allBatches.length > 1 && (
+                                <div className="text-xs text-blue-600 mt-1 flex items-center">
+                                  <FiLayers className="mr-1" />
+                                  {item.allBatches.length} batches combined
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-4 sm:px-6 py-4">
+                              <div className="flex flex-col gap-2 min-w-[180px]">
+                                {!item.hasExistingInvoice ? (
+                                  <button
+                                    onClick={() => handleGenerateInvoice(item)}
+                                    className="inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    disabled={
+                                      !item.perHourCost ||
+                                      item.perHourCost === 0
+                                    }
+                                    aria-label={`Generate invoice for ${item.trainerName}`}
+                                  >
+                                    <FiFileText className="mr-2" />
+                                    Generate Invoice
+                                  </button>
+                                ) : (
+                                  <div className="flex flex-col">
+                                    <button
+                                      onClick={() =>
+                                        handleDownloadInvoice(item)
+                                      }
+                                      className="inline-flex items-center justify-center px-3 py-2 border border-gray-200 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                                      disabled={
+                                        downloadingInvoice === item.trainerId
+                                      }
+                                      aria-label={`Download invoice for ${item.trainerName}`}
+                                    >
+                                      <FiDownload className="mr-2" />
+                                      {downloadingInvoice === item.trainerId
+                                        ? "Downloading..."
+                                        : item.invoiceCount > 1
+                                        ? `Download (${item.invoiceCount})`
+                                        : "Download Invoice"}
+                                    </button>
+                                    {getDownloadStatus(item.trainerId)}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
       </div>
 
-      {showInvoiceModal && selectedTrainer && (
+       {showInvoiceModal && selectedTrainer && (
         <InvoiceModal
           trainer={selectedTrainer}
           onClose={() => {

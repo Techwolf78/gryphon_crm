@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { db } from "../../firebase";
-import { doc, getDoc, collection, addDoc } from "firebase/firestore";
+import { doc, getDoc, collection, addDoc, updateDoc } from "firebase/firestore";
 import { query, where, getDocs } from "firebase/firestore";
-import { FiDownload, FiX } from "react-icons/fi";
+import { FiDownload, FiX, FiEdit2 } from "react-icons/fi";
 
 // Import the standardized PDF generation function
 import { generateInvoicePDF } from "./GenerateTrainerInvoice";
@@ -13,20 +13,22 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
     projectCode: trainer?.projectCode || "",
     domain: trainer?.domain || "",
     topics: Array.isArray(trainer?.topics) ? trainer.topics.join(", ") : "",
-    startDate: trainer?.startDate || "",
-    endDate: trainer?.endDate || "",
+    startDate: trainer?.earliestStartDate || "",
+    endDate: trainer?.latestEndDate || "",
     billingDate: new Date().toISOString().split("T")[0],
     trainingRate: trainer?.perHourCost || 0,
-    totalHours: trainer?.assignedHours || 0,
+    totalHours: trainer?.totalCollegeHours || 0,
     tds: 10,
     adhocAdjustment: 0,
     conveyance: 0,
     food: 0,
     lodging: 0,
+    collegeName: trainer?.collegeName || "",
   });
   const [existingInvoice, setExistingInvoice] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [editMode, setEditMode] = useState(false);
 
   useEffect(() => {
     const fetchTrainerBankDetails = async () => {
@@ -44,6 +46,8 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
             accountNumber: data.accountNumber || "",
             ifscCode: data.ifsc || "",
             panNumber: data.pan || "",
+            trainerEmail: data.email || "",
+            trainerPhone: data.phone || "",
           }));
         } else {
           console.warn("Trainer details not found");
@@ -54,20 +58,23 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
     };
 
     const checkExistingInvoice = async () => {
-      if (!trainer?.trainerId) return;
+      if (!trainer?.trainerId || !trainer?.collegeName) return;
 
       try {
         const q = query(
           collection(db, "invoices"),
           where("trainerId", "==", trainer.trainerId),
-          where("projectCode", "==", trainer.projectCode)
+          where("collegeName", "==", trainer.collegeName)
         );
 
         const querySnapshot = await getDocs(q);
         if (!querySnapshot.empty) {
           // Get the most recent invoice
-          const latestInvoice =
-            querySnapshot.docs[querySnapshot.docs.length - 1].data();
+          const latestInvoiceDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
+          const latestInvoice = {
+            id: latestInvoiceDoc.id,
+            ...latestInvoiceDoc.data()
+          };
           setExistingInvoice(latestInvoice);
 
           // Pre-fill form with existing data
@@ -86,7 +93,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
 
     checkExistingInvoice();
     fetchTrainerBankDetails();
-  }, [trainer?.trainerId]);
+  }, [trainer?.trainerId, trainer?.collegeName]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -98,17 +105,25 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
         ...invoiceData,
         trainerId: trainer?.trainerId,
         trainerName: trainer?.trainerName,
+        collegeName: trainer?.collegeName,
         totalAmount: calculateTotalAmount(),
         netPayment: calculateNetPayment(),
-        createdAt: new Date(),
+        updatedAt: new Date(),
         status: "generated",
       };
 
-      // Add to Firestore
-      const docRef = await addDoc(collection(db, "invoices"), invoiceToSave);
-
-      console.log("Invoice saved with ID: ", docRef.id);
-      alert("Invoice generated successfully!");
+      // If editing existing invoice, update it instead of creating new
+      if (existingInvoice && editMode) {
+        await updateDoc(doc(db, "invoices", existingInvoice.id), invoiceToSave);
+        console.log("Invoice updated with ID: ", existingInvoice.id);
+        alert("Invoice updated successfully!");
+      } else {
+        // Add to Firestore as new invoice
+        invoiceToSave.createdAt = new Date();
+        const docRef = await addDoc(collection(db, "invoices"), invoiceToSave);
+        console.log("Invoice saved with ID: ", docRef.id);
+        alert("Invoice generated successfully!");
+      }
 
       // Generate and download PDF using the standardized function
       await generateInvoicePDF(invoiceToSave);
@@ -117,34 +132,36 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
       onInvoiceGenerated(); // Refresh the parent component
     } catch (error) {
       console.error("Error saving invoice: ", error);
-      
+      alert("Error saving invoice. Please try again.");
     } finally {
       setIsGenerating(false);
     }
   };
 
-const handleDownload = async () => {
-  setIsDownloading(true);
-  try {
-    // केवल चुना हुआ invoice
-    await generateInvoicePDF({
-      ...existingInvoice,
-      trainerName: trainer?.trainerName || existingInvoice.trainerName || "",
-    });
-  } catch (error) {
-    console.error("Error downloading invoice:", error);
-    alert("Failed to download invoice. Please try again.");
-  } finally {
-    setIsDownloading(false);
-  }
-};
+  const handleDownload = async () => {
+    setIsDownloading(true);
+    try {
+      await generateInvoicePDF({
+        ...existingInvoice,
+        trainerName: trainer?.trainerName || existingInvoice.trainerName || "",
+      });
+    } catch (error) {
+      console.error("Error downloading invoice:", error);
+      alert("Failed to download invoice. Please try again.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
+  const handleEdit = () => {
+    setEditMode(true);
+  };
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type } = e.target;
     setInvoiceData((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: type === 'number' ? parseFloat(value) || 0 : value,
     }));
   };
 
@@ -166,12 +183,12 @@ const handleDownload = async () => {
   };
 
   return (
-    <div className="fixed inset-0 backdrop-blur-md  bg-opacity-50 flex items-center justify-center p-4 z-500">
+    <div className="fixed inset-0 backdrop-blur-md bg-opacity-50 flex items-center justify-center p-4 z-500">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-screen overflow-y-auto">
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-2xl font-bold">
-              Generate Invoice for {trainer?.trainerName || "Trainer"}
+              {existingInvoice && !editMode ? "View Invoice" : "Generate Invoice"} for {trainer?.trainerName || "Trainer"}
             </h2>
             <button
               onClick={onClose}
@@ -181,20 +198,29 @@ const handleDownload = async () => {
             </button>
           </div>
           
-          {existingInvoice && (
+          {existingInvoice && !editMode && (
             <div className="mb-4 p-4 bg-blue-50 rounded-md">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <p className="text-blue-700">
-                  An invoice already exists for this trainer and project.
+                  An invoice already exists for this trainer and college.
                 </p>
-                <button
-                  onClick={handleDownload}
-                  disabled={isDownloading}
-                  className="flex items-center bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
-                >
-                  <FiDownload className="mr-2" />
-                  {isDownloading ? "Downloading..." : "Download Invoice"}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleDownload}
+                    disabled={isDownloading}
+                    className="flex items-center bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    <FiDownload className="mr-2" />
+                    {isDownloading ? "Downloading..." : "Download Invoice"}
+                  </button>
+                  <button
+                    onClick={handleEdit}
+                    className="flex items-center bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700"
+                  >
+                    <FiEdit2 className="mr-2" />
+                    Edit Invoice
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -212,6 +238,7 @@ const handleDownload = async () => {
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
                   required
+                  readOnly={existingInvoice && !editMode}
                 />
               </div>
               
@@ -226,6 +253,22 @@ const handleDownload = async () => {
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
                   required
+                  readOnly={existingInvoice && !editMode}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  College Name
+                </label>
+                <input
+                  type="text"
+                  name="collegeName"
+                  value={invoiceData.collegeName}
+                  onChange={handleChange}
+                  className="w-full p-2 border border-gray-300 rounded-md"
+                  required
+                  readOnly={true}
                 />
               </div>
               
@@ -240,6 +283,7 @@ const handleDownload = async () => {
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
                   required
+                  readOnly={existingInvoice && !editMode}
                 />
               </div>
               
@@ -254,10 +298,11 @@ const handleDownload = async () => {
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
                   required
+                  readOnly={existingInvoice && !editMode}
                 />
               </div>
               
-              <div>
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Topics
                 </label>
@@ -267,6 +312,7 @@ const handleDownload = async () => {
                   value={invoiceData.topics}
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
+                  readOnly={existingInvoice && !editMode}
                 />
               </div>
               
@@ -280,6 +326,7 @@ const handleDownload = async () => {
                   value={invoiceData.startDate}
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
+                  readOnly={existingInvoice && !editMode}
                 />
               </div>
               
@@ -293,6 +340,7 @@ const handleDownload = async () => {
                   value={invoiceData.endDate}
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
+                  readOnly={existingInvoice && !editMode}
                 />
               </div>
               
@@ -307,6 +355,9 @@ const handleDownload = async () => {
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
                   required
+                  readOnly={existingInvoice && !editMode}
+                  step="0.01"
+                  min="0"
                 />
               </div>
               
@@ -321,6 +372,9 @@ const handleDownload = async () => {
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
                   required
+                  readOnly={existingInvoice && !editMode}
+                  step="0.5"
+                  min="0"
                 />
               </div>
               
@@ -335,6 +389,10 @@ const handleDownload = async () => {
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
                   required
+                  readOnly={existingInvoice && !editMode}
+                  step="0.01"
+                  min="0"
+                  max="100"
                 />
               </div>
               
@@ -348,6 +406,8 @@ const handleDownload = async () => {
                   value={invoiceData.adhocAdjustment}
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
+                  readOnly={existingInvoice && !editMode}
+                  step="0.01"
                 />
               </div>
               
@@ -361,6 +421,9 @@ const handleDownload = async () => {
                   value={invoiceData.conveyance}
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
+                  readOnly={existingInvoice && !editMode}
+                  step="0.01"
+                  min="0"
                 />
               </div>
               
@@ -374,6 +437,9 @@ const handleDownload = async () => {
                   value={invoiceData.food}
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
+                  readOnly={existingInvoice && !editMode}
+                  step="0.01"
+                  min="0"
                 />
               </div>
               
@@ -387,6 +453,9 @@ const handleDownload = async () => {
                   value={invoiceData.lodging}
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
+                  readOnly={existingInvoice && !editMode}
+                  step="0.01"
+                  min="0"
                 />
               </div>
               
@@ -400,6 +469,7 @@ const handleDownload = async () => {
                   value={invoiceData.bankName || ""}
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
+                  readOnly={existingInvoice && !editMode}
                 />
               </div>
               
@@ -413,6 +483,7 @@ const handleDownload = async () => {
                   value={invoiceData.accountNumber || ""}
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
+                  readOnly={existingInvoice && !editMode}
                 />
               </div>
               
@@ -426,6 +497,7 @@ const handleDownload = async () => {
                   value={invoiceData.ifscCode || ""}
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
+                  readOnly={existingInvoice && !editMode}
                 />
               </div>
               
@@ -439,6 +511,7 @@ const handleDownload = async () => {
                   value={invoiceData.panNumber || ""}
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
+                  readOnly={existingInvoice && !editMode}
                 />
               </div>
             </div>
@@ -466,13 +539,15 @@ const handleDownload = async () => {
               >
                 Cancel
               </button>
-              <button
-                type="submit"
-                disabled={isGenerating}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-              >
-                {isGenerating ? "Generating..." : "Generate Invoice"}
-              </button>
+              {(!existingInvoice || editMode) && (
+                <button
+                  type="submit"
+                  disabled={isGenerating}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {isGenerating ? "Processing..." : (editMode ? "Update Invoice" : "Generate Invoice")}
+                </button>
+              )}
             </div>
           </form>
         </div>
