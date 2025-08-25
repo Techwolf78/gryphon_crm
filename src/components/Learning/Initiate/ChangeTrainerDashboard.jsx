@@ -5,6 +5,7 @@ import {
   doc,
   updateDoc,
   getDoc,
+  onSnapshot,
 } from "firebase/firestore";
 import { db } from "../../../firebase";
 import {
@@ -36,6 +37,7 @@ const ChangeTrainerDashboard = ({
   const [newTrainerCost, setNewTrainerCost] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [loadingDomains, setLoadingDomains] = useState(false);
+  const [globalTrainerAssignments, setGlobalTrainerAssignments] = useState([]);
 
   // Debug log to check if modal is opening
   useEffect(() => {
@@ -244,6 +246,31 @@ const ChangeTrainerDashboard = ({
     }
   }, [isOpen, preSelectedTraining]);
 
+  // Listen to centralized trainerAssignments to detect external conflicts
+  useEffect(() => {
+    if (!isOpen) return;
+    const col = collection(db, "trainerAssignments");
+    const unsub = onSnapshot(col, (snap) => {
+      const arr = [];
+      snap.forEach((d) => {
+        arr.push({ id: d.id, ...d.data() });
+      });
+      setGlobalTrainerAssignments(arr);
+    });
+    return () => unsub();
+  }, [isOpen]);
+
+  // Auto-populate new trainer cost when user selects a trainer (unless user overrides)
+  useEffect(() => {
+    if (!selectedNewTrainer) return;
+    const info = trainers.find((t) => t.id === selectedNewTrainer);
+    if (!info) return;
+    // Only set if empty so user's manual override isn't overwritten
+    if (!newTrainerCost) {
+      setNewTrainerCost(info.charges ? String(info.charges) : "");
+    }
+  }, [selectedNewTrainer, trainers, newTrainerCost]);
+
   // Add debug logging to the getActiveTrainers function around line 185
 
 
@@ -366,6 +393,17 @@ const ChangeTrainerDashboard = ({
       // Prepare new trainers array (remove current, add splits)
       let newTrainersArr = [];
 
+      // Compute per-day hours for slot once and reuse
+      const perDayHours = getTrainingHoursPerDay(selectedTraining.phaseData);
+      const computePerDayHoursForSlot = (slot) => {
+        if (slot === "AM & PM") return perDayHours;
+        if (slot === "AM" || slot === "PM") return +(perDayHours / 2).toFixed(2);
+        return 0;
+      };
+      const currentPerDayHours = computePerDayHoursForSlot(
+        currentTrainer.dayDuration
+      );
+
       // 1. Old trainer before replacement period
       if (changeStartObj > startDateObj) {
         const beforeEnd = new Date(changeStartObj);
@@ -374,16 +412,6 @@ const ChangeTrainerDashboard = ({
           selectedCurrentTrainer.startDate,
           toDateStr(beforeEnd)
         );
-        const perDayHours = getTrainingHoursPerDay(selectedTraining.phaseData);
-        let currentPerDayHours = 0;
-        if (currentTrainer.dayDuration === "AM & PM")
-          currentPerDayHours = perDayHours;
-        else if (
-          currentTrainer.dayDuration === "AM" ||
-          currentTrainer.dayDuration === "PM"
-        )
-          currentPerDayHours = +(perDayHours / 2).toFixed(2);
-
         newTrainersArr.push(
           removeUndefinedFields({
             ...currentTrainer,
@@ -405,27 +433,16 @@ const ChangeTrainerDashboard = ({
         changeEndDate
       );
       const newTrainerInfo = trainers.find((t) => t.id === selectedNewTrainer);
-      const perDayHours = getTrainingHoursPerDay(selectedTraining.phaseData);
-      let currentPerDayHours = 0;
-      if (currentTrainer.dayDuration === "AM & PM")
-        currentPerDayHours = perDayHours;
-      else if (
-        currentTrainer.dayDuration === "AM" ||
-        currentTrainer.dayDuration === "PM"
-      )
-        currentPerDayHours = +(perDayHours / 2).toFixed(2);
 
       newTrainersArr.push(
         removeUndefinedFields({
           trainerId: selectedNewTrainer,
-          trainerName: newTrainerInfo?.name || "",
+          trainerName: newTrainerInfo?.name || newTrainerInfo?.displayName || "",
           dayDuration: currentTrainer.dayDuration,
           startDate: changeStartDate,
           endDate: changeEndDate,
           perHourCost:
-            newTrainerCost ||
-            newTrainerInfo?.charges ||
-            currentTrainer.perHourCost,
+            Number(newTrainerCost) || Number(newTrainerInfo?.charges) || Number(currentTrainer.perHourCost) || 0,
           activeDates: newActiveDates,
           dailyHours: newActiveDates.map(() => currentPerDayHours),
           assignedHours: newActiveDates.length * currentPerDayHours,
@@ -477,15 +494,18 @@ const ChangeTrainerDashboard = ({
   };
 
   // Helper functions
+  // Return list of ISO date strings (YYYY-MM-DD) excluding Sundays
   const getDateListExcludingSundays = (start, end) => {
     if (!start || !end) return [];
     const startDate = new Date(start);
     const endDate = new Date(end);
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return [];
+    if (startDate > endDate) return [];
     const dates = [];
     let current = new Date(startDate);
     while (current <= endDate) {
       if (current.getDay() !== 0) {
-        dates.push(new Date(current));
+        dates.push(current.toISOString().slice(0, 10));
       }
       current.setDate(current.getDate() + 1);
     }
@@ -870,16 +890,46 @@ const ChangeTrainerDashboard = ({
                     <option value="">Select new trainer</option>
                     {trainers
                       .filter((t) => {
-                        // Exclude current trainer and any trainer already booked in this period
                         if (t.id === selectedCurrentTrainer.trainerId) return false;
                         const bookedIds = getBookedTrainerIds();
-                        return !bookedIds.includes(t.id);
+                        if (bookedIds.includes(t.id)) return false;
+
+                        // Check global assignments for overlap/conflict
+                        // Build replacement date list (ISO strings)
+                        if (!changeStartDate || !changeEndDate) return true;
+                        const replacementDates = getDateListExcludingSundays(
+                          changeStartDate,
+                          changeEndDate
+                        );
+
+                        // If any global assignment for this trainer conflicts on any date and slot, exclude
+                        for (const assign of globalTrainerAssignments) {
+                          if (assign.trainerId !== t.id) continue;
+                          // Normalize assignment date to ISO yyyy-mm-dd
+                          const assignDate = new Date(assign.date);
+                          if (isNaN(assignDate.getTime())) continue;
+                          const assignISO = assignDate.toISOString().slice(0, 10);
+                          if (replacementDates.includes(assignISO)) {
+                            const assignSlot = assign.dayDuration || "AM & PM";
+                            const curSlot = selectedCurrentTrainer.dayDuration || "AM & PM";
+                            const conflict =
+                              assignSlot === "AM & PM" ||
+                              curSlot === "AM & PM" ||
+                              (assignSlot === curSlot && (assignSlot === "AM" || assignSlot === "PM"));
+                            if (conflict) return false;
+                          }
+                        }
+
+                        return true;
                       })
-                      .map((trainer) => (
-                        <option key={trainer.id} value={trainer.id}>
-                          {trainer.name} ({trainer.id})
-                        </option>
-                      ))}
+                      .map((trainer) => {
+                        const label = `${trainer.name} (${trainer.id})`;
+                        return (
+                          <option key={trainer.id} value={trainer.id}>
+                            {label}
+                          </option>
+                        );
+                      })}
                   </select>
                 </div>
 

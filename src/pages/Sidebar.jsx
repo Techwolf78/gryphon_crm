@@ -22,8 +22,8 @@ const roleLinks = {
   admin: [
     { label: "Admin", path: "/dashboard/admin", icon: <FiUsers /> },
     { label: "Sales", path: "/dashboard/sales", icon: <MdOutlineCurrencyRupee /> },
-    { label: "Placement", path: "/dashboard/placement", icon: <FiBriefcase /> },
     { label: "L & D", path: "/dashboard/learning-development", icon: <FiBook /> },
+    { label: "Placement", path: "/dashboard/placement", icon: <FiBriefcase /> },
     { label: "D M", path: "/dashboard/marketing", icon: <FiTrendingUp /> },
   ],
   sales: [{ label: "Sales", path: "/dashboard/sales", icon: <MdOutlineCurrencyRupee /> }],

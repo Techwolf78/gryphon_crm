@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, deleteField } from "firebase/firestore";
 import { db } from "../../../firebase";
 import {
   FiPlay,
@@ -13,7 +13,11 @@ import {
   FiFilter,
   FiRefreshCw,
   FiUserCheck,
-  FiX, // <-- Add this import
+  FiX,
+  FiCircle,
+  FiClock,
+  FiPause,
+  FiCheckCircle,
 } from "react-icons/fi";
 import ChangeTrainerDashboard from "./ChangeTrainerDashboard";
 
@@ -21,6 +25,55 @@ const PHASE_LABELS = {
   "phase-1": "Phase 1",
   "phase-2": "Phase 2",
   "phase-3": "Phase 3",
+};
+
+const STATUS_LABELS = {
+  all: "All",
+  "Not Started": "Not Started",
+  Initiated: "Initiated",
+  Hold: "Hold",
+  "In Progress": "In Progress",
+  Done: "Done",
+};
+const STATUS_UI = {
+  "Not Started": {
+    pill: "bg-gray-100 text-gray-700",
+    icon: "text-gray-700",
+    tabActive: "bg-gradient-to-r from-gray-600 to-gray-700 text-white shadow-lg",
+    tabInactive: "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200",
+  },
+  Initiated: {
+    pill: "bg-yellow-100 text-yellow-700",
+    icon: "text-yellow-700",
+    tabActive: "bg-gradient-to-r from-yellow-500 to-yellow-600 text-white shadow-lg",
+    tabInactive: "bg-yellow-50 text-yellow-600 hover:bg-yellow-100 border border-yellow-200",
+  },
+  Hold: {
+    pill: "bg-orange-100 text-orange-700",
+    icon: "text-orange-700",
+    tabActive: "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg",
+    tabInactive: "bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200",
+  },
+  "In Progress": {
+    pill: "bg-blue-100 text-blue-700",
+    icon: "text-blue-700",
+    tabActive: "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg",
+    tabInactive: "bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200",
+  },
+  Done: {
+    pill: "bg-green-100 text-green-700",
+    icon: "text-green-700",
+    tabActive: "bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg",
+    tabInactive: "bg-green-50 text-green-600 hover:bg-green-100 border border-green-200",
+  },
+};
+
+const STATUS_ICON_MAP = {
+  "Not Started": FiCircle,
+  Initiated: FiClock,
+  Hold: FiPause,
+  "In Progress": FiPlay,
+  Done: FiCheckCircle,
 };
 
 // Helper to group trainings by college
@@ -39,6 +92,13 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterPhase, setFilterPhase] = useState("all");
+  const [activeStatusTab, setActiveStatusTab] = useState(() => {
+    try {
+      return localStorage.getItem("ld_initiation_activeStatusTab") || "all";
+    } catch {
+      return "all";
+    }
+  });
   const [refreshing, setRefreshing] = useState(false);
   const [changeTrainerModalOpen, setChangeTrainerModalOpen] = useState(false);
   const [selectedTrainingForChange, setSelectedTrainingForChange] = useState(null);
@@ -46,6 +106,43 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
   const dropdownRef = useRef();
   const actionBtnRefs = useRef({});
+  const [toast, setToast] = useState(null);
+
+  // Get phase status and style (moved up so it can be used while filtering)
+  const getPhaseStatus = (training) => {
+    // decide status string first
+    let statusStr = null;
+
+    if (training.manualStatus) {
+      statusStr = training.manualStatus;
+    } else if (training.domainsCount === 0) {
+      statusStr = "Not Started";
+    } else if (!training.trainingStartDate || !training.trainingEndDate) {
+      statusStr = "Initiated";
+    } else {
+      const today = new Date();
+      const startDate = new Date(training.trainingStartDate);
+      const endDate = new Date(training.trainingEndDate);
+      today.setHours(0, 0, 0, 0);
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(0, 0, 0, 0);
+
+      if (training.status === "hold" || training.isOnHold) {
+        statusStr = "Hold";
+      } else if (today < startDate) {
+        statusStr = "Initiated";
+      } else if (today > endDate) {
+        statusStr = "Done";
+      } else if (today >= startDate && today <= endDate) {
+        statusStr = "In Progress";
+      } else {
+        statusStr = "Initiated";
+      }
+    }
+
+    const style = (STATUS_UI[statusStr] && STATUS_UI[statusStr].pill) || "bg-gray-100 text-gray-700";
+    return { status: statusStr, style };
+  };
 
   // Fetch all trainingForms and their phases
   const fetchData = async () => {
@@ -128,54 +225,25 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
     return matchesSearch && matchesPhase;
   });
 
+  // Status-aware filtering: compute status counts and filter by active tab
+  const filteredTrainingsBase = filteredTrainings;
+
+  const statusCounts = useMemo(() => {
+    const counts = { all: filteredTrainingsBase.length, "Not Started": 0, Initiated: 0, Hold: 0, "In Progress": 0, Done: 0 };
+    filteredTrainingsBase.forEach((t) => {
+      const s = getPhaseStatus(t).status;
+      if (counts[s] !== undefined) counts[s]++;
+    });
+    return counts;
+  }, [filteredTrainingsBase]);
+
+  const filteredByStatus = useMemo(() => {
+    if (activeStatusTab === "all") return filteredTrainingsBase;
+    return filteredTrainingsBase.filter((t) => getPhaseStatus(t).status === activeStatusTab);
+  }, [filteredTrainingsBase, activeStatusTab]);
+
   // Group trainings by college
-  const grouped = groupByCollege(filteredTrainings);
-
-  // Get phase status and style
-  const getPhaseStatus = (training) => {
-    // If no domains configured, it's not started
-    if (training.domainsCount === 0) {
-      return { status: "Not Started", style: "bg-gray-100 text-gray-700" };
-    }
-
-    // If domains are configured but no start/end dates, it's initiated
-    if (!training.trainingStartDate || !training.trainingEndDate) {
-      return { status: "Initiated", style: "bg-yellow-100 text-yellow-700" };
-    }
-
-    // Parse dates for comparison
-    const today = new Date();
-    const startDate = new Date(training.trainingStartDate);
-    const endDate = new Date(training.trainingEndDate);
-
-    // Reset time to compare only dates
-    today.setHours(0, 0, 0, 0);
-    startDate.setHours(0, 0, 0, 0);
-    endDate.setHours(0, 0, 0, 0);
-
-    // Check if training is on hold (you might want to add a specific field for this)
-    if (training.status === "hold" || training.isOnHold) {
-      return { status: "Hold", style: "bg-orange-100 text-orange-700" };
-    }
-
-    // If current date is before start date - Initiated
-    if (today < startDate) {
-      return { status: "Initiated", style: "bg-yellow-100 text-yellow-700" };
-    }
-
-    // If current date is after end date - Done
-    if (today > endDate) {
-      return { status: "Done", style: "bg-green-100 text-green-700" };
-    }
-
-    // If current date is between start and end date - In Progress
-    if (today >= startDate && today <= endDate) {
-      return { status: "In Progress", style: "bg-blue-100 text-blue-700" };
-    }
-
-    // Fallback to initiated
-    return { status: "Initiated", style: "bg-yellow-100 text-yellow-700" };
-  };
+  const grouped = groupByCollege(filteredByStatus);
 
   const handleStartPhase = (e, training) => {
     e.stopPropagation(); // Prevent row click
@@ -215,6 +283,93 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
     setChangeTrainerModalOpen(true);
   };
 
+  // Move a phase to a specific status (manual override). Updates Firestore and local state optimistically.
+  const moveToStatus = async (training, newStatus) => {
+    try {
+      // Save previous manualStatus for undo
+      const prevManual = training.manualStatus;
+
+      // Optimistic UI update
+      setTrainings(prev => prev.map(t => t.id === training.id ? { ...t, manualStatus: newStatus } : t));
+
+      // Persist manualStatus to Firestore: training.trainingId -> trainings -> training.phaseId
+      const trainingDocRef = doc(db, "trainingForms", training.trainingId, "trainings", training.phaseId);
+      updateDoc(trainingDocRef, { manualStatus: newStatus }).catch(err => {
+        console.error("Failed to update status:", err);
+        // rollback on error
+        fetchData();
+      });
+
+      // Show undo toast
+      if (toast && toast.timer) {
+        clearTimeout(toast.timer);
+      }
+      const timer = setTimeout(() => setToast(null), 6000);
+  setToast({ status: newStatus, message: `Moved to ${newStatus}`, trainingId: training.id, prevManual, timer });
+    } catch (err) {
+      console.error("Failed to update status:", err);
+      fetchData();
+    }
+  };
+
+  const handleUndo = async () => {
+    if (!toast) return;
+    const { trainingId, prevManual, timer } = toast;
+    if (timer) clearTimeout(timer);
+
+    // Optimistically revert locally
+    setTrainings(prev => prev.map(t => t.id === trainingId ? { ...t, manualStatus: prevManual } : t));
+
+    // Find training to get ids for Firestore
+    const t = trainings.find(x => x.id === trainingId);
+    if (t) {
+      const trainingDocRef = doc(db, "trainingForms", t.trainingId, "trainings", t.phaseId);
+      try {
+        if (prevManual === undefined) {
+          await updateDoc(trainingDocRef, { manualStatus: deleteField() });
+        } else {
+          await updateDoc(trainingDocRef, { manualStatus: prevManual });
+        }
+      } catch (err) {
+        console.error("Failed to undo status:", err);
+        fetchData();
+      }
+    }
+
+    setToast(null);
+  };
+
+  // cleanup toast timer on unmount
+  useEffect(() => {
+    return () => {
+      if (toast && toast.timer) clearTimeout(toast.timer);
+    };
+  }, [toast]);
+
+  // Persist active status tab so it survives reloads
+  useEffect(() => {
+    try {
+      localStorage.setItem("ld_initiation_activeStatusTab", activeStatusTab);
+    } catch {
+      // ignore storage errors
+    }
+  }, [activeStatusTab]);
+
+  // Revert manual override so automatic date logic applies again
+  const revertToAutomatic = async (training) => {
+    try {
+      // Optimistic UI update: remove manualStatus locally
+      setTrainings(prev => prev.map(t => t.id === training.id ? { ...t, manualStatus: undefined } : t));
+
+      // Remove manualStatus field in Firestore
+      const trainingDocRef = doc(db, "trainingForms", training.trainingId, "trainings", training.phaseId);
+      await updateDoc(trainingDocRef, { manualStatus: deleteField() });
+    } catch (err) {
+      console.error("Failed to revert status:", err);
+      fetchData();
+    }
+  };
+
   // Close dropdown on click outside
   useEffect(() => {
     function handleClickOutside(event) {
@@ -235,7 +390,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
 
   return (
     <div className="min-h-screen bg-gray-50/50">
-      <div className="max-w-7xl mx-auto space-y-3">
+<div className="w-full space-y-3 ">
         {/* Header Section */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-3">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
@@ -288,6 +443,25 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                 />
                 Refresh
               </button>
+            </div>
+          </div>
+
+          {/* Status Tabs (Not Started, Initiated, Hold, In Progress, Done) */}
+          <div className="mt-3">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-3">
+              {Object.keys(STATUS_LABELS).map((key) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveStatusTab(key)}
+                  className={`py-2 rounded-xl text-sm font-semibold transition-all ${
+                      activeStatusTab === key
+                        ? (key !== 'all' && STATUS_UI[key] ? STATUS_UI[key].tabActive : 'bg-blue-600 text-white shadow-md')
+                        : (key !== 'all' && STATUS_UI[key] && STATUS_UI[key].tabInactive) ? STATUS_UI[key].tabInactive : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
+                    }`}
+                >
+                  {STATUS_LABELS[key]} <span className="ml-1 text-xs font-bold">({statusCounts[key] || 0})</span>
+                </button>
+              ))}
             </div>
           </div>
         </div>
@@ -575,6 +749,46 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                                           <span>Change trainer</span>
                                         </button>
                                       )}
+
+                                      {/* Move To (manual override) */}
+                                      <div className="border-t border-gray-100 mt-1" />
+                                      <div className="px-2 pt-1 text-xs text-gray-500">Move to</div>
+                                      {(() => {
+                                        const currentStatus = getPhaseStatus(training).status;
+                                        return Object.keys(STATUS_LABELS)
+                                          .filter((k) => k !== 'all' && k !== currentStatus)
+                                          .map((s) => {
+                                            const Icon = STATUS_ICON_MAP[s];
+                                            return (
+                                              <button
+                                                key={s}
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  moveToStatus(training, s);
+                                                  setOpenDropdownId(null);
+                                                }}
+                                                className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                                              >
+                                                {Icon && <Icon className={`w-4 h-4 mr-2 ${(STATUS_UI[s] && STATUS_UI[s].icon) || 'text-gray-700'}`} />}
+                                                <span>{s}</span>
+                                              </button>
+                                            );
+                                          });
+                                      })()}
+
+                                      {training.manualStatus ? (
+                                        <>
+                                          <div className="border-t border-gray-50 my-1" />
+                                          <button
+                                            onClick={e => { e.stopPropagation(); revertToAutomatic(training); setOpenDropdownId(null); }}
+                                            className="flex items-center px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                                          >
+                                            <span>Revert to automatic</span>
+                                          </button>
+                                        </>
+                                      ) : null}
+
+                                      
                                     </div>,
                                     document.body
                                   )}
@@ -753,6 +967,19 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
         }}
         selectedTraining={selectedTrainingForChange}
       />
+      {/* Undo toast */}
+      {toast && (
+        <div className="fixed right-4 bottom-6 z-50">
+          <div className="bg-white border border-gray-200 rounded-lg shadow-lg px-4 py-2 flex items-center gap-3">
+            <span className="text-sm text-gray-700">Moved to</span>
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${(STATUS_UI[toast.status] && STATUS_UI[toast.status].pill) || 'bg-gray-100 text-gray-700'}`}>
+              {toast.status}
+            </span>
+            <button onClick={handleUndo} className="text-sm text-blue-600 font-semibold">Undo</button>
+            <button onClick={() => { if (toast.timer) clearTimeout(toast.timer); setToast(null); }} className="text-sm text-gray-400">✕</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
