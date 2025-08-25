@@ -21,7 +21,13 @@ function LearningDevelopment() {
   const [modalTrainingId, setModalTrainingId] = useState(null);
   const [studentPageData, setStudentPageData] = useState(null);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState("newContact");
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      return localStorage.getItem("ld_activeTab") || "newContact";
+    } catch {
+      return "newContact";
+    }
+  });
   const [selectedInitiationTraining, setSelectedInitiationTraining] = useState(null);
   const [showInitiationModal, setShowInitiationModal] = useState(false);
   const [selectedTrainingForInitiation, setSelectedTrainingForInitiation] = useState(null);
@@ -53,6 +59,15 @@ function LearningDevelopment() {
   useEffect(() => {
     if (activeTab === "newContact") {
       fetchTrainings();
+    }
+  }, [activeTab]);
+
+  // Persist active tab so it survives reloads
+  useEffect(() => {
+    try {
+      localStorage.setItem("ld_activeTab", activeTab);
+    } catch {
+      // ignore storage errors
     }
   }, [activeTab]);
 
