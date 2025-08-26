@@ -5,23 +5,27 @@ import React, {
   useMemo,
   useCallback,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   collection,
   getDocs,
   addDoc,
   doc,
   updateDoc,
+  arrayUnion,
 } from "firebase/firestore";
 import { db } from "../../../firebase";
 import {
   FiPlus,
   FiTrash2,
+  FiLayers,
   FiChevronDown,
   FiChevronUp,
   FiUser,
   FiClock,
-  FiLayers,
+  FiEye,
 } from "react-icons/fi";
+import { FaRupeeSign } from "react-icons/fa";
 
 const DAY_DURATION_OPTIONS = ["AM", "PM", "AM & PM"];
 
@@ -74,35 +78,105 @@ const TrainerRow = React.memo(
     openSwapModal,
     isTrainerAvailable,
     isDuplicate = false,
-    openDailySchedule,
-    setOpenDailySchedule,
+  removeDailyDate,
+  openDailySchedule,
+  setOpenDailySchedule,
+  updateTrainerLocal,
   }) => {
 
     // ✅ ADD: Calculate unique key for this trainer
     const trainerKey = `${rowIndex}-${batchIndex}-${trainerIdx}`;
     const showDailyHours = openDailySchedule === trainerKey;
 
+  // Portal positioning for daily schedule outside table
+  const viewBtnRef = useRef(null);
+  const panelRef = useRef(null);
+  const [schedulePos, setSchedulePos] = useState({ top: 0, left: 0, width: 320, arrowOffset: 0 });
+
+    // Local UI state to allow adding new topics per trainer
+  const [addedTopics, setAddedTopics] = useState([]);
+  const [newTopicInput, setNewTopicInput] = useState("");
+
+    // ✅ If trainer has no topics selected but the selected trainer document
+    // provides specializations, default-select those topics once.
+    useEffect(() => {
+      try {
+        const hasTopics = Array.isArray(trainer.topics) && trainer.topics.length > 0;
+        if (!hasTopics && trainer.trainerId && Array.isArray(trainers) && trainers.length > 0) {
+          const trDoc = trainers.find(
+            (t) => t.id === trainer.trainerId || t.trainerId === trainer.trainerId
+          );
+          if (trDoc) {
+            const s1 = Array.isArray(trDoc.specialization) ? trDoc.specialization : [];
+            const s2 = Array.isArray(trDoc.otherSpecialization) ? trDoc.otherSpecialization : [];
+            const defaults = Array.from(new Set([...s1, ...s2].filter(Boolean)));
+            if (defaults.length > 0) {
+              handleTrainerField(rowIndex, batchIndex, trainerIdx, "topics", defaults);
+            }
+          }
+        }
+      } catch {
+        // swallow - non-critical UI defaulting
+      }
+    }, [trainer.trainerId, trainers, rowIndex, batchIndex, trainerIdx, handleTrainerField, trainer.topics]);
+
     // ✅ ADD: Toggle function for daily schedule
     const toggleDailySchedule = () => {
       if (showDailyHours) {
-        setOpenDailySchedule(null); // Close if already open
+        setOpenDailySchedule(null);
       } else {
-        setOpenDailySchedule(trainerKey); // Open this one, close others
+        // Compute button position to place panel
+        if (viewBtnRef.current) {
+          const rect = viewBtnRef.current.getBoundingClientRect();
+          // Default below the button; adjust if near right edge
+          const panelWidth = 340;
+          // Attach to left side horizontally centered to button using arrow
+          let left = rect.left + window.scrollX - panelWidth - 12; // include space for arrow
+          if (left < 8) left = 8; // clamp
+          const buttonCenterOffset = rect.height / 2; // vertical center of button
+          const top = rect.top + window.scrollY - 12; // slight shift up so arrow overlaps button edge
+          const arrowOffset = buttonCenterOffset + 12; // distance from panel top to arrow center
+          setSchedulePos({ top, left, width: panelWidth, arrowOffset });
+        }
+        setOpenDailySchedule(trainerKey);
       }
     };
+
+    // Close on outside click
+    useEffect(() => {
+      if (!showDailyHours) return;
+      const handler = (e) => {
+        if (panelRef.current && !panelRef.current.contains(e.target) && !viewBtnRef.current?.contains(e.target)) {
+          setOpenDailySchedule(null);
+        }
+      };
+      window.addEventListener("mousedown", handler);
+      return () => window.removeEventListener("mousedown", handler);
+    }, [showDailyHours, setOpenDailySchedule]);
+
+    // Reposition on resize
+    useEffect(() => {
+      if (!showDailyHours) return;
+      const handleResize = () => {
+        if (viewBtnRef.current) {
+          const rect = viewBtnRef.current.getBoundingClientRect();
+          const panelWidth = schedulePos.width || 340;
+          let left = rect.left + window.scrollX - panelWidth - 12;
+          if (left < 8) left = 8;
+          const top = rect.top + window.scrollY - 12;
+          const arrowOffset = rect.height / 2 + 12;
+          setSchedulePos((p) => ({ ...p, top, left, arrowOffset }));
+        }
+      };
+      window.addEventListener("resize", handleResize);
+      return () => window.removeEventListener("resize", handleResize);
+    }, [showDailyHours, schedulePos.width]);
 
     // ✅ ADD: Handle daily hours input change
     const handleDailyHourChange = (dayIndex, value) => {
       const updated = [...(trainer.dailyHours || [])];
-      updated[dayIndex] = Number(value) || 0;
-
-      // Update the trainer's daily hours and recalculate total
-      const newTotalHours = updated.reduce(
-        (sum, hours) => sum + Number(hours || 0),
-        0
-      );
-
-      // Call the parent handler to update the trainer data
+  updated[dayIndex] = Number(value) || 0;
+  // Call the parent handler to update the trainer data; parent will recalc assignedHours
       handleTrainerField(
         rowIndex,
         batchIndex,
@@ -110,18 +184,18 @@ const TrainerRow = React.memo(
         "dailyHours",
         updated
       );
-      handleTotalHoursChange(rowIndex, batchIndex, trainerIdx, newTotalHours);
     };
 
     return (
+      <>
       <tr
-  id={`trainer-${trainerKey}`}
-  className={`border-b last:border-0 ${
+        id={`trainer-${trainerKey}`}
+        className={`border-b last:border-0 ${
           isDuplicate ? "bg-red-50 border-red-200" : ""
         }`}
       >
-        {/* Trainer Name/Select */}
-        <td className="px-2 py-1">
+  {/* Trainer Name/Select */}
+  <td className="px-2 py-1 align-top min-w-[180px]">
           {isDuplicate && (
             <div className="text-xs text-red-600 font-medium mb-1 flex items-center">
               <svg
@@ -254,11 +328,14 @@ const TrainerRow = React.memo(
         </td>
 
         {/* Total Cost */}
-        <td className="px-2 py-1 text-xs">
+        <td className="px-2 py-1 text-xs text-right">
           ₹
-          {((trainer.assignedHours || 0) * (trainer.perHourCost || 0)).toFixed(
-            2
-          )}
+          {(
+            ((Number(trainer.assignedHours) || 0) * (Number(trainer.perHourCost) || 0)) +
+            (Number(trainer.conveyance) || 0) +
+            (Number(trainer.food) || 0) +
+            (Number(trainer.lodging) || 0)
+          ).toFixed(2)}
         </td>
 
         {/* Total Hours */}
@@ -279,8 +356,8 @@ const TrainerRow = React.memo(
           />
         </td>
 
-        {/* ✅ UPDATED: Daily Hours with View Button */}
-        <td className="px-2 py-1">
+  {/* ✅ UPDATED: Daily Hours with View Button */}
+  <td className="px-2 py-1 relative">
           <div className="flex items-center space-x-1">
             <span className="text-xs">
               {trainer.dailyHours && trainer.dailyHours.length > 0
@@ -292,36 +369,54 @@ const TrainerRow = React.memo(
               <button
                 type="button"
                 onClick={toggleDailySchedule}
-                className="px-1 py-0.5 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                className="inline-flex items-center justify-center h-4 w-4 rounded-md bg-blue-500/90 hover:bg-blue-600 text-white shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-300 transition text-[10px]"
                 title="View Daily Schedule"
+                aria-label="View daily schedule"
+                ref={viewBtnRef}
               >
-                View
+                <FiEye className="w-2 h-2" />
               </button>
             )}
           </div>
-
-          {/* ✅ ADD: Daily Hours Breakdown Dropdown */}
-          {showDailyHours && trainer.dailyHours && trainer.activeDates && (
-            <div className="absolute z-10 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3 min-w-80 right-32">
+          {/* ✅ Daily Hours Breakdown rendered via Portal outside table bounds */}
+          {showDailyHours && trainer.dailyHours && trainer.activeDates && createPortal(
+            <div
+              ref={panelRef}
+              style={{ top: schedulePos.top, left: schedulePos.left, width: schedulePos.width, maxWidth: '100%', position: 'absolute' }}
+              className="fixed z-[1000] bg-white border border-gray-200 rounded-lg shadow-xl p-3"
+            >
+              {/* Arrow */}
+              <span
+                className="absolute -right-2 top-0 h-full pointer-events-none flex"
+                style={{ top: schedulePos.arrowOffset - 8 }}
+              >
+                <span className="relative w-0 h-0"
+                  style={{
+                    borderTop: '8px solid transparent',
+                    borderBottom: '8px solid transparent',
+                    borderLeft: '8px solid white',
+                    filter: 'drop-shadow(0 0 1px rgba(0,0,0,0.15))'
+                  }}
+                />
+              </span>
               <div className="flex justify-between items-center mb-2">
-                <h4 className="text-xs font-medium text-gray-700">
-                  Daily Schedule
-                </h4>
+                <h4 className="text-xs font-medium text-gray-700">Daily Schedule</h4>
                 <button
                   type="button"
                   onClick={toggleDailySchedule}
                   className="text-gray-400 hover:text-gray-600"
+                  aria-label="Close daily schedule"
                 >
                   ×
                 </button>
               </div>
-              <div className="max-h-48 overflow-y-auto">
+              <div className="max-h-56 overflow-y-auto pr-1 custom-scrollbar">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="bg-gray-50">
-                      <th className="px-2 py-1 text-left">Date</th>
-                      <th className="px-2 py-1 text-left">Day</th>
-                      <th className="px-2 py-1 text-left">Hours</th>
+                    <tr className="bg-gray-50 text-gray-600">
+                      <th className="px-2 py-1 text-left font-medium">Date</th>
+                      <th className="px-2 py-1 text-left font-medium">Day</th>
+                      <th className="px-2 py-1 text-left font-medium">Hours</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -331,76 +426,71 @@ const TrainerRow = React.memo(
                         return !isNaN(dateObj.getTime());
                       })
                       .map((date, dayIndex) => {
-                      const dateObj = new Date(date);
-                      const dayName = dateObj.toLocaleDateString("en-US", {
-                        weekday: "short",
-                      });
-                      const formattedDate = dateObj.toLocaleDateString(
-                        "en-US",
-                        {
-                          month: "short",
-                          day: "numeric",
-                        }
-                      );
-
-                      return (
-                        <tr key={dayIndex} className="border-b border-gray-100">
-                          <td className="px-2 py-1">{formattedDate}</td>
-                          <td className="px-2 py-1 text-gray-600">{dayName}</td>
-                          <td className="px-2 py-1">
-                            <div className="flex items-center">
-                              <input
-                                type="number"
-                                value={trainer.dailyHours[dayIndex] || ""}
-                                onChange={(e) =>
-                                  handleDailyHourChange(dayIndex, e.target.value)
-                                }
-                                className="w-12 rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-0.5 px-1"
-                                min="0"
-                                step="0.5"
-                                placeholder="0"
-                              />
-                              <span className="ml-1 text-xs text-gray-500">h</span>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                        const dateObj = new Date(date);
+                        const dayName = dateObj.toLocaleDateString("en-US", { weekday: "short" });
+                        const formattedDate = dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                        return (
+                          <tr key={dayIndex} className="border-b border-gray-100 last:border-0">
+                            <td className="px-2 py-1 whitespace-nowrap">{formattedDate}</td>
+                            <td className="px-2 py-1 text-gray-600">{dayName}</td>
+                            <td className="px-2 py-1">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center">
+                                  <input
+                                    type="number"
+                                    value={trainer.dailyHours[dayIndex] || ""}
+                                    onChange={(e) => handleDailyHourChange(dayIndex, e.target.value)}
+                                    className="w-14 rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-0.5 px-1"
+                                    min="0"
+                                    step="0.5"
+                                    placeholder="0"
+                                  />
+                                  <span className="ml-1 text-[10px] text-gray-500">h</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => removeDailyDate && removeDailyDate(rowIndex, batchIndex, trainerIdx, dayIndex)}
+                                  className="ml-3 text-rose-500 hover:text-rose-600 p-0.5 rounded"
+                                  title="Remove date"
+                                  aria-label="Remove date"
+                                >
+                                  <FiTrash2 size={12} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                   </tbody>
                   <tfoot>
-                    <tr className="bg-gray-50 font-medium">
-                      <td className="px-2 py-1" colSpan="2">
-                        Total:
-                      </td>
-                      <td className="px-2 py-1">
-                        {trainer.dailyHours
-                          .reduce((sum, hours) => sum + Number(hours || 0), 0)
-                          .toFixed(2)}
-                        h
-                      </td>
+                    <tr className="bg-gray-50 font-medium text-gray-700">
+                      <td className="px-2 py-1" colSpan={2}>Total:</td>
+                      <td className="px-2 py-1">{trainer.dailyHours.reduce((s, h) => s + Number(h || 0), 0).toFixed(2)}h</td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
-            </div>
+            </div>,
+            document.body
           )}
         </td>
 
         {/* Actions */}
         <td className="px-2 py-1">
-          <div className="flex space-x-1">
+          <div className="flex items-center space-x-1">
             <button
               type="button"
-              className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
               onClick={() => removeTrainer(rowIndex, batchIndex, trainerIdx)}
+              aria-label="Remove trainer"
               title="Remove Trainer"
+              className="p-1 rounded-md text-rose-500 hover:text-rose-600 hover:bg-rose-100 focus:outline-none focus:ring-1 focus:ring-rose-300 transition"
             >
-              ×
+              <FiTrash2 className="w-3 h-3" />
             </button>
             {trainer.dayDuration === "AM" && (
               <button
                 type="button"
-                className="ml-2 px-2 py-1 text-xs bg-black text-white rounded hover:bg-gray-800"
+                className="ml-1 px-2 py-1 text-xs bg-black text-white rounded hover:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-black/30"
                 onClick={() => {
                   openSwapModal(rowIndex, batchIndex, trainerIdx);
                 }}
@@ -412,6 +502,229 @@ const TrainerRow = React.memo(
           </div>
         </td>
       </tr>
+
+      {/* Extra info row for each trainer: conveyance, food, lodging, topics (modern SaaS style) */}
+      <tr className="bg-transparent text-[11px]">
+        <td colSpan={9} className="px-2 py-2">
+          <div className="grid grid-cols-1 sm:grid-cols-4 lg:grid-cols-12 gap-1.5 items-start">
+            {/* Small card inputs */}
+            {/** Conveyance */}
+            <div className="flex flex-col bg-white/70 border border-gray-100 rounded-md p-0.5 sm:col-span-1 lg:col-span-2">
+              <label className="text-[10px] font-semibold text-slate-600 mb-0.5">Conveyance</label>
+              <div className="relative">
+                <FaRupeeSign className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-500 w-3 h-3" />
+                <input
+                  aria-label={`Conveyance for trainer ${trainer.trainerName || trainer.trainerId || trainerIdx}`}
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={trainer.conveyance ?? ""}
+                  onChange={(e) =>
+                    handleTrainerField(
+                      rowIndex,
+                      batchIndex,
+                      trainerIdx,
+                      "conveyance",
+                      e.target.value === "" ? "" : parseFloat(e.target.value) || 0
+                    )
+                  }
+                  className="w-full pl-6 rounded border border-gray-200 bg-white text-[10px] py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-200"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            {/** Food */}
+            <div className="flex flex-col bg-white/70 border border-gray-100 rounded-md p-0.5 sm:col-span-1 lg:col-span-2">
+              <label className="text-[10px] font-semibold text-slate-600 mb-0.5">Food</label>
+              <div className="relative">
+                <FaRupeeSign className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-500 w-3 h-3" />
+                <input
+                  aria-label={`Food for trainer ${trainer.trainerName || trainer.trainerId || trainerIdx}`}
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={trainer.food ?? ""}
+                  onChange={(e) =>
+                    handleTrainerField(
+                      rowIndex,
+                      batchIndex,
+                      trainerIdx,
+                      "food",
+                      e.target.value === "" ? "" : parseFloat(e.target.value) || 0
+                    )
+                  }
+                  className="w-full pl-6 rounded border border-gray-200 bg-white text-[10px] py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-200"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            {/** Lodging */}
+            <div className="flex flex-col bg-white/70 border border-gray-100 rounded-md p-0.5 sm:col-span-1 lg:col-span-2">
+              <label className="text-[10px] font-semibold text-slate-600 mb-0.5">Lodging</label>
+              <div className="relative">
+                <FaRupeeSign className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-500 w-3 h-3" />
+                <input
+                  aria-label={`Lodging for trainer ${trainer.trainerName || trainer.trainerId || trainerIdx}`}
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={trainer.lodging ?? ""}
+                  onChange={(e) =>
+                    handleTrainerField(
+                      rowIndex,
+                      batchIndex,
+                      trainerIdx,
+                      "lodging",
+                      e.target.value === "" ? "" : parseFloat(e.target.value) || 0
+                    )
+                  }
+                  className="w-full pl-6 rounded border border-gray-200 bg-white text-[10px] py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-200"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            {/** Topics area - larger, spans */}
+            <div className="col-span-1 sm:col-span-4 lg:col-span-6">
+              <div className="flex items-center justify-between mb-0.5">
+                <h4 className="text-[10px] font-semibold text-slate-700">Topics</h4>
+                <span className="text-[10px] text-slate-500">Select or add</span>
+              </div>
+
+              <div className="bg-white rounded-md border border-gray-100 p-1 shadow-sm">
+                {/* Simplified topics selection UI */}
+                {(() => {
+                  const trainerDoc = trainers.find((t) => t.trainerId === trainer.trainerId);
+                  const base = [];
+                  if (trainerDoc) {
+                    if (Array.isArray(trainerDoc.specialization)) base.push(...trainerDoc.specialization);
+                    if (Array.isArray(trainerDoc.otherSpecialization)) base.push(...trainerDoc.otherSpecialization);
+                  }
+                  const allTopics = Array.from(new Set([...base, ...addedTopics])).filter(Boolean).sort();
+                  const selected = Array.isArray(trainer.topics)
+                    ? trainer.topics
+                    : trainer.topics
+                    ? [trainer.topics]
+                    : [];
+
+                  // Auto-select all existing topics (from Firestore) if none selected yet
+                  if (allTopics.length > 0 && selected.length === 0) {
+                    // Prevent infinite loop: only trigger when strictly empty
+                    handleTrainerField(rowIndex, batchIndex, trainerIdx, "topics", allTopics);
+                  }
+
+                  const toggleTopic = (topic) => {
+                    const isActive = selected.includes(topic);
+                    const next = isActive ? selected.filter((t) => t !== topic) : [...selected, topic];
+                    handleTrainerField(rowIndex, batchIndex, trainerIdx, "topics", next);
+                  };
+
+                  return (
+                    <div className="space-y-1.5">
+                      <div
+                        role="group"
+                        aria-label="Topics"
+                        className="min-h-[22px] max-h-24 overflow-auto rounded border border-dashed border-gray-200 p-0.5 bg-gray-50"
+                      >
+                        {allTopics.length === 0 ? (
+                          <div className="text-[10px] text-slate-400 py-2 text-center">
+                            No topics yet. Add below.
+                          </div>
+                        ) : (
+  <div className="flex flex-wrap gap-0.5">
+                            {allTopics.map((topic) => {
+                              const active = selected.includes(topic);
+                              return (
+                                <button
+                                  key={topic}
+                                  type="button"
+                                  role="checkbox"
+                                  aria-checked={active}
+                                  onClick={() => toggleTopic(topic)}
+          className={`text-[9px] px-1 py-0.5 rounded-full border transition-all focus:outline-none focus:ring-1 focus:ring-indigo-400 truncate ${
+                                    active
+                                      ? "bg-indigo-600 text-white border-indigo-600 shadow"
+                                      : "bg-white text-slate-700 border-gray-300 hover:border-indigo-400 hover:bg-indigo-50"
+                                  }`}
+                                  title={topic}
+                                >
+                                  {topic}
+                                  {active && <span className="ml-1">✓</span>}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          aria-label={`Add topic for trainer ${trainer.trainerName || trainer.trainerId || trainerIdx}`}
+                          type="text"
+                          value={newTopicInput}
+                          onChange={(e) => setNewTopicInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              const t = (newTopicInput || "").trim();
+                              if (!t) return;
+                              if (!addedTopics.includes(t)) setAddedTopics((s) => [...s, t]);
+                              const next = Array.from(new Set([...selected, t]));
+                              handleTrainerField(rowIndex, batchIndex, trainerIdx, "topics", next);
+                              if (trainer.trainerId) {
+                                (async () => {
+                                  try {
+                                    const trainerDocRef = doc(db, "trainers", String(trainer.trainerId));
+                                    await updateDoc(trainerDocRef, { otherSpecialization: arrayUnion(t) });
+                                    updateTrainerLocal?.(trainer.trainerId, t);
+                                  } catch (err) {
+                                    console.error("Failed to persist new topic:", err);
+                                  }
+                                })();
+                              }
+                              setNewTopicInput("");
+                            }
+                          }}
+                          placeholder="Add topic & Enter"
+                          className="flex-1 rounded border border-gray-200 px-2 py-0.5 text-[10px] focus:outline-none focus:ring-1 focus:ring-indigo-200"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const t = (newTopicInput || "").trim();
+                            if (!t) return;
+                            if (!addedTopics.includes(t)) setAddedTopics((s) => [...s, t]);
+                            const next = Array.from(new Set([...selected, t]));
+                            handleTrainerField(rowIndex, batchIndex, trainerIdx, "topics", next);
+                            if (trainer.trainerId) {
+                              (async () => {
+                                try {
+                                  const trainerDocRef = doc(db, "trainers", String(trainer.trainerId));
+                                  await updateDoc(trainerDocRef, { otherSpecialization: arrayUnion(t) });
+                                  updateTrainerLocal?.(trainer.trainerId, t);
+                                } catch (err) {
+                                  console.error("Failed to persist new topic:", err);
+                                }
+                              })();
+                            }
+                            setNewTopicInput("");
+                          }}
+                          className="inline-flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-0.5 rounded text-[10px] focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                        >
+                          <FiPlus size={10} />
+                          <span>Add</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        </td>
+      </tr>
+      </>
     );
   }
 );
@@ -437,6 +750,9 @@ const TrainersTable = React.memo(
     duplicates = [],
     openDailySchedule, // Add this prop
     setOpenDailySchedule, // Add this prop
+  removeDailyDate,
+  refetchTrainers,
+  updateTrainerLocal,
   }) => {
 
     return (
@@ -492,6 +808,9 @@ const TrainersTable = React.memo(
                       isDuplicate={isDuplicate}
                       openDailySchedule={openDailySchedule} // Add this prop
                       setOpenDailySchedule={setOpenDailySchedule} // Add this prop
+                      removeDailyDate={removeDailyDate}
+                      refetchTrainers={refetchTrainers}
+                      updateTrainerLocal={updateTrainerLocal}
                     />
                   );
                 })}
@@ -532,6 +851,9 @@ const BatchComponent = React.memo(
     duplicates = [],
     openDailySchedule, // Add this prop
     setOpenDailySchedule, // Add this prop
+  removeDailyDate,
+  refetchTrainers,
+  updateTrainerLocal,
   }) => {
 
     return (
@@ -703,8 +1025,11 @@ const BatchComponent = React.memo(
             openSwapModal={openSwapModal}
             isTrainerAvailable={isTrainerAvailable}
             duplicates={duplicates}
-            openDailySchedule={openDailySchedule} // Add this prop
-            setOpenDailySchedule={setOpenDailySchedule} // Add this prop
+            openDailySchedule={openDailySchedule}
+            setOpenDailySchedule={setOpenDailySchedule}
+            removeDailyDate={removeDailyDate}
+            refetchTrainers={refetchTrainers}
+            updateTrainerLocal={updateTrainerLocal}
           />
         </div>
       </div>
@@ -892,20 +1217,36 @@ const BatchDetailsTable = ({
     }
     return true;
   };
+  const refetchTrainers = useCallback(async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "trainers"));
+      const trainerList = [];
+      querySnapshot.forEach((d) => {
+        trainerList.push({ id: d.id, ...d.data() });
+      });
+      setTrainers(trainerList);
+    } catch (error) {
+      console.error("Error fetching trainers:", error);
+    }
+  }, []);
+
   useEffect(() => {
-    const fetchTrainers = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, "trainers"));
-        const trainerList = [];
-        querySnapshot.forEach((doc) => {
-          trainerList.push({ id: doc.id, ...doc.data() });
-        });
-        setTrainers(trainerList);
-      } catch (error) {
-        console.error("Error fetching trainers:", error);
-      }
-    };
-    fetchTrainers();
+    refetchTrainers();
+  }, [refetchTrainers]);
+
+  // Update a trainer in the local `trainers` state to avoid a full refetch
+  const updateTrainerLocal = useCallback((trainerId, newTopic) => {
+    if (!trainerId || !newTopic) return;
+    setTrainers((prev) =>
+      prev.map((t) => {
+        if (!t || (!t.id && !t.trainerId)) return t;
+        const id = t.id || t.trainerId;
+        if (id !== trainerId) return t;
+        const existing = Array.isArray(t.otherSpecialization) ? t.otherSpecialization : [];
+        const merged = Array.from(new Set([...existing, newTopic]));
+        return { ...t, otherSpecialization: merged };
+      })
+    );
   }, []);
 
   const generateBatchCode = (specialization, index) => {
@@ -1090,6 +1431,28 @@ const BatchDetailsTable = ({
     setTable1Data(updated);
   };
 
+  // Remove a single date from trainer's activeDates and dailyHours
+  const removeDailyDate = (rowIndex, batchIndex, trainerIdx, dayIndex) => {
+    const updated = [...table1Data];
+    const trainer = updated[rowIndex].batches[batchIndex].trainers[trainerIdx];
+    if (!trainer) return;
+
+    // Remove the date and the corresponding hours
+    if (trainer.activeDates && trainer.activeDates.length > dayIndex) {
+      trainer.activeDates = trainer.activeDates.filter((_, idx) => idx !== dayIndex);
+    }
+    if (trainer.dailyHours && trainer.dailyHours.length > dayIndex) {
+      trainer.dailyHours = trainer.dailyHours.filter((_, idx) => idx !== dayIndex);
+    }
+
+    // Recalculate assignedHours
+    trainer.assignedHours = trainer.dailyHours
+      ? trainer.dailyHours.reduce((sum, h) => sum + Number(h || 0), 0)
+      : 0;
+
+    setTable1Data(updated);
+  };
+
   const getTrainingHoursPerDay = (commonFields) => {
     if (
       !commonFields.collegeStartTime ||
@@ -1222,6 +1585,15 @@ const BatchDetailsTable = ({
     // ✅ FIXED: Ensure assignedHours is always a number
     if (field === "assignedHours") {
       trainer.assignedHours = Number(value) || 0;
+    }
+
+    // Persist other generic trainer fields (conveyance, food, lodging, topics, etc.)
+    if (
+      !["dailyHours", "dayDuration", "startDate", "endDate", "trainerId", "assignedHours"].includes(
+        field
+      )
+    ) {
+      trainer[field] = value;
     }
 
     setTable1Data(updated);
@@ -1859,7 +2231,7 @@ const BatchDetailsTable = ({
                     if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "center" });
                   }, 120);
                 }}
-                className="px-3 py-1.5 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                className="px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700"
               >
                 Show duplicates
               </button>
@@ -2243,6 +2615,9 @@ const BatchDetailsTable = ({
                           duplicates={duplicateTrainers}
                           openDailySchedule={openDailySchedule} // Add this line
                           setOpenDailySchedule={setOpenDailySchedule} // Add this line
+                          removeDailyDate={removeDailyDate}
+                          refetchTrainers={refetchTrainers}
+                          updateTrainerLocal={updateTrainerLocal}
                         />
                       ))}
                       {/* Add Batch Button */}

@@ -20,6 +20,7 @@ import {
   FiCheckCircle,
 } from "react-icons/fi";
 import ChangeTrainerDashboard from "./ChangeTrainerDashboard";
+import TrainerCalendar from "../TrainerCalendar/TrainerCalendar";
 
 const PHASE_LABELS = {
   "phase-1": "Phase 1",
@@ -88,6 +89,8 @@ function groupByCollege(trainings) {
 }
 
 const Dashboard = ({ onRowClick, onStartPhase }) => {
+  const [showTrainerCalendar, setShowTrainerCalendar] = useState(false);
+  const [trainerCalendarTraining, setTrainerCalendarTraining] = useState(null);
   const [trainings, setTrainings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -388,6 +391,19 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [openDropdownId]);
 
+  // Full-page takeover view for Trainer Calendar (like other detail pages)
+  if (showTrainerCalendar) {
+    return (
+      <div className="min-h-screen bg-gray-50/50">
+        <TrainerCalendar
+          embedded
+          onBack={() => setShowTrainerCalendar(false)}
+          initialTrainerId={trainerCalendarTraining?.trainerId || ""}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50/50">
 <div className="w-full space-y-3 ">
@@ -442,6 +458,15 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                   className={`w-4 h-4 mr-1 ${refreshing ? "animate-spin" : ""}`}
                 />
                 Refresh
+              </button>
+            </div>
+            <div className="mt-2 lg:mt-0 flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={() => { setTrainerCalendarTraining(null); setShowTrainerCalendar(true); }}
+                className="inline-flex items-center px-3 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+              >
+                <FiCalendar className="mr-2" /> Trainer Calendar
               </button>
             </div>
           </div>

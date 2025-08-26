@@ -1,4 +1,4 @@
-import React, { useContext, useState } from "react";
+import React, { useContext, useState, useEffect, useRef, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import AiBot from "./AiBot";
@@ -47,6 +47,34 @@ const Sidebar = ({ collapsed, onToggle }) => {
   const { user } = useContext(AuthContext);
   const location = useLocation();
   const [isAIDrawerOpen, setIsAIDrawerOpen] = useState(false);
+  const initializedRef = useRef(false);
+
+  // Sync stored preference on mount (run once). If stored value differs from current prop, call onToggle to sync parent.
+  useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+    try {
+      const raw = localStorage.getItem('sidebar_collapsed');
+      if (raw !== null) {
+        const stored = JSON.parse(raw);
+        if (Boolean(stored) !== Boolean(collapsed)) {
+          if (typeof onToggle === 'function') onToggle();
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }, [collapsed, onToggle]);
+
+  const handleToggle = useCallback(() => {
+    try {
+      const newVal = !collapsed;
+      localStorage.setItem('sidebar_collapsed', JSON.stringify(newVal));
+    } catch {
+      // ignore storage errors
+    }
+    if (typeof onToggle === 'function') onToggle();
+  }, [collapsed, onToggle]);
 
   if (!user) return null;
 
@@ -64,7 +92,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
       {/* Mobile Menu Button */}
       {collapsed && (
         <button
-          onClick={onToggle}
+          onClick={handleToggle}
           className="fixed top-4 left-4 z-60 p-2 bg-white rounded-md shadow-md lg:hidden border border-gray-200 hover:bg-gray-50"
           aria-label="Open menu"
         >
@@ -76,7 +104,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
       {!collapsed && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
-          onClick={onToggle}
+          onClick={handleToggle}
         />
       )}
 
@@ -91,14 +119,14 @@ const Sidebar = ({ collapsed, onToggle }) => {
         lg:translate-x-0
       `}>
         {/* Header */}
-        <div className={`p-3 border-b border-gray-200 ${collapsed ? "flex flex-col items-center space-y-2" : "flex items-center justify-between"}`}>
+    <div className={`p-3 border-b border-gray-200 ${collapsed ? "flex flex-col items-center space-y-2" : "flex items-center justify-between"}`}>
           <img 
             src={collapsed ? compactLogo : logo} 
             alt="SYNC" 
             className={collapsed ? "w-6 h-6" : "h-5 max-w-[120px] sm:max-w-none"} 
           />
           <button 
-            onClick={onToggle} 
+      onClick={handleToggle} 
             className="p-1 rounded hover:bg-gray-100 lg:block" 
             aria-label={collapsed ? "Expand" : "Collapse"}
           >
@@ -120,7 +148,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
               onClick={() => {
                 // Auto-close sidebar on mobile after navigation
                 if (window.innerWidth < 1024) {
-                  onToggle();
+                  handleToggle();
                 }
               }}
             >
@@ -136,7 +164,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
                 setIsAIDrawerOpen(true);
                 // Auto-close sidebar on mobile when opening AI
                 if (window.innerWidth < 1024) {
-                  onToggle();
+                  handleToggle();
                 }
               }}
               className="w-full flex items-center px-3 py-2 rounded text-sm bg-gradient-to-r from-blue-50 to-sky-100 text-blue-700 hover:from-blue-100 hover:to-sky-150 hover:text-blue-800 border border-blue-200 shadow-sm transition-all duration-200"
