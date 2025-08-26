@@ -70,10 +70,11 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
         const querySnapshot = await getDocs(q);
         if (!querySnapshot.empty) {
           // Get the most recent invoice
-          const latestInvoiceDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
+          const latestInvoiceDoc =
+            querySnapshot.docs[querySnapshot.docs.length - 1];
           const latestInvoice = {
             id: latestInvoiceDoc.id,
-            ...latestInvoiceDoc.data()
+            ...latestInvoiceDoc.data(),
           };
           setExistingInvoice(latestInvoice);
 
@@ -112,23 +113,35 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
         status: "generated",
       };
 
+      let updatedInvoiceId = existingInvoice?.id;
+
       // If editing existing invoice, update it instead of creating new
       if (existingInvoice && editMode) {
         await updateDoc(doc(db, "invoices", existingInvoice.id), invoiceToSave);
         console.log("Invoice updated with ID: ", existingInvoice.id);
         alert("Invoice updated successfully!");
+        updatedInvoiceId = existingInvoice.id;
       } else {
         // Add to Firestore as new invoice
         invoiceToSave.createdAt = new Date();
         const docRef = await addDoc(collection(db, "invoices"), invoiceToSave);
         console.log("Invoice saved with ID: ", docRef.id);
         alert("Invoice generated successfully!");
+        updatedInvoiceId = docRef.id;
       }
 
-      // Generate and download PDF using the standardized function
-      await generateInvoicePDF(invoiceToSave);
+      // If we were editing, fetch the updated invoice
+      if (existingInvoice && editMode) {
+        const updatedDoc = await getDoc(doc(db, "invoices", updatedInvoiceId));
+        if (updatedDoc.exists()) {
+          setExistingInvoice({
+            id: updatedDoc.id,
+            ...updatedDoc.data(),
+          });
+        }
+        setEditMode(false); // Exit edit mode
+      }
 
-      onClose();
       onInvoiceGenerated(); // Refresh the parent component
     } catch (error) {
       console.error("Error saving invoice: ", error);
@@ -161,7 +174,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
     const { name, value, type } = e.target;
     setInvoiceData((prev) => ({
       ...prev,
-      [name]: type === 'number' ? parseFloat(value) || 0 : value,
+      [name]: type === "number" ? parseFloat(value) || 0 : value,
     }));
   };
 
@@ -187,9 +200,19 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
       <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-screen overflow-y-auto">
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold">
-              {existingInvoice && !editMode ? "View Invoice" : "Generate Invoice"} for {trainer?.trainerName || "Trainer"}
-            </h2>
+            <div className="flex items-center">
+              <h2 className="text-2xl font-bold mr-3">
+                {existingInvoice && !editMode
+                  ? "View Invoice"
+                  : "Generate Invoice"}{" "}
+                for {trainer?.trainerName || "Trainer"}
+              </h2>
+              {existingInvoice && !editMode && (
+                <span className="bg-yellow-100 text-yellow-800 text-sm font-medium px-2.5 py-0.5 rounded-full">
+                  Already Generated
+                </span>
+              )}
+            </div>
             <button
               onClick={onClose}
               className="text-gray-500 hover:text-gray-700"
@@ -197,25 +220,27 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
               <FiX size={24} />
             </button>
           </div>
-          
+
           {existingInvoice && !editMode && (
-            <div className="mb-4 p-4 bg-blue-50 rounded-md">
+            <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <p className="text-blue-700">
-                  An invoice already exists for this trainer and college.
-                </p>
+                <div>
+                  <p className="text-yellow-800 font-medium">
+                    ✓ Invoice already exists for this trainer and college
+                  </p>
+                </div>
                 <div className="flex gap-2">
                   <button
                     onClick={handleDownload}
                     disabled={isDownloading}
-                    className="flex items-center bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                    className="flex items-center bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
                   >
                     <FiDownload className="mr-2" />
                     {isDownloading ? "Downloading..." : "Download Invoice"}
                   </button>
                   <button
                     onClick={handleEdit}
-                    className="flex items-center bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700"
+                    className="flex items-center bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors"
                   >
                     <FiEdit2 className="mr-2" />
                     Edit Invoice
@@ -224,7 +249,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
               </div>
             </div>
           )}
-          
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -241,7 +266,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
                   readOnly={existingInvoice && !editMode}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Billing Date
@@ -256,7 +281,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
                   readOnly={existingInvoice && !editMode}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   College Name
@@ -271,7 +296,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
                   readOnly={true}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Project Code
@@ -286,7 +311,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
                   readOnly={existingInvoice && !editMode}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Domain
@@ -301,7 +326,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
                   readOnly={existingInvoice && !editMode}
                 />
               </div>
-              
+
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Topics
@@ -315,7 +340,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
                   readOnly={existingInvoice && !editMode}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Start Date
@@ -329,7 +354,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
                   readOnly={existingInvoice && !editMode}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   End Date
@@ -343,7 +368,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
                   readOnly={existingInvoice && !editMode}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Training Rate (per hour)
@@ -360,7 +385,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
                   min="0"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Total Hours
@@ -377,7 +402,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
                   min="0"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   TDS (%)
@@ -395,7 +420,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
                   max="100"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Adhoc Adjustment
@@ -410,7 +435,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
                   step="0.01"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Conveyance
@@ -426,7 +451,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
                   min="0"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Food
@@ -442,7 +467,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
                   min="0"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Lodging
@@ -458,7 +483,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
                   min="0"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Bank Name
@@ -472,7 +497,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
                   readOnly={existingInvoice && !editMode}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Account Number
@@ -486,7 +511,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
                   readOnly={existingInvoice && !editMode}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   IFSC Code
@@ -500,7 +525,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
                   readOnly={existingInvoice && !editMode}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   PAN Number
@@ -515,22 +540,48 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
                 />
               </div>
             </div>
-            
+
             {/* Calculation Summary */}
             <div className="mt-6 p-4 bg-gray-50 rounded-md">
-              <h3 className="text-lg font-semibold mb-2">Calculation Summary</h3>
+              <h3 className="text-lg font-semibold mb-2">
+                Calculation Summary
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <div>Training Fees: ₹{(invoiceData.trainingRate * invoiceData.totalHours).toFixed(2)}</div>
-                <div>Conveyance: ₹{parseFloat(invoiceData.conveyance || 0).toFixed(2)}</div>
+                <div>
+                  Training Fees: ₹
+                  {(invoiceData.trainingRate * invoiceData.totalHours).toFixed(
+                    2
+                  )}
+                </div>
+                <div>
+                  Conveyance: ₹
+                  {parseFloat(invoiceData.conveyance || 0).toFixed(2)}
+                </div>
                 <div>Food: ₹{parseFloat(invoiceData.food || 0).toFixed(2)}</div>
-                <div>Lodging: ₹{parseFloat(invoiceData.lodging || 0).toFixed(2)}</div>
-                <div className="font-semibold">Total Amount: ₹{calculateTotalAmount().toFixed(2)}</div>
-                <div>TDS ({invoiceData.tds}%): ₹{(calculateTotalAmount() * (parseFloat(invoiceData.tds) || 0) / 100).toFixed(2)}</div>
-                <div>Adhoc Adjustment: ₹{parseFloat(invoiceData.adhocAdjustment || 0).toFixed(2)}</div>
-                <div className="font-semibold text-green-600">Net Payment: ₹{calculateNetPayment().toFixed(2)}</div>
+                <div>
+                  Lodging: ₹{parseFloat(invoiceData.lodging || 0).toFixed(2)}
+                </div>
+                <div className="font-semibold">
+                  Total Amount: ₹{calculateTotalAmount().toFixed(2)}
+                </div>
+                <div>
+                  TDS ({invoiceData.tds}%): ₹
+                  {(
+                    (calculateTotalAmount() *
+                      (parseFloat(invoiceData.tds) || 0)) /
+                    100
+                  ).toFixed(2)}
+                </div>
+                <div>
+                  Adhoc Adjustment: ₹
+                  {parseFloat(invoiceData.adhocAdjustment || 0).toFixed(2)}
+                </div>
+                <div className="font-semibold text-green-600">
+                  Net Payment: ₹{calculateNetPayment().toFixed(2)}
+                </div>
               </div>
             </div>
-            
+
             <div className="flex justify-end space-x-3 mt-6">
               <button
                 type="button"
@@ -545,7 +596,11 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
                   disabled={isGenerating}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {isGenerating ? "Processing..." : (editMode ? "Update Invoice" : "Generate Invoice")}
+                  {isGenerating
+                    ? "Processing..."
+                    : editMode
+                    ? "Update Invoice"
+                    : "Generate Invoice"}
                 </button>
               )}
             </div>

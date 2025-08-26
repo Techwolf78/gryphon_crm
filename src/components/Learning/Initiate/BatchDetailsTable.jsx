@@ -4,7 +4,6 @@ import React, {
   useRef,
   useMemo,
   useCallback,
-  useLayoutEffect,
 } from "react";
 import {
   collection,
@@ -68,10 +67,7 @@ const TrainerRow = React.memo(
     trainerIdx,
     rowIndex,
     batchIndex,
-    batch,
-    row,
     trainers,
-    selectedDomain,
     handleTrainerField,
     handleTotalHoursChange,
     removeTrainer,
@@ -81,11 +77,6 @@ const TrainerRow = React.memo(
     openDailySchedule,
     setOpenDailySchedule,
   }) => {
-    console.log(
-      `🔄 [MEMOIZED] TrainerRow ${trainerIdx} rendering for ${
-        trainer.trainerName || "unnamed"
-      }`
-    );
 
     // ✅ ADD: Calculate unique key for this trainer
     const trainerKey = `${rowIndex}-${batchIndex}-${trainerIdx}`;
@@ -124,7 +115,8 @@ const TrainerRow = React.memo(
 
     return (
       <tr
-        className={`border-b last:border-0 ${
+  id={`trainer-${trainerKey}`}
+  className={`border-b last:border-0 ${
           isDuplicate ? "bg-red-50 border-red-200" : ""
         }`}
       >
@@ -292,11 +284,9 @@ const TrainerRow = React.memo(
           <div className="flex items-center space-x-1">
             <span className="text-xs">
               {trainer.dailyHours && trainer.dailyHours.length > 0
-                ? trainer.dailyHours
-                    .reduce((sum, hours) => sum + Number(hours || 0), 0)
-                    .toFixed(2)
-                : trainer.assignedHours || 0}
-              h
+                ? (trainer.dailyHours.reduce((sum, hours) => sum + Number(hours || 0), 0) / trainer.dailyHours.length).toFixed(2)
+                : (trainer.assignedHours || 0)}
+              h/day
             </span>
             {trainer.dailyHours && trainer.dailyHours.length > 0 && (
               <button
@@ -335,7 +325,12 @@ const TrainerRow = React.memo(
                     </tr>
                   </thead>
                   <tbody>
-                    {trainer.activeDates.map((date, dayIndex) => {
+                    {trainer.activeDates
+                      .filter((date) => {
+                        const dateObj = new Date(date);
+                        return !isNaN(dateObj.getTime());
+                      })
+                      .map((date, dayIndex) => {
                       const dateObj = new Date(date);
                       const dayName = dateObj.toLocaleDateString("en-US", {
                         weekday: "short",
@@ -353,17 +348,20 @@ const TrainerRow = React.memo(
                           <td className="px-2 py-1">{formattedDate}</td>
                           <td className="px-2 py-1 text-gray-600">{dayName}</td>
                           <td className="px-2 py-1">
-                            <input
-                              type="number"
-                              value={trainer.dailyHours[dayIndex] || ""}
-                              onChange={(e) =>
-                                handleDailyHourChange(dayIndex, e.target.value)
-                              }
-                              className="w-16 rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-0.5 px-1"
-                              min="0"
-                              step="0.5"
-                              placeholder="0"
-                            />
+                            <div className="flex items-center">
+                              <input
+                                type="number"
+                                value={trainer.dailyHours[dayIndex] || ""}
+                                onChange={(e) =>
+                                  handleDailyHourChange(dayIndex, e.target.value)
+                                }
+                                className="w-12 rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-0.5 px-1"
+                                min="0"
+                                step="0.5"
+                                placeholder="0"
+                              />
+                              <span className="ml-1 text-xs text-gray-500">h</span>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -404,15 +402,6 @@ const TrainerRow = React.memo(
                 type="button"
                 className="ml-2 px-2 py-1 text-xs bg-black text-white rounded hover:bg-gray-800"
                 onClick={() => {
-                  console.log("🔴 [SWAP] Swap button clicked for trainer:", {
-                    rowIndex,
-                    batchIndex,
-                    trainerIdx,
-                    trainerData: trainer,
-                    batchCode: batch.batchCode,
-                    specialization: row.batch,
-                    domain: selectedDomain,
-                  });
                   openSwapModal(rowIndex, batchIndex, trainerIdx);
                 }}
                 title="Swap Trainer"
@@ -446,12 +435,9 @@ const TrainersTable = React.memo(
     openSwapModal,
     isTrainerAvailable,
     duplicates = [],
-      openDailySchedule, // Add this prop
-  setOpenDailySchedule // Add this prop
+    openDailySchedule, // Add this prop
+    setOpenDailySchedule, // Add this prop
   }) => {
-    console.log(
-      `🔄 [MEMOIZED] TrainersTable rendering for batch ${batchIndex} with ${trainers.length} trainers`
-    );
 
     return (
       <div>
@@ -482,34 +468,34 @@ const TrainersTable = React.memo(
                   <th className="px-2 py-1 text-left">Actions</th>
                 </tr>
               </thead>
-      <tbody>
-        {trainers.map((trainer, trainerIdx) => {
-          const duplicateKey = `${rowIndex}-${batchIndex}-${trainerIdx}`;
-          const isDuplicate = duplicates.includes(duplicateKey);
-          
-          return (
-            <TrainerRow
-              key={`trainer-${rowIndex}-${batchIndex}-${trainerIdx}`}
-              trainer={trainer}
-              trainerIdx={trainerIdx}
-              rowIndex={rowIndex}
-              batchIndex={batchIndex}
-              batch={batch}
-              row={row}
-              trainers={allTrainers}
-              selectedDomain={selectedDomain}
-              handleTrainerField={handleTrainerField}
-              handleTotalHoursChange={handleTotalHoursChange}
-              removeTrainer={removeTrainer}
-              openSwapModal={openSwapModal}
-              isTrainerAvailable={isTrainerAvailable}
-              isDuplicate={isDuplicate}
-              openDailySchedule={openDailySchedule} // Add this prop
-              setOpenDailySchedule={setOpenDailySchedule} // Add this prop
-            />
-          );
-        })}
-      </tbody>
+              <tbody>
+                {trainers.map((trainer, trainerIdx) => {
+                  const duplicateKey = `${rowIndex}-${batchIndex}-${trainerIdx}`;
+                  const isDuplicate = duplicates.includes(duplicateKey);
+
+                  return (
+                    <TrainerRow
+                      key={`trainer-${rowIndex}-${batchIndex}-${trainerIdx}`}
+                      trainer={trainer}
+                      trainerIdx={trainerIdx}
+                      rowIndex={rowIndex}
+                      batchIndex={batchIndex}
+                      batch={batch}
+                      row={row}
+                      trainers={allTrainers}
+                      selectedDomain={selectedDomain}
+                      handleTrainerField={handleTrainerField}
+                      handleTotalHoursChange={handleTotalHoursChange}
+                      removeTrainer={removeTrainer}
+                      openSwapModal={openSwapModal}
+                      isTrainerAvailable={isTrainerAvailable}
+                      isDuplicate={isDuplicate}
+                      openDailySchedule={openDailySchedule} // Add this prop
+                      setOpenDailySchedule={setOpenDailySchedule} // Add this prop
+                    />
+                  );
+                })}
+              </tbody>
             </table>
           </div>
         ) : (
@@ -544,12 +530,9 @@ const BatchComponent = React.memo(
     openSwapModal,
     isTrainerAvailable,
     duplicates = [],
-  openDailySchedule, // Add this prop
-  setOpenDailySchedule // Add this prop
-}) => {
-    console.log(
-      `🔄 [MEMOIZED] BatchComponent ${batchIndex} rendering for ${row.batch}`
-    );
+    openDailySchedule, // Add this prop
+    setOpenDailySchedule, // Add this prop
+  }) => {
 
     return (
       <div
@@ -705,24 +688,24 @@ const BatchComponent = React.memo(
           )}
 
           {/* Trainers Table */}
-  <TrainersTable
-    trainers={batch.trainers || []}
-    rowIndex={rowIndex}
-    batchIndex={batchIndex}
-    batch={batch}
-    row={row}
-    allTrainers={trainers}
-    selectedDomain={selectedDomain}
-    addTrainer={addTrainer}
-    handleTrainerField={handleTrainerField}
-    handleTotalHoursChange={handleTotalHoursChange}
-    removeTrainer={removeTrainer}
-    openSwapModal={openSwapModal}
-    isTrainerAvailable={isTrainerAvailable}
-    duplicates={duplicates}
-    openDailySchedule={openDailySchedule} // Add this prop
-    setOpenDailySchedule={setOpenDailySchedule} // Add this prop
-  />
+          <TrainersTable
+            trainers={batch.trainers || []}
+            rowIndex={rowIndex}
+            batchIndex={batchIndex}
+            batch={batch}
+            row={row}
+            allTrainers={trainers}
+            selectedDomain={selectedDomain}
+            addTrainer={addTrainer}
+            handleTrainerField={handleTrainerField}
+            handleTotalHoursChange={handleTotalHoursChange}
+            removeTrainer={removeTrainer}
+            openSwapModal={openSwapModal}
+            isTrainerAvailable={isTrainerAvailable}
+            duplicates={duplicates}
+            openDailySchedule={openDailySchedule} // Add this prop
+            setOpenDailySchedule={setOpenDailySchedule} // Add this prop
+          />
         </div>
       </div>
     );
@@ -731,65 +714,18 @@ const BatchComponent = React.memo(
 
 BatchComponent.displayName = "BatchComponent";
 
+// Accept globalTrainerAssignments as a prop (array of {trainerId, date, dayDuration, ...})
 const BatchDetailsTable = ({
   table1Data,
   setTable1Data,
   selectedDomain,
   commonFields,
-  canMergeBatches,
   onSwapTrainer,
   mergeFirestoreConfig,
   courses,
   onValidationChange,
+  globalTrainerAssignments = [], // <-- pass this from parent (InitiationModal)
 }) => {
-  // ✅ FIXED: Use useRef to ensure consistent timer name across renders
-  const renderTimerRef = useRef(null);
-  const startTimeRef = useRef(null);
-
-  // ✅ FIXED: Initialize timer only once per render cycle
-  if (!renderTimerRef.current) {
-    renderTimerRef.current = `BatchDetailsTable Render ${Date.now()}-${Math.random()}`;
-    startTimeRef.current = performance.now();
-    console.time(renderTimerRef.current);
-  }
-
-  // Add logging when props change
-  useEffect(() => {
-    console.log("🔄 [BATCH DETAILS TABLE] Props updated:", {
-      selectedDomain: selectedDomain,
-      table1DataLength: table1Data?.length || 0,
-      table1Data: table1Data,
-      timestamp: new Date().toISOString(),
-    });
-  }, [table1Data, selectedDomain]);
-
-  // Add logging when trainers are rendered
-  useEffect(() => {
-    if (table1Data && table1Data.length > 0) {
-      table1Data.forEach((row, rowIdx) => {
-        row.batches.forEach((batch, batchIdx) => {
-          if (batch.trainers && batch.trainers.length > 0) {
-            console.log(
-              `👨‍🏫 [BATCH DETAILS TABLE] Rendering trainers for ${
-                row.batch
-              } - Batch ${batchIdx + 1}:`,
-              {
-                rowIdx,
-                batchIdx,
-                batchCode: batch.batchCode,
-                trainers: batch.trainers.map((trainer, trainerIdx) => ({
-                  trainerIdx,
-                  trainerId: trainer.trainerId,
-                  trainerName: trainer.trainerName,
-                  dayDuration: trainer.dayDuration,
-                })),
-              }
-            );
-          }
-        });
-      });
-    }
-  }, [table1Data]);
 
   const [mergeModal, setMergeModal] = useState({
     open: false,
@@ -815,11 +751,10 @@ const BatchDetailsTable = ({
   const [expandedBatch, setExpandedBatch] = useState({});
   const [swapModal, setSwapModal] = useState({ open: false, source: null });
   const [duplicateTrainers, setDuplicateTrainers] = useState([]);
-  const [openDailySchedule, setOpenDailySchedule] = useState(null); 
+  const [openDailySchedule, setOpenDailySchedule] = useState(null);
 
   // ✅ 4. Memoize filtered trainers to prevent unnecessary re-filtering
   const filteredTrainers = useMemo(() => {
-    console.log("🔄 [MEMOIZED] Recalculating filtered trainers");
     return trainers.filter(
       (tr) =>
         tr.domain &&
@@ -830,7 +765,7 @@ const BatchDetailsTable = ({
 
   // ✅ 5. Memoize batch statistics to prevent recalculation on every render
   const batchStatistics = useMemo(() => {
-    console.log("🔄 [MEMOIZED] Recalculating batch statistics");
+    
     return table1Data.map((row, rowIndex) => {
       const totalAssignedStudents = row.batches.reduce(
         (sum, b) => sum + Number(b.batchPerStdCount || 0),
@@ -868,7 +803,7 @@ const BatchDetailsTable = ({
     [courses, getSpecializationColors]
   );
 
-  // color helpers (colors constant removed because not used)
+  // GLOBAL TRAINER AVAILABILITY CHECK
   const isTrainerAvailable = (
     trainerId,
     date,
@@ -876,36 +811,82 @@ const BatchDetailsTable = ({
     excludeTrainerKey = null,
     currentBatchKey = null
   ) => {
-    // Check if this trainer is already assigned to any batch (including current batch)
+    // 1. Check current table (local)
     for (let rowIdx = 0; rowIdx < table1Data.length; rowIdx++) {
       const row = table1Data[rowIdx];
       for (let batchIdx = 0; batchIdx < row.batches.length; batchIdx++) {
         const batch = row.batches[batchIdx];
         const batchKey = `${rowIdx}-${batchIdx}`;
-
-        // Skip checking same batch if currentBatchKey is provided
         if (currentBatchKey && batchKey === currentBatchKey) continue;
-
-        for (
-          let trainerIdx = 0;
-          trainerIdx < batch.trainers.length;
-          trainerIdx++
-        ) {
+        for (let trainerIdx = 0; trainerIdx < batch.trainers.length; trainerIdx++) {
           const trainer = batch.trainers[trainerIdx];
           const currentKey = `${rowIdx}-${batchIdx}-${trainerIdx}`;
-
           if (excludeTrainerKey === currentKey) continue;
-
           if (
             trainer.trainerId === trainerId &&
-            trainer.dayDuration === dayDuration &&
             trainer.startDate &&
-            trainer.endDate &&
-            new Date(date) >= new Date(trainer.startDate) &&
-            new Date(date) <= new Date(trainer.endDate)
+            trainer.endDate
           ) {
-            return false; // Trainer is already booked
+            const startDateObj = new Date(trainer.startDate);
+            const endDateObj = new Date(trainer.endDate);
+            const dateObj = new Date(date);
+            if (
+              !isNaN(dateObj.getTime()) &&
+              !isNaN(startDateObj.getTime()) &&
+              !isNaN(endDateObj.getTime()) &&
+              dateObj >= startDateObj &&
+              dateObj <= endDateObj
+            ) {
+              // Conflict logic
+              if (
+                trainer.dayDuration === "AM & PM" ||
+                dayDuration === "AM & PM" ||
+                (trainer.dayDuration === "AM" && dayDuration === "AM") ||
+                (trainer.dayDuration === "PM" && dayDuration === "PM")
+              ) {
+                return false;
+              }
+            }
           }
+        }
+      }
+    }
+    // 2. Check global assignments
+    const normalizeDate = (d) => {
+      if (!d) return null;
+      const dt = new Date(d);
+      if (isNaN(dt.getTime())) return null;
+      return dt.toISOString().slice(0, 10);
+    };
+
+    for (let assignment of globalTrainerAssignments) {
+      if (assignment.trainerId !== trainerId) continue;
+
+      // Build list of dates for the assignment (supports single date or range)
+      let assignDates = [];
+      if (assignment.date) {
+        const d = normalizeDate(assignment.date);
+        if (d) assignDates.push(d);
+      } else if (assignment.startDate && assignment.endDate) {
+        const list = getDateListExcludingSundays(
+          assignment.startDate,
+          assignment.endDate
+        );
+        assignDates = list.map((dd) => normalizeDate(dd)).filter(Boolean);
+      }
+
+      const dateNorm = normalizeDate(date);
+      if (!dateNorm) continue;
+
+      if (assignDates.includes(dateNorm)) {
+        const ad = assignment.dayDuration;
+        if (
+          ad === "AM & PM" ||
+          dayDuration === "AM & PM" ||
+          (ad === "AM" && dayDuration === "AM") ||
+          (ad === "PM" && dayDuration === "PM")
+        ) {
+          return false;
         }
       }
     }
@@ -968,19 +949,11 @@ const BatchDetailsTable = ({
 
   // Optional prop: mergeFirestoreConfig = { collectionPath: 'trainings', docIdField: 'id' }
   const handleMergeBatch = async (sourceRowIndex, targetRowIndex) => {
-    console.log("[BatchDetailsTable] handleMergeBatch called", {
-      sourceRowIndex,
-      targetRowIndex,
-    });
     const updatedData = [...table1Data];
     const sourceRow = updatedData[sourceRowIndex];
     const targetRow = updatedData[targetRowIndex];
 
     if (!sourceRow || !targetRow) {
-      console.warn(
-        "[BatchDetailsTable] handleMergeBatch: invalid source/target",
-        { sourceRow, targetRow }
-      );
       return;
     }
 
@@ -1031,9 +1004,6 @@ const BatchDetailsTable = ({
     }
 
     setTable1Data(updatedData);
-    console.log("[BatchDetailsTable] merged rows updated locally", {
-      mergedRow,
-    });
 
     // Persist if config provided
     if (
@@ -1049,22 +1019,11 @@ const BatchDetailsTable = ({
             String(targetRow[docIdField])
           );
           await updateDoc(targetDocRef, mergedRow);
-          console.log("[BatchDetailsTable] merged row updated in Firestore", {
-            collectionPath,
-            docId: targetRow[docIdField],
-          });
         } else {
-          const added = await addDoc(collection(db, collectionPath), mergedRow);
-          console.log("[BatchDetailsTable] merged row added to Firestore", {
-            collectionPath,
-            docId: added.id,
-          });
+          await addDoc(collection(db, collectionPath), mergedRow);
         }
-      } catch (err) {
-        console.error(
-          "[BatchDetailsTable] Error persisting merged batch:",
-          err
-        );
+      } catch {
+        // Error persisting merged batch
       }
     }
 
@@ -1192,13 +1151,17 @@ const BatchDetailsTable = ({
       }
 
       // Prepare dates
-      const normalizeDate = (dateStr) =>
-        new Date(dateStr).toISOString().slice(0, 10);
+      const normalizeDate = (dateStr) => {
+        if (!dateStr) return null;
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return null;
+        return date.toISOString().slice(0, 10);
+      };
       const newTrainerDates = getDateListExcludingSundays(
         tempTrainer.startDate,
         tempTrainer.endDate
       );
-      const newTrainerDatesNormalized = newTrainerDates.map(normalizeDate);
+      const newTrainerDatesNormalized = newTrainerDates.map(normalizeDate).filter(date => date !== null);
 
       const hasConflict = batch.trainers.some((t, idx) => {
         if (idx === trainerIdx) return false;
@@ -1206,7 +1169,7 @@ const BatchDetailsTable = ({
 
         const existingDates =
           t.activeDates || getDateListExcludingSundays(t.startDate, t.endDate);
-        const existingDatesNormalized = existingDates.map(normalizeDate);
+        const existingDatesNormalized = existingDates.map(normalizeDate).filter(date => date !== null);
 
         return newTrainerDatesNormalized.some((date) =>
           existingDatesNormalized.includes(date)
@@ -1242,32 +1205,10 @@ const BatchDetailsTable = ({
         (a, b) => a + Number(b || 0),
         0
       );
-
-      console.log("📊 [TRAINER FIELD] Updated trainer schedule:", {
-        rowIndex,
-        batchIndex,
-        trainerIdx,
-        field,
-        value,
-        trainerName: trainer.trainerName,
-        perDayHours,
-        dateList: dateList.length,
-        dailyHours: trainer.dailyHours,
-        assignedHours: trainer.assignedHours,
-      });
     }
 
     if (field === "trainerId") {
       const tr = trainers.find((t) => t.trainerId === value);
-
-      // ✅ FIXED: Debug and ensure proper trainer data mapping
-      console.log("🔍 [TRAINER FIELD] Trainer selection debug:", {
-        selectedTrainerId: value,
-        foundTrainer: tr,
-        trainerFromDatabase: tr,
-        trainerNameField: tr?.name,
-        trainerStructure: tr ? Object.keys(tr) : "not found",
-      });
 
       // ✅ FIXED: Handle different possible field names for trainer name
       trainer.trainerName =
@@ -1276,14 +1217,6 @@ const BatchDetailsTable = ({
 
       // ✅ ADDED: Set trainerId to ensure the dropdown shows the selection
       trainer.trainerId = value;
-
-      console.log("📊 [TRAINER FIELD] Updated trainer data:", {
-        trainerId: trainer.trainerId,
-        trainerName: trainer.trainerName,
-        perHourCost: trainer.perHourCost,
-        paymentType: tr?.paymentType,
-        charges: tr?.charges,
-      });
     }
 
     // ✅ FIXED: Ensure assignedHours is always a number
@@ -1298,22 +1231,11 @@ const BatchDetailsTable = ({
 
   // 1) getAvailableSpecializations (replace existing)
   const getAvailableSpecializations = (sourceRowIndex) => {
-    console.log("[BatchDetailsTable] getAvailableSpecializations called", {
-      sourceRowIndex,
-      table1DataLength: table1Data?.length ?? 0,
-      selectedDomain,
-    });
-
     if (!table1Data || table1Data.length === 0) {
-      console.warn("[BatchDetailsTable] table1Data empty or undefined");
       return [];
     }
     const sourceRow = table1Data[sourceRowIndex];
     if (!sourceRow) {
-      console.warn(
-        "[BatchDetailsTable] sourceRow not found for index",
-        sourceRowIndex
-      );
       return [];
     }
 
@@ -1344,23 +1266,6 @@ const BatchDetailsTable = ({
         hrs: row.hrs || 0,
       }));
 
-    console.log("[BatchDetailsTable] available specializations for merge", {
-      sourceIndex: sourceRowIndex,
-      sourceBatch: sourceRow.batch,
-      result,
-    });
-
-    if (result.length === 0) {
-      console.info(
-        "[BatchDetailsTable] no available specializations found for merge. Check row.domain / row.hrs values",
-        {
-          sourceRow,
-          selectedDomain,
-          table1DataSample: table1Data.slice(0, 5),
-        }
-      );
-    }
-
     return result;
   };
 
@@ -1368,6 +1273,11 @@ const BatchDetailsTable = ({
     if (!start || !end) return [];
     const startDate = new Date(start);
     const endDate = new Date(end);
+    
+    // Validate dates
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return [];
+    if (startDate > endDate) return [];
+    
     const dates = [];
     let current = new Date(startDate);
     while (current <= endDate) {
@@ -1407,58 +1317,25 @@ const BatchDetailsTable = ({
       trainer.dailyHours = total > 0 ? [total] : [];
     }
 
-    console.log("📊 [TOTAL HOURS] Updated trainer hours:", {
-      rowIndex,
-      batchIndex,
-      trainerIdx,
-      trainerName: trainer.trainerName,
-      newAssignedHours: trainer.assignedHours,
-      dailyHours: trainer.dailyHours,
-      daysCount: days,
-    });
-
     setTable1Data(updated);
   };
 
   const openSwapModal = (rowIdx, batchIdx, trainerIdx) => {
-    console.log("🔄 [SWAP] Opening swap modal with details:", {
-      sourceRowIdx: rowIdx,
-      sourceBatchIdx: batchIdx,
-      sourceTrainerIdx: trainerIdx,
-      sourceTrainerData:
-        table1Data[rowIdx]?.batches[batchIdx]?.trainers[trainerIdx],
-      sourceBatchCode: table1Data[rowIdx]?.batches[batchIdx]?.batchCode,
-      sourceSpecialization: table1Data[rowIdx]?.batch,
-    });
     setSwapModal({ open: true, source: { rowIdx, batchIdx, trainerIdx } });
   };
 
   const closeSwapModal = () => {
-    console.log("❌ [SWAP] Closing swap modal");
     setSwapModal({ open: false, source: null });
   };
 
   const handleSwap = (target) => {
-    console.log("🔄 [SWAP] handleSwap called with:", {
-      source: swapModal.source,
-      target: target,
-      sourceExists: !!swapModal.source,
-      targetExists: !!target,
-    });
-
     if (!swapModal.source || !target) {
-      console.error("❌ [SWAP] Missing source or target data:", {
-        source: swapModal.source,
-        target: target,
-      });
       return;
     }
 
     const source = swapModal.source;
 
-    // Get trainer data with detailed logging
-    console.log("📊 [SWAP] Extracting trainer data...");
-
+    // Get trainer data
     const sourceTrainerData =
       table1Data[source.rowIdx]?.batches[source.batchIdx]?.trainers[
         source.trainerIdx
@@ -1468,27 +1345,7 @@ const BatchDetailsTable = ({
         target.trainerIdx
       ];
 
-    console.log("👤 [SWAP] Source trainer data:", {
-      rowIdx: source.rowIdx,
-      batchIdx: source.batchIdx,
-      trainerIdx: source.trainerIdx,
-      trainerData: sourceTrainerData,
-      batchCode: table1Data[source.rowIdx]?.batches[source.batchIdx]?.batchCode,
-    });
-
-    console.log("👤 [SWAP] Target trainer data:", {
-      rowIdx: target.rowIdx,
-      batchIdx: target.batchIdx,
-      trainerIdx: target.trainerIdx,
-      trainerData: targetTrainerData,
-      batchCode: table1Data[target.rowIdx]?.batches[target.batchIdx]?.batchCode,
-    });
-
     if (!sourceTrainerData || !targetTrainerData) {
-      console.error("❌ [SWAP] Failed to get trainer data:", {
-        sourceTrainerData: sourceTrainerData,
-        targetTrainerData: targetTrainerData,
-      });
       alert("Error: Could not find trainer data for swap");
       return;
     }
@@ -1514,10 +1371,6 @@ const BatchDetailsTable = ({
 
     // Check if durations match
     if (sourceDuration !== targetDuration) {
-      console.error("❌ [SWAP] Duration mismatch:", {
-        sourceDuration,
-        targetDuration,
-      });
       alert(
         `Cannot swap trainers: Duration mismatch.\n` +
           `Source trainer: ${sourceDuration} days\n` +
@@ -1541,24 +1394,7 @@ const BatchDetailsTable = ({
       targetTrainerData.dayDuration
     );
 
-    console.log("🔄 [SWAP] Cross-batch swap mapping:", {
-      sourceOriginal: `${sourceTrainerData.trainerName} (${
-        sourceTrainerData.dayDuration
-      }) in ${table1Data[source.rowIdx]?.batch}`,
-      sourceNew: `${sourceTrainerData.trainerName} (${sourceNewTimeSlot}) in ${
-        table1Data[target.rowIdx]?.batch
-      }`,
-      targetOriginal: `${targetTrainerData.trainerName} (${
-        targetTrainerData.dayDuration
-      }) in ${table1Data[target.rowIdx]?.batch}`,
-      targetNew: `${targetTrainerData.trainerName} (${targetNewTimeSlot}) in ${
-        table1Data[source.rowIdx]?.batch
-      }`,
-    });
-
     // Check availability in the TARGET batches (cross-swap)
-    console.log("🔍 [SWAP] Checking cross-batch availability...");
-
     // Check if source trainer can be added to TARGET batch in new time slot
     const sourceAvailableInTargetBatch = isTrainerAvailable(
       sourceTrainerData.trainerId,
@@ -1577,22 +1413,7 @@ const BatchDetailsTable = ({
       `${source.rowIdx}-${source.batchIdx}` // Check source batch
     );
 
-    console.log("✅ [SWAP] Cross-batch availability check:", {
-      sourceAvailableInTargetBatch: sourceAvailableInTargetBatch,
-      targetAvailableInSourceBatch: targetAvailableInSourceBatch,
-      sourceToTarget: `${sourceTrainerData.trainerId} to ${
-        table1Data[target.rowIdx]?.batch
-      } (${sourceNewTimeSlot})`,
-      targetToSource: `${targetTrainerData.trainerId} to ${
-        table1Data[source.rowIdx]?.batch
-      } (${targetNewTimeSlot})`,
-    });
-
     if (!sourceAvailableInTargetBatch || !targetAvailableInSourceBatch) {
-      console.error("❌ [SWAP] Cross-batch availability check failed:", {
-        sourceAvailableInTargetBatch,
-        targetAvailableInSourceBatch,
-      });
       alert(
         `Cannot perform cross-batch swap due to scheduling conflicts:\n` +
           `${
@@ -1616,8 +1437,6 @@ const BatchDetailsTable = ({
       );
       return;
     }
-
-    console.log("🔄 [SWAP] Proceeding with cross-batch swap...");
 
     if (onSwapTrainer) {
       console.log(
@@ -1652,7 +1471,7 @@ const BatchDetailsTable = ({
             },
           },
         });
-        console.log("✅ [SWAP] Cross-batch swap completed successfully");
+        
       } catch (error) {
         console.error("❌ [SWAP] Error during cross-batch swap:", error);
         alert("Error occurred during swap: " + error.message);
@@ -1660,7 +1479,7 @@ const BatchDetailsTable = ({
       }
     } else {
       // Fallback: perform cross-batch swap locally
-      console.log("🔄 [SWAP] Performing local cross-batch swap...");
+      
 
       const updatedData = [...table1Data];
 
@@ -1675,15 +1494,6 @@ const BatchDetailsTable = ({
         dayDuration: targetNewTimeSlot,
       };
 
-      console.log("🔄 [SWAP] Adding trainers to opposite batches:", {
-        sourceToTarget: `${sourceNewTrainer.trainerName} (${
-          sourceNewTrainer.dayDuration
-        }) → ${table1Data[target.rowIdx]?.batch} batch`,
-        targetToSource: `${targetNewTrainer.trainerName} (${
-          targetNewTrainer.dayDuration
-        }) → ${table1Data[source.rowIdx]?.batch} batch`,
-      });
-
       // CROSS-BATCH SWAP: Add source trainer to target batch, target trainer to source batch
       updatedData[target.rowIdx].batches[target.batchIdx].trainers.push(
         sourceNewTrainer
@@ -1693,19 +1503,19 @@ const BatchDetailsTable = ({
       );
 
       setTable1Data(updatedData);
-      console.log("✅ [SWAP] Local cross-batch swap completed");
+      
     }
 
     closeSwapModal();
-    console.log("✅ [SWAP] Cross-batch swap process completed");
+    
   };
 
   // Update the getAMTrainers function to include duration information
   const getAMTrainers = () => {
-    console.log("🔍 [SWAP] Getting AM trainers list...");
+    
 
     if (!swapModal.source) {
-      console.log("❌ [SWAP] No source trainer selected");
+      
       return [];
     }
 
@@ -1714,7 +1524,7 @@ const BatchDetailsTable = ({
         ?.trainers[swapModal.source.trainerIdx];
 
     if (!sourceTrainer) {
-      console.log("❌ [SWAP] Source trainer not found");
+      
       return [];
     }
 
@@ -1731,12 +1541,6 @@ const BatchDetailsTable = ({
       sourceTrainer.startDate,
       sourceTrainer.endDate
     );
-
-    console.log("📊 [SWAP] Source trainer duration:", {
-      startDate: sourceTrainer.startDate,
-      endDate: sourceTrainer.endDate,
-      duration: sourceDuration,
-    });
 
     const list = [];
     table1Data.forEach((row, rowIdx) => {
@@ -1781,13 +1585,6 @@ const BatchDetailsTable = ({
       });
     });
 
-    console.log("📋 [SWAP] Compatible trainers list generated:", {
-      totalFound: list.length,
-      sourceDuration: sourceDuration,
-      sourceTimeSlot: sourceTrainer.dayDuration,
-      trainers: list,
-    });
-
     return list;
   };
 
@@ -1808,7 +1605,9 @@ const BatchDetailsTable = ({
             changed = true;
             return {
               ...trainer,
-              activeDates: trainer.activeDates.map((d) => new Date(d)),
+              activeDates: trainer.activeDates
+                .map((d) => new Date(d))
+                .filter((date) => !isNaN(date.getTime())),
             };
           }
           return trainer;
@@ -1831,13 +1630,8 @@ const BatchDetailsTable = ({
     }
   }, [table1Data]);
 
-  // use canMergeBatches so eslint doesn't mark it unused (keeps intent visible)
-  useEffect(() => {
-    console.log("[BatchDetailsTable] canMergeBatches:", canMergeBatches);
-  }, [canMergeBatches]);
-
   const undoMerge = async (mergedRowIndex) => {
-    console.log("[BatchDetailsTable] undoMerge called", { mergedRowIndex });
+    
     const updated = [...table1Data];
     const mergedRow = updated[mergedRowIndex];
     if (!mergedRow || !mergedRow.originalData) {
@@ -1898,89 +1692,181 @@ const BatchDetailsTable = ({
     }
   };
 
-  // ✅ FIXED: Use useLayoutEffect to ensure cleanup happens synchronously
-  useLayoutEffect(() => {
-    return () => {
-      if (renderTimerRef.current && startTimeRef.current) {
-        const endTime = performance.now();
-        const renderTime = endTime - startTimeRef.current;
-        console.log(
-          `⚡ [PERFORMANCE] BatchDetailsTable render completed in ${renderTime.toFixed(
-            2
-          )}ms`
-        );
-
-        try {
-          console.timeEnd(renderTimerRef.current);
-        } catch {
-          // Timer doesn't exist, ignore the error
-        }
-
-        // Reset for next render
-        renderTimerRef.current = null;
-        startTimeRef.current = null;
-      }
-    };
-  });
-
   // Monitor for duplicate trainers whenever table1Data changes
   useEffect(() => {
     if (!table1Data || table1Data.length === 0) {
       setDuplicateTrainers([]);
       if (onValidationChange) {
         onValidationChange(selectedDomain, {
-          hasDuplicates: false,
+          hasErrors: false,
+          errors: [],
           duplicates: [],
         });
       }
       return;
     }
 
-    // Inline duplicate detection to avoid useCallback dependency cycle
-    const duplicates = [];
+    // Improved duplicate detection with normalized dates and readable errors
+    const duplicatesSet = new Set();
     const trainerMap = new Map();
+    const errors = [];
+
+    const normalizeDate = (d) => {
+      if (!d) return null;
+      const dateObj = new Date(d);
+      if (isNaN(dateObj.getTime())) return null;
+      return dateObj.toISOString().slice(0, 10);
+    };
 
     table1Data.forEach((row, rowIndex) => {
       row.batches?.forEach((batch, batchIndex) => {
         batch.trainers?.forEach((trainer, trainerIdx) => {
-          if (
-            !trainer.trainerId ||
-            !trainer.dayDuration ||
-            !trainer.startDate
-          ) {
-            return; // Skip incomplete trainer data
+          if (!trainer.trainerId) return;
+
+          // Build list of normalized active dates for this trainer
+          let dates = [];
+          if (trainer.activeDates && trainer.activeDates.length > 0) {
+            dates = trainer.activeDates
+              .map((dd) => normalizeDate(dd))
+              .filter(Boolean);
+          } else if (trainer.startDate && trainer.endDate) {
+            const generated = getDateListExcludingSundays(
+              trainer.startDate,
+              trainer.endDate
+            );
+            dates = generated.map((dd) => normalizeDate(dd)).filter(Boolean);
+          } else if (trainer.startDate) {
+            const single = normalizeDate(trainer.startDate);
+            if (single) dates = [single];
           }
 
-          const key = `${trainer.trainerId}-${trainer.dayDuration}-${trainer.startDate}`;
+          if (dates.length === 0) return; // nothing to compare
+
           const trainerKey = `${rowIndex}-${batchIndex}-${trainerIdx}`;
 
-          if (trainerMap.has(key)) {
-            // Found duplicate - add both current and existing to duplicates
-            const existingKey = trainerMap.get(key);
-            if (!duplicates.includes(existingKey)) {
-              duplicates.push(existingKey);
+          dates.forEach((dateISO) => {
+            const keyBase = `${trainer.trainerId}-${dateISO}`;
+
+            if (trainerMap.has(keyBase)) {
+              const existing = trainerMap.get(keyBase);
+              const existingKey = existing.trainerKey;
+              // If the existing entry is the same trainer instance (same key), skip
+              if (existingKey === trainerKey) return;
+              // Check time slot overlap
+              const conflict =
+                trainer.dayDuration === "AM & PM" ||
+                existing.dayDuration === "AM & PM" ||
+                (trainer.dayDuration === "AM" && existing.dayDuration === "AM") ||
+                (trainer.dayDuration === "PM" && existing.dayDuration === "PM");
+
+              if (conflict) {
+                duplicatesSet.add(existingKey);
+                duplicatesSet.add(trainerKey);
+
+                // add a readable error for this conflict (grouped by trainer/date)
+                const message = `${trainer.trainerName || trainer.trainerId} (${trainer.trainerId}) has conflicting assignment on ${dateISO} for slot ${trainer.dayDuration || existing.dayDuration}`;
+                errors.push({ message });
+                // Debug log to help track false positives
+                console.debug('[BatchDetailsTable] duplicate detected (local)', {
+                  trainerKey,
+                  existingKey,
+                  trainerId: trainer.trainerId,
+                  dateISO,
+                  trainerDayDuration: trainer.dayDuration,
+                  existingDayDuration: existing.dayDuration,
+                });
+              }
+            } else {
+              trainerMap.set(keyBase, {
+                trainerKey,
+                dayDuration: trainer.dayDuration,
+              });
             }
-            duplicates.push(trainerKey);
-          } else {
-            trainerMap.set(key, trainerKey);
-          }
+
+            // Check global assignments (normalize their date too)
+            for (let assignment of globalTrainerAssignments) {
+              const assignDate = normalizeDate(assignment.date);
+              if (!assignDate) continue;
+              if (assignment.trainerId === trainer.trainerId && assignDate === dateISO) {
+                const globalConflict =
+                  assignment.dayDuration === "AM & PM" ||
+                  trainer.dayDuration === "AM & PM" ||
+                  (assignment.dayDuration === "AM" && trainer.dayDuration === "AM") ||
+                  (assignment.dayDuration === "PM" && trainer.dayDuration === "PM");
+                if (globalConflict) {
+                  duplicatesSet.add(trainerKey);
+                  const message = `${trainer.trainerName || trainer.trainerId} (${trainer.trainerId}) conflicts with an external assignment on ${dateISO}`;
+                  errors.push({ message });
+                  console.debug('[BatchDetailsTable] duplicate detected (global)', {
+                    trainerKey,
+                    trainerId: trainer.trainerId,
+                    dateISO,
+                    trainerDayDuration: trainer.dayDuration,
+                    assignmentDayDuration: assignment.dayDuration,
+                    assignmentSourceTrainingId: assignment.sourceTrainingId,
+                  });
+                }
+              }
+            }
+          });
         });
       });
     });
 
+    const duplicates = Array.from(duplicatesSet);
     setDuplicateTrainers(duplicates);
 
-    // Notify parent component about validation status
+    // Remove duplicate error messages
+    const uniqueErrors = Array.from(
+      new Map(errors.map((e) => [e.message, e])).values()
+    );
+
+    // Notify parent component about validation status using the shape expected by InitiationModal
     if (onValidationChange) {
       onValidationChange(selectedDomain, {
-        hasDuplicates: duplicates.length > 0,
+        hasErrors: duplicates.length > 0,
+        errors: uniqueErrors,
         duplicates: duplicates,
       });
     }
-  }, [table1Data, selectedDomain, onValidationChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [table1Data, selectedDomain, globalTrainerAssignments]);
 
   return (
     <div className="space-y-6">
+      {/* Duplicate prompt banner inside the table component */}
+      {duplicateTrainers && duplicateTrainers.length > 0 && (
+        <div className="rounded bg-red-50 border border-red-200 p-3">
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-red-800">
+              Duplicate trainer assignments detected. Rows with conflicts are highlighted in the table below.
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={() => {
+                  // Expand rows containing duplicates and scroll to first duplicate
+                  if (!duplicateTrainers || duplicateTrainers.length === 0) return;
+                  const first = duplicateTrainers[0];
+                  const parts = first.split("-");
+                  const rowIdx = Number(parts[0]);
+                  if (!isNaN(rowIdx)) {
+                    setExpandedBatch((prev) => ({ ...prev, [rowIdx]: true }));
+                  }
+                  // Scroll into view if element exists
+                  setTimeout(() => {
+                    const el = document.getElementById(`trainer-${first}`);
+                    if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                  }, 120);
+                }}
+                className="px-3 py-1.5 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+              >
+                Show duplicates
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Merge Modal */}
       {mergeModal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-30 backdrop-blur-sm">
@@ -2008,8 +1894,6 @@ const BatchDetailsTable = ({
                         "[BatchDetailsTable] selected target spec:",
                         table1Data[val]
                       );
-                    } else if (val === null) {
-                      console.log("[BatchDetailsTable] merge target cleared");
                     }
                     setMergeModal((prev) => ({
                       ...prev,
@@ -2339,27 +2223,27 @@ const BatchDetailsTable = ({
                   {isExpanded && (
                     <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 space-y-6">
                       {row.batches.map((batch, batchIndex) => (
-<BatchComponent
-  key={`batch-${rowIndex}-${batchIndex}`}
-  batch={batch}
-  batchIndex={batchIndex}
-  rowIndex={rowIndex}
-  row={row}
-  trainers={filteredTrainers}
-  selectedDomain={selectedDomain}
-  memoizedGetColorsForBatch={memoizedGetColorsForBatch}
-  handleBatchChange={handleBatchChange}
-  removeBatch={removeBatch}
-  addTrainer={addTrainer}
-  handleTrainerField={handleTrainerField}
-  handleTotalHoursChange={handleTotalHoursChange}
-  removeTrainer={removeTrainer}
-  openSwapModal={openSwapModal}
-  isTrainerAvailable={isTrainerAvailable}
-  duplicates={duplicateTrainers}
-  openDailySchedule={openDailySchedule} // Add this line
-  setOpenDailySchedule={setOpenDailySchedule} // Add this line
-/>
+                        <BatchComponent
+                          key={`batch-${rowIndex}-${batchIndex}`}
+                          batch={batch}
+                          batchIndex={batchIndex}
+                          rowIndex={rowIndex}
+                          row={row}
+                          trainers={filteredTrainers}
+                          selectedDomain={selectedDomain}
+                          memoizedGetColorsForBatch={memoizedGetColorsForBatch}
+                          handleBatchChange={handleBatchChange}
+                          removeBatch={removeBatch}
+                          addTrainer={addTrainer}
+                          handleTrainerField={handleTrainerField}
+                          handleTotalHoursChange={handleTotalHoursChange}
+                          removeTrainer={removeTrainer}
+                          openSwapModal={openSwapModal}
+                          isTrainerAvailable={isTrainerAvailable}
+                          duplicates={duplicateTrainers}
+                          openDailySchedule={openDailySchedule} // Add this line
+                          setOpenDailySchedule={setOpenDailySchedule} // Add this line
+                        />
                       ))}
                       {/* Add Batch Button */}
                       <div className="flex justify-end mt-1">

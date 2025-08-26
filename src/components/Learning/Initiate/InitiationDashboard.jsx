@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import React, { useEffect, useState, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
+import { collection, getDocs, doc, updateDoc, deleteField } from "firebase/firestore";
 import { db } from "../../../firebase";
 import {
   FiPlay,
@@ -12,6 +13,11 @@ import {
   FiFilter,
   FiRefreshCw,
   FiUserCheck,
+  FiX,
+  FiCircle,
+  FiClock,
+  FiPause,
+  FiCheckCircle,
 } from "react-icons/fi";
 import ChangeTrainerDashboard from "./ChangeTrainerDashboard";
 
@@ -19,6 +25,55 @@ const PHASE_LABELS = {
   "phase-1": "Phase 1",
   "phase-2": "Phase 2",
   "phase-3": "Phase 3",
+};
+
+const STATUS_LABELS = {
+  all: "All",
+  "Not Started": "Not Started",
+  Initiated: "Initiated",
+  Hold: "Hold",
+  "In Progress": "In Progress",
+  Done: "Done",
+};
+const STATUS_UI = {
+  "Not Started": {
+    pill: "bg-gray-100 text-gray-700",
+    icon: "text-gray-700",
+    tabActive: "bg-gradient-to-r from-gray-600 to-gray-700 text-white shadow-lg",
+    tabInactive: "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200",
+  },
+  Initiated: {
+    pill: "bg-yellow-100 text-yellow-700",
+    icon: "text-yellow-700",
+    tabActive: "bg-gradient-to-r from-yellow-500 to-yellow-600 text-white shadow-lg",
+    tabInactive: "bg-yellow-50 text-yellow-600 hover:bg-yellow-100 border border-yellow-200",
+  },
+  Hold: {
+    pill: "bg-orange-100 text-orange-700",
+    icon: "text-orange-700",
+    tabActive: "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg",
+    tabInactive: "bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200",
+  },
+  "In Progress": {
+    pill: "bg-blue-100 text-blue-700",
+    icon: "text-blue-700",
+    tabActive: "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg",
+    tabInactive: "bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200",
+  },
+  Done: {
+    pill: "bg-green-100 text-green-700",
+    icon: "text-green-700",
+    tabActive: "bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg",
+    tabInactive: "bg-green-50 text-green-600 hover:bg-green-100 border border-green-200",
+  },
+};
+
+const STATUS_ICON_MAP = {
+  "Not Started": FiCircle,
+  Initiated: FiClock,
+  Hold: FiPause,
+  "In Progress": FiPlay,
+  Done: FiCheckCircle,
 };
 
 // Helper to group trainings by college
@@ -37,9 +92,57 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterPhase, setFilterPhase] = useState("all");
+  const [activeStatusTab, setActiveStatusTab] = useState(() => {
+    try {
+      return localStorage.getItem("ld_initiation_activeStatusTab") || "all";
+    } catch {
+      return "all";
+    }
+  });
   const [refreshing, setRefreshing] = useState(false);
   const [changeTrainerModalOpen, setChangeTrainerModalOpen] = useState(false);
   const [selectedTrainingForChange, setSelectedTrainingForChange] = useState(null);
+  const [openDropdownId, setOpenDropdownId] = useState(null);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+  const dropdownRef = useRef();
+  const actionBtnRefs = useRef({});
+  const [toast, setToast] = useState(null);
+
+  // Get phase status and style (moved up so it can be used while filtering)
+  const getPhaseStatus = (training) => {
+    // decide status string first
+    let statusStr = null;
+
+    if (training.manualStatus) {
+      statusStr = training.manualStatus;
+    } else if (training.domainsCount === 0) {
+      statusStr = "Not Started";
+    } else if (!training.trainingStartDate || !training.trainingEndDate) {
+      statusStr = "Initiated";
+    } else {
+      const today = new Date();
+      const startDate = new Date(training.trainingStartDate);
+      const endDate = new Date(training.trainingEndDate);
+      today.setHours(0, 0, 0, 0);
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(0, 0, 0, 0);
+
+      if (training.status === "hold" || training.isOnHold) {
+        statusStr = "Hold";
+      } else if (today < startDate) {
+        statusStr = "Initiated";
+      } else if (today > endDate) {
+        statusStr = "Done";
+      } else if (today >= startDate && today <= endDate) {
+        statusStr = "In Progress";
+      } else {
+        statusStr = "Initiated";
+      }
+    }
+
+    const style = (STATUS_UI[statusStr] && STATUS_UI[statusStr].pill) || "bg-gray-100 text-gray-700";
+    return { status: statusStr, style };
+  };
 
   // Fetch all trainingForms and their phases
   const fetchData = async () => {
@@ -122,54 +225,25 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
     return matchesSearch && matchesPhase;
   });
 
+  // Status-aware filtering: compute status counts and filter by active tab
+  const filteredTrainingsBase = filteredTrainings;
+
+  const statusCounts = useMemo(() => {
+    const counts = { all: filteredTrainingsBase.length, "Not Started": 0, Initiated: 0, Hold: 0, "In Progress": 0, Done: 0 };
+    filteredTrainingsBase.forEach((t) => {
+      const s = getPhaseStatus(t).status;
+      if (counts[s] !== undefined) counts[s]++;
+    });
+    return counts;
+  }, [filteredTrainingsBase]);
+
+  const filteredByStatus = useMemo(() => {
+    if (activeStatusTab === "all") return filteredTrainingsBase;
+    return filteredTrainingsBase.filter((t) => getPhaseStatus(t).status === activeStatusTab);
+  }, [filteredTrainingsBase, activeStatusTab]);
+
   // Group trainings by college
-  const grouped = groupByCollege(filteredTrainings);
-
-  // Get phase status and style
-  const getPhaseStatus = (training) => {
-    // If no domains configured, it's not started
-    if (training.domainsCount === 0) {
-      return { status: "Not Started", style: "bg-gray-100 text-gray-700" };
-    }
-
-    // If domains are configured but no start/end dates, it's initiated
-    if (!training.trainingStartDate || !training.trainingEndDate) {
-      return { status: "Initiated", style: "bg-yellow-100 text-yellow-700" };
-    }
-
-    // Parse dates for comparison
-    const today = new Date();
-    const startDate = new Date(training.trainingStartDate);
-    const endDate = new Date(training.trainingEndDate);
-
-    // Reset time to compare only dates
-    today.setHours(0, 0, 0, 0);
-    startDate.setHours(0, 0, 0, 0);
-    endDate.setHours(0, 0, 0, 0);
-
-    // Check if training is on hold (you might want to add a specific field for this)
-    if (training.status === "hold" || training.isOnHold) {
-      return { status: "Hold", style: "bg-orange-100 text-orange-700" };
-    }
-
-    // If current date is before start date - Initiated
-    if (today < startDate) {
-      return { status: "Initiated", style: "bg-yellow-100 text-yellow-700" };
-    }
-
-    // If current date is after end date - Done
-    if (today > endDate) {
-      return { status: "Done", style: "bg-green-100 text-green-700" };
-    }
-
-    // If current date is between start and end date - In Progress
-    if (today >= startDate && today <= endDate) {
-      return { status: "In Progress", style: "bg-blue-100 text-blue-700" };
-    }
-
-    // Fallback to initiated
-    return { status: "Initiated", style: "bg-yellow-100 text-yellow-700" };
-  };
+  const grouped = groupByCollege(filteredByStatus);
 
   const handleStartPhase = (e, training) => {
     e.stopPropagation(); // Prevent row click
@@ -209,23 +283,128 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
     setChangeTrainerModalOpen(true);
   };
 
+  // Move a phase to a specific status (manual override). Updates Firestore and local state optimistically.
+  const moveToStatus = async (training, newStatus) => {
+    try {
+      // Save previous manualStatus for undo
+      const prevManual = training.manualStatus;
+
+      // Optimistic UI update
+      setTrainings(prev => prev.map(t => t.id === training.id ? { ...t, manualStatus: newStatus } : t));
+
+      // Persist manualStatus to Firestore: training.trainingId -> trainings -> training.phaseId
+      const trainingDocRef = doc(db, "trainingForms", training.trainingId, "trainings", training.phaseId);
+      updateDoc(trainingDocRef, { manualStatus: newStatus }).catch(err => {
+        console.error("Failed to update status:", err);
+        // rollback on error
+        fetchData();
+      });
+
+      // Show undo toast
+      if (toast && toast.timer) {
+        clearTimeout(toast.timer);
+      }
+      const timer = setTimeout(() => setToast(null), 6000);
+  setToast({ status: newStatus, message: `Moved to ${newStatus}`, trainingId: training.id, prevManual, timer });
+    } catch (err) {
+      console.error("Failed to update status:", err);
+      fetchData();
+    }
+  };
+
+  const handleUndo = async () => {
+    if (!toast) return;
+    const { trainingId, prevManual, timer } = toast;
+    if (timer) clearTimeout(timer);
+
+    // Optimistically revert locally
+    setTrainings(prev => prev.map(t => t.id === trainingId ? { ...t, manualStatus: prevManual } : t));
+
+    // Find training to get ids for Firestore
+    const t = trainings.find(x => x.id === trainingId);
+    if (t) {
+      const trainingDocRef = doc(db, "trainingForms", t.trainingId, "trainings", t.phaseId);
+      try {
+        if (prevManual === undefined) {
+          await updateDoc(trainingDocRef, { manualStatus: deleteField() });
+        } else {
+          await updateDoc(trainingDocRef, { manualStatus: prevManual });
+        }
+      } catch (err) {
+        console.error("Failed to undo status:", err);
+        fetchData();
+      }
+    }
+
+    setToast(null);
+  };
+
+  // cleanup toast timer on unmount
+  useEffect(() => {
+    return () => {
+      if (toast && toast.timer) clearTimeout(toast.timer);
+    };
+  }, [toast]);
+
+  // Persist active status tab so it survives reloads
+  useEffect(() => {
+    try {
+      localStorage.setItem("ld_initiation_activeStatusTab", activeStatusTab);
+    } catch {
+      // ignore storage errors
+    }
+  }, [activeStatusTab]);
+
+  // Revert manual override so automatic date logic applies again
+  const revertToAutomatic = async (training) => {
+    try {
+      // Optimistic UI update: remove manualStatus locally
+      setTrainings(prev => prev.map(t => t.id === training.id ? { ...t, manualStatus: undefined } : t));
+
+      // Remove manualStatus field in Firestore
+      const trainingDocRef = doc(db, "trainingForms", training.trainingId, "trainings", training.phaseId);
+      await updateDoc(trainingDocRef, { manualStatus: deleteField() });
+    } catch (err) {
+      console.error("Failed to revert status:", err);
+      fetchData();
+    }
+  };
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target) &&
+        // Also check if click is not on the action button
+        (!openDropdownId ||
+          !actionBtnRefs.current[openDropdownId] ||
+          !actionBtnRefs.current[openDropdownId].contains(event.target))
+      ) {
+        setOpenDropdownId(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [openDropdownId]);
+
   return (
     <div className="min-h-screen bg-gray-50/50">
-      <div className="max-w-7xl mx-auto space-y-6">
+<div className="w-full space-y-3 ">
         {/* Header Section */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-3">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+              <h1 className="text-xl font-bold text-gray-900 tracking-tight">
                 Training Initiation Dashboard
               </h1>
-              <p className="text-gray-600 text-sm mt-1">
+              <p className="text-gray-600 text-xs mt-0.5">
                 Manage and monitor training phases across all colleges
               </p>
             </div>
 
             {/* Controls */}
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col sm:flex-row gap-2">
               {/* Search */}
               <div className="relative">
                 <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -234,7 +413,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                   placeholder="Search colleges or domains..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all w-full sm:w-64"
+                  className="pl-10 pr-3 py-1.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all w-full sm:w-52"
                 />
               </div>
 
@@ -244,7 +423,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                 <select
                   value={filterPhase}
                   onChange={(e) => setFilterPhase(e.target.value)}
-                  className="pl-10 pr-8 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none bg-white min-w-[140px]"
+                  className="pl-10 pr-6 py-1.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none bg-white min-w-[110px]"
                 >
                   <option value="all">All Phases</option>
                   <option value="phase-1">Phase 1</option>
@@ -257,30 +436,49 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
               <button
                 onClick={handleRefresh}
                 disabled={refreshing}
-                className="inline-flex items-center px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <FiRefreshCw
-                  className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`}
+                  className={`w-4 h-4 mr-1 ${refreshing ? "animate-spin" : ""}`}
                 />
                 Refresh
               </button>
+            </div>
+          </div>
+
+          {/* Status Tabs (Not Started, Initiated, Hold, In Progress, Done) */}
+          <div className="mt-3">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-3">
+              {Object.keys(STATUS_LABELS).map((key) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveStatusTab(key)}
+                  className={`py-2 rounded-xl text-sm font-semibold transition-all ${
+                      activeStatusTab === key
+                        ? (key !== 'all' && STATUS_UI[key] ? STATUS_UI[key].tabActive : 'bg-blue-600 text-white shadow-md')
+                        : (key !== 'all' && STATUS_UI[key] && STATUS_UI[key].tabInactive) ? STATUS_UI[key].tabInactive : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
+                    }`}
+                >
+                  {STATUS_LABELS[key]} <span className="ml-1 text-xs font-bold">({statusCounts[key] || 0})</span>
+                </button>
+              ))}
             </div>
           </div>
         </div>
 
         {/* Loading State */}
         {loading ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-12">
-            <div className="flex flex-col items-center justify-center space-y-4">
-              <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-              <p className="text-gray-500 text-sm">Loading training data...</p>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-6">
+            <div className="flex flex-col items-center justify-center space-y-2">
+              <div className="w-7 h-7 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-gray-500 text-xs">Loading training data...</p>
             </div>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-3">
             {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200/50 p-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200/50 p-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-gray-600 text-sm font-medium">
@@ -296,7 +494,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                 </div>
               </div>
 
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200/50 p-6">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200/50 p-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-gray-600 text-sm font-medium">
@@ -312,7 +510,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                 </div>
               </div>
 
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200/50 p-6">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200/50 p-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-gray-600 text-sm font-medium">
@@ -341,7 +539,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                   className="bg-white rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden"
                 >
                   {/* College Header */}
-                  <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-5">
+                  <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3">
                     <div className="flex items-center justify-between">
                       <div>
                         <h2 className="text-lg font-bold text-white">
@@ -363,22 +561,22 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50/50">
                         <tr>
-                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                             Phase
                           </th>
-                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                             Domain
                           </th>
-                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                             Timeline
                           </th>
-                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                             Batches
                           </th>
-                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                             Status
                           </th>
-                          <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
                             Actions
                           </th>
                         </tr>
@@ -403,7 +601,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                                 })
                               }
                             >
-                              <td className="px-6 py-4 whitespace-nowrap">
+                              <td className="px-4 py-2 whitespace-nowrap">
                                 <div className="flex items-center">
                                   <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
                                     <span className="text-blue-600 font-semibold text-sm">
@@ -416,7 +614,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                                   </span>
                                 </div>
                               </td>
-                              <td className="px-6 py-4">
+                              <td className="px-4 py-2">
                                 <div
                                   className="text-sm text-gray-900 max-w-xs truncate"
                                   title={training.domain}
@@ -428,7 +626,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                                   )}
                                 </div>
                               </td>
-                              <td className="px-6 py-4">
+                              <td className="px-4 py-2">
                                 <div className="space-y-1">
                                   {training.trainingStartDate &&
                                   training.trainingEndDate ? (
@@ -446,7 +644,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                                   )}
                                 </div>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
+                              <td className="px-4 py-2 whitespace-nowrap">
                                 <div className="flex items-center">
                                   <FiUsers className="w-4 h-4 text-gray-400 mr-2" />
                                   <span className="text-sm font-medium text-gray-900">
@@ -456,69 +654,143 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                                   </span>
                                 </div>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
+                              <td className="px-4 py-2 whitespace-nowrap">
                                 <span
                                   className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${status.style}`}
                                 >
                                   {status.status}
                                 </span>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-right">
-                                <div className="flex items-center justify-end gap-2 transition-opacity">
-                                  {training.domainsCount === 0 ? (
-                                    <button
-                                      onClick={(e) =>
-                                        handleStartPhase(e, training)
+                              <td className="px-4 py-2 whitespace-nowrap text-right">
+                                <div className="relative flex items-center justify-end gap-1 transition-opacity">
+                                  <button
+                                    className="p-1 rounded-full hover:bg-gray-100"
+                                    ref={el => (actionBtnRefs.current[training.id] = el)}
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      if (openDropdownId === training.id) {
+                                        setOpenDropdownId(null);
+                                      } else {
+                                        // Calculate position for portal dropdown
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        setDropdownPosition({
+                                          top: rect.bottom + window.scrollY + 4,
+                                          left: rect.right - 160 + window.scrollX, // 160px = dropdown width
+                                        });
+                                        setOpenDropdownId(training.id);
                                       }
-                                      className="inline-flex items-center px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
-                                      title={`Start ${
-                                        PHASE_LABELS[training.phaseId] ||
-                                        training.phaseId
-                                      }`}
+                                    }}
+                                    title="Actions"
+                                  >
+                                    {openDropdownId === training.id ? (
+                                      <FiX className="w-5 h-5 text-red-500" />
+                                    ) : (
+                                      <FiMoreVertical className="w-5 h-5" />
+                                    )}
+                                  </button>
+                                  {openDropdownId === training.id && createPortal(
+                                    <div
+                                      ref={dropdownRef}
+                                      className="z-50 w-40 bg-white border border-gray-200 rounded-lg shadow-lg py-1 flex flex-col"
+                                      style={{
+                                        position: "absolute",
+                                        top: dropdownPosition.top,
+                                        left: dropdownPosition.left,
+                                      }}
                                     >
-                                      <FiPlay className="w-3 h-3 mr-1" />
-                                      Start
-                                    </button>
-                                  ) : (
-                                    <span className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                                      View Details
-                                    </span>
-                                  )}
+                                      {training.domainsCount === 0 ? (
+                                        <button
+                                          onClick={e => {
+                                            handleStartPhase(e, training);
+                                            setOpenDropdownId(null);
+                                          }}
+                                          className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                                        >
+                                          <FiPlay className="w-4 h-4 mr-2 text-green-600" />
+                                          <span>Start</span>
+                                        </button>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors cursor-default bg-transparent"
+                                          onClick={e => e.preventDefault()}
+                                          tabIndex={-1}
+                                        >
+                                          <FiBookOpen className="w-4 h-4 mr-2 text-blue-600" />
+                                          <span>View Details</span>
+                                        </button>
+                                      )}
 
-                                  {canEdit && (
-                                    <button
-                                      onClick={(e) =>
-                                        handleEditPhase(e, training)
-                                      }
-                                      className="inline-flex items-center px-3 py-1.5 bg-amber-500 text-white text-xs font-medium rounded-lg hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-500/20 transition-all"
-                                      title={`Edit ${
-                                        PHASE_LABELS[training.phaseId] ||
-                                        training.phaseId
-                                      }`}
-                                    >
-                                      <FiEdit className="w-3 h-3 mr-1" />
-                                      Edit
-                                    </button>
-                                  )}
+                                      {canEdit && (
+                                        <button
+                                          onClick={e => {
+                                            handleEditPhase(e, training);
+                                            setOpenDropdownId(null);
+                                          }}
+                                          className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                                        >
+                                          <FiEdit className="w-4 h-4 mr-2 text-amber-500" />
+                                          <span>Edit</span>
+                                        </button>
+                                      )}
 
-                                  {/* Change Trainer Button - Show for in-progress trainings */}
-                                  {(() => {
-                                    const status = getPhaseStatus(training);
-                                    return status.status === "In Progress";
-                                  })() && (
-                                    <button
-                                      onClick={(e) =>
-                                        handleChangeTrainer(e, training)
-                                      }
-                                      className="inline-flex items-center px-3 py-1.5 bg-orange-500 text-white text-xs font-medium rounded-lg hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 transition-all"
-                                      title={`Change Trainer for ${
-                                        PHASE_LABELS[training.phaseId] ||
-                                        training.phaseId
-                                      }`}
-                                    >
-                                      <FiUserCheck className="w-3 h-3 mr-1" />
-                                      Change Trainer
-                                    </button>
+                                      {(() => {
+                                        const status = getPhaseStatus(training);
+                                        return status.status === "In Progress";
+                                      })() && (
+                                        <button
+                                          onClick={e => {
+                                            handleChangeTrainer(e, training);
+                                            setOpenDropdownId(null);
+                                          }}
+                                          className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                                        >
+                                          <FiEdit className="w-4 h-4 mr-2 text-red-500" />
+                                          <span>Change trainer</span>
+                                        </button>
+                                      )}
+
+                                      {/* Move To (manual override) */}
+                                      <div className="border-t border-gray-100 mt-1" />
+                                      <div className="px-2 pt-1 text-xs text-gray-500">Move to</div>
+                                      {(() => {
+                                        const currentStatus = getPhaseStatus(training).status;
+                                        return Object.keys(STATUS_LABELS)
+                                          .filter((k) => k !== 'all' && k !== currentStatus)
+                                          .map((s) => {
+                                            const Icon = STATUS_ICON_MAP[s];
+                                            return (
+                                              <button
+                                                key={s}
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  moveToStatus(training, s);
+                                                  setOpenDropdownId(null);
+                                                }}
+                                                className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                                              >
+                                                {Icon && <Icon className={`w-4 h-4 mr-2 ${(STATUS_UI[s] && STATUS_UI[s].icon) || 'text-gray-700'}`} />}
+                                                <span>{s}</span>
+                                              </button>
+                                            );
+                                          });
+                                      })()}
+
+                                      {training.manualStatus ? (
+                                        <>
+                                          <div className="border-t border-gray-50 my-1" />
+                                          <button
+                                            onClick={e => { e.stopPropagation(); revertToAutomatic(training); setOpenDropdownId(null); }}
+                                            className="flex items-center px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                                          >
+                                            <span>Revert to automatic</span>
+                                          </button>
+                                        </>
+                                      ) : null}
+
+                                      
+                                    </div>,
+                                    document.body
                                   )}
                                 </div>
                               </td>
@@ -539,7 +811,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                       return (
                         <div
                           key={training.id}
-                          className="p-6 hover:bg-blue-50/30 cursor-pointer transition-all"
+                          className="p-3 hover:bg-blue-50/30 cursor-pointer transition-all"
                           onClick={() =>
                             onRowClick &&
                             onRowClick({
@@ -549,20 +821,20 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                             })
                           }
                         >
-                          <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-start justify-between mb-2">
                             <div className="flex items-center">
-                              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center mr-3">
+                              <div className="w-8 h-8 bg-blue-100 rounded-xl flex items-center justify-center mr-2">
                                 <span className="text-blue-600 font-bold text-sm">
                                   {training.phaseId.replace("phase-", "")}
                                 </span>
                               </div>
                               <div>
-                                <h3 className="text-sm font-semibold text-gray-900">
+                                <h3 className="text-xs font-semibold text-gray-900">
                                   {PHASE_LABELS[training.phaseId] ||
                                     training.phaseId}
                                 </h3>
                                 <span
-                                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${status.style}`}
+                                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-0.5 ${status.style}`}
                                 >
                                   {status.status}
                                 </span>
@@ -573,12 +845,12 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                             </button>
                           </div>
 
-                          <div className="space-y-3">
+                          <div className="space-y-1.5">
                             <div>
-                              <p className="text-xs font-medium text-gray-500 mb-1">
+                              <p className="text-xs font-medium text-gray-500 mb-0.5">
                                 Domain
                               </p>
-                              <p className="text-sm text-gray-900 truncate">
+                              <p className="text-xs text-gray-900 truncate">
                                 {training.domain || (
                                   <span className="text-gray-400 italic">
                                     No domain specified
@@ -590,26 +862,25 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                             {training.trainingStartDate &&
                               training.trainingEndDate && (
                                 <div>
-                                  <p className="text-xs font-medium text-gray-500 mb-1">
+                                  <p className="text-xs font-medium text-gray-500 mb-0.5">
                                     Timeline
                                   </p>
                                   <div className="flex items-center text-xs text-gray-600">
                                     <FiCalendar className="w-3 h-3 mr-1" />
                                     <span>
-                                      {training.trainingStartDate} -{" "}
-                                      {training.trainingEndDate}
+                                      {training.trainingStartDate} - {training.trainingEndDate}
                                     </span>
                                   </div>
                                 </div>
                               )}
 
                             <div>
-                              <p className="text-xs font-medium text-gray-500 mb-1">
+                              <p className="text-xs font-medium text-gray-500 mb-0.5">
                                 Batches
                               </p>
                               <div className="flex items-center">
                                 <FiUsers className="w-4 h-4 text-gray-400 mr-2" />
-                                <span className="text-sm font-medium text-gray-900">
+                                <span className="text-xs font-medium text-gray-900">
                                   {training.table1Data
                                     ? training.table1Data.length
                                     : 0}
@@ -618,17 +889,17 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                             </div>
                           </div>
 
-                          <div className="flex gap-2 mt-4 pt-4 border-t border-gray-100">
+                          <div className="flex gap-1 mt-2 pt-2 border-t border-gray-100">
                             {training.domainsCount === 0 ? (
                               <button
                                 onClick={(e) => handleStartPhase(e, training)}
-                                className="flex-1 inline-flex items-center justify-center px-3 py-2 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
+                                className="flex-1 inline-flex items-center justify-center px-2 py-1 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
                               >
                                 <FiPlay className="w-3 h-3 mr-1" />
                                 Start Phase
                               </button>
                             ) : (
-                              <button className="flex-1 text-blue-600 hover:text-blue-800 text-sm font-medium py-2">
+                              <button className="flex-1 text-blue-600 hover:text-blue-800 text-xs font-medium py-1">
                                 View Details
                               </button>
                             )}
@@ -636,7 +907,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                             {canEdit && (
                               <button
                                 onClick={(e) => handleEditPhase(e, training)}
-                                className="flex-1 inline-flex items-center justify-center px-3 py-2 bg-amber-500 text-white text-xs font-medium rounded-lg hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-500/20 transition-all"
+                                className="flex-1 inline-flex items-center justify-center px-2 py-1 bg-amber-500 text-white text-xs font-medium rounded-lg hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-500/20 transition-all"
                               >
                                 <FiEdit className="w-3 h-3 mr-1" />
                                 Edit
@@ -650,10 +921,12 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                             })() && (
                               <button
                                 onClick={(e) => handleChangeTrainer(e, training)}
-                                className="flex-1 inline-flex items-center justify-center px-3 py-2 bg-orange-500 text-white text-xs font-medium rounded-lg hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 transition-all"
+                                className="flex-1 inline-flex items-center justify-center px-2 py-1 bg-orange-500 text-white text-xs font-medium rounded-lg hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 transition-all"
+                                title="Trainer"
                               >
-                                <FiUserCheck className="w-3 h-3 mr-1" />
-                                Change Trainer
+                                <FiEdit className="w-3 h-3 mr-1" />
+                                <span className="mr-1">Trainer</span>
+                                <FiUserCheck className="w-3 h-3" />
                               </button>
                             )}
                           </div>
@@ -665,15 +938,15 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
               ))
             ) : (
               /* Empty State */
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-12">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-6">
                 <div className="text-center max-w-md mx-auto">
-                  <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <FiBookOpen className="w-8 h-8 text-gray-400" />
+                  <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-2">
+                    <FiBookOpen className="w-6 h-6 text-gray-400" />
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  <h3 className="text-base font-semibold text-gray-900 mb-1">
                     No trainings found
                   </h3>
-                  <p className="text-gray-500 text-sm">
+                  <p className="text-gray-500 text-xs">
                     {searchTerm || filterPhase !== "all"
                       ? "Try adjusting your search or filter criteria"
                       : "Get started by creating your first training program"}
@@ -694,6 +967,19 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
         }}
         selectedTraining={selectedTrainingForChange}
       />
+      {/* Undo toast */}
+      {toast && (
+        <div className="fixed right-4 bottom-6 z-50">
+          <div className="bg-white border border-gray-200 rounded-lg shadow-lg px-4 py-2 flex items-center gap-3">
+            <span className="text-sm text-gray-700">Moved to</span>
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${(STATUS_UI[toast.status] && STATUS_UI[toast.status].pill) || 'bg-gray-100 text-gray-700'}`}>
+              {toast.status}
+            </span>
+            <button onClick={handleUndo} className="text-sm text-blue-600 font-semibold">Undo</button>
+            <button onClick={() => { if (toast.timer) clearTimeout(toast.timer); setToast(null); }} className="text-sm text-gray-400">✕</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
