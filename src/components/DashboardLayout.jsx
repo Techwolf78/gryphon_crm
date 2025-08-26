@@ -5,20 +5,28 @@ import Sidebar from '../pages/Sidebar';
 
 const DashboardLayout = () => {
   const { user } = useContext(AuthContext);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      const raw = localStorage.getItem('sidebar_collapsed');
+      if (raw !== null) return JSON.parse(raw);
+    } catch {
+      // ignore
+    }
+    // fallback to responsive default
+    return typeof window !== 'undefined' && window.innerWidth < 1024;
+  });
 
-  // Auto-collapse sidebar on mobile
+  // Auto-collapse sidebar on mobile only when user has not set a preference
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 1024) {
-        setSidebarCollapsed(true);
-      } else {
-        setSidebarCollapsed(false);
+      try {
+        const raw = localStorage.getItem('sidebar_collapsed');
+        if (raw !== null) return; // respect user preference
+      } catch {
+        // ignore
       }
+      setSidebarCollapsed(window.innerWidth < 1024);
     };
-
-    // Set initial state
-    handleResize();
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
