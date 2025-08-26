@@ -25,7 +25,7 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import "rc-time-picker/assets/index.css";
 
-// helper: generate time options in HH:mm at given step (15 minutes)
+// helper: generate time options in HH:mm (24h values) at given step, but display 12h with AM/PM
 function generateTimeOptions(step = 15) {
   const opts = [];
   for (let h = 0; h < 24; h++) {
@@ -37,6 +37,18 @@ function generateTimeOptions(step = 15) {
   }
   return opts;
 }
+
+function formatTime12(hhmm) {
+  if (!hhmm) return "";
+  const [hStr, m] = hhmm.split(":");
+  let h = parseInt(hStr, 10);
+  if (isNaN(h)) return hhmm;
+  const suffix = h >= 12 ? "PM" : "AM";
+  h = h % 12;
+  if (h === 0) h = 12; // Midnight / Noon edge
+  return `${h}:${m} ${suffix}`;
+}
+
 const TIME_OPTIONS = generateTimeOptions(15);
 
 const PHASE_OPTIONS = ["phase-1", "phase-2", "phase-3"];
@@ -279,6 +291,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
         const phaseDocData = {
           createdAt: serverTimestamp(),
           createdBy: training.createdBy || {},
+          collegeName: training.collegeName || "",
           ...commonFields,
           phase,
         };
@@ -306,6 +319,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
         let phaseData = {
           createdAt: serverTimestamp(),
           createdBy: training.createdBy || {},
+          collegeName: training.collegeName || "",
           ...commonFields,
           phase: mainPhase,
           domain,
@@ -406,6 +420,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                     sourceTrainingId: training.id,
                     domain,
                     batchCode: batch.batchCode || "",
+                    collegeName: tr.collegeName || training.collegeName || "",
                     // Include source indices for traceability and to avoid lint unused-vars
                     sourceRowIndex: rowIdx,
                     sourceBatchIndex: batchIdx,
@@ -992,23 +1007,42 @@ function InitiationModal({ training, onClose, onConfirm }) {
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
         {/* Page Header */}
         <div className="bg-white shadow-sm border-b border-gray-200">
-          <div className="mx-auto p-3 ">
-            <div className="flex justify-between items-start">
-              <div>
+          <div className="mx-auto p-3">
+            <div className="flex items-center justify-between">
+              {/* Left: Back */}
+              <div className="flex-1">
                 <button
                   onClick={onClose}
-                  className="mb-1 flex items-center text-blue-600 hover:text-blue-800 transition-colors text-xs"
+                  className="inline-flex items-center text-blue-600 hover:text-blue-800 transition-colors text-xs font-medium"
                   disabled={loading}
                 >
                   <FiChevronLeft className="w-3 h-3 mr-1" />
                   Back to Training List
                 </button>
-                <h1 className="text-lg font-bold text-gray-900">
-                  Initiate Training
+              </div>
+              {/* Center: College Name */}
+              <div className="flex-1 text-center">
+                <h1 className="text-sm font-semibold text-gray-800 leading-tight">
+                  {training?.collegeName ? (
+                    <>
+                      {training.collegeName}
+                      {training.collegeCode && (
+                        <span className="ml-1 text-gray-500 font-normal">({training.collegeCode})</span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-gray-500 font-normal">Training Setup</span>
+                  )}
                 </h1>
-                <p className="text-xs text-gray-600 mt-0.5">
-                  {training?.collegeName} • {training?.collegeCode}
-                </p>
+                {selectedPhases?.length > 0 && (
+                  <p className="mt-0.5 text-[10px] tracking-wide uppercase text-gray-400">
+                    {selectedPhases.join(" • ")}
+                  </p>
+                )}
+              </div>
+              {/* Right: Placeholder for spacing / future actions */}
+              <div className="flex-1 text-right hidden sm:block">
+                {/* Reserved for future quick actions */}
               </div>
             </div>
           </div>
@@ -1143,11 +1177,12 @@ function InitiationModal({ training, onClose, onConfirm }) {
                             collegeStartTime: e.target.value,
                           })
                         }
+                        className="w-full h-8 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white"
                       >
                         <option value="">Select time</option>
                         {TIME_OPTIONS.map((t) => (
                           <option key={t} value={t}>
-                            {t}
+                            {formatTime12(t)}
                           </option>
                         ))}
                       </select>
@@ -1165,11 +1200,12 @@ function InitiationModal({ training, onClose, onConfirm }) {
                             collegeEndTime: e.target.value,
                           })
                         }
+                        className="w-full h-8 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white"
                       >
                         <option value="">Select time</option>
                         {TIME_OPTIONS.map((t) => (
                           <option key={t} value={t}>
-                            {t}
+                            {formatTime12(t)}
                           </option>
                         ))}
                       </select>
@@ -1187,11 +1223,12 @@ function InitiationModal({ training, onClose, onConfirm }) {
                             lunchStartTime: e.target.value,
                           })
                         }
+                        className="w-full h-8 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white"
                       >
                         <option value="">Select time</option>
                         {TIME_OPTIONS.map((t) => (
                           <option key={t} value={t}>
-                            {t}
+                            {formatTime12(t)}
                           </option>
                         ))}
                       </select>
@@ -1209,11 +1246,12 @@ function InitiationModal({ training, onClose, onConfirm }) {
                             lunchEndTime: e.target.value,
                           })
                         }
+                        className="w-full h-8 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white"
                       >
                         <option value="">Select time</option>
                         {TIME_OPTIONS.map((t) => (
                           <option key={t} value={t}>
-                            {t}
+                            {formatTime12(t)}
                           </option>
                         ))}
                       </select>
@@ -1402,7 +1440,14 @@ function InitiationModal({ training, onClose, onConfirm }) {
                     {/* Batch Details Table per Domain */}
                     {selectedDomains.map(domain => {
                       const tableData = table1DataByDomain[domain] || [];
-                      const allNoHours = tableData.length > 0 && tableData.every(row => row.hrs === 0);
+                      // Ensure we compare numeric values. Use domain-level hours as the primary source
+                      // for deciding whether hours are configured. This avoids showing the "No hours" warning
+                      // when the domain has hours but individual rows may temporarily show 0 due to
+                      // allocations from other phases.
+                      const domainHours = Number(getDomainHours(domain, currentPhase) || 0);
+                      const allNoHours =
+                        domainHours === 0 ||
+                        (tableData.length > 0 && tableData.every(row => Number(row.hrs || 0) === 0));
 
                       return (
                         <div
@@ -1579,14 +1624,17 @@ function InitiationModal({ training, onClose, onConfirm }) {
             {/* Page Footer */}
             <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 rounded-b-lg">
               <div className="flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-                  disabled={loading}
-                >
-                  Cancel
-                </button>
+                <div className="flex items-center gap-2">
+                  {/* Trainer Calendar button moved to InitiationDashboard */}
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                    disabled={loading}
+                  >
+                    Cancel
+                  </button>
+                </div>
                 <button
                   type="submit"
                   onClick={handleSubmit}
@@ -1607,6 +1655,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
           </div>
         </div>
       </div>
+          {/* Trainer Calendar is opened from the Initiation Dashboard now */}
     </>
   );
 }

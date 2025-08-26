@@ -35,6 +35,8 @@ const ChangeTrainerDashboard = ({
   const [changeEndDate, setChangeEndDate] = useState("");
   const [reason, setReason] = useState("");
   const [newTrainerCost, setNewTrainerCost] = useState("");
+  const [autoTrainerBaseCost, setAutoTrainerBaseCost] = useState(null); // raw cost fetched from trainer doc
+  const [manualCostEdited, setManualCostEdited] = useState(false); // track if user manually changed cost
   const [submitting, setSubmitting] = useState(false);
   const [loadingDomains, setLoadingDomains] = useState(false);
   const [globalTrainerAssignments, setGlobalTrainerAssignments] = useState([]);
@@ -260,16 +262,31 @@ const ChangeTrainerDashboard = ({
     return () => unsub();
   }, [isOpen]);
 
-  // Auto-populate new trainer cost when user selects a trainer (unless user overrides)
+  // Auto-populate new trainer cost when user selects a trainer.
+  // Uses multiple possible field names; does not overwrite after manual edit.
   useEffect(() => {
-    if (!selectedNewTrainer) return;
+    if (!selectedNewTrainer) {
+      setAutoTrainerBaseCost(null);
+      if (!manualCostEdited) setNewTrainerCost("");
+      return;
+    }
     const info = trainers.find((t) => t.id === selectedNewTrainer);
     if (!info) return;
-    // Only set if empty so user's manual override isn't overwritten
-    if (!newTrainerCost) {
-      setNewTrainerCost(info.charges ? String(info.charges) : "");
+    const detected =
+      info.charges ??
+      info.perHourCost ??
+      info.rate ??
+      info.cost ??
+      null;
+    setAutoTrainerBaseCost(detected);
+    if (!manualCostEdited) {
+      setNewTrainerCost(
+        detected !== null && detected !== undefined && detected !== ""
+          ? String(detected)
+          : ""
+      );
     }
-  }, [selectedNewTrainer, trainers, newTrainerCost]);
+  }, [selectedNewTrainer, trainers, manualCostEdited]);
 
   // Add debug logging to the getActiveTrainers function around line 185
 
@@ -568,7 +585,8 @@ const ChangeTrainerDashboard = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-54 flex items-center justify-center bg-black bg-opacity-50">
+<div className="fixed inset-0 z-54 flex items-center justify-center 
+    bg-black/30 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
@@ -938,13 +956,31 @@ const ChangeTrainerDashboard = ({
                     <FiDollarSign className="inline w-4 h-4 mr-1" />
                     New Trainer Cost (per hour)
                   </label>
-                  <input
-                    type="number"
-                    value={newTrainerCost}
-                    onChange={(e) => setNewTrainerCost(e.target.value)}
-                    placeholder="Enter cost or leave empty for default"
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <div className="space-y-1">
+                    <input
+                      type="number"
+                      value={newTrainerCost}
+                      onChange={(e) => { setNewTrainerCost(e.target.value); setManualCostEdited(true); }}
+                      placeholder="Auto from trainer doc or enter manually"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <div className="flex items-center justify-between text-[11px] text-gray-500">
+                      <span>
+                        {autoTrainerBaseCost !== null && !manualCostEdited && "Loaded from Firestore"}
+                        {autoTrainerBaseCost === null && selectedNewTrainer && !manualCostEdited && "No cost in doc - enter manually"}
+                        {manualCostEdited && "Manual override"}
+                      </span>
+                      {autoTrainerBaseCost !== null && (
+                        <button
+                          type="button"
+                          onClick={() => { setManualCostEdited(false); setNewTrainerCost(String(autoTrainerBaseCost ?? "")); }}
+                          className="text-blue-600 hover:text-blue-800"
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="md:col-span-2">

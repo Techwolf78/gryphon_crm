@@ -143,7 +143,7 @@ function LearningDevelopment() {
       <div className="bg-gray-50 min-h-screen">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-blue-800">
-            Training Onboarding Submissions
+            Training Onboarding
           </h1>
           <button
             onClick={handleViewTrainers}
