@@ -31,88 +31,69 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [showOtherSpecialization, setShowOtherSpecialization] = useState(false);
+  const [selectedSpecs, setSelectedSpecs] = useState([]); // standard specs
+  const [customSpecs, setCustomSpecs] = useState([]); // custom specs
+  const [customInput, setCustomInput] = useState("");
   const [currentSection, setCurrentSection] = useState("basic");
 
   useEffect(() => {
+    const toArray = (val) => {
+      if (Array.isArray(val)) return val.filter(Boolean);
+      if (typeof val === "string")
+        return val
+          .split(",")
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0);
+      return [];
+    };
     const fetchTrainer = async () => {
       try {
         setLoading(true);
         const docRef = doc(db, "trainers", trainerId);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-
-                const allSpecializations = [
-          ...(data.specialization || []),
-          ...(data.otherSpecialization || [])
-        ];
-           const standardSpecs = allSpecializations.filter(s => 
-          specializationOptions.includes(s)
-        );
-        const customSpecs = allSpecializations.filter(s => 
-          !specializationOptions.includes(s)
-        );
-          // Convert specialization to array
-          const specArr = Array.isArray(data.specialization)
-            ? data.specialization
-            : typeof data.specialization === "string"
-              ? data.specialization.split(",").map(s => s.trim())
-              : [];
-                  const showOthers = customSpecs.length > 0;
-        const finalStandardSpecs = showOthers 
-          ? [...standardSpecs, "Others"]
-          : standardSpecs;
-          // Find custom specializations not in options
-          // If custom specs exist, add "Others" to specialization and set otherSpecialization
-          let specializationStr = specArr.join(", ");
-          let otherSpecializationStr = "";
-          let showOther = false;
-          if (customSpecs.length > 0) {
-            // Add "Others" if not present
-            if (!specArr.includes("Others")) {
-              specializationStr = [...specArr.filter(s => specializationOptions.includes(s)), "Others"].join(", ");
-            }
-            otherSpecializationStr = customSpecs.join(", ");
-            showOther = true;
-          } else if (Array.isArray(data.otherSpecialization) && data.otherSpecialization.length > 0) {
-            otherSpecializationStr = data.otherSpecialization.join(", ");
-            showOther = true;
-          } else if (specArr.includes("Others")) {
-            showOther = true;
-          }
-
-          setTrainerData({
-            trainerId: data.trainerId || trainerId,
-            name: data.name || "",
-            contact: data.contact || "",
-            email: data.email || "",
-            domain: data.domain || "Soft Skills",
-            nameAsPerBank: data.nameAsPerBank || "",
-            bankName: data.bankName || "",
-            accountNumber: data.accountNumber || "",
-            ifsc: data.ifsc || "",
-            pan: data.pan || "",
-            aadhar: data.aadhar || "",
-            bankAddress: data.bankAddress || "",
-            paymentType: data.paymentType || "Per Hour",
-            charges: data.charges || "",
-             specialization: finalStandardSpecs.join(", "),
-          otherSpecialization: customSpecs.join(", "),
-          });
-        setShowOtherSpecialization(showOthers);
-        } else {
+        const snap = await getDoc(docRef);
+        if (!snap.exists()) {
           setError("Trainer not found");
+          return;
         }
-      } catch (err) {
-        console.error("Error fetching trainer:", err);
+        const data = snap.data();
+        const specArr = toArray(data.specialization);
+        const otherArr = toArray(data.otherSpecialization);
+        // Standard options from specArr only
+        const standard = specArr.filter((s) => specializationOptions.includes(s));
+        // Custom are explicit otherArr + any specArr items not in standard list
+        const custom = [
+          ...otherArr,
+          ...specArr.filter((s) => !specializationOptions.includes(s)),
+        ].filter((v, i, a) => a.indexOf(v) === i);
+        const showOthers = custom.length > 0;
+  setTrainerData({
+          trainerId: data.trainerId || trainerId,
+          name: data.name || "",
+          contact: data.contact || "",
+          email: data.email || "",
+          domain: data.domain || "Soft Skills",
+            nameAsPerBank: data.nameAsPerBank || "",
+          bankName: data.bankName || "",
+          accountNumber: data.accountNumber || "",
+          ifsc: data.ifsc || "",
+          pan: data.pan || "",
+          aadhar: data.aadhar || "",
+          bankAddress: data.bankAddress || "",
+          paymentType: data.paymentType || "Per Hour",
+          charges: data.charges || "",
+          specialization: [...standard, ...(showOthers ? ["Others"] : [])].join(", "),
+          otherSpecialization: custom.join(", "),
+        });
+  // showOthers no longer toggles a separate UI section; kept for potential future logic
+        setSelectedSpecs(standard);
+        setCustomSpecs(custom);
+      } catch (e) {
+        console.error("Error fetching trainer:", e);
         setError("Failed to load trainer data");
       } finally {
         setLoading(false);
       }
     };
-
     fetchTrainer();
   }, [trainerId]);
 
@@ -120,46 +101,26 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
     const { name, value } = e.target;
     setTrainerData((prev) => ({ ...prev, [name]: value }));
 
-    if (name === "specialization") {
-      // If "Others" is selected or not in options, show otherSpecialization
-      const selectedSpecs = value.split(",").map(s => s.trim());
-      if (
-        selectedSpecs.includes("Others") ||
-        selectedSpecs.some(s => !specializationOptions.includes(s))
-      ) {
-        setShowOtherSpecialization(true);
-      } else {
-        setShowOtherSpecialization(false);
-      }
-    }
+  // specialization handled via chip UI now
   };
-// In the handleSubmit function:
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setLoading(true);
-  setError("");
-  try {
-    // Process specializations
- const specializationArr = (trainerData.specialization || "")
-  .split(",")
-  .map(s => s.trim())
-  .filter(s => s);
-
-const hasOthers = specializationArr.includes("Others");
-
-const otherSpecializationArr =
-  hasOthers && trainerData.otherSpecialization
-    ? trainerData.otherSpecialization.split(",").map(s => s.trim()).filter(Boolean)
-    : [];
-
-const finalSpecialization = [
-  ...specializationArr.filter(s => s !== "Others"),
-  ...otherSpecializationArr,
-];
-
+  // Submit updated trainer
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      // Validation: require at least one specialization
+      if (selectedSpecs.length + customSpecs.length === 0) {
+        setError("Select at least one specialization");
+        setLoading(false);
+        return;
+      }
+      const specializationArr = selectedSpecs; // only standard
+      const otherArr = customSpecs; // custom list
       const trainerToUpdate = {
         trainerId: trainerData.trainerId,
         name: trainerData.name,
+        nameLower: (trainerData.name || "").toLowerCase(),
         contact: trainerData.contact,
         email: trainerData.email,
         domain: trainerData.domain,
@@ -172,32 +133,50 @@ const finalSpecialization = [
         bankAddress: trainerData.bankAddress,
         paymentType: trainerData.paymentType,
         charges: Number(trainerData.charges) || 0,
-        specialization: specializationArr.filter(s => s !== "Others"), // keep only one key
+  specialization: specializationArr,
+  otherSpecialization: otherArr,
         updatedAt: new Date(),
-        otherSpecialization: hasOthers ? otherSpecializationArr : [],
       };
-
-      if (showOtherSpecialization) {
-        trainerToUpdate.otherSpecialization = otherSpecializationArr;
-      } else {
-        trainerToUpdate.otherSpecialization = [];
-      }
-
-    await updateDoc(doc(db, "trainers", trainerId), trainerToUpdate);
-    onTrainerUpdated();
-    onClose();
-  } catch (err) {
-    console.error("Error updating trainer:", err);
-    setError(`Failed to update trainer: ${err.message}`);
-  } finally {
-    setLoading(false);
-  }
-};
+      await updateDoc(doc(db, "trainers", trainerId), trainerToUpdate);
+      onTrainerUpdated({ id: trainerId, ...trainerToUpdate });
+      onClose();
+    } catch (err) {
+      console.error("Error updating trainer:", err);
+      setError(`Failed to update trainer: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Add these functions to the EditTrainer component
+  const toggleSpec = (opt) => {
+    setSelectedSpecs((prev) =>
+      prev.includes(opt) ? prev.filter((s) => s !== opt) : [...prev, opt]
+    );
+  };
+  const addCustomSpec = (e) => {
+    e.preventDefault();
+    const val = customInput.trim();
+    if (!val) return;
+    const parts = val
+      .split(",")
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
+    if (!parts.length) return;
+    setCustomSpecs((prev) => {
+      const existing = new Set(prev.map((p) => p.toLowerCase()));
+      const additions = parts.filter((p) => !existing.has(p.toLowerCase()));
+      return [...prev, ...additions];
+    });
+    setCustomInput("");
+  };
+  const removeCustom = (spec) => {
+    setCustomSpecs((prev) => prev.filter((s) => s !== spec));
+  };
+
   const renderBasicInfoSection = () => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Trainer ID
@@ -224,7 +203,7 @@ const finalSpecialization = [
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Contact*
@@ -253,7 +232,7 @@ const finalSpecialization = [
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4">
+  <div className="grid grid-cols-1 gap-3">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Domain*
@@ -272,67 +251,69 @@ const finalSpecialization = [
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4">
-  <div>
-    <label className="block text-sm font-medium text-gray-700 mb-1">
-      Specialization*
-    </label>
-    <div className="flex flex-wrap gap-2">
-      {specializationOptions.map(opt => (
-        <label key={opt} className="flex items-center space-x-2">
-          <input
-            type="checkbox"
-            value={opt}
-            checked={trainerData.specialization.split(",").map(s => s.trim()).includes(opt)}
-            onChange={e => {
-              const specs = trainerData.specialization
-                .split(",")
-                .map(s => s.trim())
-                .filter(s => s);
-              
-              let updatedSpecs;
-              if (e.target.checked) {
-                updatedSpecs = [...specs, opt];
-              } else {
-                updatedSpecs = specs.filter(s => s !== opt);
-              }
-              
-              setTrainerData(prev => ({
-                ...prev,
-                specialization: updatedSpecs.join(", "),
-              }));
-              
-              setShowOtherSpecialization(updatedSpecs.includes("Others"));
-            }}
-            className="form-checkbox h-4 w-4 text-blue-600 focus:ring-blue-500"
-          />
-          <span className="text-sm text-gray-700">{opt}</span>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Specializations* (choose multiple)
         </label>
-      ))}
-    </div>
-  </div>
-</div>
-{showOtherSpecialization && (
-  <div className="grid grid-cols-1 gap-4">
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        Other Specialization*
-      </label>
-      <input
-        type="text"
-        name="otherSpecialization"
-        value={trainerData.otherSpecialization}
-        onChange={handleChange}
-        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        required={showOtherSpecialization}
-        placeholder="e.g. Microsoft Excel, PowerPoint"
-      />
-      <small className="text-gray-500">
-        Enter comma separated values. Example: Microsoft Excel, PowerPoint
-      </small>
-    </div>
-  </div>
-)}
+  <div className="flex flex-wrap gap-1">
+          {specializationOptions
+            .filter((o) => o !== "Others")
+            .map((opt) => {
+              const active = selectedSpecs.includes(opt);
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => toggleSpec(opt)}
+      className={`px-2 py-0.5 rounded-full border text-[11px] font-medium transition ${
+                    active
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
+                  }`}
+                >
+                  {opt}
+                </button>
+              );
+            })}
+        </div>
+        <div className="mt-4">
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            Add Custom (press Enter)
+          </label>
+          <input
+            type="text"
+            value={customInput}
+            onChange={(e) => setCustomInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") addCustomSpec(e);
+            }}
+            placeholder="e.g. Microsoft Excel, PowerPoint"
+    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+          />
+          {!!customSpecs.length && (
+    <div className="flex flex-wrap gap-1 mt-2">
+              {customSpecs.map((spec) => (
+                <span
+                  key={spec}
+      className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] bg-purple-100 text-purple-800 border border-purple-200"
+                >
+                  {spec}
+                  <button
+                    type="button"
+                    onClick={() => removeCustom(spec)}
+                    className="ml-1 text-purple-500 hover:text-purple-700"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+        <p className="mt-2 text-xs text-gray-500">
+          Selected: {selectedSpecs.length + customSpecs.length} (standard {selectedSpecs.length}, custom {customSpecs.length})
+        </p>
+      </div>
       <div className="flex justify-between">
         <button
           type="submit"
@@ -353,8 +334,8 @@ const finalSpecialization = [
   );
 
   const renderPaymentInfoSection = () => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Payment Type*
@@ -398,7 +379,7 @@ const finalSpecialization = [
 
       <div className="border-t border-gray-200 pt-4">
         <h3 className="text-sm font-medium text-gray-700 mb-3">Bank Details</h3>
-        <div className="space-y-4">
+  <div className="space-y-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Name as per Bank*
@@ -413,7 +394,7 @@ const finalSpecialization = [
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Bank Name*
@@ -442,7 +423,7 @@ const finalSpecialization = [
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 IFSC Code*
@@ -565,7 +546,7 @@ const finalSpecialization = [
           &#8203;
         </span>
 
-        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full relative z-10">
+  <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-xl sm:w-full relative z-10">
           <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <div className="flex justify-between items-start">
               <div>

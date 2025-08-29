@@ -42,7 +42,10 @@ function AddTrainer({ onClose, onTrainerAdded }) {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [showOtherSpecialization, setShowOtherSpecialization] = useState(false);
+  // Multi-select specialization state
+  const [selectedSpecs, setSelectedSpecs] = useState([]); // standard options
+  const [customSpecs, setCustomSpecs] = useState([]); // custom added
+  const [customInput, setCustomInput] = useState("");
   const [importStatus, setImportStatus] = useState("");
   const [importProgress, setImportProgress] = useState(0);
   const [currentSection, setCurrentSection] = useState("basic");
@@ -82,15 +85,7 @@ function AddTrainer({ onClose, onTrainerAdded }) {
     const { name, value } = e.target;
     setTrainerData((prev) => ({ ...prev, [name]: value }));
 
-    if (name === "specialization") {
-      if (value === "Others") {
-        setShowOtherSpecialization(true);
-      } else {
-        setShowOtherSpecialization(false);
-        // Clear other specialization when selecting a predefined option
-        setTrainerData((prev) => ({ ...prev, otherSpecialization: "" }));
-      }
-    }
+  // (legacy select removed; no-op for specialization now)
   };
 
   const handleSubmit = async (e) => {
@@ -102,6 +97,7 @@ function AddTrainer({ onClose, onTrainerAdded }) {
       const trainerToSave = {
         trainerId: trainerData.trainerId,
         name: trainerData.name,
+        nameLower: (trainerData.name || "").toLowerCase(),
         contact: trainerData.contact,
         email: trainerData.email,
         domain: trainerData.domain,
@@ -117,35 +113,19 @@ function AddTrainer({ onClose, onTrainerAdded }) {
         createdAt: new Date(),
       };
 
-      // Validate specialization
-      if (!trainerData.specialization) {
-        setError("Please select a specialization");
+      // Validate multi-select specialization
+      if (selectedSpecs.length + customSpecs.length === 0) {
+        setError("Select at least one specialization");
         setLoading(false);
         return;
       }
+      trainerToSave.specialization = selectedSpecs;
+      trainerToSave.otherSpecialization = customSpecs;
 
-      if (
-        trainerData.specialization === "Others" &&
-        !trainerData.otherSpecialization
-      ) {
-        setError("Please enter your specialization");
-        setLoading(false);
-        return;
-      }
-      // Handle specialization differently
-      if (showOtherSpecialization) {
-        trainerToSave.specialization = ""; // Store "Others" as the main specialization
-        trainerToSave.otherSpecialization = trainerData.otherSpecialization; // Store the custom value
-      } else {
-        trainerToSave.specialization = trainerData.specialization; // Store the selected specialization
-        trainerToSave.otherSpecialization = ""; // Clear other specialization if not used
-      }
+  await setDoc(doc(db, "trainers", trainerData.trainerId), trainerToSave, { merge: true });
 
-      await setDoc(doc(db, "trainers", trainerData.trainerId), trainerToSave, {
-        merge: true,
-      });
-
-      onTrainerAdded();
+  // Provide the created trainer (with an id field matching Firestore doc id)
+  onTrainerAdded({ id: trainerData.trainerId, ...trainerToSave });
       onClose();
     } catch (err) {
       console.error("Error adding trainer:", err);
@@ -180,7 +160,8 @@ function AddTrainer({ onClose, onTrainerAdded }) {
 
         setImportProgress(80);
 
-        for (const importedData of jsonData) {
+  const importedTrainers = [];
+  for (const importedData of jsonData) {
           let trainerId = importedData["Trainer ID"] || "";
           if (!trainerId) {
             const q = query(
@@ -231,6 +212,7 @@ function AddTrainer({ onClose, onTrainerAdded }) {
           const trainerToSave = {
             trainerId: trainerId,
             name: importedData["Name"] || "",
+            nameLower: (importedData["Name"] || "").toLowerCase(),
             contact: importedData["Contact"] || "",
             email: importedData["Email"] || "",
             domain: importedData["Domain"] || "Soft Skills",
@@ -249,22 +231,16 @@ function AddTrainer({ onClose, onTrainerAdded }) {
           };
 
           await setDoc(doc(db, "trainers", trainerId), trainerToSave);
+          importedTrainers.push({ id: trainerId, ...trainerToSave });
 
-          if (importedData === jsonData[jsonData.length - 1]) {
-            setTrainerData((prev) => ({
-              ...prev,
-              ...trainerToSave,
-              // For the form, we'll just join them with comma if there are multiple
-              specialization:
-                specializations.length > 0 ? specializations[0] : "",
-              otherSpecialization: otherSpecializations.join(", "),
-            }));
-          }
+              // After import we rely on toast in parent; no per-row UI update needed
         }
 
         setImportStatus(`${jsonData.length} trainers imported successfully!`);
         setImportProgress(100);
-        onTrainerAdded();
+        if (importedTrainers.length) {
+          onTrainerAdded(importedTrainers);
+        }
 
         setTimeout(() => {
           setImportStatus("");
@@ -316,9 +292,37 @@ function AddTrainer({ onClose, onTrainerAdded }) {
     XLSX.writeFile(workbook, "trainer_import_template.xlsx");
   };
 
+  const toggleSpec = (opt) => {
+    setSelectedSpecs((prev) =>
+      prev.includes(opt) ? prev.filter((s) => s !== opt) : [...prev, opt]
+    );
+  };
+
+  const addCustomSpec = (e) => {
+    e.preventDefault();
+    const val = customInput.trim();
+    if (!val) return;
+    // Split by comma to allow bulk add
+    const parts = val
+      .split(",")
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
+    if (!parts.length) return;
+    setCustomSpecs((prev) => {
+      const existing = new Set(prev.map((p) => p.toLowerCase()));
+      const additions = parts.filter((p) => !existing.has(p.toLowerCase()));
+      return [...prev, ...additions];
+    });
+    setCustomInput("");
+  };
+
+  const removeCustom = (spec) => {
+    setCustomSpecs((prev) => prev.filter((s) => s !== spec));
+  };
+
   const renderBasicInfoSection = () => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Trainer ID
@@ -345,7 +349,7 @@ function AddTrainer({ onClose, onTrainerAdded }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Contact*
@@ -374,7 +378,7 @@ function AddTrainer({ onClose, onTrainerAdded }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4">
+  <div className="grid grid-cols-1 gap-3">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Domain*
@@ -393,53 +397,71 @@ function AddTrainer({ onClose, onTrainerAdded }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
-            Specialization*
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          Specializations* (choose multiple)
+        </label>
+  <div className="flex flex-wrap gap-1">
+          {specializationOptions
+            .filter((o) => o !== "Others")
+            .map((opt) => {
+              const active = selectedSpecs.includes(opt);
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => toggleSpec(opt)}
+      className={`px-2 py-0.5 rounded-full border text-[11px] font-medium transition ${
+                    active
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
+                  }`}
+                >
+                  {opt}
+                </button>
+              );
+            })}
+        </div>
+        <div className="mt-4">
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            Add Custom (press Enter)
           </label>
-          <div className="relative">
-            <select
-              name="specialization" // Add this
-              value={trainerData.specialization} // Add this
-              onChange={handleChange} // Add this
-              className="block w-full pl-3 pr-10 py-2.5 text-base border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/80 focus:border-blue-500 transition-all duration-150 appearance-none"
-              style={{
-                backgroundImage:
-                  "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")",
-                backgroundPosition: "right 0.5rem center",
-                backgroundRepeat: "no-repeat",
-                backgroundSize: "1.5em 1.5em",
-              }}
-            >
-              {specializationOptions.map((option, idx) => (
-                <option key={idx} value={option}>
-                  {option}
-                </option>
+          <input
+            type="text"
+            value={customInput}
+            onChange={(e) => setCustomInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                addCustomSpec(e);
+              }
+            }}
+            placeholder="e.g. Microsoft Excel, PowerPoint"
+    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+          />
+          {!!customSpecs.length && (
+    <div className="flex flex-wrap gap-1 mt-2">
+              {customSpecs.map((spec) => (
+                <span
+                  key={spec}
+      className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] bg-purple-100 text-purple-800 border border-purple-200"
+                >
+                  {spec}
+                  <button
+                    type="button"
+                    onClick={() => removeCustom(spec)}
+                    className="ml-1 text-purple-500 hover:text-purple-700"
+                  >
+                    ×
+                  </button>
+                </span>
               ))}
-            </select>
-          </div>
+            </div>
+          )}
         </div>
+        <p className="mt-2 text-xs text-gray-500">
+          Selected: {selectedSpecs.length + customSpecs.length} (standard {selectedSpecs.length}, custom {customSpecs.length})
+        </p>
       </div>
-
-      {showOtherSpecialization && (
-        <div className="grid grid-cols-1 gap-4 mt-2">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Other Specialization*
-            </label>
-            <input
-              type="text"
-              name="otherSpecialization"
-              value={trainerData.otherSpecialization}
-              onChange={handleChange}
-              className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/80 focus:border-blue-500 transition-all duration-150"
-              required={showOtherSpecialization}
-              placeholder="Enter your specialization"
-            />
-          </div>
-        </div>
-      )}
 
       <div className="flex justify-end">
         <button
@@ -454,8 +476,8 @@ function AddTrainer({ onClose, onTrainerAdded }) {
   );
 
   const renderPaymentInfoSection = () => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Payment Type*
@@ -499,7 +521,7 @@ function AddTrainer({ onClose, onTrainerAdded }) {
 
       <div className="border-t border-gray-200 pt-4">
         <h3 className="text-sm font-medium text-gray-700 mb-3">Bank Details</h3>
-        <div className="space-y-4">
+  <div className="space-y-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Name as per Bank*
@@ -514,7 +536,7 @@ function AddTrainer({ onClose, onTrainerAdded }) {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Bank Name*
@@ -543,7 +565,7 @@ function AddTrainer({ onClose, onTrainerAdded }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 IFSC Code*
@@ -670,7 +692,7 @@ function AddTrainer({ onClose, onTrainerAdded }) {
         </span>
 
         {/* Modal content - relative positioning and higher z-index */}
-        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full relative z-10">
+  <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-xl sm:w-full relative z-10">
           <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <div className="flex justify-between items-start">
               <div>
