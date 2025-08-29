@@ -1,34 +1,19 @@
-import React, { useState, useEffect } from "react";
-import {
-  collection,
-  getDocs,
-  query,
-  orderBy,
-  limit,
-  startAfter,
-  endBefore,
-  limitToLast,
-  where, // <-- added
-} from "firebase/firestore";
+import React, { useState, useEffect, useRef } from "react";
+import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import { db } from "../../firebase";
 import AddTrainer from "./AddTrainer.jsx";
 import EditTrainer from "./EditTrainer.jsx";
 import DeleteTrainer from "./DeleteTrainer.jsx";
 import TrainerLeadDetails from "./TrainerLeadDetails.jsx";
-import {
-  FiPlusCircle,
-  FiEdit,
-  FiTrash2,
-  FiChevronLeft,
-  FiChevronRight,
-} from "react-icons/fi";
-import { useNavigate } from "react-router-dom";
-
-const TRAINERS_PER_PAGE = 20;
+import { FiPlusCircle, FiEdit, FiTrash2, FiChevronLeft } from "react-icons/fi";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 function TrainersDashboard() {
   const [trainers, setTrainers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Load ALL trainers once (dataset < 500) then operate purely client-side
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const [showAddTrainer, setShowAddTrainer] = useState(false);
@@ -42,124 +27,50 @@ function TrainersDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOrder, setSortOrder] = useState("asc");
 
-  const [lastVisible, setLastVisible] = useState(null);
-  const [firstVisible, setFirstVisible] = useState(null);
-  const [pageStack, setPageStack] = useState([]);
-
   const navigate = useNavigate();
-
-  const fetchTrainersPaginated = async (direction = "initial") => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      let q;
-      const baseQuery = collection(db, "trainers");
-      const orderField = "trainerId";
-
-      if (direction === "initial") {
-        q = query(baseQuery, orderBy(orderField), limit(TRAINERS_PER_PAGE));
-      } else if (direction === "next" && lastVisible) {
-        q = query(
-          baseQuery,
-          orderBy(orderField),
-          startAfter(lastVisible),
-          limit(TRAINERS_PER_PAGE)
-        );
-      } else if (direction === "prev" && firstVisible) {
-        q = query(
-          baseQuery,
-          orderBy(orderField),
-          endBefore(firstVisible),
-          limitToLast(TRAINERS_PER_PAGE)
-        );
-      }
-
-      const snapshot = await getDocs(q);
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-
-      setTrainers(data);
-
-      const firstDoc = snapshot.docs[0];
-      const lastDoc = snapshot.docs[snapshot.docs.length - 1];
-
-      setFirstVisible(firstDoc);
-      setLastVisible(lastDoc);
-
-      if (direction === "next") {
-        setPageStack((prev) => [...prev, firstVisible]);
-      } else if (direction === "prev") {
-        setPageStack((prev) => prev.slice(0, -1));
-      } else if (direction === "initial") {
-        setPageStack([]);
-      }
-    } catch (err) {
-      console.error("Pagination fetch failed:", err);
-      setError("Failed to fetch trainers. Try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  async function searchTrainersFirestore(term) {
-    try {
-      setLoading(true);
-      setError(null);
-
-      if (!term) {
-        // if search cleared, go back to paginated listing
-        await fetchTrainersPaginated("initial");
-        return;
-      }
-
-      // Firestore prefix search on name (requires index for complex queries)
-      const q = query(
-        collection(db, "trainers"),
-        where("name", ">=", term),
-        where("name", "<=", term + "\uf8ff"),
-        orderBy("name"),
-        limit(1000) // adjust max results as needed
-      );
-
-      const snapshot = await getDocs(q);
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-
-      setTrainers(data);
-      // reset pagination cursors while showing search results
-      setFirstVisible(null);
-      setLastVisible(null);
-      setPageStack([]);
-    } catch (err) {
-      console.error("Search failed:", err);
-      setError("Search failed. Try again.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
+  const [searchParams, setSearchParams] = useSearchParams();
+  const didInitRef = useRef(false);
   useEffect(() => {
-    fetchTrainersPaginated("initial");
-  }, []);
-
-  useEffect(() => {
-    const t = setTimeout(() => {
-      const trimmed = searchTerm.trim();
-      if (trimmed.length > 0) {
-        searchTrainersFirestore(trimmed);
+    const loadAll = async () => {
+      try {
+        setError(null);
+        const q = query(collection(db, "trainers"), orderBy("trainerId"));
+        const snapshot = await getDocs(q);
+        const all = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setTrainers(all);
+      } catch (err) {
+        console.error("Fetch trainers failed:", err);
+        setError("Failed to fetch trainers. Try again.");
+      } finally {
+        setInitialLoading(false);
+      }
+    };
+    if (!didInitRef.current) {
+      didInitRef.current = true;
+      // Initialize search term from URL or localStorage
+      const urlQ = searchParams.get("q");
+      if (urlQ !== null) {
+        setSearchTerm(urlQ);
       } else {
-        // restore paginated view
-        fetchTrainersPaginated("initial");
+        const stored = localStorage.getItem("trainersSearch") || "";
+        if (stored) setSearchTerm(stored);
       }
-    }, 300);
+      loadAll();
+    }
+  }, [searchParams]);
 
-    return () => clearTimeout(t);
-  }, [searchTerm]);
+  // Persist search term to URL & localStorage
+  useEffect(() => {
+    // Avoid unnecessary URL updates
+    const currentQ = searchParams.get("q") || "";
+    if (searchTerm) {
+      if (currentQ !== searchTerm) setSearchParams({ q: searchTerm });
+    } else if (currentQ) {
+      setSearchParams({});
+    }
+    localStorage.setItem("trainersSearch", searchTerm || "");
+  }, [searchTerm, searchParams, setSearchParams]);
+  // No remote searching; purely client-side filter now.
 
   const toggleSortOrder = () => {
     setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
@@ -179,18 +90,36 @@ function TrainersDashboard() {
 
   const handleBack = () => navigate(-1);
 
-  const handleTrainerAdded = () => {
-    fetchTrainersPaginated("initial");
+  const handleTrainerAdded = (newTrainerOrArray) => {
+    if (Array.isArray(newTrainerOrArray)) {
+      setTrainers((prev) => {
+        const existingIds = new Set(prev.map((t) => t.id));
+        const additions = newTrainerOrArray.filter((t) => !existingIds.has(t.id));
+        return [...prev, ...additions];
+      });
+    toast.success(`${newTrainerOrArray.length} trainer(s) imported`);
+    } else if (newTrainerOrArray && newTrainerOrArray.id) {
+      setTrainers((prev) => [...prev, newTrainerOrArray]);
+    toast.success("Trainer added");
+    }
     setShowAddTrainer(false);
   };
 
-  const handleTrainerUpdated = () => {
-    fetchTrainersPaginated("initial");
+  const handleTrainerUpdated = (updatedTrainer) => {
+    if (updatedTrainer && updatedTrainer.id) {
+      setTrainers((prev) =>
+        prev.map((t) => (t.id === updatedTrainer.id ? { ...t, ...updatedTrainer } : t))
+      );
+    toast.success("Trainer updated");
+    }
     setShowEditTrainer(false);
   };
 
-  const handleTrainerDeleted = () => {
-    fetchTrainersPaginated("initial");
+  const handleTrainerDeleted = (deletedId) => {
+    if (deletedId) {
+      setTrainers((prev) => prev.filter((t) => t.id !== deletedId));
+    toast.success("Trainer deleted");
+    }
     setShowDeleteTrainer(false);
   };
 
@@ -320,13 +249,14 @@ function TrainersDashboard() {
           </div>
         )}
 
-        {/* Loading */}
-        {loading ? (
+  {/* Table / Content */}
+  {initialLoading ? (
           <div className="flex justify-center items-center h-40">
-            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
+            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500" />
           </div>
         ) : (
-          <>
+          <div className="relative">
+            <>
             {/* Table with horizontal scroll */}
             <div className="overflow-x-auto mb-3" style={{ maxWidth: "100%" }}>
               <table className="min-w-full text-xs divide-y divide-gray-200">
@@ -403,26 +333,8 @@ function TrainersDashboard() {
               </table>
             </div>
 
-            {/* Pagination Controls BELOW the scroll bar */}
-            <div className="flex justify-between items-center mt-1">
-              <button
-                onClick={() => fetchTrainersPaginated("prev")}
-                disabled={pageStack.length === 0}
-                className="flex items-center gap-2 px-3 py-1 border rounded disabled:opacity-50 text-sm"
-              >
-                <FiChevronLeft />
-                Previous
-              </button>
-
-              <button
-                onClick={() => fetchTrainersPaginated("next")}
-                disabled={trainers.length < TRAINERS_PER_PAGE}
-                className="flex items-center gap-2 px-3 py-1 border rounded disabled:opacity-50 text-sm"
-              >
-                Next
-                <FiChevronRight />
-              </button>
-            </div>
+            {/* Pagination removed: all trainers loaded once */}
+            <ToastContainer position="bottom-right" autoClose={3000} hideProgressBar newestOnTop closeOnClick pauseOnHover={false} theme="light" />
 
             {/* Modals */}
             {showAddTrainer && (
@@ -452,7 +364,8 @@ function TrainersDashboard() {
                 onClose={() => setShowTrainerDetails(false)}
               />
             )}
-          </>
+            </>
+          </div>
         )}
       </div>
     </div>
