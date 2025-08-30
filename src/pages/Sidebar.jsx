@@ -16,6 +16,7 @@ import {
   FiHelpCircle,
   FiMessageSquare,
   FiMenu,
+  FiUserCheck,
 } from "react-icons/fi";
 
 const roleLinks = {
@@ -25,6 +26,7 @@ const roleLinks = {
     { label: "L & D", path: "/dashboard/learning-development", icon: <FiBook /> },
     { label: "Placement", path: "/dashboard/placement", icon: <FiBriefcase /> },
     { label: "D M", path: "/dashboard/marketing", icon: <FiTrendingUp /> },
+    { label: "HR", path: "/dashboard/hr", icon: <FiUserCheck /> },
   ],
   sales: [{ label: "Sales", path: "/dashboard/sales", icon: <MdOutlineCurrencyRupee /> }],
   placement: [{ label: "Placement", path: "/dashboard/placement", icon: <FiBriefcase /> }],

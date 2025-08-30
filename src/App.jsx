@@ -22,6 +22,7 @@ import UpdateProfile from "./components/UpdateProfile";
 import Help from "./pages/Help";
 import SessionManager from "./components/SessionManager";
 import TrainersDashboard from "./components/Learning/TrainersDashboard";
+import HR from "./pages/HR";
 
 const AppContent = () => {
   const location = useLocation();
@@ -53,6 +54,7 @@ const AppContent = () => {
             <Route path="trainers" element={<TrainersDashboard />} />
           </Route>
           <Route path="marketing" element={<DigitalMarketing />} />
+          <Route path="hr" element={<HR />} />
         </Route>
       </Routes>
       {location.pathname === "/" && <Footer />}

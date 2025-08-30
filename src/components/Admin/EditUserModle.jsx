@@ -3,7 +3,7 @@ import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import { FiX } from "react-icons/fi";
 
-const departments = ["Sales", "Placement", "L & D", "DM", "Admin"];
+const departments = ["Sales", "Placement", "L & D", "DM", "Admin", "HR"];
 const roles = ["Director", "Head", "Manager", "Assistant Manager", "Executive"];
 
 const EditUser = ({ user, onCancel, onSuccess }) => {
