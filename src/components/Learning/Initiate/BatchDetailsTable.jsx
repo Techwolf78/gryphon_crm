@@ -78,47 +78,78 @@ const TrainerRow = React.memo(
     openSwapModal,
     isTrainerAvailable,
     isDuplicate = false,
-  removeDailyDate,
-  openDailySchedule,
-  setOpenDailySchedule,
-  updateTrainerLocal,
+    removeDailyDate,
+    openDailySchedule,
+    setOpenDailySchedule,
+    updateTrainerLocal,
   }) => {
-
     // ✅ ADD: Calculate unique key for this trainer
     const trainerKey = `${rowIndex}-${batchIndex}-${trainerIdx}`;
     const showDailyHours = openDailySchedule === trainerKey;
 
-  // Portal positioning for daily schedule outside table
-  const viewBtnRef = useRef(null);
-  const panelRef = useRef(null);
-  const [schedulePos, setSchedulePos] = useState({ top: 0, left: 0, width: 320, arrowOffset: 0 });
+    // Portal positioning for daily schedule outside table
+    const viewBtnRef = useRef(null);
+    const panelRef = useRef(null);
+    const [schedulePos, setSchedulePos] = useState({
+      top: 0,
+      left: 0,
+      width: 320,
+      arrowOffset: 0,
+    });
 
     // Local UI state to allow adding new topics per trainer
-  const [addedTopics, setAddedTopics] = useState([]);
-  const [newTopicInput, setNewTopicInput] = useState("");
+    const [addedTopics, setAddedTopics] = useState([]);
+    const [newTopicInput, setNewTopicInput] = useState("");
 
     // ✅ If trainer has no topics selected but the selected trainer document
     // provides specializations, default-select those topics once.
     useEffect(() => {
       try {
-        const hasTopics = Array.isArray(trainer.topics) && trainer.topics.length > 0;
-        if (!hasTopics && trainer.trainerId && Array.isArray(trainers) && trainers.length > 0) {
+        const hasTopics =
+          Array.isArray(trainer.topics) && trainer.topics.length > 0;
+        if (
+          !hasTopics &&
+          trainer.trainerId &&
+          Array.isArray(trainers) &&
+          trainers.length > 0
+        ) {
           const trDoc = trainers.find(
-            (t) => t.id === trainer.trainerId || t.trainerId === trainer.trainerId
+            (t) =>
+              t.id === trainer.trainerId || t.trainerId === trainer.trainerId
           );
           if (trDoc) {
-            const s1 = Array.isArray(trDoc.specialization) ? trDoc.specialization : [];
-            const s2 = Array.isArray(trDoc.otherSpecialization) ? trDoc.otherSpecialization : [];
-            const defaults = Array.from(new Set([...s1, ...s2].filter(Boolean)));
+            const s1 = Array.isArray(trDoc.specialization)
+              ? trDoc.specialization
+              : [];
+            const s2 = Array.isArray(trDoc.otherSpecialization)
+              ? trDoc.otherSpecialization
+              : [];
+            const defaults = Array.from(
+              new Set([...s1, ...s2].filter(Boolean))
+            );
             if (defaults.length > 0) {
-              handleTrainerField(rowIndex, batchIndex, trainerIdx, "topics", defaults);
+              handleTrainerField(
+                rowIndex,
+                batchIndex,
+                trainerIdx,
+                "topics",
+                defaults
+              );
             }
           }
         }
       } catch {
         // swallow - non-critical UI defaulting
       }
-    }, [trainer.trainerId, trainers, rowIndex, batchIndex, trainerIdx, handleTrainerField, trainer.topics]);
+    }, [
+      trainer.trainerId,
+      trainers,
+      rowIndex,
+      batchIndex,
+      trainerIdx,
+      handleTrainerField,
+      trainer.topics,
+    ]);
 
     // ✅ ADD: Toggle function for daily schedule
     const toggleDailySchedule = () => {
@@ -146,7 +177,11 @@ const TrainerRow = React.memo(
     useEffect(() => {
       if (!showDailyHours) return;
       const handler = (e) => {
-        if (panelRef.current && !panelRef.current.contains(e.target) && !viewBtnRef.current?.contains(e.target)) {
+        if (
+          panelRef.current &&
+          !panelRef.current.contains(e.target) &&
+          !viewBtnRef.current?.contains(e.target)
+        ) {
           setOpenDailySchedule(null);
         }
       };
@@ -175,8 +210,8 @@ const TrainerRow = React.memo(
     // ✅ ADD: Handle daily hours input change
     const handleDailyHourChange = (dayIndex, value) => {
       const updated = [...(trainer.dailyHours || [])];
-  updated[dayIndex] = Number(value) || 0;
-  // Call the parent handler to update the trainer data; parent will recalc assignedHours
+      updated[dayIndex] = Number(value) || 0;
+      // Call the parent handler to update the trainer data; parent will recalc assignedHours
       handleTrainerField(
         rowIndex,
         batchIndex,
@@ -186,546 +221,730 @@ const TrainerRow = React.memo(
       );
     };
 
-    return (
-      <>
+  return (
+    <>
       <tr
-        id={`trainer-${trainerKey}`}
-        className={`border-b last:border-0 ${
-          isDuplicate ? "bg-red-50 border-red-200" : ""
-        }`}
-      >
-  {/* Trainer Name/Select */}
-  <td className="px-2 py-1 align-top min-w-[180px]">
-          {isDuplicate && (
-            <div className="text-xs text-red-600 font-medium mb-1 flex items-center">
-              <svg
-                className="w-3 h-3 mr-1"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              Duplicate
-            </div>
-          )}
-          <select
-            value={trainer.trainerId || ""}
-            onChange={(e) =>
-              handleTrainerField(
-                rowIndex,
-                batchIndex,
-                trainerIdx,
-                "trainerId",
-                e.target.value
-              )
-            }
-            className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
-          >
-            <option value="">Select Trainer</option>
-            {trainers.map((tr) => {
-              const isAvailable = isTrainerAvailable(
-                tr.trainerId,
-                trainer.startDate,
-                trainer.dayDuration,
-                `${rowIndex}-${batchIndex}-${trainerIdx}`
-              );
-              return (
-                <option
-                  key={tr.trainerId}
-                  value={tr.trainerId}
-                  disabled={!isAvailable}
-                  className={!isAvailable ? "text-gray-400" : ""}
+          id={`trainer-${trainerKey}`}
+          className={`border-b last:border-0 ${
+            isDuplicate ? "bg-red-50 border-red-200" : ""
+          }`}
+        >
+          {/* Trainer Name/Select */}
+          <td className="px-2 py-1 align-top min-w-[180px]">
+            {isDuplicate && (
+              <div className="text-xs text-red-600 font-medium mb-1 flex items-center">
+                <svg
+                  className="w-3 h-3 mr-1"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
                 >
-                  {tr.name} ({tr.trainerId})
-                  {!isAvailable && " (Already booked)"}
-                </option>
-              );
-            })}
-          </select>
-        </td>
-
-        {/* Duration dropdown */}
-        <td className="px-2 py-1">
-          <select
-            value={trainer.dayDuration || ""}
-            onChange={(e) =>
-              handleTrainerField(
-                rowIndex,
-                batchIndex,
-                trainerIdx,
-                "dayDuration",
-                e.target.value
-              )
-            }
-            className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
-          >
-            <option value="">Select Duration</option>
-            {DAY_DURATION_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </td>
-
-        {/* Start Date */}
-        <td className="px-2 py-1">
-          <input
-            type="date"
-            value={trainer.startDate || ""}
-            onChange={(e) =>
-              handleTrainerField(
-                rowIndex,
-                batchIndex,
-                trainerIdx,
-                "startDate",
-                e.target.value
-              )
-            }
-            className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
-          />
-        </td>
-
-        {/* End Date */}
-        <td className="px-2 py-1">
-          <input
-            type="date"
-            value={trainer.endDate || ""}
-            onChange={(e) =>
-              handleTrainerField(
-                rowIndex,
-                batchIndex,
-                trainerIdx,
-                "endDate",
-                e.target.value
-              )
-            }
-            className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
-          />
-        </td>
-
-        {/* Per Hour Cost */}
-        <td className="px-2 py-1">
-          <input
-            type="number"
-            value={trainer.perHourCost || ""}
-            onChange={(e) =>
-              handleTrainerField(
-                rowIndex,
-                batchIndex,
-                trainerIdx,
-                "perHourCost",
-                parseFloat(e.target.value) || 0
-              )
-            }
-            className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
-            placeholder="Cost"
-          />
-        </td>
-
-        {/* Total Cost */}
-        <td className="px-2 py-1 text-xs text-right">
-          ₹
-          {(
-            ((Number(trainer.assignedHours) || 0) * (Number(trainer.perHourCost) || 0)) +
-            (Number(trainer.conveyance) || 0) +
-            (Number(trainer.food) || 0) +
-            (Number(trainer.lodging) || 0)
-          ).toFixed(2)}
-        </td>
-
-        {/* Total Hours */}
-        <td className="px-2 py-1">
-          <input
-            type="number"
-            value={trainer.assignedHours || ""}
-            onChange={(e) =>
-              handleTotalHoursChange(
-                rowIndex,
-                batchIndex,
-                trainerIdx,
-                e.target.value
-              )
-            }
-            className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
-            placeholder="Hours"
-          />
-        </td>
-
-  {/* ✅ UPDATED: Daily Hours with View Button */}
-  <td className="px-2 py-1 relative">
-          <div className="flex items-center space-x-1">
-            <span className="text-xs">
-              {trainer.dailyHours && trainer.dailyHours.length > 0
-                ? (trainer.dailyHours.reduce((sum, hours) => sum + Number(hours || 0), 0) / trainer.dailyHours.length).toFixed(2)
-                : (trainer.assignedHours || 0)}
-              h/day
-            </span>
-            {trainer.dailyHours && trainer.dailyHours.length > 0 && (
-              <button
-                type="button"
-                onClick={toggleDailySchedule}
-                className="inline-flex items-center justify-center h-4 w-4 rounded-md bg-blue-500/90 hover:bg-blue-600 text-white shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-300 transition text-[10px]"
-                title="View Daily Schedule"
-                aria-label="View daily schedule"
-                ref={viewBtnRef}
-              >
-                <FiEye className="w-2 h-2" />
-              </button>
+                  <path
+                    fillRule="evenodd"
+                    d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                Duplicate
+              </div>
             )}
-          </div>
-          {/* ✅ Daily Hours Breakdown rendered via Portal outside table bounds */}
-          {showDailyHours && trainer.dailyHours && trainer.activeDates && createPortal(
-            <div
-              ref={panelRef}
-              style={{ top: schedulePos.top, left: schedulePos.left, width: schedulePos.width, maxWidth: '100%', position: 'absolute' }}
-              className="fixed z-[1000] bg-white border border-gray-200 rounded-lg shadow-xl p-3"
+            <select
+              value={trainer.trainerId || ""}
+              onChange={(e) =>
+                handleTrainerField(
+                  rowIndex,
+                  batchIndex,
+                  trainerIdx,
+                  "trainerId",
+                  e.target.value
+                )
+              }
+              className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
             >
-              {/* Arrow */}
-              <span
-                className="absolute -right-2 top-0 h-full pointer-events-none flex"
-                style={{ top: schedulePos.arrowOffset - 8 }}
-              >
-                <span className="relative w-0 h-0"
-                  style={{
-                    borderTop: '8px solid transparent',
-                    borderBottom: '8px solid transparent',
-                    borderLeft: '8px solid white',
-                    filter: 'drop-shadow(0 0 1px rgba(0,0,0,0.15))'
-                  }}
-                />
+              <option value="">Select Trainer</option>
+              {trainers.map((tr) => {
+                const isAvailable = isTrainerAvailable(
+                  tr.trainerId,
+                  trainer.startDate,
+                  trainer.dayDuration,
+                  `${rowIndex}-${batchIndex}-${trainerIdx}`
+                );
+                return (
+                  <option
+                    key={tr.trainerId}
+                    value={tr.trainerId}
+                    disabled={!isAvailable}
+                    className={!isAvailable ? "text-gray-400" : ""}
+                  >
+                    {tr.name} ({tr.trainerId})
+                    {!isAvailable && " (Already booked)"}
+                  </option>
+                );
+              })}
+            </select>
+          </td>
+
+          {/* Duration dropdown */}
+          <td className="px-2 py-1">
+            <select
+              value={trainer.dayDuration || ""}
+              onChange={(e) =>
+                handleTrainerField(
+                  rowIndex,
+                  batchIndex,
+                  trainerIdx,
+                  "dayDuration",
+                  e.target.value
+                )
+              }
+              className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
+            >
+              <option value="">Select Duration</option>
+              {DAY_DURATION_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </td>
+
+          {/* Start Date */}
+          <td className="px-2 py-1">
+            <input
+              type="date"
+              value={trainer.startDate || ""}
+              onChange={(e) =>
+                handleTrainerField(
+                  rowIndex,
+                  batchIndex,
+                  trainerIdx,
+                  "startDate",
+                  e.target.value
+                )
+              }
+              className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
+            />
+          </td>
+
+          {/* End Date */}
+          <td className="px-2 py-1">
+            <input
+              type="date"
+              value={trainer.endDate || ""}
+              onChange={(e) =>
+                handleTrainerField(
+                  rowIndex,
+                  batchIndex,
+                  trainerIdx,
+                  "endDate",
+                  e.target.value
+                )
+              }
+              className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
+            />
+          </td>
+
+          {/* No. of Days (Excluding Sundays) */}
+          <td className="px-2 py-1 text-xs">
+            {(() => {
+              try {
+                if (!trainer.startDate || !trainer.endDate) return "-";
+                const start = new Date(trainer.startDate);
+                const end = new Date(trainer.endDate);
+                if (isNaN(start) || isNaN(end) || end < start) return "-";
+                // Exclude Sundays
+                let days = 0;
+                const cur = new Date(start);
+                while (cur <= end) {
+                  if (cur.getDay() !== 0) days++;
+                  cur.setDate(cur.getDate() + 1);
+                }
+                return days;
+              } catch {
+                return "-";
+              }
+            })()}
+          </td>
+
+          {/* Total Hours */}
+          <td className="px-2 py-1">
+            <input
+              type="number"
+              value={trainer.assignedHours || ""}
+              onChange={(e) =>
+                handleTotalHoursChange(
+                  rowIndex,
+                  batchIndex,
+                  trainerIdx,
+                  e.target.value
+                )
+              }
+              className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
+              placeholder="Hours"
+            />
+          </td>
+
+          {/* Per Hour Cost */}
+          <td className="px-2 py-1">
+            <input
+              type="number"
+              value={trainer.perHourCost || ""}
+              onChange={(e) =>
+                handleTrainerField(
+                  rowIndex,
+                  batchIndex,
+                  trainerIdx,
+                  "perHourCost",
+                  parseFloat(e.target.value) || 0
+                )
+              }
+              className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
+              placeholder="Cost"
+            />
+          </td>
+
+          {/* ✅ UPDATED: Daily Hours with View Button */}
+          <td className="px-2 py-1 relative">
+            <div className="flex items-center space-x-1">
+              <span className="text-xs">
+                {trainer.dailyHours && trainer.dailyHours.length > 0
+                  ? (
+                      trainer.dailyHours.reduce(
+                        (sum, hours) => sum + Number(hours || 0),
+                        0
+                      ) / trainer.dailyHours.length
+                    ).toFixed(2)
+                  : trainer.assignedHours || 0}
+                h/day
               </span>
-              <div className="flex justify-between items-center mb-2">
-                <h4 className="text-xs font-medium text-gray-700">Daily Schedule</h4>
+              {trainer.dailyHours && trainer.dailyHours.length > 0 && (
                 <button
                   type="button"
                   onClick={toggleDailySchedule}
-                  className="text-gray-400 hover:text-gray-600"
-                  aria-label="Close daily schedule"
+                  className="inline-flex items-center justify-center h-4 w-4 rounded-md bg-blue-500/90 hover:bg-blue-600 text-white shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-300 transition text-[10px]"
+                  title="View Daily Schedule"
+                  aria-label="View daily schedule"
+                  ref={viewBtnRef}
                 >
-                  ×
+                  <FiEye className="w-2 h-2" />
                 </button>
-              </div>
-              <div className="max-h-56 overflow-y-auto pr-1 custom-scrollbar">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="bg-gray-50 text-gray-600">
-                      <th className="px-2 py-1 text-left font-medium">Date</th>
-                      <th className="px-2 py-1 text-left font-medium">Day</th>
-                      <th className="px-2 py-1 text-left font-medium">Hours</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {trainer.activeDates
-                      .filter((date) => {
-                        const dateObj = new Date(date);
-                        return !isNaN(dateObj.getTime());
-                      })
-                      .map((date, dayIndex) => {
-                        const dateObj = new Date(date);
-                        const dayName = dateObj.toLocaleDateString("en-US", { weekday: "short" });
-                        const formattedDate = dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-                        return (
-                          <tr key={dayIndex} className="border-b border-gray-100 last:border-0">
-                            <td className="px-2 py-1 whitespace-nowrap">{formattedDate}</td>
-                            <td className="px-2 py-1 text-gray-600">{dayName}</td>
-                            <td className="px-2 py-1">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center">
-                                  <input
-                                    type="number"
-                                    value={trainer.dailyHours[dayIndex] || ""}
-                                    onChange={(e) => handleDailyHourChange(dayIndex, e.target.value)}
-                                    className="w-14 rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-0.5 px-1"
-                                    min="0"
-                                    step="0.5"
-                                    placeholder="0"
-                                  />
-                                  <span className="ml-1 text-[10px] text-gray-500">h</span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => removeDailyDate && removeDailyDate(rowIndex, batchIndex, trainerIdx, dayIndex)}
-                                  className="ml-3 text-rose-500 hover:text-rose-600 p-0.5 rounded"
-                                  title="Remove date"
-                                  aria-label="Remove date"
-                                >
-                                  <FiTrash2 size={12} />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                  </tbody>
-                  <tfoot>
-                    <tr className="bg-gray-50 font-medium text-gray-700">
-                      <td className="px-2 py-1" colSpan={2}>Total:</td>
-                      <td className="px-2 py-1">{trainer.dailyHours.reduce((s, h) => s + Number(h || 0), 0).toFixed(2)}h</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </div>,
-            document.body
-          )}
-        </td>
+              )}
+            </div>
+            {/* ✅ Daily Hours Breakdown rendered via Portal outside table bounds */}
+            {showDailyHours &&
+              trainer.dailyHours &&
+              trainer.activeDates &&
+              createPortal(
+                <div
+                  ref={panelRef}
+                  style={{
+                    top: schedulePos.top,
+                    left: schedulePos.left,
+                    width: schedulePos.width,
+                    maxWidth: "100%",
+                    position: "absolute",
+                  }}
+                  className="fixed z-[1000] bg-white border border-gray-200 rounded-lg shadow-xl p-3"
+                >
+                  {/* Arrow */}
+                  <span
+                    className="absolute -right-2 top-0 h-full pointer-events-none flex"
+                    style={{ top: schedulePos.arrowOffset - 8 }}
+                  >
+                    <span
+                      className="relative w-0 h-0"
+                      style={{
+                        borderTop: "8px solid transparent",
+                        borderBottom: "8px solid transparent",
+                        borderLeft: "8px solid white",
+                        filter: "drop-shadow(0 0 1px rgba(0,0,0,0.15))",
+                      }}
+                    />
+                  </span>
+                  <div className="flex justify-between items-center mb-2">
+                    <h4 className="text-xs font-medium text-gray-700">
+                      Daily Schedule
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={toggleDailySchedule}
+                      className="text-gray-400 hover:text-gray-600"
+                      aria-label="Close daily schedule"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div className="max-h-56 overflow-y-auto pr-1 custom-scrollbar">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="bg-gray-50 text-gray-600">
+                          <th className="px-2 py-1 text-left font-medium">
+                            Date
+                          </th>
+                          <th className="px-2 py-1 text-left font-medium">
+                            Day
+                          </th>
+                          <th className="px-2 py-1 text-left font-medium">
+                            Hours
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {trainer.activeDates
+                          .filter((date) => {
+                            const dateObj = new Date(date);
+                            return !isNaN(dateObj.getTime());
+                          })
+                          .map((date, dayIndex) => {
+                            const dateObj = new Date(date);
+                            const dayName = dateObj.toLocaleDateString(
+                              "en-US",
+                              { weekday: "short" }
+                            );
+                            const formattedDate = dateObj.toLocaleDateString(
+                              "en-US",
+                              { month: "short", day: "numeric" }
+                            );
+                            return (
+                              <tr
+                                key={dayIndex}
+                                className="border-b border-gray-100 last:border-0"
+                              >
+                                <td className="px-2 py-1 whitespace-nowrap">
+                                  {formattedDate}
+                                </td>
+                                <td className="px-2 py-1 text-gray-600">
+                                  {dayName}
+                                </td>
+                                <td className="px-2 py-1">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center">
+                                      <input
+                                        type="number"
+                                        value={
+                                          trainer.dailyHours[dayIndex] || ""
+                                        }
+                                        onChange={(e) =>
+                                          handleDailyHourChange(
+                                            dayIndex,
+                                            e.target.value
+                                          )
+                                        }
+                                        className="w-14 rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-0.5 px-1"
+                                        min="0"
+                                        step="0.5"
+                                        placeholder="0"
+                                      />
+                                      <span className="ml-1 text-[10px] text-gray-500">
+                                        h
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        removeDailyDate &&
+                                        removeDailyDate(
+                                          rowIndex,
+                                          batchIndex,
+                                          trainerIdx,
+                                          dayIndex
+                                        )
+                                      }
+                                      className="ml-3 text-rose-500 hover:text-rose-600 p-0.5 rounded"
+                                      title="Remove date"
+                                      aria-label="Remove date"
+                                    >
+                                      <FiTrash2 size={12} />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-gray-50 font-medium text-gray-700">
+                          <td className="px-2 py-1" colSpan={2}>
+                            Total:
+                          </td>
+                          <td className="px-2 py-1">
+                            {trainer.dailyHours
+                              .reduce((s, h) => s + Number(h || 0), 0)
+                              .toFixed(2)}
+                            h
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>,
+                document.body
+              )}
+          </td>
 
-        {/* Actions */}
-        <td className="px-2 py-1">
-          <div className="flex items-center space-x-1">
-            <button
-              type="button"
-              onClick={() => removeTrainer(rowIndex, batchIndex, trainerIdx)}
-              aria-label="Remove trainer"
-              title="Remove Trainer"
-              className="p-1 rounded-md text-rose-500 hover:text-rose-600 hover:bg-rose-100 focus:outline-none focus:ring-1 focus:ring-rose-300 transition"
-            >
-              <FiTrash2 className="w-3 h-3" />
-            </button>
-            {trainer.dayDuration === "AM" && (
+          {/* Actions */}
+          <td className="px-2 py-1">
+            <div className="flex items-center space-x-1">
               <button
                 type="button"
-                className="ml-1 px-2 py-1 text-xs bg-black text-white rounded hover:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-black/30"
-                onClick={() => {
-                  openSwapModal(rowIndex, batchIndex, trainerIdx);
-                }}
-                title="Swap Trainer"
+                onClick={() => removeTrainer(rowIndex, batchIndex, trainerIdx)}
+                aria-label="Remove trainer"
+                title="Remove Trainer"
+                className="p-1 rounded-md text-rose-500 hover:text-rose-600 hover:bg-rose-100 focus:outline-none focus:ring-1 focus:ring-rose-300 transition"
               >
-                Swap
+                <FiTrash2 className="w-3 h-3" />
               </button>
-            )}
-          </div>
-        </td>
+              {trainer.dayDuration === "AM" && (
+                <button
+                  type="button"
+                  className="ml-1 px-2 py-1 text-xs bg-black text-white rounded hover:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-black/30"
+                  onClick={() => {
+                    openSwapModal(rowIndex, batchIndex, trainerIdx);
+                  }}
+                  title="Swap Trainer"
+                >
+                  Swap
+                </button>
+              )}
+            </div>
+          </td>
       </tr>
-
       {/* Extra info row for each trainer: conveyance, food, lodging, topics (modern SaaS style) */}
       <tr className="bg-transparent text-[11px]">
-        <td colSpan={9} className="px-2 py-2">
-          <div className="grid grid-cols-1 sm:grid-cols-4 lg:grid-cols-12 gap-1.5 items-start">
-            {/* Small card inputs */}
-            {/** Conveyance */}
-            <div className="flex flex-col bg-white/70 border border-gray-100 rounded-md p-0.5 sm:col-span-1 lg:col-span-2">
-              <label className="text-[10px] font-semibold text-slate-600 mb-0.5">Conveyance</label>
-              <div className="relative">
-                <FaRupeeSign className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-500 w-3 h-3" />
-                <input
-                  aria-label={`Conveyance for trainer ${trainer.trainerName || trainer.trainerId || trainerIdx}`}
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  value={trainer.conveyance ?? ""}
-                  onChange={(e) =>
-                    handleTrainerField(
-                      rowIndex,
-                      batchIndex,
-                      trainerIdx,
-                      "conveyance",
-                      e.target.value === "" ? "" : parseFloat(e.target.value) || 0
-                    )
-                  }
-                  className="w-full pl-6 rounded border border-gray-200 bg-white text-[10px] py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-200"
-                  placeholder="0"
-                />
-              </div>
-            </div>
-
-            {/** Food */}
-            <div className="flex flex-col bg-white/70 border border-gray-100 rounded-md p-0.5 sm:col-span-1 lg:col-span-2">
-              <label className="text-[10px] font-semibold text-slate-600 mb-0.5">Food</label>
-              <div className="relative">
-                <FaRupeeSign className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-500 w-3 h-3" />
-                <input
-                  aria-label={`Food for trainer ${trainer.trainerName || trainer.trainerId || trainerIdx}`}
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  value={trainer.food ?? ""}
-                  onChange={(e) =>
-                    handleTrainerField(
-                      rowIndex,
-                      batchIndex,
-                      trainerIdx,
-                      "food",
-                      e.target.value === "" ? "" : parseFloat(e.target.value) || 0
-                    )
-                  }
-                  className="w-full pl-6 rounded border border-gray-200 bg-white text-[10px] py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-200"
-                  placeholder="0"
-                />
-              </div>
-            </div>
-
-            {/** Lodging */}
-            <div className="flex flex-col bg-white/70 border border-gray-100 rounded-md p-0.5 sm:col-span-1 lg:col-span-2">
-              <label className="text-[10px] font-semibold text-slate-600 mb-0.5">Lodging</label>
-              <div className="relative">
-                <FaRupeeSign className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-500 w-3 h-3" />
-                <input
-                  aria-label={`Lodging for trainer ${trainer.trainerName || trainer.trainerId || trainerIdx}`}
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  value={trainer.lodging ?? ""}
-                  onChange={(e) =>
-                    handleTrainerField(
-                      rowIndex,
-                      batchIndex,
-                      trainerIdx,
-                      "lodging",
-                      e.target.value === "" ? "" : parseFloat(e.target.value) || 0
-                    )
-                  }
-                  className="w-full pl-6 rounded border border-gray-200 bg-white text-[10px] py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-200"
-                  placeholder="0"
-                />
-              </div>
-            </div>
-
-            {/** Topics area - larger, spans */}
-            <div className="col-span-1 sm:col-span-4 lg:col-span-6">
-              <div className="flex items-center justify-between mb-0.5">
-                <h4 className="text-[10px] font-semibold text-slate-700">Topics</h4>
-                <span className="text-[10px] text-slate-500">Select or add</span>
+  <td colSpan={6} className="px-2 py-2">
+            <div className="grid grid-cols-1 sm:grid-cols-4 lg:grid-cols-12 gap-1.5 items-start">
+              {/* Small card inputs */}
+              {/** Conveyance */}
+              <div className="flex flex-col bg-white/70 border border-gray-100 rounded-md p-0.5 sm:col-span-1 lg:col-span-2">
+                <label className="text-[10px] font-semibold text-slate-600 mb-0.5">
+                  Conveyance
+                </label>
+                <div className="relative">
+                  <FaRupeeSign className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-500 w-3 h-3" />
+                  <input
+                    aria-label={`Conveyance for trainer ${
+                      trainer.trainerName || trainer.trainerId || trainerIdx
+                    }`}
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={trainer.conveyance ?? ""}
+                    onChange={(e) =>
+                      handleTrainerField(
+                        rowIndex,
+                        batchIndex,
+                        trainerIdx,
+                        "conveyance",
+                        e.target.value === ""
+                          ? ""
+                          : parseFloat(e.target.value) || 0
+                      )
+                    }
+                    className="w-full pl-6 rounded border border-gray-200 bg-white text-[10px] py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-200"
+                    placeholder="0"
+                  />
+                </div>
               </div>
 
-              <div className="bg-white rounded-md border border-gray-100 p-1 shadow-sm">
-                {/* Simplified topics selection UI */}
+              {/** Food */}
+              <div className="flex flex-col bg-white/70 border border-gray-100 rounded-md p-0.5 sm:col-span-1 lg:col-span-2">
+                <label className="text-[10px] font-semibold text-slate-600 mb-0.5">
+                  Food
+                </label>
+                <div className="relative">
+                  <FaRupeeSign className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-500 w-3 h-3" />
+                  <input
+                    aria-label={`Food for trainer ${
+                      trainer.trainerName || trainer.trainerId || trainerIdx
+                    }`}
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={trainer.food ?? ""}
+                    onChange={(e) =>
+                      handleTrainerField(
+                        rowIndex,
+                        batchIndex,
+                        trainerIdx,
+                        "food",
+                        e.target.value === ""
+                          ? ""
+                          : parseFloat(e.target.value) || 0
+                      )
+                    }
+                    className="w-full pl-6 rounded border border-gray-200 bg-white text-[10px] py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-200"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+
+              {/** Lodging */}
+              <div className="flex flex-col bg-white/70 border border-gray-100 rounded-md p-0.5 sm:col-span-1 lg:col-span-2">
+                <label className="text-[10px] font-semibold text-slate-600 mb-0.5">
+                  Lodging
+                </label>
+                <div className="relative">
+                  <FaRupeeSign className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-500 w-3 h-3" />
+                  <input
+                    aria-label={`Lodging for trainer ${
+                      trainer.trainerName || trainer.trainerId || trainerIdx
+                    }`}
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={trainer.lodging ?? ""}
+                    onChange={(e) =>
+                      handleTrainerField(
+                        rowIndex,
+                        batchIndex,
+                        trainerIdx,
+                        "lodging",
+                        e.target.value === ""
+                          ? ""
+                          : parseFloat(e.target.value) || 0
+                      )
+                    }
+                    className="w-full pl-6 rounded border border-gray-200 bg-white text-[10px] py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-200"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+
+              {/* Cost + Topics inline wrapper spans remaining 8 cols */}
+              <div className="sm:col-span-2 lg:col-span-6 flex flex-col md:flex-row gap-2 items-stretch">
                 {(() => {
-                  const trainerDoc = trainers.find((t) => t.trainerId === trainer.trainerId);
-                  const base = [];
-                  if (trainerDoc) {
-                    if (Array.isArray(trainerDoc.specialization)) base.push(...trainerDoc.specialization);
-                    if (Array.isArray(trainerDoc.otherSpecialization)) base.push(...trainerDoc.otherSpecialization);
-                  }
-                  const allTopics = Array.from(new Set([...base, ...addedTopics])).filter(Boolean).sort();
-                  const selected = Array.isArray(trainer.topics)
-                    ? trainer.topics
-                    : trainer.topics
-                    ? [trainer.topics]
-                    : [];
-
-                  // Auto-select all existing topics (from Firestore) if none selected yet
-                  if (allTopics.length > 0 && selected.length === 0) {
-                    // Prevent infinite loop: only trigger when strictly empty
-                    handleTrainerField(rowIndex, batchIndex, trainerIdx, "topics", allTopics);
-                  }
-
-                  const toggleTopic = (topic) => {
-                    const isActive = selected.includes(topic);
-                    const next = isActive ? selected.filter((t) => t !== topic) : [...selected, topic];
-                    handleTrainerField(rowIndex, batchIndex, trainerIdx, "topics", next);
-                  };
-
+                  const trainerCost = ((Number(trainer.assignedHours) || 0) * (Number(trainer.perHourCost) || 0)) || 0;
+                  const miscCost = ((Number(trainer.conveyance) || 0) + (Number(trainer.food) || 0) + (Number(trainer.lodging) || 0)) || 0;
+                  const totalCost = trainerCost + miscCost;
+                  const boxBase = "flex items-center gap-1 bg-white/70 border border-gray-100 rounded-md px-2 py-1";
+                  const valueCls = "text-xs font-semibold";
                   return (
-                    <div className="space-y-1.5">
-                      <div
-                        role="group"
-                        aria-label="Topics"
-                        className="min-h-[22px] max-h-24 overflow-auto rounded border border-dashed border-gray-200 p-0.5 bg-gray-50"
-                      >
-                        {allTopics.length === 0 ? (
-                          <div className="text-[10px] text-slate-400 py-2 text-center">
-                            No topics yet. Add below.
-                          </div>
-                        ) : (
-  <div className="flex flex-wrap gap-0.5">
-                            {allTopics.map((topic) => {
-                              const active = selected.includes(topic);
-                              return (
-                                <button
-                                  key={topic}
-                                  type="button"
-                                  role="checkbox"
-                                  aria-checked={active}
-                                  onClick={() => toggleTopic(topic)}
-          className={`text-[9px] px-1 py-0.5 rounded-full border transition-all focus:outline-none focus:ring-1 focus:ring-indigo-400 truncate ${
-                                    active
-                                      ? "bg-indigo-600 text-white border-indigo-600 shadow"
-                                      : "bg-white text-slate-700 border-gray-300 hover:border-indigo-400 hover:bg-indigo-50"
-                                  }`}
-                                  title={topic}
-                                >
-                                  {topic}
-                                  {active && <span className="ml-1">✓</span>}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
+                    <div className="flex flex-wrap md:flex-nowrap gap-1 md:w-auto">
+                      <div className={`${boxBase} text-indigo-700`}> 
+                        <span className="text-[10px] font-medium">Trainer:</span>
+                        <span className={`${valueCls} text-indigo-900`}>₹{trainerCost.toFixed(2)}</span>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          aria-label={`Add topic for trainer ${trainer.trainerName || trainer.trainerId || trainerIdx}`}
-                          type="text"
-                          value={newTopicInput}
-                          onChange={(e) => setNewTopicInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              const t = (newTopicInput || "").trim();
-                              if (!t) return;
-                              if (!addedTopics.includes(t)) setAddedTopics((s) => [...s, t]);
-                              const next = Array.from(new Set([...selected, t]));
-                              handleTrainerField(rowIndex, batchIndex, trainerIdx, "topics", next);
-                              if (trainer.trainerId) {
-                                (async () => {
-                                  try {
-                                    const trainerDocRef = doc(db, "trainers", String(trainer.trainerId));
-                                    await updateDoc(trainerDocRef, { otherSpecialization: arrayUnion(t) });
-                                    updateTrainerLocal?.(trainer.trainerId, t);
-                                  } catch (err) {
-                                    console.error("Failed to persist new topic:", err);
-                                  }
-                                })();
-                              }
-                              setNewTopicInput("");
-                            }
-                          }}
-                          placeholder="Add topic & Enter"
-                          className="flex-1 rounded border border-gray-200 px-2 py-0.5 text-[10px] focus:outline-none focus:ring-1 focus:ring-indigo-200"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const t = (newTopicInput || "").trim();
-                            if (!t) return;
-                            if (!addedTopics.includes(t)) setAddedTopics((s) => [...s, t]);
-                            const next = Array.from(new Set([...selected, t]));
-                            handleTrainerField(rowIndex, batchIndex, trainerIdx, "topics", next);
-                            if (trainer.trainerId) {
-                              (async () => {
-                                try {
-                                  const trainerDocRef = doc(db, "trainers", String(trainer.trainerId));
-                                  await updateDoc(trainerDocRef, { otherSpecialization: arrayUnion(t) });
-                                  updateTrainerLocal?.(trainer.trainerId, t);
-                                } catch (err) {
-                                  console.error("Failed to persist new topic:", err);
-                                }
-                              })();
-                            }
-                            setNewTopicInput("");
-                          }}
-                          className="inline-flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-0.5 rounded text-[10px] focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                        >
-                          <FiPlus size={10} />
-                          <span>Add</span>
-                        </button>
+                      <div className={`${boxBase} text-amber-700`}> 
+                        <span className="text-[10px] font-medium">Misc:</span>
+                        <span className={`${valueCls} text-amber-900`}>₹{miscCost.toFixed(2)}</span>
+                      </div>
+                      <div className={`${boxBase} text-emerald-700`}> 
+                        <span className="text-[10px] font-medium">Total:</span>
+                        <span className={`${valueCls} text-emerald-900`}>₹{totalCost.toFixed(2)}</span>
                       </div>
                     </div>
                   );
                 })()}
-              </div>
-            </div>
-          </div>
+
+                {/** Topics area */}
+                <div className="flex-1 min-w-[240px]">
+                  <div className="flex items-center justify-between mb-0.5">
+                  <h4 className="text-[10px] font-semibold text-slate-700">
+                    Topics
+                  </h4>
+                  <span className="text-[10px] text-slate-500">
+                    Select or add
+                  </span>
+                </div>
+
+                  <div className="bg-white rounded-md border border-gray-100 p-1 shadow-sm">
+                  {/* Simplified topics selection UI */}
+                  {(() => {
+                    const trainerDoc = trainers.find(
+                      (t) => t.trainerId === trainer.trainerId
+                    );
+                    const base = [];
+                    if (trainerDoc) {
+                      if (Array.isArray(trainerDoc.specialization))
+                        base.push(...trainerDoc.specialization);
+                      if (Array.isArray(trainerDoc.otherSpecialization))
+                        base.push(...trainerDoc.otherSpecialization);
+                    }
+                    const allTopics = Array.from(
+                      new Set([...base, ...addedTopics])
+                    )
+                      .filter(Boolean)
+                      .sort();
+                    const selected = Array.isArray(trainer.topics)
+                      ? trainer.topics
+                      : trainer.topics
+                      ? [trainer.topics]
+                      : [];
+
+                    // Auto-select all existing topics (from Firestore) if none selected yet
+                    if (allTopics.length > 0 && selected.length === 0) {
+                      // Prevent infinite loop: only trigger when strictly empty
+                      handleTrainerField(
+                        rowIndex,
+                        batchIndex,
+                        trainerIdx,
+                        "topics",
+                        allTopics
+                      );
+                    }
+
+                    const toggleTopic = (topic) => {
+                      const isActive = selected.includes(topic);
+                      const next = isActive
+                        ? selected.filter((t) => t !== topic)
+                        : [...selected, topic];
+                      handleTrainerField(
+                        rowIndex,
+                        batchIndex,
+                        trainerIdx,
+                        "topics",
+                        next
+                      );
+                    };
+
+                    return (
+                      <div className="space-y-1.5">
+                        <div
+                          role="group"
+                          aria-label="Topics"
+                          className="min-h-[22px] max-h-24 overflow-auto rounded border border-dashed border-gray-200 p-0.5 bg-gray-50"
+                        >
+                          {allTopics.length === 0 ? (
+                            <div className="text-[10px] text-slate-400 py-2 text-center">
+                              No topics yet. Add below.
+                            </div>
+                          ) : (
+                            <div className="flex flex-wrap gap-0.5">
+                              {allTopics.map((topic) => {
+                                const active = selected.includes(topic);
+                                return (
+                                  <button
+                                    key={topic}
+                                    type="button"
+                                    role="checkbox"
+                                    aria-checked={active}
+                                    onClick={() => toggleTopic(topic)}
+                                    className={`text-[9px] px-1 py-0.5 rounded-full border transition-all focus:outline-none focus:ring-1 focus:ring-indigo-400 truncate ${
+                                      active
+                                        ? "bg-indigo-600 text-white border-indigo-600 shadow"
+                                        : "bg-white text-slate-700 border-gray-300 hover:border-indigo-400 hover:bg-indigo-50"
+                                    }`}
+                                    title={topic}
+                                  >
+                                    {topic}
+                                    {active && <span className="ml-1">✓</span>}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            aria-label={`Add topic for trainer ${
+                              trainer.trainerName ||
+                              trainer.trainerId ||
+                              trainerIdx
+                            }`}
+                            type="text"
+                            value={newTopicInput}
+                            onChange={(e) => setNewTopicInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                const t = (newTopicInput || "").trim();
+                                if (!t) return;
+                                if (!addedTopics.includes(t))
+                                  setAddedTopics((s) => [...s, t]);
+                                const next = Array.from(
+                                  new Set([...selected, t])
+                                );
+                                handleTrainerField(
+                                  rowIndex,
+                                  batchIndex,
+                                  trainerIdx,
+                                  "topics",
+                                  next
+                                );
+                                if (trainer.trainerId) {
+                                  (async () => {
+                                    try {
+                                      const trainerDocRef = doc(
+                                        db,
+                                        "trainers",
+                                        String(trainer.trainerId)
+                                      );
+                                      await updateDoc(trainerDocRef, {
+                                        otherSpecialization: arrayUnion(t),
+                                      });
+                                      updateTrainerLocal?.(
+                                        trainer.trainerId,
+                                        t
+                                      );
+                                    } catch (err) {
+                                      console.error(
+                                        "Failed to persist new topic:",
+                                        err
+                                      );
+                                    }
+                                  })();
+                                }
+                                setNewTopicInput("");
+                              }
+                            }}
+                            placeholder="Add topic & Enter"
+                            className="flex-1 rounded border border-gray-200 px-2 py-0.5 text-[10px] focus:outline-none focus:ring-1 focus:ring-indigo-200"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const t = (newTopicInput || "").trim();
+                              if (!t) return;
+                              if (!addedTopics.includes(t))
+                                setAddedTopics((s) => [...s, t]);
+                              const next = Array.from(
+                                new Set([...selected, t])
+                              );
+                              handleTrainerField(
+                                rowIndex,
+                                batchIndex,
+                                trainerIdx,
+                                "topics",
+                                next
+                              );
+                              if (trainer.trainerId) {
+                                (async () => {
+                                  try {
+                                    const trainerDocRef = doc(
+                                      db,
+                                      "trainers",
+                                      String(trainer.trainerId)
+                                    );
+                                    await updateDoc(trainerDocRef, {
+                                      otherSpecialization: arrayUnion(t),
+                                    });
+                                    updateTrainerLocal?.(trainer.trainerId, t);
+                                  } catch (err) {
+                                    console.error(
+                                      "Failed to persist new topic:",
+                                      err
+                                    );
+                                  }
+                                })();
+                              }
+                              setNewTopicInput("");
+                            }}
+                            className="inline-flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-0.5 rounded text-[10px] focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                          >
+                            <FiPlus size={10} />
+                            <span>Add</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  </div> {/* end topics card */}
+                </div> {/* end topics container */}
+              </div> {/* end cost+topics wrapper */}
+            </div> {/* end grid */}
         </td>
       </tr>
-      </>
-    );
+    </>
+  );
   }
 );
 
@@ -750,11 +969,10 @@ const TrainersTable = React.memo(
     duplicates = [],
     openDailySchedule, // Add this prop
     setOpenDailySchedule, // Add this prop
-  removeDailyDate,
-  refetchTrainers,
-  updateTrainerLocal,
+    removeDailyDate,
+    refetchTrainers,
+    updateTrainerLocal,
   }) => {
-
     return (
       <div>
         <div className="flex justify-between items-center mb-2 ">
@@ -777,9 +995,9 @@ const TrainersTable = React.memo(
                   <th className="px-2 py-1 text-left">Duration</th>
                   <th className="px-2 py-1 text-left">Start Date</th>
                   <th className="px-2 py-1 text-left">End Date</th>
-                  <th className="px-2 py-1 text-left">Per Hour Cost</th>
-                  <th className="px-2 py-1 text-left">Total Cost</th>
+                  <th className="px-2 py-1 text-left">No. of Days</th>
                   <th className="px-2 py-1 text-left">Total Hours</th>
+                  <th className="px-2 py-1 text-left">Per Hour Cost</th>
                   <th className="px-2 py-1 text-left">Daily Hours</th>
                   <th className="px-2 py-1 text-left">Actions</th>
                 </tr>
@@ -851,11 +1069,10 @@ const BatchComponent = React.memo(
     duplicates = [],
     openDailySchedule, // Add this prop
     setOpenDailySchedule, // Add this prop
-  removeDailyDate,
-  refetchTrainers,
-  updateTrainerLocal,
+    removeDailyDate,
+    refetchTrainers,
+    updateTrainerLocal,
   }) => {
-
     return (
       <div
         className={`bg-white rounded-lg border ${
@@ -1051,7 +1268,6 @@ const BatchDetailsTable = ({
   onValidationChange,
   globalTrainerAssignments = [], // <-- pass this from parent (InitiationModal)
 }) => {
-
   const [mergeModal, setMergeModal] = useState({
     open: false,
     sourceRowIndex: null,
@@ -1090,7 +1306,6 @@ const BatchDetailsTable = ({
 
   // ✅ 5. Memoize batch statistics to prevent recalculation on every render
   const batchStatistics = useMemo(() => {
-    
     return table1Data.map((row, rowIndex) => {
       const totalAssignedStudents = row.batches.reduce(
         (sum, b) => sum + Number(b.batchPerStdCount || 0),
@@ -1143,7 +1358,11 @@ const BatchDetailsTable = ({
         const batch = row.batches[batchIdx];
         const batchKey = `${rowIdx}-${batchIdx}`;
         if (currentBatchKey && batchKey === currentBatchKey) continue;
-        for (let trainerIdx = 0; trainerIdx < batch.trainers.length; trainerIdx++) {
+        for (
+          let trainerIdx = 0;
+          trainerIdx < batch.trainers.length;
+          trainerIdx++
+        ) {
           const trainer = batch.trainers[trainerIdx];
           const currentKey = `${rowIdx}-${batchIdx}-${trainerIdx}`;
           if (excludeTrainerKey === currentKey) continue;
@@ -1242,7 +1461,9 @@ const BatchDetailsTable = ({
         if (!t || (!t.id && !t.trainerId)) return t;
         const id = t.id || t.trainerId;
         if (id !== trainerId) return t;
-        const existing = Array.isArray(t.otherSpecialization) ? t.otherSpecialization : [];
+        const existing = Array.isArray(t.otherSpecialization)
+          ? t.otherSpecialization
+          : [];
         const merged = Array.from(new Set([...existing, newTopic]));
         return { ...t, otherSpecialization: merged };
       })
@@ -1439,10 +1660,14 @@ const BatchDetailsTable = ({
 
     // Remove the date and the corresponding hours
     if (trainer.activeDates && trainer.activeDates.length > dayIndex) {
-      trainer.activeDates = trainer.activeDates.filter((_, idx) => idx !== dayIndex);
+      trainer.activeDates = trainer.activeDates.filter(
+        (_, idx) => idx !== dayIndex
+      );
     }
     if (trainer.dailyHours && trainer.dailyHours.length > dayIndex) {
-      trainer.dailyHours = trainer.dailyHours.filter((_, idx) => idx !== dayIndex);
+      trainer.dailyHours = trainer.dailyHours.filter(
+        (_, idx) => idx !== dayIndex
+      );
     }
 
     // Recalculate assignedHours
@@ -1524,7 +1749,9 @@ const BatchDetailsTable = ({
         tempTrainer.startDate,
         tempTrainer.endDate
       );
-      const newTrainerDatesNormalized = newTrainerDates.map(normalizeDate).filter(date => date !== null);
+      const newTrainerDatesNormalized = newTrainerDates
+        .map(normalizeDate)
+        .filter((date) => date !== null);
 
       const hasConflict = batch.trainers.some((t, idx) => {
         if (idx === trainerIdx) return false;
@@ -1532,7 +1759,9 @@ const BatchDetailsTable = ({
 
         const existingDates =
           t.activeDates || getDateListExcludingSundays(t.startDate, t.endDate);
-        const existingDatesNormalized = existingDates.map(normalizeDate).filter(date => date !== null);
+        const existingDatesNormalized = existingDates
+          .map(normalizeDate)
+          .filter((date) => date !== null);
 
         return newTrainerDatesNormalized.some((date) =>
           existingDatesNormalized.includes(date)
@@ -1589,9 +1818,14 @@ const BatchDetailsTable = ({
 
     // Persist other generic trainer fields (conveyance, food, lodging, topics, etc.)
     if (
-      !["dailyHours", "dayDuration", "startDate", "endDate", "trainerId", "assignedHours"].includes(
-        field
-      )
+      ![
+        "dailyHours",
+        "dayDuration",
+        "startDate",
+        "endDate",
+        "trainerId",
+        "assignedHours",
+      ].includes(field)
     ) {
       trainer[field] = value;
     }
@@ -1645,11 +1879,11 @@ const BatchDetailsTable = ({
     if (!start || !end) return [];
     const startDate = new Date(start);
     const endDate = new Date(end);
-    
+
     // Validate dates
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return [];
     if (startDate > endDate) return [];
-    
+
     const dates = [];
     let current = new Date(startDate);
     while (current <= endDate) {
@@ -1843,7 +2077,6 @@ const BatchDetailsTable = ({
             },
           },
         });
-        
       } catch (error) {
         console.error("❌ [SWAP] Error during cross-batch swap:", error);
         alert("Error occurred during swap: " + error.message);
@@ -1851,7 +2084,6 @@ const BatchDetailsTable = ({
       }
     } else {
       // Fallback: perform cross-batch swap locally
-      
 
       const updatedData = [...table1Data];
 
@@ -1875,19 +2107,14 @@ const BatchDetailsTable = ({
       );
 
       setTable1Data(updatedData);
-      
     }
 
     closeSwapModal();
-    
   };
 
   // Update the getAMTrainers function to include duration information
   const getAMTrainers = () => {
-    
-
     if (!swapModal.source) {
-      
       return [];
     }
 
@@ -1896,7 +2123,6 @@ const BatchDetailsTable = ({
         ?.trainers[swapModal.source.trainerIdx];
 
     if (!sourceTrainer) {
-      
       return [];
     }
 
@@ -2003,7 +2229,6 @@ const BatchDetailsTable = ({
   }, [table1Data]);
 
   const undoMerge = async (mergedRowIndex) => {
-    
     const updated = [...table1Data];
     const mergedRow = updated[mergedRowIndex];
     if (!mergedRow || !mergedRow.originalData) {
@@ -2128,7 +2353,8 @@ const BatchDetailsTable = ({
               const conflict =
                 trainer.dayDuration === "AM & PM" ||
                 existing.dayDuration === "AM & PM" ||
-                (trainer.dayDuration === "AM" && existing.dayDuration === "AM") ||
+                (trainer.dayDuration === "AM" &&
+                  existing.dayDuration === "AM") ||
                 (trainer.dayDuration === "PM" && existing.dayDuration === "PM");
 
               if (conflict) {
@@ -2136,17 +2362,24 @@ const BatchDetailsTable = ({
                 duplicatesSet.add(trainerKey);
 
                 // add a readable error for this conflict (grouped by trainer/date)
-                const message = `${trainer.trainerName || trainer.trainerId} (${trainer.trainerId}) has conflicting assignment on ${dateISO} for slot ${trainer.dayDuration || existing.dayDuration}`;
+                const message = `${trainer.trainerName || trainer.trainerId} (${
+                  trainer.trainerId
+                }) has conflicting assignment on ${dateISO} for slot ${
+                  trainer.dayDuration || existing.dayDuration
+                }`;
                 errors.push({ message });
                 // Debug log to help track false positives
-                console.debug('[BatchDetailsTable] duplicate detected (local)', {
-                  trainerKey,
-                  existingKey,
-                  trainerId: trainer.trainerId,
-                  dateISO,
-                  trainerDayDuration: trainer.dayDuration,
-                  existingDayDuration: existing.dayDuration,
-                });
+                console.debug(
+                  "[BatchDetailsTable] duplicate detected (local)",
+                  {
+                    trainerKey,
+                    existingKey,
+                    trainerId: trainer.trainerId,
+                    dateISO,
+                    trainerDayDuration: trainer.dayDuration,
+                    existingDayDuration: existing.dayDuration,
+                  }
+                );
               }
             } else {
               trainerMap.set(keyBase, {
@@ -2159,24 +2392,36 @@ const BatchDetailsTable = ({
             for (let assignment of globalTrainerAssignments) {
               const assignDate = normalizeDate(assignment.date);
               if (!assignDate) continue;
-              if (assignment.trainerId === trainer.trainerId && assignDate === dateISO) {
+              if (
+                assignment.trainerId === trainer.trainerId &&
+                assignDate === dateISO
+              ) {
                 const globalConflict =
                   assignment.dayDuration === "AM & PM" ||
                   trainer.dayDuration === "AM & PM" ||
-                  (assignment.dayDuration === "AM" && trainer.dayDuration === "AM") ||
-                  (assignment.dayDuration === "PM" && trainer.dayDuration === "PM");
+                  (assignment.dayDuration === "AM" &&
+                    trainer.dayDuration === "AM") ||
+                  (assignment.dayDuration === "PM" &&
+                    trainer.dayDuration === "PM");
                 if (globalConflict) {
                   duplicatesSet.add(trainerKey);
-                  const message = `${trainer.trainerName || trainer.trainerId} (${trainer.trainerId}) conflicts with an external assignment on ${dateISO}`;
+                  const message = `${
+                    trainer.trainerName || trainer.trainerId
+                  } (${
+                    trainer.trainerId
+                  }) conflicts with an external assignment on ${dateISO}`;
                   errors.push({ message });
-                  console.debug('[BatchDetailsTable] duplicate detected (global)', {
-                    trainerKey,
-                    trainerId: trainer.trainerId,
-                    dateISO,
-                    trainerDayDuration: trainer.dayDuration,
-                    assignmentDayDuration: assignment.dayDuration,
-                    assignmentSourceTrainingId: assignment.sourceTrainingId,
-                  });
+                  console.debug(
+                    "[BatchDetailsTable] duplicate detected (global)",
+                    {
+                      trainerKey,
+                      trainerId: trainer.trainerId,
+                      dateISO,
+                      trainerDayDuration: trainer.dayDuration,
+                      assignmentDayDuration: assignment.dayDuration,
+                      assignmentSourceTrainingId: assignment.sourceTrainingId,
+                    }
+                  );
                 }
               }
             }
@@ -2211,14 +2456,16 @@ const BatchDetailsTable = ({
         <div className="rounded bg-red-50 border border-red-200 p-3">
           <div className="flex items-center justify-between">
             <div className="text-xs text-red-800">
-              Duplicate trainer assignments detected. Rows with conflicts are highlighted in the table below.
+              Duplicate trainer assignments detected. Rows with conflicts are
+              highlighted in the table below.
             </div>
             <div className="flex items-center space-x-2">
               <button
                 type="button"
                 onClick={() => {
                   // Expand rows containing duplicates and scroll to first duplicate
-                  if (!duplicateTrainers || duplicateTrainers.length === 0) return;
+                  if (!duplicateTrainers || duplicateTrainers.length === 0)
+                    return;
                   const first = duplicateTrainers[0];
                   const parts = first.split("-");
                   const rowIdx = Number(parts[0]);
@@ -2228,7 +2475,11 @@ const BatchDetailsTable = ({
                   // Scroll into view if element exists
                   setTimeout(() => {
                     const el = document.getElementById(`trainer-${first}`);
-                    if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                    if (el && el.scrollIntoView)
+                      el.scrollIntoView({
+                        behavior: "smooth",
+                        block: "center",
+                      });
                   }, 120);
                 }}
                 className="px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700"

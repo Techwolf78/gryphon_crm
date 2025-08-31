@@ -1164,98 +1164,120 @@ function InitiationModal({ training, onClose, onConfirm }) {
                       Set up the basic timing and schedule configuration for the training.
                     </p>
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                        College Start Time
-                      </label>
-                      <select
-                        value={commonFields.collegeStartTime || ""}
-                        onChange={(e) =>
-                          setCommonFields({
-                            ...commonFields,
-                            collegeStartTime: e.target.value,
-                          })
-                        }
-                        className="w-full h-8 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white"
-                      >
-                        <option value="">Select time</option>
-                        {TIME_OPTIONS.map((t) => (
-                          <option key={t} value={t}>
-                            {formatTime12(t)}
-                          </option>
-                        ))}
-                      </select>
+                  <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:flex-1">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                          College Start Time
+                        </label>
+                        <select
+                          value={commonFields.collegeStartTime || ""}
+                          onChange={(e) =>
+                            setCommonFields({
+                              ...commonFields,
+                              collegeStartTime: e.target.value,
+                            })
+                          }
+                          className="w-full h-8 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white"
+                        >
+                          <option value="">Select time</option>
+                          {TIME_OPTIONS.map((t) => (
+                            <option key={t} value={t}>
+                              {formatTime12(t)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+  
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                          College End Time
+                        </label>
+                        <select
+                          value={commonFields.collegeEndTime || ""}
+                          onChange={(e) =>
+                            setCommonFields({
+                              ...commonFields,
+                              collegeEndTime: e.target.value,
+                            })
+                          }
+                          className="w-full h-8 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white"
+                        >
+                          <option value="">Select time</option>
+                          {TIME_OPTIONS.map((t) => (
+                            <option key={t} value={t}>
+                              {formatTime12(t)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+  
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                          Lunch Start Time
+                        </label>
+                        <select
+                          value={commonFields.lunchStartTime || ""}
+                          onChange={(e) =>
+                            setCommonFields({
+                              ...commonFields,
+                              lunchStartTime: e.target.value,
+                            })
+                          }
+                          className="w-full h-8 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white"
+                        >
+                          <option value="">Select time</option>
+                          {TIME_OPTIONS.map((t) => (
+                            <option key={t} value={t}>
+                              {formatTime12(t)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+  
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                          Lunch End Time
+                        </label>
+                        <select
+                          value={commonFields.lunchEndTime || ""}
+                          onChange={(e) =>
+                            setCommonFields({
+                              ...commonFields,
+                              lunchEndTime: e.target.value,
+                            })
+                          }
+                          className="w-full h-8 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white"
+                        >
+                          <option value="">Select time</option>
+                          {TIME_OPTIONS.map((t) => (
+                            <option key={t} value={t}>
+                              {formatTime12(t)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
-    
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                        College End Time
-                      </label>
-                      <select
-                        value={commonFields.collegeEndTime || ""}
-                        onChange={(e) =>
-                          setCommonFields({
-                            ...commonFields,
-                            collegeEndTime: e.target.value,
-                          })
-                        }
-                        className="w-full h-8 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white"
-                      >
-                        <option value="">Select time</option>
-                        {TIME_OPTIONS.map((t) => (
-                          <option key={t} value={t}>
-                            {formatTime12(t)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-    
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                        Lunch Start Time
-                      </label>
-                      <select
-                        value={commonFields.lunchStartTime || ""}
-                        onChange={(e) =>
-                          setCommonFields({
-                            ...commonFields,
-                            lunchStartTime: e.target.value,
-                          })
-                        }
-                        className="w-full h-8 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white"
-                      >
-                        <option value="">Select time</option>
-                        {TIME_OPTIONS.map((t) => (
-                          <option key={t} value={t}>
-                            {formatTime12(t)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-    
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                        Lunch End Time
-                      </label>
-                      <select
-                        value={commonFields.lunchEndTime || ""}
-                        onChange={(e) =>
-                          setCommonFields({
-                            ...commonFields,
-                            lunchEndTime: e.target.value,
-                          })
-                        }
-                        className="w-full h-8 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white"
-                      >
-                        <option value="">Select time</option>
-                        {TIME_OPTIONS.map((t) => (
-                          <option key={t} value={t}>
-                            {formatTime12(t)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    {/* Inline summary */}
+                    {(() => {
+                      const toMin = (t) => {
+                        if (!t) return null; const [h,m] = t.split(":").map(Number); if (isNaN(h)||isNaN(m)) return null; return h*60+m; };
+                      const fmt = (mins) => { if(mins==null) return "--"; const h=Math.floor(mins/60); const m=mins%60; return m?`${h}h ${m}m`:`${h}h`; };
+                      const s = toMin(commonFields.collegeStartTime);
+                      const e = toMin(commonFields.collegeEndTime);
+                      let total = null; if(s!=null && e!=null && e>s) total = e - s;
+                      const ls = toMin(commonFields.lunchStartTime);
+                      const le = toMin(commonFields.lunchEndTime);
+                      let lunch = null; if(total!=null && ls!=null && le!=null && le>ls){ const overlap = Math.max(0, Math.min(e, le) - Math.max(s, ls)); lunch = overlap>0?overlap:0; }
+                      let working = null; if(total!=null){ working = total - (lunch||0); if(working<0) working = 0; }
+                      return (
+                        <div className="md:w-64 w-full border border-gray-200 rounded-md bg-gray-50 px-3 py-2 flex flex-col justify-center text-[10px] md:text-xs text-gray-700">
+                          <div className="flex justify-between"><span>Total</span><span className="font-medium">{fmt(total)}</span></div>
+                          <div className="flex justify-between"><span>Lunch</span><span className="font-medium">{fmt(lunch)}</span></div>
+                          <div className="flex justify-between"><span>Working</span><span className="font-semibold text-gray-900">{fmt(working)}</span></div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Phase 2 and Phase 3 Dates in Same Row */}
