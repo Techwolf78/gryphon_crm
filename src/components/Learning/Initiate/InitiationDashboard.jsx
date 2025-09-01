@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { collection, getDocs, doc, updateDoc, deleteField } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, deleteField, query, where } from "firebase/firestore";
 import { db } from "../../../firebase";
+import { useAuth } from "../../../context/AuthContext";
 import {
   FiPlay,
   FiEdit,
@@ -18,6 +19,7 @@ import {
   FiClock,
   FiPause,
   FiCheckCircle,
+  FiUser,
 } from "react-icons/fi";
 import ChangeTrainerDashboard from "./ChangeTrainerDashboard";
 import TrainerCalendar from "../TrainerCalendar/TrainerCalendar";
@@ -109,9 +111,18 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
   const dropdownRef = useRef();
   const actionBtnRefs = useRef({});
-  const [toast, setToast] = useState(null);
+  const [selectedUserFilter, setSelectedUserFilter] = useState(() => {
+    try {
+      return localStorage.getItem("ld_initiation_selectedUserFilter") || "";
+    } catch {
+      return "";
+    }
+  });
+  const [availableUsers, setAvailableUsers] = useState([]);
 
-  // Get phase status and style (moved up so it can be used while filtering)
+  const { user } = useAuth();
+
+  const [toast, setToast] = useState(null);
   const getPhaseStatus = (training) => {
     // decide status string first
     let statusStr = null;
@@ -148,9 +159,51 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
   };
 
   // Fetch all trainingForms and their phases
-  const fetchData = async () => {
+  const fetchData = useCallback(async (forceRefresh = false) => {
     setLoading(true);
-    const formsSnap = await getDocs(collection(db, "trainingForms"));
+    console.log("Fetching data with selectedUserFilter:", selectedUserFilter);
+
+    const cacheKey = `ld_initiation_trainings_${selectedUserFilter || user?.uid}`;
+    const cacheExpiry = 5 * 60 * 1000; // 5 minutes
+
+    if (!forceRefresh) {
+      try {
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          const { data, timestamp } = JSON.parse(cached);
+          if (Date.now() - timestamp < cacheExpiry) {
+            setTrainings(data);
+            setLoading(false);
+            console.log("Loaded from cache:", data);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error("Error loading from cache:", error);
+      }
+    }
+
+    // Filter trainings by the selected user's UID (only show assigned trainings)
+    let q;
+    if (selectedUserFilter) {
+      q = query(
+        collection(db, "trainingForms"),
+        where("assignedTo.uid", "==", selectedUserFilter)
+      );
+    } else if (user) {
+      // Fallback to current user if no filter selected
+      q = query(
+        collection(db, "trainingForms"),
+        where("assignedTo.uid", "==", user.uid)
+      );
+    } else {
+      // Fallback: If no user, fetch nothing (or handle as needed)
+      setTrainings([]);
+      setLoading(false);
+      return;
+    }
+
+    const formsSnap = await getDocs(q);
     const allTrainings = [];
 
     for (const formDoc of formsSnap.docs) {
@@ -162,27 +215,11 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
       for (const phaseDoc of phasesSnap.docs) {
         const phaseData = phaseDoc.data();
 
-        // Get domains count and summary info
-        const domainsSnap = await getDocs(
-          collection(
-            db,
-            "trainingForms",
-            formDoc.id,
-            "trainings",
-            phaseDoc.id,
-            "domains"
-          )
-        );
-        const domains = [];
-        let totalBatches = 0;
-
-        domainsSnap.forEach((domainDoc) => {
-          const domainData = domainDoc.data();
-          domains.push(domainData.domain || domainDoc.id);
-          if (domainData.table1Data) {
-            totalBatches += domainData.table1Data.length;
-          }
-        });
+        // Use denormalized fields to avoid fetching domains subcollection
+        const domainsCount = phaseData.domainsCount || 0;
+        const totalBatches = phaseData.totalBatches || 0;
+        const domains = phaseData.domains || []; // Assuming domains is an array of domain names
+        const domainString = Array.isArray(domains) ? domains.join(", ") : domains;
 
         allTrainings.push({
           id: `${formDoc.id}_${phaseDoc.id}`,
@@ -190,8 +227,8 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
           phaseId: phaseDoc.id,
           collegeName: formData.collegeName,
           collegeCode: formData.collegeCode,
-          domain: domains.join(", ") || "-",
-          domainsCount: domains.length,
+          domain: domainString || "-",
+          domainsCount: domainsCount,
           table1Data: Array(totalBatches).fill({}), // For batch count display
           ...phaseData,
           // Include original form data for phase initiation
@@ -199,18 +236,89 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
         });
       }
     }
+
+    // Cache the data
+    try {
+      localStorage.setItem(cacheKey, JSON.stringify({
+        data: allTrainings,
+        timestamp: Date.now()
+      }));
+    } catch (error) {
+      console.error("Error caching data:", error);
+    }
+
     setTrainings(allTrainings);
     setLoading(false);
-  };
+    console.log("Fetched trainings:", allTrainings);
+  }, [user, selectedUserFilter]);
+
+  // Fetch available users based on current user's permissions
+  useEffect(() => {
+    const fetchAvailableUsers = async () => {
+      if (!user) return;
+
+      try {
+        let q;
+        
+        // Directors and Heads can see the filter, but it should only show L&D users
+        if (user.role === "Director" || user.role === "Head") {
+          q = query(
+            collection(db, "users"),
+            where("department", "==", "L & D") // Only L&D users in dropdown
+          );
+        } 
+        // L&D department users can see all L&D users (including themselves)
+        else if (user.department === "L & D") {
+          q = query(
+            collection(db, "users"),
+            where("department", "==", "L & D")
+          );
+        } 
+        // Everyone else can only see themselves (no filter dropdown)
+        else {
+          q = query(
+            collection(db, "users"),
+            where("uid", "==", user.uid)
+          );
+        }
+
+        const usersSnap = await getDocs(q);
+        const users = usersSnap.docs.map(doc => ({
+          uid: doc.id,
+          ...doc.data()
+        }));
+
+        setAvailableUsers(users);
+        
+        // Set default selected user filter to current user if not set
+        if (!selectedUserFilter && users.length > 0) {
+          setSelectedUserFilter(user.uid);
+        }
+
+        console.log("Current user role:", user.role);
+        console.log("Current user department:", user.department);
+        console.log("Available users in dropdown:", users.length);
+        console.log("Users in dropdown:", users.map(u => ({name: u.name, department: u.department})));
+      } catch (error) {
+        console.error("Error fetching available users:", error);
+      }
+    };
+
+    fetchAvailableUsers();
+  }, [user, selectedUserFilter]); // selectedUserFilter included to satisfy ESLint, but doesn't cause refetch since set only if empty
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
+
+  useEffect(() => {
+    console.log("selectedUserFilter changed to:", selectedUserFilter);
+  }, [selectedUserFilter]);
 
   // Refresh data handler
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchData();
+    await fetchData(true); // Force refresh
     setRefreshing(false);
   };
 
@@ -303,6 +411,13 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
         fetchData();
       });
 
+      // Clear cache since data changed
+      try {
+        localStorage.removeItem(`ld_initiation_trainings_${selectedUserFilter || user?.uid}`);
+      } catch (error) {
+        console.error("Error clearing cache:", error);
+      }
+
       // Show undo toast
       if (toast && toast.timer) {
         clearTimeout(toast.timer);
@@ -333,6 +448,13 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
         } else {
           await updateDoc(trainingDocRef, { manualStatus: prevManual });
         }
+
+        // Clear cache since data changed
+        try {
+          localStorage.removeItem(`ld_initiation_trainings_${selectedUserFilter || user?.uid}`);
+        } catch (error) {
+          console.error("Error clearing cache:", error);
+        }
       } catch (err) {
         console.error("Failed to undo status:", err);
         fetchData();
@@ -358,6 +480,15 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
     }
   }, [activeStatusTab]);
 
+  // Persist selected user filter
+  useEffect(() => {
+    try {
+      localStorage.setItem("ld_initiation_selectedUserFilter", selectedUserFilter);
+    } catch {
+      // ignore storage errors
+    }
+  }, [selectedUserFilter]);
+
   // Revert manual override so automatic date logic applies again
   const revertToAutomatic = async (training) => {
     try {
@@ -367,6 +498,13 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
       // Remove manualStatus field in Firestore
       const trainingDocRef = doc(db, "trainingForms", training.trainingId, "trainings", training.phaseId);
       await updateDoc(trainingDocRef, { manualStatus: deleteField() });
+
+      // Clear cache since data changed
+      try {
+        localStorage.removeItem(`ld_initiation_trainings_${selectedUserFilter || user?.uid}`);
+      } catch (error) {
+        console.error("Error clearing cache:", error);
+      }
     } catch (err) {
       console.error("Failed to revert status:", err);
       fetchData();
@@ -447,6 +585,24 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                   <option value="phase-3">Phase 3</option>
                 </select>
               </div>
+
+              {/* User Filter */}
+              {(user?.role === "Director" || user?.role === "Head") && availableUsers.length > 1 && (
+                <div className="relative">
+                  <FiUser className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <select
+                    value={selectedUserFilter}
+                    onChange={(e) => setSelectedUserFilter(e.target.value)}
+                    className="pl-10 pr-6 py-1.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none bg-white min-w-[140px]"
+                  >
+                    {availableUsers.map((userOption) => (
+                      <option key={userOption.uid} value={userOption.uid}>
+                        {userOption.displayName || userOption.email || userOption.uid} {userOption.department ? `(${userOption.department.toLowerCase()})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Refresh Button */}
               <button

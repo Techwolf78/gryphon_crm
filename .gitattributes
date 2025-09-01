@@ -1,0 +1,9 @@
+# Normalize text files to LF in the repository
+* text=auto
+
+# Ensure JSON files use LF
+*.json text eol=lf
+
+# Ensure Firestore rules and config files use LF
+*.rules text eol=lf
+*.rc text eol=lf

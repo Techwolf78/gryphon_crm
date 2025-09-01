@@ -12,7 +12,9 @@ import {
   writeBatch,
   query,
   where,
+  updateDoc,
 } from "firebase/firestore";
+import { useAuth } from "../../../context/AuthContext";
 import {
   FiChevronLeft,
   FiCheck,
@@ -106,6 +108,8 @@ function InitiationModal({ training, onClose, onConfirm }) {
   const [validationByDomain, setValidationByDomain] = useState({});
   // Global assignments pulled from other saved trainings (used to prevent cross-college conflicts)
   const [globalTrainerAssignments, setGlobalTrainerAssignments] = useState([]);
+
+  const { user } = useAuth();
 
   // Get domain hours - use custom hours if set, otherwise default from database
   const getDomainHours = useCallback((domain, phase = null) => {
@@ -266,6 +270,18 @@ function InitiationModal({ training, onClose, onConfirm }) {
     setLoading(true);
     setError(null);
     try {
+      // Assign the training to the current user
+      if (user) {
+        const trainingDocRef = doc(db, "trainingForms", training.id);
+        await updateDoc(trainingDocRef, {
+          assignedTo: {
+            uid: user.uid,
+            email: user.email,
+            name: user.displayName || user.name || "Unknown",
+          },
+        });
+      }
+
       const serializeTable1Data = (data) => {
         return data.map((row) => ({
           ...row,
@@ -352,6 +368,31 @@ function InitiationModal({ training, onClose, onConfirm }) {
       });
 
       await Promise.all([...phaseLevelPromises, ...batchPromises]);
+
+      // After saving domains, update the phase document with denormalized fields
+      const phaseDocRef = doc(db, "trainingForms", training.id, "trainings", mainPhase);
+      
+      // Calculate denormalized data
+      let totalBatches = 0;
+      const domainsArray = [];
+      
+      domainsList.forEach(domain => {
+        domainsArray.push(domain);
+        const tableData = tableDataLookup[domain] || [];
+        tableData.forEach(row => {
+          if (row.batches) {
+            totalBatches += row.batches.length;
+          }
+        });
+      });
+      
+      // Update phase document with denormalized fields
+      await updateDoc(phaseDocRef, {
+        domainsCount: domainsList.length,
+        totalBatches: totalBatches,
+        domains: domainsArray,
+        updatedAt: serverTimestamp(),
+      });
 
       // --- centralized trainerAssignments update (create one doc per trainer-date) ---
       try {
