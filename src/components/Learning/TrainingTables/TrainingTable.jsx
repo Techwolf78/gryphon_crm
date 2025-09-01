@@ -75,7 +75,7 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
   };
 
   return (
-    <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm ring-1 ring-gray-200/60 overflow-hidden">
+  <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm ring-1 ring-gray-200/60">
       {/* Desktop Header */}
       <div className="hidden md:grid grid-cols-12 gap-2 px-5 py-3 text-[11px] font-semibold tracking-wide uppercase text-gray-600 bg-gradient-to-r from-gray-50 via-white to-gray-50 border-b border-gray-200">
         <div className="col-span-3 flex items-center gap-1.5">

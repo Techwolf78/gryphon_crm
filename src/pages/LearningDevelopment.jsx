@@ -237,7 +237,7 @@ function LearningDevelopment() {
           )
         ) : activeTab === "trainerInvoice" ? (
           <GenerateTrainerInvoice />
-        ) : null}
+        ) : null }
       </div>
     </>
   );

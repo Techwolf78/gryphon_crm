@@ -206,7 +206,9 @@ function GenerateTrainerInvoice() {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [expandedPhases, setExpandedPhases] = useState({});
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterDomain, setFilterDomain] = useState("");
+  const [startDateFilter, setStartDateFilter] = useState("");
+  const [endDateFilter, setEndDateFilter] = useState("");
+  const [projectCodeFilter, setProjectCodeFilter] = useState("");
   const [downloadingInvoice, setDownloadingInvoice] = useState(null);
   const [pdfStatus, setPdfStatus] = useState({});
 
@@ -535,11 +537,17 @@ function GenerateTrainerInvoice() {
         trainer.collegeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         trainer.projectCode.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesDomain = filterDomain
-        ? trainer.domain === filterDomain
+      // Date range filter
+      const matchesDateRange = 
+        (!startDateFilter || new Date(trainer.earliestStartDate) >= new Date(startDateFilter)) &&
+        (!endDateFilter || new Date(trainer.latestEndDate) <= new Date(endDateFilter));
+      
+      // Project code filter
+      const matchesProjectCode = projectCodeFilter
+        ? trainer.projectCode.toLowerCase().includes(projectCodeFilter.toLowerCase())
         : true;
 
-      return matchesSearch && matchesDomain;
+      return matchesSearch && matchesDateRange && matchesProjectCode;
     });
 
     if (filteredTrainers.length > 0) {
@@ -549,8 +557,8 @@ function GenerateTrainerInvoice() {
     return acc;
   }, {});
 
-  // Get unique domains for filter
-  const domains = [...new Set(trainerData.map((item) => item.domain))].filter(
+  // Get unique project codes for filter
+  const projectCodes = [...new Set(trainerData.map((item) => item.projectCode))].filter(
     Boolean
   );
 
@@ -597,7 +605,9 @@ function GenerateTrainerInvoice() {
 
   const clearFilters = () => {
     setSearchTerm("");
-    setFilterDomain("");
+    setStartDateFilter("");
+    setEndDateFilter("");
+    setProjectCodeFilter("");
   };
 
   return (
@@ -627,8 +637,8 @@ function GenerateTrainerInvoice() {
 
         {/* Filters and Search */}
         <div className="p-6 border-b border-gray-100 bg-gray-50/50">
-          <div className="flex flex-col md:flex-row gap-4 items-end">
-            <div className="flex-1 w-full">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+            <div className="w-full">
               <label
                 htmlFor="search"
                 className="block text-sm font-medium text-gray-700 mb-1"
@@ -649,52 +659,96 @@ function GenerateTrainerInvoice() {
               </div>
             </div>
 
-            <div className="w-full md:w-56">
+            <div className="w-full">
               <label
-                htmlFor="domain-filter"
+                htmlFor="project-code-filter"
                 className="block text-sm font-medium text-gray-700 mb-1"
               >
-                Domain
+                Project Code
               </label>
               <select
-                id="domain-filter"
+                id="project-code-filter"
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                value={filterDomain}
-                onChange={(e) => setFilterDomain(e.target.value)}
-                aria-label="Filter by domain"
+                value={projectCodeFilter}
+                onChange={(e) => setProjectCodeFilter(e.target.value)}
+                aria-label="Filter by project code"
               >
-                <option value="">All Domains</option>
-                {domains.map((domain) => (
-                  <option key={domain} value={domain}>
-                    {domain}
+                <option value="">All Project Codes</option>
+                {projectCodes.map((code) => (
+                  <option key={code} value={code}>
+                    {code}
                   </option>
                 ))}
               </select>
             </div>
 
-            <div className="w-full md:w-auto">
-              <button
-                onClick={clearFilters}
-                className="w-full md:w-auto px-4 py-2.5 text-sm border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
-                aria-label="Clear filters"
+            <div className="w-full">
+              <label
+                htmlFor="start-date-filter"
+                className="block text-sm font-medium text-gray-700 mb-1"
               >
-                Clear Filters
-              </button>
+                Start Date (From)
+              </label>
+              <input
+                id="start-date-filter"
+                type="date"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                value={startDateFilter}
+                onChange={(e) => setStartDateFilter(e.target.value)}
+                aria-label="Filter by start date"
+              />
+            </div>
+
+            <div className="w-full">
+              <label
+                htmlFor="end-date-filter"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                End Date (To)
+              </label>
+              <input
+                id="end-date-filter"
+                type="date"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                value={endDateFilter}
+                onChange={(e) => setEndDateFilter(e.target.value)}
+                aria-label="Filter by end date"
+              />
             </div>
           </div>
 
+          <div className="mt-4 flex justify-end">
+            <button
+              onClick={clearFilters}
+              className="px-4 py-2.5 text-sm border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+              aria-label="Clear filters"
+            >
+              Clear Filters
+            </button>
+          </div>
+
           {/* Active filters indicator */}
-          {(searchTerm || filterDomain) && (
-            <div className="mt-3 flex items-center text-sm text-gray-500">
+          {(searchTerm || startDateFilter || endDateFilter || projectCodeFilter) && (
+            <div className="mt-3 flex flex-wrap items-center text-sm text-gray-500">
               <span className="mr-2">Active filters:</span>
               {searchTerm && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-2">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-2 mb-2">
                   Search: {searchTerm}
                 </span>
               )}
-              {filterDomain && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                  Domain: {filterDomain}
+              {projectCodeFilter && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 mr-2 mb-2">
+                  Project Code: {projectCodeFilter}
+                </span>
+              )}
+              {startDateFilter && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 mr-2 mb-2">
+                  Start Date: {startDateFilter}
+                </span>
+              )}
+              {endDateFilter && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 mr-2 mb-2">
+                  End Date: {endDateFilter}
                 </span>
               )}
             </div>
