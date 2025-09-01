@@ -137,7 +137,6 @@ export default function LoginPage() {
     } catch (error) {
       console.error("Login failed:", error);
 
-      let errorMessage = "Login failed. Please try again.";
       let emailErrors = [];
       let passwordErrors = [];
 

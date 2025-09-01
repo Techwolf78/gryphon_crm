@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { db } from "../../firebase";
-import { doc, getDoc, collection, addDoc } from "firebase/firestore";
+import { doc, getDoc, collection, addDoc, updateDoc } from "firebase/firestore";
 import { query, where, getDocs } from "firebase/firestore";
-import { FiDownload, FiX } from "react-icons/fi";
+import { FiDownload, FiX, FiEdit2 } from "react-icons/fi";
 
 // Import the standardized PDF generation function
 import { generateInvoicePDF } from "./GenerateTrainerInvoice";
@@ -13,20 +13,22 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
     projectCode: trainer?.projectCode || "",
     domain: trainer?.domain || "",
     topics: Array.isArray(trainer?.topics) ? trainer.topics.join(", ") : "",
-    startDate: trainer?.startDate || "",
-    endDate: trainer?.endDate || "",
+    startDate: trainer?.earliestStartDate || "",
+    endDate: trainer?.latestEndDate || "",
     billingDate: new Date().toISOString().split("T")[0],
     trainingRate: trainer?.perHourCost || 0,
-    totalHours: trainer?.assignedHours || 0,
+    totalHours: trainer?.totalCollegeHours || 0,
     tds: 10,
     adhocAdjustment: 0,
     conveyance: 0,
     food: 0,
     lodging: 0,
+    collegeName: trainer?.collegeName || "",
   });
   const [existingInvoice, setExistingInvoice] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [editMode, setEditMode] = useState(false);
 
   useEffect(() => {
     const fetchTrainerBankDetails = async () => {
@@ -44,6 +46,8 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
             accountNumber: data.accountNumber || "",
             ifscCode: data.ifsc || "",
             panNumber: data.pan || "",
+            trainerEmail: data.email || "",
+            trainerPhone: data.phone || "",
           }));
         } else {
           console.warn("Trainer details not found");
@@ -54,20 +58,24 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
     };
 
     const checkExistingInvoice = async () => {
-      if (!trainer?.trainerId) return;
+      if (!trainer?.trainerId || !trainer?.collegeName) return;
 
       try {
         const q = query(
           collection(db, "invoices"),
           where("trainerId", "==", trainer.trainerId),
-          where("projectCode", "==", trainer.projectCode)
+          where("collegeName", "==", trainer.collegeName)
         );
 
         const querySnapshot = await getDocs(q);
         if (!querySnapshot.empty) {
           // Get the most recent invoice
-          const latestInvoice =
-            querySnapshot.docs[querySnapshot.docs.length - 1].data();
+          const latestInvoiceDoc =
+            querySnapshot.docs[querySnapshot.docs.length - 1];
+          const latestInvoice = {
+            id: latestInvoiceDoc.id,
+            ...latestInvoiceDoc.data(),
+          };
           setExistingInvoice(latestInvoice);
 
           // Pre-fill form with existing data
@@ -86,7 +94,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
 
     checkExistingInvoice();
     fetchTrainerBankDetails();
-  }, [trainer?.trainerId]);
+  }, [trainer?.trainerId, trainer?.collegeName]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -98,53 +106,75 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
         ...invoiceData,
         trainerId: trainer?.trainerId,
         trainerName: trainer?.trainerName,
+        collegeName: trainer?.collegeName,
         totalAmount: calculateTotalAmount(),
         netPayment: calculateNetPayment(),
-        createdAt: new Date(),
+        updatedAt: new Date(),
         status: "generated",
       };
 
-      // Add to Firestore
-      const docRef = await addDoc(collection(db, "invoices"), invoiceToSave);
+      let updatedInvoiceId = existingInvoice?.id;
 
-      console.log("Invoice saved with ID: ", docRef.id);
-      alert("Invoice generated successfully!");
+      // If editing existing invoice, update it instead of creating new
+      if (existingInvoice && editMode) {
+        await updateDoc(doc(db, "invoices", existingInvoice.id), invoiceToSave);
+        console.log("Invoice updated with ID: ", existingInvoice.id);
+        alert("Invoice updated successfully!");
+        updatedInvoiceId = existingInvoice.id;
+      } else {
+        // Add to Firestore as new invoice
+        invoiceToSave.createdAt = new Date();
+        const docRef = await addDoc(collection(db, "invoices"), invoiceToSave);
+        console.log("Invoice saved with ID: ", docRef.id);
+        alert("Invoice generated successfully!");
+        updatedInvoiceId = docRef.id;
+      }
 
-      // Generate and download PDF using the standardized function
-      await generateInvoicePDF(invoiceToSave);
+      // If we were editing, fetch the updated invoice
+      if (existingInvoice && editMode) {
+        const updatedDoc = await getDoc(doc(db, "invoices", updatedInvoiceId));
+        if (updatedDoc.exists()) {
+          setExistingInvoice({
+            id: updatedDoc.id,
+            ...updatedDoc.data(),
+          });
+        }
+        setEditMode(false); // Exit edit mode
+      }
 
-      onClose();
       onInvoiceGenerated(); // Refresh the parent component
     } catch (error) {
       console.error("Error saving invoice: ", error);
-      
+      alert("Error saving invoice. Please try again.");
     } finally {
       setIsGenerating(false);
     }
   };
 
-const handleDownload = async () => {
-  setIsDownloading(true);
-  try {
-    // केवल चुना हुआ invoice
-    await generateInvoicePDF({
-      ...existingInvoice,
-      trainerName: trainer?.trainerName || existingInvoice.trainerName || "",
-    });
-  } catch (error) {
-    console.error("Error downloading invoice:", error);
-    alert("Failed to download invoice. Please try again.");
-  } finally {
-    setIsDownloading(false);
-  }
-};
+  const handleDownload = async () => {
+    setIsDownloading(true);
+    try {
+      await generateInvoicePDF({
+        ...existingInvoice,
+        trainerName: trainer?.trainerName || existingInvoice.trainerName || "",
+      });
+    } catch (error) {
+      console.error("Error downloading invoice:", error);
+      alert("Failed to download invoice. Please try again.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
+  const handleEdit = () => {
+    setEditMode(true);
+  };
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type } = e.target;
     setInvoiceData((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: type === "number" ? parseFloat(value) || 0 : value,
     }));
   };
 
@@ -166,13 +196,23 @@ const handleDownload = async () => {
   };
 
   return (
-    <div className="fixed inset-0 backdrop-blur-md  bg-opacity-50 flex items-center justify-center p-4 z-500">
+    <div className="fixed inset-0 backdrop-blur-md bg-opacity-50 flex items-center justify-center p-4 z-500">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-screen overflow-y-auto">
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold">
-              Generate Invoice for {trainer?.trainerName || "Trainer"}
-            </h2>
+            <div className="flex items-center">
+              <h2 className="text-2xl font-bold mr-3">
+                {existingInvoice && !editMode
+                  ? "View Invoice"
+                  : "Generate Invoice"}{" "}
+                for {trainer?.trainerName || "Trainer"}
+              </h2>
+              {existingInvoice && !editMode && (
+                <span className="bg-yellow-100 text-yellow-800 text-sm font-medium px-2.5 py-0.5 rounded-full">
+                  Already Generated
+                </span>
+              )}
+            </div>
             <button
               onClick={onClose}
               className="text-gray-500 hover:text-gray-700"
@@ -180,25 +220,36 @@ const handleDownload = async () => {
               <FiX size={24} />
             </button>
           </div>
-          
-          {existingInvoice && (
-            <div className="mb-4 p-4 bg-blue-50 rounded-md">
-              <div className="flex items-center justify-between">
-                <p className="text-blue-700">
-                  An invoice already exists for this trainer and project.
-                </p>
-                <button
-                  onClick={handleDownload}
-                  disabled={isDownloading}
-                  className="flex items-center bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
-                >
-                  <FiDownload className="mr-2" />
-                  {isDownloading ? "Downloading..." : "Download Invoice"}
-                </button>
+
+          {existingInvoice && !editMode && (
+            <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div>
+                  <p className="text-yellow-800 font-medium">
+                    ✓ Invoice already exists for this trainer and college
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleDownload}
+                    disabled={isDownloading}
+                    className="flex items-center bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                  >
+                    <FiDownload className="mr-2" />
+                    {isDownloading ? "Downloading..." : "Download Invoice"}
+                  </button>
+                  <button
+                    onClick={handleEdit}
+                    className="flex items-center bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors"
+                  >
+                    <FiEdit2 className="mr-2" />
+                    Edit Invoice
+                  </button>
+                </div>
               </div>
             </div>
           )}
-          
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -212,9 +263,10 @@ const handleDownload = async () => {
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
                   required
+                  readOnly={existingInvoice && !editMode}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Billing Date
@@ -226,9 +278,25 @@ const handleDownload = async () => {
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
                   required
+                  readOnly={existingInvoice && !editMode}
                 />
               </div>
-              
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  College Name
+                </label>
+                <input
+                  type="text"
+                  name="collegeName"
+                  value={invoiceData.collegeName}
+                  onChange={handleChange}
+                  className="w-full p-2 border border-gray-300 rounded-md"
+                  required
+                  readOnly={true}
+                />
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Project Code
@@ -240,9 +308,10 @@ const handleDownload = async () => {
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
                   required
+                  readOnly={existingInvoice && !editMode}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Domain
@@ -254,10 +323,11 @@ const handleDownload = async () => {
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
                   required
+                  readOnly={existingInvoice && !editMode}
                 />
               </div>
-              
-              <div>
+
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Topics
                 </label>
@@ -267,9 +337,10 @@ const handleDownload = async () => {
                   value={invoiceData.topics}
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
+                  readOnly={existingInvoice && !editMode}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Start Date
@@ -280,9 +351,10 @@ const handleDownload = async () => {
                   value={invoiceData.startDate}
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
+                  readOnly={existingInvoice && !editMode}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   End Date
@@ -293,9 +365,10 @@ const handleDownload = async () => {
                   value={invoiceData.endDate}
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
+                  readOnly={existingInvoice && !editMode}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Training Rate (per hour)
@@ -307,9 +380,12 @@ const handleDownload = async () => {
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
                   required
+                  readOnly={existingInvoice && !editMode}
+                  step="0.01"
+                  min="0"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Total Hours
@@ -321,9 +397,12 @@ const handleDownload = async () => {
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
                   required
+                  readOnly={existingInvoice && !editMode}
+                  step="0.5"
+                  min="0"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   TDS (%)
@@ -335,9 +414,13 @@ const handleDownload = async () => {
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
                   required
+                  readOnly={existingInvoice && !editMode}
+                  step="0.01"
+                  min="0"
+                  max="100"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Adhoc Adjustment
@@ -348,9 +431,11 @@ const handleDownload = async () => {
                   value={invoiceData.adhocAdjustment}
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
+                  readOnly={existingInvoice && !editMode}
+                  step="0.01"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Conveyance
@@ -361,9 +446,12 @@ const handleDownload = async () => {
                   value={invoiceData.conveyance}
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
+                  readOnly={existingInvoice && !editMode}
+                  step="0.01"
+                  min="0"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Food
@@ -374,9 +462,12 @@ const handleDownload = async () => {
                   value={invoiceData.food}
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
+                  readOnly={existingInvoice && !editMode}
+                  step="0.01"
+                  min="0"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Lodging
@@ -387,9 +478,12 @@ const handleDownload = async () => {
                   value={invoiceData.lodging}
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
+                  readOnly={existingInvoice && !editMode}
+                  step="0.01"
+                  min="0"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Bank Name
@@ -400,9 +494,10 @@ const handleDownload = async () => {
                   value={invoiceData.bankName || ""}
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
+                  readOnly={existingInvoice && !editMode}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Account Number
@@ -413,9 +508,10 @@ const handleDownload = async () => {
                   value={invoiceData.accountNumber || ""}
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
+                  readOnly={existingInvoice && !editMode}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   IFSC Code
@@ -426,9 +522,10 @@ const handleDownload = async () => {
                   value={invoiceData.ifscCode || ""}
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
+                  readOnly={existingInvoice && !editMode}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   PAN Number
@@ -439,25 +536,52 @@ const handleDownload = async () => {
                   value={invoiceData.panNumber || ""}
                   onChange={handleChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
+                  readOnly={existingInvoice && !editMode}
                 />
               </div>
             </div>
-            
+
             {/* Calculation Summary */}
             <div className="mt-6 p-4 bg-gray-50 rounded-md">
-              <h3 className="text-lg font-semibold mb-2">Calculation Summary</h3>
+              <h3 className="text-lg font-semibold mb-2">
+                Calculation Summary
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <div>Training Fees: ₹{(invoiceData.trainingRate * invoiceData.totalHours).toFixed(2)}</div>
-                <div>Conveyance: ₹{parseFloat(invoiceData.conveyance || 0).toFixed(2)}</div>
+                <div>
+                  Training Fees: ₹
+                  {(invoiceData.trainingRate * invoiceData.totalHours).toFixed(
+                    2
+                  )}
+                </div>
+                <div>
+                  Conveyance: ₹
+                  {parseFloat(invoiceData.conveyance || 0).toFixed(2)}
+                </div>
                 <div>Food: ₹{parseFloat(invoiceData.food || 0).toFixed(2)}</div>
-                <div>Lodging: ₹{parseFloat(invoiceData.lodging || 0).toFixed(2)}</div>
-                <div className="font-semibold">Total Amount: ₹{calculateTotalAmount().toFixed(2)}</div>
-                <div>TDS ({invoiceData.tds}%): ₹{(calculateTotalAmount() * (parseFloat(invoiceData.tds) || 0) / 100).toFixed(2)}</div>
-                <div>Adhoc Adjustment: ₹{parseFloat(invoiceData.adhocAdjustment || 0).toFixed(2)}</div>
-                <div className="font-semibold text-green-600">Net Payment: ₹{calculateNetPayment().toFixed(2)}</div>
+                <div>
+                  Lodging: ₹{parseFloat(invoiceData.lodging || 0).toFixed(2)}
+                </div>
+                <div className="font-semibold">
+                  Total Amount: ₹{calculateTotalAmount().toFixed(2)}
+                </div>
+                <div>
+                  TDS ({invoiceData.tds}%): ₹
+                  {(
+                    (calculateTotalAmount() *
+                      (parseFloat(invoiceData.tds) || 0)) /
+                    100
+                  ).toFixed(2)}
+                </div>
+                <div>
+                  Adhoc Adjustment: ₹
+                  {parseFloat(invoiceData.adhocAdjustment || 0).toFixed(2)}
+                </div>
+                <div className="font-semibold text-green-600">
+                  Net Payment: ₹{calculateNetPayment().toFixed(2)}
+                </div>
               </div>
             </div>
-            
+
             <div className="flex justify-end space-x-3 mt-6">
               <button
                 type="button"
@@ -466,13 +590,19 @@ const handleDownload = async () => {
               >
                 Cancel
               </button>
-              <button
-                type="submit"
-                disabled={isGenerating}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-              >
-                {isGenerating ? "Generating..." : "Generate Invoice"}
-              </button>
+              {(!existingInvoice || editMode) && (
+                <button
+                  type="submit"
+                  disabled={isGenerating}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {isGenerating
+                    ? "Processing..."
+                    : editMode
+                    ? "Update Invoice"
+                    : "Generate Invoice"}
+                </button>
+              )}
             </div>
           </form>
         </div>
