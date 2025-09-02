@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { FaEllipsisV, FaUsers, FaFileContract, FaClock, FaUniversity, FaPlay, FaTimes } from "react-icons/fa";
+import { FaEllipsisV, FaUsers, FaFileContract, FaClock, FaUniversity, FaPlay, FaTimes, FaCheckCircle } from "react-icons/fa";
 import { IoDocumentTextOutline } from "react-icons/io5";
 import { MdOutlineAttachMoney } from "react-icons/md";
 
@@ -123,6 +123,9 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
                   <div className="flex items-center mb-1">
                     <IoDocumentTextOutline className="mr-2 text-blue-500 flex-shrink-0" />
                     <span className="font-semibold text-blue-700 truncate tracking-wide">{item.projectCode}</span>
+                    {item.isInitiated && (
+                      <FaCheckCircle className="ml-2 text-green-500 text-sm flex-shrink-0" title="Initiated" />
+                    )}
                   </div>
                   <div className="flex items-center text-gray-600 text-sm">
                     <FaUniversity className="mr-2 text-blue-500 flex-shrink-0" />
@@ -163,7 +166,12 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
             {/* Desktop Grid Layout */}
             <div className="hidden md:grid grid-cols-12 gap-2 px-5 py-3 text-[13px] items-center transition-colors">
               <div className="col-span-3 truncate">
-                <span className="font-medium text-blue-700 tracking-wide group-hover:underline underline-offset-2 decoration-dotted">{item.projectCode}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-blue-700 tracking-wide group-hover:underline underline-offset-2 decoration-dotted">{item.projectCode}</span>
+                  {item.isInitiated && (
+                    <FaCheckCircle className="text-green-500 text-sm flex-shrink-0" title="Initiated" />
+                  )}
+                </div>
               </div>
               <div className="col-span-3 truncate">
                 <span className="font-medium text-gray-800">{item.collegeName}</span>
@@ -228,7 +236,7 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
                       role="menuitem"
                     >
                       <FaPlay className="text-blue-500 text-xs" />
-                      <span className="font-medium text-[12px]">Initiation</span>
+                      <span className="font-medium text-[12px]">{item.isInitiated ? "View Initiation" : "Initiation"}</span>
                     </button>
                   </div>
                 </div>

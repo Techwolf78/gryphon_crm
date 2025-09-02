@@ -24,7 +24,7 @@ const auth = getAuth(app);
 export const setAuthPersistence = async (rememberMe) => {
   try {
     await setPersistence(
-      auth, 
+      auth,
       rememberMe ? browserLocalPersistence : browserSessionPersistence
     );
   } catch (error) {
@@ -36,6 +36,16 @@ export const setAuthPersistence = async (rememberMe) => {
 setPersistence(auth, browserSessionPersistence).catch(console.error);
 
 const db = getFirestore(app);
+
+// Enable Firestore offline persistence for better performance
+import { enableIndexedDbPersistence } from "firebase/firestore";
+enableIndexedDbPersistence(db).catch((err) => {
+  if (err.code === 'failed-precondition') {
+    console.warn('Multiple tabs open, persistence can only be enabled in one tab at a time.');
+  } else if (err.code === 'unimplemented') {
+    console.warn('The current browser does not support persistence.');
+  }
+});
 
 // Secondary app for admin operations
 let secondaryApp;

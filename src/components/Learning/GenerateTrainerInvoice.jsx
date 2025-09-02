@@ -18,7 +18,8 @@ import {
   FiCheckCircle,
   FiAlertCircle,
   FiXCircle,
-  FiInfo
+  FiInfo,
+  FiLayers,
 } from "react-icons/fi";
 
 // Enhanced PDF generation function with robust error handling
@@ -113,11 +114,13 @@ doc.text("Trainer Invoice", 105, 21, { align: 'center' });
           data.cell.styles.fontStyle = 'bold';
           data.cell.styles.cellPadding = 1.8;
           data.cell.styles.fontSize = 10.5;
+
         }
       }
     });
 
     // Charges Table
+
     const trainingAmount = invoiceData.totalHours * invoiceData.trainingRate;
     const conveyance = invoiceData.conveyance || 0;
     const food = invoiceData.food || 0;
@@ -237,6 +240,7 @@ doc.text("Trainer Invoice", 105, 21, { align: 'center' });
   } catch (error) {
     console.error("PDF generation failed:", error);
     alert("Failed to generate PDF. Please try again.");
+
     return false;
   }
 };
@@ -250,20 +254,29 @@ function GenerateTrainerInvoice() {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [expandedPhases, setExpandedPhases] = useState({});
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterDomain, setFilterDomain] = useState("");
+  const [startDateFilter, setStartDateFilter] = useState("");
+  const [endDateFilter, setEndDateFilter] = useState("");
+  const [projectCodeFilter, setProjectCodeFilter] = useState("");
   const [downloadingInvoice, setDownloadingInvoice] = useState(null);
   const [pdfStatus, setPdfStatus] = useState({});
 
   const handleDownloadInvoice = async (trainer) => {
-    setDownloadingInvoice(trainer.trainerId);
-    setPdfStatus(prev => ({...prev, [trainer.trainerId]: "downloading"}));
-    
+    setDownloadingInvoice(
+      `${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`
+    );
+    setPdfStatus((prev) => ({
+      ...prev,
+      [`${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`]:
+        "downloading",
+    }));
+
     try {
-      // Find ALL invoices for this trainer and project combination
+      // Find invoices for this trainer, college, and phase combination
       const q = query(
         collection(db, "invoices"),
         where("trainerId", "==", trainer.trainerId),
-        where("projectCode", "==", trainer.projectCode)
+        where("collegeName", "==", trainer.collegeName),
+        where("phase", "==", trainer.phase)
       );
 
       const querySnapshot = await getDocs(q);
@@ -275,9 +288,11 @@ function GenerateTrainerInvoice() {
             (doc) => doc.data().billNumber
           );
           const selectedInvoice = prompt(
-            `Multiple invoices found for ${
-              trainer.trainerName
-            }. Please enter the invoice number you want to download:\n${invoiceNumbers.join(
+            `Multiple invoices found for ${trainer.trainerName} at ${
+              trainer.collegeName
+            } (${
+              trainer.phase
+            }). Please enter the invoice number you want to download:\n${invoiceNumbers.join(
               "\n"
             )}`
           );
@@ -286,36 +301,62 @@ function GenerateTrainerInvoice() {
             const selectedDoc = querySnapshot.docs.find(
               (doc) => doc.data().billNumber === selectedInvoice
             );
-           if (selectedDoc) {
-  const invoiceData = selectedDoc.data();
-  const success = await generateInvoicePDF(invoiceData);
-  setPdfStatus(prev => ({...prev, [trainer.trainerId]: success ? "success" : "error"}));
-} else {
+            if (selectedDoc) {
+              const invoiceData = selectedDoc.data();
+              const success = await generateInvoicePDF(invoiceData);
+              setPdfStatus((prev) => ({
+                ...prev,
+                [`${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`]:
+                  success ? "success" : "error",
+              }));
+            } else {
               alert("Invalid invoice number selected");
-              setPdfStatus(prev => ({...prev, [trainer.trainerId]: "error"}));
+              setPdfStatus((prev) => ({
+                ...prev,
+                [`${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`]:
+                  "error",
+              }));
             }
           } else {
-            setPdfStatus(prev => ({...prev, [trainer.trainerId]: "cancelled"}));
+            setPdfStatus((prev) => ({
+              ...prev,
+              [`${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`]:
+                "cancelled",
+            }));
           }
         } else {
           // Single invoice - download it directly
-          const success = await generateInvoicePDF(querySnapshot.docs[0].data());
-          setPdfStatus(prev => ({...prev, [trainer.trainerId]: success ? "success" : "error"}));
+          const success = await generateInvoicePDF(
+            querySnapshot.docs[0].data()
+          );
+          setPdfStatus((prev) => ({
+            ...prev,
+            [`${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`]:
+              success ? "success" : "error",
+          }));
         }
       } else {
-        alert("No invoice found for this trainer");
-        setPdfStatus(prev => ({...prev, [trainer.trainerId]: "not_found"}));
+        alert("No invoice found for this trainer at this college and phase");
+        setPdfStatus((prev) => ({
+          ...prev,
+          [`${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`]:
+            "not_found",
+        }));
       }
     } catch (error) {
       console.error("Error downloading invoice:", error);
       alert("Failed to download invoice. Please try again.");
-      setPdfStatus(prev => ({...prev, [trainer.trainerId]: "error"}));
+      setPdfStatus((prev) => ({
+        ...prev,
+        [`${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`]:
+          "error",
+      }));
     } finally {
       setDownloadingInvoice(null);
     }
   };
 
-  // Data fetch function
+  // Enhanced data fetch function with proper college+phase based grouping
   const fetchTrainers = useCallback(async () => {
     setLoading(true);
     let trainersList = [];
@@ -365,8 +406,8 @@ function GenerateTrainerInvoice() {
                     batches: batch.batches || [],
                     mergedBreakdown: trainer.mergedBreakdown || [],
                     activeDates: trainer.activeDates || [],
-                    assignedHours: trainer.assignedHours || 0,
-                    perHourCost: trainer.perHourCost || 0,
+                    assignedHours: parseFloat(trainer.assignedHours) || 0,
+                    perHourCost: parseFloat(trainer.perHourCost) || 0,
                     dailyHours: trainer.dailyHours || [],
                     dayDuration: trainer.dayDuration || "",
                     stdCount: trainer.stdCount || 0,
@@ -381,14 +422,85 @@ function GenerateTrainerInvoice() {
         }
       }
 
-      // Check invoices for each trainer
+      // Enhanced grouping by college, trainer AND phase
+      const collegePhaseBasedGrouping = {};
+
+      trainersList.forEach((trainer) => {
+        // Create a unique key for each trainer-college-phase combination
+        const collegePhaseKey = `${trainer.collegeName}_${trainer.trainerId}_${trainer.phase}`;
+
+        if (!collegePhaseBasedGrouping[collegePhaseKey]) {
+          collegePhaseBasedGrouping[collegePhaseKey] = {
+            ...trainer,
+            totalCollegeHours: trainer.assignedHours,
+            allBatches: [trainer],
+            earliestStartDate: trainer.startDate,
+            latestEndDate: trainer.endDate,
+            // Keep track of all projects for this trainer at this college and phase
+            allProjects: [trainer.projectCode],
+            // Keep track of all domains for this trainer at this college and phase
+            allDomains: [trainer.domain],
+          };
+        } else {
+          // Add hours from this batch to total
+          collegePhaseBasedGrouping[collegePhaseKey].totalCollegeHours +=
+            trainer.assignedHours;
+          collegePhaseBasedGrouping[collegePhaseKey].allBatches.push(trainer);
+
+          // Update dates to show the full range
+          if (
+            new Date(trainer.startDate) <
+            new Date(
+              collegePhaseBasedGrouping[collegePhaseKey].earliestStartDate
+            )
+          ) {
+            collegePhaseBasedGrouping[collegePhaseKey].earliestStartDate =
+              trainer.startDate;
+          }
+          if (
+            new Date(trainer.endDate) >
+            new Date(collegePhaseBasedGrouping[collegePhaseKey].latestEndDate)
+          ) {
+            collegePhaseBasedGrouping[collegePhaseKey].latestEndDate =
+              trainer.endDate;
+          }
+
+          // Add unique projects and domains
+          if (
+            !collegePhaseBasedGrouping[collegePhaseKey].allProjects.includes(
+              trainer.projectCode
+            )
+          ) {
+            collegePhaseBasedGrouping[collegePhaseKey].allProjects.push(
+              trainer.projectCode
+            );
+          }
+
+          if (
+            !collegePhaseBasedGrouping[collegePhaseKey].allDomains.includes(
+              trainer.domain
+            )
+          ) {
+            collegePhaseBasedGrouping[collegePhaseKey].allDomains.push(
+              trainer.domain
+            );
+          }
+        }
+      });
+
+      const collegePhaseBasedTrainers = Object.values(
+        collegePhaseBasedGrouping
+      );
+
+      // Check invoices for each trainer-college-phase combination
       const updatedTrainersList = await Promise.all(
-        trainersList.map(async (trainer) => {
+        collegePhaseBasedTrainers.map(async (trainer) => {
           try {
             const q = query(
               collection(db, "invoices"),
               where("trainerId", "==", trainer.trainerId),
-              where("projectCode", "==", trainer.projectCode)
+              where("collegeName", "==", trainer.collegeName),
+              where("phase", "==", trainer.phase)
             );
 
             const querySnapshot = await getDocs(q);
@@ -473,11 +585,17 @@ function GenerateTrainerInvoice() {
         trainer.collegeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         trainer.projectCode.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesDomain = filterDomain
-        ? trainer.domain === filterDomain
+      // Date range filter
+      const matchesDateRange = 
+        (!startDateFilter || new Date(trainer.earliestStartDate) >= new Date(startDateFilter)) &&
+        (!endDateFilter || new Date(trainer.latestEndDate) <= new Date(endDateFilter));
+      
+      // Project code filter
+      const matchesProjectCode = projectCodeFilter
+        ? trainer.projectCode.toLowerCase().includes(projectCodeFilter.toLowerCase())
         : true;
 
-      return matchesSearch && matchesDomain;
+      return matchesSearch && matchesDateRange && matchesProjectCode;
     });
 
     if (filteredTrainers.length > 0) {
@@ -487,27 +605,47 @@ function GenerateTrainerInvoice() {
     return acc;
   }, {});
 
-  // Get unique domains for filter
-  const domains = [...new Set(trainerData.map((item) => item.domain))].filter(
+  // Get unique project codes for filter
+  const projectCodes = [...new Set(trainerData.map((item) => item.projectCode))].filter(
     Boolean
   );
 
   // Get status icon and text for download button
-   const getDownloadStatus = (trainerId) => {
-    const status = pdfStatus[trainerId];
+  const getDownloadStatus = (trainerId, collegeName, phase) => {
+    const status = pdfStatus[`${trainerId}_${collegeName}_${phase}`];
     if (!status) return null;
-    
-    switch(status) {
+
+    switch (status) {
       case "downloading":
-        return <span className="text-blue-500 text-xs flex items-center mt-1"><FiRefreshCw className="animate-spin mr-1" /> Downloading...</span>;
+        return (
+          <span className="text-blue-500 text-xs flex items-center mt-1">
+            <FiRefreshCw className="animate-spin mr-1" /> Downloading...
+          </span>
+        );
       case "success":
-        return <span className="text-green-600 text-xs flex items-center mt-1"><FiCheckCircle className="mr-1" /> Downloaded!</span>;
+        return (
+          <span className="text-green-600 text-xs flex items-center mt-1">
+            <FiCheckCircle className="mr-1" /> Downloaded!
+          </span>
+        );
       case "error":
-        return <span className="text-red-500 text-xs flex items-center mt-1"><FiAlertCircle className="mr-1" /> Failed. Try again.</span>;
+        return (
+          <span className="text-red-500 text-xs flex items-center mt-1">
+            <FiAlertCircle className="mr-1" /> Failed. Try again.
+          </span>
+        );
       case "cancelled":
-        return <span className="text-gray-500 text-xs flex items-center mt-1"><FiXCircle className="mr-1" /> Cancelled</span>;
+        return (
+          <span className="text-gray-500 text-xs flex items-center mt-1">
+            <FiXCircle className="mr-1" /> Cancelled
+          </span>
+        );
       case "not_found":
-        return <span className="text-amber-500 text-xs flex items-center mt-1"><FiInfo className="mr-1" /> No invoice found</span>;
+        return (
+          <span className="text-amber-500 text-xs flex items-center mt-1">
+            <FiInfo className="mr-1" /> No invoice found
+          </span>
+        );
       default:
         return null;
     }
@@ -515,7 +653,9 @@ function GenerateTrainerInvoice() {
 
   const clearFilters = () => {
     setSearchTerm("");
-    setFilterDomain("");
+    setStartDateFilter("");
+    setEndDateFilter("");
+    setProjectCodeFilter("");
   };
 
   return (
@@ -545,9 +685,12 @@ function GenerateTrainerInvoice() {
 
         {/* Filters and Search */}
         <div className="p-6 border-b border-gray-100 bg-gray-50/50">
-          <div className="flex flex-col md:flex-row gap-4 items-end">
-            <div className="flex-1 w-full">
-              <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+            <div className="w-full">
+              <label
+                htmlFor="search"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Search
               </label>
               <div className="relative">
@@ -563,57 +706,103 @@ function GenerateTrainerInvoice() {
                 />
               </div>
             </div>
-            
-            <div className="w-full md:w-56">
-              <label htmlFor="domain-filter" className="block text-sm font-medium text-gray-700 mb-1">
-                Domain
+
+            <div className="w-full">
+              <label
+                htmlFor="project-code-filter"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Project Code
               </label>
               <select
-                id="domain-filter"
+                id="project-code-filter"
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                value={filterDomain}
-                onChange={(e) => setFilterDomain(e.target.value)}
-                aria-label="Filter by domain"
+                value={projectCodeFilter}
+                onChange={(e) => setProjectCodeFilter(e.target.value)}
+                aria-label="Filter by project code"
               >
-                <option value="">All Domains</option>
-                {domains.map((domain) => (
-                  <option key={domain} value={domain}>
-                    {domain}
+                <option value="">All Project Codes</option>
+                {projectCodes.map((code) => (
+                  <option key={code} value={code}>
+                    {code}
                   </option>
                 ))}
               </select>
             </div>
-            
-            <div className="w-full md:w-auto">
-              <button
-                onClick={clearFilters}
-                className="w-full md:w-auto px-4 py-2.5 text-sm border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
-                aria-label="Clear filters"
+
+            <div className="w-full">
+              <label
+                htmlFor="start-date-filter"
+                className="block text-sm font-medium text-gray-700 mb-1"
               >
-                Clear Filters
-              </button>
+                Start Date (From)
+              </label>
+              <input
+                id="start-date-filter"
+                type="date"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                value={startDateFilter}
+                onChange={(e) => setStartDateFilter(e.target.value)}
+                aria-label="Filter by start date"
+              />
+            </div>
+
+            <div className="w-full">
+              <label
+                htmlFor="end-date-filter"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                End Date (To)
+              </label>
+              <input
+                id="end-date-filter"
+                type="date"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                value={endDateFilter}
+                onChange={(e) => setEndDateFilter(e.target.value)}
+                aria-label="Filter by end date"
+              />
             </div>
           </div>
-          
+
+          <div className="mt-4 flex justify-end">
+            <button
+              onClick={clearFilters}
+              className="px-4 py-2.5 text-sm border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+              aria-label="Clear filters"
+            >
+              Clear Filters
+            </button>
+          </div>
+
           {/* Active filters indicator */}
-          {(searchTerm || filterDomain) && (
-            <div className="mt-3 flex items-center text-sm text-gray-500">
+          {(searchTerm || startDateFilter || endDateFilter || projectCodeFilter) && (
+            <div className="mt-3 flex flex-wrap items-center text-sm text-gray-500">
               <span className="mr-2">Active filters:</span>
               {searchTerm && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-2">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-2 mb-2">
                   Search: {searchTerm}
                 </span>
               )}
-              {filterDomain && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                  Domain: {filterDomain}
+              {projectCodeFilter && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 mr-2 mb-2">
+                  Project Code: {projectCodeFilter}
+                </span>
+              )}
+              {startDateFilter && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 mr-2 mb-2">
+                  Start Date: {startDateFilter}
+                </span>
+              )}
+              {endDateFilter && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 mr-2 mb-2">
+                  End Date: {endDateFilter}
                 </span>
               )}
             </div>
           )}
         </div>
 
-        {/* Content */}
         <div className="p-4 sm:p-6">
           {loading ? (
             <div className="flex flex-col justify-center items-center py-12">
@@ -667,11 +856,14 @@ function GenerateTrainerInvoice() {
                       )}
                       {phase.toUpperCase()} Trainers
                       <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-1 rounded-full ml-2">
-                        {filteredGroupedData[phase].length} {filteredGroupedData[phase].length === 1 ? 'trainer' : 'trainers'}
+                        {filteredGroupedData[phase].length}{" "}
+                        {filteredGroupedData[phase].length === 1
+                          ? "trainer"
+                          : "trainers"}
                       </span>
                     </h3>
                     <span className="text-sm text-gray-500">
-                      {expandedPhases[phase] ? 'Collapse' : 'Expand'}
+                      {expandedPhases[phase] ? "Collapse" : "Expand"}
                     </span>
                   </div>
 
@@ -685,10 +877,10 @@ function GenerateTrainerInvoice() {
                               Trainer
                             </th>
                             <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Domain & Project
+                              College & Projects
                             </th>
                             <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              College
+                              Domains
                             </th>
                             <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                               Dates & Hours
@@ -716,44 +908,56 @@ function GenerateTrainerInvoice() {
                                     <div className="text-sm text-gray-500">
                                       ID: {item.trainerId}
                                     </div>
+                                    <div className="text-xs text-blue-600 mt-1">
+                                      Phase: {item.phase}
+                                    </div>
                                   </div>
                                 </div>
                               </td>
                               <td className="px-4 sm:px-6 py-4">
-                                <div className="text-sm text-gray-900 font-medium">
-                                  {item.domain}
+                                <div className="text-sm text-gray-900 font-medium max-w-xs truncate">
+                                  {item.collegeName}
                                 </div>
                                 <div className="text-sm text-gray-500">
-                                  {item.projectCode}
+                                  {item.allProjects.join(", ")}
                                 </div>
                               </td>
                               <td className="px-4 sm:px-6 py-4">
-                                <div className="text-sm text-gray-900 max-w-xs truncate">
-                                  {item.collegeName}
+                                <div className="text-sm text-gray-900">
+                                  {item.allDomains.join(", ")}
                                 </div>
                               </td>
                               <td className="px-4 sm:px-6 py-4">
                                 <div className="flex items-center gap-1 text-sm text-gray-500">
                                   <FiCalendar className="text-gray-400 flex-shrink-0" />
                                   <span>
-                                    {formatDate(item.startDate)} - {formatDate(item.endDate)}
+                                    {formatDate(item.earliestStartDate)} -{" "}
+                                    {formatDate(item.latestEndDate)}
                                   </span>
                                 </div>
                                 <div className="text-xs text-gray-500 mt-1 flex items-center">
                                   <FiDollarSign className="text-gray-400 mr-1 flex-shrink-0" />
                                   <span>
-                                    {item.assignedHours} hrs •{" "}
+                                    {item.totalCollegeHours} hrs •{" "}
                                     {item.perHourCost
                                       ? `₹${item.perHourCost}/hr`
                                       : "Rate not set"}
                                   </span>
                                 </div>
+                                {item.allBatches.length > 1 && (
+                                  <div className="text-xs text-blue-600 mt-1 flex items-center">
+                                    <FiLayers className="mr-1" />
+                                    {item.allBatches.length} batches combined
+                                  </div>
+                                )}
                               </td>
                               <td className="px-4 sm:px-6 py-4">
                                 <div className="flex flex-col gap-2 min-w-[180px]">
                                   {!item.hasExistingInvoice ? (
                                     <button
-                                      onClick={() => handleGenerateInvoice(item)}
+                                      onClick={() =>
+                                        handleGenerateInvoice(item)
+                                      }
                                       className="inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                       disabled={
                                         !item.perHourCost ||
@@ -762,28 +966,44 @@ function GenerateTrainerInvoice() {
                                       aria-label={`Generate invoice for ${item.trainerName}`}
                                     >
                                       <FiFileText className="mr-2" />
-                                      Generate Invoice
+                                     View Invoices
                                     </button>
                                   ) : (
                                     <div className="flex flex-col">
+                                      {/* YEH NAYA BUTTON ADD KARO - Generated wala */}
+                                      <button
+                                        className="inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-yellow-800 bg-yellow-400 hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors cursor-default mb-2"
+                                        aria-label={`Invoice already generated for ${item.trainerName}`}
+                                      >
+                                        <FiCheckCircle className="mr-2" />
+                                        Generated
+                                      </button>
+
+                                      {/* Download button (existing code) */}
                                       <button
                                         onClick={() =>
                                           handleDownloadInvoice(item)
                                         }
                                         className="inline-flex items-center justify-center px-3 py-2 border border-gray-200 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
                                         disabled={
-                                          downloadingInvoice === item.trainerId
+                                          downloadingInvoice ===
+                                          `${item.trainerId}_${item.collegeName}_${item.phase}`
                                         }
                                         aria-label={`Download invoice for ${item.trainerName}`}
                                       >
                                         <FiDownload className="mr-2" />
-                                        {downloadingInvoice === item.trainerId
+                                        {downloadingInvoice ===
+                                        `${item.trainerId}_${item.collegeName}_${item.phase}`
                                           ? "Downloading..."
                                           : item.invoiceCount > 1
                                           ? `Download (${item.invoiceCount})`
                                           : "Download Invoice"}
                                       </button>
-                                      {getDownloadStatus(item.trainerId)}
+                                      {getDownloadStatus(
+                                        item.trainerId,
+                                        item.collegeName,
+                                        item.phase
+                                      )}
                                     </div>
                                   )}
                                 </div>

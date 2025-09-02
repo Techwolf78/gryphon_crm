@@ -44,9 +44,19 @@ function LearningDevelopment() {
       );
 
       const snapshot = await getDocs(q);
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
+      const data = await Promise.all(snapshot.docs.map(async (doc) => {
+        const trainingData = { id: doc.id, ...doc.data() };
+        
+        // Check if training has been initiated by looking for phases
+        try {
+          const trainingsSnap = await getDocs(collection(db, "trainingForms", doc.id, "trainings"));
+          trainingData.isInitiated = !trainingsSnap.empty;
+        } catch (err) {
+          console.error("Error checking initiation status:", err);
+          trainingData.isInitiated = false;
+        }
+        
+        return trainingData;
       }));
 
       setTrainings(data);
@@ -237,7 +247,7 @@ function LearningDevelopment() {
           )
         ) : activeTab === "trainerInvoice" ? (
           <GenerateTrainerInvoice />
-        ) : null}
+        ) : null }
       </div>
     </>
   );
