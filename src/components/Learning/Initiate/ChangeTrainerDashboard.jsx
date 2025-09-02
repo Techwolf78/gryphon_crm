@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   collection,
   getDocs,
@@ -52,7 +52,7 @@ const ChangeTrainerDashboard = ({
   }, [isOpen, preSelectedTraining, step, selectedTraining]);
 
   // Fetch all in-progress trainings
-  const fetchInProgressTrainings = async () => {
+  const fetchInProgressTrainings = useCallback(async () => {
     setLoading(true);
     try {
       console.log("🔄 [CHANGE TRAINER] Fetching in-progress trainings...");
@@ -71,8 +71,8 @@ const ChangeTrainerDashboard = ({
           // Only include trainings that are in progress
           if (phaseData.trainingStartDate && phaseData.trainingEndDate) {
             const today = new Date();
-            const startDate = new Date(phaseData.trainingStartDate);
-            const endDate = new Date(phaseData.trainingEndDate);
+            const startDate = parseDate(phaseData.trainingStartDate);
+            const endDate = parseDate(phaseData.trainingEndDate);
 
             today.setHours(0, 0, 0, 0);
             startDate.setHours(0, 0, 0, 0);
@@ -126,7 +126,7 @@ const ChangeTrainerDashboard = ({
       console.error("❌ [CHANGE TRAINER] Error fetching trainings:", error);
     }
     setLoading(false);
-  };
+  }, []);
 
   // Fetch available trainers
   const fetchTrainers = async () => {
@@ -246,7 +246,7 @@ const ChangeTrainerDashboard = ({
       setChangeStartDate(tomorrow.toISOString().slice(0, 10));
       setChangeEndDate(tomorrow.toISOString().slice(0, 10));
     }
-  }, [isOpen, preSelectedTraining]);
+  }, [isOpen, preSelectedTraining, fetchInProgressTrainings]);
 
   // Listen to centralized trainerAssignments to detect external conflicts
   useEffect(() => {
@@ -330,16 +330,16 @@ const ChangeTrainerDashboard = ({
   const getBookedTrainerIds = () => {
     if (!selectedTraining || !changeStartDate || !changeEndDate) return [];
     const bookedIds = new Set();
-    const changeStart = new Date(changeStartDate);
-    const changeEnd = new Date(changeEndDate);
+    const changeStart = parseDate(changeStartDate);
+    const changeEnd = parseDate(changeEndDate);
     selectedTraining.domains.forEach((domain) => {
       domain.table1Data.forEach((row) => {
         row.batches?.forEach((batch) => {
           batch.trainers?.forEach((trainer) => {
             if (!trainer.isReplaced && trainer.trainerId && trainer.trainerName) {
               // Check for date overlap
-              const tStart = new Date(trainer.startDate);
-              const tEnd = new Date(trainer.endDate);
+              const tStart = parseDate(trainer.startDate);
+              const tEnd = parseDate(trainer.endDate);
               if (
                 (tStart <= changeEnd && tEnd >= changeStart)
               ) {
@@ -399,10 +399,10 @@ const ChangeTrainerDashboard = ({
         table1Data[rowIdx].batches[batchIdx].trainers[trainerIdx];
 
       // Dates
-      const startDateObj = new Date(selectedCurrentTrainer.startDate);
-      const endDateObj = new Date(selectedCurrentTrainer.endDate);
-      const changeStartObj = new Date(changeStartDate);
-      const changeEndObj = new Date(changeEndDate);
+      const startDateObj = parseDate(selectedCurrentTrainer.startDate);
+      const endDateObj = parseDate(selectedCurrentTrainer.endDate);
+      const changeStartObj = parseDate(changeStartDate);
+      const changeEndObj = parseDate(changeEndDate);
 
       // Helper for date string
       const toDateStr = (d) => d.toISOString().slice(0, 10);
@@ -514,8 +514,8 @@ const ChangeTrainerDashboard = ({
   // Return list of ISO date strings (YYYY-MM-DD) excluding Sundays
   const getDateListExcludingSundays = (start, end) => {
     if (!start || !end) return [];
-    const startDate = new Date(start);
-    const endDate = new Date(end);
+    const startDate = parseDate(start);
+    const endDate = parseDate(end);
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return [];
     if (startDate > endDate) return [];
     const dates = [];
@@ -566,13 +566,29 @@ const ChangeTrainerDashboard = ({
     onClose();
   };
 
+  // Helper function to parse date strings safely
+  const parseDate = (dateStr) => {
+    if (!dateStr) return null;
+    // If it's already in YYYY-MM-DD format, use it directly
+    if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      return new Date(dateStr);
+    }
+    // If it's in DD-MM-YYYY format, convert to YYYY-MM-DD
+    if (dateStr.match(/^\d{2}-\d{2}-\d{4}$/)) {
+      const [day, month, year] = dateStr.split('-');
+      return new Date(`${year}-${month}-${day}`);
+    }
+    // Fallback to default parsing
+    return new Date(dateStr);
+  };
+
   const validateChangeDateRange = () => {
     if (!selectedCurrentTrainer || !changeStartDate || !changeEndDate) return true;
-    const changeStartObj = new Date(changeStartDate);
-    const changeEndObj = new Date(changeEndDate);
-    const trainerStartObj = new Date(selectedCurrentTrainer.startDate);
-    const trainerEndObj = new Date(selectedCurrentTrainer.endDate);
-    const trainingEndDate = new Date(selectedTraining.phaseData.trainingEndDate);
+    const changeStartObj = parseDate(changeStartDate);
+    const changeEndObj = parseDate(changeEndDate);
+    const trainerStartObj = parseDate(selectedCurrentTrainer.startDate);
+    const trainerEndObj = parseDate(selectedCurrentTrainer.endDate);
+    const trainingEndDate = parseDate(selectedTraining.phaseData.trainingEndDate);
 
     // Start must be >= trainer start, end <= trainer end, start <= end, and both within training period
     return (
@@ -924,7 +940,7 @@ const ChangeTrainerDashboard = ({
                         for (const assign of globalTrainerAssignments) {
                           if (assign.trainerId !== t.id) continue;
                           // Normalize assignment date to ISO yyyy-mm-dd
-                          const assignDate = new Date(assign.date);
+                          const assignDate = parseDate(assign.date);
                           if (isNaN(assignDate.getTime())) continue;
                           const assignISO = assignDate.toISOString().slice(0, 10);
                           if (replacementDates.includes(assignISO)) {

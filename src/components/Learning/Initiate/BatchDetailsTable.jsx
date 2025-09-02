@@ -82,6 +82,7 @@ const TrainerRow = React.memo(
     openDailySchedule,
     setOpenDailySchedule,
     updateTrainerLocal,
+    includeSundays,
   }) => {
     // ✅ ADD: Calculate unique key for this trainer
     const trainerKey = `${rowIndex}-${batchIndex}-${trainerIdx}`;
@@ -351,11 +352,10 @@ const TrainerRow = React.memo(
                 const start = new Date(trainer.startDate);
                 const end = new Date(trainer.endDate);
                 if (isNaN(start) || isNaN(end) || end < start) return "-";
-                // Exclude Sundays
                 let days = 0;
                 const cur = new Date(start);
                 while (cur <= end) {
-                  if (cur.getDay() !== 0) days++;
+                  if (includeSundays || cur.getDay() !== 0) days++;
                   cur.setDate(cur.getDate() + 1);
                 }
                 return days;
@@ -972,6 +972,7 @@ const TrainersTable = React.memo(
     removeDailyDate,
     refetchTrainers,
     updateTrainerLocal,
+    includeSundays,
   }) => {
     return (
       <div>
@@ -1029,6 +1030,7 @@ const TrainersTable = React.memo(
                       removeDailyDate={removeDailyDate}
                       refetchTrainers={refetchTrainers}
                       updateTrainerLocal={updateTrainerLocal}
+                      includeSundays={includeSundays}
                     />
                   );
                 })}
@@ -1072,6 +1074,7 @@ const BatchComponent = React.memo(
     removeDailyDate,
     refetchTrainers,
     updateTrainerLocal,
+    includeSundays,
   }) => {
     return (
       <div
@@ -1247,6 +1250,7 @@ const BatchComponent = React.memo(
             removeDailyDate={removeDailyDate}
             refetchTrainers={refetchTrainers}
             updateTrainerLocal={updateTrainerLocal}
+            includeSundays={includeSundays}
           />
         </div>
       </div>
@@ -1267,6 +1271,7 @@ const BatchDetailsTable = ({
   courses,
   onValidationChange,
   globalTrainerAssignments = [], // <-- pass this from parent (InitiationModal)
+  includeSundays = false,
 }) => {
   const [mergeModal, setMergeModal] = useState({
     open: false,
@@ -1412,7 +1417,7 @@ const BatchDetailsTable = ({
         const d = normalizeDate(assignment.date);
         if (d) assignDates.push(d);
       } else if (assignment.startDate && assignment.endDate) {
-        const list = getDateListExcludingSundays(
+        const list = getDateList(
           assignment.startDate,
           assignment.endDate
         );
@@ -1745,7 +1750,7 @@ const BatchDetailsTable = ({
         if (isNaN(date.getTime())) return null;
         return date.toISOString().slice(0, 10);
       };
-      const newTrainerDates = getDateListExcludingSundays(
+      const newTrainerDates = getDateList(
         tempTrainer.startDate,
         tempTrainer.endDate
       );
@@ -1758,7 +1763,7 @@ const BatchDetailsTable = ({
         if (t.dayDuration !== tempTrainer.dayDuration) return false;
 
         const existingDates =
-          t.activeDates || getDateListExcludingSundays(t.startDate, t.endDate);
+          t.activeDates || getDateList(t.startDate, t.endDate);
         const existingDatesNormalized = existingDates
           .map(normalizeDate)
           .filter((date) => date !== null);
@@ -1785,7 +1790,7 @@ const BatchDetailsTable = ({
       else if (trainer.dayDuration === "AM" || trainer.dayDuration === "PM")
         perDayHours = +(perDay / 2).toFixed(2);
 
-      const dateList = getDateListExcludingSundays(
+      const dateList = getDateList(
         trainer.startDate,
         trainer.endDate
       );
@@ -1875,7 +1880,7 @@ const BatchDetailsTable = ({
     return result;
   };
 
-  const getDateListExcludingSundays = (start, end) => {
+  const getDateList = (start, end) => {
     if (!start || !end) return [];
     const startDate = new Date(start);
     const endDate = new Date(end);
@@ -1887,7 +1892,7 @@ const BatchDetailsTable = ({
     const dates = [];
     let current = new Date(startDate);
     while (current <= endDate) {
-      if (current.getDay() !== 0) {
+      if (includeSundays || current.getDay() !== 0) {
         dates.push(new Date(current));
       }
       current.setDate(current.getDate() + 1);
@@ -2327,7 +2332,7 @@ const BatchDetailsTable = ({
               .map((dd) => normalizeDate(dd))
               .filter(Boolean);
           } else if (trainer.startDate && trainer.endDate) {
-            const generated = getDateListExcludingSundays(
+            const generated = getDateList(
               trainer.startDate,
               trainer.endDate
             );
@@ -2869,6 +2874,7 @@ const BatchDetailsTable = ({
                           removeDailyDate={removeDailyDate}
                           refetchTrainers={refetchTrainers}
                           updateTrainerLocal={updateTrainerLocal}
+                          includeSundays={includeSundays}
                         />
                       ))}
                       {/* Add Batch Button */}

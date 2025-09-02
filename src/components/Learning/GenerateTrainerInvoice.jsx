@@ -211,9 +211,16 @@ doc.text("Trainer Invoice", 105, 21, { align: 'center' });
 
     // Footer text at bottom center
     doc.text(
-      "This is a system-generated invoice. No signature required.",
+      "This Invoice is issued in accordance with the provisions of the Information Technology Act, 2000 (21 of 2000),",
+      
       doc.internal.pageSize.getWidth() / 2,
-      pageHeight - 12, // 10 units above bottom
+      pageHeight - 16, // 10 units above bottom
+      { align: "center" }
+    );
+
+    doc.text("hence physical signature is not required.",
+      doc.internal.pageSize.getWidth() / 2,
+      pageHeight - 12, // 6 units above bottom
       { align: "center" }
     );
     // Set watermark opacity (lighter)

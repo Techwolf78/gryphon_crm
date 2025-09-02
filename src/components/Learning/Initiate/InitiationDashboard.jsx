@@ -1416,6 +1416,7 @@ const assignedDisplay = assignedUser?.name || assignedUser?.email || assignedUse
           setSelectedTrainingForChange(null);
         }}
         selectedTraining={selectedTrainingForChange}
+        includeSundays={false}
       />
       {/* Undo toast */}
       {toast && (

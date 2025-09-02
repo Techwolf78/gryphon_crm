@@ -111,6 +111,24 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
   const { user } = useAuth();
 
+  // Global toggle for including Sundays
+  const [includeSundays, setIncludeSundays] = useState(false);
+
+  // Helper to generate date list, respecting includeSundays
+  const getDateList = (start, end) => {
+    if (!start || !end) return [];
+    const s = new Date(start);
+    const e = new Date(end);
+    if (isNaN(s.getTime()) || isNaN(e.getTime()) || s > e) return [];
+    const out = [];
+    const cur = new Date(s);
+    while (cur <= e) {
+      if (includeSundays || cur.getDay() !== 0) out.push(cur.toISOString().slice(0, 10));
+      cur.setDate(cur.getDate() + 1);
+    }
+    return out;
+  };
+
   // Get domain hours - use custom hours if set, otherwise default from database
   const getDomainHours = useCallback((domain, phase = null) => {
     if (phase && customPhaseHours[phase] && customPhaseHours[phase] !== "") {
@@ -535,20 +553,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
           return isNaN(dt.getTime()) ? null : dt.toISOString().slice(0, 10);
         };
 
-        const getDateListExcludingSundaysLocal = (start, end) => {
-          if (!start || !end) return [];
-          const s = new Date(start);
-          const e = new Date(end);
-          if (isNaN(s.getTime()) || isNaN(e.getTime()) || s > e) return [];
-          const out = [];
-          const cur = new Date(s);
-          while (cur <= e) {
-            if (cur.getDay() !== 0) out.push(cur.toISOString().slice(0, 10));
-            cur.setDate(cur.getDate() + 1);
-          }
-          return out;
-        };
-
         // 1) delete existing assignments for this training (single source of truth)
         const qExisting = query(collection(db, "trainerAssignments"), where("sourceTrainingId", "==", training.id));
         const existingSnap = await getDocs(qExisting);
@@ -573,7 +577,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                 if (tr.activeDates && tr.activeDates.length > 0) {
                   dateStrings = tr.activeDates.map(normalizeDate).filter(Boolean);
                 } else if (tr.startDate && tr.endDate) {
-                  dateStrings = getDateListExcludingSundaysLocal(tr.startDate, tr.endDate);
+                dateStrings = getDateList(tr.startDate, tr.endDate);
                 } else if (tr.startDate) {
                   const d = normalizeDate(tr.startDate);
                   if (d) dateStrings = [d];
@@ -1316,6 +1320,23 @@ function InitiationModal({ training, onClose, onConfirm }) {
                             popperClassName="small-datepicker-popper"
                           />
                         </div>
+                        {/* NEW: Include Sundays toggle */}
+                        <div className="flex items-center col-span-2 mt-2">
+                          <button
+                            type="button"
+                            className={`inline-flex items-center px-3 py-1.5 rounded border text-xs font-medium transition-colors ${
+                              includeSundays
+                                ? "bg-green-100 border-green-400 text-green-700"
+                                : "bg-gray-100 border-gray-300 text-gray-700"
+                            }`}
+                            onClick={() => setIncludeSundays((prev) => !prev)}
+                          >
+                            {includeSundays ? "Including Sundays" : "Excluding Sundays"}
+                          </button>
+                          <span className="ml-2 text-xs text-gray-500">
+                            Apply to all phases and trainer assignments
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1688,6 +1709,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                               customHours={customPhaseHours[currentPhase]}
                               onValidationChange={handleValidationChange}
                               globalTrainerAssignments={globalTrainerAssignments}
+                              includeSundays={includeSundays}
                             />
                           )}
                         </div>
