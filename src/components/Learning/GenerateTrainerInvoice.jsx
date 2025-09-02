@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { db } from "../../firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import InvoiceModal from "./InvoiceModal";
+import logo from '../../assets/gryphon_logo.png';
 import {
   FiUser,
   FiBook,
@@ -24,48 +25,102 @@ import {
 // Enhanced PDF generation function with robust error handling
 export const generateInvoicePDF = async (invoiceData) => {
   try {
-    // Dynamically import jsPDF
-    const { default: jsPDF } = await import("jspdf");
+    const { default: jsPDF } = await import('jspdf');
+    const autoTableModule = await import('jspdf-autotable');
+    const autoTable = autoTableModule.default;
 
-    // Initialize the document
     const doc = new jsPDF();
 
-    let autoTableAvailable = false;
 
-    try {
-      // Try to dynamically import autoTable
-      const autoTableModule = await import("jspdf-autotable");
-      // Apply the autoTable plugin to jsPDF
-      if (autoTableModule.default) {
-        // Use the correct way to apply autoTable based on version
-        if (typeof doc.autoTable !== "function") {
-          jsPDF.API.autoTable = autoTableModule.default;
-        }
-        autoTableAvailable = true;
-      }
-    } catch (autoTableError) {
-      console.warn(
-        "AutoTable plugin failed to load, using fallback table rendering",
-        autoTableError
-      );
-      autoTableAvailable = false;
+    doc.setDrawColor(100);      // Border color (dark gray/black)
+    doc.setLineWidth(0.5);      // Border thickness
+    doc.rect(8, 8, 195, 280);
+    // Logodoc.setGState(new doc.GState({ opacity: 0.25 })); 
+    // Add logo inside strip, taller so it covers full strip height
+    doc.addImage(logo, "PNG", 15, 9, 30, 15); 
+    // x=5 (padding from left), y=11 (top of strip), width=30, height=15 (same as strip)
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    
+
+// Header text
+doc.setFontSize(17);
+doc.setFont(undefined, 'bold');
+doc.setTextColor(0, 0, 0); // Black text
+doc.text("Trainer Invoice", 105, 21, { align: 'center' });
+    // Header text
+    doc.setFontSize(17);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(0, 0, 0); // Black text
+    doc.text("Trainer Invoice", 105, 21, { align: 'center' });
+
+    doc.setFontSize(9.8);
+    doc.setFont(undefined, 'normal');
+    let yPosition = 40;
+    let xPosition = 15;
+    doc.text("To", xPosition , yPosition);
+    yPosition += 6;
+    doc.text("Gryphon Academy", xPosition , yPosition);
+    yPosition += 4.5;
+    doc.text("9th Floor, Olympia Business House (Achnalare)", xPosition, yPosition);
+    yPosition += 4.5;
+    doc.text("Next to Supreme HQ, Mum - Pune Highway, Baner", xPosition, yPosition);
+    yPosition += 4.5;
+    doc.text("Pune, MH - 411045", xPosition, yPosition);
+    yPosition += 10;
+    doc.text("From", xPosition, yPosition);
+    yPosition += 6;
+    doc.text(`${invoiceData.trainerName}`, xPosition, yPosition);
+    yPosition += 4.5;
+    function formatDate(dateStr) {
+      if (!dateStr) return '';
+      const date = new Date(dateStr);
+      if (isNaN(date)) return dateStr; // if already formatted
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
     }
+    // Bill & Account details side by side
+   autoTable(doc, {
+      startY: yPosition,
+      body: [
+        ['Bill Details', 'Account Details of Trainer'],
+        [`Bill Number: ${invoiceData.billNumber}`, `Name in Bank: ${invoiceData.trainerName}`],
+        [`Project Code: ${invoiceData.projectCode}`, `Bank Name: ${invoiceData.bankName}`],
+        [`Domain: ${invoiceData.domain}`, `Bank Account No: ${invoiceData.accountNumber}`],
+        [`Topic: ${invoiceData.topics}`, `IFSC Code: ${invoiceData.ifscCode}`],
+        [`From: ${formatDate(invoiceData.startDate)}`, `PAN Card: ${invoiceData.panNumber}`],
+        [`To: ${formatDate(invoiceData.endDate)}`, `Billing Date: ${formatDate(invoiceData.billingDate)}`],
+      ],
+      theme: 'grid',
+      styles: {
+        textColor : [0, 0, 0], // black text
+        fontSize: 9,
+        cellPadding: 1.2,
+        valign: 'middle',
+        lineColor: [0, 0, 0],   // black border lines
+        lineWidth: 0.2          // thickness of border
+      },
+      tableWidth: '100%',   // ✅ makes table stretch full width
+      columnStyles: {
+        0: { cellWidth: 'auto' },   // auto distribute
+        1: { cellWidth: 'auto' }
+      },
+      didParseCell: function (data) {
+        // Make first row (index 0) bold
+        if (data.row.index === 0) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.cellPadding = 1.8;
+          data.cell.styles.fontSize = 10.5;
 
-    // Add the invoice header
-    doc.setFontSize(20);
-    doc.text("INVOICE", 105, 15, { align: "center" });
+        }
+      }
+    });
 
-    // Bill details
-    doc.setFontSize(12);
-    doc.text(`Bill Number: ${invoiceData.billNumber}`, 15, 25);
-    doc.text(`Date: ${invoiceData.billingDate}`, 15, 32);
+    // Charges Table
 
-    // Trainer details
-    doc.text(`Trainer: ${invoiceData.trainerName}`, 15, 45);
-    doc.text(`Project Code: ${invoiceData.projectCode}`, 15, 52);
-    doc.text(`Domain: ${invoiceData.domain}`, 15, 59);
-
-    // Calculate amounts
     const trainingAmount = invoiceData.totalHours * invoiceData.trainingRate;
     const conveyance = invoiceData.conveyance || 0;
     const food = invoiceData.food || 0;
@@ -75,128 +130,121 @@ export const generateInvoicePDF = async (invoiceData) => {
     const adhocAdjustment = invoiceData.adhocAdjustment || 0;
     const netPayable = subTotal - tdsAmount + adhocAdjustment;
 
-    // Check if autoTable is available and working
-    if (autoTableAvailable && typeof doc.autoTable === "function") {
-      try {
-        // Use autoTable for the charges table
-        doc.autoTable({
-          startY: 70,
-          head: [["Description", "Quantity", "Rate", "Amount"]],
-          body: [
-            [
-              "Training Hours",
-              invoiceData.totalHours,
-              invoiceData.trainingRate,
-              trainingAmount.toFixed(2),
-            ],
-            ["Conveyance", "-", "-", conveyance.toFixed(2)],
-            ["Food", "-", "-", food.toFixed(2)],
-            ["Lodging", "-", "-", lodging.toFixed(2)],
-            ["Sub Total", "", "", subTotal.toFixed(2)],
-            ["TDS Deduction", `${invoiceData.tds}%`, "", tdsAmount.toFixed(2)],
-            ["Adhoc Adjustment", "", "", adhocAdjustment.toFixed(2)],
-            ["Net Payable", "", "", netPayable.toFixed(2)],
-          ],
-          styles: { fontSize: 10 },
-          headStyles: { fillColor: [66, 139, 202] },
-        });
-      } catch (autoTableError) {
-        console.warn("AutoTable failed, using fallback:", autoTableError);
-        autoTableAvailable = false;
-        // Continue with fallback rendering
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY + 6,
+      body: [
+        ['Charges', 'Rate', 'Total Hrs/Days', 'Total Amount'],
+        ['Training Charges per Hour', `Rs. ${invoiceData.trainingRate}`, `${invoiceData.totalHours}`, `Rs. ${trainingAmount}`],
+        ['Conveyance', '-', '-', `Rs. ${conveyance}`],
+        ['Food', '-', '-', `Rs. ${food}`],
+        ['Lodging', '-', '-', `Rs. ${lodging}`],
+        [{ content: 'Total Amount', colSpan: 3, styles: { halign: 'left' } }, `Rs. ${subTotal}`],
+        ['Adhoc Addition/Deduction', '-', '-', `Rs. ${adhocAdjustment}`],
+        ['Less (TDS)', '-', '-', `Rs. ${tdsAmount}`],
+        [{ content: 'Net Payment', colSpan: 3, styles: { halign: 'left', fontStyle: 'bold' } }, `Rs. ${netPayable}`],
+      ],
+      theme: 'grid',
+      styles: { fontSize: 9, cellPadding: 1.2 ,lineColor: [0, 0, 0], lineWidth: 0.2,textColor : [0, 0, 0] },
+      didParseCell: function (data) {
+        // Make first row (index 0) bold
+        if (data.row.index === 0) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.cellPadding = 1.8;
+          data.cell.styles.fontSize = 10.5;
+        }
+        if( data.row.index === 8 || data.row.index === 5 || data.row.index === 6 || data.row.index === 7 ) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.fontSize = 10;
+        }
       }
-    }
+    });
 
-    // If autoTable is not available or failed, use manual table
-    if (!autoTableAvailable) {
-      console.log("Using fallback table rendering");
-      let yPosition = 70;
+    // Summary Table
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY + 6,
+      body: [
+        [{ content: 'Summary of Training', colSpan: 2, styles: { halign: 'left' ,fontSize: 10.5, fonStyle:'bold',cellPadding:1.8} }],
+        ['No of Sessions', ''],
+        ['No of Hours', `${invoiceData.totalHours}`],
+        ['No of Attendees', ''],
+        ['Average Students/ Batch', '-']
+      ],
+      theme: 'grid',
+      styles: { fontSize: 9, cellPadding: 1.2 ,lineColor: [0, 0, 0], lineWidth: 0.2 ,textColor : [0, 0, 0]},
+      columnStyles: {
+        0: { cellWidth: 75 },   // auto distribute
+        1: { cellWidth: 'auto' }
+      },
+      didParseCell: function (data) {
+        // Make first row (index 0) bold
+        if (data.row.index === 0) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.fontSize = 10.5;
+        }
+      }
+    });
 
-      // Table headers
-      doc.setFontSize(10);
-      doc.text("Description", 15, yPosition);
-      doc.text("Quantity", 80, yPosition);
-      doc.text("Rate", 120, yPosition);
-      doc.text("Amount", 160, yPosition);
-      yPosition += 10;
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY + 10,
+      body: [
+        ['L & D Manager','Co-founder','Paid By','Date/Stamp','Ref. ID'],
+        ['','','','',''],
+      ],
+      theme: 'grid',
+      styles: { fontSize: 10, cellPadding: 1.2 ,lineColor: [0, 0, 0], lineWidth: 0.2,halign: 'center' ,textColor : [0, 0, 0]},
+      didParseCell: function (data) {
+        // Make first row (index 0) bold
+        if (data.row.index === 1) {
+          data.cell.styles.cellPadding = 6;
+        }
+      }
+    });
 
-      // Draw a line under headers
-      doc.line(15, yPosition, 190, yPosition);
-      yPosition += 10;
+    // Signatures Section
+    // Bill + Account details table (side by side row-wise)
+    
 
-      // Table rows
-      const rows = [
-        [
-          "Training Hours",
-          invoiceData.totalHours,
-          invoiceData.trainingRate,
-          trainingAmount.toFixed(2),
-        ],
-        ["Conveyance", "-", "-", conveyance.toFixed(2)],
-        ["Food", "-", "-", food.toFixed(2)],
-        ["Lodging", "-", "-", lodging.toFixed(2)],
-        ["Sub Total", "", "", subTotal.toFixed(2)],
-        ["TDS Deduction", `${invoiceData.tds}%`, "", tdsAmount.toFixed(2)],
-        ["Adhoc Adjustment", "", "", adhocAdjustment.toFixed(2)],
-        ["Net Payable", "", "", netPayable.toFixed(2)],
-      ];
+    // Footer style
+    doc.setFontSize(8); // small font
+    doc.setFont("helvetica", "italic"); // thin/light style
+    doc.setTextColor(120); // gray text
 
-      rows.forEach((row) => {
-        doc.text(row[0], 15, yPosition);
-        doc.text(String(row[1]), 80, yPosition);
-        doc.text(String(row[2]), 120, yPosition);
-        doc.text(String(row[3]), 160, yPosition);
-        yPosition += 10;
-      });
-
-      // Set finalY for bank details placement
-      doc.lastAutoTable = { finalY: yPosition };
-    }
-
-    // Bank details
-    const finalY =
-      typeof doc.lastAutoTable !== "undefined"
-        ? doc.lastAutoTable.finalY + 10
-        : 150;
-    doc.setFontSize(12);
-    doc.text("Bank Details:", 15, finalY);
-    doc.text(`Bank Name: ${invoiceData.bankName || ""}`, 15, finalY + 7);
+    // Footer text at bottom center
     doc.text(
-      `Account Number: ${invoiceData.accountNumber || ""}`,
-      15,
-      finalY + 14
+      "This is a system-generated invoice. No signature required.",
+      doc.internal.pageSize.getWidth() / 2,
+      pageHeight - 12, // 10 units above bottom
+      { align: "center" }
     );
-    doc.text(`IFSC Code: ${invoiceData.ifscCode || ""}`, 15, finalY + 21);
-    doc.text(`PAN Number: ${invoiceData.panNumber || ""}`, 15, finalY + 28);
+    // Set watermark opacity (lighter)
+    doc.setGState(new doc.GState({ opacity: 0.2 }));
 
-    // Save the PDF - Create a blob URL for download
-    const pdfBlob = doc.output("blob");
-    const blobUrl = URL.createObjectURL(pdfBlob);
+    // Add logo in center
+    doc.addImage(
+      logo,              // image
+      "PNG",             // format
+      pageWidth / 2 - 40, // x position (centered by subtracting half width)
+      pageHeight / 2 - 40, // y position (centered by subtracting half height)
+      80,                // width
+      45                 // height
+    );
 
-    // Create a temporary download link
-    const downloadLink = document.createElement("a");
-    downloadLink.href = blobUrl;
-    downloadLink.download = `Invoice_${invoiceData.billNumber || "NA"}.pdf`;
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    document.body.removeChild(downloadLink);
+    // Reset opacity for normal content
+    doc.setGState(new doc.GState({ opacity: 1 }));
 
-    // Revoke the blob URL after a delay
-    setTimeout(() => {
-      URL.revokeObjectURL(blobUrl);
-    }, 100);
 
+
+    // Save PDF
+    doc.save(`Invoice_${invoiceData.billNumber || 'NA'}.pdf`);
     return true;
   } catch (error) {
     console.error("PDF generation failed:", error);
+    alert("Failed to generate PDF. Please try again.");
 
-    // Show user-friendly error message
-    alert(
-      "Failed to generate PDF. Please try again or check the console for details."
-    );
     return false;
   }
 };
+
 
 function GenerateTrainerInvoice() {
   const [trainerData, setTrainerData] = useState([]);
@@ -325,7 +373,7 @@ function GenerateTrainerInvoice() {
 
         for (const phaseDoc of trainingsSnap.docs) {
           const phaseId = phaseDoc.id;
-          const phaseData = phaseDoc.data();
+          const _phaseData = phaseDoc.data();
 
           const domainsSnap = await getDocs(
             collection(
