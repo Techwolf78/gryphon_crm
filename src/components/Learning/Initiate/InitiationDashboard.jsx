@@ -20,6 +20,8 @@ import {
   FiPause,
   FiCheckCircle,
   FiUser,
+  FiTrash2, // Added for Clear All icon
+  FiDollarSign
 } from "react-icons/fi";
 import ChangeTrainerDashboard from "./ChangeTrainerDashboard";
 import TrainerCalendar from "../TrainerCalendar/TrainerCalendar";
@@ -120,20 +122,88 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
   });
   const [availableUsers, setAvailableUsers] = useState([]);
 
+  // Combined filters dropdown state
+  const [filtersDropdownOpen, setFiltersDropdownOpen] = useState(false);
+  const filtersBtnRef = useRef();
+  const filtersDropdownRef = useRef();
+
+  // Date filter state (moved from separate modal)
+  const [dateFilterStart, setDateFilterStart] = useState(() => {
+    try {
+      return localStorage.getItem("ld_initiation_dateFilterStart") || "";
+    } catch {
+      return "";
+    }
+  });
+  const [dateFilterEnd, setDateFilterEnd] = useState(() => {
+    try {
+      return localStorage.getItem("ld_initiation_dateFilterEnd") || "";
+    } catch {
+      return "";
+    }
+  });
+
   const { user } = useAuth();
 
-  const [toast, setToast] = useState(null);
-  const getPhaseStatus = (training) => {
-    // decide status string first
-    let statusStr = null;
-
-    if (training.manualStatus) {
-      statusStr = training.manualStatus;
-    } else if (training.domainsCount === 0) {
-      statusStr = "Not Started";
-    } else if (!training.trainingStartDate || !training.trainingEndDate) {
-      statusStr = "Initiated";
+  const defaultSelectedUserFilter = useMemo(() => {
+    if (user?.role === "Director") {
+      return "all";
+    } else if (user?.role === "Head") {
+      return user.uid;
     } else {
+      return user?.uid || "";
+    }
+  }, [user]);
+
+  const [toast, setToast] = useState(null);
+const getPhaseStatus = (training) => {
+  // If status is stored in Firestore, use it (manual override)
+  if (training.status) {
+    // Special case: If no batches configured, ignore stored status and recompute
+    const hasBatches = training.domainsCount > 0;
+    if (!hasBatches) {
+      // Don't use stored status, fall through to automatic logic
+      // Also, update Firestore to remove the stored status since it's inconsistent
+      const trainingDocRef = doc(db, "trainingForms", training.trainingId, "trainings", training.phaseId);
+      updateDoc(trainingDocRef, { status: deleteField() }).catch(err => {
+        console.error("Failed to remove inconsistent status:", err);
+      });
+    } else {
+      const style = (STATUS_UI[training.status] && STATUS_UI[training.status].pill) || "bg-gray-100 text-gray-700";
+      return { status: training.status, style };
+    }
+  }
+
+  // If manual status is set, use it
+  if (training.manualStatus) {
+    const style = (STATUS_UI[training.manualStatus] && STATUS_UI[training.manualStatus].pill) || "bg-gray-100 text-gray-700";
+    return { status: training.manualStatus, style };
+  }
+
+  // Check for hold status
+  if (training.status === "hold" || training.isOnHold) {
+    const style = (STATUS_UI["Hold"] && STATUS_UI["Hold"].pill) || "bg-gray-100 text-gray-700";
+    return { status: "Hold", style };
+  }
+
+  // Determine status based on batch configuration and dates
+  let statusStr = null;
+  const hasBatches = training.domainsCount > 0; // Or check for domain data if needed
+  const hasDates = training.trainingStartDate && training.trainingEndDate;
+
+  if (!hasBatches) {
+    // No batches configured
+    if (hasDates) {
+      statusStr = "Not Started"; // Dates entered but no batches
+    } else {
+      statusStr = "Not Started"; // No dates or batches
+    }
+  } else {
+    // Batches configured
+    if (!hasDates) {
+      statusStr = "Initiated"; // Batches but no dates
+    } else {
+      // Batches and dates: Check date-based logic
       const today = new Date();
       const startDate = new Date(training.trainingStartDate);
       const endDate = new Date(training.trainingEndDate);
@@ -141,23 +211,19 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
       startDate.setHours(0, 0, 0, 0);
       endDate.setHours(0, 0, 0, 0);
 
-      if (training.status === "hold" || training.isOnHold) {
-        statusStr = "Hold";
-      } else if (today < startDate) {
-        statusStr = "Initiated";
+      if (today >= startDate && today <= endDate) {
+        statusStr = "In Progress";
       } else if (today > endDate) {
         statusStr = "Done";
-      } else if (today >= startDate && today <= endDate) {
-        statusStr = "In Progress";
       } else {
-        statusStr = "Initiated";
+        statusStr = "Initiated"; // Batches configured, dates in future
       }
     }
+  }
 
-    const style = (STATUS_UI[statusStr] && STATUS_UI[statusStr].pill) || "bg-gray-100 text-gray-700";
-    return { status: statusStr, style };
-  };
-
+  const style = (STATUS_UI[statusStr] && STATUS_UI[statusStr].pill) || "bg-gray-100 text-gray-700";
+  return { status: statusStr, style };
+};
   // Fetch all trainingForms and their phases
   const fetchData = useCallback(async (forceRefresh = false) => {
     setLoading(true);
@@ -183,15 +249,16 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
       }
     }
 
-    // Filter trainings by the selected user's UID (only show assigned trainings)
     let q;
-    if (selectedUserFilter) {
+    if (selectedUserFilter === "all") {
+      // For "All Users", fetch all trainings and filter by availableUsers client-side
+      q = query(collection(db, "trainingForms"));
+    } else if (selectedUserFilter) {
       q = query(
         collection(db, "trainingForms"),
         where("assignedTo.uid", "==", selectedUserFilter)
       );
     } else if (user) {
-      // Fallback to current user if no filter selected
       q = query(
         collection(db, "trainingForms"),
         where("assignedTo.uid", "==", user.uid)
@@ -215,11 +282,21 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
       for (const phaseDoc of phasesSnap.docs) {
         const phaseData = phaseDoc.data();
 
+        // If "all" is selected, filter by availableUsers UIDs client-side
+        if (selectedUserFilter === "all") {
+          const assignedUid = formData.assignedTo?.uid;
+          if (!assignedUid || !availableUsers.some(u => u.uid === assignedUid)) {
+            continue; // Skip if not assigned to an available user
+          }
+        }
+
         // Use denormalized fields to avoid fetching domains subcollection
         const domainsCount = phaseData.domainsCount || 0;
         const totalBatches = phaseData.totalBatches || 0;
         const domains = phaseData.domains || []; // Assuming domains is an array of domain names
         const domainString = Array.isArray(domains) ? domains.join(", ") : domains;
+        const totalHours = phaseData.totalHours || 0;
+        const totalCost = phaseData.totalCost || 0;
 
         allTrainings.push({
           id: `${formDoc.id}_${phaseDoc.id}`,
@@ -229,6 +306,8 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
           collegeCode: formData.collegeCode,
           domain: domainString || "-",
           domainsCount: domainsCount,
+          totalHours: totalHours,
+          totalCost: totalCost,
           table1Data: Array(totalBatches).fill({}), // For batch count display
           ...phaseData,
           // Include original form data for phase initiation
@@ -250,7 +329,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
     setTrainings(allTrainings);
     setLoading(false);
     console.log("Fetched trainings:", allTrainings);
-  }, [user, selectedUserFilter]);
+  }, [user, selectedUserFilter, availableUsers]); // Add availableUsers to dependencies
 
   // Fetch available users based on current user's permissions
   useEffect(() => {
@@ -260,12 +339,9 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
       try {
         let q;
         
-        // Directors and Heads can see the filter, but it should only show L&D users
+        // Directors and Heads can see the filter, but it should only show L&D and Admin users
         if (user.role === "Director" || user.role === "Head") {
-          q = query(
-            collection(db, "users"),
-            where("department", "==", "L & D") // Only L&D users in dropdown
-          );
+          q = query(collection(db, "users")); // Fetch all users, then filter client-side
         } 
         // L&D department users can see all L&D users (including themselves)
         else if (user.department === "L & D") {
@@ -283,16 +359,21 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
         }
 
         const usersSnap = await getDocs(q);
-        const users = usersSnap.docs.map(doc => ({
+        let users = usersSnap.docs.map(doc => ({
           uid: doc.id,
           ...doc.data()
         }));
 
+        // For Directors and Heads, filter to only include L&D and Admin departments
+        if (user.role === "Director" || user.role === "Head") {
+          users = users.filter(u => u.department === "L & D" || u.department === "Admin");
+        }
+
         setAvailableUsers(users);
         
-        // Set default selected user filter to current user if not set
-        if (!selectedUserFilter && users.length > 0) {
-          setSelectedUserFilter(user.uid);
+        // Set default selected user filter based on role if not already set
+        if (!selectedUserFilter) {
+          setSelectedUserFilter(defaultSelectedUserFilter);
         }
 
         console.log("Current user role:", user.role);
@@ -305,7 +386,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
     };
 
     fetchAvailableUsers();
-  }, [user, selectedUserFilter]); // selectedUserFilter included to satisfy ESLint, but doesn't cause refetch since set only if empty
+  }, [user, selectedUserFilter, defaultSelectedUserFilter]); // Add defaultSelectedUserFilter to dependencies
 
   useEffect(() => {
     fetchData();
@@ -322,7 +403,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
     setRefreshing(false);
   };
 
-  // Filter trainings based on search and phase filter
+  // Filter trainings based on search, phase, and date
   const filteredTrainings = trainings.filter((training) => {
     const matchesSearch =
       searchTerm === "" ||
@@ -333,7 +414,20 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
     const matchesPhase =
       filterPhase === "all" || training.phaseId === filterPhase;
 
-    return matchesSearch && matchesPhase;
+    // Date filter based on trainingStartDate
+    let matchesDate = true;
+    if (dateFilterStart && dateFilterEnd) {
+      const startDate = new Date(dateFilterStart);
+      const endDate = new Date(dateFilterEnd);
+      const trainingStart = training.trainingStartDate ? new Date(training.trainingStartDate) : null;
+      if (trainingStart) {
+        matchesDate = trainingStart >= startDate && trainingStart <= endDate;
+      } else {
+        matchesDate = false; // Exclude if no start date
+      }
+    }
+
+    return matchesSearch && matchesPhase && matchesDate;
   });
 
   // Status-aware filtering: compute status counts and filter by active tab
@@ -355,6 +449,43 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
 
   // Group trainings by college
   const grouped = groupByCollege(filteredByStatus);
+
+  // Check if any filters are active (for badge on Filters button)
+  const isAnyFilterActive = filterPhase !== "all" || (dateFilterStart && dateFilterEnd) || selectedUserFilter !== defaultSelectedUserFilter;
+
+  // Handle filters dropdown toggle with always downward positioning
+  const toggleFiltersDropdown = () => {
+    if (filtersDropdownOpen) {
+      setFiltersDropdownOpen(false);
+    } else {
+      const rect = filtersBtnRef.current.getBoundingClientRect();
+      const dropdownWidth = 320; // Approximate width
+      let top = rect.bottom + window.scrollY + 8; // Always position below the button
+      let left = rect.left + window.scrollX - dropdownWidth; // Left side (aligned to button's left edge)
+
+      // Adjust for left overflow only
+      if (left < 16) { // Minimum left margin
+        left = 16;
+      }
+
+      setDropdownPosition({ top, left });
+      setFiltersDropdownOpen(true);
+    }
+  };
+
+  // Apply filters and close dropdown
+  const applyFilters = () => {
+    setFiltersDropdownOpen(false);
+  };
+
+  // Clear all filters
+  const clearAllFilters = () => {
+    setFilterPhase("all");
+    setDateFilterStart("");
+    setDateFilterEnd("");
+    setSelectedUserFilter(defaultSelectedUserFilter);
+    setFiltersDropdownOpen(false);
+  };
 
   const handleStartPhase = (e, training) => {
     e.stopPropagation(); // Prevent row click
@@ -397,15 +528,15 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
   // Move a phase to a specific status (manual override). Updates Firestore and local state optimistically.
   const moveToStatus = async (training, newStatus) => {
     try {
-      // Save previous manualStatus for undo
-      const prevManual = training.manualStatus;
+      // Save previous status for undo
+      const prevStatus = training.status || getPhaseStatus(training).status;
 
       // Optimistic UI update
-      setTrainings(prev => prev.map(t => t.id === training.id ? { ...t, manualStatus: newStatus } : t));
+      setTrainings(prev => prev.map(t => t.id === training.id ? { ...t, status: newStatus } : t));
 
-      // Persist manualStatus to Firestore: training.trainingId -> trainings -> training.phaseId
+      // Persist status to Firestore: training.trainingId -> trainings -> training.phaseId
       const trainingDocRef = doc(db, "trainingForms", training.trainingId, "trainings", training.phaseId);
-      updateDoc(trainingDocRef, { manualStatus: newStatus }).catch(err => {
+      updateDoc(trainingDocRef, { status: newStatus }).catch(err => {
         console.error("Failed to update status:", err);
         // rollback on error
         fetchData();
@@ -423,7 +554,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
         clearTimeout(toast.timer);
       }
       const timer = setTimeout(() => setToast(null), 6000);
-  setToast({ status: newStatus, message: `Moved to ${newStatus}`, trainingId: training.id, prevManual, timer });
+      setToast({ status: newStatus, message: `Moved to ${newStatus}`, trainingId: training.id, prevStatus, timer });
     } catch (err) {
       console.error("Failed to update status:", err);
       fetchData();
@@ -432,22 +563,18 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
 
   const handleUndo = async () => {
     if (!toast) return;
-    const { trainingId, prevManual, timer } = toast;
+    const { trainingId, prevStatus, timer } = toast;
     if (timer) clearTimeout(timer);
 
     // Optimistically revert locally
-    setTrainings(prev => prev.map(t => t.id === trainingId ? { ...t, manualStatus: prevManual } : t));
+    setTrainings(prev => prev.map(t => t.id === trainingId ? { ...t, status: prevStatus } : t));
 
     // Find training to get ids for Firestore
     const t = trainings.find(x => x.id === trainingId);
     if (t) {
       const trainingDocRef = doc(db, "trainingForms", t.trainingId, "trainings", t.phaseId);
       try {
-        if (prevManual === undefined) {
-          await updateDoc(trainingDocRef, { manualStatus: deleteField() });
-        } else {
-          await updateDoc(trainingDocRef, { manualStatus: prevManual });
-        }
+        updateDoc(trainingDocRef, { status: prevStatus });
 
         // Clear cache since data changed
         try {
@@ -489,15 +616,28 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
     }
   }, [selectedUserFilter]);
 
+  // Persist date filter
+  useEffect(() => {
+    try {
+      localStorage.setItem("ld_initiation_dateFilterStart", dateFilterStart);
+      localStorage.setItem("ld_initiation_dateFilterEnd", dateFilterEnd);
+    } catch {
+      // ignore storage errors
+    }
+  }, [dateFilterStart, dateFilterEnd]);
+
   // Revert manual override so automatic date logic applies again
   const revertToAutomatic = async (training) => {
     try {
-      // Optimistic UI update: remove manualStatus locally
-      setTrainings(prev => prev.map(t => t.id === training.id ? { ...t, manualStatus: undefined } : t));
+      // Compute the automatic status
+      const computedStatus = getPhaseStatus({ ...training, status: undefined }).status;
 
-      // Remove manualStatus field in Firestore
+      // Optimistic UI update: set to computed status
+      setTrainings(prev => prev.map(t => t.id === training.id ? { ...t, status: computedStatus } : t));
+
+      // Remove status field in Firestore to use automatic logic
       const trainingDocRef = doc(db, "trainingForms", training.trainingId, "trainings", training.phaseId);
-      await updateDoc(trainingDocRef, { manualStatus: deleteField() });
+      await updateDoc(trainingDocRef, { status: deleteField() });
 
       // Clear cache since data changed
       try {
@@ -511,23 +651,39 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
     }
   };
 
-  // Close dropdown on click outside
+  // Close dropdowns on click outside or Escape
   useEffect(() => {
     function handleClickOutside(event) {
       if (
         dropdownRef.current &&
         !dropdownRef.current.contains(event.target) &&
-        // Also check if click is not on the action button
         (!openDropdownId ||
           !actionBtnRefs.current[openDropdownId] ||
           !actionBtnRefs.current[openDropdownId].contains(event.target))
       ) {
         setOpenDropdownId(null);
       }
+      if (
+        filtersDropdownRef.current &&
+        !filtersDropdownRef.current.contains(event.target) &&
+        !filtersBtnRef.current.contains(event.target)
+      ) {
+        setFiltersDropdownOpen(false);
+      }
+    }
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setOpenDropdownId(null);
+        setFiltersDropdownOpen(false);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [openDropdownId]);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [openDropdownId, filtersDropdownOpen]);
 
   // Full-page takeover view for Trainer Calendar (like other detail pages)
   if (showTrainerCalendar) {
@@ -544,7 +700,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
 
   return (
     <div className="min-h-screen bg-gray-50/50">
-<div className="w-full space-y-3 ">
+      <div className="w-full space-y-3">
         {/* Header Section */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-3">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
@@ -571,38 +727,116 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                 />
               </div>
 
-              {/* Phase Filter */}
+              {/* Combined Filters Button */}
               <div className="relative">
-                <FiFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <select
-                  value={filterPhase}
-                  onChange={(e) => setFilterPhase(e.target.value)}
-                  className="pl-10 pr-6 py-1.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none bg-white min-w-[110px]"
+                <button
+                  ref={filtersBtnRef}
+                  onClick={toggleFiltersDropdown}
+                  className={`inline-flex items-center px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${isAnyFilterActive ? 'ring-2 ring-blue-500/20' : ''}`}
+                  aria-label="Open filters"
                 >
-                  <option value="all">All Phases</option>
-                  <option value="phase-1">Phase 1</option>
-                  <option value="phase-2">Phase 2</option>
-                  <option value="phase-3">Phase 3</option>
-                </select>
-              </div>
-
-              {/* User Filter */}
-              {(user?.role === "Director" || user?.role === "Head") && availableUsers.length > 1 && (
-                <div className="relative">
-                  <FiUser className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <select
-                    value={selectedUserFilter}
-                    onChange={(e) => setSelectedUserFilter(e.target.value)}
-                    className="pl-10 pr-6 py-1.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none bg-white min-w-[140px]"
+                  <FiFilter className="w-4 h-4 mr-1" />
+                  Filters
+                  {isAnyFilterActive && (
+                    <span className="ml-1 w-2 h-2 bg-blue-500 rounded-full"></span>
+                  )}
+                </button>
+                {filtersDropdownOpen && createPortal(
+                  <div
+                    ref={filtersDropdownRef}
+                    className="z-54 w-full max-w-sm md:max-w-md bg-white border border-gray-200 rounded-xl shadow-xl py-4 px-4 flex flex-col space-y-4 animate-fade-in transition-opacity duration-200"
+                    style={{
+                      position: "absolute",
+                      top: dropdownPosition.top,
+                      left: dropdownPosition.left,
+                      maxHeight: "80vh", // Prevent vertical overflow
+                      overflowY: "auto", // Scroll if needed
+                    }}
                   >
-                    {availableUsers.map((userOption) => (
-                      <option key={userOption.uid} value={userOption.uid}>
-                        {userOption.displayName || userOption.email || userOption.uid} {userOption.department ? `(${userOption.department.toLowerCase()})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+                    {/* Phase Filter */}
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                        <FiFilter className="w-4 h-4 mr-1" />
+                        Phase
+                      </label>
+                      <select
+                        value={filterPhase}
+                        onChange={(e) => setFilterPhase(e.target.value)}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                      >
+                        <option value="all">All Phases</option>
+                        <option value="phase-1">Phase 1</option>
+                        <option value="phase-2">Phase 2</option>
+                        <option value="phase-3">Phase 3</option>
+                      </select>
+                    </div>
+
+                    {/* Date Filter */}
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                        <FiCalendar className="w-4 h-4 mr-1" />
+                        Date Range
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="date"
+                          value={dateFilterStart}
+                          onChange={(e) => setDateFilterStart(e.target.value)}
+                          className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                          placeholder="Start Date"
+                        />
+                        <input
+                          type="date"
+                          value={dateFilterEnd}
+                          onChange={(e) => setDateFilterEnd(e.target.value)}
+                          className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                          placeholder="End Date"
+                        />
+                      </div>
+                    </div>
+
+                    {/* User Filter */}
+                    {(user?.role === "Director" || user?.role === "Head") && availableUsers.length > 1 && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                          <FiUser className="w-4 h-4 mr-1" />
+                          User
+                        </label>
+                        <select
+                          value={selectedUserFilter}
+                          onChange={(e) => setSelectedUserFilter(e.target.value)}
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                        >
+                          <option value="all">All Users</option>
+    {availableUsers.map((userOption) => (
+  <option key={userOption.uid} value={userOption.uid}>
+    {userOption.name || userOption.email || userOption.uid} {userOption.department ? `(${userOption.department.toLowerCase()})` : ''}
+  </option>
+))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-col sm:flex-row justify-between gap-2 pt-2 border-t border-gray-100">
+                      <button
+                        onClick={clearAllFilters}
+                        className="flex-1 inline-flex items-center justify-center px-3 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all"
+                      >
+                        <FiTrash2 className="w-4 h-4 mr-1" />
+                        Clear All
+                      </button>
+                      <button
+                        onClick={applyFilters}
+                        className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all"
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  </div>,
+                  document.body
+                )}
+              </div>
 
               {/* Refresh Button */}
               <button
@@ -675,38 +909,41 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                 </div>
               </div>
 
+              {/* Replaced Active Phases with Total Hours */}
               <div className="bg-white rounded-xl shadow-sm border border-gray-200/50 p-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-gray-600 text-sm font-medium">
-                      Active Phases
+                      Total Hours
                     </p>
                     <p className="text-2xl font-bold text-gray-900 mt-1">
-                      {filteredTrainings.length}
+                      {trainings
+                        .filter(t => getPhaseStatus(t).status !== "Not Started")
+                        .reduce((acc, t) => acc + (t.totalHours || 0), 0)}
                     </p>
                   </div>
-                  <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
-                    <FiPlay className="w-5 h-5 text-green-600" />
+                  <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center">
+                    <FiClock className="w-5 h-5 text-indigo-600" />
                   </div>
                 </div>
               </div>
 
+              {/* Replaced Total Batches with Total Cost */}
               <div className="bg-white rounded-xl shadow-sm border border-gray-200/50 p-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-gray-600 text-sm font-medium">
-                      Total Batches
+                      Total Cost
                     </p>
                     <p className="text-2xl font-bold text-gray-900 mt-1">
-                      {filteredTrainings.reduce(
-                        (acc, t) =>
-                          acc + (t.table1Data ? t.table1Data.length : 0),
-                        0
-                      )}
+                      ₹{trainings
+                        .filter(t => getPhaseStatus(t).status !== "Not Started")
+                        .reduce((acc, t) => acc + (t.totalCost || 0), 0)
+                        .toLocaleString()}
                     </p>
                   </div>
-                  <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center">
-                    <FiUsers className="w-5 h-5 text-purple-600" />
+                  <div className="w-10 h-10 bg-yellow-50 rounded-lg flex items-center justify-center">
+                    <FiDollarSign className="w-5 h-5 text-yellow-600" />
                   </div>
                 </div>
               </div>
@@ -757,6 +994,9 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                           <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                             Status
                           </th>
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                            Assigned
+                          </th>
                           <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
                             Actions
                           </th>
@@ -768,6 +1008,10 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                           const canEdit =
                             training.domainsCount > 0 ||
                             training.isEdit === true;
+
+                          // Get assigned user details
+                          const assignedUser = training.originalFormData?.assignedTo;
+const assignedDisplay = assignedUser?.name || assignedUser?.email || assignedUser?.uid || "Unassigned";
 
                           return (
                             <tr
@@ -841,6 +1085,14 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                                 >
                                   {status.status}
                                 </span>
+                              </td>
+                              <td className="px-4 py-2 whitespace-nowrap">
+                                <div className="flex items-center">
+                                  <FiUser className="w-4 h-4 text-gray-400 mr-2" />
+                                  <span className="text-sm text-gray-900">
+                                    {assignedDisplay}
+                                  </span>
+                                </div>
                               </td>
                               <td className="px-4 py-2 whitespace-nowrap text-right">
                                 <div className="relative flex items-center justify-end gap-1 transition-opacity">
@@ -957,7 +1209,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                                           });
                                       })()}
 
-                                      {training.manualStatus ? (
+                                      {training.status ? (
                                         <>
                                           <div className="border-t border-gray-50 my-1" />
                                           <button
@@ -988,6 +1240,10 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                       const status = getPhaseStatus(training);
                       const canEdit =
                         training.domainsCount > 0 || training.isEdit === true;
+
+                      // Get assigned user details
+                      const assignedUser = training.originalFormData?.assignedTo;
+const assignedDisplay = assignedUser?.name || assignedUser?.email || assignedUser?.uid || "Unassigned";
 
                       return (
                         <div
@@ -1068,6 +1324,19 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                                 </span>
                               </div>
                             </div>
+
+                            {/* New Assigned section */}
+                            <div>
+                              <p className="text-xs font-medium text-gray-500 mb-0.5">
+                                Assigned
+                              </p>
+                              <div className="flex items-center">
+                                <FiUser className="w-4 h-4 text-gray-400 mr-2" />
+                                <span className="text-xs text-gray-900">
+                                  {assignedDisplay}
+                                </span>
+                              </div>
+                            </div>
                           </div>
 
                           <div className="flex gap-1 mt-2 pt-2 border-t border-gray-100">
@@ -1128,8 +1397,8 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                     No trainings found
                   </h3>
                   <p className="text-gray-500 text-xs">
-                    {searchTerm || filterPhase !== "all"
-                      ? "Try adjusting your search or filter criteria"
+                    {searchTerm || filterPhase !== "all" || (dateFilterStart && dateFilterEnd)
+                      ? "Try adjusting your search or filters"
                       : "Get started by creating your first training program"}
                   </p>
                 </div>

@@ -106,7 +106,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
   
   // Validation state for duplicate trainers
   const [validationByDomain, setValidationByDomain] = useState({});
-  // Global assignments pulled from other saved trainings (used to prevent cross-college conflicts)
+  const [completedPhases, setCompletedPhases] = useState([]);
   const [globalTrainerAssignments, setGlobalTrainerAssignments] = useState([]);
 
   const { user } = useAuth();
@@ -185,6 +185,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
   // Allocation logic removed — table rows are managed by domain hours and loaded data
 
   const handlePhaseChange = (phase) => {
+    
     setSelectedPhases((prev) => {
       const newPhases = prev.includes(phase)
         ? prev.filter((p) => p !== phase)
@@ -270,8 +271,8 @@ function InitiationModal({ training, onClose, onConfirm }) {
     setLoading(true);
     setError(null);
     try {
-      // Assign the training to the current user
-      if (user) {
+      // Assign the training to the current user only on initiation, not on edit
+      if (user && !training.selectedPhase) {
         const trainingDocRef = doc(db, "trainingForms", training.id);
         await updateDoc(trainingDocRef, {
           assignedTo: {
@@ -302,6 +303,10 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
       const mainPhase = getMainPhase();
 
+      // Use provided domain list (if any) to avoid setState race when auto-deselecting
+      const domainsList = Array.isArray(domainsToSave) ? domainsToSave : selectedDomains;
+      const tableDataLookup = tableDataToSave || table1DataByDomain;
+
       const phaseLevelPromises = selectedPhases.map((phase) => {
         const phaseDocRef = doc(db, "trainingForms", training.id, "trainings", phase);
         const phaseDocData = {
@@ -311,6 +316,62 @@ function InitiationModal({ training, onClose, onConfirm }) {
           ...commonFields,
           phase,
         };
+
+        // Always set status field using automatic logic
+        let computedStatus = "Not Started";
+
+        // Get the appropriate dates for this phase
+        let startDate = null;
+        let endDate = null;
+
+        if (phase === "phase-2" && phase2Dates?.startDate && phase2Dates?.endDate) {
+          startDate = phase2Dates.startDate;
+          endDate = phase2Dates.endDate;
+        } else if (phase === "phase-3" && phase3Dates?.startDate && phase3Dates?.endDate) {
+          startDate = phase3Dates.startDate;
+          endDate = phase3Dates.endDate;
+        } else if (commonFields.trainingStartDate && commonFields.trainingEndDate) {
+          startDate = commonFields.trainingStartDate;
+          endDate = commonFields.trainingEndDate;
+        }
+
+        // Compute status based on batch configuration and dates
+        computedStatus = "Not Started";
+        const hasBatches = domainsList.length > 0; // Check if domains/batches are configured
+        const hasDates = startDate && endDate;
+
+        if (!hasBatches) {
+          // No batches configured
+          if (hasDates) {
+            computedStatus = "Not Started"; // Dates entered but no batches
+          } else {
+            computedStatus = "Not Started"; // No dates or batches
+          }
+        } else {
+          // Batches configured
+          if (!hasDates) {
+            computedStatus = "Initiated"; // Batches but no dates
+          } else {
+            // Batches and dates: Check date-based logic
+            const today = new Date();
+            const phaseStart = new Date(startDate);
+            const phaseEnd = new Date(endDate);
+            today.setHours(0, 0, 0, 0);
+            phaseStart.setHours(0, 0, 0, 0);
+            phaseEnd.setHours(0, 0, 0, 0);
+
+            if (today >= phaseStart && today <= phaseEnd) {
+              computedStatus = "In Progress";
+            } else if (today > phaseEnd) {
+              computedStatus = "Done";
+            } else {
+              computedStatus = "Initiated"; // Batches configured, dates in future
+            }
+          }
+        }
+
+        phaseDocData.status = computedStatus;
+
         if (phase === "phase-2") phaseDocData.phase2Dates = phase2Dates;
         if (phase === "phase-3") phaseDocData.phase3Dates = phase3Dates;
         if (phase2Dates?.startDate && phase === "phase-2") {
@@ -329,9 +390,57 @@ function InitiationModal({ training, onClose, onConfirm }) {
       });
 
       // Use provided domain list (if any) to avoid setState race when auto-deselecting
-      const domainsList = Array.isArray(domainsToSave) ? domainsToSave : selectedDomains;
-      const tableDataLookup = tableDataToSave || table1DataByDomain;
       const batchPromises = domainsList.map(async (domain) => {
+        // Compute status for main phase (same logic as above)
+        let mainPhaseStatus = "Not Started";
+        let startDate = null;
+        let endDate = null;
+
+        if (mainPhase === "phase-2" && phase2Dates?.startDate && phase2Dates?.endDate) {
+          startDate = phase2Dates.startDate;
+          endDate = phase2Dates.endDate;
+        } else if (mainPhase === "phase-3" && phase3Dates?.startDate && phase3Dates?.endDate) {
+          startDate = phase3Dates.startDate;
+          endDate = phase3Dates.endDate;
+        } else if (commonFields.trainingStartDate && commonFields.trainingEndDate) {
+          startDate = commonFields.trainingStartDate;
+          endDate = commonFields.trainingEndDate;
+        }
+
+        // Compute status based on batch configuration and dates
+        const hasBatches = domainsList.length > 0; // Check if domains/batches are configured
+        const hasDates = startDate && endDate;
+
+        if (!hasBatches) {
+          // No batches configured
+          if (hasDates) {
+            mainPhaseStatus = "Not Started"; // Dates entered but no batches
+          } else {
+            mainPhaseStatus = "Not Started"; // No dates or batches
+          }
+        } else {
+          // Batches configured
+          if (!hasDates) {
+            mainPhaseStatus = "Initiated"; // Batches but no dates
+          } else {
+            // Batches and dates: Check date-based logic
+            const today = new Date();
+            const phaseStart = new Date(startDate);
+            const phaseEnd = new Date(endDate);
+            today.setHours(0, 0, 0, 0);
+            phaseStart.setHours(0, 0, 0, 0);
+            phaseEnd.setHours(0, 0, 0, 0);
+
+            if (today >= phaseStart && today <= phaseEnd) {
+              mainPhaseStatus = "In Progress";
+            } else if (today > phaseEnd) {
+              mainPhaseStatus = "Done";
+            } else {
+              mainPhaseStatus = "Initiated"; // Batches configured, dates in future
+            }
+          }
+        }
+
         let phaseData = {
           createdAt: serverTimestamp(),
           createdBy: training.createdBy || {},
@@ -344,6 +453,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
           isMainPhase: true,
           customHours: customPhaseHours[mainPhase] || "",
           allSelectedPhases: selectedPhases,
+          status: mainPhaseStatus, // Use computed status for main phase
         };
         if (mainPhase === "phase-2") {
           phaseData.phase2Dates = phase2Dates;
@@ -374,6 +484,8 @@ function InitiationModal({ training, onClose, onConfirm }) {
       
       // Calculate denormalized data
       let totalBatches = 0;
+      let totalHours = 0;
+      let totalCost = 0;
       const domainsArray = [];
       
       domainsList.forEach(domain => {
@@ -382,6 +494,19 @@ function InitiationModal({ training, onClose, onConfirm }) {
         tableData.forEach(row => {
           if (row.batches) {
             totalBatches += row.batches.length;
+            row.batches.forEach(batch => {
+              if (batch.trainers) {
+                batch.trainers.forEach(trainer => {
+                  const assignedHours = Number(trainer.assignedHours || 0);
+                  const perHourCost = Number(trainer.perHourCost || 0);
+                  const conveyance = Number(trainer.conveyance || 0);
+                  const food = Number(trainer.food || 0);
+                  const lodging = Number(trainer.lodging || 0);
+                  totalHours += assignedHours;
+                  totalCost += (assignedHours * perHourCost) + conveyance + food + lodging;
+                });
+              }
+            });
           }
         });
       });
@@ -390,6 +515,8 @@ function InitiationModal({ training, onClose, onConfirm }) {
       await updateDoc(phaseDocRef, {
         domainsCount: domainsList.length,
         totalBatches: totalBatches,
+        totalHours: totalHours,
+        totalCost: totalCost,
         domains: domainsArray,
         updatedAt: serverTimestamp(),
       });
@@ -437,7 +564,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
         // 2) collect new assignments from table data
         const assignments = [];
         const domainsListForWrite = Array.isArray(domainsToSave) ? domainsToSave : selectedDomains;
-        const tableDataLookup = tableDataToSave || table1DataByDomain;
         domainsListForWrite.forEach((domain) => {
           (tableDataLookup[domain] || []).forEach((row, rowIdx) => {
             (row.batches || []).forEach((batch, batchIdx) => {
