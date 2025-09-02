@@ -303,6 +303,7 @@ const Admin = () => {
                       {dep}
                     </option>
                   ))}
+                  <option value="HR">HR</option>
                 </select>
 
                 <button

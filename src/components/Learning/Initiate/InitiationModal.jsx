@@ -12,7 +12,9 @@ import {
   writeBatch,
   query,
   where,
+  updateDoc,
 } from "firebase/firestore";
+import { useAuth } from "../../../context/AuthContext";
 import {
   FiChevronLeft,
   FiCheck,
@@ -104,8 +106,28 @@ function InitiationModal({ training, onClose, onConfirm }) {
   
   // Validation state for duplicate trainers
   const [validationByDomain, setValidationByDomain] = useState({});
-  // Global assignments pulled from other saved trainings (used to prevent cross-college conflicts)
+  const [completedPhases, setCompletedPhases] = useState([]);
   const [globalTrainerAssignments, setGlobalTrainerAssignments] = useState([]);
+
+  const { user } = useAuth();
+
+  // Global toggle for including Sundays
+  const [includeSundays, setIncludeSundays] = useState(false);
+
+  // Helper to generate date list, respecting includeSundays
+  const getDateList = (start, end) => {
+    if (!start || !end) return [];
+    const s = new Date(start);
+    const e = new Date(end);
+    if (isNaN(s.getTime()) || isNaN(e.getTime()) || s > e) return [];
+    const out = [];
+    const cur = new Date(s);
+    while (cur <= e) {
+      if (includeSundays || cur.getDay() !== 0) out.push(cur.toISOString().slice(0, 10));
+      cur.setDate(cur.getDate() + 1);
+    }
+    return out;
+  };
 
   // Get domain hours - use custom hours if set, otherwise default from database
   const getDomainHours = useCallback((domain, phase = null) => {
@@ -181,6 +203,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
   // Allocation logic removed — table rows are managed by domain hours and loaded data
 
   const handlePhaseChange = (phase) => {
+    
     setSelectedPhases((prev) => {
       const newPhases = prev.includes(phase)
         ? prev.filter((p) => p !== phase)
@@ -266,6 +289,18 @@ function InitiationModal({ training, onClose, onConfirm }) {
     setLoading(true);
     setError(null);
     try {
+      // Assign the training to the current user only on initiation, not on edit
+      if (user && !training.selectedPhase) {
+        const trainingDocRef = doc(db, "trainingForms", training.id);
+        await updateDoc(trainingDocRef, {
+          assignedTo: {
+            uid: user.uid,
+            email: user.email,
+            name: user.displayName || user.name || "Unknown",
+          },
+        });
+      }
+
       const serializeTable1Data = (data) => {
         return data.map((row) => ({
           ...row,
@@ -286,6 +321,10 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
       const mainPhase = getMainPhase();
 
+      // Use provided domain list (if any) to avoid setState race when auto-deselecting
+      const domainsList = Array.isArray(domainsToSave) ? domainsToSave : selectedDomains;
+      const tableDataLookup = tableDataToSave || table1DataByDomain;
+
       const phaseLevelPromises = selectedPhases.map((phase) => {
         const phaseDocRef = doc(db, "trainingForms", training.id, "trainings", phase);
         const phaseDocData = {
@@ -295,6 +334,62 @@ function InitiationModal({ training, onClose, onConfirm }) {
           ...commonFields,
           phase,
         };
+
+        // Always set status field using automatic logic
+        let computedStatus = "Not Started";
+
+        // Get the appropriate dates for this phase
+        let startDate = null;
+        let endDate = null;
+
+        if (phase === "phase-2" && phase2Dates?.startDate && phase2Dates?.endDate) {
+          startDate = phase2Dates.startDate;
+          endDate = phase2Dates.endDate;
+        } else if (phase === "phase-3" && phase3Dates?.startDate && phase3Dates?.endDate) {
+          startDate = phase3Dates.startDate;
+          endDate = phase3Dates.endDate;
+        } else if (commonFields.trainingStartDate && commonFields.trainingEndDate) {
+          startDate = commonFields.trainingStartDate;
+          endDate = commonFields.trainingEndDate;
+        }
+
+        // Compute status based on batch configuration and dates
+        computedStatus = "Not Started";
+        const hasBatches = domainsList.length > 0; // Check if domains/batches are configured
+        const hasDates = startDate && endDate;
+
+        if (!hasBatches) {
+          // No batches configured
+          if (hasDates) {
+            computedStatus = "Not Started"; // Dates entered but no batches
+          } else {
+            computedStatus = "Not Started"; // No dates or batches
+          }
+        } else {
+          // Batches configured
+          if (!hasDates) {
+            computedStatus = "Initiated"; // Batches but no dates
+          } else {
+            // Batches and dates: Check date-based logic
+            const today = new Date();
+            const phaseStart = new Date(startDate);
+            const phaseEnd = new Date(endDate);
+            today.setHours(0, 0, 0, 0);
+            phaseStart.setHours(0, 0, 0, 0);
+            phaseEnd.setHours(0, 0, 0, 0);
+
+            if (today >= phaseStart && today <= phaseEnd) {
+              computedStatus = "In Progress";
+            } else if (today > phaseEnd) {
+              computedStatus = "Done";
+            } else {
+              computedStatus = "Initiated"; // Batches configured, dates in future
+            }
+          }
+        }
+
+        phaseDocData.status = computedStatus;
+
         if (phase === "phase-2") phaseDocData.phase2Dates = phase2Dates;
         if (phase === "phase-3") phaseDocData.phase3Dates = phase3Dates;
         if (phase2Dates?.startDate && phase === "phase-2") {
@@ -313,9 +408,57 @@ function InitiationModal({ training, onClose, onConfirm }) {
       });
 
       // Use provided domain list (if any) to avoid setState race when auto-deselecting
-      const domainsList = Array.isArray(domainsToSave) ? domainsToSave : selectedDomains;
-      const tableDataLookup = tableDataToSave || table1DataByDomain;
       const batchPromises = domainsList.map(async (domain) => {
+        // Compute status for main phase (same logic as above)
+        let mainPhaseStatus = "Not Started";
+        let startDate = null;
+        let endDate = null;
+
+        if (mainPhase === "phase-2" && phase2Dates?.startDate && phase2Dates?.endDate) {
+          startDate = phase2Dates.startDate;
+          endDate = phase2Dates.endDate;
+        } else if (mainPhase === "phase-3" && phase3Dates?.startDate && phase3Dates?.endDate) {
+          startDate = phase3Dates.startDate;
+          endDate = phase3Dates.endDate;
+        } else if (commonFields.trainingStartDate && commonFields.trainingEndDate) {
+          startDate = commonFields.trainingStartDate;
+          endDate = commonFields.trainingEndDate;
+        }
+
+        // Compute status based on batch configuration and dates
+        const hasBatches = domainsList.length > 0; // Check if domains/batches are configured
+        const hasDates = startDate && endDate;
+
+        if (!hasBatches) {
+          // No batches configured
+          if (hasDates) {
+            mainPhaseStatus = "Not Started"; // Dates entered but no batches
+          } else {
+            mainPhaseStatus = "Not Started"; // No dates or batches
+          }
+        } else {
+          // Batches configured
+          if (!hasDates) {
+            mainPhaseStatus = "Initiated"; // Batches but no dates
+          } else {
+            // Batches and dates: Check date-based logic
+            const today = new Date();
+            const phaseStart = new Date(startDate);
+            const phaseEnd = new Date(endDate);
+            today.setHours(0, 0, 0, 0);
+            phaseStart.setHours(0, 0, 0, 0);
+            phaseEnd.setHours(0, 0, 0, 0);
+
+            if (today >= phaseStart && today <= phaseEnd) {
+              mainPhaseStatus = "In Progress";
+            } else if (today > phaseEnd) {
+              mainPhaseStatus = "Done";
+            } else {
+              mainPhaseStatus = "Initiated"; // Batches configured, dates in future
+            }
+          }
+        }
+
         let phaseData = {
           createdAt: serverTimestamp(),
           createdBy: training.createdBy || {},
@@ -328,6 +471,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
           isMainPhase: true,
           customHours: customPhaseHours[mainPhase] || "",
           allSelectedPhases: selectedPhases,
+          status: mainPhaseStatus, // Use computed status for main phase
         };
         if (mainPhase === "phase-2") {
           phaseData.phase2Dates = phase2Dates;
@@ -353,6 +497,48 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
       await Promise.all([...phaseLevelPromises, ...batchPromises]);
 
+      // After saving domains, update the phase document with denormalized fields
+      const phaseDocRef = doc(db, "trainingForms", training.id, "trainings", mainPhase);
+      
+      // Calculate denormalized data
+      let totalBatches = 0;
+      let totalHours = 0;
+      let totalCost = 0;
+      const domainsArray = [];
+      
+      domainsList.forEach(domain => {
+        domainsArray.push(domain);
+        const tableData = tableDataLookup[domain] || [];
+        tableData.forEach(row => {
+          if (row.batches) {
+            totalBatches += row.batches.length;
+            row.batches.forEach(batch => {
+              if (batch.trainers) {
+                batch.trainers.forEach(trainer => {
+                  const assignedHours = Number(trainer.assignedHours || 0);
+                  const perHourCost = Number(trainer.perHourCost || 0);
+                  const conveyance = Number(trainer.conveyance || 0);
+                  const food = Number(trainer.food || 0);
+                  const lodging = Number(trainer.lodging || 0);
+                  totalHours += assignedHours;
+                  totalCost += (assignedHours * perHourCost) + conveyance + food + lodging;
+                });
+              }
+            });
+          }
+        });
+      });
+      
+      // Update phase document with denormalized fields
+      await updateDoc(phaseDocRef, {
+        domainsCount: domainsList.length,
+        totalBatches: totalBatches,
+        totalHours: totalHours,
+        totalCost: totalCost,
+        domains: domainsArray,
+        updatedAt: serverTimestamp(),
+      });
+
       // --- centralized trainerAssignments update (create one doc per trainer-date) ---
       try {
         const normalizeDate = (d) => {
@@ -365,20 +551,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
           if (d?.toDate) return d.toDate().toISOString().slice(0, 10);
           const dt = new Date(d);
           return isNaN(dt.getTime()) ? null : dt.toISOString().slice(0, 10);
-        };
-
-        const getDateListExcludingSundaysLocal = (start, end) => {
-          if (!start || !end) return [];
-          const s = new Date(start);
-          const e = new Date(end);
-          if (isNaN(s.getTime()) || isNaN(e.getTime()) || s > e) return [];
-          const out = [];
-          const cur = new Date(s);
-          while (cur <= e) {
-            if (cur.getDay() !== 0) out.push(cur.toISOString().slice(0, 10));
-            cur.setDate(cur.getDate() + 1);
-          }
-          return out;
         };
 
         // 1) delete existing assignments for this training (single source of truth)
@@ -396,7 +568,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
         // 2) collect new assignments from table data
         const assignments = [];
         const domainsListForWrite = Array.isArray(domainsToSave) ? domainsToSave : selectedDomains;
-        const tableDataLookup = tableDataToSave || table1DataByDomain;
         domainsListForWrite.forEach((domain) => {
           (tableDataLookup[domain] || []).forEach((row, rowIdx) => {
             (row.batches || []).forEach((batch, batchIdx) => {
@@ -406,7 +577,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                 if (tr.activeDates && tr.activeDates.length > 0) {
                   dateStrings = tr.activeDates.map(normalizeDate).filter(Boolean);
                 } else if (tr.startDate && tr.endDate) {
-                  dateStrings = getDateListExcludingSundaysLocal(tr.startDate, tr.endDate);
+                dateStrings = getDateList(tr.startDate, tr.endDate);
                 } else if (tr.startDate) {
                   const d = normalizeDate(tr.startDate);
                   if (d) dateStrings = [d];
@@ -1149,6 +1320,23 @@ function InitiationModal({ training, onClose, onConfirm }) {
                             popperClassName="small-datepicker-popper"
                           />
                         </div>
+                        {/* NEW: Include Sundays toggle */}
+                        <div className="flex items-center col-span-2 mt-2">
+                          <button
+                            type="button"
+                            className={`inline-flex items-center px-3 py-1.5 rounded border text-xs font-medium transition-colors ${
+                              includeSundays
+                                ? "bg-green-100 border-green-400 text-green-700"
+                                : "bg-gray-100 border-gray-300 text-gray-700"
+                            }`}
+                            onClick={() => setIncludeSundays((prev) => !prev)}
+                          >
+                            {includeSundays ? "Including Sundays" : "Excluding Sundays"}
+                          </button>
+                          <span className="ml-2 text-xs text-gray-500">
+                            Apply to all phases and trainer assignments
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1164,98 +1352,120 @@ function InitiationModal({ training, onClose, onConfirm }) {
                       Set up the basic timing and schedule configuration for the training.
                     </p>
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                        College Start Time
-                      </label>
-                      <select
-                        value={commonFields.collegeStartTime || ""}
-                        onChange={(e) =>
-                          setCommonFields({
-                            ...commonFields,
-                            collegeStartTime: e.target.value,
-                          })
-                        }
-                        className="w-full h-8 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white"
-                      >
-                        <option value="">Select time</option>
-                        {TIME_OPTIONS.map((t) => (
-                          <option key={t} value={t}>
-                            {formatTime12(t)}
-                          </option>
-                        ))}
-                      </select>
+                  <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:flex-1">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                          College Start Time
+                        </label>
+                        <select
+                          value={commonFields.collegeStartTime || ""}
+                          onChange={(e) =>
+                            setCommonFields({
+                              ...commonFields,
+                              collegeStartTime: e.target.value,
+                            })
+                          }
+                          className="w-full h-8 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white"
+                        >
+                          <option value="">Select time</option>
+                          {TIME_OPTIONS.map((t) => (
+                            <option key={t} value={t}>
+                              {formatTime12(t)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+  
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                          College End Time
+                        </label>
+                        <select
+                          value={commonFields.collegeEndTime || ""}
+                          onChange={(e) =>
+                            setCommonFields({
+                              ...commonFields,
+                              collegeEndTime: e.target.value,
+                            })
+                          }
+                          className="w-full h-8 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white"
+                        >
+                          <option value="">Select time</option>
+                          {TIME_OPTIONS.map((t) => (
+                            <option key={t} value={t}>
+                              {formatTime12(t)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+  
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                          Lunch Start Time
+                        </label>
+                        <select
+                          value={commonFields.lunchStartTime || ""}
+                          onChange={(e) =>
+                            setCommonFields({
+                              ...commonFields,
+                              lunchStartTime: e.target.value,
+                            })
+                          }
+                          className="w-full h-8 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white"
+                        >
+                          <option value="">Select time</option>
+                          {TIME_OPTIONS.map((t) => (
+                            <option key={t} value={t}>
+                              {formatTime12(t)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+  
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                          Lunch End Time
+                        </label>
+                        <select
+                          value={commonFields.lunchEndTime || ""}
+                          onChange={(e) =>
+                            setCommonFields({
+                              ...commonFields,
+                              lunchEndTime: e.target.value,
+                            })
+                          }
+                          className="w-full h-8 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white"
+                        >
+                          <option value="">Select time</option>
+                          {TIME_OPTIONS.map((t) => (
+                            <option key={t} value={t}>
+                              {formatTime12(t)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
-    
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                        College End Time
-                      </label>
-                      <select
-                        value={commonFields.collegeEndTime || ""}
-                        onChange={(e) =>
-                          setCommonFields({
-                            ...commonFields,
-                            collegeEndTime: e.target.value,
-                          })
-                        }
-                        className="w-full h-8 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white"
-                      >
-                        <option value="">Select time</option>
-                        {TIME_OPTIONS.map((t) => (
-                          <option key={t} value={t}>
-                            {formatTime12(t)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-    
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                        Lunch Start Time
-                      </label>
-                      <select
-                        value={commonFields.lunchStartTime || ""}
-                        onChange={(e) =>
-                          setCommonFields({
-                            ...commonFields,
-                            lunchStartTime: e.target.value,
-                          })
-                        }
-                        className="w-full h-8 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white"
-                      >
-                        <option value="">Select time</option>
-                        {TIME_OPTIONS.map((t) => (
-                          <option key={t} value={t}>
-                            {formatTime12(t)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-    
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                        Lunch End Time
-                      </label>
-                      <select
-                        value={commonFields.lunchEndTime || ""}
-                        onChange={(e) =>
-                          setCommonFields({
-                            ...commonFields,
-                            lunchEndTime: e.target.value,
-                          })
-                        }
-                        className="w-full h-8 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white"
-                      >
-                        <option value="">Select time</option>
-                        {TIME_OPTIONS.map((t) => (
-                          <option key={t} value={t}>
-                            {formatTime12(t)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    {/* Inline summary */}
+                    {(() => {
+                      const toMin = (t) => {
+                        if (!t) return null; const [h,m] = t.split(":").map(Number); if (isNaN(h)||isNaN(m)) return null; return h*60+m; };
+                      const fmt = (mins) => { if(mins==null) return "--"; const h=Math.floor(mins/60); const m=mins%60; return m?`${h}h ${m}m`:`${h}h`; };
+                      const s = toMin(commonFields.collegeStartTime);
+                      const e = toMin(commonFields.collegeEndTime);
+                      let total = null; if(s!=null && e!=null && e>s) total = e - s;
+                      const ls = toMin(commonFields.lunchStartTime);
+                      const le = toMin(commonFields.lunchEndTime);
+                      let lunch = null; if(total!=null && ls!=null && le!=null && le>ls){ const overlap = Math.max(0, Math.min(e, le) - Math.max(s, ls)); lunch = overlap>0?overlap:0; }
+                      let working = null; if(total!=null){ working = total - (lunch||0); if(working<0) working = 0; }
+                      return (
+                        <div className="md:w-64 w-full border border-gray-200 rounded-md bg-gray-50 px-3 py-2 flex flex-col justify-center text-[10px] md:text-xs text-gray-700">
+                          <div className="flex justify-between"><span>Total</span><span className="font-medium">{fmt(total)}</span></div>
+                          <div className="flex justify-between"><span>Lunch</span><span className="font-medium">{fmt(lunch)}</span></div>
+                          <div className="flex justify-between"><span>Working</span><span className="font-semibold text-gray-900">{fmt(working)}</span></div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Phase 2 and Phase 3 Dates in Same Row */}
@@ -1499,6 +1709,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                               customHours={customPhaseHours[currentPhase]}
                               onValidationChange={handleValidationChange}
                               globalTrainerAssignments={globalTrainerAssignments}
+                              includeSundays={includeSundays}
                             />
                           )}
                         </div>

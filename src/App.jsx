@@ -22,13 +22,15 @@ import UpdateProfile from "./components/UpdateProfile";
 import Help from "./pages/Help";
 import SessionManager from "./components/SessionManager";
 import TrainersDashboard from "./components/Learning/TrainersDashboard";
+import HR from "./pages/HR";
+import NotFound from "./pages/NotFound"; // Import the new component
 
 const AppContent = () => {
   const location = useLocation();
 
   return (
     <>
-      <Navbar />
+      {location.pathname !== "/404" && <Navbar />}
       <SessionManager />
       <Routes>
         <Route path="/" element={<Home />} />
@@ -53,7 +55,11 @@ const AppContent = () => {
             <Route path="trainers" element={<TrainersDashboard />} />
           </Route>
           <Route path="marketing" element={<DigitalMarketing />} />
+          <Route path="hr" element={<HR />} />
         </Route>
+        
+        {/* Add the 404 route - catch all unmatched routes */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
       {location.pathname === "/" && <Footer />}
     </>
