@@ -1231,113 +1231,101 @@ function InitiationModal({ training, onClose, onConfirm }) {
                     <h2 className="text-base font-semibold text-gray-900">
                       Select Training Phases
                     </h2>
-                    <p className="mt-0.5 text-xs text-gray-500">
+                    <p className="mt-0.5 text-sm text-gray-500">
                       Choose which phases you want to initiate for this training program.
                     </p>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-                    {/* Left: Phase Selection */}
-                    <div>
-                      <div className="flex flex-row space-x-2">
-                        {PHASE_OPTIONS.map((phase) => (
-                          <div
-                            key={phase}
-                            onClick={() => handlePhaseChange(phase)}
-                            className={`flex items-center px-2 py-1.5 rounded border cursor-pointer text-xs font-medium transition-all
-                              ${selectedPhases.includes(phase)
-                                ? "border-blue-500 bg-blue-50 text-blue-700"
-                                : "border-gray-200 bg-white hover:border-gray-300"}
-                            `}
-                            style={{ maxWidth: 120 }}
-                          >
-                            <div
-                              className={`w-4 h-4 rounded-full border-2 flex items-center justify-center mr-2
-                                ${selectedPhases.includes(phase)
-                                  ? "bg-blue-500 border-blue-500"
-                                  : "bg-white border-gray-300"}
-                            `}
-                            >
-                              {selectedPhases.includes(phase) && (
-                                <FiCheck className="w-3 h-3 text-white" />
-                              )}
-                            </div>
-                            <span className="capitalize">{phase.replace("-", " ")}</span>
-                          </div>
-                        ))}
+                  <div className="flex flex-wrap gap-6 items-start">
+                 
+                    <div className="flex flex-wrap gap-3 min-w-[300px]">
+                      {PHASE_OPTIONS.map((phase) => (
+                        <label
+                          key={phase}
+                          className={`flex items-center px-3 py-2 rounded-lg border cursor-pointer text-sm font-medium transition-all min-w-[120px] ${
+                            selectedPhases.includes(phase)
+                              ? "border-blue-500 bg-blue-50 text-blue-700"
+                              : "border-gray-200 bg-white hover:border-gray-300"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            className="mr-2 accent-blue-600"
+                            checked={selectedPhases.includes(phase)}
+                            onChange={() => handlePhaseChange(phase)}
+                          />
+                          <span className="capitalize">{phase.replace("-", " ")}</span>
+                        </label>
+                      ))}
+                    </div>
+                    {/* Start/End Date */}
+                    <div className="flex gap-4 min-w-[300px]">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Start Date
+                        </label>
+                        <DatePicker
+                          selected={
+                            commonFields.trainingStartDate
+                              ? new Date(commonFields.trainingStartDate + "T00:00:00")
+                              : null
+                          }
+                          onChange={(date) => {
+                            setCommonFields({
+                              ...commonFields,
+                              trainingStartDate: date
+                                ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+                                : "",
+                            });
+                          }}
+                          dateFormat="yyyy-MM-dd"
+                          placeholderText="Select date"
+                          className="w-full h-10 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-sm px-3"
+                          calendarClassName="small-datepicker"
+                          popperClassName="small-datepicker-popper"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          End Date
+                        </label>
+                        <DatePicker
+                          selected={
+                            commonFields.trainingEndDate
+                              ? new Date(commonFields.trainingEndDate + "T00:00:00")
+                              : null
+                          }
+                          onChange={(date) => {
+                            setCommonFields({
+                              ...commonFields,
+                              trainingEndDate: date
+                                ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+                                : "",
+                            });
+                          }}
+                          dateFormat="yyyy-MM-dd"
+                          placeholderText="Select date"
+                          className="w-full h-10 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-sm px-3"
+                          calendarClassName="small-datepicker"
+                          popperClassName="small-datepicker-popper"
+                        />
                       </div>
                     </div>
-                    {/* Right: Start/End Date */}
-                    <div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                            Start Date
-                          </label>
-                          <DatePicker
-                            selected={
-                              commonFields.trainingStartDate
-                                ? new Date(commonFields.trainingStartDate + "T00:00:00")
-                                : null
-                            }
-                            onChange={(date) => {
-                              setCommonFields({
-                                ...commonFields,
-                                trainingStartDate: date
-                                  ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
-                                  : "",
-                              });
-                            }}
-                            dateFormat="yyyy-MM-dd"
-                            placeholderText="Select date"
-                            /* changed: fixed width and height */
-                            className="w-56 h-10 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2"
-                            calendarClassName="small-datepicker"
-                            popperClassName="small-datepicker-popper"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                            End Date
-                          </label>
-                          <DatePicker
-                            selected={
-                              commonFields.trainingEndDate
-                                ? new Date(commonFields.trainingEndDate + "T00:00:00")
-                                : null
-                            }
-                            onChange={(date) => {
-                              setCommonFields({
-                                ...commonFields,
-                                trainingEndDate: date
-                                  ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
-                                  : "",
-                              });
-                            }}
-                            dateFormat="yyyy-MM-dd"
-                            placeholderText="Select date"
-                            className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
-                            calendarClassName="small-datepicker"
-                            popperClassName="small-datepicker-popper"
-                          />
-                        </div>
-                        {/* NEW: Include Sundays toggle */}
-                        <div className="flex items-center col-span-2 mt-2">
-                          <button
-                            type="button"
-                            className={`inline-flex items-center px-3 py-1.5 rounded border text-xs font-medium transition-colors ${
-                              includeSundays
-                                ? "bg-green-100 border-green-400 text-green-700"
-                                : "bg-gray-100 border-gray-300 text-gray-700"
-                            }`}
-                            onClick={() => setIncludeSundays((prev) => !prev)}
-                          >
-                            {includeSundays ? "Including Sundays" : "Excluding Sundays"}
-                          </button>
-                          <span className="ml-2 text-xs text-gray-500">
-                            Apply to all phases and trainer assignments
-                          </span>
-                        </div>
-                      </div>
+                    {/* Include Sundays Toggle */}
+                    <div className="flex items-center min-w-[250px]">
+                      <button
+                        type="button"
+                        className={`inline-flex items-center px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                          includeSundays
+                            ? "bg-green-100 border-green-400 text-green-700"
+                            : "bg-gray-100 border-gray-300 text-gray-700"
+                        }`}
+                        onClick={() => setIncludeSundays((prev) => !prev)}
+                      >
+                        {includeSundays ? "Including Sundays" : "Excluding Sundays"}
+                      </button>
+                      <span className="ml-3 text-sm text-gray-500">
+                        Apply to all phases and trainer assignments
+                      </span>
                     </div>
                   </div>
                 </div>
