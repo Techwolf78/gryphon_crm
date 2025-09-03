@@ -103,7 +103,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
   const [deselectingZeroDomains, setDeselectingZeroDomains] = useState(false);
   // totalTrainingHours removed (was used only for allocation)
   const [canMergeBatches, setCanMergeBatches] = useState(false);
-  
+
   // Validation state for duplicate trainers
   const [validationByDomain, setValidationByDomain] = useState({});
   const [completedPhases, setCompletedPhases] = useState([]);
@@ -123,31 +123,35 @@ function InitiationModal({ training, onClose, onConfirm }) {
     const out = [];
     const cur = new Date(s);
     while (cur <= e) {
-      if (includeSundays || cur.getDay() !== 0) out.push(cur.toISOString().slice(0, 10));
+      if (includeSundays || cur.getDay() !== 0)
+        out.push(cur.toISOString().slice(0, 10));
       cur.setDate(cur.getDate() + 1);
     }
     return out;
   };
 
   // Get domain hours - use custom hours if set, otherwise default from database
-  const getDomainHours = useCallback((domain, phase = null) => {
-    if (phase && customPhaseHours[phase] && customPhaseHours[phase] !== "") {
-      return Number(customPhaseHours[phase]);
-    }
-    if (!domain) return 0;
-    const topicMap = {
-      Technical: "Domain Technical",
-      NonTechnical: "Soft Skills",
-      "Soft skills": "Soft Skills",
-      Aptitude: "Aptitude",
-      Tools: "Tools",
-    };
-    const topicName = topicMap[domain] || domain;
-    const topicObj = topics?.find(
-      (t) => t?.topic?.trim()?.toLowerCase() === topicName?.toLowerCase()
-    );
-    return topicObj?.hours || 0;
-  }, [customPhaseHours, topics]);
+  const getDomainHours = useCallback(
+    (domain, phase = null) => {
+      if (phase && customPhaseHours[phase] && customPhaseHours[phase] !== "") {
+        return Number(customPhaseHours[phase]);
+      }
+      if (!domain) return 0;
+      const topicMap = {
+        Technical: "Domain Technical",
+        NonTechnical: "Soft Skills",
+        "Soft skills": "Soft Skills",
+        Aptitude: "Aptitude",
+        Tools: "Tools",
+      };
+      const topicName = topicMap[domain] || domain;
+      const topicObj = topics?.find(
+        (t) => t?.topic?.trim()?.toLowerCase() === topicName?.toLowerCase()
+      );
+      return topicObj?.hours || 0;
+    },
+    [customPhaseHours, topics]
+  );
 
   const getMainPhase = useCallback(() => {
     if (selectedPhases.includes("phase-1")) return "phase-1";
@@ -203,7 +207,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
   // Allocation logic removed — table rows are managed by domain hours and loaded data
 
   const handlePhaseChange = (phase) => {
-    
     setSelectedPhases((prev) => {
       const newPhases = prev.includes(phase)
         ? prev.filter((p) => p !== phase)
@@ -285,7 +288,10 @@ function InitiationModal({ training, onClose, onConfirm }) {
   };
 
   // Extracted save logic so callers (auto-deselect) can pass computed domains/table data
-  const submitInternal = async (domainsToSave = null, tableDataToSave = null) => {
+  const submitInternal = async (
+    domainsToSave = null,
+    tableDataToSave = null
+  ) => {
     setLoading(true);
     setError(null);
     try {
@@ -322,11 +328,19 @@ function InitiationModal({ training, onClose, onConfirm }) {
       const mainPhase = getMainPhase();
 
       // Use provided domain list (if any) to avoid setState race when auto-deselecting
-      const domainsList = Array.isArray(domainsToSave) ? domainsToSave : selectedDomains;
+      const domainsList = Array.isArray(domainsToSave)
+        ? domainsToSave
+        : selectedDomains;
       const tableDataLookup = tableDataToSave || table1DataByDomain;
 
       const phaseLevelPromises = selectedPhases.map((phase) => {
-        const phaseDocRef = doc(db, "trainingForms", training.id, "trainings", phase);
+        const phaseDocRef = doc(
+          db,
+          "trainingForms",
+          training.id,
+          "trainings",
+          phase
+        );
         const phaseDocData = {
           createdAt: serverTimestamp(),
           createdBy: training.createdBy || {},
@@ -342,13 +356,24 @@ function InitiationModal({ training, onClose, onConfirm }) {
         let startDate = null;
         let endDate = null;
 
-        if (phase === "phase-2" && phase2Dates?.startDate && phase2Dates?.endDate) {
+        if (
+          phase === "phase-2" &&
+          phase2Dates?.startDate &&
+          phase2Dates?.endDate
+        ) {
           startDate = phase2Dates.startDate;
           endDate = phase2Dates.endDate;
-        } else if (phase === "phase-3" && phase3Dates?.startDate && phase3Dates?.endDate) {
+        } else if (
+          phase === "phase-3" &&
+          phase3Dates?.startDate &&
+          phase3Dates?.endDate
+        ) {
           startDate = phase3Dates.startDate;
           endDate = phase3Dates.endDate;
-        } else if (commonFields.trainingStartDate && commonFields.trainingEndDate) {
+        } else if (
+          commonFields.trainingStartDate &&
+          commonFields.trainingEndDate
+        ) {
           startDate = commonFields.trainingStartDate;
           endDate = commonFields.trainingEndDate;
         }
@@ -414,13 +439,24 @@ function InitiationModal({ training, onClose, onConfirm }) {
         let startDate = null;
         let endDate = null;
 
-        if (mainPhase === "phase-2" && phase2Dates?.startDate && phase2Dates?.endDate) {
+        if (
+          mainPhase === "phase-2" &&
+          phase2Dates?.startDate &&
+          phase2Dates?.endDate
+        ) {
           startDate = phase2Dates.startDate;
           endDate = phase2Dates.endDate;
-        } else if (mainPhase === "phase-3" && phase3Dates?.startDate && phase3Dates?.endDate) {
+        } else if (
+          mainPhase === "phase-3" &&
+          phase3Dates?.startDate &&
+          phase3Dates?.endDate
+        ) {
           startDate = phase3Dates.startDate;
           endDate = phase3Dates.endDate;
-        } else if (commonFields.trainingStartDate && commonFields.trainingEndDate) {
+        } else if (
+          commonFields.trainingStartDate &&
+          commonFields.trainingEndDate
+        ) {
           startDate = commonFields.trainingStartDate;
           endDate = commonFields.trainingEndDate;
         }
@@ -475,13 +511,17 @@ function InitiationModal({ training, onClose, onConfirm }) {
         };
         if (mainPhase === "phase-2") {
           phaseData.phase2Dates = phase2Dates;
-          if (phase2Dates?.startDate) phaseData.trainingStartDate = phase2Dates.startDate;
-          if (phase2Dates?.endDate) phaseData.trainingEndDate = phase2Dates.endDate;
+          if (phase2Dates?.startDate)
+            phaseData.trainingStartDate = phase2Dates.startDate;
+          if (phase2Dates?.endDate)
+            phaseData.trainingEndDate = phase2Dates.endDate;
         }
         if (mainPhase === "phase-3") {
           phaseData.phase3Dates = phase3Dates;
-          if (phase3Dates?.startDate) phaseData.trainingStartDate = phase3Dates.startDate;
-          if (phase3Dates?.endDate) phaseData.trainingEndDate = phase3Dates.endDate;
+          if (phase3Dates?.startDate)
+            phaseData.trainingStartDate = phase3Dates.startDate;
+          if (phase3Dates?.endDate)
+            phaseData.trainingEndDate = phase3Dates.endDate;
         }
         const domainRef = doc(
           db,
@@ -498,37 +538,44 @@ function InitiationModal({ training, onClose, onConfirm }) {
       await Promise.all([...phaseLevelPromises, ...batchPromises]);
 
       // After saving domains, update the phase document with denormalized fields
-      const phaseDocRef = doc(db, "trainingForms", training.id, "trainings", mainPhase);
-      
+      const phaseDocRef = doc(
+        db,
+        "trainingForms",
+        training.id,
+        "trainings",
+        mainPhase
+      );
+
       // Calculate denormalized data
       let totalBatches = 0;
       let totalHours = 0;
       let totalCost = 0;
       const domainsArray = [];
-      
-      domainsList.forEach(domain => {
+
+      domainsList.forEach((domain) => {
         domainsArray.push(domain);
         const tableData = tableDataLookup[domain] || [];
-        tableData.forEach(row => {
+        tableData.forEach((row) => {
           if (row.batches) {
             totalBatches += row.batches.length;
-            row.batches.forEach(batch => {
+            row.batches.forEach((batch) => {
               if (batch.trainers) {
-                batch.trainers.forEach(trainer => {
+                batch.trainers.forEach((trainer) => {
                   const assignedHours = Number(trainer.assignedHours || 0);
                   const perHourCost = Number(trainer.perHourCost || 0);
                   const conveyance = Number(trainer.conveyance || 0);
                   const food = Number(trainer.food || 0);
                   const lodging = Number(trainer.lodging || 0);
                   totalHours += assignedHours;
-                  totalCost += (assignedHours * perHourCost) + conveyance + food + lodging;
+                  totalCost +=
+                    assignedHours * perHourCost + conveyance + food + lodging;
                 });
               }
             });
           }
         });
       });
-      
+
       // Update phase document with denormalized fields
       await updateDoc(phaseDocRef, {
         domainsCount: domainsList.length,
@@ -545,7 +592,8 @@ function InitiationModal({ training, onClose, onConfirm }) {
           if (!d) return null;
           if (typeof d === "string") {
             const asDate = new Date(d);
-            if (!isNaN(asDate.getTime())) return asDate.toISOString().slice(0, 10);
+            if (!isNaN(asDate.getTime()))
+              return asDate.toISOString().slice(0, 10);
             return d;
           }
           if (d?.toDate) return d.toDate().toISOString().slice(0, 10);
@@ -554,7 +602,10 @@ function InitiationModal({ training, onClose, onConfirm }) {
         };
 
         // 1) delete existing assignments for this training (single source of truth)
-        const qExisting = query(collection(db, "trainerAssignments"), where("sourceTrainingId", "==", training.id));
+        const qExisting = query(
+          collection(db, "trainerAssignments"),
+          where("sourceTrainingId", "==", training.id)
+        );
         const existingSnap = await getDocs(qExisting);
         if (!existingSnap.empty) {
           const delBatch = writeBatch(db);
@@ -562,12 +613,17 @@ function InitiationModal({ training, onClose, onConfirm }) {
             delBatch.delete(doc(db, "trainerAssignments", docSnap.id));
           });
           await delBatch.commit();
-          console.log("[trainerAssignments] removed previous assignments for:", training.id);
+          console.log(
+            "[trainerAssignments] removed previous assignments for:",
+            training.id
+          );
         }
 
         // 2) collect new assignments from table data
         const assignments = [];
-        const domainsListForWrite = Array.isArray(domainsToSave) ? domainsToSave : selectedDomains;
+        const domainsListForWrite = Array.isArray(domainsToSave)
+          ? domainsToSave
+          : selectedDomains;
         domainsListForWrite.forEach((domain) => {
           (tableDataLookup[domain] || []).forEach((row, rowIdx) => {
             (row.batches || []).forEach((batch, batchIdx) => {
@@ -575,9 +631,11 @@ function InitiationModal({ training, onClose, onConfirm }) {
                 if (!tr?.trainerId) return;
                 let dateStrings = [];
                 if (tr.activeDates && tr.activeDates.length > 0) {
-                  dateStrings = tr.activeDates.map(normalizeDate).filter(Boolean);
+                  dateStrings = tr.activeDates
+                    .map(normalizeDate)
+                    .filter(Boolean);
                 } else if (tr.startDate && tr.endDate) {
-                dateStrings = getDateList(tr.startDate, tr.endDate);
+                  dateStrings = getDateList(tr.startDate, tr.endDate);
                 } else if (tr.startDate) {
                   const d = normalizeDate(tr.startDate);
                   if (d) dateStrings = [d];
@@ -612,20 +670,30 @@ function InitiationModal({ training, onClose, onConfirm }) {
             wb.set(ref, a);
           });
           await wb.commit();
-          console.log("[trainerAssignments] wrote", assignments.length, "assignments for training:", training.id);
+          console.log(
+            "[trainerAssignments] wrote",
+            assignments.length,
+            "assignments for training:",
+            training.id
+          );
         } else {
-          console.log("[trainerAssignments] no trainer assignments to write for training:", training.id);
+          console.log(
+            "[trainerAssignments] no trainer assignments to write for training:",
+            training.id
+          );
         }
       } catch (assignmentErr) {
         console.error("Error updating trainerAssignments:", assignmentErr);
         // don't block main save; surface a console warning
       }
       // --- end trainerAssignments update ---
-      
+
       setSuccess("Training phases initiated successfully!");
       setLoading(false);
       setTimeout(() => {
-        const finalDomains = Array.isArray(domainsToSave) ? domainsToSave : selectedDomains;
+        const finalDomains = Array.isArray(domainsToSave)
+          ? domainsToSave
+          : selectedDomains;
         const finalTableData = tableDataToSave || table1DataByDomain;
         if (onConfirm)
           onConfirm({
@@ -656,7 +724,9 @@ function InitiationModal({ training, onClose, onConfirm }) {
     try {
       setDeselectingZeroDomains(true);
       // compute new selections synchronously to avoid setState timing issues
-      const newSelectedDomains = selectedDomains.filter((d) => !zeroHourDomains.includes(d));
+      const newSelectedDomains = selectedDomains.filter(
+        (d) => !zeroHourDomains.includes(d)
+      );
       const newTable1Data = { ...table1DataByDomain };
       zeroHourDomains.forEach((d) => delete newTable1Data[d]);
 
@@ -675,15 +745,17 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
   // Handle validation changes from BatchDetailsTable
   const handleValidationChange = useCallback((domain, validationStatus) => {
-    setValidationByDomain(prev => ({
+    setValidationByDomain((prev) => ({
       ...prev,
-      [domain]: validationStatus
+      [domain]: validationStatus,
     }));
   }, []);
 
   // Check if there are any validation errors across all domains
   const hasValidationErrors = () => {
-    return Object.values(validationByDomain).some(validation => validation?.hasErrors);
+    return Object.values(validationByDomain).some(
+      (validation) => validation?.hasErrors
+    );
   };
 
   const canProceedToNextStep = () => !hasValidationErrors();
@@ -844,7 +916,14 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
     const fetchPhaseDomains = async () => {
       const domainsSnap = await getDocs(
-        collection(db, "trainingForms", training.id, "trainings", currentPhase, "domains")
+        collection(
+          db,
+          "trainingForms",
+          training.id,
+          "trainings",
+          currentPhase,
+          "domains"
+        )
       );
       const loadedDomains = [];
       const loadedTable1Data = {};
@@ -869,7 +948,15 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
       for (const domain of loadedDomains) {
         const currentDoc = await getDoc(
-          doc(db, "trainingForms", training.id, "trainings", currentPhase, "domains", domain)
+          doc(
+            db,
+            "trainingForms",
+            training.id,
+            "trainings",
+            currentPhase,
+            "domains",
+            domain
+          )
         );
         const currentData = currentDoc.exists() ? currentDoc.data() : null;
 
@@ -878,7 +965,15 @@ function InitiationModal({ training, onClose, onConfirm }) {
         for (const phase of PHASE_OPTIONS) {
           if (phase === currentPhase) continue; // we only want prior/other phases' usage
           const otherDoc = await getDoc(
-            doc(db, "trainingForms", training.id, "trainings", phase, "domains", domain)
+            doc(
+              db,
+              "trainingForms",
+              training.id,
+              "trainings",
+              phase,
+              "domains",
+              domain
+            )
           );
           if (!otherDoc.exists()) continue;
           const otherData = otherDoc.data();
@@ -912,12 +1007,18 @@ function InitiationModal({ training, onClose, onConfirm }) {
         });
 
         // if there is no table data in current phase but courses exist, fallback to auto-generated rows
-        if ((!rowsForDomain || rowsForDomain.length === 0) && courses.length > 0) {
+        if (
+          (!rowsForDomain || rowsForDomain.length === 0) &&
+          courses.length > 0
+        ) {
           const domainHours = getDomainHours(domain, currentPhase);
-          loadedTable1Data[domain] = courses.map(course => ({
+          loadedTable1Data[domain] = courses.map((course) => ({
             batch: course.specialization,
             stdCount: course.students,
-            hrs: Math.max(0, domainHours - (usedBySpec[course.specialization] || 0)),
+            hrs: Math.max(
+              0,
+              domainHours - (usedBySpec[course.specialization] || 0)
+            ),
             assignedHours: 0,
             batches: [
               {
@@ -978,7 +1079,9 @@ function InitiationModal({ training, onClose, onConfirm }) {
             });
           });
           // Filter out assignments that belong to the current training to avoid self-conflict
-          const filtered = assignments.filter(a => a.sourceTrainingId !== (training?.id || ""));
+          const filtered = assignments.filter(
+            (a) => a.sourceTrainingId !== (training?.id || "")
+          );
           if (!cancelled) setGlobalTrainerAssignments(filtered);
         } catch (err) {
           console.error("Error processing trainerAssignments snapshot:", err);
@@ -1004,7 +1107,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
       selectedDomainsLength: selectedDomains.length,
       table1DataByDomainKeys: Object.keys(table1DataByDomain),
     });
-    
+
     if (!swapData || !swapData.source || !swapData.target) {
       console.error("❌ [INITIATION MODAL] Missing swap data:", { swapData });
       return;
@@ -1014,32 +1117,44 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
     // Use the domain from swapData or fallback to first selected domain
     const currentDomain = domain || selectedDomains[0];
-    
-    console.log("🔄 [INITIATION MODAL] Processing cross-batch swap for domain:", {
-      currentDomain,
-      sourceTrainer: source.trainerData?.trainerName,
-      targetTrainer: target.trainerData?.trainerName,
-      sourceOriginalBatch: table1DataByDomain[currentDomain]?.[source.rowIdx]?.batch,
-      targetOriginalBatch: table1DataByDomain[currentDomain]?.[target.rowIdx]?.batch,
-    });
-    
+
+    console.log(
+      "🔄 [INITIATION MODAL] Processing cross-batch swap for domain:",
+      {
+        currentDomain,
+        sourceTrainer: source.trainerData?.trainerName,
+        targetTrainer: target.trainerData?.trainerName,
+        sourceOriginalBatch:
+          table1DataByDomain[currentDomain]?.[source.rowIdx]?.batch,
+        targetOriginalBatch:
+          table1DataByDomain[currentDomain]?.[target.rowIdx]?.batch,
+      }
+    );
+
     if (!table1DataByDomain[currentDomain]) {
-      console.error("❌ [INITIATION MODAL] No table data found for domain:", currentDomain);
+      console.error(
+        "❌ [INITIATION MODAL] No table data found for domain:",
+        currentDomain
+      );
       return;
     }
 
     // Get current domain's table data
     const currentDomainData = [...table1DataByDomain[currentDomain]];
-    
+
     // Validate that the indices exist
-    if (!currentDomainData[source.rowIdx] || 
-        !currentDomainData[source.rowIdx].batches[source.batchIdx]) {
+    if (
+      !currentDomainData[source.rowIdx] ||
+      !currentDomainData[source.rowIdx].batches[source.batchIdx]
+    ) {
       console.error("❌ [INITIATION MODAL] Invalid source batch path:", source);
       return;
     }
 
-    if (!currentDomainData[target.rowIdx] || 
-        !currentDomainData[target.rowIdx].batches[target.batchIdx]) {
+    if (
+      !currentDomainData[target.rowIdx] ||
+      !currentDomainData[target.rowIdx].batches[target.batchIdx]
+    ) {
       console.error("❌ [INITIATION MODAL] Invalid target batch path:", target);
       return;
     }
@@ -1049,12 +1164,12 @@ function InitiationModal({ training, onClose, onConfirm }) {
     // CROSS-BATCH SWAP: Create trainers for opposite batches
     const sourceNewTrainer = {
       ...source.trainerData,
-      dayDuration: source.newTimeSlot
+      dayDuration: source.newTimeSlot,
     };
 
     const targetNewTrainer = {
       ...target.trainerData,
-      dayDuration: target.newTimeSlot
+      dayDuration: target.newTimeSlot,
     };
 
     console.log("🔄 [INITIATION MODAL] Cross-batch swap details:", {
@@ -1071,47 +1186,79 @@ function InitiationModal({ training, onClose, onConfirm }) {
         toBatch: currentDomainData[source.rowIdx].batch,
         originalTimeSlot: target.trainerData.dayDuration,
         newTimeSlot: targetNewTrainer.dayDuration,
-      }
+      },
     });
 
     // CROSS-BATCH SWAP: Add source trainer to TARGET batch, target trainer to SOURCE batch
-    currentDomainData[target.rowIdx].batches[target.batchIdx].trainers.push(sourceNewTrainer);
-    currentDomainData[source.rowIdx].batches[source.batchIdx].trainers.push(targetNewTrainer);
+    currentDomainData[target.rowIdx].batches[target.batchIdx].trainers.push(
+      sourceNewTrainer
+    );
+    currentDomainData[source.rowIdx].batches[source.batchIdx].trainers.push(
+      targetNewTrainer
+    );
 
-    console.log("✅ [INITIATION MODAL] Cross-batch trainers added successfully:", {
-      sourceTrainerAddedTo: `${currentDomainData[target.rowIdx].batch} batch (${currentDomainData[target.rowIdx].batches[target.batchIdx].batchCode})`,
-      targetTrainerAddedTo: `${currentDomainData[source.rowIdx].batch} batch (${currentDomainData[source.rowIdx].batches[source.batchIdx].batchCode})`,
-      sourceBatchTrainerCount: currentDomainData[source.rowIdx].batches[source.batchIdx].trainers.length,
-      targetBatchTrainerCount: currentDomainData[target.rowIdx].batches[target.batchIdx].trainers.length,
-    });
+    console.log(
+      "✅ [INITIATION MODAL] Cross-batch trainers added successfully:",
+      {
+        sourceTrainerAddedTo: `${
+          currentDomainData[target.rowIdx].batch
+        } batch (${
+          currentDomainData[target.rowIdx].batches[target.batchIdx].batchCode
+        })`,
+        targetTrainerAddedTo: `${
+          currentDomainData[source.rowIdx].batch
+        } batch (${
+          currentDomainData[source.rowIdx].batches[source.batchIdx].batchCode
+        })`,
+        sourceBatchTrainerCount:
+          currentDomainData[source.rowIdx].batches[source.batchIdx].trainers
+            .length,
+        targetBatchTrainerCount:
+          currentDomainData[target.rowIdx].batches[target.batchIdx].trainers
+            .length,
+      }
+    );
 
     // Update the state with the modified data
-    setTable1DataByDomain(prev => {
+    setTable1DataByDomain((prev) => {
       const newState = {
         ...prev,
-        [currentDomain]: currentDomainData
+        [currentDomain]: currentDomainData,
       };
-      
-      console.log("📊 [INITIATION MODAL] table1DataByDomain updated with cross-batch swap:", {
-        domain: currentDomain,
-        crossBatchSwapCompleted: {
-          sourceBatch: {
-            batchCode: newState[currentDomain][source.rowIdx].batches[source.batchIdx].batchCode,
-            trainerCount: newState[currentDomain][source.rowIdx].batches[source.batchIdx].trainers.length,
-            specialization: newState[currentDomain][source.rowIdx].batch,
+
+      console.log(
+        "📊 [INITIATION MODAL] table1DataByDomain updated with cross-batch swap:",
+        {
+          domain: currentDomain,
+          crossBatchSwapCompleted: {
+            sourceBatch: {
+              batchCode:
+                newState[currentDomain][source.rowIdx].batches[source.batchIdx]
+                  .batchCode,
+              trainerCount:
+                newState[currentDomain][source.rowIdx].batches[source.batchIdx]
+                  .trainers.length,
+              specialization: newState[currentDomain][source.rowIdx].batch,
+            },
+            targetBatch: {
+              batchCode:
+                newState[currentDomain][target.rowIdx].batches[target.batchIdx]
+                  .batchCode,
+              trainerCount:
+                newState[currentDomain][target.rowIdx].batches[target.batchIdx]
+                  .trainers.length,
+              specialization: newState[currentDomain][target.rowIdx].batch,
+            },
           },
-          targetBatch: {
-            batchCode: newState[currentDomain][target.rowIdx].batches[target.batchIdx].batchCode,
-            trainerCount: newState[currentDomain][target.rowIdx].batches[target.batchIdx].trainers.length,
-            specialization: newState[currentDomain][target.rowIdx].batch,
-          }
         }
-      });
-      
+      );
+
       return newState;
     });
 
-    console.log("✅ [INITIATION MODAL] Cross-batch trainer swap completed successfully - trainers swapped batches and time slots");
+    console.log(
+      "✅ [INITIATION MODAL] Cross-batch trainer swap completed successfully - trainers swapped batches and time slots"
+    );
   };
 
   return (
@@ -1198,11 +1345,15 @@ function InitiationModal({ training, onClose, onConfirm }) {
                     <>
                       {training.collegeName}
                       {training.collegeCode && (
-                        <span className="ml-1 text-gray-500 font-normal">({training.collegeCode})</span>
+                        <span className="ml-1 text-gray-500 font-normal">
+                          ({training.collegeCode})
+                        </span>
                       )}
                     </>
                   ) : (
-                    <span className="text-gray-500 font-normal">Training Setup</span>
+                    <span className="text-gray-500 font-normal">
+                      Training Setup
+                    </span>
                   )}
                 </h1>
                 {selectedPhases?.length > 0 && (
@@ -1232,16 +1383,16 @@ function InitiationModal({ training, onClose, onConfirm }) {
                       Select Training Phases
                     </h2>
                     <p className="mt-0.5 text-sm text-gray-500">
-                      Choose which phases you want to initiate for this training program.
+                      Choose which phases you want to initiate for this training
+                      program.
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-6 items-start">
-                 
                     <div className="flex flex-wrap gap-3 min-w-[300px]">
                       {PHASE_OPTIONS.map((phase) => (
                         <label
                           key={phase}
-                          className={`flex items-center px-3 py-2 rounded-lg border cursor-pointer text-sm font-medium transition-all min-w-[120px] ${
+                          className={`flex items-center px-3 py-2 rounded-lg border cursor-pointer text-sm font-medium transition-all min-w-[80px] ${
                             selectedPhases.includes(phase)
                               ? "border-blue-500 bg-blue-50 text-blue-700"
                               : "border-gray-200 bg-white hover:border-gray-300"
@@ -1253,14 +1404,16 @@ function InitiationModal({ training, onClose, onConfirm }) {
                             checked={selectedPhases.includes(phase)}
                             onChange={() => handlePhaseChange(phase)}
                           />
-                          <span className="capitalize">{phase.replace("-", " ")}</span>
+                          <span className="capitalize">
+                            {phase.replace("-", " ")}
+                          </span>
                         </label>
                       ))}
                     </div>
-                    {/* Start/End Date */}
-                    <div className="flex gap-4 min-w-[300px]">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+ {/* Start/End Date */}
+                    <div className="flex gap-4 min-w-[200px]">
+                      <div className="flex flex-col items-start">
+                        <label className="text-sm font-medium text-gray-700 mb-1">
                           Start Date
                         </label>
                         <DatePicker
@@ -1279,13 +1432,13 @@ function InitiationModal({ training, onClose, onConfirm }) {
                           }}
                           dateFormat="yyyy-MM-dd"
                           placeholderText="Select date"
-                          className="w-full h-10 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-sm px-3"
+                          className="w-32 h-10 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-sm px-3"
                           calendarClassName="small-datepicker"
                           popperClassName="small-datepicker-popper"
                         />
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <div className="flex flex-col items-start">
+                        <label className="text-sm font-medium text-gray-700 mb-1">
                           End Date
                         </label>
                         <DatePicker
@@ -1304,28 +1457,40 @@ function InitiationModal({ training, onClose, onConfirm }) {
                           }}
                           dateFormat="yyyy-MM-dd"
                           placeholderText="Select date"
-                          className="w-full h-10 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-sm px-3"
+                          className="w-32 h-10 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-sm px-3"
                           calendarClassName="small-datepicker"
                           popperClassName="small-datepicker-popper"
                         />
                       </div>
                     </div>
                     {/* Include Sundays Toggle */}
-                    <div className="flex items-center min-w-[250px]">
-                      <button
-                        type="button"
-                        className={`inline-flex items-center px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                          includeSundays
-                            ? "bg-green-100 border-green-400 text-green-700"
-                            : "bg-gray-100 border-gray-300 text-gray-700"
-                        }`}
-                        onClick={() => setIncludeSundays((prev) => !prev)}
-                      >
-                        {includeSundays ? "Including Sundays" : "Excluding Sundays"}
-                      </button>
-                      <span className="ml-3 text-sm text-gray-500">
+                    <div className="flex flex-col items-start min-w-[250px]">
+                      <span className="text-sm text-gray-500 mb-2">
                         Apply to all phases and trainer assignments
                       </span>
+                      <label className="flex items-center cursor-pointer">
+                        <div className="relative">
+                          <input
+                            type="checkbox"
+                            className="sr-only"
+                            checked={includeSundays}
+                            onChange={() => setIncludeSundays((prev) => !prev)}
+                          />
+                          <div
+                            className={`block w-10 h-6 rounded-full transition-colors ${
+                              includeSundays ? "bg-blue-600" : "bg-gray-300"
+                            }`}
+                          ></div>
+                          <div
+                            className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                              includeSundays ? "translate-x-4" : "translate-x-0"
+                            }`}
+                          ></div>
+                        </div>
+                        <span className={`ml-3 text-sm ${includeSundays ? 'text-green-700' : 'text-red-700'}`}>
+                          {includeSundays ? 'Sundays Included' : 'Sundays Excluded'}
+                        </span>
+                      </label>
                     </div>
                   </div>
                 </div>
@@ -1337,7 +1502,8 @@ function InitiationModal({ training, onClose, onConfirm }) {
                       Training Configuration
                     </h2>
                     <p className="mt-0.5 text-xs text-gray-500">
-                      Set up the basic timing and schedule configuration for the training.
+                      Set up the basic timing and schedule configuration for the
+                      training.
                     </p>
                   </div>
                   <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
@@ -1364,7 +1530,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                           ))}
                         </select>
                       </div>
-  
+
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-0.5">
                           College End Time
@@ -1387,7 +1553,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                           ))}
                         </select>
                       </div>
-  
+
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-0.5">
                           Lunch Start Time
@@ -1410,7 +1576,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                           ))}
                         </select>
                       </div>
-  
+
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-0.5">
                           Lunch End Time
@@ -1437,115 +1603,155 @@ function InitiationModal({ training, onClose, onConfirm }) {
                     {/* Inline summary */}
                     {(() => {
                       const toMin = (t) => {
-                        if (!t) return null; const [h,m] = t.split(":").map(Number); if (isNaN(h)||isNaN(m)) return null; return h*60+m; };
-                      const fmt = (mins) => { if(mins==null) return "--"; const h=Math.floor(mins/60); const m=mins%60; return m?`${h}h ${m}m`:`${h}h`; };
+                        if (!t) return null;
+                        const [h, m] = t.split(":").map(Number);
+                        if (isNaN(h) || isNaN(m)) return null;
+                        return h * 60 + m;
+                      };
+                      const fmt = (mins) => {
+                        if (mins == null) return "--";
+                        const h = Math.floor(mins / 60);
+                        const m = mins % 60;
+                        return m ? `${h}h ${m}m` : `${h}h`;
+                      };
                       const s = toMin(commonFields.collegeStartTime);
                       const e = toMin(commonFields.collegeEndTime);
-                      let total = null; if(s!=null && e!=null && e>s) total = e - s;
+                      let total = null;
+                      if (s != null && e != null && e > s) total = e - s;
                       const ls = toMin(commonFields.lunchStartTime);
                       const le = toMin(commonFields.lunchEndTime);
-                      let lunch = null; if(total!=null && ls!=null && le!=null && le>ls){ const overlap = Math.max(0, Math.min(e, le) - Math.max(s, ls)); lunch = overlap>0?overlap:0; }
-                      let working = null; if(total!=null){ working = total - (lunch||0); if(working<0) working = 0; }
+                      let lunch = null;
+                      if (
+                        total != null &&
+                        ls != null &&
+                        le != null &&
+                        le > ls
+                      ) {
+                        const overlap = Math.max(
+                          0,
+                          Math.min(e, le) - Math.max(s, ls)
+                        );
+                        lunch = overlap > 0 ? overlap : 0;
+                      }
+                      let working = null;
+                      if (total != null) {
+                        working = total - (lunch || 0);
+                        if (working < 0) working = 0;
+                      }
                       return (
                         <div className="md:w-64 w-full border border-gray-200 rounded-md bg-gray-50 px-3 py-2 flex flex-col justify-center text-[10px] md:text-xs text-gray-700">
-                          <div className="flex justify-between"><span>Total</span><span className="font-medium">{fmt(total)}</span></div>
-                          <div className="flex justify-between"><span>Lunch</span><span className="font-medium">{fmt(lunch)}</span></div>
-                          <div className="flex justify-between"><span>Working</span><span className="font-semibold text-gray-900">{fmt(working)}</span></div>
+                          <div className="flex justify-between">
+                            <span>Total</span>
+                            <span className="font-medium">{fmt(total)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Lunch</span>
+                            <span className="font-medium">{fmt(lunch)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Working</span>
+                            <span className="font-semibold text-gray-900">
+                              {fmt(working)}
+                            </span>
+                          </div>
                         </div>
                       );
                     })()}
                   </div>
 
                   {/* Phase 2 and Phase 3 Dates in Same Row */}
-                  {(selectedPhases.includes("phase-2") || selectedPhases.includes("phase-3")) &&
+                  {(selectedPhases.includes("phase-2") ||
+                    selectedPhases.includes("phase-3")) &&
                     selectedPhases.length > 1 && (
                       <div className="space-y-2 pt-2 border-t border-gray-200">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           {/* Phase 2 Dates */}
-                          {selectedPhases.includes("phase-2") && getMainPhase() !== "phase-2" && (
-                            <div className="space-y-2">
-                              <h4 className="text-sm font-medium text-gray-900">
-                                Phase 2 Dates
-                              </h4>
-                              <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                                    Phase 2 Start Date
-                                  </label>
-                                  <input
-                                    type="date"
-                                    value={phase2Dates.startDate || ""}
-                                    onChange={(e) =>
-                                      setPhase2Dates({
-                                        ...phase2Dates,
-                                        startDate: e.target.value,
-                                      })
-                                    }
-                                    className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                                    Phase 2 End Date
-                                  </label>
-                                  <input
-                                    type="date"
-                                    value={phase2Dates.endDate || ""}
-                                    onChange={(e) =>
-                                      setPhase2Dates({
-                                        ...phase2Dates,
-                                        endDate: e.target.value,
-                                      })
-                                    }
-                                    className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
-                                  />
+                          {selectedPhases.includes("phase-2") &&
+                            getMainPhase() !== "phase-2" && (
+                              <div className="space-y-2">
+                                <h4 className="text-sm font-medium text-gray-900">
+                                  Phase 2 Dates
+                                </h4>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                                      Phase 2 Start Date
+                                    </label>
+                                    <input
+                                      type="date"
+                                      value={phase2Dates.startDate || ""}
+                                      onChange={(e) =>
+                                        setPhase2Dates({
+                                          ...phase2Dates,
+                                          startDate: e.target.value,
+                                        })
+                                      }
+                                      className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                                      Phase 2 End Date
+                                    </label>
+                                    <input
+                                      type="date"
+                                      value={phase2Dates.endDate || ""}
+                                      onChange={(e) =>
+                                        setPhase2Dates({
+                                          ...phase2Dates,
+                                          endDate: e.target.value,
+                                        })
+                                      }
+                                      className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
+                                    />
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          )}
+                            )}
 
                           {/* Phase 3 Dates */}
-                          {selectedPhases.includes("phase-3") && getMainPhase() !== "phase-3" && (
-                            <div className="space-y-2">
-                              <h4 className="text-sm font-medium text-gray-900">
-                                Phase 3 Dates
-                              </h4>
-                              <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                                    Phase 3 Start Date
-                                  </label>
-                                  <input
-                                    type="date"
-                                    value={phase3Dates?.startDate || ""}
-                                    onChange={(e) =>
-                                      setPhase3Dates({
-                                        ...phase3Dates,
-                                        startDate: e.target.value,
-                                      })
-                                    }
-                                    className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                                    Phase 3 End Date
-                                  </label>
-                                  <input
-                                    type="date"
-                                    value={phase3Dates?.endDate || ""}
-                                    onChange={(e) =>
-                                      setPhase3Dates({
-                                        ...phase3Dates,
-                                        endDate: e.target.value,
-                                      })
-                                    }
-                                    className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
-                                  />
+                          {selectedPhases.includes("phase-3") &&
+                            getMainPhase() !== "phase-3" && (
+                              <div className="space-y-2">
+                                <h4 className="text-sm font-medium text-gray-900">
+                                  Phase 3 Dates
+                                </h4>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                                      Phase 3 Start Date
+                                    </label>
+                                    <input
+                                      type="date"
+                                      value={phase3Dates?.startDate || ""}
+                                      onChange={(e) =>
+                                        setPhase3Dates({
+                                          ...phase3Dates,
+                                          startDate: e.target.value,
+                                        })
+                                      }
+                                      className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                                      Phase 3 End Date
+                                    </label>
+                                    <input
+                                      type="date"
+                                      value={phase3Dates?.endDate || ""}
+                                      onChange={(e) =>
+                                        setPhase3Dates({
+                                          ...phase3Dates,
+                                          endDate: e.target.value,
+                                        })
+                                      }
+                                      className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
+                                    />
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          )}
+                            )}
                         </div>
                       </div>
                     )}
@@ -1567,9 +1773,11 @@ function InitiationModal({ training, onClose, onConfirm }) {
                       {/* Chips for selected domains */}
                       <div className="flex flex-wrap gap-2 mb-2 min-h-[32px]">
                         {selectedDomains.length === 0 && (
-                          <span className="text-xs text-gray-400">No domains selected</span>
+                          <span className="text-xs text-gray-400">
+                            No domains selected
+                          </span>
                         )}
-                        {selectedDomains.map(domain => (
+                        {selectedDomains.map((domain) => (
                           <span
                             key={domain}
                             className="flex items-center bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs font-medium"
@@ -1579,7 +1787,9 @@ function InitiationModal({ training, onClose, onConfirm }) {
                               type="button"
                               className="ml-1 text-blue-500 hover:text-blue-700 focus:outline-none"
                               onClick={() =>
-                                setSelectedDomains(selectedDomains.filter(d => d !== domain))
+                                setSelectedDomains(
+                                  selectedDomains.filter((d) => d !== domain)
+                                )
                               }
                               aria-label={`Remove ${domain}`}
                             >
@@ -1590,7 +1800,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                       </div>
                       {/* Checkbox list for all domains in a single row */}
                       <div className="flex flex-row gap-3">
-                        {DOMAIN_OPTIONS.map(domain => {
+                        {DOMAIN_OPTIONS.map((domain) => {
                           const isSelected = selectedDomains.includes(domain);
                           const isZero = zeroHourDomains.includes(domain);
                           // highlight classes for zero-hour domains
@@ -1600,11 +1810,17 @@ function InitiationModal({ training, onClose, onConfirm }) {
                           return (
                             <label
                               key={domain}
-                              title={isZero ? "This domain has 0 configured hours" : undefined}
+                              title={
+                                isZero
+                                  ? "This domain has 0 configured hours"
+                                  : undefined
+                              }
                               className={`flex items-center px-2 py-1 rounded cursor-pointer text-xs transition
-                                ${isSelected
-                                  ? "bg-blue-50 text-blue-700 border border-blue-200"
-                                  : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"}
+                                ${
+                                  isSelected
+                                    ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                    : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
+                                }
                                 ${zeroClasses}
                               `}
                             >
@@ -1612,18 +1828,27 @@ function InitiationModal({ training, onClose, onConfirm }) {
                                 type="checkbox"
                                 className="mr-2 accent-blue-600"
                                 checked={isSelected}
-                                onChange={e => {
+                                onChange={(e) => {
                                   if (e.target.checked) {
-                                    setSelectedDomains([...selectedDomains, domain]);
-                                    setTable1DataByDomain(prev => ({
+                                    setSelectedDomains([
+                                      ...selectedDomains,
+                                      domain,
+                                    ]);
+                                    setTable1DataByDomain((prev) => ({
                                       ...prev,
                                       [domain]: prev[domain] || [],
                                     }));
                                   } else {
-                                    setSelectedDomains(selectedDomains.filter(d => d !== domain));
+                                    setSelectedDomains(
+                                      selectedDomains.filter(
+                                        (d) => d !== domain
+                                      )
+                                    );
                                   }
                                   // clear any previous zero-hour marks for this domain on user action
-                                  setZeroHourDomains(prev => prev.filter(d => d !== domain));
+                                  setZeroHourDomains((prev) =>
+                                    prev.filter((d) => d !== domain)
+                                  );
                                   setShowZeroHourWarning(false);
                                   setError(null);
                                 }}
@@ -1634,43 +1859,56 @@ function InitiationModal({ training, onClose, onConfirm }) {
                         })}
                       </div>
                     </div>
-                   
+
                     {/* Batch Details Table per Domain */}
-                    {selectedDomains.map(domain => {
+                    {selectedDomains.map((domain) => {
                       const tableData = table1DataByDomain[domain] || [];
                       // Ensure we compare numeric values. Use domain-level hours as the primary source
                       // for deciding whether hours are configured. This avoids showing the "No hours" warning
                       // when the domain has hours but individual rows may temporarily show 0 due to
                       // allocations from other phases.
-                      const domainHours = Number(getDomainHours(domain, currentPhase) || 0);
+                      const domainHours = Number(
+                        getDomainHours(domain, currentPhase) || 0
+                      );
                       const allNoHours =
                         domainHours === 0 ||
-                        (tableData.length > 0 && tableData.every(row => Number(row.hrs || 0) === 0));
+                        (tableData.length > 0 &&
+                          tableData.every((row) => Number(row.hrs || 0) === 0));
 
                       return (
                         <div
                           key={domain}
-                          className={`space-y-3 mt-4 border-l-4 pl-4 rounded ${DOMAIN_COLORS[domain] || "border-gray-300 bg-gray-50"}`}
+                          className={`space-y-3 mt-4 border-l-4 pl-4 rounded ${
+                            DOMAIN_COLORS[domain] ||
+                            "border-gray-300 bg-gray-50"
+                          }`}
                         >
                           <div className="pb-2 border-b border-gray-200 flex items-center justify-between">
                             <div>
                               <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
                                 Batch & Trainer Assignment for
                                 <span
-                                  className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold uppercase ${DOMAIN_COLORS[domain] || "bg-gray-100 border-gray-300"}`}
+                                  className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold uppercase ${
+                                    DOMAIN_COLORS[domain] ||
+                                    "bg-gray-100 border-gray-300"
+                                  }`}
                                 >
                                   {domain}
                                 </span>
                               </h2>
                               <p className="mt-0.5 text-xs text-gray-500">
-                                Configure batch details and assign trainers for {domain}.
+                                Configure batch details and assign trainers for{" "}
+                                {domain}.
                               </p>
                             </div>
                           </div>
                           <div className=" border-b border-gray-100">
                             <div className="flex items-center justify-between gap-4">
                               <div className="text-xs text-gray-700">
-                                Domain total hours: <span className="font-semibold">{getDomainHours(domain, currentPhase)}</span>
+                                Domain total hours:{" "}
+                                <span className="font-semibold">
+                                  {getDomainHours(domain, currentPhase)}
+                                </span>
                               </div>
                               {/* allocation UI removed */}
                             </div>
@@ -1678,25 +1916,33 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
                           {allNoHours ? (
                             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded text-yellow-800 text-xs font-semibold">
-                              No hours configured for <b>{domain}</b>. Please set hours in the training domain setup.
+                              No hours configured for <b>{domain}</b>. Please
+                              set hours in the training domain setup.
                             </div>
                           ) : (
                             <BatchDetailsTable
                               table1Data={tableData}
-                              setTable1Data={data =>
-                                setTable1DataByDomain(prev => ({ ...prev, [domain]: data }))
+                              setTable1Data={(data) =>
+                                setTable1DataByDomain((prev) => ({
+                                  ...prev,
+                                  [domain]: data,
+                                }))
                               }
                               selectedDomain={domain}
                               topics={topics}
                               courses={courses}
-                              getDomainHours={d => getDomainHours(d, currentPhase)}
+                              getDomainHours={(d) =>
+                                getDomainHours(d, currentPhase)
+                              }
                               commonFields={commonFields}
                               canMergeBatches={canMergeBatches}
                               mainPhase={currentPhase}
                               onSwapTrainer={swapTrainers}
                               customHours={customPhaseHours[currentPhase]}
                               onValidationChange={handleValidationChange}
-                              globalTrainerAssignments={globalTrainerAssignments}
+                              globalTrainerAssignments={
+                                globalTrainerAssignments
+                              }
                               includeSundays={includeSundays}
                             />
                           )}
@@ -1743,13 +1989,15 @@ function InitiationModal({ training, onClose, onConfirm }) {
                     <div className="flex items-start justify-between">
                       <div>
                         <div className="text-xs font-medium text-yellow-800 mb-1">
-                          The following selected domain(s) have 0 configured hours:
+                          The following selected domain(s) have 0 configured
+                          hours:
                         </div>
                         <div className="text-xs text-yellow-700 font-semibold">
                           {zeroHourDomains.join(", ")}
                         </div>
                         <div className="text-xs text-yellow-700 mt-2">
-                          You can either configure hours for these domains or auto-deselect them to continue.
+                          You can either configure hours for these domains or
+                          auto-deselect them to continue.
                         </div>
                       </div>
                       <div className="flex flex-col gap-2 ml-4">
@@ -1779,10 +2027,10 @@ function InitiationModal({ training, onClose, onConfirm }) {
                         >
                           Cancel
                         </button>
-                       </div>
-                     </div>
-                   </div>
-                 )}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Duplicate trainers validation error */}
                 {hasValidationErrors() && (
@@ -1796,21 +2044,24 @@ function InitiationModal({ training, onClose, onConfirm }) {
                           Duplicate Trainer Assignments Detected
                         </h3>
                         <div className="text-xs text-red-700">
-                          {Object.entries(validationByDomain).map(([domain, validation]) => {
-                            if (!validation?.hasErrors) return null;
-                            return (
-                              <div key={domain} className="mb-2">
-                                <strong>{domain} domain:</strong>
-                                <ul className="list-disc ml-4 mt-1">
-                                  {validation.errors.map((error, index) => (
-                                    <li key={index}>{error.message}</li>
-                                  ))}
-                                </ul>
-                              </div>
-                            );
-                          })}
+                          {Object.entries(validationByDomain).map(
+                            ([domain, validation]) => {
+                              if (!validation?.hasErrors) return null;
+                              return (
+                                <div key={domain} className="mb-2">
+                                  <strong>{domain} domain:</strong>
+                                  <ul className="list-disc ml-4 mt-1">
+                                    {validation.errors.map((error, index) => (
+                                      <li key={index}>{error.message}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              );
+                            }
+                          )}
                           <p className="mt-2 font-medium">
-                            Please remove duplicate assignments or modify trainer details (dates, duration) before proceeding.
+                            Please remove duplicate assignments or modify
+                            trainer details (dates, duration) before proceeding.
                           </p>
                         </div>
                       </div>
@@ -1854,7 +2105,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
           </div>
         </div>
       </div>
-          {/* Trainer Calendar is opened from the Initiation Dashboard now */}
+      {/* Trainer Calendar is opened from the Initiation Dashboard now */}
     </>
   );
 }
