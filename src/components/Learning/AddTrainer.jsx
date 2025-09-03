@@ -393,6 +393,7 @@ function AddTrainer({ onClose, onTrainerAdded }) {
             <option value="Soft Skills">Soft Skills</option>
             <option value="Aptitude">Aptitude</option>
             <option value="Technical">Technical</option>
+            <option value="Tools">Tools</option>
           </select>
         </div>
       </div>

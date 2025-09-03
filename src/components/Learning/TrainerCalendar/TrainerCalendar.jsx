@@ -1,26 +1,22 @@
-import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { db } from "../../../firebase";
-import { collection, getDocs, onSnapshot, query as fsQuery, where, orderBy, addDoc } from "firebase/firestore";
+import { collection, getDocs, onSnapshot, query as fsQuery, where, orderBy, getDoc, doc } from "firebase/firestore";
 import {
   FiX,
   FiDownload,
   FiCalendar,
-  FiSearch,
   FiChevronLeft,
   FiChevronRight,
   FiChevronDown,
   FiAlertTriangle,
-  FiPlus,
-  FiClock,
   FiLayers,
-  FiFilter,
   FiMaximize2,
   FiMinimize2,
 } from "react-icons/fi";
-// delete functionality removed for safety; deleteDoc/doc intentionally not imported
+import jsPDF from 'jspdf';
 
 // TrainerCalendar
-// Purpose: dashboard to view trainer bookings (booked dates, free dates, details).
+// Purpose: dashboard to view trainer bookings (booked dates, details).
 // - Fetches `trainers` and `trainerAssignments` from Firestore.
 // - Allows filtering by trainer, college, date range and searching by name/id.
 // - Shows a simple month calendar with booked days highlighted and a side list of bookings.
@@ -29,36 +25,28 @@ import {
 function formatDateISO(d) {
   if (!d) return "";
   try {
-    // Firestore Timestamp has toDate()
+    if (typeof d === 'string') {
+      // Assume YYYY-MM-DD local
+      return d;
+    }
     if (typeof d === 'object' && typeof d.toDate === 'function') {
       const dt = d.toDate();
-      return isNaN(dt.getTime()) ? "" : dt.toISOString().slice(0, 10);
+      return dt.toLocaleDateString('en-CA');
     }
-    // Firestore-like { seconds, nanoseconds }
     if (d && typeof d.seconds === 'number') {
       const dt = new Date(d.seconds * 1000);
-      return isNaN(dt.getTime()) ? "" : dt.toISOString().slice(0, 10);
+      return dt.toLocaleDateString('en-CA');
     }
-    // numeric timestamp in ms
     if (typeof d === 'number') {
       const dt = new Date(d);
-      return isNaN(dt.getTime()) ? "" : dt.toISOString().slice(0, 10);
+      return dt.toLocaleDateString('en-CA');
     }
     const dt = new Date(d);
     if (isNaN(dt.getTime())) return "";
-    return dt.toISOString().slice(0, 10);
+    return dt.toLocaleDateString('en-CA');
   } catch {
     return "";
   }
-}
-
-function useDebounced(value, delay = 250) {
-  const [v, setV] = useState(value);
-  useEffect(() => {
-    const id = setTimeout(() => setV(value), delay);
-    return () => clearTimeout(id);
-  }, [value, delay]);
-  return v;
 }
 
 function BookingDetail({ booking, onClose }) {
@@ -90,7 +78,7 @@ function BookingDetail({ booking, onClose }) {
             <div className="text-xs text-gray-500">Trainer</div>
             <div className="font-medium text-gray-900">{booking.trainerName || booking.trainerId}</div>
             <div className="text-xs text-gray-500 mt-2">Date</div>
-            <div className="font-medium text-gray-900">{booking.dateISO || booking.date || booking.startDate}</div>
+            <div className="font-medium text-gray-900">{booking.date ? new Date(booking.date).toLocaleDateString('en-CA') : (booking.dateISO || booking.date || booking.startDate)}</div>
             <div className="text-xs text-gray-500 mt-2">Duration</div>
             <div className="font-medium text-gray-900">{booking.dayDuration || '—'}</div>
           </div>
@@ -131,32 +119,19 @@ function TrainerCalendar({
   const [trainers, setTrainers] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [selectedTrainer, setSelectedTrainer] = useState(initialTrainerId);
-  const [search, setSearch] = useState("");
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [monthOffset, setMonthOffset] = useState(0); // 0 = current month
   const [selectedCollege, setSelectedCollege] = useState("");
   const [bookingDetail, setBookingDetail] = useState(null);
-  const [trainersCollapsed, setTrainersCollapsed] = useState(true);
-  // Enhancements
+  // Trainer search dropdown state
+  const [trainerSearchOpen, setTrainerSearchOpen] = useState(false);
+  const [trainerSearchValue, setTrainerSearchValue] = useState("");
+  // PDF export loading state
+  const [pdfLoading, setPdfLoading] = useState(false);
   const [viewMode, setViewMode] = useState('month'); // month | week | day
   const [focusedDate, setFocusedDate] = useState(() => new Date());
-  const [showQuickBooking, setShowQuickBooking] = useState(false);
-  const [quickBookingDate, setQuickBookingDate] = useState('');
-  const [quickBookingSlot, setQuickBookingSlot] = useState('AM');
-  const [quickBookingTrainer, setQuickBookingTrainer] = useState('');
-  const [quickCreating, setQuickCreating] = useState(false);
-  const [quickError, setQuickError] = useState('');
-  const [showFreeSlots, setShowFreeSlots] = useState(false);
-  const [slotFilters, setSlotFilters] = useState({ AM: true, PM: true, FULL: true }); // FULL maps to AM & PM
   const [showAllPast, setShowAllPast] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState(()=> new Set()); // dates that are collapsed
   const [showBookingsFull, setShowBookingsFull] = useState(false); // full-screen bookings overlay
-  const [showSlotMenu, setShowSlotMenu] = useState(false); // dropdown for slot filters (main toolbar)
-  const [showSlotMenuFull, setShowSlotMenuFull] = useState(false); // dropdown for slot filters (full-screen toolbar)
-  const slotMenuRef = useRef(null);
-  const slotMenuFullRef = useRef(null);
-  const firstSlotCheckRef = useRef(null);
-  const firstSlotCheckFullRef = useRef(null);
   // Persistence key
   const PERSIST_KEY = 'trainerCalendarPrefs_v1';
 
@@ -167,7 +142,6 @@ function TrainerCalendar({
       if (!raw) return;
       const prefs = JSON.parse(raw);
       if (prefs && typeof prefs === 'object') {
-        if (prefs.slotFilters) setSlotFilters(f => ({...f, ...prefs.slotFilters}));
         if (prefs.selectedCollege) setSelectedCollege(prefs.selectedCollege);
         if (prefs.selectedTrainer) setSelectedTrainer(prefs.selectedTrainer);
         if (typeof prefs.showAllPast === 'boolean') setShowAllPast(prefs.showAllPast);
@@ -180,34 +154,15 @@ function TrainerCalendar({
   // Persist on change (debounced minimal implementation)
   useEffect(() => {
     try {
-      const data = { slotFilters, selectedCollege, selectedTrainer, showAllPast };
+      const data = { selectedCollege, selectedTrainer, showAllPast };
       localStorage.setItem(PERSIST_KEY, JSON.stringify(data));
   } catch { /* ignore persist error */ }
-  }, [slotFilters, selectedCollege, selectedTrainer, showAllPast]);
-  const searchRef = useRef(null);
-  const trainersListRef = useRef(null);
-  const trainersPanelRef = useRef(null);
+  }, [selectedCollege, selectedTrainer, showAllPast]);
   const modalRef = useRef(null);
   const previousActiveRef = useRef(null);
-  // Loading states removed for now (add if skeletons needed later)
-  const debouncedSearch = useDebounced(search, 250);
+  const mainRef = useRef(null);
 
-  const selectedTrainerObj = useMemo(() => {
-    if (!selectedTrainer) return null;
-    return trainers.find(t => (t.trainerId === selectedTrainer) || (t.id === selectedTrainer) || (t.name === selectedTrainer)) || null;
-  }, [trainers, selectedTrainer]);
 
-  // Auto-collapse trainers list on mobile when a trainer is selected to free screen space
-  useEffect(() => {
-    if (!selectedTrainer) return;
-    try {
-      if (window.innerWidth < 768) {
-        setTrainersCollapsed(true);
-      }
-    } catch {
-      // ignore in non-browser environments
-    }
-  }, [selectedTrainer]);
 
   useEffect(() => {
     let mounted = true;
@@ -223,6 +178,19 @@ function TrainerCalendar({
     })();
     return () => { mounted = false; };
   }, []);
+
+  // Sync trainer search value with selected trainer
+  useEffect(() => {
+    if (selectedTrainer && trainers.length > 0) {
+      const selectedTrainerData = trainers.find(t => (t.trainerId || t.id) === selectedTrainer);
+      if (selectedTrainerData) {
+        const name = selectedTrainerData.name || selectedTrainerData.trainerName || selectedTrainer;
+        setTrainerSearchValue(name);
+      }
+    } else if (!selectedTrainer) {
+      setTrainerSearchValue('');
+    }
+  }, [selectedTrainer, trainers]);
 
   // focus trap for modal + Escape to close
   // Focus trap only for modal mode
@@ -263,81 +231,9 @@ function TrainerCalendar({
     }
   }, [onClose, embedded]);
 
-  // Collapse trainers panel when clicking/tapping outside of it (and outside the search box)
-  useEffect(() => {
-    const handleOutsideTrainers = (e) => {
-      try {
-        const target = e.target;
-        if (!trainersPanelRef.current) return;
-        // if click is inside trainers panel or inside search area, do nothing
-        if (trainersPanelRef.current.contains(target)) return;
-        if (searchRef.current && searchRef.current.contains(target)) return;
-        // collapse if currently open
-        if (!trainersCollapsed) setTrainersCollapsed(true);
-      } catch {
-        // ignore
-      }
-    };
 
-    document.addEventListener('pointerdown', handleOutsideTrainers);
-    return () => {
-      document.removeEventListener('pointerdown', handleOutsideTrainers);
-    };
-  }, [trainersCollapsed]);
 
-  // Close suggestions when clicking outside
-  useEffect(() => {
-    // Use pointerdown/touchstart to cover mouse and touch, and listen for Escape key
-    const handleOutside = (e) => {
-      try {
-        if (searchRef.current && !searchRef.current.contains(e.target)) {
-          setShowSuggestions(false);
-        }
-      } catch {
-        // defensive: if ref access fails, close suggestions
-        setShowSuggestions(false);
-      }
-    };
 
-    const handleKey = (e) => {
-      if (e.key === 'Escape') setShowSuggestions(false);
-    };
-
-    document.addEventListener('pointerdown', handleOutside);
-    document.addEventListener('keydown', handleKey);
-
-    return () => {
-      document.removeEventListener('pointerdown', handleOutside);
-      document.removeEventListener('keydown', handleKey);
-    };
-  }, []);
-
-  // Close slot filter dropdowns on outside click / Escape + focus management
-  useEffect(() => {
-    const handler = (e) => {
-      if (showSlotMenu && slotMenuRef.current && !slotMenuRef.current.contains(e.target)) setShowSlotMenu(false);
-      if (showSlotMenuFull && slotMenuFullRef.current && !slotMenuFullRef.current.contains(e.target)) setShowSlotMenuFull(false);
-    };
-    const keyHandler = (e) => {
-      if (e.key === 'Escape') { setShowSlotMenu(false); setShowSlotMenuFull(false); }
-      if (e.key === 'Tab') {
-        // trap focus while menu open (simple containment)
-        if (showSlotMenu && slotMenuRef.current && !slotMenuRef.current.contains(document.activeElement)) {
-          firstSlotCheckRef.current && firstSlotCheckRef.current.focus();
-        }
-        if (showSlotMenuFull && slotMenuFullRef.current && !slotMenuFullRef.current.contains(document.activeElement)) {
-          firstSlotCheckFullRef.current && firstSlotCheckFullRef.current.focus();
-        }
-      }
-    };
-    document.addEventListener('pointerdown', handler);
-    document.addEventListener('keydown', keyHandler);
-    return () => { document.removeEventListener('pointerdown', handler); document.removeEventListener('keydown', keyHandler); };
-  }, [showSlotMenu, showSlotMenuFull]);
-
-  // Autofocus first checkbox when menu opens
-  useEffect(() => { if (showSlotMenu && firstSlotCheckRef.current) firstSlotCheckRef.current.focus(); }, [showSlotMenu]);
-  useEffect(() => { if (showSlotMenuFull && firstSlotCheckFullRef.current) firstSlotCheckFullRef.current.focus(); }, [showSlotMenuFull]);
 
   useEffect(() => {
     const colRef = collection(db, 'trainerAssignments');
@@ -384,7 +280,7 @@ function TrainerCalendar({
   }, [assignments]);
 
   const filteredTrainers = useMemo(() => {
-    const q = debouncedSearch.trim().toLowerCase();
+    const q = trainerSearchValue.trim().toLowerCase();
     return trainers.filter((t) => {
       if (!t) return false;
       if (q) {
@@ -395,7 +291,7 @@ function TrainerCalendar({
       }
       return true;
     });
-  }, [trainers, debouncedSearch]);
+  }, [trainers, trainerSearchValue]);
   // note: dependent on debouncedSearch to avoid rapid re-filtering
 
   // Build bookings map for selected trainer (or all if not selected)
@@ -463,20 +359,11 @@ function TrainerCalendar({
   }, [bookingsWithConflicts]);
 
   const filteredGroupedBookings = useMemo(() => {
-    const matchSlot = (b) => {
-      const dd = String(b.dayDuration||'').toUpperCase();
-      const isFull = dd.includes('AM') && dd.includes('PM');
-      if (isFull) return slotFilters.FULL;
-      if (dd.includes('AM') && !dd.includes('PM')) return slotFilters.AM;
-      if (dd.includes('PM') && !dd.includes('AM')) return slotFilters.PM;
-      // fallback treat unknown as full
-      return slotFilters.FULL;
-    };
     return groupedBookings.map(g => ({
       ...g,
-      bookings: g.bookings.filter(matchSlot)
+      bookings: g.bookings
     })).filter(g => g.bookings.length > 0);
-  }, [groupedBookings, slotFilters]);
+  }, [groupedBookings]);
 
   // Toggle a grouped date section collapsed/expanded
   const toggleGroup = (date) => {
@@ -518,37 +405,6 @@ function TrainerCalendar({
     Object.keys(used).forEach(t => out[t] = Math.min(100, Math.round(used[t] / totalHalfSlots * 100)));
     return out;
   }, [bookingsWithConflicts, monthOffset]);
-
-  // Helper to get taken half-day slots for a trainer and date
-  const getTakenSlots = useCallback((trainerId, isoDate) => {
-    const taken = new Set();
-    bookingsWithConflicts.forEach(b => {
-      if (b.trainerId !== trainerId) return;
-      if (b.dateISO !== isoDate) return;
-      const dd = String(b.dayDuration || '').toUpperCase();
-      if (dd.includes('AM')) taken.add('AM');
-      if (dd.includes('PM')) taken.add('PM');
-      if (!dd.includes('AM') && !dd.includes('PM')) { taken.add('AM'); taken.add('PM'); }
-    });
-    return taken;
-  }, [bookingsWithConflicts]);
-
-  // Free slot finder (next 5 half-day slots across 90 days)
-  const freeSlots = useMemo(() => {
-    if (!selectedTrainer) return [];
-    const res = [];
-    const start = new Date();
-    start.setDate(start.getDate() + 1);
-    for (let i=0; i<90 && res.length < 5; i++) {
-      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
-      const iso = formatDateISO(d);
-      const taken = getTakenSlots(selectedTrainer, iso);
-      if (!taken.has('AM')) res.push({ date: iso, slot: 'AM' });
-      if (res.length >= 5) break;
-      if (!taken.has('PM')) res.push({ date: iso, slot: 'PM' });
-    }
-    return res.slice(0,5);
-  }, [selectedTrainer, getTakenSlots]);
 
   // calendar helpers
   const current = new Date();
@@ -601,6 +457,247 @@ function TrainerCalendar({
     URL.revokeObjectURL(url);
   };
 
+  // PDF export function
+  const exportPDF = async () => {
+    if (bookingsWithConflicts.length === 0) return;
+    setPdfLoading(true);
+    try {
+      // Fetch additional data from trainingForms
+      let venue = 'To be specified';
+      let contactPerson = 'To be specified';
+      let contactNumber = 'To be specified';
+      if (bookingsWithConflicts[0]?.sourceTrainingId) {
+        try {
+          const trainingDoc = await getDoc(doc(db, 'trainingForms', bookingsWithConflicts[0].sourceTrainingId));
+          if (trainingDoc.exists()) {
+            const data = trainingDoc.data();
+            venue = data.venue || venue;
+            contactPerson = data.contactPerson || contactPerson;
+            contactNumber = data.contactNumber || contactNumber;
+          }
+        } catch (err) {
+          console.warn('Failed to fetch training data for PDF:', err);
+        }
+      }
+      const pdf = new jsPDF('portrait', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      let yPosition = 20;
+
+      // Header
+      pdf.setFontSize(16);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Training Assignment Invoice', pageWidth / 2, yPosition, { align: 'center' });
+      yPosition += 15;
+
+      // College Information
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('College Details:', 20, yPosition);
+      yPosition += 8;
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(10);
+
+      // Get college name from first booking or selected college
+      const collegeName = selectedCollege || (bookingsWithConflicts[0]?.collegeName) || 'Not Specified';
+      pdf.text(`1. College Name: ${collegeName}`, 25, yPosition);
+      yPosition += 6;
+
+      pdf.text(`2. Venue: ${venue}`, 25, yPosition);
+      yPosition += 6;
+
+      pdf.text(`3. Contact Person: ${contactPerson}`, 25, yPosition);
+      yPosition += 6;
+
+      pdf.text(`4. Contact Number: ${contactNumber}`, 25, yPosition);
+      yPosition += 10;
+
+      // Schedule Details Header
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('5. Details of Schedule', 20, yPosition);
+      yPosition += 10;
+
+      // Table Headers
+      const headers = [
+        'Domain', 'Year', 'Trainer Name', 'Date', 'Batch',
+        'Hrs.', 'Cost/hrs', 'Cost/day',
+        'Food+Lodging/Day', 'Travel To & Fro', 'Total Amount'
+      ];
+
+      const colWidths = [20, 12, 24, 20, 16, 10, 14, 14, 20, 16, 16];
+      let xPosition = 20;
+
+      pdf.setFontSize(6);
+      pdf.setFont('helvetica', 'bold');
+
+      // Draw header row with borders
+      let headerY = yPosition;
+      headers.forEach((header, index) => {
+        const lines = pdf.splitTextToSize(header, colWidths[index] - 2);
+        pdf.text(lines, xPosition + 1, yPosition + 4); // Slight padding
+        // Draw cell border
+        pdf.rect(xPosition, headerY, colWidths[index], 6);
+        xPosition += colWidths[index];
+      });
+
+      yPosition += 6;
+
+      // Draw table lines
+      pdf.setDrawColor(0);
+      pdf.setLineWidth(0.3);
+      let tableStartY = headerY;
+
+      // Horizontal lines
+      pdf.line(20, tableStartY, pageWidth - 20, tableStartY); // Top line
+      pdf.line(20, yPosition, pageWidth - 20, yPosition); // Bottom of header
+
+      // Vertical lines for columns
+      xPosition = 20;
+      headers.forEach((_, index) => {
+        pdf.line(xPosition, tableStartY, xPosition, yPosition);
+        xPosition += colWidths[index];
+      });
+      pdf.line(xPosition, tableStartY, xPosition, yPosition); // Rightmost line
+
+      // Process bookings data
+      let totalHours = 0;
+      let totalDays = new Set();
+      let totalCost = 0;
+      // Default rate - could be made configurable
+      const defaultHourlyRate = bookingsWithConflicts[0]?.perHourCost || 1500;
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(6);
+
+      bookingsWithConflicts.forEach((booking) => {
+        if (yPosition > pageHeight - 40) {
+          // Add new page
+          pdf.addPage();
+          yPosition = 20;
+          tableStartY = yPosition - 6;
+
+          // Redraw headers on new page
+          xPosition = 20;
+          pdf.setFont('helvetica', 'bold');
+          headers.forEach((header, colIndex) => {
+            const lines = pdf.splitTextToSize(header, colWidths[colIndex] - 2);
+            pdf.text(lines, xPosition + 1, yPosition + 4);
+            pdf.rect(xPosition, yPosition, colWidths[colIndex], 6);
+            xPosition += colWidths[colIndex];
+          });
+          pdf.line(20, yPosition, pageWidth - 20, yPosition);
+          pdf.line(20, yPosition + 6, pageWidth - 20, yPosition + 6);
+          xPosition = 20;
+          headers.forEach((_, colIndex) => {
+            pdf.line(xPosition, yPosition, xPosition, yPosition + 6);
+            xPosition += colWidths[colIndex];
+          });
+          pdf.line(xPosition, yPosition, xPosition, yPosition + 6);
+          yPosition += 6;
+        }
+
+        const date = new Date(booking.dateISO).toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+
+        const hours = booking.dayDuration?.includes('AM') && booking.dayDuration?.includes('PM') ? 8 : 4;
+        const costPerDay = hours * (booking.perHourCost || defaultHourlyRate);
+        const foodLodging = (booking.food || 0) + (booking.lodging || 0);
+        const travel = booking.conveyance || 0;
+        const totalAmount = costPerDay + foodLodging + travel;
+
+        totalHours += hours;
+        totalDays.add(booking.dateISO);
+        totalCost += totalAmount;
+
+        const rowData = [
+          booking.domain || 'Technical',
+          booking.year || '2nd Year',
+          booking.trainerName || booking.trainerId || 'Unknown',
+          date,
+          booking.batchCode || booking.domain || 'General',
+          hours.toString(),
+          (booking.perHourCost || defaultHourlyRate).toString(),
+          costPerDay.toString(),
+          foodLodging.toString(),
+          travel.toString(),
+          totalAmount.toString()
+        ];
+
+        let rowY = yPosition;
+        xPosition = 20;
+        rowData.forEach((data, colIndex) => {
+          const lines = pdf.splitTextToSize(data.toString(), colWidths[colIndex] - 2);
+          pdf.text(lines, xPosition + 1, yPosition + 4);
+          pdf.rect(xPosition, rowY, colWidths[colIndex], 6);
+          xPosition += colWidths[colIndex];
+        });
+
+        yPosition += 6;
+
+        // Draw horizontal line after each row
+        pdf.line(20, yPosition, pageWidth - 20, yPosition);
+
+        // Vertical lines for this row
+        xPosition = 20;
+        rowData.forEach((_, colIndex) => {
+          pdf.line(xPosition, rowY, xPosition, yPosition);
+          xPosition += colWidths[colIndex];
+        });
+        pdf.line(xPosition, rowY, xPosition, yPosition);
+      });
+
+      // Summary Section
+      yPosition += 10;
+
+      if (yPosition > pageHeight - 60) {
+        pdf.addPage();
+        yPosition = 20;
+      }
+
+      // Totals
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'bold');
+
+      const tdsAmount = totalCost * 0.1; // 10% TDS
+      const payableAmount = totalCost - tdsAmount;
+
+      pdf.text(`Total Assignment Days = ${totalDays.size} Days`, 20, yPosition);
+      yPosition += 8;
+      pdf.text(`Total Hours of assignment = ${totalHours} Hrs.`, 20, yPosition);
+      yPosition += 8;
+      pdf.text(`Start Date: ${Array.from(totalDays).sort()[0] ? new Date(Array.from(totalDays).sort()[0]).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Not specified'}`, 20, yPosition);
+      yPosition += 8;
+      pdf.text(`Professional Fee: Rs ${defaultHourlyRate}/Hrs.`, 20, yPosition);
+      yPosition += 8;
+      pdf.text(`Total Assignment Cost: Rs ${totalCost.toLocaleString()}`, 20, yPosition);
+      yPosition += 8;
+      pdf.text(`Total Payable Cost: Rs ${payableAmount.toLocaleString()}`, 20, yPosition);
+
+      // Footer
+      yPosition += 15;
+      pdf.setFontSize(8);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`Generated on: ${new Date().toLocaleString()}`, 20, pageHeight - 10);
+      pdf.text(`Total Bookings: ${bookingsWithConflicts.length}`, pageWidth - 60, pageHeight - 10);
+
+      // Save the PDF
+      const filename = `training-assignment-${selectedTrainer || 'all'}-${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(filename);
+
+    } catch (error) {
+      console.error('PDF export failed:', error);
+      alert(`Failed to generate PDF: ${error.message || 'Unknown error'}. Please try again.`);
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
   const outerWrapperClass = embedded
     ? 'w-full'
     : 'fixed inset-0 z-54 flex items-stretch justify-center p-0 md:p-6 bg-black/30 backdrop-blur-sm overflow-y-auto';
@@ -623,104 +720,6 @@ function TrainerCalendar({
     const iso = formatDateISO(focusedDate);
     return bookingsByDate[iso] || [];
   }, [viewMode, focusedDate, bookingsByDate]);
-
-  const openQuickBooking = (dateObj, presetSlot=null) => {
-    const iso = typeof dateObj === 'string' ? dateObj : formatDateISO(dateObj);
-    setQuickBookingDate(iso);
-    if (presetSlot) setQuickBookingSlot(presetSlot);
-    setQuickBookingTrainer(selectedTrainer || '');
-    setShowQuickBooking(true);
-  };
-
-  const QuickBookingModal = () => {
-    if (!showQuickBooking) return null;
-    const needsTrainerSelect = !selectedTrainer && !quickBookingTrainer;
-    const submit = async (e) => {
-      e.preventDefault();
-      setQuickError('');
-      const trainerId = selectedTrainer || quickBookingTrainer;
-      if (!trainerId) { setQuickError('Trainer required'); return; }
-      if (!quickBookingDate) { setQuickError('Date required'); return; }
-      try {
-        setQuickCreating(true);
-        const taken = getTakenSlots(trainerId, quickBookingDate);
-        if (quickBookingSlot === 'AM & PM') {
-          if (taken.has('AM') || taken.has('PM')) throw new Error('Slot conflict');
-        } else if (taken.has(quickBookingSlot)) {
-          throw new Error('Slot conflict');
-        }
-        await addDoc(collection(db,'trainerAssignments'), {
-          trainerId,
-          date: quickBookingDate,
-          dayDuration: quickBookingSlot,
-          createdAt: Date.now(),
-        });
-        setShowQuickBooking(false);
-      } catch (err) {
-        console.error('quick booking create failed', err);
-        setQuickError(err.message || 'Create failed');
-      } finally {
-        setQuickCreating(false);
-      }
-    };
-    return (
-      <div className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center p-4 animate-fadeIn">
-        <div className="bg-white w-full max-w-sm rounded-xl shadow-xl p-5 relative animate-scaleIn">
-          <button onClick={()=> setShowQuickBooking(false)} className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"><FiX /></button>
-          <h3 className="text-base font-semibold text-gray-800 flex items-center gap-2"><FiPlus />Quick Booking</h3>
-          <form onSubmit={submit} className="mt-4 space-y-3 text-sm">
-            <div>
-              <label className="text-xs text-gray-500">Date</label>
-              <input type="date" value={quickBookingDate} onChange={e=> setQuickBookingDate(e.target.value)} className="mt-1 w-full border border-gray-200 rounded-md p-2" required />
-            </div>
-            {needsTrainerSelect && (
-              <div>
-                <label className="text-xs text-gray-500">Trainer</label>
-                <select value={quickBookingTrainer} onChange={e=> setQuickBookingTrainer(e.target.value)} className="mt-1 w-full border border-gray-200 rounded-md p-2" required>
-                  <option value="">Select trainer</option>
-                  {trainers.map(t => <option key={t.id} value={t.trainerId || t.id}>{t.name || t.trainerName || t.trainerId}</option>)}
-                </select>
-              </div>
-            )}
-            <div>
-              <label className="text-xs text-gray-500">Slot</label>
-              <select value={quickBookingSlot} onChange={e=> setQuickBookingSlot(e.target.value)} className="mt-1 w-full border border-gray-200 rounded-md p-2">
-                <option>AM</option>
-                <option>PM</option>
-                <option>AM & PM</option>
-              </select>
-            </div>
-            {quickError && <div className="text-xs text-red-600">{quickError}</div>}
-            <div className="pt-2 flex justify-end gap-2">
-              <button type="button" onClick={()=> setShowQuickBooking(false)} className="px-3 py-1.5 rounded-md border border-gray-200 text-sm">Cancel</button>
-              <button type="submit" disabled={quickCreating} className={`px-3 py-1.5 rounded-md text-sm text-white ${quickCreating ? 'bg-indigo-300' : 'bg-indigo-600 hover:bg-indigo-700'}`}>{quickCreating ? 'Saving...' : 'Save'}</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-  };
-
-  const FreeSlotsPanel = () => {
-    if (!showFreeSlots || !selectedTrainer) return null;
-    return (
-      <div className="absolute right-0 mt-2 w-60 bg-white border border-gray-200 rounded-md shadow-lg p-3 z-40 text-xs">
-        <div className="font-medium text-gray-800 mb-2 flex items-center gap-1"><FiClock className="w-4 h-4"/>Next Free Slots</div>
-        {freeSlots.length === 0 && <div className="text-gray-500">No free slots (90d)</div>}
-        <ul className="space-y-1">
-          {freeSlots.map((s,i)=>(
-            <li key={i} className="flex items-center justify-between">
-              <span>{s.date} • {s.slot}</span>
-              <button onClick={()=> openQuickBooking(s.date, s.slot)} className="text-indigo-600 hover:underline">Book</button>
-            </li>
-          ))}
-        </ul>
-        <div className="pt-2 text-right">
-          <button onClick={()=> setShowFreeSlots(false)} className="text-gray-500 hover:text-gray-700">Close</button>
-        </div>
-      </div>
-    );
-  };
 
   const ViewToggle = () => (
     <div className="inline-flex items-center rounded-lg border border-gray-200 overflow-hidden text-xs">
@@ -745,18 +744,6 @@ function TrainerCalendar({
           </div>
 
           <div className="flex items-center gap-3 ml-auto">
-            <div className="relative">
-              <button
-                type="button"
-                disabled={!selectedTrainer}
-                onClick={()=> setShowFreeSlots(s => !s)}
-                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border ${selectedTrainer ? 'border-gray-200 bg-white hover:bg-gray-50 text-gray-700' : 'bg-gray-100 border-gray-100 text-gray-400 cursor-not-allowed'}`}
-              >
-                <FiClock className="w-4 h-4" />
-                Free Slots
-              </button>
-              <FreeSlotsPanel />
-            </div>
             <ViewToggle />
             {embedded && (
               <button
@@ -768,13 +755,26 @@ function TrainerCalendar({
               </button>
             )}
             <button
+              disabled={bookingsWithConflicts.length === 0 || pdfLoading}
+              onClick={exportPDF}
+              className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition ${
+                bookingsWithConflicts.length === 0 || pdfLoading
+                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                  : 'bg-green-600 text-white hover:bg-green-700'
+              }`}
+            >
+              <FiDownload className="w-4 h-4" />
+              <span className="hidden sm:inline">{pdfLoading ? 'Generating...' : 'Export PDF'}</span>
+              <span className="sm:hidden">{pdfLoading ? 'PDF...' : 'PDF'}</span>
+            </button>
+            <button
               disabled={bookingsWithConflicts.length === 0}
               onClick={exportCSV}
               className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition ${bookingsWithConflicts.length === 0 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
             >
               <FiDownload className="w-4 h-4" />
               <span className="hidden sm:inline">Export CSV</span>
-              <span className="sm:hidden">Export</span>
+              <span className="sm:hidden">CSV</span>
             </button>
             {!embedded && (
               <button
@@ -790,114 +790,84 @@ function TrainerCalendar({
         <div className="flex-1 overflow-y-auto">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-5 p-4 md:p-5 xl:gap-6">
           <aside className="md:col-span-2 lg:col-span-1 space-y-4">
-            <div className="relative" ref={searchRef}>
-              <label className="sr-only">Search trainers</label>
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><FiSearch /></div>
-              <input
-                aria-label="Search trainers"
-                value={search}
-                onChange={(e) => { setSearch(e.target.value); setShowSuggestions(true); }}
-                onFocus={() => setShowSuggestions(true)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') { setShowSuggestions(false); }
-                }}
-                className="pl-10 pr-10 w-full rounded-lg border border-gray-200 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                placeholder={selectedTrainerObj ? (selectedTrainerObj.name || selectedTrainerObj.trainerName || selectedTrainerObj.trainerId || '') : 'Search name or id'}
-                role="combobox"
-                aria-expanded={showSuggestions}
-              />
-
-              {/* inline clear button: clears selected trainer and search */}
-              {selectedTrainerObj && (
-                <button
-                  aria-label="Clear selected trainer"
-                  onClick={() => { setSelectedTrainer(''); setSearch(''); setShowSuggestions(false); setTrainersCollapsed(false); }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 rounded focus:outline-none"
-                >
-                  <FiX />
-                </button>
-              )}
-
-              {showSuggestions && search.trim() !== '' && (
-                <div role="listbox" className="absolute z-40 mt-1 w-full bg-white border border-gray-200 rounded shadow-md max-h-56 overflow-auto">
-                  {filteredTrainers.length === 0 && <div className="p-2 text-sm text-gray-500">No trainers found</div>}
-                  {filteredTrainers.map((t) => {
-                    const id = t.trainerId || t.id || t.name;
-                    return (
-                      <div
-                        role="option"
-                        tabIndex={0}
-                        key={`suggest-${id}`}
-                        onClick={() => { const id = t.trainerId || t.id; setSelectedTrainer(id); setShowSuggestions(false); setSearch(''); setTrainersCollapsed(true); }}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { const id = t.trainerId || t.id; setSelectedTrainer(id); setShowSuggestions(false); setSearch(''); setTrainersCollapsed(true); } }}
-                        className="px-3 py-2 hover:bg-indigo-50 cursor-pointer text-sm text-gray-800"
-                      >
-                        <div className="font-medium">{t.name || t.trainerName || id}</div>
-                        <div className="text-xs text-gray-500">{t.trainerId || t.id}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-    <div className="bg-white border border-gray-100 rounded-lg shadow-sm p-2 max-h-[520px] overflow-y-auto">
-              {/* trainersPanelRef used to detect outside clicks to collapse the list */}
-              <div ref={trainersPanelRef} className="flex flex-col">
-                <div className="flex items-center justify-between px-2 py-1">
-                <div className="text-xs font-medium text-gray-500">Trainers</div>
-                <button aria-expanded={!trainersCollapsed} onClick={() => setTrainersCollapsed(s => !s)} className="text-xs text-gray-500 hover:text-gray-700 focus:outline-none flex items-center gap-1">
-                  <span className="sr-only">Toggle trainers list</span>
-                  <FiChevronDown className={`${trainersCollapsed ? 'transform rotate-0' : 'transform rotate-180'} w-4 h-4`} />
-                </button>
-                </div>
-                <div ref={trainersListRef} className={`divide-y divide-gray-100 ${trainersCollapsed ? 'hidden' : ''}`}>
-                {filteredTrainers.map((t) => {
-                  const id = t.trainerId || t.id || t.name;
-                  const initials = (t.name || t.trainerName || id || '').split(' ').map(s => s[0]).join('').slice(0,2).toUpperCase();
-                  const count = (assignments.filter(a => (a.trainerId === (t.trainerId || t.id)) || (a.trainerName === t.name))).length;
-                  const isSelected = selectedTrainer === (t.trainerId || t.id);
-      const util = utilizationByTrainer[t.trainerId || t.id];
-                  return (
-                    <button key={id} onClick={() => {
-                        const newId = isSelected ? '' : (t.trainerId || t.id);
-                        setSelectedTrainer(newId);
-                        if (!isSelected) {
-                          setTrainersCollapsed(true);
-                          setSearch('');
-                          setShowSuggestions(false);
-                        }
-                      }} className={`w-full text-left px-3 py-2 flex items-center gap-3 hover:bg-gray-50 focus:outline-none ${isSelected ? 'bg-indigo-50 ring-1 ring-indigo-100' : ''}`}>
-                      <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-semibold text-sm">{initials}</div>
-                      <div className="flex-1">
-        <div className="text-sm font-medium text-gray-900 flex items-center gap-1">{t.name || t.trainerName || id}{util != null && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700">{util}%</span>}</div>
-                        <div className="text-xs text-gray-500">{t.trainerId || t.id}</div>
-                      </div>
-                      <div className="text-xs text-gray-500">{count}</div>
-                    </button>
-                  );
-                })}
-                {filteredTrainers.length === 0 && <div className="p-3 text-sm text-gray-500">No trainers found</div>}
-                </div>
-              </div>
-            </div>
-
             <div className="bg-white border border-gray-100 rounded-lg p-3 text-sm text-gray-600">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between mb-3">
                 <div className="font-medium text-gray-900">Filters</div>
-                <button onClick={() => { setSelectedTrainer(''); setSelectedCollege(''); setSearch(''); }} className="text-xs text-indigo-600">Reset</button>
+                <button onClick={() => { setSelectedTrainer(''); setSelectedCollege(''); setTrainerSearchValue(''); }} className="text-xs text-indigo-600">Reset</button>
               </div>
-              <div className="mt-3">
-                <label className="text-xs text-gray-500">College</label>
-                <select aria-label="Filter by college" value={selectedCollege} onChange={(e) => setSelectedCollege(e.target.value)} className="w-full mt-1 rounded-md border border-gray-200 text-sm py-1">
-                  <option value="">All colleges</option>
-                  {colleges.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-gray-500">Trainer</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={trainerSearchValue}
+                      onChange={(e) => {
+                        setTrainerSearchValue(e.target.value);
+                        setTrainerSearchOpen(true);
+                      }}
+                      onFocus={() => setTrainerSearchOpen(true)}
+                      onBlur={() => setTimeout(() => setTrainerSearchOpen(false), 200)}
+                      placeholder="Search trainers..."
+                      className="w-full mt-1 rounded-md border border-gray-200 text-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    {trainerSearchOpen && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                        <button
+                          onClick={() => {
+                            setSelectedTrainer('');
+                            setTrainerSearchValue('');
+                            setTrainerSearchOpen(false);
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:bg-gray-50"
+                        >
+                          All trainers
+                        </button>
+                        {filteredTrainers.map((t) => {
+                          const id = t.trainerId || t.id;
+                          const name = t.name || t.trainerName || id;
+                          const util = utilizationByTrainer[id];
+                          return (
+                            <button
+                              key={id}
+                              onClick={() => {
+                                setSelectedTrainer(id);
+                                setTrainerSearchValue(name);
+                                setTrainerSearchOpen(false);
+                              }}
+                              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:bg-gray-50"
+                            >
+                              {name} {util != null ? `(${util}%)` : ''}
+                            </button>
+                          );
+                        })}
+                        {filteredTrainers.length === 0 && trainerSearchValue && (
+                          <div className="px-3 py-2 text-sm text-gray-500">
+                            No trainers found
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs text-gray-500">College</label>
+                  <select 
+                    value={selectedCollege} 
+                    onChange={(e) => setSelectedCollege(e.target.value)} 
+                    className="w-full mt-1 rounded-md border border-gray-200 text-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">All colleges</option>
+                    {colleges.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
               </div>
             </div>
           </aside>
 
-          <main className="md:col-span-3 lg:col-span-4 flex flex-col">
+          <main ref={mainRef} data-main-content className="md:col-span-3 lg:col-span-4 flex flex-col">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
               <div className="text-sm text-gray-700 font-medium flex items-center gap-2">
                 {viewMode === 'month' && monthLabel}
@@ -932,8 +902,6 @@ function TrainerCalendar({
                     const iso = formatDateISO(dt);
                     const dayBookings = bookingsByDate[iso] || [];
                     const hasConflict = dayBookings.some(b => b._conflict);
-                    const takenSet = selectedTrainer ? getTakenSlots(selectedTrainer, iso) : new Set();
-                    const freeHalf = selectedTrainer ? ['AM','PM'].filter(s => !takenSet.has(s)) : [];
                     return (
                       <div key={iso} className={`relative h-16 sm:h-20 xl:h-24 border ${hasConflict ? 'border-red-300 ring-1 ring-red-200' : 'border-gray-100'} rounded-lg p-1.5 sm:p-2 flex flex-col justify-between text-[11px] sm:text-sm bg-white hover:shadow-sm transition`}> 
                         <div className="flex items-start justify-between">
@@ -955,11 +923,6 @@ function TrainerCalendar({
                           ))}
                           {dayBookings.length > 3 && <div className="text-[9px] sm:text-[10px] text-gray-400">+{dayBookings.length - 3} more</div>}
                         </div>
-                        {selectedTrainer && freeHalf.length > 0 && (
-                          <div className="absolute bottom-1 right-1 flex gap-1">
-                            <button onClick={()=> openQuickBooking(dt, freeHalf.length === 1 ? freeHalf[0] : 'AM')} className="p-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white shadow focus:outline-none" title={`Add booking (${freeHalf.join('/')})`}><FiPlus className="w-3.5 h-3.5"/></button>
-                          </div>
-                        )}
                       </div>
                     );
                   })}
@@ -977,8 +940,6 @@ function TrainerCalendar({
                     const iso = formatDateISO(d);
                     const dayBookings = bookingsByDate[iso] || [];
                     const hasConflict = dayBookings.some(b=> b._conflict);
-                    const takenSet = selectedTrainer ? getTakenSlots(selectedTrainer, iso) : new Set();
-                    const freeHalf = selectedTrainer ? ['AM','PM'].filter(s=> !takenSet.has(s)) : [];
                     return (
                       <div key={iso} className={`relative border-r last:border-r-0 border-t border-gray-100 p-1.5 ${hasConflict ? 'bg-red-50/60' : 'bg-white'} hover:bg-indigo-50/30 transition`}> 
                         <div className="space-y-1 max-h-32 overflow-y-auto">
@@ -986,9 +947,6 @@ function TrainerCalendar({
                             <button key={i} onClick={()=> setBookingDetail(b)} className={`w-full text-left px-1 py-0.5 rounded border ${b._conflict ? 'border-red-300 bg-red-100/70 text-red-700' : 'border-gray-200 bg-gray-50 text-gray-700'} hover:shadow-sm`}>{b.dayDuration} • {(b.batchCode || b.domain || '')}</button>
                           ))}
                         </div>
-                        {selectedTrainer && freeHalf.length>0 && (
-                          <button onClick={()=> openQuickBooking(d, freeHalf.length===1 ? freeHalf[0] : 'AM')} className="absolute top-1 right-1 p-1 rounded bg-indigo-600 text-white hover:bg-indigo-700" aria-label="Add booking"><FiPlus className="w-3 h-3"/></button>
-                        )}
                       </div>
                     );
                   })}
@@ -1000,19 +958,9 @@ function TrainerCalendar({
               <div className="mt-2">
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-sm font-medium text-gray-800 flex items-center gap-2"><FiLayers /> Day View</div>
-                  <div className="flex gap-2">
-                    {['AM','PM'].map(slot => {
-                      const iso = formatDateISO(focusedDate);
-                      const taken = selectedTrainer ? getTakenSlots(selectedTrainer, iso) : new Set();
-                      const isFree = selectedTrainer && !taken.has(slot);
-                      return (
-                        <button key={slot} disabled={!isFree} onClick={()=> openQuickBooking(focusedDate, slot)} className={`px-2 py-1 rounded text-xs border ${isFree ? 'border-indigo-200 text-indigo-600 hover:bg-indigo-50' : 'border-gray-200 text-gray-400 cursor-not-allowed'}`}>{slot} {isFree ? '+' : ''}</button>
-                      );
-                    })}
-                  </div>
                 </div>
                 <div className="space-y-2">
-                  {dayBookings.length === 0 && <div className="p-4 border border-dashed border-gray-300 rounded text-sm text-gray-500">No bookings. {selectedTrainer && <button onClick={()=> openQuickBooking(focusedDate,'AM')} className="text-indigo-600 underline ml-1">Add one</button>}</div>}
+                  {dayBookings.length === 0 && <div className="p-4 border border-dashed border-gray-300 rounded text-sm text-gray-500">No bookings.</div>}
                   {dayBookings.map((b,i)=>(
                     <div key={i} className={`p-3 rounded-lg border ${b._conflict ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white'} flex items-start justify-between`}>
                       <div>
@@ -1032,54 +980,9 @@ function TrainerCalendar({
                   {bookingsWithConflicts.some(b=> b._conflict) && <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700"><FiAlertTriangle className="w-3 h-3"/>Conflicts</span>}
                 </h4>
                 <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setShowBookingsFull(true)}
-                    title="Full Screen"
-                    className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md border border-gray-200 text-[10px] font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-700"
-                    aria-label="Full Screen"
-                  >
-                    <FiMaximize2 className="w-3.5 h-3.5" />
-                    <span>Full Screen</span>
-                  </button>
-                  <div className="relative" ref={slotMenuRef}>
-                    <button
-                      type="button"
-                      onClick={() => setShowSlotMenu(s => !s)}
-                      aria-haspopup="true"
-                      aria-expanded={showSlotMenu}
-                      className={`inline-flex items-center gap-1 px-2 py-1.5 rounded-md border text-[10px] font-medium transition ${ (slotFilters.AM && slotFilters.PM && slotFilters.FULL) ? 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50' : 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100'} focus:outline-none`}
-                      title="Slot Filters"
-                    >
-                      <FiFilter className="w-3.5 h-3.5" />
-                      <span>Slots</span>
-                      {!(slotFilters.AM && slotFilters.PM && slotFilters.FULL) && <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-pulse" />}
-                    </button>
-                    {showSlotMenu && (
-                      <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-[11px] animate-popIn z-[9999] max-h-64 overflow-y-auto" role="menu" aria-label="Slot filters">
-                        <div className="font-medium text-gray-700 mb-2 flex items-center justify-between">
-                          <span>Slot Filters</span>
-                          <button type="button" onClick={()=> setShowSlotMenu(false)} className="text-gray-400 hover:text-gray-600 focus:outline-none" aria-label="Close slot filters"><FiX className="w-3.5 h-3.5" /></button>
-                        </div>
-                        {['AM','PM','FULL'].map((slot, idx) => (
-                          <label key={slot} className="flex items-center gap-2 px-2 py-1 rounded cursor-pointer hover:bg-indigo-50 select-none transition" onKeyDown={(e)=> { if(e.key==='Enter' || e.key===' ') { e.preventDefault(); setSlotFilters(f => ({...f, [slot]: !f[slot]})); }}}>
-                            <input
-                              ref={idx===0 ? firstSlotCheckRef : null}
-                              type="checkbox"
-                              className="accent-indigo-600 w-3.5 h-3.5 focus:ring-0 focus:outline-none"
-                              checked={!!slotFilters[slot]}
-                              onChange={() => setSlotFilters(f => ({...f, [slot]: !f[slot]}))}
-                            />
-                            <span className="text-gray-700">{slot}</span>
-                          </label>
-                        ))}
-                        <div className="mt-2 flex items-center justify-between pt-2 border-t border-gray-100">
-                          <button type="button" onClick={()=> setSlotFilters({AM:true,PM:true,FULL:true})} className="text-indigo-600 hover:underline">Reset</button>
-                          <button type="button" onClick={()=> setShowSlotMenu(false)} className="text-gray-500 hover:underline">Done</button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <button onClick={expandAll} className="text-indigo-600 hover:underline">Expand All</button>
+                  <span className="text-gray-300">|</span>
+                  <button onClick={collapseAll} className="text-indigo-600 hover:underline">Collapse All</button>
                 </div>
               </div>
               <div className="mt-2 text-[11px] text-gray-500 flex flex-wrap items-center gap-3">
@@ -1098,9 +1001,6 @@ function TrainerCalendar({
                 {filteredGroupedBookings.length === 0 && (
                   <div className="p-6 text-center text-sm text-gray-500">
                     No bookings match the current filters.
-                    { (slotFilters.AM+slotFilters.PM+slotFilters.FULL) !== 3 && (
-                      <div className="mt-2"><button onClick={()=> setSlotFilters({AM:true,PM:true,FULL:true})} className="text-indigo-600 underline">Reset slot filters</button></div>
-                    )}
                   </div>
                 )}
                 <ul className="divide-y divide-gray-100">
@@ -1127,16 +1027,12 @@ function TrainerCalendar({
                       <div id={`group-${g.date}`} className="px-3 py-2 space-y-2">
                         {g.bookings.map(b => {
                           const dd = String(b.dayDuration||'').toUpperCase();
-                          const full = dd.includes('AM') && dd.includes('PM');
-                          const slotType = full ? 'FULL' : (dd.includes('AM') ? 'AM' : 'PM');
-                          const slotColor = full ? 'bg-purple-100 text-purple-700' : (slotType==='AM' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700');
                           // deleteBooking removed (safety)
                           return (
                             <div key={b.id || `${b.trainerId}-${b.dateISO}-${dd}`} className={`group relative p-3 rounded-md border ${b._conflict ? 'border-red-300 bg-red-50/60' : 'border-gray-200 bg-white'} hover:shadow-sm focus-within:ring-2 focus-within:ring-indigo-500 transition`}> 
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
                                   <div className="flex items-center gap-2">
-                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${slotColor}`}>{slotType}</span>
                                     <span className="font-medium text-gray-900 text-sm truncate max-w-[120px]">{b.batchCode || b.domain || '—'}</span>
                                   </div>
                                   <div className="mt-0.5 text-[11px] text-gray-500 truncate">
@@ -1168,7 +1064,6 @@ function TrainerCalendar({
         </div>
       </div>
   {bookingDetail && <BookingDetail booking={bookingDetail} onClose={() => setBookingDetail(null)} />}
-  <QuickBookingModal />
   {showBookingsFull && (
     <div role="dialog" aria-modal="true" aria-label="All bookings" className="fixed inset-0 z-[80] flex flex-col bg-white/90 backdrop-blur-md animate-fadeIn">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white/80 backdrop-blur-sm">
@@ -1178,44 +1073,6 @@ function TrainerCalendar({
           {bookingsWithConflicts.some(b=> b._conflict) && <span className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-red-100 text-red-700"><FiAlertTriangle className="w-3 h-3"/>Conflicts</span>}
         </div>
         <div className="flex items-center gap-2">
-          <div className="hidden sm:flex items-center gap-2 mr-2 relative" ref={slotMenuFullRef}>
-            <button
-              type="button"
-              onClick={()=> setShowSlotMenuFull(s=> !s)}
-              aria-haspopup="true"
-              aria-expanded={showSlotMenuFull}
-              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[11px] font-medium transition ${(slotFilters.AM && slotFilters.PM && slotFilters.FULL) ? 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50' : 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100'} focus:outline-none`}
-              title="Slot Filters"
-            >
-              <FiFilter className="w-4 h-4" />
-              <span>Slots</span>
-              {!(slotFilters.AM && slotFilters.PM && slotFilters.FULL) && <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-pulse" />}
-            </button>
-            {showSlotMenuFull && (
-              <div className="absolute top-full mt-2 right-0 w-56 bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-[11px] animate-popIn z-[9999] max-h-72 overflow-y-auto" role="menu" aria-label="Slot filters">
-                <div className="font-medium text-gray-700 mb-2 flex items-center justify-between">
-                  <span>Slot Filters</span>
-                  <button type="button" onClick={()=> setShowSlotMenuFull(false)} className="text-gray-400 hover:text-gray-600 focus:outline-none" aria-label="Close slot filters"><FiX className="w-3.5 h-3.5"/></button>
-                </div>
-                {['AM','PM','FULL'].map((slot, idx) => (
-                  <label key={slot} className="flex items-center gap-2 px-2 py-1 rounded cursor-pointer hover:bg-indigo-50 select-none transition" onKeyDown={(e)=> { if(e.key==='Enter' || e.key===' ') { e.preventDefault(); setSlotFilters(f => ({...f, [slot]: !f[slot]})); }}}>
-                    <input
-                      ref={idx===0 ? firstSlotCheckFullRef : null}
-                      type="checkbox"
-                      className="accent-indigo-600 w-3.5 h-3.5 focus:ring-0 focus:outline-none"
-                      checked={!!slotFilters[slot]}
-                      onChange={() => setSlotFilters(f => ({...f, [slot]: !f[slot]}))}
-                    />
-                    <span className="text-gray-700">{slot}</span>
-                  </label>
-                ))}
-                <div className="mt-2 flex items-center justify-between pt-2 border-t border-gray-100">
-                  <button type="button" onClick={()=> setSlotFilters({AM:true,PM:true,FULL:true})} className="text-indigo-600 hover:underline">Reset</button>
-                  <button type="button" onClick={()=> setShowSlotMenuFull(false)} className="text-gray-500 hover:underline">Done</button>
-                </div>
-              </div>
-            )}
-          </div>
           <button onClick={expandAll} className="text-xs text-indigo-600 hover:underline">Expand All</button>
           <button onClick={collapseAll} className="text-xs text-indigo-600 hover:underline">Collapse All</button>
           <button
@@ -1255,16 +1112,12 @@ function TrainerCalendar({
                 <div id={`full-group-${g.date}`} className="px-4 py-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 animate-fadeIn">
                   {g.bookings.map(b => {
                     const dd = String(b.dayDuration||'').toUpperCase();
-                    const full = dd.includes('AM') && dd.includes('PM');
-                    const slotType = full ? 'FULL' : (dd.includes('AM') ? 'AM' : 'PM');
-                    const slotColor = full ? 'bg-purple-100 text-purple-700' : (slotType==='AM' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700');
                     // deleteBooking removed (safety)
                     return (
                       <div key={b.id || `${b.trainerId}-${b.dateISO}-${dd}`} className={`group relative p-4 rounded-md border ${b._conflict ? 'border-red-300 bg-red-50/60' : 'border-gray-200 bg-white'} hover:shadow-sm transition`}> 
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 mb-0.5">
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${slotColor}`}>{slotType}</span>
                               <span className="font-medium text-gray-900 text-sm truncate max-w-[140px]">{b.batchCode || b.domain || '—'}</span>
                             </div>
                             <div className="text-[11px] text-gray-500 truncate">

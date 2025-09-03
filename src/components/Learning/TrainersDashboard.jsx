@@ -10,6 +10,13 @@ import TrainerLeadDetails from "./TrainerLeadDetails.jsx";
 import { FiPlusCircle, FiEdit, FiTrash2, FiChevronLeft } from "react-icons/fi";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
+const DOMAIN_COLORS = {
+  Technical: "bg-blue-100 border border-blue-300 text-blue-800",
+  "Soft skills": "bg-green-100 border border-green-300 text-green-800",
+  Aptitude: "bg-purple-100 border border-purple-300 text-purple-800",
+  Tools: "bg-yellow-100 border border-yellow-300 text-yellow-800",
+};
+
 function TrainersDashboard() {
   const [trainers, setTrainers] = useState([]);
   // Load ALL trainers once (dataset < 500) then operate purely client-side
@@ -88,7 +95,14 @@ function TrainersDashboard() {
     return sortOrder === "asc" ? numA - numB : numB - numA;
   });
 
-  const handleBack = () => navigate(-1);
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      // Fallback to parent route if no history
+      navigate('/dashboard/learning-development');
+    }
+  };
 
   const handleTrainerAdded = (newTrainerOrArray) => {
     if (Array.isArray(newTrainerOrArray)) {
@@ -157,13 +171,13 @@ function TrainersDashboard() {
     );
   };
 
-  // Only three domains: "Soft Skills", "Aptitude", "Technical"
-  const domainBadgeClass = (domain) => {
-    const d = (domain || "").toLowerCase();
-    if (d.includes("aptitude")) return "bg-emerald-100 text-emerald-800";
-    if (d.includes("soft")) return "bg-sky-100 text-sky-800";
-    if (d.includes("tech") || d.includes("technical")) return "bg-amber-100 text-amber-800";
-    return "bg-gray-100 text-gray-800";
+  const getDomainColor = (domain) => {
+    const normalized = (domain || "").toLowerCase();
+    if (normalized.includes("technical")) return DOMAIN_COLORS.Technical;
+    if (normalized.includes("soft")) return DOMAIN_COLORS["Soft skills"];
+    if (normalized.includes("aptitude")) return DOMAIN_COLORS.Aptitude;
+    if (normalized.includes("tools")) return DOMAIN_COLORS.Tools;
+    return "bg-gray-100 border border-gray-300 text-gray-800"; // default with border
   };
 
   const renderDomains = (trainer) => {
@@ -179,9 +193,7 @@ function TrainersDashboard() {
           .map((d, i) => (
             <span
               key={i}
-              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${domainBadgeClass(
-                d
-              )}`}
+              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${getDomainColor(d)}`}
             >
               {d}
             </span>

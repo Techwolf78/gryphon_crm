@@ -38,6 +38,44 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
     if (lead) {
       const deliveryTypes = ["TP", "OT", "IP", "DM", "SNS"];
       setIsCustomDeliveryType(lead.deliveryType && !deliveryTypes.includes(lead.deliveryType));
+
+      // Normalize courses: if the stored specialization is not one of the predefined
+      // options for the course, treat it as "Other" and populate othersSpecText with the stored value
+      const normalizedCourses = (lead.courses || [
+        { specialization: "", students: 0, othersSpecText: "" },
+      ]).map((c) => {
+        const origSpec = (c.specialization || "").toString();
+        const specsForCourse = courseSpecializations[lead.course] || [];
+
+        // If course has predefined specs and origSpec is not one of them -> show as Other + preserve text
+        if (specsForCourse.length > 0 && origSpec && !specsForCourse.includes(origSpec)) {
+          return {
+            ...c,
+            specialization: "Other",
+            othersSpecText: origSpec,
+            students: c.students || 0,
+          };
+        }
+
+        // If stored as "Other" and there is an othersSpecText, preserve it
+        if (origSpec === "Other" && c.othersSpecText) {
+          return {
+            ...c,
+            specialization: "Other",
+            othersSpecText: c.othersSpecText,
+            students: c.students || 0,
+          };
+        }
+
+        // Normal case: keep stored specialization, clear othersSpecText
+        return {
+          ...c,
+          specialization: origSpec,
+          othersSpecText: c.othersSpecText || "",
+          students: c.students || 0,
+        };
+      });
+
       setFormData({
         businessName: lead.collegeName || "",
         projectCode: lead.projectCode || "",
@@ -52,13 +90,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
         gstNumber: lead.gstNumber || "",
         gstType: lead.gstType || "include",
         course: lead.course || "",
-        courses: lead.courses || [
-          {
-            specialization: "",
-            students: 0,
-            othersSpecText: "", // Add this field for custom specializations
-          },
-        ],
+        courses: normalizedCourses,
         year: lead.year || "",
         deliveryType: lead.deliveryType || "",
         passingYear: lead.passingYear || "",
@@ -283,10 +315,27 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
     setError(null);
 
     try {
-      // Update the main lead document
+      // Prepare courses for saving:
+      // If a course has specialization === "Other" and othersSpecText is provided,
+      // store the custom text in the specialization field (and drop othersSpecText).
+      const coursesForSave = (formData.courses || []).map((c) => {
+        const spec =
+          c.specialization === "Other" && c.othersSpecText
+            ? c.othersSpecText
+            : c.specialization;
+        const { othersSpecText, ...rest } = c;
+        return {
+          ...rest,
+          specialization: spec,
+          students: parseInt(rest.students) || 0,
+        };
+      });
+
+      // Update the main lead document (use transformed courses)
       const leadRef = doc(db, "trainingForms", lead.id);
       await updateDoc(leadRef, {
         ...formData,
+        courses: coursesForSave,
         updatedAt: new Date(),
       });
 
@@ -315,7 +364,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
             gstNumber: formData.gstNumber,
             gstType: formData.gstType,
             course: formData.course,
-            courses: formData.courses,
+            courses: coursesForSave, // Save transformed courses here too
             year: formData.year,
             deliveryType: formData.deliveryType,
             passingYear: formData.passingYear,
@@ -345,7 +394,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
           const placementRef = doc(db, "placementData", projectDocId);
           const placementSnap = await getDoc(placementRef);
           const placementData = {
-            projectCode: formData.projectCode, // <-- Add this line
+            projectCode: formData.projectCode,
             collegeName: formData.collegeName,
             collegeCode: formData.collegeCode,
             city: formData.city,
@@ -361,7 +410,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
             gstNumber: formData.gstNumber,
             gstType: formData.gstType,
             course: formData.course,
-            courses: formData.courses,
+            courses: coursesForSave, // Save transformed courses here too
             year: formData.year,
             deliveryType: formData.deliveryType,
             passingYear: formData.passingYear,
@@ -1887,7 +1936,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                       <path
                         className="opacity-75"
                         fill="currentColor"
-                        d="M4.93 4.93a10 10 0 0114.14 14.14M2.05 12a9.95 9.95 0 001.88 5.66M12 22c-5.52 0-10-4.48-10-10S6.48 2 12 2s10 4.48 10 10-4.48 10-10 10z"
+                        d="M4.93 4.93a10 10 0 0114.14 14.14M2.05 12a9.95 9.95 0 001.88 5.66M12 22c-5.52 0-10-4.48-10-10S6.48 2 12 2s10 4.48 10 10 10z"
                       />
                     </svg>
                   )}
