@@ -55,6 +55,11 @@ const TIME_OPTIONS = generateTimeOptions(15);
 
 const PHASE_OPTIONS = ["phase-1", "phase-2", "phase-3"];
 const DOMAIN_OPTIONS = ["Technical", "Soft skills", "Aptitude", "Tools"];
+// Keep top-level "Tools" option in the UI but expand to two sub-domains:
+const TOOL_SUBDOMAINS = [
+  { key: "Tools (Excel - Power BI)", topic: "Excel - Power BI" },
+  { key: "Tools (Looker Studio)", topic: "Looker Studio" },
+];
 
 // Add a color for each domain for visual clarity
 const DOMAIN_COLORS = {
@@ -62,6 +67,8 @@ const DOMAIN_COLORS = {
   "Soft skills": "border-green-400 bg-green-50",
   Aptitude: "border-purple-400 bg-purple-50",
   Tools: "border-yellow-400 bg-yellow-50",
+  "Tools (Excel - Power BI)": "border-orange-400 bg-orange-50",
+  "Tools (Looker Studio)": "border-red-400 bg-red-50",
 };
 
 function InitiationModal({ training, onClose, onConfirm }) {
@@ -137,18 +144,40 @@ function InitiationModal({ training, onClose, onConfirm }) {
         return Number(customPhaseHours[phase]);
       }
       if (!domain) return 0;
+      // Support for Tools subdomains:
+      // - If domain is legacy "Tools" -> sum both topics (backwards compatible)
+      // - If domain is "Tools (Excel - Power BI)" or "Tools (Looker Studio)"
+      //   -> return hours for the specific topic only.
+      const toolsMatch = TOOL_SUBDOMAINS.find((s) => s.key === domain);
+      if (toolsMatch) {
+        const t = topics?.find(
+          (x) => x?.topic?.trim()?.toLowerCase() === toolsMatch.topic.toLowerCase()
+        );
+        return Number(t?.hours || 0);
+      }
+      if (domain === "Tools") {
+        const toolsTopics = ["Excel - Power BI", "Looker Studio"];
+        let total = 0;
+        toolsTopics.forEach((tn) => {
+          const t = topics?.find(
+            (x) => x?.topic?.trim()?.toLowerCase() === tn.toLowerCase()
+          );
+          if (t && t.hours) total += Number(t.hours || 0);
+        });
+        return total;
+      }
+
       const topicMap = {
         Technical: "Domain Technical",
         NonTechnical: "Soft Skills",
         "Soft skills": "Soft Skills",
         Aptitude: "Aptitude",
-        Tools: "Tools",
       };
       const topicName = topicMap[domain] || domain;
       const topicObj = topics?.find(
         (t) => t?.topic?.trim()?.toLowerCase() === topicName?.toLowerCase()
       );
-      return topicObj?.hours || 0;
+      return Number(topicObj?.hours || 0);
     },
     [customPhaseHours, topics]
   );
@@ -182,6 +211,9 @@ function InitiationModal({ training, onClose, onConfirm }) {
     setTable1DataByDomain((prev) => {
       const updated = { ...prev };
       selectedDomains.forEach((domain) => {
+        // Skip "Tools" as it doesn't have its own batch assignment section
+        if (domain === "Tools") return;
+
         if (!updated[domain] || updated[domain].length === 0) {
           const domainHours = getDomainHours(domain, getMainPhase());
           updated[domain] = courses.map((course) => ({
@@ -200,6 +232,30 @@ function InitiationModal({ training, onClose, onConfirm }) {
           }));
         }
       });
+
+      // Special handling for Tools: ensure sub-domains have data when Tools is selected
+      if (selectedDomains.includes("Tools")) {
+        TOOL_SUBDOMAINS.forEach((s) => {
+          if (!updated[s.key] || updated[s.key].length === 0) {
+            const domainHours = getDomainHours(s.key, getMainPhase());
+            updated[s.key] = courses.map((course) => ({
+              batch: course.specialization,
+              stdCount: course.students,
+              hrs: domainHours,
+              assignedHours: 0,
+              batches: [
+                {
+                  batchPerStdCount: "",
+                  batchCode: `${course.specialization}1`,
+                  assignedHours: 0,
+                  trainers: [],
+                },
+              ],
+            }));
+          }
+        });
+      }
+
       return updated;
     });
   }, [selectedDomains, courses, topics, getDomainHours, getMainPhase]);
@@ -946,7 +1002,22 @@ function InitiationModal({ training, onClose, onConfirm }) {
         loadedDomains.push(docSnap.id);
       });
 
+      // Backwards compatibility: if Firestore has a single "Tools" doc,
+      // expand it into two UI domains: Tools (Excel - Power BI) and Tools (Looker Studio)
+      if (loadedDomains.includes("Tools")) {
+        // remove legacy "Tools" entry and add the two subdomains
+        const idx = loadedDomains.indexOf("Tools");
+        if (idx !== -1) loadedDomains.splice(idx, 1);
+        TOOL_SUBDOMAINS.forEach((s) => {
+          if (!loadedDomains.includes(s.key)) loadedDomains.push(s.key);
+        });
+      }
+
       for (const domain of loadedDomains) {
+        // If this domain is one of the Tools subdomains, attempt to read the
+        // corresponding document (doc id must match the key). If it does not
+        // exist (e.g. legacy single "Tools" doc existed), we'll fallback to
+        // auto-generating rows from courses below.
         const currentDoc = await getDoc(
           doc(
             db,
@@ -1801,7 +1872,10 @@ function InitiationModal({ training, onClose, onConfirm }) {
                       {/* Checkbox list for all domains in a single row */}
                       <div className="flex flex-row gap-3">
                         {DOMAIN_OPTIONS.map((domain) => {
-                          const isSelected = selectedDomains.includes(domain);
+                          // Special logic for Tools: consider it selected if any of its sub-domains are selected
+                          const isSelected = domain === "Tools"
+                            ? selectedDomains.includes("Tools") || TOOL_SUBDOMAINS.some(s => selectedDomains.includes(s.key))
+                            : selectedDomains.includes(domain);
                           const isZero = zeroHourDomains.includes(domain);
                           // highlight classes for zero-hour domains
                           const zeroClasses = isZero
@@ -1829,21 +1903,60 @@ function InitiationModal({ training, onClose, onConfirm }) {
                                 className="mr-2 accent-blue-600"
                                 checked={isSelected}
                                 onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedDomains([
-                                      ...selectedDomains,
-                                      domain,
-                                    ]);
-                                    setTable1DataByDomain((prev) => ({
-                                      ...prev,
-                                      [domain]: prev[domain] || [],
-                                    }));
+                                  const checked = e.target.checked;
+                                  // Special handling for Tools: expand into two separate entries
+                                  if (domain === "Tools") {
+                                    if (checked) {
+                                      // add Tools and both tool subdomains
+                                      const toAdd = ["Tools", ...TOOL_SUBDOMAINS.map((s) => s.key)];
+                                      setSelectedDomains((prev) => {
+                                        const merged = Array.from(new Set([...prev, ...toAdd]));
+                                        return merged;
+                                      });
+                                      setTable1DataByDomain((prev) => {
+                                        const updated = { ...prev };
+                                        TOOL_SUBDOMAINS.forEach((s) => {
+                                          if (!updated[s.key] || updated[s.key].length === 0) {
+                                            const domainHours = getDomainHours(s.key, getMainPhase());
+                                            updated[s.key] = (courses || []).map((course) => ({
+                                              batch: course.specialization,
+                                              stdCount: course.students,
+                                              hrs: domainHours,
+                                              assignedHours: 0,
+                                              batches: [
+                                                {
+                                                  batchPerStdCount: "",
+                                                  batchCode: `${course.specialization}1`,
+                                                  assignedHours: 0,
+                                                  trainers: [],
+                                                },
+                                              ],
+                                            }));
+                                          }
+                                        });
+                                        return updated;
+                                      });
+                                    } else {
+                                      // remove Tools and both tool subdomains
+                                      const toRemove = ["Tools", ...TOOL_SUBDOMAINS.map((s) => s.key)];
+                                      setSelectedDomains((prev) => prev.filter((d) => !toRemove.includes(d)));
+                                      setTable1DataByDomain((prev) => {
+                                        const updated = { ...prev };
+                                        TOOL_SUBDOMAINS.forEach((s) => delete updated[s.key]);
+                                        return updated;
+                                      });
+                                    }
                                   } else {
-                                    setSelectedDomains(
-                                      selectedDomains.filter(
-                                        (d) => d !== domain
-                                      )
-                                    );
+                                    // Normal domain toggle
+                                    if (checked) {
+                                      setSelectedDomains([...selectedDomains, domain]);
+                                      setTable1DataByDomain((prev) => ({
+                                        ...prev,
+                                        [domain]: prev[domain] || [],
+                                      }));
+                                    } else {
+                                      setSelectedDomains(selectedDomains.filter((d) => d !== domain));
+                                    }
                                   }
                                   // clear any previous zero-hour marks for this domain on user action
                                   setZeroHourDomains((prev) =>
@@ -1861,7 +1974,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                     </div>
 
                     {/* Batch Details Table per Domain */}
-                    {selectedDomains.map((domain) => {
+                    {selectedDomains.filter(domain => domain !== "Tools").map((domain) => {
                       const tableData = table1DataByDomain[domain] || [];
                       // Ensure we compare numeric values. Use domain-level hours as the primary source
                       // for deciding whether hours are configured. This avoids showing the "No hours" warning

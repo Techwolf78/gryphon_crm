@@ -10,7 +10,9 @@ import {
   FiChevronDown,
   FiChevronUp,
   FiLoader,
+  FiMail, // Added for the button icon
 } from "react-icons/fi";
+import SendSchedule from "../SendSchedule";
 
 const PHASE_LABELS = {
   "phase-1": "Phase 1",
@@ -83,6 +85,7 @@ function InitiationTrainingDetails({ training, onBack }) {
   const [domainsData, setDomainsData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showSendSchedule, setShowSendSchedule] = useState(false);
 
   // Fetch hierarchical data from Firestore
   useEffect(() => {
@@ -158,14 +161,14 @@ function InitiationTrainingDetails({ training, onBack }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 to-gray-200 p-6">
+      <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 to-gray-200 ">
         <button
-          className="mb-6 flex items-center text-blue-600 hover:underline"
+          className="mb-2 flex items-center text-blue-600 hover:underline"
           onClick={onBack}
         >
           <FiArrowLeft className="mr-2" /> Back to Dashboard
         </button>
-        <div className="w-full mx-auto bg-white rounded-xl shadow border border-gray-200 p-8">
+        <div className="w-full mx-auto bg-white rounded-xl shadow border border-gray-200 ">
           <div className="flex items-center justify-center py-12">
             <FiLoader className="animate-spin text-2xl text-gray-400 mr-3" />
             <span className="text-gray-600">Loading training details...</span>
@@ -177,14 +180,14 @@ function InitiationTrainingDetails({ training, onBack }) {
 
   if (error) {
     return (
-      <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 to-gray-200 p-6">
+      <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 to-gray-200 ">
         <button
-          className="mb-6 flex items-center text-blue-600 hover:underline"
+          className="mb-62 flex items-center text-blue-600 hover:underline"
           onClick={onBack}
         >
           <FiArrowLeft className="mr-2" /> Back to Dashboard
         </button>
-        <div className="w-full mx-auto bg-white rounded-xl shadow border border-gray-200 p-8">
+        <div className="w-full mx-auto bg-white rounded-xl shadow border border-gray-200 ">
           <div className="text-center py-12">
             <div className="text-red-600 mb-4">Error loading training details</div>
             <div className="text-gray-500">{error}</div>
@@ -196,13 +199,24 @@ function InitiationTrainingDetails({ training, onBack }) {
 
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 to-gray-200 ">
+    <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 to-gray-200 "> {/* Added padding for better spacing */}
       <button
-        className="mb-2 flex items-center text-blue-600 hover:underline"
+        className="mb-6 flex items-center text-blue-600 hover:underline" // Adjusted margin for proper gap
         onClick={onBack}
       >
         <FiArrowLeft className="mr-2" /> Back to Dashboard
       </button>
+      
+      <div className="flex justify-between items-center mb-4 px-4"> {/* Added padding and increased margin for better gap */}
+        <h1 className="text-3xl font-bold text-gray-800">Training Details</h1>
+        <button
+          onClick={() => setShowSendSchedule(true)}
+          className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 hover:shadow-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2" // Enhanced styling with icon, gap, shadow, and focus states
+        >
+          <FiMail className="w-5 h-5" />
+          Send Schedule
+        </button>
+      </div>
       
       <div className="w-full mx-auto bg-white rounded-xl shadow border border-gray-200 p-4">
         {/* Training Form Header */}
@@ -452,6 +466,16 @@ function InitiationTrainingDetails({ training, onBack }) {
           </div>
         )}
       </div>
+
+      {showSendSchedule && (
+        <SendSchedule
+          training={training}
+          trainingData={trainingData}
+          phaseData={phaseData}
+          domainsData={domainsData}
+          onClose={() => setShowSendSchedule(false)}
+        />
+      )}
     </div>
   );
 }
