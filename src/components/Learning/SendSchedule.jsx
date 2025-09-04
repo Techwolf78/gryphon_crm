@@ -107,7 +107,7 @@ function SendSchedule({
   const handleConfirmSchedule = () => {
     setCurrentStep(3);
     setEmailData({
-      to: selectedTrainer?.email || "", // ✅ prefill recipient email
+      to: selectedTrainer?.email || "",
       subject: `Training Schedule for ${selectedTrainer.name} - ${trainingData?.collegeName}`,
       message: `Dear ${selectedTrainer.name},\n\nPlease find your training schedule details below:\n\nCollege: ${trainingData?.collegeName}\nCourse: ${trainingData?.course} - ${trainingData?.year}\nPhase: ${training?.selectedPhase}\n\nYour schedule has been confirmed. Please review the details attached.\n\nBest regards,\nTraining Team`,
     });
@@ -118,106 +118,115 @@ function SendSchedule({
     setEmailData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // ✅ FIXED EMAIL SENDING
-  const handleSendEmail = async () => {
-    if (!emailData.to.trim()) {
-      setError("Please enter recipient email");
-      return;
+const handleSendEmail = async () => {
+  if (!emailData.to.trim()) {
+    setError("Please enter recipient email");
+    return;
+  }
+
+  setLoading(true);
+  setError("");
+
+  try {
+    // Fetch trainer's rate from the trainers collection
+    let feePerHour = 0;
+
+    if (selectedTrainer) {
+      try {
+        const trainerQuery = query(
+          collection(db, "trainers"),
+          where("trainerId", "==", selectedTrainer.trainerId || selectedTrainer.id)
+        );
+        const trainerSnap = await getDocs(trainerQuery);
+
+        if (!trainerSnap.empty) {
+          const trainerData = trainerSnap.docs[0].data();
+          feePerHour = trainerData.charges || 0;
+        }
+      } catch (err) {
+        console.error("Error fetching trainer rate:", err);
+      }
     }
 
-    setLoading(true);
-    setError("");
+    // Calculate total hours by summing all assignment hours
+    const totalHours = trainerAssignments.reduce(
+      (acc, assignment) => acc + (parseFloat(assignment.hours) || 0),
+      0
+    );
 
-    try {
-// Replace the scheduleRows generation in your handleSendEmail function
-const scheduleRows = trainerAssignments
-  .map(
-    (a) => `
-      <tr>
-        <td>${a.domain || "-"}</td>
-        <td>${trainingData?.year || "-"}</td>
-        <td>${selectedTrainer?.name || "-"}</td>
-        <td>${formatDate(a.date)}</td>
-        <td>${a.batchCode || "-"}</td>
-        <td>${getTimingForSlot(a.dayDuration)}</td>
-        <td>${a.dayDuration || "-"}</td>
-        <td>${a.costPerHour || "-"}</td>
-        <td>${a.costPerDay || "-"}</td>
-      </tr>`
-  )
-  .join("");
+    // Calculate financial details
+    const totalCost = totalHours * feePerHour;
+    const tdsAmount = totalCost * 0.1; // 10% TDS
+    const payableCost = totalCost - tdsAmount;
+console.log("Fee per Hour:", feePerHour);
+console.log("Total Cost:", totalCost);
+console.log("TDS (10%):", tdsAmount);
+console.log("Payable Amount:", payableCost);
+    // Generate schedule rows with correct per-session cost
+    const scheduleRows = trainerAssignments
+      .map(
+        (assignment) => `
+    <tr>
+      <td>${assignment.domain || "-"}</td>
+      <td>${trainingData?.year || "-"}</td>
+      <td>${selectedTrainer?.name || "-"}</td>
+      <td>${formatDate(assignment.date)}</td>
+      <td>${assignment.batchCode || "-"}</td>
+      <td>${getTimingForSlot(assignment.dayDuration)}</td>
+      <td>${assignment.hours || "0"}</td>
+      <td>₹ ${feePerHour}</td>
+      <td>₹ ${feePerHour * (parseFloat(assignment.hours) || 0)}</td>
+    </tr>`
+      )
+      .join("");
 
-      const templateParams = {
-        // 👇 IMPORTANT: emailjs needs this
-        to_email: emailData.to, 
-        trainer_mobile: selectedTrainer?.mobile || "",
-        trainer_email: selectedTrainer?.email || "",
-        trainer_name: selectedTrainer?.name || "",
-        company_address: trainingData?.companyAddress || "Pune, India",
-        training_email: trainingData?.trainingEmail || "training@gryphon.com",
-        email_date: new Date().toLocaleDateString(),
-        cc_emails: "",
-        email_subject: emailData.subject,
-        salutation: "Mr./Ms.",
-        trainer_last_name:
-          selectedTrainer?.lastName ||
-          selectedTrainer?.name?.split(" ").slice(-1)[0],
-        training_topic: trainingData?.topic || "",
-        placement_year: trainingData?.placementYear || "",
-        college_name: trainingData?.collegeName || "",
-        venue_address: trainingData?.venue || "",
-        contact_person: trainingData?.contactPerson || "",
-        contact_number: trainingData?.contactNumber || "",
-        schedule_rows: scheduleRows,
-        total_days: trainerAssignments.length,
-        total_hours: trainerAssignments.reduce(
-          (acc, a) => acc + (Number(a.dayDuration) || 0),
-          0
-        ),
-        start_date: trainerAssignments[0]
-          ? formatDate(trainerAssignments[0].date)
-          : "",
-        fee_per_hour: trainingData?.feePerHour || "",
-        total_cost: trainingData?.totalCost || "",
-        payable_cost: trainingData?.payableCost || "",
-        project_code: trainingData?.projectCode || "",
-        google_form_link: trainingData?.googleFormLink || "",
-        topics_covered: trainingData?.topics || "",
-        payment_cycle: trainingData?.paymentCycle || "",
-        company_mobile: trainingData?.companyMobile || "",
-        company_email: trainingData?.companyEmail || "",
-      };
-console.log("Sending email with params:", templateParams);
+    const templateParams = {
+      to_email: emailData.to,
+      // ... other template parameters
+      schedule_rows: scheduleRows,
+      total_days: trainerAssignments.length,
+      total_hours: totalHours,
+      start_date: trainerAssignments[0]
+        ? formatDate(trainerAssignments[0].date)
+        : "",
+      fee_per_hour: feePerHour,
+      total_cost: totalCost,
+      tds_amount: tdsAmount,
+      payable_cost: payableCost,
+      // ... other template parameters
+    };
 
-      await emailjs.send(
-        "service_pskknsn",
-        "template_p2as3pp",
-        templateParams,
-        "zEVWxxT-QvGIrhvTV"
-      );
+    console.log("Sending email with params:", templateParams);
 
-      setSuccess(true);
-      setTimeout(() => {
-        setSuccess(false);
-        onClose();
-      }, 3000);
-    } catch (err) {
-      console.error("Error sending email:", err);
-      setError("Failed to send email. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    await emailjs.send(
+      "service_pskknsn",
+      "template_p2as3pp",
+      templateParams,
+      "zEVWxxT-QvGIrhvTV"
+    );
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return "";
-    return new Date(dateStr).toLocaleDateString("en-US", {
-      weekday: "short",
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
+    setSuccess(true);
+    setTimeout(() => {
+      setSuccess(false);
+      onClose();
+    }, 3000);
+  } catch (err) {
+    console.error("Error sending email:", err);
+    setError("Failed to send email. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return "";
+  return new Date(dateStr).toLocaleDateString("en-US", {
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+};
 
   const getTimingForSlot = (slot) => {
     if (!slot) return "-";
@@ -239,8 +248,7 @@ console.log("Sending email with params:", templateParams);
   };
 
   return (
-    
-    <div className="fixed inset-0 bg-transparent bg-opacity-90 backdrop-blur-xl flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-transparent bg-opacity-90 backdrop-blur-xl flex items-center justify-center z-500 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
