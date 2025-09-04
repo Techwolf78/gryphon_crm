@@ -24,6 +24,7 @@ import {
   FiUser,
   FiClock,
   FiEye,
+  FiAlertTriangle,
 } from "react-icons/fi";
 import { FaRupeeSign } from "react-icons/fa";
 
@@ -125,16 +126,17 @@ const TrainerRow = React.memo(
             const s2 = Array.isArray(trDoc.otherSpecialization)
               ? trDoc.otherSpecialization
               : [];
-            const defaults = Array.from(
-              new Set([...s1, ...s2].filter(Boolean))
-            );
-            if (defaults.length > 0) {
+            const base = [...s1, ...s2];
+            const allTopics = Array.from(
+              new Set([...base, ...addedTopics])
+            ).filter(Boolean);
+            if (allTopics.length > 0) {
               handleTrainerField(
                 rowIndex,
                 batchIndex,
                 trainerIdx,
                 "topics",
-                defaults
+                allTopics
               );
             }
           }
@@ -150,6 +152,7 @@ const TrainerRow = React.memo(
       trainerIdx,
       handleTrainerField,
       trainer.topics,
+      addedTopics,
     ]);
 
     // ✅ ADD: Toggle function for daily schedule
@@ -222,9 +225,9 @@ const TrainerRow = React.memo(
       );
     };
 
-  return (
-    <>
-      <tr
+    return (
+      <>
+        <tr
           id={`trainer-${trainerKey}`}
           className={`border-b last:border-0 ${
             isDuplicate ? "bg-red-50 border-red-200" : ""
@@ -357,16 +360,19 @@ const TrainerRow = React.memo(
                 while (cur <= end) {
                   const dayOfWeek = cur.getDay(); // 0 = Sunday, 6 = Saturday
                   let shouldInclude = true;
-                  
+
                   if (excludeDays === "Saturday" && dayOfWeek === 6) {
                     shouldInclude = false;
                   } else if (excludeDays === "Sunday" && dayOfWeek === 0) {
                     shouldInclude = false;
-                  } else if (excludeDays === "Both" && (dayOfWeek === 0 || dayOfWeek === 6)) {
+                  } else if (
+                    excludeDays === "Both" &&
+                    (dayOfWeek === 0 || dayOfWeek === 6)
+                  ) {
                     shouldInclude = false;
                   }
                   // If excludeDays === "None", include all days
-                  
+
                   if (shouldInclude) days++;
                   cur.setDate(cur.getDate() + 1);
                 }
@@ -619,10 +625,10 @@ const TrainerRow = React.memo(
               )}
             </div>
           </td>
-      </tr>
-      {/* Extra info row for each trainer: conveyance, food, lodging, topics (modern SaaS style) */}
-      <tr className="bg-transparent text-[11px]">
-  <td colSpan={6} className="px-2 py-2">
+        </tr>
+        {/* Extra info row for each trainer: conveyance, food, lodging, topics (modern SaaS style) */}
+        <tr className="bg-transparent text-[11px]">
+          <td colSpan={6} className="px-2 py-2">
             <div className="grid grid-cols-1 sm:grid-cols-4 lg:grid-cols-12 gap-1.5 items-start">
               {/* Small card inputs */}
               {/** Conveyance */}
@@ -656,7 +662,6 @@ const TrainerRow = React.memo(
                   />
                 </div>
               </div>
-
               {/** Food */}
               <div className="flex flex-col bg-white/70 border border-gray-100 rounded-md p-0.5 sm:col-span-1 lg:col-span-2">
                 <label className="text-[10px] font-semibold text-slate-600 mb-0.5">
@@ -688,7 +693,6 @@ const TrainerRow = React.memo(
                   />
                 </div>
               </div>
-
               {/** Lodging */}
               <div className="flex flex-col bg-white/70 border border-gray-100 rounded-md p-0.5 sm:col-span-1 lg:col-span-2">
                 <label className="text-[10px] font-semibold text-slate-600 mb-0.5">
@@ -720,144 +724,194 @@ const TrainerRow = React.memo(
                   />
                 </div>
               </div>
-
               {/* Cost + Topics inline wrapper spans remaining 8 cols */}
               <div className="sm:col-span-2 lg:col-span-6 flex flex-col md:flex-row gap-2 items-stretch">
                 {(() => {
-                  const trainerCost = ((Number(trainer.assignedHours) || 0) * (Number(trainer.perHourCost) || 0)) || 0;
-                  const miscCost = ((Number(trainer.conveyance) || 0) + (Number(trainer.food) || 0) + (Number(trainer.lodging) || 0)) || 0;
+                  const trainerCost =
+                    (Number(trainer.assignedHours) || 0) *
+                      (Number(trainer.perHourCost) || 0) || 0;
+                  const miscCost =
+                    (Number(trainer.conveyance) || 0) +
+                      (Number(trainer.food) || 0) +
+                      (Number(trainer.lodging) || 0) || 0;
                   const totalCost = trainerCost + miscCost;
-                  const boxBase = "flex items-center gap-1 bg-white/70 border border-gray-100 rounded-md px-2 py-1";
+                  const boxBase =
+                    "flex items-center gap-1 bg-white/70 border border-gray-100 rounded-md px-2 py-1";
                   const valueCls = "text-xs font-semibold";
                   return (
                     <div className="flex flex-wrap md:flex-nowrap gap-1 md:w-auto">
-                      <div className={`${boxBase} text-indigo-700`}> 
-                        <span className="text-[10px] font-medium">Trainer:</span>
-                        <span className={`${valueCls} text-indigo-900`}>₹{trainerCost.toFixed(2)}</span>
+                      <div className={`${boxBase} text-indigo-700`}>
+                        <span className="text-[10px] font-medium">
+                          Trainer:
+                        </span>
+                        <span className={`${valueCls} text-indigo-900`}>
+                          ₹{trainerCost.toFixed(2)}
+                        </span>
                       </div>
-                      <div className={`${boxBase} text-amber-700`}> 
+                      <div className={`${boxBase} text-amber-700`}>
                         <span className="text-[10px] font-medium">Misc:</span>
-                        <span className={`${valueCls} text-amber-900`}>₹{miscCost.toFixed(2)}</span>
+                        <span className={`${valueCls} text-amber-900`}>
+                          ₹{miscCost.toFixed(2)}
+                        </span>
                       </div>
-                      <div className={`${boxBase} text-emerald-700`}> 
+                      <div className={`${boxBase} text-emerald-700`}>
                         <span className="text-[10px] font-medium">Total:</span>
-                        <span className={`${valueCls} text-emerald-900`}>₹{totalCost.toFixed(2)}</span>
+                        <span className={`${valueCls} text-emerald-900`}>
+                          ₹{totalCost.toFixed(2)}
+                        </span>
                       </div>
                     </div>
                   );
                 })()}
-
                 {/** Topics area */}
                 <div className="flex-1 min-w-[240px]">
                   <div className="flex items-center justify-between mb-0.5">
-                  <h4 className="text-[10px] font-semibold text-slate-700">
-                    Topics
-                  </h4>
-                  <span className="text-[10px] text-slate-500">
-                    Select or add
-                  </span>
-                </div>
-
+                    <h4 className="text-[10px] font-semibold text-slate-700">
+                      Topics
+                    </h4>
+                    <span className="text-[10px] text-slate-500">
+                      Select or add
+                    </span>
+                  </div>
                   <div className="bg-white rounded-md border border-gray-100 p-1 shadow-sm">
-                  {/* Simplified topics selection UI */}
-                  {(() => {
-                    const trainerDoc = trainers.find(
-                      (t) => t.trainerId === trainer.trainerId
-                    );
-                    const base = [];
-                    if (trainerDoc) {
-                      if (Array.isArray(trainerDoc.specialization))
-                        base.push(...trainerDoc.specialization);
-                      if (Array.isArray(trainerDoc.otherSpecialization))
-                        base.push(...trainerDoc.otherSpecialization);
-                    }
-                    const allTopics = Array.from(
-                      new Set([...base, ...addedTopics])
-                    )
-                      .filter(Boolean)
-                      .sort();
-                    const selected = Array.isArray(trainer.topics)
-                      ? trainer.topics
-                      : trainer.topics
-                      ? [trainer.topics]
-                      : [];
-
-                    // Auto-select all existing topics (from Firestore) if none selected yet
-                    if (allTopics.length > 0 && selected.length === 0) {
-                      // Prevent infinite loop: only trigger when strictly empty
-                      handleTrainerField(
-                        rowIndex,
-                        batchIndex,
-                        trainerIdx,
-                        "topics",
-                        allTopics
+                    {/* Simplified topics selection UI */}
+                    {(() => {
+                      const trainerDoc = trainers.find(
+                        (t) => t.trainerId === trainer.trainerId
                       );
-                    }
+                      const base = [];
+                      if (trainerDoc) {
+                        if (Array.isArray(trainerDoc.specialization))
+                          base.push(...trainerDoc.specialization);
+                        if (Array.isArray(trainerDoc.otherSpecialization))
+                          base.push(...trainerDoc.otherSpecialization);
+                      }
+                      const allTopics = Array.from(
+                        new Set([...base, ...addedTopics])
+                      )
+                        .filter(Boolean)
+                        .sort();
+                      const selected = Array.isArray(trainer.topics)
+                        ? trainer.topics
+                        : trainer.topics
+                        ? [trainer.topics]
+                        : [];
 
-                    const toggleTopic = (topic) => {
-                      const isActive = selected.includes(topic);
-                      const next = isActive
-                        ? selected.filter((t) => t !== topic)
-                        : [...selected, topic];
-                      handleTrainerField(
-                        rowIndex,
-                        batchIndex,
-                        trainerIdx,
-                        "topics",
-                        next
-                      );
-                    };
+                      // Auto-select all existing topics (from Firestore) if none selected yet
+                      // Moved to useEffect to prevent setState during render
 
-                    return (
-                      <div className="space-y-1.5">
-                        <div
-                          role="group"
-                          aria-label="Topics"
-                          className="min-h-[22px] max-h-24 overflow-auto rounded border border-dashed border-gray-200 p-0.5 bg-gray-50"
-                        >
-                          {allTopics.length === 0 ? (
-                            <div className="text-[10px] text-slate-400 py-2 text-center">
-                              No topics yet. Add below.
-                            </div>
-                          ) : (
-                            <div className="flex flex-wrap gap-0.5">
-                              {allTopics.map((topic) => {
-                                const active = selected.includes(topic);
-                                return (
-                                  <button
-                                    key={topic}
-                                    type="button"
-                                    role="checkbox"
-                                    aria-checked={active}
-                                    onClick={() => toggleTopic(topic)}
-                                    className={`text-[9px] px-1 py-0.5 rounded-full border transition-all focus:outline-none focus:ring-1 focus:ring-indigo-400 truncate ${
-                                      active
-                                        ? "bg-indigo-600 text-white border-indigo-600 shadow"
-                                        : "bg-white text-slate-700 border-gray-300 hover:border-indigo-400 hover:bg-indigo-50"
-                                    }`}
-                                    title={topic}
-                                  >
-                                    {topic}
-                                    {active && <span className="ml-1">✓</span>}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <input
-                            aria-label={`Add topic for trainer ${
-                              trainer.trainerName ||
-                              trainer.trainerId ||
-                              trainerIdx
-                            }`}
-                            type="text"
-                            value={newTopicInput}
-                            onChange={(e) => setNewTopicInput(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
+                      const toggleTopic = (topic) => {
+                        const isActive = selected.includes(topic);
+                        const next = isActive
+                          ? selected.filter((t) => t !== topic)
+                          : [...selected, topic];
+                        handleTrainerField(
+                          rowIndex,
+                          batchIndex,
+                          trainerIdx,
+                          "topics",
+                          next
+                        );
+                      };
+
+                      return (
+                        <div className="space-y-1.5">
+                          <div
+                            role="group"
+                            aria-label="Topics"
+                            className="min-h-[22px] max-h-24 overflow-auto rounded border border-dashed border-gray-200 p-0.5 bg-gray-50"
+                          >
+                            {allTopics.length === 0 ? (
+                              <div className="text-[10px] text-slate-400 py-2 text-center">
+                                No topics yet. Add below.
+                              </div>
+                            ) : (
+                              <div className="flex flex-wrap gap-0.5">
+                                {allTopics.map((topic) => {
+                                  const active = selected.includes(topic);
+                                  return (
+                                    <button
+                                      key={topic}
+                                      type="button"
+                                      role="checkbox"
+                                      aria-checked={active}
+                                      onClick={() => toggleTopic(topic)}
+                                      className={`text-[9px] px-1 py-0.5 rounded-full border transition-all focus:outline-none focus:ring-1 focus:ring-indigo-400 truncate ${
+                                        active
+                                          ? "bg-indigo-600 text-white border-indigo-600 shadow"
+                                          : "bg-white text-slate-700 border-gray-300 hover:border-indigo-400 hover:bg-indigo-50"
+                                      }`}
+                                      title={topic}
+                                    >
+                                      {topic}
+                                      {active && (
+                                        <span className="ml-1">✓</span>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              aria-label={`Add topic for trainer ${
+                                trainer.trainerName ||
+                                trainer.trainerId ||
+                                trainerIdx
+                              }`}
+                              type="text"
+                              value={newTopicInput}
+                              onChange={(e) => setNewTopicInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  const t = (newTopicInput || "").trim();
+                                  if (!t) return;
+                                  if (!addedTopics.includes(t))
+                                    setAddedTopics((s) => [...s, t]);
+                                  const next = Array.from(
+                                    new Set([...selected, t])
+                                  );
+                                  handleTrainerField(
+                                    rowIndex,
+                                    batchIndex,
+                                    trainerIdx,
+                                    "topics",
+                                    next
+                                  );
+                                  if (trainer.trainerId) {
+                                    (async () => {
+                                      try {
+                                        const trainerDocRef = doc(
+                                          db,
+                                          "trainers",
+                                          String(trainer.trainerId)
+                                        );
+                                        await updateDoc(trainerDocRef, {
+                                          otherSpecialization: arrayUnion(t),
+                                        });
+                                        updateTrainerLocal?.(
+                                          trainer.trainerId,
+                                          t
+                                        );
+                                      } catch (err) {
+                                        console.error(
+                                          "Failed to persist new topic:",
+                                          err
+                                        );
+                                      }
+                                    })();
+                                  }
+                                  setNewTopicInput("");
+                                }
+                              }}
+                              placeholder="Add topic & Enter"
+                              className="flex-1 rounded border border-gray-200 px-2 py-0.5 text-[10px] focus:outline-none focus:ring-1 focus:ring-indigo-200"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
                                 const t = (newTopicInput || "").trim();
                                 if (!t) return;
                                 if (!addedTopics.includes(t))
@@ -896,67 +950,28 @@ const TrainerRow = React.memo(
                                   })();
                                 }
                                 setNewTopicInput("");
-                              }
-                            }}
-                            placeholder="Add topic & Enter"
-                            className="flex-1 rounded border border-gray-200 px-2 py-0.5 text-[10px] focus:outline-none focus:ring-1 focus:ring-indigo-200"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const t = (newTopicInput || "").trim();
-                              if (!t) return;
-                              if (!addedTopics.includes(t))
-                                setAddedTopics((s) => [...s, t]);
-                              const next = Array.from(
-                                new Set([...selected, t])
-                              );
-                              handleTrainerField(
-                                rowIndex,
-                                batchIndex,
-                                trainerIdx,
-                                "topics",
-                                next
-                              );
-                              if (trainer.trainerId) {
-                                (async () => {
-                                  try {
-                                    const trainerDocRef = doc(
-                                      db,
-                                      "trainers",
-                                      String(trainer.trainerId)
-                                    );
-                                    await updateDoc(trainerDocRef, {
-                                      otherSpecialization: arrayUnion(t),
-                                    });
-                                    updateTrainerLocal?.(trainer.trainerId, t);
-                                  } catch (err) {
-                                    console.error(
-                                      "Failed to persist new topic:",
-                                      err
-                                    );
-                                  }
-                                })();
-                              }
-                              setNewTopicInput("");
-                            }}
-                            className="inline-flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-0.5 rounded text-[10px] focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                          >
-                            <FiPlus size={10} />
-                            <span>Add</span>
-                          </button>
+                              }}
+                              className="inline-flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-0.5 rounded text-[10px] focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                            >
+                              <FiPlus size={10} />
+                              <span>Add</span>
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })()}
-                  </div> {/* end topics card */}
-                </div> {/* end topics container */}
-              </div> {/* end cost+topics wrapper */}
-            </div> {/* end grid */}
-        </td>
-      </tr>
-    </>
-  );
+                      );
+                    })()}
+                  </div>{" "}
+                  {/* end topics card */}
+                </div>{" "}
+                {/* end topics container */}
+              </div>{" "}
+              {/* end cost+topics wrapper */}
+            </div>{" "}
+            {/* end grid */}
+          </td>
+        </tr>
+      </>
+    );
   }
 );
 
@@ -986,17 +1001,106 @@ const TrainersTable = React.memo(
     updateTrainerLocal,
     excludeDays,
   }) => {
+    const [showTooltip, setShowTooltip] = useState(false);
+    const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
+    const buttonRef = useRef(null);
+
+    const handleAddTrainerClick = () => {
+      if (
+        !batch.batchPerStdCount ||
+        batch.batchPerStdCount === 0 ||
+        batch.batchPerStdCount === ""
+      ) {
+        // Show tooltip instead of alert
+        if (buttonRef.current) {
+          const rect = buttonRef.current.getBoundingClientRect();
+          setTooltipPosition({
+            top: rect.top - 10,
+            left: rect.left + rect.width / 2,
+          });
+          setShowTooltip(true);
+          // Auto-hide tooltip after 3 seconds
+          setTimeout(() => setShowTooltip(false), 3000);
+        }
+        return;
+      }
+      addTrainer(rowIndex, batchIndex);
+    };
+
+    // Hide tooltip when clicking elsewhere
+    useEffect(() => {
+      if (!showTooltip) return;
+      const handleClickOutside = (e) => {
+        if (buttonRef.current && !buttonRef.current.contains(e.target)) {
+          setShowTooltip(false);
+        }
+      };
+      document.addEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
+    }, [showTooltip]);
+
     return (
       <div>
         <div className="flex justify-between items-center mb-2 ">
           <h5 className="text-sm font-medium text-gray-700">Trainers</h5>
-          <button
-            onClick={() => addTrainer(rowIndex, batchIndex)}
-            className="text-xs flex items-center text-indigo-600 hover:text-indigo-800 font-medium"
-            type="button"
-          >
-            <FiPlus className="mr-1" size={12} /> Add Trainer
-          </button>
+          <div className="relative">
+            <button
+              ref={buttonRef}
+              onClick={handleAddTrainerClick}
+              className={`text-xs flex items-center font-medium ${
+                !batch.batchPerStdCount ||
+                batch.batchPerStdCount === 0 ||
+                batch.batchPerStdCount === ""
+                  ? "text-gray-400 cursor-pointer"
+                  : "text-indigo-600 hover:text-indigo-800"
+              }`}
+              type="button"
+              title={
+                !batch.batchPerStdCount ||
+                batch.batchPerStdCount === 0 ||
+                batch.batchPerStdCount === ""
+                  ? "Please enter student count first"
+                  : "Add Trainer"
+              }
+            >
+              {(!batch.batchPerStdCount ||
+                batch.batchPerStdCount === 0 ||
+                batch.batchPerStdCount === "") ? (
+                <FiAlertTriangle className="mr-1 text-red-500" size={12} />
+              ) : (
+                <FiPlus className="mr-1" size={12} />
+              )}
+              Add Trainer
+            </button>
+
+            {/* Tooltip */}
+            {showTooltip &&
+              createPortal(
+                <div
+                  className="fixed z-[1000] bg-red-600 text-white text-xs px-4 py-2 rounded-lg shadow-lg max-w-md"
+                  style={{
+                    top: tooltipPosition.top,
+                    left: tooltipPosition.left,
+                    transform: "translate(-50%, -100%)",
+                  }}
+                >
+                  <div className="flex flex-col items-center">
+                    Please enter student count first.
+                  </div>
+                  {/* Arrow pointing down */}
+                  <div
+                    className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0"
+                    style={{
+                      borderLeft: "6px solid transparent",
+                      borderRight: "6px solid transparent",
+                      borderTop: "6px solid #dc2626",
+                    }}
+                  />
+                </div>,
+                document.body
+              )}
+          </div>
         </div>
 
         {trainers.length > 0 ? (
@@ -1429,10 +1533,7 @@ const BatchDetailsTable = ({
         const d = normalizeDate(assignment.date);
         if (d) assignDates.push(d);
       } else if (assignment.startDate && assignment.endDate) {
-        const list = getDateList(
-          assignment.startDate,
-          assignment.endDate
-        );
+        const list = getDateList(assignment.startDate, assignment.endDate);
         assignDates = list.map((dd) => normalizeDate(dd)).filter(Boolean);
       }
 
@@ -1802,10 +1903,7 @@ const BatchDetailsTable = ({
       else if (trainer.dayDuration === "AM" || trainer.dayDuration === "PM")
         perDayHours = +(perDay / 2).toFixed(2);
 
-      const dateList = getDateList(
-        trainer.startDate,
-        trainer.endDate
-      );
+      const dateList = getDateList(trainer.startDate, trainer.endDate);
       trainer.activeDates = dateList;
       trainer.dailyHours = dateList.map(() => perDayHours);
 
@@ -1906,16 +2004,19 @@ const BatchDetailsTable = ({
     while (current <= endDate) {
       const dayOfWeek = current.getDay(); // 0 = Sunday, 6 = Saturday
       let shouldInclude = true;
-      
+
       if (excludeDays === "Saturday" && dayOfWeek === 6) {
         shouldInclude = false;
       } else if (excludeDays === "Sunday" && dayOfWeek === 0) {
         shouldInclude = false;
-      } else if (excludeDays === "Both" && (dayOfWeek === 0 || dayOfWeek === 6)) {
+      } else if (
+        excludeDays === "Both" &&
+        (dayOfWeek === 0 || dayOfWeek === 6)
+      ) {
         shouldInclude = false;
       }
       // If excludeDays === "None", include all days
-      
+
       if (shouldInclude) {
         dates.push(new Date(current));
       }
@@ -2356,10 +2457,7 @@ const BatchDetailsTable = ({
               .map((dd) => normalizeDate(dd))
               .filter(Boolean);
           } else if (trainer.startDate && trainer.endDate) {
-            const generated = getDateList(
-              trainer.startDate,
-              trainer.endDate
-            );
+            const generated = getDateList(trainer.startDate, trainer.endDate);
             dates = generated.map((dd) => normalizeDate(dd)).filter(Boolean);
           } else if (trainer.startDate) {
             const single = normalizeDate(trainer.startDate);

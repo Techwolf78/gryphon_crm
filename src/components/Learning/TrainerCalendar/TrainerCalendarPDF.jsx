@@ -4,12 +4,13 @@ import { getDoc, doc } from "firebase/firestore";
 import { FiDownload } from "react-icons/fi";
 import { db } from "../../../firebase";
 
-function TrainerCalendarPDF({ bookings, selectedTrainer, selectedCollege, disabled }) {
+function TrainerCalendarPDF({ bookings, selectedTrainer, selectedCollege, disabled, asDropdownItem = false, onClick }) {
   const [loading, setLoading] = useState(false);
 
   const exportPDF = async () => {
     if (disabled || loading) return;
     setLoading(true);
+    if (onClick) onClick(); // Close dropdown
     try {
       // Fetch additional data from trainingForms
       let venue = 'To be specified';
@@ -253,7 +254,16 @@ function TrainerCalendarPDF({ bookings, selectedTrainer, selectedCollege, disabl
     }
   };
 
-  return (
+  return asDropdownItem ? (
+    <button
+      disabled={disabled || loading}
+      onClick={exportPDF}
+      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      <FiDownload className="w-4 h-4" />
+      {loading ? 'Generating PDF...' : 'Export PDF'}
+    </button>
+  ) : (
     <button
       disabled={disabled || loading}
       onClick={exportPDF}

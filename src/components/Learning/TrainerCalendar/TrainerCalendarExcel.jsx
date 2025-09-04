@@ -1,9 +1,10 @@
 import React from "react";
 import { FiDownload } from "react-icons/fi";
 
-function TrainerCalendarExcel({ bookings, selectedTrainer, disabled }) {
+function TrainerCalendarExcel({ bookings, selectedTrainer, disabled, asDropdownItem = false, onClick }) {
   const exportCSV = () => {
     if (disabled) return;
+    if (onClick) onClick(); // Close dropdown
     const rows = bookings.map((b) => ({
       trainerId: b.trainerId,
       trainerName: b.trainerName || b.trainer || "",
@@ -31,7 +32,16 @@ function TrainerCalendarExcel({ bookings, selectedTrainer, disabled }) {
     URL.revokeObjectURL(url);
   };
 
-  return (
+  return asDropdownItem ? (
+    <button
+      disabled={disabled}
+      onClick={exportCSV}
+      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      <FiDownload className="w-4 h-4" />
+      Export CSV
+    </button>
+  ) : (
     <button
       disabled={disabled}
       onClick={exportCSV}

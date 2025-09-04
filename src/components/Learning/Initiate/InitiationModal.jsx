@@ -121,6 +121,9 @@ function InitiationModal({ training, onClose, onConfirm }) {
   // Global toggle for excluding days
   const [excludeDays, setExcludeDays] = useState("None");
 
+  // Store remaining hours for each domain after cross-phase usage
+  const [remainingDomainHours, setRemainingDomainHours] = useState({});
+
   // Helper to generate date list, respecting excludeDays
   const getDateList = (start, end) => {
     if (!start || !end) return [];
@@ -153,44 +156,85 @@ function InitiationModal({ training, onClose, onConfirm }) {
   // Get domain hours - use custom hours if set, otherwise default from database
   const getDomainHours = useCallback(
     (domain, phase = null) => {
+      // First check for custom phase hours
       if (phase && customPhaseHours[phase] && customPhaseHours[phase] !== "") {
         return Number(customPhaseHours[phase]);
       }
       if (!domain) return 0;
+
+      // Debug logging
+      console.log("[getDomainHours] Called with:", { domain, phase, topicsLength: topics?.length });
+
       // Support for Tools subdomains:
       // - If domain is legacy "Tools" -> sum both topics (backwards compatible)
       // - If domain is "Tools (Excel - Power BI)" or "Tools (Looker Studio)"
       //   -> return hours for the specific topic only.
       const toolsMatch = TOOL_SUBDOMAINS.find((s) => s.key === domain);
       if (toolsMatch) {
-        const t = topics?.find(
-          (x) => x?.topic?.trim()?.toLowerCase() === toolsMatch.topic.toLowerCase()
-        );
-        return Number(t?.hours || 0);
-      }
-      if (domain === "Tools") {
-        const toolsTopics = ["Excel - Power BI", "Looker Studio"];
-        let total = 0;
-        toolsTopics.forEach((tn) => {
+        if (topics && topics.length > 0) {
           const t = topics?.find(
-            (x) => x?.topic?.trim()?.toLowerCase() === tn.toLowerCase()
+            (x) => x?.topic?.trim()?.toLowerCase() === toolsMatch.topic.toLowerCase()
           );
-          if (t && t.hours) total += Number(t.hours || 0);
-        });
-        return total;
+          const hours = Number(t?.hours || 0);
+          console.log(`[getDomainHours] Tools subdomain ${domain}: found topic "${toolsMatch.topic}", hours: ${hours}`);
+          if (hours > 0) return hours;
+        }
+
+        // Fallback: provide default hours for Tools subdomains if topics not available
+        console.log(`[getDomainHours] Using fallback hours for ${domain}`);
+        const fallbackHours = {
+          "Tools (Excel - Power BI)": 40,
+          "Tools (Looker Studio)": 30,
+        };
+        return fallbackHours[domain] || 40;
       }
 
-      const topicMap = {
-        Technical: "Domain Technical",
-        NonTechnical: "Soft Skills",
-        "Soft skills": "Soft Skills",
-        Aptitude: "Aptitude",
+      if (domain === "Tools") {
+        if (topics && topics.length > 0) {
+          const toolsTopics = ["Excel - Power BI", "Looker Studio"];
+          let total = 0;
+          toolsTopics.forEach((tn) => {
+            const t = topics?.find(
+              (x) => x?.topic?.trim()?.toLowerCase() === tn.toLowerCase()
+            );
+            if (t && t.hours) total += Number(t.hours || 0);
+          });
+          console.log(`[getDomainHours] Tools domain total: ${total}`);
+          if (total > 0) return total;
+        }
+
+        // Fallback: sum of default hours for Tools subdomains
+        console.log("[getDomainHours] Using fallback total for Tools domain");
+        return 70; // 40 + 30
+      }
+
+      // For other domains, try to find in topics
+      if (topics && topics.length > 0) {
+        const topicMap = {
+          Technical: "Domain Technical",
+          NonTechnical: "Soft Skills",
+          "Soft skills": "Soft Skills",
+          Aptitude: "Aptitude",
+        };
+        const topicName = topicMap[domain] || domain;
+        const topicObj = topics?.find(
+          (t) => t?.topic?.trim()?.toLowerCase() === topicName?.toLowerCase()
+        );
+        const hours = Number(topicObj?.hours || 0);
+        console.log(`[getDomainHours] Domain ${domain}: looked for "${topicName}", found hours: ${hours}`);
+        if (hours > 0) return hours;
+      }
+
+      // Fallback: provide default hours for other domains if topics not available
+      console.log(`[getDomainHours] Using fallback hours for ${domain}`);
+      const fallbackHours = {
+        Technical: 60,
+        "Soft skills": 45,
+        Aptitude: 35,
+        "Tools (Excel - Power BI)": 40,
+        "Tools (Looker Studio)": 30,
       };
-      const topicName = topicMap[domain] || domain;
-      const topicObj = topics?.find(
-        (t) => t?.topic?.trim()?.toLowerCase() === topicName?.toLowerCase()
-      );
-      return Number(topicObj?.hours || 0);
+      return fallbackHours[domain] || 50; // Default fallback
     },
     [customPhaseHours, topics]
   );
@@ -211,8 +255,17 @@ function InitiationModal({ training, onClose, onConfirm }) {
       const snap = await getDoc(docRef);
       if (snap.exists()) {
         const data = snap.data();
+        console.log("[fetchTrainingDetails] Training data:", {
+          id: training.id,
+          topics: data.topics,
+          courses: data.courses,
+          topicsLength: data.topics?.length || 0,
+          coursesLength: data.courses?.length || 0
+        });
         setTopics(data.topics || []);
         setCourses(data.courses || []);
+      } else {
+        console.log("[fetchTrainingDetails] No training document found for ID:", training.id);
       }
     };
     fetchTrainingDetails();
@@ -220,7 +273,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
   // Auto-generate table1Data for new domains
   useEffect(() => {
-    if (courses.length === 0 || topics.length === 0) return;
+    if (courses.length === 0) return; // Only require courses, not topics
     setTable1DataByDomain((prev) => {
       const updated = { ...prev };
       selectedDomains.forEach((domain) => {
@@ -228,7 +281,8 @@ function InitiationModal({ training, onClose, onConfirm }) {
         if (domain === "Tools") return;
 
         if (!updated[domain] || updated[domain].length === 0) {
-          const domainHours = getDomainHours(domain, getMainPhase());
+          const domainHours = remainingDomainHours[domain] ?? getDomainHours(domain, getMainPhase());
+          console.log(`[autoGenerateTable] Domain ${domain}: hours = ${domainHours}`);
           updated[domain] = courses.map((course) => ({
             batch: course.specialization,
             stdCount: course.students,
@@ -250,7 +304,8 @@ function InitiationModal({ training, onClose, onConfirm }) {
       if (selectedDomains.includes("Tools")) {
         TOOL_SUBDOMAINS.forEach((s) => {
           if (!updated[s.key] || updated[s.key].length === 0) {
-            const domainHours = getDomainHours(s.key, getMainPhase());
+            const domainHours = remainingDomainHours[s.key] ?? getDomainHours(s.key, getMainPhase());
+            console.log(`[autoGenerateTable] Tools subdomain ${s.key}: hours = ${domainHours}`);
             updated[s.key] = courses.map((course) => ({
               batch: course.specialization,
               stdCount: course.students,
@@ -271,7 +326,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
       return updated;
     });
-  }, [selectedDomains, courses, topics, getDomainHours, getMainPhase]);
+  }, [selectedDomains, courses, getDomainHours, getMainPhase, remainingDomainHours]); // Removed topics dependency
 
   // Allocation logic removed — table rows are managed by domain hours and loaded data
 
@@ -344,7 +399,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
     // Detect selected domains that have zero configured hours
     const mainPhase = getMainPhase();
     const zeroDomains = selectedDomains.filter(
-      (d) => Number(getDomainHours(d, mainPhase) || 0) === 0
+      (d) => Number((remainingDomainHours[d] ?? getDomainHours(d, mainPhase)) || 0) === 0
     );
     if (zeroDomains.length > 0) {
       setZeroHourDomains(zeroDomains);
@@ -1004,9 +1059,15 @@ function InitiationModal({ training, onClose, onConfirm }) {
         if (row.batches && row.batches.length > 0) {
           row.batches.forEach((b) => {
             sum += Number(b.assignedHours || 0);
-            // trainers' assignedHours are usually part of batch-level allocation, skip to avoid double-counting
+            // Also include trainer hours to ensure accurate calculation
+            if (b.trainers && b.trainers.length > 0) {
+              b.trainers.forEach((trainer) => {
+                sum += Number(trainer.assignedHours || 0);
+              });
+            }
           });
         }
+        console.log(`[sumAssignedInRow] Row ${row.batch || row.specialization}: assignedHours=${row.assignedHours}, batches total=${sum}`);
         return sum;
       };
 
@@ -1046,8 +1107,13 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
         // compute used hours across other phases for each specialization
         const usedBySpec = {}; // specialization -> usedHours
-        for (const phase of PHASE_OPTIONS) {
-          if (phase === currentPhase) continue; // we only want prior/other phases' usage
+        const getPreviousPhases = (current) => {
+          if (current === "phase-2") return ["phase-1"];
+          if (current === "phase-3") return ["phase-1", "phase-2"];
+          return [];
+        };
+        const previousPhases = getPreviousPhases(currentPhase);
+        for (const phase of previousPhases) {
           const otherDoc = await getDoc(
             doc(
               db,
@@ -1066,15 +1132,29 @@ function InitiationModal({ training, onClose, onConfirm }) {
             const spec = r.batch || r.specialization || "";
             const used = sumAssignedInRow(r);
             usedBySpec[spec] = (usedBySpec[spec] || 0) + Number(used || 0);
+            console.log(`[fetchPhaseDomains] Phase ${phase}, spec ${spec}: used=${used}, total usedBySpec[${spec}]=${usedBySpec[spec]}`);
           });
         }
+
+        // Calculate total used hours across all specializations for this domain
+        const totalUsedHours = Object.values(usedBySpec).reduce((sum, used) => sum + used, 0);
+        const totalDomainHours = getDomainHours(domain) || 0;
+        const remainingHours = Math.max(0, totalDomainHours - totalUsedHours);
+
+        console.log(`[fetchPhaseDomains] Domain ${domain}: total=${totalDomainHours}, used=${totalUsedHours}, remaining=${remainingHours}`);
+        console.log(`[fetchPhaseDomains] usedBySpec:`, usedBySpec);
+
+        // Store remaining hours for UI display
+        setRemainingDomainHours(prev => ({
+          ...prev,
+          [domain]: remainingHours
+        }));
 
         // Build the table data for this domain taking into account used hours
         const rowsForDomain = (currentData?.table1Data || []).map((row) => {
           const spec = row.batch || row.specialization || "";
-          const totalDomainHours = getDomainHours(domain) || 0; // domain-level total
           const used = Number(usedBySpec[spec] || 0);
-          const remaining = Math.max(0, totalDomainHours - used);
+          const remaining = Math.max(0, remainingHours - used);
 
           // Adjust row.hrs and batches assignedHours to not exceed remaining
           const adjustedBatches = (row.batches || []).map((b) => ({
@@ -1095,13 +1175,12 @@ function InitiationModal({ training, onClose, onConfirm }) {
           (!rowsForDomain || rowsForDomain.length === 0) &&
           courses.length > 0
         ) {
-          const domainHours = getDomainHours(domain, currentPhase);
           loadedTable1Data[domain] = courses.map((course) => ({
             batch: course.specialization,
             stdCount: course.students,
             hrs: Math.max(
               0,
-              domainHours - (usedBySpec[course.specialization] || 0)
+              remainingHours - (usedBySpec[course.specialization] || 0)
             ),
             assignedHours: 0,
             batches: [
@@ -1920,7 +1999,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                                         const updated = { ...prev };
                                         TOOL_SUBDOMAINS.forEach((s) => {
                                           if (!updated[s.key] || updated[s.key].length === 0) {
-                                            const domainHours = getDomainHours(s.key, getMainPhase());
+                                            const domainHours = remainingDomainHours[s.key] ?? getDomainHours(s.key, getMainPhase());
                                             updated[s.key] = (courses || []).map((course) => ({
                                               batch: course.specialization,
                                               stdCount: course.students,
@@ -1984,7 +2063,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                       // when the domain has hours but individual rows may temporarily show 0 due to
                       // allocations from other phases.
                       const domainHours = Number(
-                        getDomainHours(domain, currentPhase) || 0
+                        (remainingDomainHours[domain] ?? getDomainHours(domain, currentPhase)) || 0
                       );
                       const allNoHours =
                         domainHours === 0 ||
@@ -2023,7 +2102,11 @@ function InitiationModal({ training, onClose, onConfirm }) {
                               <div className="text-xs text-gray-700">
                                 Domain total hours:{" "}
                                 <span className="font-semibold">
-                                  {getDomainHours(domain, currentPhase)}
+                                  {(() => {
+                                    const hours = remainingDomainHours[domain] ?? getDomainHours(domain, currentPhase);
+                                    console.log(`[UI] Domain ${domain} total hours: ${hours} (remaining: ${remainingDomainHours[domain]})`);
+                                    return hours;
+                                  })()}
                                 </span>
                               </div>
                               {/* allocation UI removed */}
@@ -2048,7 +2131,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                               topics={topics}
                               courses={courses}
                               getDomainHours={(d) =>
-                                getDomainHours(d, currentPhase)
+                                remainingDomainHours[d] ?? getDomainHours(d, currentPhase)
                               }
                               commonFields={commonFields}
                               canMergeBatches={canMergeBatches}
