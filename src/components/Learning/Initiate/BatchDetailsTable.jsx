@@ -82,7 +82,7 @@ const TrainerRow = React.memo(
     openDailySchedule,
     setOpenDailySchedule,
     updateTrainerLocal,
-    includeSundays,
+    excludeDays,
   }) => {
     // ✅ ADD: Calculate unique key for this trainer
     const trainerKey = `${rowIndex}-${batchIndex}-${trainerIdx}`;
@@ -344,7 +344,7 @@ const TrainerRow = React.memo(
             />
           </td>
 
-          {/* No. of Days (Excluding Sundays) */}
+          {/* No. of Days (Excluding specified days) */}
           <td className="px-2 py-1 text-xs">
             {(() => {
               try {
@@ -355,7 +355,19 @@ const TrainerRow = React.memo(
                 let days = 0;
                 const cur = new Date(start);
                 while (cur <= end) {
-                  if (includeSundays || cur.getDay() !== 0) days++;
+                  const dayOfWeek = cur.getDay(); // 0 = Sunday, 6 = Saturday
+                  let shouldInclude = true;
+                  
+                  if (excludeDays === "Saturday" && dayOfWeek === 6) {
+                    shouldInclude = false;
+                  } else if (excludeDays === "Sunday" && dayOfWeek === 0) {
+                    shouldInclude = false;
+                  } else if (excludeDays === "Both" && (dayOfWeek === 0 || dayOfWeek === 6)) {
+                    shouldInclude = false;
+                  }
+                  // If excludeDays === "None", include all days
+                  
+                  if (shouldInclude) days++;
                   cur.setDate(cur.getDate() + 1);
                 }
                 return days;
@@ -972,7 +984,7 @@ const TrainersTable = React.memo(
     removeDailyDate,
     refetchTrainers,
     updateTrainerLocal,
-    includeSundays,
+    excludeDays,
   }) => {
     return (
       <div>
@@ -1030,7 +1042,7 @@ const TrainersTable = React.memo(
                       removeDailyDate={removeDailyDate}
                       refetchTrainers={refetchTrainers}
                       updateTrainerLocal={updateTrainerLocal}
-                      includeSundays={includeSundays}
+                      excludeDays={excludeDays}
                     />
                   );
                 })}
@@ -1074,7 +1086,7 @@ const BatchComponent = React.memo(
     removeDailyDate,
     refetchTrainers,
     updateTrainerLocal,
-    includeSundays,
+    excludeDays,
   }) => {
     return (
       <div
@@ -1250,7 +1262,7 @@ const BatchComponent = React.memo(
             removeDailyDate={removeDailyDate}
             refetchTrainers={refetchTrainers}
             updateTrainerLocal={updateTrainerLocal}
-            includeSundays={includeSundays}
+            excludeDays={excludeDays}
           />
         </div>
       </div>
@@ -1271,7 +1283,7 @@ const BatchDetailsTable = ({
   courses,
   onValidationChange,
   globalTrainerAssignments = [], // <-- pass this from parent (InitiationModal)
-  includeSundays = false,
+  excludeDays = "None",
 }) => {
   const [mergeModal, setMergeModal] = useState({
     open: false,
@@ -1892,7 +1904,19 @@ const BatchDetailsTable = ({
     const dates = [];
     let current = new Date(startDate);
     while (current <= endDate) {
-      if (includeSundays || current.getDay() !== 0) {
+      const dayOfWeek = current.getDay(); // 0 = Sunday, 6 = Saturday
+      let shouldInclude = true;
+      
+      if (excludeDays === "Saturday" && dayOfWeek === 6) {
+        shouldInclude = false;
+      } else if (excludeDays === "Sunday" && dayOfWeek === 0) {
+        shouldInclude = false;
+      } else if (excludeDays === "Both" && (dayOfWeek === 0 || dayOfWeek === 6)) {
+        shouldInclude = false;
+      }
+      // If excludeDays === "None", include all days
+      
+      if (shouldInclude) {
         dates.push(new Date(current));
       }
       current.setDate(current.getDate() + 1);
@@ -2874,7 +2898,7 @@ const BatchDetailsTable = ({
                           removeDailyDate={removeDailyDate}
                           refetchTrainers={refetchTrainers}
                           updateTrainerLocal={updateTrainerLocal}
-                          includeSundays={includeSundays}
+                          excludeDays={excludeDays}
                         />
                       ))}
                       {/* Add Batch Button */}

@@ -118,10 +118,10 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
   const { user } = useAuth();
 
-  // Global toggle for including Sundays
-  const [includeSundays, setIncludeSundays] = useState(false);
+  // Global toggle for excluding days
+  const [excludeDays, setExcludeDays] = useState("None");
 
-  // Helper to generate date list, respecting includeSundays
+  // Helper to generate date list, respecting excludeDays
   const getDateList = (start, end) => {
     if (!start || !end) return [];
     const s = new Date(start);
@@ -130,8 +130,21 @@ function InitiationModal({ training, onClose, onConfirm }) {
     const out = [];
     const cur = new Date(s);
     while (cur <= e) {
-      if (includeSundays || cur.getDay() !== 0)
+      const dayOfWeek = cur.getDay(); // 0 = Sunday, 6 = Saturday
+      let shouldInclude = true;
+      
+      if (excludeDays === "Saturday" && dayOfWeek === 6) {
+        shouldInclude = false;
+      } else if (excludeDays === "Sunday" && dayOfWeek === 0) {
+        shouldInclude = false;
+      } else if (excludeDays === "Both" && (dayOfWeek === 0 || dayOfWeek === 6)) {
+        shouldInclude = false;
+      }
+      // If excludeDays === "None", include all days
+      
+      if (shouldInclude) {
         out.push(cur.toISOString().slice(0, 10));
+      }
       cur.setDate(cur.getDate() + 1);
     }
     return out;
@@ -1534,34 +1547,24 @@ function InitiationModal({ training, onClose, onConfirm }) {
                         />
                       </div>
                     </div>
-                    {/* Include Sundays Toggle */}
+                    {/* Exclude Days Dropdown */}
                     <div className="flex flex-col items-start min-w-[250px]">
-                      <span className="text-sm text-gray-500 mb-2">
-                        Apply to all phases and trainer assignments
-                      </span>
-                      <label className="flex items-center cursor-pointer">
-                        <div className="relative">
-                          <input
-                            type="checkbox"
-                            className="sr-only"
-                            checked={includeSundays}
-                            onChange={() => setIncludeSundays((prev) => !prev)}
-                          />
-                          <div
-                            className={`block w-10 h-6 rounded-full transition-colors ${
-                              includeSundays ? "bg-blue-600" : "bg-gray-300"
-                            }`}
-                          ></div>
-                          <div
-                            className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                              includeSundays ? "translate-x-4" : "translate-x-0"
-                            }`}
-                          ></div>
-                        </div>
-                        <span className={`ml-3 text-sm ${includeSundays ? 'text-green-700' : 'text-red-700'}`}>
-                          {includeSundays ? 'Sundays Included' : 'Sundays Excluded'}
-                        </span>
-                      </label>
+                     
+                      <div className="flex flex-col">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Exclude Days
+                        </label>
+                        <select
+                          value={excludeDays}
+                          onChange={(e) => setExcludeDays(e.target.value)}
+                          className="w-full h-8 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white"
+                        >
+                          <option value="None">None</option>
+                          <option value="Saturday">Saturday</option>
+                          <option value="Sunday">Sunday</option>
+                          <option value="Both">Saturday + Sunday</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2056,7 +2059,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                               globalTrainerAssignments={
                                 globalTrainerAssignments
                               }
-                              includeSundays={includeSundays}
+                              excludeDays={excludeDays}
                             />
                           )}
                         </div>
