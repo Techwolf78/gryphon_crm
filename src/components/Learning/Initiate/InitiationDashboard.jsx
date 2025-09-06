@@ -165,8 +165,8 @@ const getPhaseStatus = (training) => {
       // Don't use stored status, fall through to automatic logic
       // Also, update Firestore to remove the stored status since it's inconsistent
       const trainingDocRef = doc(db, "trainingForms", training.trainingId, "trainings", training.phaseId);
-      updateDoc(trainingDocRef, { status: deleteField() }).catch(err => {
-        console.error("Failed to remove inconsistent status:", err);
+      updateDoc(trainingDocRef, { status: deleteField() }).catch(() => {
+        // ignore error
       });
     } else {
       const style = (STATUS_UI[training.status] && STATUS_UI[training.status].pill) || "bg-gray-100 text-gray-700";
@@ -227,7 +227,6 @@ const getPhaseStatus = (training) => {
   // Fetch all trainingForms and their phases
   const fetchData = useCallback(async (forceRefresh = false) => {
     setLoading(true);
-    console.log("Fetching data with selectedUserFilter:", selectedUserFilter);
 
     const cacheKey = `ld_initiation_trainings_${selectedUserFilter || user?.uid}`;
     const cacheExpiry = 5 * 60 * 1000; // 5 minutes
@@ -240,12 +239,11 @@ const getPhaseStatus = (training) => {
           if (Date.now() - timestamp < cacheExpiry) {
             setTrainings(data);
             setLoading(false);
-            console.log("Loaded from cache:", data);
             return;
           }
         }
-      } catch (error) {
-        console.error("Error loading from cache:", error);
+      } catch {
+        // ignore cache errors
       }
     }
 
@@ -322,13 +320,12 @@ const getPhaseStatus = (training) => {
         data: allTrainings,
         timestamp: Date.now()
       }));
-    } catch (error) {
-      console.error("Error caching data:", error);
+    } catch {
+      // ignore storage errors
     }
 
     setTrainings(allTrainings);
     setLoading(false);
-    console.log("Fetched trainings:", allTrainings);
   }, [user, selectedUserFilter, availableUsers]); // Add availableUsers to dependencies
 
   // Fetch available users based on current user's permissions
@@ -375,13 +372,8 @@ const getPhaseStatus = (training) => {
         if (!selectedUserFilter) {
           setSelectedUserFilter(defaultSelectedUserFilter);
         }
-
-        console.log("Current user role:", user.role);
-        console.log("Current user department:", user.department);
-        console.log("Available users in dropdown:", users.length);
-        console.log("Users in dropdown:", users.map(u => ({name: u.name, department: u.department})));
-      } catch (error) {
-        console.error("Error fetching available users:", error);
+      } catch {
+        // Error fetching available users
       }
     };
 
@@ -393,7 +385,7 @@ const getPhaseStatus = (training) => {
   }, [fetchData]);
 
   useEffect(() => {
-    console.log("selectedUserFilter changed to:", selectedUserFilter);
+    // selectedUserFilter changed
   }, [selectedUserFilter]);
 
   // Refresh data handler
@@ -536,8 +528,8 @@ const getPhaseStatus = (training) => {
 
       // Persist status to Firestore: training.trainingId -> trainings -> training.phaseId
       const trainingDocRef = doc(db, "trainingForms", training.trainingId, "trainings", training.phaseId);
-      updateDoc(trainingDocRef, { status: newStatus }).catch(err => {
-        console.error("Failed to update status:", err);
+      updateDoc(trainingDocRef, { status: newStatus }).catch(() => {
+        // Failed to update status
         // rollback on error
         fetchData();
       });
@@ -545,8 +537,8 @@ const getPhaseStatus = (training) => {
       // Clear cache since data changed
       try {
         localStorage.removeItem(`ld_initiation_trainings_${selectedUserFilter || user?.uid}`);
-      } catch (error) {
-        console.error("Error clearing cache:", error);
+      } catch {
+        // Error clearing cache
       }
 
       // Show undo toast
@@ -555,8 +547,8 @@ const getPhaseStatus = (training) => {
       }
       const timer = setTimeout(() => setToast(null), 6000);
       setToast({ status: newStatus, message: `Moved to ${newStatus}`, trainingId: training.id, prevStatus, timer });
-    } catch (err) {
-      console.error("Failed to update status:", err);
+    } catch {
+      // Failed to update status
       fetchData();
     }
   };
@@ -579,11 +571,11 @@ const getPhaseStatus = (training) => {
         // Clear cache since data changed
         try {
           localStorage.removeItem(`ld_initiation_trainings_${selectedUserFilter || user?.uid}`);
-        } catch (error) {
-          console.error("Error clearing cache:", error);
+        } catch {
+          // Error clearing cache
         }
-      } catch (err) {
-        console.error("Failed to undo status:", err);
+      } catch {
+        // Failed to undo status
         fetchData();
       }
     }
@@ -642,11 +634,10 @@ const getPhaseStatus = (training) => {
       // Clear cache since data changed
       try {
         localStorage.removeItem(`ld_initiation_trainings_${selectedUserFilter || user?.uid}`);
-      } catch (error) {
-        console.error("Error clearing cache:", error);
+      } catch {
+        // ignore storage errors
       }
-    } catch (err) {
-      console.error("Failed to revert status:", err);
+    } catch {
       fetchData();
     }
   };
@@ -706,7 +697,7 @@ const getPhaseStatus = (training) => {
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
             <div>
               <h1 className="text-xl font-bold text-gray-900 tracking-tight">
-                Training Initiation Dashboard
+                Training Status
               </h1>
               <p className="text-gray-600 text-xs mt-0.5">
                 Manage and monitor training phases across all colleges

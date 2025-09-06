@@ -10,7 +10,7 @@ import {
   FiChevronDown,
   FiChevronUp,
   FiLoader,
-  FiMail, // Added for the button icon
+  FiMail,
 } from "react-icons/fi";
 import SendSchedule from "../SendSchedule";
 
@@ -26,6 +26,7 @@ const DOMAIN_COLORS = {
   Aptitude: "bg-purple-100 border-purple-300 text-purple-800",
   Tools: "bg-yellow-100 border-yellow-300 text-yellow-800",
 };
+
 function getTimingForSlot(slot, training) {
   if (!slot) return "-";
   const s = String(slot).toUpperCase();
@@ -42,7 +43,6 @@ function getTimingForSlot(slot, training) {
       return `${lunchEndTime} - ${collegeEndTime}`;
     return "PM";
   }
-  // fallback: return slot text
   return slot;
 }
 
@@ -74,11 +74,6 @@ function formatDate(d) {
 }
 
 function InitiationTrainingDetails({ training, onBack }) {
-  console.log(
-    "📦 InitiationTrainingDetails props:",
-    JSON.stringify(training, null, 2)
-  );
-
   const [expanded, setExpanded] = useState({});
   const [trainingData, setTrainingData] = useState(null);
   const [phaseData, setPhaseData] = useState(null);
@@ -87,7 +82,6 @@ function InitiationTrainingDetails({ training, onBack }) {
   const [error, setError] = useState(null);
   const [showSendSchedule, setShowSendSchedule] = useState(false);
 
-  // Fetch hierarchical data from Firestore
   useEffect(() => {
     const fetchTrainingData = async () => {
       if (!training?.id || !training?.selectedPhase) {
@@ -100,7 +94,6 @@ function InitiationTrainingDetails({ training, onBack }) {
         setLoading(true);
         setError(null);
 
-        // 1. Fetch root training form document
         const trainingFormRef = doc(db, "trainingForms", training.id);
         const trainingFormSnap = await getDoc(trainingFormRef);
         
@@ -111,7 +104,6 @@ function InitiationTrainingDetails({ training, onBack }) {
         const trainingFormData = trainingFormSnap.data();
         setTrainingData(trainingFormData);
 
-        // 2. Fetch specific phase document
         const phaseRef = doc(db, "trainingForms", training.id, "trainings", training.selectedPhase);
         const phaseSnap = await getDoc(phaseRef);
         
@@ -122,7 +114,6 @@ function InitiationTrainingDetails({ training, onBack }) {
         const phaseDocData = phaseSnap.data();
         setPhaseData(phaseDocData);
 
-        // 3. Fetch all domains for this phase
         const domainsRef = collection(db, "trainingForms", training.id, "trainings", training.selectedPhase, "domains");
         const domainsSnap = await getDocs(domainsRef);
         
@@ -149,7 +140,6 @@ function InitiationTrainingDetails({ training, onBack }) {
     fetchTrainingData();
   }, [training?.id, training?.selectedPhase]);
 
-  // simpler: toggle by a single unique key
   const toggleExpand = (key) => {
     setExpanded((prev) => ({
       ...prev,
@@ -199,19 +189,19 @@ function InitiationTrainingDetails({ training, onBack }) {
 
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 to-gray-200 "> {/* Added padding for better spacing */}
+    <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 to-gray-200 ">
       <button
-        className="mb-6 flex items-center text-blue-600 hover:underline" // Adjusted margin for proper gap
+        className="mb-6 flex items-center text-blue-600 hover:underline"
         onClick={onBack}
       >
         <FiArrowLeft className="mr-2" /> Back to Dashboard
       </button>
       
-      <div className="flex justify-between items-center mb-4 px-4"> {/* Added padding and increased margin for better gap */}
+      <div className="flex justify-between items-center mb-4 px-4">
         <h1 className="text-3xl font-bold text-gray-800">Training Details</h1>
         <button
           onClick={() => setShowSendSchedule(true)}
-          className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 hover:shadow-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2" // Enhanced styling with icon, gap, shadow, and focus states
+          className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 hover:shadow-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
         >
           <FiMail className="w-5 h-5" />
           Send Schedule
@@ -219,7 +209,6 @@ function InitiationTrainingDetails({ training, onBack }) {
       </div>
       
       <div className="w-full mx-auto bg-white rounded-xl shadow border border-gray-200 p-4">
-        {/* Training Form Header */}
         <h2 className="text-2xl font-bold text-indigo-800 mb-2">
           {trainingData?.collegeName}{" "}
           <span className="text-gray-400">({trainingData?.collegeCode})</span>
@@ -241,7 +230,6 @@ function InitiationTrainingDetails({ training, onBack }) {
           </span>
         </div>
 
-        {/* Phase Summary */}
         <div className="mb-4 p-2 bg-gray-50 rounded-lg">
           <h3 className="font-semibold text-gray-800 mb-2">Phase Information</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
@@ -266,7 +254,6 @@ function InitiationTrainingDetails({ training, onBack }) {
           </div>
         </div>
 
-        {/* Domain-wise Details */}
         <h3 className="font-semibold text-gray-800 mb-2">Domain-wise Training Details</h3>
         
         {domainsData.length > 0 ? (
@@ -278,7 +265,6 @@ function InitiationTrainingDetails({ training, onBack }) {
                   DOMAIN_COLORS[domainInfo.domain] || "bg-gray-100 border-gray-300 text-gray-800"
                 }`}
               >
-                {/* Domain Header */}
                 <div className="flex items-center justify-between mb-2">
                   <div>
                     <h4 className="text-lg font-bold">{domainInfo.domain}</h4>
@@ -295,7 +281,6 @@ function InitiationTrainingDetails({ training, onBack }) {
                   </div>
                 </div>
 
-                {/* Batches for this domain */}
                 {Array.isArray(domainInfo.table1Data) && domainInfo.table1Data.length > 0 ? (
                   <div className="space-y-4">
                     {domainInfo.table1Data.map((row, idx) => (
@@ -315,7 +300,6 @@ function InitiationTrainingDetails({ training, onBack }) {
                           </div>
                         </div>
 
-                        {/* Batch Details */}
                         <div className="space-y-3">
                           {row.batches &&
                             row.batches.map((batch, bidx) => (
@@ -340,7 +324,6 @@ function InitiationTrainingDetails({ training, onBack }) {
                                   )}
                                 </div>
 
-                                {/* Trainers */}
                                 <div>
                                   <div className="font-semibold text-sm text-gray-700 mb-2">
                                     Trainers:
@@ -375,7 +358,6 @@ function InitiationTrainingDetails({ training, onBack }) {
                                               )}
                                             </div>
 
-                                            {/* Daily Hours Breakdown */}
                                             {trainer.dailyHours && trainer.dailyHours.length > 0 && (
                                               <div className="mt-3">
                                                 <button

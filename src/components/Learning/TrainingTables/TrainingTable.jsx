@@ -236,7 +236,7 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
                       role="menuitem"
                     >
                       <FaPlay className="text-blue-500 text-xs" />
-                      <span className="font-medium text-[12px]">{item.isInitiated ? "View Initiation" : "Initiation"}</span>
+                      <span className="font-medium text-[12px]">{item.isInitiated ? "View Training" : "Start Training"}</span>
                     </button>
                   </div>
                 </div>
