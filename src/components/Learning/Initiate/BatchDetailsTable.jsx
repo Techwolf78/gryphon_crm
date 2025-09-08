@@ -993,7 +993,7 @@ const TrainersTable = React.memo(
     const handleAddTrainerClick = () => {
       if (!isStudentCountValid) {
         setShowTooltip(true);
-        setTimeout(() => setShowTooltip(false), 3000);
+        setTimeout(() => setShowTooltip(false), 2000);
       } else {
         addTrainer(rowIndex, batchIndex);
       }
@@ -1006,11 +1006,10 @@ const TrainersTable = React.memo(
             <button
               ref={buttonRef}
               onClick={handleAddTrainerClick}
-              disabled={!isStudentCountValid}
               className={`text-xs flex items-center font-medium transition-colors ${
                 isStudentCountValid
                   ? "text-indigo-600 hover:text-indigo-800 cursor-pointer"
-                  : "text-gray-400 cursor-not-allowed"
+                  : "text-gray-400 cursor-pointer"
               }`}
               type="button"
               title={isStudentCountValid ? "Add Trainer" : "Student count required"}
@@ -1023,17 +1022,15 @@ const TrainersTable = React.memo(
               Add Trainer
             </button>
             {showTooltip && (
-              <div
-                className="absolute top-full mt-1 left-0 z-10 bg-red-50 border border-red-200 text-red-800 text-xs px-3 py-2 rounded shadow-lg max-w-xs"
-                style={{
-                  whiteSpace: "nowrap",
-                  transform: "translateX(-50%)",
-                  left: "50%",
-                }}
-              >
-                <div className="flex items-center">
-                  <FiAlertTriangle className="mr-1" size={10} />
-                  Please enter a student count for this batch before adding trainers.
+              <div className="relative">
+                <div
+                  className="absolute -top-12 right-0 mr-2 z-50 bg-red-50 border border-red-200 text-red-800 text-xs px-1 py-0.5 rounded shadow-sm whitespace-nowrap"
+                >
+                  Fill std. count first
+                  {/* Triangle/arrow pointing down */}
+                  <div className="absolute -bottom-1 right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-red-50"></div>
+                  {/* Triangle border for the arrow */}
+                  <div className="absolute -bottom-1.5 right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-red-200"></div>
                 </div>
               </div>
             )}
@@ -1128,6 +1125,7 @@ const BatchComponent = React.memo(
     refetchTrainers,
     updateTrainerLocal,
     excludeDays,
+    showPersistentWarnings = false,
   }) => {
     return (
       <div
@@ -1239,6 +1237,21 @@ const BatchComponent = React.memo(
                 placeholder="0"
                 disabled={batchIndex !== 0}
               />
+              {(() => {
+                const trainerSum = batch.trainers.reduce((sum, t) => sum + Number(t.assignedHours || 0), 0);
+                const batchHours = Number(batch.assignedHours || 0);
+                if (showPersistentWarnings && trainerSum > 0 && batchHours !== trainerSum) {
+                  return (
+                    <div className="mt-1 p-1 bg-red-50 border border-red-200 rounded text-xs w-fit">
+                      <div className="flex items-center text-red-600 font-medium">
+                        <FiAlertTriangle className="mr-1" size={12} />
+                        Mismatch (assigned hrs {batchHours} ≠ trainers sum hrs {trainerSum})
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
             </div>
           </div>
 
@@ -1325,6 +1338,7 @@ const BatchDetailsTable = ({
   onValidationChange,
   globalTrainerAssignments = [], // <-- pass this from parent (InitiationModal)
   excludeDays = "None",
+  showPersistentWarnings = false,
 }) => {
   const [mergeModal, setMergeModal] = useState({
     open: false,
@@ -2368,6 +2382,7 @@ const BatchDetailsTable = ({
           hasErrors: false,
           errors: [],
           duplicates: [],
+          hasBatchMismatch: false,
         });
       }
       return;
@@ -2500,6 +2515,18 @@ const BatchDetailsTable = ({
       });
     });
 
+    // Check for batch mismatches
+    let hasBatchMismatch = false;
+    table1Data.forEach((row) => {
+      row.batches.forEach((batch) => {
+        const trainerSum = batch.trainers.reduce((sum, t) => sum + Number(t.assignedHours || 0), 0);
+        const batchHours = Number(batch.assignedHours || 0);
+        if (batchHours > trainerSum) {
+          hasBatchMismatch = true;
+        }
+      });
+    });
+
     const duplicates = Array.from(duplicatesSet);
     setDuplicateTrainers(duplicates);
 
@@ -2514,6 +2541,7 @@ const BatchDetailsTable = ({
         hasErrors: duplicates.length > 0,
         errors: uniqueErrors,
         duplicates: duplicates,
+        hasBatchMismatch,
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2940,6 +2968,7 @@ const BatchDetailsTable = ({
                           refetchTrainers={refetchTrainers}
                           updateTrainerLocal={updateTrainerLocal}
                           excludeDays={excludeDays}
+                          showPersistentWarnings={showPersistentWarnings}
                         />
                       ))}
                       {/* Add Batch Button */}

@@ -20,6 +20,7 @@ import {
   FiCheck,
   FiClock,
   FiAlertCircle,
+  FiAlertTriangle,
   FiX,
 } from "react-icons/fi";
 import BatchDetailsTable from "./BatchDetailsTable";
@@ -113,8 +114,11 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
   // Validation state for duplicate trainers
   const [validationByDomain, setValidationByDomain] = useState({});
+  const [batchMismatch, setBatchMismatch] = useState(false);
   const [completedPhases, setCompletedPhases] = useState([]);
   const [globalTrainerAssignments, setGlobalTrainerAssignments] = useState([]);
+
+  const [submitDisabled, setSubmitDisabled] = useState(false);
 
   const { user } = useAuth();
 
@@ -377,21 +381,44 @@ function InitiationModal({ training, onClose, onConfirm }) {
       }
 
       const serializeTable1Data = (data) => {
-        return data.map((row) => ({
-          ...row,
-          batches: (row.batches || []).map((batch) => ({
-            ...batch,
-            trainers: (batch.trainers || []).map((trainer) => ({
-              ...trainer,
-              mergedBreakdown: trainer.mergedBreakdown || [],
-              activeDates: (trainer.activeDates || []).map((date) =>
-                typeof date === "string"
-                  ? date
-                  : date?.toISOString?.().slice(0, 10) || ""
-              ),
-            })),
-          })),
-        }));
+        return data.map((row) => {
+          // Remove legacy merge fields and correct assignedHours
+          const cleanedRow = { ...row };
+          delete cleanedRow.isMerged;
+          delete cleanedRow.mergedFrom;
+          delete cleanedRow.originalData;
+          
+          // Recalculate assignedHours as sum of trainer hours in batches
+          let totalAssigned = 0;
+          cleanedRow.batches = (row.batches || []).map((batch) => {
+            const cleanedBatch = { ...batch };
+            delete cleanedBatch.isMerged;
+            delete cleanedBatch.mergedFrom;
+            
+            // Sum assignedHours from trainers
+            let batchAssigned = 0;
+            cleanedBatch.trainers = (batch.trainers || []).map((trainer) => {
+              const cleanedTrainer = { ...trainer };
+              delete cleanedTrainer.mergedBreakdown;
+              delete cleanedTrainer.activeDates; // Derive from dates if needed
+              delete cleanedTrainer.dailyHours; // Remove if not persisting
+              delete cleanedTrainer.stdCount; // Remove redundant stdCount from trainer
+              
+              batchAssigned += Number(trainer.assignedHours || 0);
+              return cleanedTrainer;
+            });
+            
+            cleanedBatch.assignedHours = batchAssigned;
+            totalAssigned += batchAssigned;
+            return cleanedBatch;
+          });
+          
+          cleanedRow.assignedHours = totalAssigned;
+          // Remove hrs to avoid storing outdated total hours; domainHours in domain doc handles totals
+          delete cleanedRow.hrs;
+          
+          return cleanedRow;
+        });
       };
 
       const mainPhase = getMainPhase();
@@ -784,7 +811,15 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
   const handleSubmit = async (e) => {
     e?.preventDefault?.();
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      setSubmitDisabled(true);
+      return;
+    }
+    if (batchMismatch) {
+      setError("Assigned Hours exceed trainer hours sum in one or more batches. Please fix the mismatch before submitting.");
+      setSubmitDisabled(true);
+      return;
+    }
     await submitInternal();
   };
 
@@ -818,6 +853,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
       ...prev,
       [domain]: validationStatus,
     }));
+    setBatchMismatch(validationStatus.hasBatchMismatch || false);
   }, []);
 
   // Check if there are any validation errors across all domains
@@ -827,7 +863,11 @@ function InitiationModal({ training, onClose, onConfirm }) {
     );
   };
 
-  const canProceedToNextStep = () => !hasValidationErrors();
+  useEffect(() => {
+    if (!error && !batchMismatch && !Object.values(validationByDomain).some((v) => v?.hasErrors)) {
+      setSubmitDisabled(false);
+    }
+  }, [error, batchMismatch, validationByDomain]);
 
   useEffect(() => {
     const checkTrainingsCollection = async () => {
@@ -2060,6 +2100,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                                 globalTrainerAssignments
                               }
                               excludeDays={excludeDays}
+                              showPersistentWarnings={submitDisabled || batchMismatch}
                             />
                           )}
                         </div>
@@ -2184,6 +2225,8 @@ function InitiationModal({ training, onClose, onConfirm }) {
                     </div>
                   </div>
                 )}
+
+
               </form>
             </div>
 
@@ -2204,7 +2247,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                 <button
                   type="submit"
                   onClick={handleSubmit}
-                  disabled={loading || !canProceedToNextStep()}
+                  disabled={loading || submitDisabled}
                   className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-green-400 disabled:cursor-not-allowed transition-colors"
                 >
                   {loading ? (
