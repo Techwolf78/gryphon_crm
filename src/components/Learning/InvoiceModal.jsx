@@ -5,7 +5,7 @@ import { query, where, getDocs } from "firebase/firestore";
 import { FiDownload, FiX, FiEdit2 } from "react-icons/fi";
 
 // Import the standardized PDF generation function
-import { generateInvoicePDF } from "./GenerateTrainerInvoice";
+import { generateInvoicePDF } from "./invoiceUtils";
 
 function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
   const [invoiceData, setInvoiceData] = useState({
