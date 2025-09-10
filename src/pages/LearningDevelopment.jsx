@@ -28,11 +28,23 @@ function LearningDevelopment() {
       return "newContact";
     }
   });
-  const [selectedInitiationTraining, setSelectedInitiationTraining] = useState(null);
+  const [selectedInitiationTraining, setSelectedInitiationTraining] =
+    useState(null);
   const [showInitiationModal, setShowInitiationModal] = useState(false);
-  const [selectedTrainingForInitiation, setSelectedTrainingForInitiation] = useState(null);
+  const [selectedTrainingForInitiation, setSelectedTrainingForInitiation] =
+    useState(null);
 
   const navigate = useNavigate();
+
+  // Calculate active tab index for sliding indicator
+  const getActiveTabIndex = () => {
+    switch (activeTab) {
+      case "newContact": return 0;
+      case "initiation": return 1;
+      case "trainerInvoice": return 2;
+      default: return 0;
+    }
+  };
 
   const fetchTrainings = async () => {
     try {
@@ -44,20 +56,24 @@ function LearningDevelopment() {
       );
 
       const snapshot = await getDocs(q);
-      const data = await Promise.all(snapshot.docs.map(async (doc) => {
-        const trainingData = { id: doc.id, ...doc.data() };
-        
-        // Check if training has been initiated by looking for phases
-        try {
-          const trainingsSnap = await getDocs(collection(db, "trainingForms", doc.id, "trainings"));
-          trainingData.isInitiated = !trainingsSnap.empty;
-        } catch (err) {
-          console.error("Error checking initiation status:", err);
-          trainingData.isInitiated = false;
-        }
-        
-        return trainingData;
-      }));
+      const data = await Promise.all(
+        snapshot.docs.map(async (doc) => {
+          const trainingData = { id: doc.id, ...doc.data() };
+
+          // Check if training has been initiated by looking for phases
+          try {
+            const trainingsSnap = await getDocs(
+              collection(db, "trainingForms", doc.id, "trainings")
+            );
+            trainingData.isInitiated = !trainingsSnap.empty;
+          } catch (err) {
+            console.error("Error checking initiation status:", err);
+            trainingData.isInitiated = false;
+          }
+
+          return trainingData;
+        })
+      );
 
       setTrainings(data);
     } catch (err) {
@@ -151,51 +167,64 @@ function LearningDevelopment() {
   return (
     <>
       <div className="bg-gray-50 min-h-screen">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-3">
           <h1 className="text-3xl font-bold text-blue-800">
             Training Dashboard
           </h1>
           <button
             onClick={handleViewTrainers}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="px-5 py-1.5 bg-black text-white font-medium rounded-full shadow-md hover:bg-gray-800 hover:shadow-lg transform hover:scale-105 transition-all duration-200 border border-gray-300"
           >
             View Trainers
           </button>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex mb-6 border-b">
-          <button
-            className={`px-4 py-2 font-medium ${activeTab === "newContact"
-              ? "border-b-2 border-blue-500 text-blue-600"
-              : "text-gray-500"
+        {/* Enhanced Tab Navigation with Sliding Indicator */}
+        <div className="relative mb-4">
+          <div className="flex border-b border-gray-200">
+            <button
+              className={`flex-1 px-6 py-3 font-medium text-sm transition-all duration-150 ${
+                activeTab === "newContact"
+                  ? "text-blue-600 bg-blue-50"
+                  : "text-gray-500 hover:text-gray-700"
               }`}
-            onClick={() => setActiveTab("newContact")}
-          >
-            New Contract ({trainings.length})
-          </button>
-          <button
-            className={`px-4 py-2 font-medium ${activeTab === "initiation"
-              ? "border-b-2 border-blue-500 text-blue-600"
-              : "text-gray-500"
+              onClick={() => setActiveTab("newContact")}
+            >
+              New Contract ({trainings.length})
+            </button>
+            <button
+              className={`flex-1 px-6 py-3 font-medium text-sm transition-all duration-150 ${
+                activeTab === "initiation"
+                  ? "text-blue-600 bg-blue-50"
+                  : "text-gray-500 hover:text-gray-700"
               }`}
-            onClick={() => setActiveTab("initiation")}
-          >
-            Trainings
-          </button>
-          <button
-            className={`px-4 py-2 font-medium ${activeTab === "trainerInvoice"
-              ? "border-b-2 border-blue-500 text-blue-600"
-              : "text-gray-500"
+              onClick={() => setActiveTab("initiation")}
+            >
+              Trainings
+            </button>
+            <button
+              className={`flex-1 px-6 py-3 font-medium text-sm transition-all duration-150 ${
+                activeTab === "trainerInvoice"
+                  ? "text-blue-600 bg-blue-50"
+                  : "text-gray-500 hover:text-gray-700"
               }`}
-            onClick={() => setActiveTab("trainerInvoice")}
-          >
-            Trainer Invoice
-          </button>
+              onClick={() => setActiveTab("trainerInvoice")}
+            >
+              Trainer Invoice
+            </button>
+          </div>
+          {/* Sliding Indicator */}
+          <div
+            className="absolute bottom-0 h-0.5 bg-blue-600 transition-transform duration-150 ease-out"
+            style={{
+              width: '33.333%',
+              transform: `translateX(${getActiveTabIndex() * 100}%)`,
+            }}
+          ></div>
         </div>
 
         {error && (
-          <div className="mb-4 p-4 bg-red-100 border-l-4 border-red-500 text-red-700">
+          <div className="mb-2 p-3 bg-red-100 border-l-4 border-red-500 text-red-700">
             {error}
             <button
               onClick={fetchTrainings}
@@ -240,14 +269,14 @@ function LearningDevelopment() {
               onBack={() => setSelectedInitiationTraining(null)}
             />
           ) : (
-            <InitiationDashboard 
+            <InitiationDashboard
               onRowClick={setSelectedInitiationTraining}
               onStartPhase={handleStartPhase} // ADD this prop
             />
           )
         ) : activeTab === "trainerInvoice" ? (
           <GenerateTrainerInvoice />
-        ) : null }
+        ) : null}
       </div>
     </>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { db } from "../../../firebase";
 import {
   doc,
@@ -22,37 +22,13 @@ import {
   FiAlertCircle,
   FiAlertTriangle,
   FiX,
+  FiChevronDown,
 } from "react-icons/fi";
 import BatchDetailsTable from "./BatchDetailsTable";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import "rc-time-picker/assets/index.css";
-
-// helper: generate time options in HH:mm (24h values) at given step, but display 12h with AM/PM
-function generateTimeOptions(step = 15) {
-  const opts = [];
-  for (let h = 0; h < 24; h++) {
-    for (let m = 0; m < 60; m += step) {
-      const hh = String(h).padStart(2, "0");
-      const mm = String(m).padStart(2, "0");
-      opts.push(`${hh}:${mm}`);
-    }
-  }
-  return opts;
-}
-
-function formatTime12(hhmm) {
-  if (!hhmm) return "";
-  const [hStr, m] = hhmm.split(":");
-  let h = parseInt(hStr, 10);
-  if (isNaN(h)) return hhmm;
-  const suffix = h >= 12 ? "PM" : "AM";
-  h = h % 12;
-  if (h === 0) h = 12; // Midnight / Noon edge
-  return `${h}:${m} ${suffix}`;
-}
-
-const TIME_OPTIONS = generateTimeOptions(15);
+import TrainingConfiguration from './TrainingConfiguration';
 
 const PHASE_OPTIONS = ["phase-1", "phase-2", "phase-3"];
 const DOMAIN_OPTIONS = ["Technical", "Soft skills", "Aptitude", "Tools"];
@@ -124,6 +100,9 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
   // Global toggle for excluding days
   const [excludeDays, setExcludeDays] = useState("None");
+  const [excludeDropdownOpen, setExcludeDropdownOpen] = useState(false);
+
+  const dropdownRef = useRef(null);
 
   // Helper to generate date list, respecting excludeDays
   const getDateList = (start, end) => {
@@ -401,7 +380,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
               const cleanedTrainer = { ...trainer };
               delete cleanedTrainer.mergedBreakdown;
               delete cleanedTrainer.activeDates; // Derive from dates if needed
-              delete cleanedTrainer.dailyHours; // Remove if not persisting
               delete cleanedTrainer.stdCount; // Remove redundant stdCount from trainer
               
               batchAssigned += Number(trainer.assignedHours || 0);
@@ -1225,6 +1203,23 @@ function InitiationModal({ training, onClose, onConfirm }) {
     };
   }, [training?.id]);
 
+  // Click outside to close exclude days dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setExcludeDropdownOpen(false);
+      }
+    };
+
+    if (excludeDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [excludeDropdownOpen]);
+
   const swapTrainers = (swapData) => {
     console.log("🔄 [INITIATION MODAL] swapTrainers called with:", {
       swapData: swapData,
@@ -1485,6 +1480,11 @@ function InitiationModal({ training, onClose, onConfirm }) {
                     {selectedPhases.join(" • ")}
                   </p>
                 )}
+                {training?.originalFormData?.totalCost && (
+                  <p className="mt-0.5 text-[10px] text-gray-600">
+                    TCV: ₹{training.originalFormData.totalCost.toLocaleString()}
+                  </p>
+                )}
               </div>
               {/* Right: Placeholder for spacing / future actions */}
               <div className="flex-1 text-right hidden sm:block">
@@ -1594,282 +1594,68 @@ function InitiationModal({ training, onClose, onConfirm }) {
                         <label className="block text-xs font-medium text-gray-700 mb-1">
                           Exclude Days
                         </label>
-                        <select
-                          value={excludeDays}
-                          onChange={(e) => setExcludeDays(e.target.value)}
-                          className="w-full h-8 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white"
-                        >
-                          <option value="None">None</option>
-                          <option value="Saturday">Saturday</option>
-                          <option value="Sunday">Sunday</option>
-                          <option value="Both">Saturday + Sunday</option>
-                        </select>
+                        <div className="relative" ref={dropdownRef}>
+                          <button
+                            type="button"
+                            onClick={() => setExcludeDropdownOpen(!excludeDropdownOpen)}
+                            className="min-w-[140px] h-8 rounded border border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white flex items-center justify-between hover:bg-gray-50 transition-colors"
+                          >
+                            <span>{excludeDays}</span>
+                            <FiChevronDown className={`w-3 h-3 transition-transform ${excludeDropdownOpen ? 'rotate-180' : ''}`} />
+                          </button>
+                          {excludeDropdownOpen && (
+                            <div className="absolute z-10 mt-1 min-w-[140px] bg-white border border-gray-300 rounded shadow-lg">
+                              <div className="py-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setExcludeDays("None");
+                                    setExcludeDropdownOpen(false);
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
+                                >
+                                  None
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setExcludeDays("Saturday");
+                                    setExcludeDropdownOpen(false);
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
+                                >
+                                  Saturday
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setExcludeDays("Sunday");
+                                    setExcludeDropdownOpen(false);
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
+                                >
+                                  Sunday
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setExcludeDays("Both");
+                                    setExcludeDropdownOpen(false);
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
+                                >
+                                  Saturday + Sunday
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Training Configuration */}
-                <div className="space-y-3">
-                  <div className="pb-2 border-b border-gray-200">
-                    <h2 className="text-base font-semibold text-gray-900">
-                      Training Configuration
-                    </h2>
-                    <p className="mt-0.5 text-xs text-gray-500">
-                      Set up the basic timing and schedule configuration for the
-                      training.
-                    </p>
-                  </div>
-                  <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:flex-1">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                          College Start Time
-                        </label>
-                        <select
-                          value={commonFields.collegeStartTime || ""}
-                          onChange={(e) =>
-                            setCommonFields({
-                              ...commonFields,
-                              collegeStartTime: e.target.value,
-                            })
-                          }
-                          className="w-full h-8 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white"
-                        >
-                          <option value="">Select time</option>
-                          {TIME_OPTIONS.map((t) => (
-                            <option key={t} value={t}>
-                              {formatTime12(t)}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                          College End Time
-                        </label>
-                        <select
-                          value={commonFields.collegeEndTime || ""}
-                          onChange={(e) =>
-                            setCommonFields({
-                              ...commonFields,
-                              collegeEndTime: e.target.value,
-                            })
-                          }
-                          className="w-full h-8 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white"
-                        >
-                          <option value="">Select time</option>
-                          {TIME_OPTIONS.map((t) => (
-                            <option key={t} value={t}>
-                              {formatTime12(t)}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                          Lunch Start Time
-                        </label>
-                        <select
-                          value={commonFields.lunchStartTime || ""}
-                          onChange={(e) =>
-                            setCommonFields({
-                              ...commonFields,
-                              lunchStartTime: e.target.value,
-                            })
-                          }
-                          className="w-full h-8 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white"
-                        >
-                          <option value="">Select time</option>
-                          {TIME_OPTIONS.map((t) => (
-                            <option key={t} value={t}>
-                              {formatTime12(t)}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                          Lunch End Time
-                        </label>
-                        <select
-                          value={commonFields.lunchEndTime || ""}
-                          onChange={(e) =>
-                            setCommonFields({
-                              ...commonFields,
-                              lunchEndTime: e.target.value,
-                            })
-                          }
-                          className="w-full h-8 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white"
-                        >
-                          <option value="">Select time</option>
-                          {TIME_OPTIONS.map((t) => (
-                            <option key={t} value={t}>
-                              {formatTime12(t)}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                    {/* Inline summary */}
-                    {(() => {
-                      const toMin = (t) => {
-                        if (!t) return null;
-                        const [h, m] = t.split(":").map(Number);
-                        if (isNaN(h) || isNaN(m)) return null;
-                        return h * 60 + m;
-                      };
-                      const fmt = (mins) => {
-                        if (mins == null) return "--";
-                        const h = Math.floor(mins / 60);
-                        const m = mins % 60;
-                        return m ? `${h}h ${m}m` : `${h}h`;
-                      };
-                      const s = toMin(commonFields.collegeStartTime);
-                      const e = toMin(commonFields.collegeEndTime);
-                      let total = null;
-                      if (s != null && e != null && e > s) total = e - s;
-                      const ls = toMin(commonFields.lunchStartTime);
-                      const le = toMin(commonFields.lunchEndTime);
-                      let lunch = null;
-                      if (
-                        total != null &&
-                        ls != null &&
-                        le != null &&
-                        le > ls
-                      ) {
-                        const overlap = Math.max(
-                          0,
-                          Math.min(e, le) - Math.max(s, ls)
-                        );
-                        lunch = overlap > 0 ? overlap : 0;
-                      }
-                      let working = null;
-                      if (total != null) {
-                        working = total - (lunch || 0);
-                        if (working < 0) working = 0;
-                      }
-                      return (
-                        <div className="md:w-64 w-full border border-gray-200 rounded-md bg-gray-50 px-3 py-2 flex flex-col justify-center text-[10px] md:text-xs text-gray-700">
-                          <div className="flex justify-between">
-                            <span>Total</span>
-                            <span className="font-medium">{fmt(total)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Lunch</span>
-                            <span className="font-medium">{fmt(lunch)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Working</span>
-                            <span className="font-semibold text-gray-900">
-                              {fmt(working)}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-
-                  {/* Phase 2 and Phase 3 Dates in Same Row */}
-                  {(selectedPhases.includes("phase-2") ||
-                    selectedPhases.includes("phase-3")) &&
-                    selectedPhases.length > 1 && (
-                      <div className="space-y-2 pt-2 border-t border-gray-200">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          {/* Phase 2 Dates */}
-                          {selectedPhases.includes("phase-2") &&
-                            getMainPhase() !== "phase-2" && (
-                              <div className="space-y-2">
-                                <h4 className="text-sm font-medium text-gray-900">
-                                  Phase 2 Dates
-                                </h4>
-                                <div className="grid grid-cols-2 gap-2">
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                                      Phase 2 Start Date
-                                    </label>
-                                    <input
-                                      type="date"
-                                      value={phase2Dates.startDate || ""}
-                                      onChange={(e) =>
-                                        setPhase2Dates({
-                                          ...phase2Dates,
-                                          startDate: e.target.value,
-                                        })
-                                      }
-                                      className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                                      Phase 2 End Date
-                                    </label>
-                                    <input
-                                      type="date"
-                                      value={phase2Dates.endDate || ""}
-                                      onChange={(e) =>
-                                        setPhase2Dates({
-                                          ...phase2Dates,
-                                          endDate: e.target.value,
-                                        })
-                                      }
-                                      className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                          {/* Phase 3 Dates */}
-                          {selectedPhases.includes("phase-3") &&
-                            getMainPhase() !== "phase-3" && (
-                              <div className="space-y-2">
-                                <h4 className="text-sm font-medium text-gray-900">
-                                  Phase 3 Dates
-                                </h4>
-                                <div className="grid grid-cols-2 gap-2">
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                                      Phase 3 Start Date
-                                    </label>
-                                    <input
-                                      type="date"
-                                      value={phase3Dates?.startDate || ""}
-                                      onChange={(e) =>
-                                        setPhase3Dates({
-                                          ...phase3Dates,
-                                          startDate: e.target.value,
-                                        })
-                                      }
-                                      className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                                      Phase 3 End Date
-                                    </label>
-                                    <input
-                                      type="date"
-                                      value={phase3Dates?.endDate || ""}
-                                      onChange={(e) =>
-                                        setPhase3Dates({
-                                          ...phase3Dates,
-                                          endDate: e.target.value,
-                                        })
-                                      }
-                                      className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                        </div>
-                      </div>
-                    )}
-                </div>
+                <TrainingConfiguration commonFields={commonFields} setCommonFields={setCommonFields} selectedPhases={selectedPhases} phase2Dates={phase2Dates} phase3Dates={phase3Dates} setPhase2Dates={setPhase2Dates} setPhase3Dates={setPhase3Dates} getMainPhase={getMainPhase} />
 
                 {/* Training Domain + Batch Details */}
                 {getMainPhase() && (
