@@ -113,10 +113,14 @@ function groupByCollege(trainings) {
   trainings.forEach((t) => {
     const key = `${t.collegeName} (${t.collegeCode})`;
     if (!map[key]) {
-      map[key] = { phases: [], tcv: t.tcv || 0, totalCost: 0 };
+      map[key] = { phases: [], tcv: t.tcv || 0, totalCost: 0, totalNetPayable: 0, hasGST: false };
     }
     map[key].phases.push(t);
     map[key].totalCost += t.totalCost || 0;
+    if (t.originalFormData?.gstType === "include") {
+      map[key].totalNetPayable += t.originalFormData?.netPayableAmount || 0;
+      map[key].hasGST = true;
+    }
   });
   // Calculate health
   Object.keys(map).forEach((key) => {
@@ -1397,8 +1401,8 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                             {phases.length} phase
                             {phases.length !== 1 ? "s" : ""} configured • TCV: ₹
                             {data.tcv.toLocaleString()} • Training Cost: ₹
-                            {data.totalCost.toLocaleString()} • Health:{" "}
-                            {health.toFixed(1)}%
+                            {data.totalCost.toLocaleString()} • Health: {health.toFixed(1)}% • Total Contract Amount (including GST): ₹
+                            {data.hasGST ? data.totalNetPayable.toLocaleString() : "NA"}
                           </p>
                         </div>
                         <div className="text-blue-100">
