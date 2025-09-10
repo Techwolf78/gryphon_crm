@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { db } from "../../firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import InvoiceModal from "./InvoiceModal";
@@ -20,6 +21,7 @@ import {
   FiXCircle,
   FiInfo,
   FiLayers,
+  FiTrash2,
 } from "react-icons/fi";
 
 // Enhanced PDF generation function with robust error handling
@@ -264,8 +266,15 @@ function GenerateTrainerInvoice() {
   const [startDateFilter, setStartDateFilter] = useState("");
   const [endDateFilter, setEndDateFilter] = useState("");
   const [projectCodeFilter, setProjectCodeFilter] = useState("");
+  const [collegeNameFilter, setCollegeNameFilter] = useState("");
   const [downloadingInvoice, setDownloadingInvoice] = useState(null);
   const [pdfStatus, setPdfStatus] = useState({});
+
+  // Combined filters dropdown state
+  const [filtersDropdownOpen, setFiltersDropdownOpen] = useState(false);
+  const filtersBtnRef = useRef();
+  const filtersDropdownRef = useRef();
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
 
   const handleDownloadInvoice = async (trainer) => {
     setDownloadingInvoice(
@@ -602,7 +611,12 @@ function GenerateTrainerInvoice() {
         ? trainer.projectCode.toLowerCase().includes(projectCodeFilter.toLowerCase())
         : true;
 
-      return matchesSearch && matchesDateRange && matchesProjectCode;
+      // College name filter
+      const matchesCollegeName = collegeNameFilter
+        ? trainer.collegeName.toLowerCase().includes(collegeNameFilter.toLowerCase())
+        : true;
+
+      return matchesSearch && matchesDateRange && matchesProjectCode && matchesCollegeName;
     });
 
     if (filteredTrainers.length > 0) {
@@ -614,6 +628,11 @@ function GenerateTrainerInvoice() {
 
   // Get unique project codes for filter
   const projectCodes = [...new Set(trainerData.map((item) => item.projectCode))].filter(
+    Boolean
+  );
+
+  // Get unique college names for filter
+  const collegeNames = [...new Set(trainerData.map((item) => item.collegeName))].filter(
     Boolean
   );
 
@@ -663,13 +682,75 @@ function GenerateTrainerInvoice() {
     setStartDateFilter("");
     setEndDateFilter("");
     setProjectCodeFilter("");
+    setCollegeNameFilter("");
   };
 
+  // Check if any filters are active (for badge on Filters button)
+  const isAnyFilterActive = startDateFilter || endDateFilter || projectCodeFilter || collegeNameFilter;
+
+  // Handle filters dropdown toggle with always downward positioning
+  const toggleFiltersDropdown = () => {
+    if (filtersDropdownOpen) {
+      setFiltersDropdownOpen(false);
+    } else {
+      const rect = filtersBtnRef.current.getBoundingClientRect();
+      const dropdownWidth = 320; // Approximate width
+      let top = rect.bottom + window.scrollY + 8; // Always position below the button
+      let left = rect.left + window.scrollX - dropdownWidth; // Left side (aligned to button's left edge)
+
+      // Adjust for left overflow only
+      if (left < 16) { // Minimum left margin
+        left = 16;
+      }
+
+      setDropdownPosition({ top, left });
+      setFiltersDropdownOpen(true);
+    }
+  };
+
+  // Apply filters and close dropdown
+  const applyFilters = () => {
+    setFiltersDropdownOpen(false);
+  };
+
+  // Clear all filters
+  const clearAllFilters = () => {
+    setStartDateFilter("");
+    setEndDateFilter("");
+    setProjectCodeFilter("");
+    setCollegeNameFilter("");
+    setFiltersDropdownOpen(false);
+  };
+
+  // Close dropdowns on click outside or Escape
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (
+        filtersDropdownRef.current &&
+        !filtersDropdownRef.current.contains(event.target) &&
+        !filtersBtnRef.current.contains(event.target)
+      ) {
+        setFiltersDropdownOpen(false);
+      }
+    }
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setFiltersDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [filtersDropdownOpen]);
+
   return (
-    <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
-      <div className="max-w-7xl mx-auto bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+    <div className="min-h-screen bg-gray-50 ">
+      <div className=" mx-auto bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-6">
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-4">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
             <div>
               <h1 className="text-2xl font-bold mb-2">
@@ -679,21 +760,14 @@ function GenerateTrainerInvoice() {
                 Generate and manage invoices for trainers
               </p>
             </div>
-            <button
-              onClick={handleRefreshData}
-              className="mt-4 md:mt-0 flex items-center gap-2 bg-white/10 hover:bg-white/20 transition-all px-4 py-2 rounded-lg backdrop-blur-sm"
-              aria-label="Refresh data"
-            >
-              <FiRefreshCw className="text-sm" />
-              Refresh Data
-            </button>
           </div>
         </div>
 
         {/* Filters and Search */}
         <div className="p-6 border-b border-gray-100 bg-gray-50/50">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-            <div className="w-full">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 mb-4">
+            {/* Search */}
+            <div className="flex-1 max-w-md">
               <label
                 htmlFor="search"
                 className="block text-sm font-medium text-gray-700 mb-1"
@@ -714,76 +788,129 @@ function GenerateTrainerInvoice() {
               </div>
             </div>
 
-            <div className="w-full">
-              <label
-                htmlFor="project-code-filter"
-                className="block text-sm font-medium text-gray-700 mb-1"
+            {/* Combined Filters Button */}
+            <div className="relative">
+              <button
+                ref={filtersBtnRef}
+                onClick={toggleFiltersDropdown}
+                className={`inline-flex items-center px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${isAnyFilterActive ? 'ring-2 ring-blue-500/20' : ''}`}
+                aria-label="Open filters"
               >
-                Project Code
-              </label>
-              <select
-                id="project-code-filter"
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                value={projectCodeFilter}
-                onChange={(e) => setProjectCodeFilter(e.target.value)}
-                aria-label="Filter by project code"
-              >
-                <option value="">All Project Codes</option>
-                {projectCodes.map((code) => (
-                  <option key={code} value={code}>
-                    {code}
-                  </option>
-                ))}
-              </select>
+                <FiFilter className="w-4 h-4 mr-1" />
+                Filters
+                {isAnyFilterActive && (
+                  <span className="ml-1 w-2 h-2 bg-blue-500 rounded-full"></span>
+                )}
+              </button>
+              {filtersDropdownOpen && createPortal(
+                <div
+                  ref={filtersDropdownRef}
+                  className="z-50 w-full max-w-sm md:max-w-md bg-white border border-gray-200 rounded-xl shadow-xl py-4 px-4 flex flex-col space-y-4 animate-fade-in transition-opacity duration-200"
+                  style={{
+                    position: "absolute",
+                    top: dropdownPosition.top,
+                    left: dropdownPosition.left,
+                    maxHeight: "80vh",
+                    overflowY: "auto",
+                  }}
+                >
+                  {/* Project Code Filter */}
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                      <FiBook className="w-4 h-4 mr-1" />
+                      Project Code
+                    </label>
+                    <select
+                      value={projectCodeFilter}
+                      onChange={(e) => setProjectCodeFilter(e.target.value)}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                    >
+                      <option value="">All Project Codes</option>
+                      {projectCodes.map((code) => (
+                        <option key={code} value={code}>
+                          {code}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* College Name Filter */}
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                      <FiUser className="w-4 h-4 mr-1" />
+                      College Name
+                    </label>
+                    <select
+                      value={collegeNameFilter}
+                      onChange={(e) => setCollegeNameFilter(e.target.value)}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                    >
+                      <option value="">All Colleges</option>
+                      {collegeNames.map((college) => (
+                        <option key={college} value={college}>
+                          {college}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Date Filter */}
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                      <FiCalendar className="w-4 h-4 mr-1" />
+                      Date Range
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="date"
+                        value={startDateFilter}
+                        onChange={(e) => setStartDateFilter(e.target.value)}
+                        className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                        placeholder="Start Date"
+                      />
+                      <input
+                        type="date"
+                        value={endDateFilter}
+                        onChange={(e) => setEndDateFilter(e.target.value)}
+                        className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                        placeholder="End Date"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex flex-col sm:flex-row justify-between gap-2 pt-2 border-t border-gray-100">
+                    <button
+                      onClick={clearAllFilters}
+                      className="flex-1 inline-flex items-center justify-center px-3 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all"
+                    >
+                      <FiTrash2 className="w-4 h-4 mr-1" />
+                      Clear All
+                    </button>
+                    <button
+                      onClick={applyFilters}
+                      className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                </div>,
+                document.body
+              )}
             </div>
 
-            <div className="w-full">
-              <label
-                htmlFor="start-date-filter"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Start Date (From)
-              </label>
-              <input
-                id="start-date-filter"
-                type="date"
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                value={startDateFilter}
-                onChange={(e) => setStartDateFilter(e.target.value)}
-                aria-label="Filter by start date"
-              />
-            </div>
-
-            <div className="w-full">
-              <label
-                htmlFor="end-date-filter"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                End Date (To)
-              </label>
-              <input
-                id="end-date-filter"
-                type="date"
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                value={endDateFilter}
-                onChange={(e) => setEndDateFilter(e.target.value)}
-                aria-label="Filter by end date"
-              />
-            </div>
-          </div>
-
-          <div className="mt-4 flex justify-end">
+            {/* Refresh Button */}
             <button
-              onClick={clearFilters}
-              className="px-4 py-2.5 text-sm border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
-              aria-label="Clear filters"
+              onClick={handleRefreshData}
+              className="inline-flex items-center px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
             >
-              Clear Filters
+              <FiRefreshCw className="w-4 h-4 mr-1" />
+              Refresh
             </button>
           </div>
 
           {/* Active filters indicator */}
-          {(searchTerm || startDateFilter || endDateFilter || projectCodeFilter) && (
+          {(searchTerm || startDateFilter || endDateFilter || projectCodeFilter || collegeNameFilter) && (
             <div className="mt-3 flex flex-wrap items-center text-sm text-gray-500">
               <span className="mr-2">Active filters:</span>
               {searchTerm && (
@@ -796,8 +923,13 @@ function GenerateTrainerInvoice() {
                   Project Code: {projectCodeFilter}
                 </span>
               )}
-              {startDateFilter && (
+              {collegeNameFilter && (
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 mr-2 mb-2">
+                  College: {collegeNameFilter}
+                </span>
+              )}
+              {startDateFilter && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 mr-2 mb-2">
                   Start Date: {startDateFilter}
                 </span>
               )}

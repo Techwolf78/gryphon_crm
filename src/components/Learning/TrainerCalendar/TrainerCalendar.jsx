@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import { db } from "../../../firebase";
-import { collection, getDocs, onSnapshot, query as fsQuery, where, orderBy, getDoc, doc } from "firebase/firestore";
+import { collection, getDocs, onSnapshot, query as fsQuery, where, orderBy } from "firebase/firestore";
 import {
   FiX,
   FiDownload,
@@ -13,7 +13,9 @@ import {
   FiMaximize2,
   FiMinimize2,
 } from "react-icons/fi";
-import jsPDF from 'jspdf';
+import TrainerCalendarPDF from './TrainerCalendarPDF';
+import TrainerCalendarExcel from './TrainerCalendarExcel';
+import BookingDetail from './BookingDetail';
 
 // TrainerCalendar
 // Purpose: dashboard to view trainer bookings (booked dates, details).
@@ -49,55 +51,81 @@ function formatDateISO(d) {
   }
 }
 
-function BookingDetail({ booking, onClose }) {
-  if (!booking) return null;
+function DateBookingsModal({ dateBookings, date, onClose, onBookingDetail }) {
+  if (!dateBookings) return null;
+  
+  const dateObj = new Date(date + 'T00:00:00');
+  const formattedDate = dateObj.toLocaleDateString('en-CA');
+  const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+  
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Booking details"
+      aria-label={`All bookings for ${formattedDate}`}
       className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/40"
     >
-      <div className="w-full max-w-lg bg-white rounded-xl shadow-2xl p-5">
-        <div className="flex items-start justify-between mb-3">
+      <div className="w-full max-w-2xl bg-white rounded-xl shadow-2xl p-5 max-h-[80vh] overflow-hidden flex flex-col">
+        <div className="flex items-start justify-between mb-4">
           <div>
-            <h4 className="text-lg font-semibold text-gray-900">Booking details</h4>
-            <p className="text-sm text-gray-500">Details for the selected trainer booking</p>
+            <h4 className="text-lg font-semibold text-gray-900">All Bookings</h4>
+            <p className="text-sm text-gray-500">{dayName}, {formattedDate}</p>
+            <p className="text-xs text-gray-400 mt-1">{dateBookings.length} booking{dateBookings.length !== 1 ? 's' : ''}</p>
           </div>
           <button
             onClick={onClose}
-            aria-label="Close booking details"
+            aria-label="Close bookings modal"
             className="text-gray-500 p-2 rounded hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
             <FiX />
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-gray-700">
-          <div className="space-y-2">
-            <div className="text-xs text-gray-500">Trainer</div>
-            <div className="font-medium text-gray-900">{booking.trainerName || booking.trainerId}</div>
-            <div className="text-xs text-gray-500 mt-2">Date</div>
-            <div className="font-medium text-gray-900">{booking.date ? new Date(booking.date).toLocaleDateString('en-CA') : (booking.dateISO || booking.date || booking.startDate)}</div>
-            <div className="text-xs text-gray-500 mt-2">Duration</div>
-            <div className="font-medium text-gray-900">{booking.dayDuration || '—'}</div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="text-xs text-gray-500">Batch / Domain</div>
-            <div className="font-medium text-gray-900">
-              {booking.batchCode && booking.domain
-                ? `${booking.batchCode} • ${booking.domain}`
-                : (booking.batchCode || booking.domain || '—')}
-            </div>
-            <div className="text-xs text-gray-500 mt-2">College</div>
-            <div className="font-medium text-gray-900">{booking.collegeName || '—'}</div>
-            <div className="text-xs text-gray-500 mt-2">Source training</div>
-            <div className="font-medium text-gray-900">{booking.sourceTrainingId || '—'}</div>
+        <div className="flex-1 overflow-y-auto">
+          <div className="space-y-3">
+            {dateBookings.map((booking, index) => {
+              const dd = String(booking.dayDuration || '').toUpperCase();
+              return (
+                <div key={booking.id || `${booking.trainerId}-${booking.dateISO}-${dd}-${index}`} 
+                     className={`p-4 rounded-lg border ${booking._conflict ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white'} hover:shadow-sm transition`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-gray-900 text-sm">{booking.batchCode || booking.domain || '—'}</span>
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${dd.includes('AM') && dd.includes('PM') ? 'bg-blue-100 text-blue-700' : dd.includes('AM') ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                          {booking.dayDuration || '—'}
+                        </span>
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        {booking.trainerName || booking.trainerId} • {booking.collegeName || '—'}
+                        {booking._conflict && <span className="ml-2 text-red-600 font-semibold">(Conflict)</span>}
+                      </div>
+                      {booking.sourceTrainingId && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          Project Code: {booking.sourceTrainingId}
+                        </div>
+                      )}
+                    </div>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onBookingDetail) {
+                          onBookingDetail(booking);
+                        }
+                      }}
+                      className="shrink-0 p-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-medium shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                      aria-label="View booking details"
+                    >
+                      Info
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        <div className="mt-5 text-right">
+        <div className="mt-4 pt-4 border-t border-gray-200 text-right">
           <button
             onClick={onClose}
             className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -125,13 +153,13 @@ function TrainerCalendar({
   // Trainer search dropdown state
   const [trainerSearchOpen, setTrainerSearchOpen] = useState(false);
   const [trainerSearchValue, setTrainerSearchValue] = useState("");
-  // PDF export loading state
-  const [pdfLoading, setPdfLoading] = useState(false);
   const [viewMode, setViewMode] = useState('month'); // month | week | day
   const [focusedDate, setFocusedDate] = useState(() => new Date());
   const [showAllPast, setShowAllPast] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState(()=> new Set()); // dates that are collapsed
   const [showBookingsFull, setShowBookingsFull] = useState(false); // full-screen bookings overlay
+  const [selectedDateBookings, setSelectedDateBookings] = useState(null); // for showing all bookings for a specific date
+  const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
   // Persistence key
   const PERSIST_KEY = 'trainerCalendarPrefs_v1';
 
@@ -352,7 +380,7 @@ function TrainerCalendar({
           const tomorrow = formatDateISO(new Date(Date.now()+86400000));
             if (date === tomorrow) label = 'Tomorrow';
         }
-        const isPast = date < todayISO;
+        const isPast = new Date(date + 'T00:00:00') < new Date(new Date().toDateString());
         return { date, label, bookings: list, anyConflict, isPast };
       });
     return out;
@@ -378,15 +406,15 @@ function TrainerCalendar({
   };
   const expandAll = () => setCollapsedGroups(new Set());
 
-  // Close full bookings on Escape
+  // Close date bookings modal on Escape
   useEffect(() => {
-    if (!showBookingsFull) return;
+    if (!selectedDateBookings) return;
     const handleKey = (e) => {
-      if (e.key === 'Escape') setShowBookingsFull(false);
+      if (e.key === 'Escape') setSelectedDateBookings(null);
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [showBookingsFull]);
+  }, [selectedDateBookings]);
 
   // Utilization (% half-day slots booked / total in month)
   const utilizationByTrainer = useMemo(() => {
@@ -429,274 +457,7 @@ function TrainerCalendar({
     return map;
   }, [bookingsWithConflicts]);
 
-  const exportCSV = () => {
-    const rows = bookingsWithConflicts.map((b) => ({
-      trainerId: b.trainerId,
-      trainerName: b.trainerName || b.trainer || "",
-      date: b.dateISO || "",
-      dayDuration: b.dayDuration || "",
-      domain: b.domain || "",
-      batchCode: b.batchCode || "",
-      sourceTrainingId: b.sourceTrainingId || "",
-      conflict: b._conflict ? 'YES' : 'NO'
-    }));
-    if (!rows.length) return;
-    const headerCols = ['trainerId','trainerName','date','dayDuration','domain','batchCode','sourceTrainingId','conflict'];
-    const header = headerCols.join(',') + '\n';
-    const body = rows.map((r) => headerCols.map(k => `"${String(r[k] || '').replace(/"/g, '""')}"`).join(',')).join('\n');
-    const csv = header + body;
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.style.display = 'none';
-    a.href = url;
-    a.download = `trainer-bookings-${selectedTrainer || 'all'}-${viewMode}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
 
-  // PDF export function
-  const exportPDF = async () => {
-    if (bookingsWithConflicts.length === 0) return;
-    setPdfLoading(true);
-    try {
-      // Fetch additional data from trainingForms
-      let venue = 'To be specified';
-      let contactPerson = 'To be specified';
-      let contactNumber = 'To be specified';
-      if (bookingsWithConflicts[0]?.sourceTrainingId) {
-        try {
-          const trainingDoc = await getDoc(doc(db, 'trainingForms', bookingsWithConflicts[0].sourceTrainingId));
-          if (trainingDoc.exists()) {
-            const data = trainingDoc.data();
-            venue = data.venue || venue;
-            contactPerson = data.contactPerson || contactPerson;
-            contactNumber = data.contactNumber || contactNumber;
-          }
-        } catch (err) {
-          console.warn('Failed to fetch training data for PDF:', err);
-        }
-      }
-      const pdf = new jsPDF('portrait', 'mm', 'a4');
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      let yPosition = 20;
-
-      // Header
-      pdf.setFontSize(16);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Training Assignment Invoice', pageWidth / 2, yPosition, { align: 'center' });
-      yPosition += 15;
-
-      // College Information
-      pdf.setFontSize(12);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('College Details:', 20, yPosition);
-      yPosition += 8;
-
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(10);
-
-      // Get college name from first booking or selected college
-      const collegeName = selectedCollege || (bookingsWithConflicts[0]?.collegeName) || 'Not Specified';
-      pdf.text(`1. College Name: ${collegeName}`, 25, yPosition);
-      yPosition += 6;
-
-      pdf.text(`2. Venue: ${venue}`, 25, yPosition);
-      yPosition += 6;
-
-      pdf.text(`3. Contact Person: ${contactPerson}`, 25, yPosition);
-      yPosition += 6;
-
-      pdf.text(`4. Contact Number: ${contactNumber}`, 25, yPosition);
-      yPosition += 10;
-
-      // Schedule Details Header
-      pdf.setFontSize(12);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('5. Details of Schedule', 20, yPosition);
-      yPosition += 10;
-
-      // Table Headers
-      const headers = [
-        'Domain', 'Year', 'Trainer Name', 'Date', 'Batch',
-        'Hrs.', 'Cost/hrs', 'Cost/day',
-        'Food+Lodging/Day', 'Travel To & Fro', 'Total Amount'
-      ];
-
-      const colWidths = [20, 12, 24, 20, 16, 10, 14, 14, 20, 16, 16];
-      let xPosition = 20;
-
-      pdf.setFontSize(6);
-      pdf.setFont('helvetica', 'bold');
-
-      // Draw header row with borders
-      let headerY = yPosition;
-      headers.forEach((header, index) => {
-        const lines = pdf.splitTextToSize(header, colWidths[index] - 2);
-        pdf.text(lines, xPosition + 1, yPosition + 4); // Slight padding
-        // Draw cell border
-        pdf.rect(xPosition, headerY, colWidths[index], 6);
-        xPosition += colWidths[index];
-      });
-
-      yPosition += 6;
-
-      // Draw table lines
-      pdf.setDrawColor(0);
-      pdf.setLineWidth(0.3);
-      let tableStartY = headerY;
-
-      // Horizontal lines
-      pdf.line(20, tableStartY, pageWidth - 20, tableStartY); // Top line
-      pdf.line(20, yPosition, pageWidth - 20, yPosition); // Bottom of header
-
-      // Vertical lines for columns
-      xPosition = 20;
-      headers.forEach((_, index) => {
-        pdf.line(xPosition, tableStartY, xPosition, yPosition);
-        xPosition += colWidths[index];
-      });
-      pdf.line(xPosition, tableStartY, xPosition, yPosition); // Rightmost line
-
-      // Process bookings data
-      let totalHours = 0;
-      let totalDays = new Set();
-      let totalCost = 0;
-      // Default rate - could be made configurable
-      const defaultHourlyRate = bookingsWithConflicts[0]?.perHourCost || 1500;
-
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(6);
-
-      bookingsWithConflicts.forEach((booking) => {
-        if (yPosition > pageHeight - 40) {
-          // Add new page
-          pdf.addPage();
-          yPosition = 20;
-          tableStartY = yPosition - 6;
-
-          // Redraw headers on new page
-          xPosition = 20;
-          pdf.setFont('helvetica', 'bold');
-          headers.forEach((header, colIndex) => {
-            const lines = pdf.splitTextToSize(header, colWidths[colIndex] - 2);
-            pdf.text(lines, xPosition + 1, yPosition + 4);
-            pdf.rect(xPosition, yPosition, colWidths[colIndex], 6);
-            xPosition += colWidths[colIndex];
-          });
-          pdf.line(20, yPosition, pageWidth - 20, yPosition);
-          pdf.line(20, yPosition + 6, pageWidth - 20, yPosition + 6);
-          xPosition = 20;
-          headers.forEach((_, colIndex) => {
-            pdf.line(xPosition, yPosition, xPosition, yPosition + 6);
-            xPosition += colWidths[colIndex];
-          });
-          pdf.line(xPosition, yPosition, xPosition, yPosition + 6);
-          yPosition += 6;
-        }
-
-        const date = new Date(booking.dateISO).toLocaleDateString('en-US', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        });
-
-        const hours = booking.dayDuration?.includes('AM') && booking.dayDuration?.includes('PM') ? 8 : 4;
-        const costPerDay = hours * (booking.perHourCost || defaultHourlyRate);
-        const foodLodging = (booking.food || 0) + (booking.lodging || 0);
-        const travel = booking.conveyance || 0;
-        const totalAmount = costPerDay + foodLodging + travel;
-
-        totalHours += hours;
-        totalDays.add(booking.dateISO);
-        totalCost += totalAmount;
-
-        const rowData = [
-          booking.domain || 'Technical',
-          booking.year || '2nd Year',
-          booking.trainerName || booking.trainerId || 'Unknown',
-          date,
-          booking.batchCode || booking.domain || 'General',
-          hours.toString(),
-          (booking.perHourCost || defaultHourlyRate).toString(),
-          costPerDay.toString(),
-          foodLodging.toString(),
-          travel.toString(),
-          totalAmount.toString()
-        ];
-
-        let rowY = yPosition;
-        xPosition = 20;
-        rowData.forEach((data, colIndex) => {
-          const lines = pdf.splitTextToSize(data.toString(), colWidths[colIndex] - 2);
-          pdf.text(lines, xPosition + 1, yPosition + 4);
-          pdf.rect(xPosition, rowY, colWidths[colIndex], 6);
-          xPosition += colWidths[colIndex];
-        });
-
-        yPosition += 6;
-
-        // Draw horizontal line after each row
-        pdf.line(20, yPosition, pageWidth - 20, yPosition);
-
-        // Vertical lines for this row
-        xPosition = 20;
-        rowData.forEach((_, colIndex) => {
-          pdf.line(xPosition, rowY, xPosition, yPosition);
-          xPosition += colWidths[colIndex];
-        });
-        pdf.line(xPosition, rowY, xPosition, yPosition);
-      });
-
-      // Summary Section
-      yPosition += 10;
-
-      if (yPosition > pageHeight - 60) {
-        pdf.addPage();
-        yPosition = 20;
-      }
-
-      // Totals
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'bold');
-
-      const tdsAmount = totalCost * 0.1; // 10% TDS
-      const payableAmount = totalCost - tdsAmount;
-
-      pdf.text(`Total Assignment Days = ${totalDays.size} Days`, 20, yPosition);
-      yPosition += 8;
-      pdf.text(`Total Hours of assignment = ${totalHours} Hrs.`, 20, yPosition);
-      yPosition += 8;
-      pdf.text(`Start Date: ${Array.from(totalDays).sort()[0] ? new Date(Array.from(totalDays).sort()[0]).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Not specified'}`, 20, yPosition);
-      yPosition += 8;
-      pdf.text(`Professional Fee: Rs ${defaultHourlyRate}/Hrs.`, 20, yPosition);
-      yPosition += 8;
-      pdf.text(`Total Assignment Cost: Rs ${totalCost.toLocaleString()}`, 20, yPosition);
-      yPosition += 8;
-      pdf.text(`Total Payable Cost: Rs ${payableAmount.toLocaleString()}`, 20, yPosition);
-
-      // Footer
-      yPosition += 15;
-      pdf.setFontSize(8);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text(`Generated on: ${new Date().toLocaleString()}`, 20, pageHeight - 10);
-      pdf.text(`Total Bookings: ${bookingsWithConflicts.length}`, pageWidth - 60, pageHeight - 10);
-
-      // Save the PDF
-      const filename = `training-assignment-${selectedTrainer || 'all'}-${new Date().toISOString().split('T')[0]}.pdf`;
-      pdf.save(filename);
-
-    } catch (error) {
-      console.error('PDF export failed:', error);
-      alert(`Failed to generate PDF: ${error.message || 'Unknown error'}. Please try again.`);
-    } finally {
-      setPdfLoading(false);
-    }
-  };
 
   const outerWrapperClass = embedded
     ? 'w-full'
@@ -754,28 +515,49 @@ function TrainerCalendar({
                 Back
               </button>
             )}
-            <button
-              disabled={bookingsWithConflicts.length === 0 || pdfLoading}
-              onClick={exportPDF}
-              className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition ${
-                bookingsWithConflicts.length === 0 || pdfLoading
-                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                  : 'bg-green-600 text-white hover:bg-green-700'
-              }`}
-            >
-              <FiDownload className="w-4 h-4" />
-              <span className="hidden sm:inline">{pdfLoading ? 'Generating...' : 'Export PDF'}</span>
-              <span className="sm:hidden">{pdfLoading ? 'PDF...' : 'PDF'}</span>
-            </button>
-            <button
-              disabled={bookingsWithConflicts.length === 0}
-              onClick={exportCSV}
-              className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition ${bookingsWithConflicts.length === 0 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
-            >
-              <FiDownload className="w-4 h-4" />
-              <span className="hidden sm:inline">Export CSV</span>
-              <span className="sm:hidden">CSV</span>
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
+                disabled={bookingsWithConflicts.length === 0}
+                className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm border border-gray-200 ${
+                  bookingsWithConflicts.length === 0
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-white text-gray-700 hover:bg-gray-50'
+                } focus:outline-none focus:ring-2 focus:ring-indigo-500`}
+              >
+                <FiDownload className="w-4 h-4" />
+                Export
+                <FiChevronDown className={`w-3 h-3 transition-transform ${exportDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {exportDropdownOpen && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={() => setExportDropdownOpen(false)}
+                  ></div>
+                  <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                    <div className="py-1">
+                      <TrainerCalendarPDF 
+                        bookings={bookingsWithConflicts} 
+                        selectedTrainer={selectedTrainer} 
+                        selectedCollege={selectedCollege} 
+                        disabled={false}
+                        asDropdownItem={true}
+                        onClick={() => setExportDropdownOpen(false)}
+                      />
+                      <TrainerCalendarExcel 
+                        bookings={bookingsWithConflicts} 
+                        selectedTrainer={selectedTrainer} 
+                        disabled={false}
+                        asDropdownItem={true}
+                        onClick={() => setExportDropdownOpen(false)}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
             {!embedded && (
               <button
                 onClick={onClose}
@@ -921,7 +703,15 @@ function TrainerCalendar({
                               <button onClick={(ev)=> { ev.stopPropagation(); setBookingDetail(b); }} className="shrink-0 text-[10px] sm:text-xs text-indigo-600 hover:text-indigo-700 focus:outline-none">Info</button>
                             </div>
                           ))}
-                          {dayBookings.length > 3 && <div className="text-[9px] sm:text-[10px] text-gray-400">+{dayBookings.length - 3} more</div>}
+                          {dayBookings.length > 3 && (
+                            <button 
+                              onClick={() => setSelectedDateBookings({ date: iso, bookings: dayBookings })}
+                              className="text-[9px] sm:text-[10px] text-indigo-600 hover:text-indigo-700 hover:underline focus:outline-none focus:underline"
+                              aria-label={`View all ${dayBookings.length} bookings for ${iso}`}
+                            >
+                              +{dayBookings.length - 3} more
+                            </button>
+                          )}
                         </div>
                       </div>
                     );
@@ -980,22 +770,25 @@ function TrainerCalendar({
                   {bookingsWithConflicts.some(b=> b._conflict) && <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700"><FiAlertTriangle className="w-3 h-3"/>Conflicts</span>}
                 </h4>
                 <div className="flex items-center gap-1">
-                  <button onClick={expandAll} className="text-indigo-600 hover:underline">Expand All</button>
+                  <button onClick={() => setShowBookingsFull(true)} className="text-indigo-600 hover:underline">Full Screen</button>
                   <span className="text-gray-300">|</span>
-                  <button onClick={collapseAll} className="text-indigo-600 hover:underline">Collapse All</button>
+                  {collapsedGroups.size === 0 ? (
+                    <button onClick={collapseAll} className="text-indigo-600 hover:underline">Collapse All</button>
+                  ) : collapsedGroups.size === filteredGroupedBookings.length ? (
+                    <button onClick={expandAll} className="text-indigo-600 hover:underline">Expand All</button>
+                  ) : (
+                    <>
+                      <button onClick={expandAll} className="text-indigo-600 hover:underline">Expand All</button>
+                      <span className="text-gray-300">|</span>
+                      <button onClick={collapseAll} className="text-indigo-600 hover:underline">Collapse All</button>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="mt-2 text-[11px] text-gray-500 flex flex-wrap items-center gap-3">
                 <span>Total: <span className="font-semibold text-gray-700">{bookingsWithConflicts.length}</span></span>
                 <span>Visible: <span className="font-semibold text-gray-700">{filteredGroupedBookings.reduce((a,g)=> a+g.bookings.length,0)}</span></span>
                 {bookingsWithConflicts.some(b=> b._conflict) && <span>Conflicts: <span className="font-semibold text-red-600">{bookingsWithConflicts.filter(b=> b._conflict).length}</span></span>}
-                {filteredGroupedBookings.length > 1 && (
-                  <span className="ml-auto flex items-center gap-1">
-                    <button onClick={expandAll} className="text-indigo-600 hover:underline">Expand All</button>
-                    <span className="text-gray-300">|</span>
-                    <button onClick={collapseAll} className="text-indigo-600 hover:underline">Collapse All</button>
-                  </span>
-                )}
               </div>
               <div className="mt-3 relative max-h-48 xl:max-h-64 overflow-y-auto pr-1 rounded-lg border border-gray-100 bg-white/50">
                 {filteredGroupedBookings.length === 0 && (
@@ -1040,7 +833,16 @@ function TrainerCalendar({
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                                  <button onClick={()=> setBookingDetail(b)} aria-label="Details" className="p-1.5 rounded-md bg-indigo-50 text-indigo-600 hover:bg-indigo-100 text-[11px]">Info</button>
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setBookingDetail(b);
+                                    }} 
+                                    aria-label="View booking details" 
+                                    className="p-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 text-xs font-medium shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                  >
+                                    Info
+                                  </button>
                                   {/* Delete disabled */}
                                 </div>
                               </div>
@@ -1064,6 +866,14 @@ function TrainerCalendar({
         </div>
       </div>
   {bookingDetail && <BookingDetail booking={bookingDetail} onClose={() => setBookingDetail(null)} />}
+  {selectedDateBookings && (
+    <DateBookingsModal 
+      dateBookings={selectedDateBookings.bookings} 
+      date={selectedDateBookings.date} 
+      onClose={() => setSelectedDateBookings(null)}
+      onBookingDetail={setBookingDetail}
+    />
+  )}
   {showBookingsFull && (
     <div role="dialog" aria-modal="true" aria-label="All bookings" className="fixed inset-0 z-[80] flex flex-col bg-white/90 backdrop-blur-md animate-fadeIn">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white/80 backdrop-blur-sm">
@@ -1073,8 +883,16 @@ function TrainerCalendar({
           {bookingsWithConflicts.some(b=> b._conflict) && <span className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-red-100 text-red-700"><FiAlertTriangle className="w-3 h-3"/>Conflicts</span>}
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={expandAll} className="text-xs text-indigo-600 hover:underline">Expand All</button>
-          <button onClick={collapseAll} className="text-xs text-indigo-600 hover:underline">Collapse All</button>
+          {collapsedGroups.size === 0 ? (
+            <button onClick={collapseAll} className="text-xs text-indigo-600 hover:underline">Collapse All</button>
+          ) : collapsedGroups.size === filteredGroupedBookings.length ? (
+            <button onClick={expandAll} className="text-xs text-indigo-600 hover:underline">Expand All</button>
+          ) : (
+            <>
+              <button onClick={expandAll} className="text-xs text-indigo-600 hover:underline">Expand All</button>
+              <button onClick={collapseAll} className="text-xs text-indigo-600 hover:underline">Collapse All</button>
+            </>
+          )}
           <button
             onClick={() => setShowBookingsFull(false)}
             aria-label="Close full bookings"
@@ -1091,7 +909,9 @@ function TrainerCalendar({
       </div>
       <div className="flex-1 overflow-y-auto">
         <ul className="divide-y divide-gray-100">
-          {filteredGroupedBookings.map(g => (
+          {filteredGroupedBookings
+            .filter(g => showAllPast || !g.isPast || g.date === formatDateISO(new Date()))
+            .map(g => (
             <li key={g.date} className="bg-white">
               <button
                 type="button"
@@ -1125,7 +945,16 @@ function TrainerCalendar({
                             </div>
                           </div>
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                            <button onClick={()=> setBookingDetail(b)} aria-label="Details" className="p-1.5 rounded-md bg-indigo-50 text-indigo-600 hover:bg-indigo-100 text-[11px]">Info</button>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setBookingDetail(b);
+                              }} 
+                              aria-label="View booking details" 
+                              className="p-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 text-xs font-medium shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                            >
+                              Info
+                            </button>
                             {/* Delete disabled */}
                           </div>
                         </div>
@@ -1137,6 +966,11 @@ function TrainerCalendar({
             </li>
           ))}
         </ul>
+        {!showAllPast && groupedBookings.some(g=> g.isPast) && (
+          <div className="sticky bottom-0 bg-gradient-to-t from-white to-white/70 p-2 text-center border-t border-gray-100">
+            <button onClick={()=> setShowAllPast(true)} className="text-[11px] text-indigo-600 hover:underline">Show older bookings</button>
+          </div>
+        )}
       </div>
     </div>
   )}

@@ -24,7 +24,7 @@ const ChangeTrainerDashboard = ({
   onClose,
   selectedTraining: preSelectedTraining,
 }) => {
-  const [step, setStep] = useState(1); // 1: Select Training, 2: Select Trainer, 3: Change Details, 4: Confirmation
+  const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [trainings, setTrainings] = useState([]);
   const [trainers, setTrainers] = useState([]);
@@ -35,27 +35,15 @@ const ChangeTrainerDashboard = ({
   const [changeEndDate, setChangeEndDate] = useState("");
   const [reason, setReason] = useState("");
   const [newTrainerCost, setNewTrainerCost] = useState("");
-  const [autoTrainerBaseCost, setAutoTrainerBaseCost] = useState(null); // raw cost fetched from trainer doc
-  const [manualCostEdited, setManualCostEdited] = useState(false); // track if user manually changed cost
+  const [autoTrainerBaseCost, setAutoTrainerBaseCost] = useState(null);
+  const [manualCostEdited, setManualCostEdited] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [loadingDomains, setLoadingDomains] = useState(false);
   const [globalTrainerAssignments, setGlobalTrainerAssignments] = useState([]);
 
-  // Debug log to check if modal is opening
-  useEffect(() => {
-    console.log("🔍 [CHANGE TRAINER MODAL] Modal state:", {
-      isOpen,
-      preSelectedTraining,
-      step,
-      selectedTraining,
-    });
-  }, [isOpen, preSelectedTraining, step, selectedTraining]);
-
-  // Fetch all in-progress trainings
   const fetchInProgressTrainings = useCallback(async () => {
     setLoading(true);
     try {
-      console.log("🔄 [CHANGE TRAINER] Fetching in-progress trainings...");
       const formsSnap = await getDocs(collection(db, "trainingForms"));
       const inProgressTrainings = [];
 
@@ -68,7 +56,6 @@ const ChangeTrainerDashboard = ({
         for (const phaseDoc of phasesSnap.docs) {
           const phaseData = phaseDoc.data();
 
-          // Only include trainings that are in progress
           if (phaseData.trainingStartDate && phaseData.trainingEndDate) {
             const today = new Date();
             const startDate = parseDate(phaseData.trainingStartDate);
@@ -78,9 +65,7 @@ const ChangeTrainerDashboard = ({
             startDate.setHours(0, 0, 0, 0);
             endDate.setHours(0, 0, 0, 0);
 
-            // Check if training is currently in progress
             if (today >= startDate && today <= endDate) {
-              // Get domain data with trainers
               const domainsSnap = await getDocs(
                 collection(
                   db,
@@ -120,96 +105,16 @@ const ChangeTrainerDashboard = ({
         }
       }
 
-      console.log("✅ [CHANGE TRAINER] Found trainings:", inProgressTrainings);
       setTrainings(inProgressTrainings);
-    } catch (error) {
-      console.error("❌ [CHANGE TRAINER] Error fetching trainings:", error);
+    } catch {
+      // Error fetching trainings
     }
     setLoading(false);
   }, []);
 
-  // Fetch available trainers
-  const fetchTrainers = async () => {
-    try {
-      const trainersSnap = await getDocs(collection(db, "trainers"));
-      const trainersList = [];
-      trainersSnap.forEach((doc) => {
-        trainersList.push({ id: doc.id, ...doc.data() });
-      });
-      setTrainers(trainersList);
-    } catch (error) {
-      console.error("Error fetching trainers:", error);
-    }
-  };
-
-  // Fetch domains for a specific training
-  const fetchTrainingDomains = async (formId, phaseId, training) => {
-    setLoadingDomains(true);
-    try {
-      console.log("🔄 [FETCH DOMAINS] Fetching domains for:", {
-        formId,
-        phaseId,
-      });
-
-      const domainsSnap = await getDocs(
-        collection(db, "trainingForms", formId, "trainings", phaseId, "domains")
-      );
-
-      console.log(
-        "🔍 [FETCH DOMAINS] Domains snapshot size:",
-        domainsSnap.size
-      );
-
-      const domainsWithTrainers = [];
-      domainsSnap.forEach((domainDoc) => {
-        const domainData = domainDoc.data();
-        console.log(
-          "🔍 [FETCH DOMAINS] Domain data:",
-          domainDoc.id,
-          domainData
-        );
-
-        if (domainData.table1Data && domainData.table1Data.length > 0) {
-          console.log(
-            "✅ [FETCH DOMAINS] Found table1Data for domain:",
-            domainDoc.id
-          );
-          domainsWithTrainers.push({
-            domainId: domainDoc.id,
-            domainName: domainData.domain || domainDoc.id,
-            table1Data: domainData.table1Data,
-          });
-        } else {
-          console.log(
-            "❌ [FETCH DOMAINS] No table1Data for domain:",
-            domainDoc.id
-          );
-        }
-      });
-
-      console.log(
-        "✅ [FETCH DOMAINS] Final domains with trainers:",
-        domainsWithTrainers
-      );
-
-      const updatedTraining = { ...training, domains: domainsWithTrainers };
-      setSelectedTraining(updatedTraining);
-
-      console.log("✅ [FETCH DOMAINS] Updated training:", updatedTraining);
-    } catch (error) {
-      console.error(
-        "❌ [FETCH DOMAINS] Error fetching training domains:",
-        error
-      );
-    }
-    setLoadingDomains(false);
-  };
-
   useEffect(() => {
     if (isOpen) {
-      // If a training is preselected from dashboard, use it directly
       if (preSelectedTraining) {
-        // Convert dashboard training format to modal format
         const convertedTraining = {
           id: `${preSelectedTraining.trainingId}_${preSelectedTraining.phaseId}`,
           formId: preSelectedTraining.trainingId,
@@ -224,23 +129,21 @@ const ChangeTrainerDashboard = ({
             lunchStartTime: preSelectedTraining.lunchStartTime,
             lunchEndTime: preSelectedTraining.lunchEndTime,
           },
-          domains: [], // Will be fetched
+          domains: [],
         };
 
         setSelectedTraining(convertedTraining);
-        setStep(2); // Skip training selection step
+        setStep(2);
         fetchTrainingDomains(
           preSelectedTraining.trainingId,
           preSelectedTraining.phaseId,
           convertedTraining
         );
       } else {
-        // Fetch all in-progress trainings
         fetchInProgressTrainings();
       }
 
       fetchTrainers();
-      // Set default change start/end date to tomorrow and tomorrow+1
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       setChangeStartDate(tomorrow.toISOString().slice(0, 10));
@@ -248,7 +151,86 @@ const ChangeTrainerDashboard = ({
     }
   }, [isOpen, preSelectedTraining, fetchInProgressTrainings]);
 
-  // Listen to centralized trainerAssignments to detect external conflicts
+  const fetchTrainers = async () => {
+    try {
+      const trainersSnap = await getDocs(collection(db, "trainers"));
+      const trainersList = [];
+      trainersSnap.forEach((doc) => {
+        trainersList.push({ id: doc.id, ...doc.data() });
+      });
+      setTrainers(trainersList);
+    } catch {
+      // Error fetching trainers
+    }
+  };
+
+  const fetchTrainingDomains = async (formId, phaseId, training) => {
+    setLoadingDomains(true);
+    try {
+      const domainsSnap = await getDocs(
+        collection(db, "trainingForms", formId, "trainings", phaseId, "domains")
+      );
+
+      const domainsWithTrainers = [];
+      domainsSnap.forEach((domainDoc) => {
+        const domainData = domainDoc.data();
+
+        if (domainData.table1Data && domainData.table1Data.length > 0) {
+          domainsWithTrainers.push({
+            domainId: domainDoc.id,
+            domainName: domainData.domain || domainDoc.id,
+            table1Data: domainData.table1Data,
+          });
+        }
+      });
+
+      const updatedTraining = { ...training, domains: domainsWithTrainers };
+      setSelectedTraining(updatedTraining);
+    } catch {
+      // Error fetching training domains
+    }
+    setLoadingDomains(false);
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      if (preSelectedTraining) {
+        const convertedTraining = {
+          id: `${preSelectedTraining.trainingId}_${preSelectedTraining.phaseId}`,
+          formId: preSelectedTraining.trainingId,
+          phaseId: preSelectedTraining.phaseId,
+          collegeName: preSelectedTraining.collegeName,
+          collegeCode: preSelectedTraining.collegeCode,
+          phaseData: {
+            trainingStartDate: preSelectedTraining.trainingStartDate,
+            trainingEndDate: preSelectedTraining.trainingEndDate,
+            collegeStartTime: preSelectedTraining.collegeStartTime,
+            collegeEndTime: preSelectedTraining.collegeEndTime,
+            lunchStartTime: preSelectedTraining.lunchStartTime,
+            lunchEndTime: preSelectedTraining.lunchEndTime,
+          },
+          domains: [],
+        };
+
+        setSelectedTraining(convertedTraining);
+        setStep(2);
+        fetchTrainingDomains(
+          preSelectedTraining.trainingId,
+          preSelectedTraining.phaseId,
+          convertedTraining
+        );
+      } else {
+        fetchInProgressTrainings();
+      }
+
+      fetchTrainers();
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      setChangeStartDate(tomorrow.toISOString().slice(0, 10));
+      setChangeEndDate(tomorrow.toISOString().slice(0, 10));
+    }
+  }, [isOpen, preSelectedTraining, fetchInProgressTrainings]);
+
   useEffect(() => {
     if (!isOpen) return;
     const col = collection(db, "trainerAssignments");
@@ -262,8 +244,6 @@ const ChangeTrainerDashboard = ({
     return () => unsub();
   }, [isOpen]);
 
-  // Auto-populate new trainer cost when user selects a trainer.
-  // Uses multiple possible field names; does not overwrite after manual edit.
   useEffect(() => {
     if (!selectedNewTrainer) {
       setAutoTrainerBaseCost(null);
@@ -288,10 +268,6 @@ const ChangeTrainerDashboard = ({
     }
   }, [selectedNewTrainer, trainers, manualCostEdited]);
 
-  // Add debug logging to the getActiveTrainers function around line 185
-
-
-  // Get all active trainers from selected training
   const getActiveTrainers = () => {
     if (!selectedTraining) {
       return [];
@@ -326,7 +302,6 @@ const ChangeTrainerDashboard = ({
     return activeTrainers;
   };
 
-  // Get all trainer IDs already booked (assigned and not replaced) in the selected training, overlapping with the replacement period
   const getBookedTrainerIds = () => {
     if (!selectedTraining || !changeStartDate || !changeEndDate) return [];
     const bookedIds = new Set();
@@ -337,7 +312,6 @@ const ChangeTrainerDashboard = ({
         row.batches?.forEach((batch) => {
           batch.trainers?.forEach((trainer) => {
             if (!trainer.isReplaced && trainer.trainerId && trainer.trainerName) {
-              // Check for date overlap
               const tStart = parseDate(trainer.startDate);
               const tEnd = parseDate(trainer.endDate);
               if (
@@ -353,7 +327,6 @@ const ChangeTrainerDashboard = ({
     return Array.from(bookedIds);
   };
 
-  // Utility to remove undefined fields from an object (shallow)
   const removeUndefinedFields = (obj) => {
     const clean = {};
     Object.keys(obj).forEach((k) => {
@@ -362,7 +335,6 @@ const ChangeTrainerDashboard = ({
     return clean;
   };
 
-  // Handle trainer change submission
   const handleChangeTrainer = async () => {
     if (
       !selectedCurrentTrainer ||
@@ -380,7 +352,6 @@ const ChangeTrainerDashboard = ({
       const { domainId, rowIdx, batchIdx, trainerIdx } =
         selectedCurrentTrainer.indices;
 
-      // Get the domain document
       const domainDocRef = doc(
         db,
         "trainingForms",
@@ -398,19 +369,15 @@ const ChangeTrainerDashboard = ({
       const currentTrainer =
         table1Data[rowIdx].batches[batchIdx].trainers[trainerIdx];
 
-      // Dates
       const startDateObj = parseDate(selectedCurrentTrainer.startDate);
       const endDateObj = parseDate(selectedCurrentTrainer.endDate);
       const changeStartObj = parseDate(changeStartDate);
       const changeEndObj = parseDate(changeEndDate);
 
-      // Helper for date string
       const toDateStr = (d) => d.toISOString().slice(0, 10);
 
-      // Prepare new trainers array (remove current, add splits)
       let newTrainersArr = [];
 
-      // Compute per-day hours for slot once and reuse
       const perDayHours = getTrainingHoursPerDay(selectedTraining.phaseData);
       const computePerDayHoursForSlot = (slot) => {
         if (slot === "AM & PM") return perDayHours;
@@ -421,7 +388,6 @@ const ChangeTrainerDashboard = ({
         currentTrainer.dayDuration
       );
 
-      // 1. Old trainer before replacement period
       if (changeStartObj > startDateObj) {
         const beforeEnd = new Date(changeStartObj);
         beforeEnd.setDate(beforeEnd.getDate() - 1);
@@ -444,7 +410,6 @@ const ChangeTrainerDashboard = ({
         );
       }
 
-      // 2. New trainer for replacement period
       const newActiveDates = getDateListExcludingSundays(
         changeStartDate,
         changeEndDate
@@ -470,7 +435,6 @@ const ChangeTrainerDashboard = ({
         })
       );
 
-      // 3. Old trainer after replacement period
       if (changeEndObj < endDateObj) {
         const afterStart = new Date(changeEndObj);
         afterStart.setDate(afterStart.getDate() + 1);
@@ -478,14 +442,12 @@ const ChangeTrainerDashboard = ({
           toDateStr(afterStart),
           selectedCurrentTrainer.endDate
         );
-        // Only include fields that are not undefined
         newTrainersArr.push(
           removeUndefinedFields({
             ...currentTrainer,
             startDate: toDateStr(afterStart),
             endDate: selectedCurrentTrainer.endDate,
             isReplaced: false,
-            // Only add replacedOn, replacedBy, replacementReason if not undefined
             activeDates: afterActiveDates,
             dailyHours: afterActiveDates.map(() => currentPerDayHours),
             assignedHours: afterActiveDates.length * currentPerDayHours,
@@ -493,25 +455,20 @@ const ChangeTrainerDashboard = ({
         );
       }
 
-      // Remove the original trainer entry and add the splits
       table1Data[rowIdx].batches[batchIdx].trainers.splice(trainerIdx, 1, ...newTrainersArr);
 
-      // Update the document in Firestore
       await updateDoc(domainDocRef, {
         table1Data: table1Data,
       });
 
       alert("Trainer changed successfully!");
       handleClose();
-    } catch (error) {
-      console.error("Error changing trainer:", error);
+    } catch {
       alert("Error changing trainer. Please try again.");
     }
     setSubmitting(false);
   };
 
-  // Helper functions
-  // Return list of ISO date strings (YYYY-MM-DD) excluding Sundays
   const getDateListExcludingSundays = (start, end) => {
     if (!start || !end) return [];
     const startDate = parseDate(start);
@@ -552,7 +509,6 @@ const ChangeTrainerDashboard = ({
   };
 
   const handleClose = () => {
-    // Reset to appropriate step based on whether training is preselected
     setStep(preSelectedTraining ? 2 : 1);
     if (!preSelectedTraining) {
       setSelectedTraining(null);
@@ -566,36 +522,37 @@ const ChangeTrainerDashboard = ({
     onClose();
   };
 
-  // Helper function to parse date strings safely
   const parseDate = (dateStr) => {
     if (!dateStr) return null;
-    // If it's already in YYYY-MM-DD format, use it directly
     if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
       return new Date(dateStr);
     }
-    // If it's in DD-MM-YYYY format, convert to YYYY-MM-DD
     if (dateStr.match(/^\d{2}-\d{2}-\d{4}$/)) {
       const [day, month, year] = dateStr.split('-');
       return new Date(`${year}-${month}-${day}`);
     }
-    // Fallback to default parsing
     return new Date(dateStr);
+  };
+
+  const getDateString = (dateStr) => {
+    const d = parseDate(dateStr);
+    if (!d || isNaN(d.getTime())) return '';
+    return d.toISOString().slice(0, 10);
   };
 
   const validateChangeDateRange = () => {
     if (!selectedCurrentTrainer || !changeStartDate || !changeEndDate) return true;
-    const changeStartObj = parseDate(changeStartDate);
-    const changeEndObj = parseDate(changeEndDate);
-    const trainerStartObj = parseDate(selectedCurrentTrainer.startDate);
-    const trainerEndObj = parseDate(selectedCurrentTrainer.endDate);
-    const trainingEndDate = parseDate(selectedTraining.phaseData.trainingEndDate);
+    const changeStartStr = getDateString(changeStartDate);
+    const changeEndStr = getDateString(changeEndDate);
+    const trainerStartStr = getDateString(selectedCurrentTrainer.startDate);
+    const trainerEndStr = getDateString(selectedCurrentTrainer.endDate);
+    const trainingEndStr = getDateString(selectedTraining.phaseData.trainingEndDate);
 
-    // Start must be >= trainer start, end <= trainer end, start <= end, and both within training period
     return (
-      changeStartObj >= trainerStartObj &&
-      changeEndObj <= trainerEndObj &&
-      changeStartObj <= changeEndObj &&
-      changeEndObj <= trainingEndDate
+      changeStartStr >= trainerStartStr &&
+      changeEndStr <= trainerEndStr &&
+      changeStartStr <= changeEndStr &&
+      changeEndStr <= trainingEndStr
     );
   };
   if (!isOpen) return null;
@@ -604,7 +561,6 @@ const ChangeTrainerDashboard = ({
 <div className="fixed inset-0 z-54 flex items-center justify-center 
     bg-black/30 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">
             Change Trainer
@@ -617,12 +573,9 @@ const ChangeTrainerDashboard = ({
           </button>
         </div>
 
-        {/* Content */}
         <div className="p-6">
-          {/* Step Indicator */}
           <div className="flex items-center justify-center mb-8">
             <div className="flex items-center space-x-4">
-              {/* Only show step 1 if no training is preselected */}
               {!preSelectedTraining && (
                 <>
                   <div
@@ -665,7 +618,6 @@ const ChangeTrainerDashboard = ({
             </div>
           </div>
 
-          {/* Step 1: Select Training - Only show if no training is preselected */}
           {step === 1 && !preSelectedTraining && (
             <div className="space-y-4">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
@@ -725,7 +677,6 @@ const ChangeTrainerDashboard = ({
             </div>
           )}
 
-          {/* Step 2: Select Current Trainer */}
           {step === 2 && selectedTraining && (
             <div className="space-y-4">
               <div className="flex items-center justify-between mb-4">
@@ -785,10 +736,6 @@ const ChangeTrainerDashboard = ({
                       <div
                         key={idx}
                         onClick={() => {
-                          console.log(
-                            "🔄 [TRAINER SELECTION] Selected trainer:",
-                            trainer
-                          );
                           setSelectedCurrentTrainer(trainer);
                           setStep(3);
                         }}
@@ -819,7 +766,6 @@ const ChangeTrainerDashboard = ({
             </div>
           )}
 
-          {/* Step 3: Change Details */}
           {step === 3 && selectedCurrentTrainer && (
             <div className="space-y-6">
               <div className="flex items-center justify-between mb-4">
@@ -834,7 +780,6 @@ const ChangeTrainerDashboard = ({
                 </button>
               </div>
 
-              {/* Current Trainer Info */}
               <div className="bg-red-50 p-4 rounded-lg">
                 <h4 className="font-medium text-red-900 mb-2">
                   Current Trainer
@@ -860,7 +805,6 @@ const ChangeTrainerDashboard = ({
                 </div>
               </div>
 
-              {/* Change Form */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -928,18 +872,14 @@ const ChangeTrainerDashboard = ({
                         const bookedIds = getBookedTrainerIds();
                         if (bookedIds.includes(t.id)) return false;
 
-                        // Check global assignments for overlap/conflict
-                        // Build replacement date list (ISO strings)
                         if (!changeStartDate || !changeEndDate) return true;
                         const replacementDates = getDateListExcludingSundays(
                           changeStartDate,
                           changeEndDate
                         );
 
-                        // If any global assignment for this trainer conflicts on any date and slot, exclude
                         for (const assign of globalTrainerAssignments) {
                           if (assign.trainerId !== t.id) continue;
-                          // Normalize assignment date to ISO yyyy-mm-dd
                           const assignDate = parseDate(assign.date);
                           if (isNaN(assignDate.getTime())) continue;
                           const assignISO = assignDate.toISOString().slice(0, 10);
@@ -1038,7 +978,6 @@ const ChangeTrainerDashboard = ({
             </div>
           )}
 
-          {/* Step 4: Confirmation */}
           {step === 4 && (
             <div className="space-y-6">
               <div className="flex items-center justify-between mb-4">
@@ -1068,7 +1007,6 @@ const ChangeTrainerDashboard = ({
                 </div>
               </div>
 
-              {/* Summary */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-red-50 p-4 rounded-lg">
                   <h4 className="font-medium text-red-900 mb-3">

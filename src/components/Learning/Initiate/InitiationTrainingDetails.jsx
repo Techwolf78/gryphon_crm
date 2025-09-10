@@ -13,6 +13,7 @@ import {
   FiMail,
   FiPrinter,
   FiDownload
+
 } from "react-icons/fi";
 import SendSchedule from "../SendSchedule";
 const PHASE_LABELS = {
@@ -44,7 +45,6 @@ function getTimingForSlot(slot, training) {
       return `${lunchEndTime} - ${collegeEndTime}`;
     return "PM";
   }
-  // fallback: return slot text
   return slot;
 }
 
@@ -223,20 +223,18 @@ const generatePrintableTable = (trainingData, phaseData, domainsData, selectedPh
   printWindow.document.close();
 };
 function InitiationTrainingDetails({ training, onBack }) {
-  console.log(
-    "📦 InitiationTrainingDetails props:",
-    JSON.stringify(training, null, 2)
-  );
-
-  const [expanded, setExpanded] = useState({});
   const [trainingData, setTrainingData] = useState(null);
   const [phaseData, setPhaseData] = useState(null);
   const [domainsData, setDomainsData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showSendSchedule, setShowSendSchedule] = useState(false);
+  const [showSchedule, setShowSchedule] = useState({});
 
-  // Fetch hierarchical data from Firestore
+  const toggleSchedule = (key) => {
+    setShowSchedule(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
   useEffect(() => {
     const fetchTrainingData = async () => {
       if (!training?.id || !training?.selectedPhase) {
@@ -249,7 +247,6 @@ function InitiationTrainingDetails({ training, onBack }) {
         setLoading(true);
         setError(null);
 
-        // 1. Fetch root training form document
         const trainingFormRef = doc(db, "trainingForms", training.id);
         const trainingFormSnap = await getDoc(trainingFormRef);
         
@@ -260,7 +257,6 @@ function InitiationTrainingDetails({ training, onBack }) {
         const trainingFormData = trainingFormSnap.data();
         setTrainingData(trainingFormData);
 
-        // 2. Fetch specific phase document
         const phaseRef = doc(db, "trainingForms", training.id, "trainings", training.selectedPhase);
         const phaseSnap = await getDoc(phaseRef);
         
@@ -273,18 +269,28 @@ function InitiationTrainingDetails({ training, onBack }) {
         phaseDocData.phaseId = training.selectedPhase;
         setPhaseData(phaseDocData);
 
-        // 3. Fetch all domains for this phase
         const domainsRef = collection(db, "trainingForms", training.id, "trainings", training.selectedPhase, "domains");
         const domainsSnap = await getDocs(domainsRef);
         
         const domains = [];
         domainsSnap.forEach(domainDoc => {
           const domainData = domainDoc.data();
-          // Ensure each domain has phase information
+
+          
+          // Calculate total assigned hours from table1Data
+          let totalAssignedHours = 0;
+          if (Array.isArray(domainData.table1Data)) {
+            domainData.table1Data.forEach(row => {
+              if (row.assignedHours) {
+                totalAssignedHours += Number(row.assignedHours);
+              }
+            });
+          }
+          
           domains.push({
             id: domainDoc.id,
             domain: domainData.domain || domainDoc.id,
-            phase: domainData.phase || training.selectedPhase, // Use document ID as phase if phase field doesn't exist
+            assignedHours: totalAssignedHours, // Add calculated total
             ...domainData
           });
         });
@@ -301,14 +307,6 @@ function InitiationTrainingDetails({ training, onBack }) {
 
     fetchTrainingData();
   }, [training?.id, training?.selectedPhase]);
-
-  // simpler: toggle by a single unique key
-  const toggleExpand = (key) => {
-    setExpanded((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
-  };
 
   if (!training) return null;
 
@@ -351,12 +349,13 @@ function InitiationTrainingDetails({ training, onBack }) {
   }
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 to-gray-200 p-4">
+
+    <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 to-gray-200 ">
       <button
-        className="mb-6 flex items-center text-blue-600 hover:underline"
+        className="mb-2 flex items-center text-blue-600 hover:underline text-sm"
         onClick={onBack}
       >
-        <FiArrowLeft className="mr-2" /> Back to Dashboard
+        <FiArrowLeft className="mr-1" /> Back to Dashboard
       </button>
       
       <div className="flex justify-between items-center mb-6">
@@ -381,6 +380,7 @@ function InitiationTrainingDetails({ training, onBack }) {
       
       <div className="w-full mx-auto bg-white rounded-xl shadow border border-gray-200 p-6">
         {/* Training Form Header */}
+
         <h2 className="text-2xl font-bold text-indigo-800 mb-2">
           {trainingData?.collegeName}{" "}
           <span className="text-gray-400">({trainingData?.collegeCode})</span>
@@ -402,8 +402,8 @@ function InitiationTrainingDetails({ training, onBack }) {
           </span>
         </div>
 
-        {/* Phase Summary */}
-        <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+
+        <div className="mb-4 p-2 bg-gray-50 rounded-lg">
           <h3 className="font-semibold text-gray-800 mb-2">Phase Information</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
             <div>
@@ -457,6 +457,7 @@ function InitiationTrainingDetails({ training, onBack }) {
                       {domainInfo.isMainPhase && (
                         <div className="text-xs font-semibold">Main Phase</div>
                       )}
+
                     </div>
                   </div>
 
@@ -477,67 +478,140 @@ function InitiationTrainingDetails({ training, onBack }) {
                               <div className="text-xs text-gray-500">
                                 {row.stdCount} students • {row.hrs} hours • {row.assignedHours} assigned
                               </div>
+
                             </div>
                           </div>
 
-                          {/* Batch Details */}
-                          <div className="space-y-3">
-                            {row.batches &&
-                              row.batches.map((batch, bidx) => (
-                                <div
-                                  key={bidx}
-                                  className="border rounded p-3 bg-gray-50"
-                                >
-                                  <div className="flex flex-wrap gap-4 items-center mb-2">
-                                    <span className="text-sm font-semibold text-gray-700">
-                                      {batch.batchCode}
-                                    </span>
-                                    <span className="text-sm text-gray-600">
-                                      Students: {batch.batchPerStdCount || 0}
-                                    </span>
-                                    <span className="text-sm text-gray-600">
-                                      Hours: {batch.assignedHours || 0}
-                                    </span>
-                                    {batch.isMerged && (
-                                      <span className="text-sm text-rose-600 font-semibold px-2 py-1 bg-rose-100 rounded">
-                                        Merged from: {batch.mergedFrom}
-                                      </span>
-                                    )}
-                                  </div>
 
-                                  {/* Trainers */}
-                                  <div>
-                                    <div className="font-semibold text-sm text-gray-700 mb-2">
-                                      Trainers:
-                                    </div>
-                                    {batch.trainers && batch.trainers.length > 0 ? (
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                                        {batch.trainers.map((trainer, tidx) => {
-                                          const uniqueKey = `${domainInfo.id}_${batch.batchCode}_${trainer.trainerId || 'trainer'}_${tidx}_${trainer.dayDuration || 'noslot'}_${trainer.startDate || 'nostart'}`;
-                                          return (
-                                            <div
-                                              key={uniqueKey}
-                                              className="bg-white border rounded-lg p-3 shadow-sm"
-                                            >
-                                              <div className="flex items-center gap-2 mb-2">
-                                                <FiUser className="text-indigo-500" />
-                                                <span className="font-medium">
-                                                  {trainer.trainerName || "Unassigned"}
-                                                </span>
-                                                <span className="text-xs text-gray-500 ml-auto">
-                                                  ID: {trainer.trainerId}
-                                                </span>
+                        <div className="space-y-3">
+                          {row.batches &&
+                            row.batches.map((batch, bidx) => (
+                              <div
+                                key={bidx}
+                                className="border rounded p-2 bg-gray-50"
+                              >
+                                <div className="flex flex-wrap gap-4 items-center mb-1">
+                                  <span className="text-sm font-semibold text-gray-700">
+                                    {batch.batchCode}
+                                  </span>
+                                  <span className="text-sm text-gray-600">
+                                    Students: {batch.batchPerStdCount || 0}
+                                  </span>
+                                  <span className="text-sm text-gray-600">
+                                    Hours: {batch.assignedHours || 0}
+                                  </span>
+                                </div>
+
+                                <div>
+                                  <div className="font-semibold text-sm text-gray-700 mb-2">
+                                    Trainers:
+                                  </div>
+                                  {batch.trainers && batch.trainers.length > 0 ? (
+<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                      {batch.trainers.map((trainer, tidx) => {
+                                        const uniqueKey = `${domainInfo.id}_${batch.batchCode}_${trainer.trainerId || 'trainer'}_${tidx}_${trainer.dayDuration || 'noslot'}_${trainer.startDate || 'nostart'}`;
+                                        return (
+                                          <div
+                                            key={uniqueKey}
+                                            className="bg-white border rounded-lg p-3 shadow-sm"
+                                          >
+                                            <div className="flex items-center gap-2 mb-2">
+                                              <FiUser className="text-indigo-500" />
+                                              <span className="font-medium">
+                                                {trainer.trainerName || "Unassigned"}
+                                              </span>
+                                              <span className="text-xs text-gray-500 ml-auto">
+                                                ID: {trainer.trainerId}
+                                              </span>
+                                            </div>
+                                            
+                                            <div className="text-sm text-gray-600 space-y-1">
+                                              <div>Duration: {trainer.dayDuration || "-"}</div>
+                                              <div>Hours: {trainer.assignedHours || 0}</div>
+                                              <div>
+                                                Period: {formatDate(trainer.startDate)} - {formatDate(trainer.endDate)}
                                               </div>
-                                              
-                                              <div className="text-sm text-gray-600 space-y-1">
-                                                <div>Duration: {trainer.dayDuration || "-"}</div>
-                                                <div>Hours: {trainer.assignedHours || 0}</div>
-                                                <div>
-                                                  Period: {formatDate(trainer.startDate)} - {formatDate(trainer.endDate)}
-                                                </div>
-                                                {trainer.perHourCost && (
-                                                  <div>Rate: ₹{trainer.perHourCost}/hour</div>
-                                                )}
+                                              {trainer.perHourCost && (
+                                                <div>Rate: ₹{trainer.perHourCost}/hour</div>
+                                              )}
+                                              {trainer.topics && trainer.topics.length > 0 && (
+                                                <div>Topics: {Array.isArray(trainer.topics) ? trainer.topics.join(", ") : trainer.topics}</div>
+                                              )}
+                                            </div>
+                                            <div className="mt-1 flex justify-end">
+                                              <button
+                                                onClick={() => toggleSchedule(uniqueKey)}
+                                                className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-200 hover:bg-blue-100 transition-colors"
+                                              >
+                                                {showSchedule[uniqueKey] ? 'Hide' : 'Show'}
+                                              </button>
+                                            </div>
+                                            {showSchedule[uniqueKey] && (
+                                              <div className="mt-1 overflow-x-auto">
+                                                <table className="w-full text-[10px] border-collapse">
+                                                  <thead>
+                                                    <tr className="bg-gray-50">
+                                                      <th className="border-b border-gray-200 px-0.5 py-0 text-left font-medium">Date</th>
+                                                      <th className="border-b border-gray-200 px-0.5 py-0 text-left font-medium">Hrs</th>
+                                                      <th className="border-b border-gray-200 px-0.5 py-0 text-left font-medium">Slot</th>
+                                                      <th className="border-b border-gray-200 px-0.5 py-0 text-left font-medium">Timing</th>
+                                                      <th className="border-b border-gray-200 px-0.5 py-0 text-left font-medium">Domain</th>
+                                                      <th className="border-b border-gray-200 px-0.5 py-0 text-left font-medium">Cost</th>
+                                                    </tr>
+                                                  </thead>
+                                                  <tbody>
+                                                    {(() => {
+                                                      const dates = [];
+                                                      if (trainer.startDate && trainer.endDate) {
+                                                        let current = new Date(trainer.startDate);
+                                                        const end = new Date(trainer.endDate);
+                                                        const excludeDays = training?.excludeDays || "None";
+                                                        while (current <= end) {
+                                                          const dayOfWeek = current.getDay(); // 0 = Sunday, 6 = Saturday
+                                                          let shouldInclude = true;
+                                                          
+                                                          if (excludeDays === "Saturday" && dayOfWeek === 6) {
+                                                            shouldInclude = false;
+                                                          } else if (excludeDays === "Sunday" && dayOfWeek === 0) {
+                                                            shouldInclude = false;
+                                                          } else if (excludeDays === "Both" && (dayOfWeek === 0 || dayOfWeek === 6)) {
+                                                            shouldInclude = false;
+                                                          }
+                                                          // If excludeDays === "None", include all days
+                                                          
+                                                          if (shouldInclude) {
+                                                            dates.push(new Date(current));
+                                                          }
+                                                          current.setDate(current.getDate() + 1);
+                                                        }
+                                                      }
+                                                      
+                                                      // Use dailyHours if available, otherwise calculate equal distribution
+                                                      let hoursArray = [];
+                                                      if (trainer.dailyHours && Array.isArray(trainer.dailyHours) && trainer.dailyHours.length === dates.length) {
+                                                        hoursArray = trainer.dailyHours;
+                                                      } else {
+                                                        const totalDays = dates.length;
+                                                        const hoursPerDay = totalDays > 0 ? (trainer.assignedHours || 0) / totalDays : 0;
+                                                        hoursArray = new Array(totalDays).fill(hoursPerDay);
+                                                      }
+                                                      
+                                                      return dates.map((date, index) => {
+                                                        const hoursForDay = hoursArray[index] || 0;
+                                                        return (
+                                                          <tr key={date.toISOString()} className="hover:bg-gray-25">
+                                                            <td className="border-b border-gray-100 px-0.5 py-0">{formatDate(date)}</td>
+                                                            <td className="border-b border-gray-100 px-0.5 py-0">{hoursForDay.toFixed(2)}</td>
+                                                            <td className="border-b border-gray-100 px-0.5 py-0">{trainer.dayDuration || '-'}</td>
+                                                            <td className="border-b border-gray-100 px-0.5 py-0">{getTimingForSlot(trainer.dayDuration, phaseData)}</td>
+                                                            <td className="border-b border-gray-100 px-0.5 py-0">{domainInfo.domain}</td>
+                                                            <td className="border-b border-gray-100 px-0.5 py-0">₹{(hoursForDay * (trainer.perHourCost || 0)).toFixed(2)}</td>
+                                                          </tr>
+                                                        );
+                                                      });
+                                                    })()}
+                                                  </tbody>
+                                                </table>
                                               </div>
 
                                               {/* Daily Hours Breakdown */}

@@ -24,6 +24,7 @@ import SessionManager from "./components/SessionManager";
 import TrainersDashboard from "./components/Learning/TrainersDashboard";
 import HR from "./pages/HR";
 import NotFound from "./pages/NotFound"; // Import the new component
+import Roadmap from "./pages/Roadmap";
 
 const AppContent = () => {
   const location = useLocation();
@@ -54,7 +55,10 @@ const AppContent = () => {
             <Route index element={<LearningDevelopment />} />
             <Route path="trainers" element={<TrainersDashboard />} />
           </Route>
-          <Route path="marketing" element={<DigitalMarketing />} />
+          <Route path="marketing">
+            <Route index element={<DigitalMarketing />} />
+            <Route path="roadmap" element={<Roadmap />} />
+          </Route>
           <Route path="hr" element={<HR />} />
         </Route>
         

@@ -5,7 +5,6 @@ import React, {
   useMemo,
   useCallback,
 } from "react";
-import { createPortal } from "react-dom";
 import {
   collection,
   getDocs,
@@ -23,7 +22,10 @@ import {
   FiChevronUp,
   FiUser,
   FiClock,
+  FiAlertTriangle,
   FiEye,
+  FiEyeOff,
+  FiX,
 } from "react-icons/fi";
 import { FaRupeeSign } from "react-icons/fa";
 
@@ -74,33 +76,24 @@ const TrainerRow = React.memo(
     trainers,
     handleTrainerField,
     handleTotalHoursChange,
+    handleDailyHoursChange,
     removeTrainer,
     openSwapModal,
     isTrainerAvailable,
     isDuplicate = false,
-    removeDailyDate,
-    openDailySchedule,
-    setOpenDailySchedule,
     updateTrainerLocal,
-    includeSundays,
+    excludeDays,
+    commonFields,
+    getTrainingHoursPerDay,
   }) => {
     // ✅ ADD: Calculate unique key for this trainer
     const trainerKey = `${rowIndex}-${batchIndex}-${trainerIdx}`;
-    const showDailyHours = openDailySchedule === trainerKey;
-
-    // Portal positioning for daily schedule outside table
-    const viewBtnRef = useRef(null);
-    const panelRef = useRef(null);
-    const [schedulePos, setSchedulePos] = useState({
-      top: 0,
-      left: 0,
-      width: 320,
-      arrowOffset: 0,
-    });
 
     // Local UI state to allow adding new topics per trainer
     const [addedTopics, setAddedTopics] = useState([]);
     const [newTopicInput, setNewTopicInput] = useState("");
+    // ✅ ADD: State for daily hours dropdown
+    const [showDailyHoursDropdown, setShowDailyHoursDropdown] = useState(false);
 
     // ✅ If trainer has no topics selected but the selected trainer document
     // provides specializations, default-select those topics once.
@@ -152,75 +145,80 @@ const TrainerRow = React.memo(
       trainer.topics,
     ]);
 
-    // ✅ ADD: Toggle function for daily schedule
-    const toggleDailySchedule = () => {
-      if (showDailyHours) {
-        setOpenDailySchedule(null);
-      } else {
-        // Compute button position to place panel
-        if (viewBtnRef.current) {
-          const rect = viewBtnRef.current.getBoundingClientRect();
-          // Default below the button; adjust if near right edge
-          const panelWidth = 340;
-          // Attach to left side horizontally centered to button using arrow
-          let left = rect.left + window.scrollX - panelWidth - 12; // include space for arrow
-          if (left < 8) left = 8; // clamp
-          const buttonCenterOffset = rect.height / 2; // vertical center of button
-          const top = rect.top + window.scrollY - 12; // slight shift up so arrow overlaps button edge
-          const arrowOffset = buttonCenterOffset + 12; // distance from panel top to arrow center
-          setSchedulePos({ top, left, width: panelWidth, arrowOffset });
+    // ✅ ADD: Local function to generate date list with exclusions
+    const getDateList = (start, end, excludeDays) => {
+      if (!start || !end) return [];
+      const startDate = new Date(start);
+      const endDate = new Date(end);
+
+      // Validate dates
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return [];
+      if (startDate > endDate) return [];
+
+      const dates = [];
+      let current = new Date(startDate);
+      while (current <= endDate) {
+        const dayOfWeek = current.getDay(); // 0 = Sunday, 6 = Saturday
+        let shouldInclude = true;
+        
+        if (excludeDays === "Saturday" && dayOfWeek === 6) {
+          shouldInclude = false;
+        } else if (excludeDays === "Sunday" && dayOfWeek === 0) {
+          shouldInclude = false;
+        } else if (excludeDays === "Both" && (dayOfWeek === 0 || dayOfWeek === 6)) {
+          shouldInclude = false;
         }
-        setOpenDailySchedule(trainerKey);
+        // If excludeDays === "None", include all days
+        
+        if (shouldInclude) {
+          dates.push(new Date(current));
+        }
+        current.setDate(current.getDate() + 1);
       }
+      return dates;
     };
 
-    // Close on outside click
+    // ✅ ADD: Initialize dailyHours when trainer data is loaded
     useEffect(() => {
-      if (!showDailyHours) return;
-      const handler = (e) => {
-        if (
-          panelRef.current &&
-          !panelRef.current.contains(e.target) &&
-          !viewBtnRef.current?.contains(e.target)
-        ) {
-          setOpenDailySchedule(null);
-        }
-      };
-      window.addEventListener("mousedown", handler);
-      return () => window.removeEventListener("mousedown", handler);
-    }, [showDailyHours, setOpenDailySchedule]);
+      if (
+        trainer.startDate &&
+        trainer.endDate &&
+        trainer.dayDuration &&
+        (!trainer.dailyHours || trainer.dailyHours.length === 0)
+      ) {
+        // Calculate per day hours based on dayDuration
+        const perDay = getTrainingHoursPerDay(commonFields);
+        let perDayHours = 0;
+        if (trainer.dayDuration === "AM & PM") perDayHours = perDay;
+        else if (trainer.dayDuration === "AM" || trainer.dayDuration === "PM")
+          perDayHours = +(perDay / 2).toFixed(2);
 
-    // Reposition on resize
-    useEffect(() => {
-      if (!showDailyHours) return;
-      const handleResize = () => {
-        if (viewBtnRef.current) {
-          const rect = viewBtnRef.current.getBoundingClientRect();
-          const panelWidth = schedulePos.width || 340;
-          let left = rect.left + window.scrollX - panelWidth - 12;
-          if (left < 8) left = 8;
-          const top = rect.top + window.scrollY - 12;
-          const arrowOffset = rect.height / 2 + 12;
-          setSchedulePos((p) => ({ ...p, top, left, arrowOffset }));
-        }
-      };
-      window.addEventListener("resize", handleResize);
-      return () => window.removeEventListener("resize", handleResize);
-    }, [showDailyHours, schedulePos.width]);
+        // Generate date list and populate dailyHours
+        const dateList = getDateList(trainer.startDate, trainer.endDate, excludeDays);
+        const dailyHoursArray = dateList.map(() => perDayHours);
 
-    // ✅ ADD: Handle daily hours input change
-    const handleDailyHourChange = (dayIndex, value) => {
-      const updated = [...(trainer.dailyHours || [])];
-      updated[dayIndex] = Number(value) || 0;
-      // Call the parent handler to update the trainer data; parent will recalc assignedHours
-      handleTrainerField(
-        rowIndex,
-        batchIndex,
-        trainerIdx,
-        "dailyHours",
-        updated
-      );
-    };
+        // Update the trainer data with the calculated dailyHours
+        handleTrainerField(
+          rowIndex,
+          batchIndex,
+          trainerIdx,
+          "dailyHours",
+          dailyHoursArray
+        );
+      }
+    }, [
+      trainer.startDate,
+      trainer.endDate,
+      trainer.dayDuration,
+      trainer.dailyHours,
+      excludeDays,
+      rowIndex,
+      batchIndex,
+      trainerIdx,
+      handleTrainerField,
+      commonFields,
+      getTrainingHoursPerDay,
+    ]);
 
   return (
     <>
@@ -344,7 +342,7 @@ const TrainerRow = React.memo(
             />
           </td>
 
-          {/* No. of Days (Excluding Sundays) */}
+          {/* No. of Days (Excluding specified days) */}
           <td className="px-2 py-1 text-xs">
             {(() => {
               try {
@@ -355,7 +353,19 @@ const TrainerRow = React.memo(
                 let days = 0;
                 const cur = new Date(start);
                 while (cur <= end) {
-                  if (includeSundays || cur.getDay() !== 0) days++;
+                  const dayOfWeek = cur.getDay(); // 0 = Sunday, 6 = Saturday
+                  let shouldInclude = true;
+                  
+                  if (excludeDays === "Saturday" && dayOfWeek === 6) {
+                    shouldInclude = false;
+                  } else if (excludeDays === "Sunday" && dayOfWeek === 0) {
+                    shouldInclude = false;
+                  } else if (excludeDays === "Both" && (dayOfWeek === 0 || dayOfWeek === 6)) {
+                    shouldInclude = false;
+                  }
+                  // If excludeDays === "None", include all days
+                  
+                  if (shouldInclude) days++;
                   cur.setDate(cur.getDate() + 1);
                 }
                 return days;
@@ -402,10 +412,10 @@ const TrainerRow = React.memo(
             />
           </td>
 
-          {/* ✅ UPDATED: Daily Hours with View Button */}
-          <td className="px-2 py-1 relative">
-            <div className="flex items-center space-x-1">
-              <span className="text-xs">
+          {/* Daily Hours */}
+          <td className="px-2 py-1 relative bg-gradient-to-r from-gray-50 to-white rounded-md">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-gray-700">
                 {trainer.dailyHours && trainer.dailyHours.length > 0
                   ? (
                       trainer.dailyHours.reduce(
@@ -416,169 +426,100 @@ const TrainerRow = React.memo(
                   : trainer.assignedHours || 0}
                 h/day
               </span>
-              {trainer.dailyHours && trainer.dailyHours.length > 0 && (
-                <button
-                  type="button"
-                  onClick={toggleDailySchedule}
-                  className="inline-flex items-center justify-center h-4 w-4 rounded-md bg-blue-500/90 hover:bg-blue-600 text-white shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-300 transition text-[10px]"
-                  title="View Daily Schedule"
-                  aria-label="View daily schedule"
-                  ref={viewBtnRef}
-                >
-                  <FiEye className="w-2 h-2" />
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setShowDailyHoursDropdown(!showDailyHoursDropdown)}
+                className="ml-2 p-1.5 rounded-md bg-white border border-gray-200 hover:bg-indigo-50 hover:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition-all duration-200 shadow-sm"
+                title={showDailyHoursDropdown ? "Hide daily breakdown" : "Show daily breakdown"}
+                aria-expanded={showDailyHoursDropdown}
+                aria-controls="daily-hours-dropdown"
+              >
+                {showDailyHoursDropdown ? (
+                  <FiEyeOff className="w-3.5 h-3.5 text-indigo-600" />
+                ) : (
+                  <FiEye className="w-3.5 h-3.5 text-gray-500 hover:text-indigo-600 transition-colors" />
+                )}
+              </button>
             </div>
-            {/* ✅ Daily Hours Breakdown rendered via Portal outside table bounds */}
-            {showDailyHours &&
-              trainer.dailyHours &&
-              trainer.activeDates &&
-              createPortal(
-                <div
-                  ref={panelRef}
-                  style={{
-                    top: schedulePos.top,
-                    left: schedulePos.left,
-                    width: schedulePos.width,
-                    maxWidth: "100%",
-                    position: "absolute",
-                  }}
-                  className="fixed z-[1000] bg-white border border-gray-200 rounded-lg shadow-xl p-3"
-                >
-                  {/* Arrow */}
-                  <span
-                    className="absolute -right-2 top-0 h-full pointer-events-none flex"
-                    style={{ top: schedulePos.arrowOffset - 8 }}
+            {/* Dropdown for daily hours breakdown */}
+            {showDailyHoursDropdown && trainer.dailyHours && trainer.dailyHours.length > 0 && (
+              <div
+                id="daily-hours-dropdown"
+                className="absolute top-full right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-2 z-60 min-w-[240px] max-w-[280px] max-h-48 overflow-y-auto"
+                role="dialog"
+                aria-labelledby="daily-hours-title"
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <h4 id="daily-hours-title" className="text-xs font-semibold text-gray-800">
+                    Daily Hours Breakdown
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setShowDailyHoursDropdown(false)}
+                    className="p-0.5 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-gray-400 transition-colors"
+                    aria-label="Close daily hours breakdown"
                   >
-                    <span
-                      className="relative w-0 h-0"
-                      style={{
-                        borderTop: "8px solid transparent",
-                        borderBottom: "8px solid transparent",
-                        borderLeft: "8px solid white",
-                        filter: "drop-shadow(0 0 1px rgba(0,0,0,0.15))",
-                      }}
-                    />
-                  </span>
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="text-xs font-medium text-gray-700">
-                      Daily Schedule
-                    </h4>
-                    <button
-                      type="button"
-                      onClick={toggleDailySchedule}
-                      className="text-gray-400 hover:text-gray-600"
-                      aria-label="Close daily schedule"
-                    >
-                      ×
-                    </button>
-                  </div>
-                  <div className="max-h-56 overflow-y-auto pr-1 custom-scrollbar">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="bg-gray-50 text-gray-600">
-                          <th className="px-2 py-1 text-left font-medium">
-                            Date
-                          </th>
-                          <th className="px-2 py-1 text-left font-medium">
-                            Day
-                          </th>
-                          <th className="px-2 py-1 text-left font-medium">
-                            Hours
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {trainer.activeDates
-                          .filter((date) => {
-                            const dateObj = new Date(date);
-                            return !isNaN(dateObj.getTime());
-                          })
-                          .map((date, dayIndex) => {
-                            const dateObj = new Date(date);
-                            const dayName = dateObj.toLocaleDateString(
-                              "en-US",
-                              { weekday: "short" }
-                            );
-                            const formattedDate = dateObj.toLocaleDateString(
-                              "en-US",
-                              { month: "short", day: "numeric" }
-                            );
+                    <FiX className="w-3 h-3 text-gray-500" />
+                  </button>
+                </div>
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-gray-100 border-b border-gray-200">
+                      <th className="text-left py-1 px-0.5 font-medium text-gray-700 text-xs">Date</th>
+                      <th className="text-left py-1 px-0.5 font-medium text-gray-700 text-xs">Day</th>
+                      <th className="text-left py-1 px-0.5 font-medium text-gray-700 text-xs">Hours</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const dates = getDateList(trainer.startDate, trainer.endDate, excludeDays);
+                      return (
+                        <>
+                          {dates.map((date, index) => {
+                            const hours = trainer.dailyHours[index] || 0;
                             return (
-                              <tr
-                                key={dayIndex}
-                                className="border-b border-gray-100 last:border-0"
-                              >
-                                <td className="px-2 py-1 whitespace-nowrap">
-                                  {formattedDate}
+                              <tr key={index} className="hover:bg-gray-50 transition-colors">
+                                <td className="py-0.5 px-0.5 text-gray-600 text-xs">
+                                  {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                 </td>
-                                <td className="px-2 py-1 text-gray-600">
-                                  {dayName}
+                                <td className="py-0.5 px-0.5 text-gray-600 text-xs">
+                                  {date.toLocaleDateString('en-US', { weekday: 'short' })}
                                 </td>
-                                <td className="px-2 py-1">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center">
-                                      <input
-                                        type="number"
-                                        value={
-                                          trainer.dailyHours[dayIndex] || ""
-                                        }
-                                        onChange={(e) =>
-                                          handleDailyHourChange(
-                                            dayIndex,
-                                            e.target.value
-                                          )
-                                        }
-                                        className="w-14 rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-0.5 px-1"
-                                        min="0"
-                                        step="0.5"
-                                        placeholder="0"
-                                      />
-                                      <span className="ml-1 text-[10px] text-gray-500">
-                                        h
-                                      </span>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        removeDailyDate &&
-                                        removeDailyDate(
-                                          rowIndex,
-                                          batchIndex,
-                                          trainerIdx,
-                                          dayIndex
-                                        )
-                                      }
-                                      className="ml-3 text-rose-500 hover:text-rose-600 p-0.5 rounded"
-                                      title="Remove date"
-                                      aria-label="Remove date"
-                                    >
-                                      <FiTrash2 size={12} />
-                                    </button>
-                                  </div>
+                                <td className="py-0.5 px-0.5 font-medium text-indigo-600 text-xs">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.5"
+                                    value={hours || ""}
+                                    onChange={(e) =>
+                                      handleDailyHoursChange(
+                                        rowIndex,
+                                        batchIndex,
+                                        trainerIdx,
+                                        index,
+                                        e.target.value === "" ? 0 : parseFloat(e.target.value) || 0
+                                      )
+                                    }
+                                    className="w-12 text-xs border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-400 text-center"
+                                    placeholder="0"
+                                  />
                                 </td>
                               </tr>
                             );
                           })}
-                      </tbody>
-                      <tfoot>
-                        <tr className="bg-gray-50 font-medium text-gray-700">
-                          <td className="px-2 py-1" colSpan={2}>
-                            Total:
-                          </td>
-                          <td className="px-2 py-1">
-                            {trainer.dailyHours
-                              .reduce((s, h) => s + Number(h || 0), 0)
-                              .toFixed(2)}
-                            h
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                </div>,
-                document.body
-              )}
+                          <tr className="bg-indigo-50 border-t border-indigo-200 font-semibold">
+                            <td className="py-0.5 px-0.5 text-indigo-800 text-xs" colSpan={2}>Total:</td>
+                            <td className="py-0.5 px-0.5 text-indigo-800 text-xs">
+                              {trainer.dailyHours.reduce((sum, hours) => sum + Number(hours || 0), 0)}h
+                            </td>
+                          </tr>
+                        </>
+                      );
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </td>
 
           {/* Actions */}
@@ -963,32 +904,72 @@ const TrainersTable = React.memo(
     addTrainer,
     handleTrainerField,
     handleTotalHoursChange,
+    handleDailyHoursChange,
     removeTrainer,
     openSwapModal,
     isTrainerAvailable,
     duplicates = [],
-    openDailySchedule, // Add this prop
-    setOpenDailySchedule, // Add this prop
-    removeDailyDate,
     refetchTrainers,
     updateTrainerLocal,
-    includeSundays,
+    excludeDays,
+    commonFields,
+    getTrainingHoursPerDay,
   }) => {
+    const [showTooltip, setShowTooltip] = useState(false);
+    const buttonRef = useRef(null);
+    const isStudentCountValid = batch.batchPerStdCount && Number(batch.batchPerStdCount) > 0;
+    const handleAddTrainerClick = () => {
+      if (!isStudentCountValid) {
+        setShowTooltip(true);
+        setTimeout(() => setShowTooltip(false), 3000);
+      } else {
+        addTrainer(rowIndex, batchIndex);
+      }
+    };
     return (
       <div>
         <div className="flex justify-between items-center mb-2 ">
           <h5 className="text-sm font-medium text-gray-700">Trainers</h5>
-          <button
-            onClick={() => addTrainer(rowIndex, batchIndex)}
-            className="text-xs flex items-center text-indigo-600 hover:text-indigo-800 font-medium"
-            type="button"
-          >
-            <FiPlus className="mr-1" size={12} /> Add Trainer
-          </button>
+          <div className="relative">
+            <button
+              ref={buttonRef}
+              onClick={handleAddTrainerClick}
+              disabled={!isStudentCountValid}
+              className={`text-xs flex items-center font-medium transition-colors ${
+                isStudentCountValid
+                  ? "text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                  : "text-gray-400 cursor-not-allowed"
+              }`}
+              type="button"
+              title={isStudentCountValid ? "Add Trainer" : "Student count required"}
+            >
+              {isStudentCountValid ? (
+                <FiPlus className="mr-1" size={12} />
+              ) : (
+                <FiAlertTriangle className="mr-1" size={12} />
+              )}
+              Add Trainer
+            </button>
+            {showTooltip && (
+              <div
+                className="absolute top-full mt-1 left-0 z-10 bg-red-50 border border-red-200 text-red-800 text-xs px-3 py-2 rounded shadow-lg max-w-xs"
+                style={{
+                  whiteSpace: "nowrap",
+                  transform: "translateX(-50%)",
+                  left: "50%",
+                }}
+              >
+                <div className="flex items-center">
+                  <FiAlertTriangle className="mr-1" size={10} />
+                  Please enter a student count for this batch before adding trainers.
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {trainers.length > 0 ? (
-          <div className="overflow-x-auto">
+          <div className="overflow-visible">
             <table className="min-w-full text-xs border border-gray-200 rounded">
               <thead className="bg-gray-50">
                 <tr>
@@ -1021,16 +1002,16 @@ const TrainersTable = React.memo(
                       selectedDomain={selectedDomain}
                       handleTrainerField={handleTrainerField}
                       handleTotalHoursChange={handleTotalHoursChange}
+                      handleDailyHoursChange={handleDailyHoursChange}
                       removeTrainer={removeTrainer}
                       openSwapModal={openSwapModal}
                       isTrainerAvailable={isTrainerAvailable}
                       isDuplicate={isDuplicate}
-                      openDailySchedule={openDailySchedule} // Add this prop
-                      setOpenDailySchedule={setOpenDailySchedule} // Add this prop
-                      removeDailyDate={removeDailyDate}
                       refetchTrainers={refetchTrainers}
                       updateTrainerLocal={updateTrainerLocal}
-                      includeSundays={includeSundays}
+                      excludeDays={excludeDays}
+                      commonFields={commonFields}
+                      getTrainingHoursPerDay={getTrainingHoursPerDay}
                     />
                   );
                 })}
@@ -1065,22 +1046,22 @@ const BatchComponent = React.memo(
     addTrainer,
     handleTrainerField,
     handleTotalHoursChange,
+    handleDailyHoursChange,
     removeTrainer,
     openSwapModal,
     isTrainerAvailable,
     duplicates = [],
-    openDailySchedule, // Add this prop
-    setOpenDailySchedule, // Add this prop
-    removeDailyDate,
     refetchTrainers,
     updateTrainerLocal,
-    includeSundays,
+    excludeDays,
+    commonFields,
+    getTrainingHoursPerDay,
   }) => {
     return (
       <div
         className={`bg-white rounded-lg border ${
           memoizedGetColorsForBatch(row.batch).border
-        } shadow-xs overflow-hidden`}
+        } shadow-xs overflow-visible`}
       >
         <div
           className={`px-4 py-3 ${
@@ -1241,16 +1222,16 @@ const BatchComponent = React.memo(
             addTrainer={addTrainer}
             handleTrainerField={handleTrainerField}
             handleTotalHoursChange={handleTotalHoursChange}
+            handleDailyHoursChange={handleDailyHoursChange}
             removeTrainer={removeTrainer}
             openSwapModal={openSwapModal}
             isTrainerAvailable={isTrainerAvailable}
             duplicates={duplicates}
-            openDailySchedule={openDailySchedule}
-            setOpenDailySchedule={setOpenDailySchedule}
-            removeDailyDate={removeDailyDate}
             refetchTrainers={refetchTrainers}
             updateTrainerLocal={updateTrainerLocal}
-            includeSundays={includeSundays}
+            excludeDays={excludeDays}
+            commonFields={commonFields}
+            getTrainingHoursPerDay={getTrainingHoursPerDay}
           />
         </div>
       </div>
@@ -1271,7 +1252,7 @@ const BatchDetailsTable = ({
   courses,
   onValidationChange,
   globalTrainerAssignments = [], // <-- pass this from parent (InitiationModal)
-  includeSundays = false,
+  excludeDays = "None",
 }) => {
   const [mergeModal, setMergeModal] = useState({
     open: false,
@@ -1297,7 +1278,6 @@ const BatchDetailsTable = ({
   const [expandedBatch, setExpandedBatch] = useState({});
   const [swapModal, setSwapModal] = useState({ open: false, source: null });
   const [duplicateTrainers, setDuplicateTrainers] = useState([]);
-  const [openDailySchedule, setOpenDailySchedule] = useState(null);
 
   // ✅ 4. Memoize filtered trainers to prevent unnecessary re-filtering
   const filteredTrainers = useMemo(() => {
@@ -1657,32 +1637,6 @@ const BatchDetailsTable = ({
     setTable1Data(updated);
   };
 
-  // Remove a single date from trainer's activeDates and dailyHours
-  const removeDailyDate = (rowIndex, batchIndex, trainerIdx, dayIndex) => {
-    const updated = [...table1Data];
-    const trainer = updated[rowIndex].batches[batchIndex].trainers[trainerIdx];
-    if (!trainer) return;
-
-    // Remove the date and the corresponding hours
-    if (trainer.activeDates && trainer.activeDates.length > dayIndex) {
-      trainer.activeDates = trainer.activeDates.filter(
-        (_, idx) => idx !== dayIndex
-      );
-    }
-    if (trainer.dailyHours && trainer.dailyHours.length > dayIndex) {
-      trainer.dailyHours = trainer.dailyHours.filter(
-        (_, idx) => idx !== dayIndex
-      );
-    }
-
-    // Recalculate assignedHours
-    trainer.assignedHours = trainer.dailyHours
-      ? trainer.dailyHours.reduce((sum, h) => sum + Number(h || 0), 0)
-      : 0;
-
-    setTable1Data(updated);
-  };
-
   const getTrainingHoursPerDay = (commonFields) => {
     if (
       !commonFields.collegeStartTime ||
@@ -1892,7 +1846,19 @@ const BatchDetailsTable = ({
     const dates = [];
     let current = new Date(startDate);
     while (current <= endDate) {
-      if (includeSundays || current.getDay() !== 0) {
+      const dayOfWeek = current.getDay(); // 0 = Sunday, 6 = Saturday
+      let shouldInclude = true;
+      
+      if (excludeDays === "Saturday" && dayOfWeek === 6) {
+        shouldInclude = false;
+      } else if (excludeDays === "Sunday" && dayOfWeek === 0) {
+        shouldInclude = false;
+      } else if (excludeDays === "Both" && (dayOfWeek === 0 || dayOfWeek === 6)) {
+        shouldInclude = false;
+      }
+      // If excludeDays === "None", include all days
+      
+      if (shouldInclude) {
         dates.push(new Date(current));
       }
       current.setDate(current.getDate() + 1);
@@ -1927,6 +1893,20 @@ const BatchDetailsTable = ({
       // If no daily breakdown, set a single value
       trainer.dailyHours = total > 0 ? [total] : [];
     }
+
+    setTable1Data(updated);
+  };
+
+  const handleDailyHoursChange = (rowIndex, batchIndex, trainerIdx, dayIndex, value) => {
+    const updated = [...table1Data];
+    const trainer = updated[rowIndex].batches[batchIndex].trainers[trainerIdx];
+    if (!trainer.dailyHours || trainer.dailyHours.length === 0) return;
+
+    // Update the specific day's hours
+    trainer.dailyHours[dayIndex] = Number(value) || 0;
+
+    // Recalculate total assignedHours
+    trainer.assignedHours = trainer.dailyHours.reduce((sum, hours) => sum + Number(hours || 0), 0);
 
     setTable1Data(updated);
   };
@@ -2865,16 +2845,16 @@ const BatchDetailsTable = ({
                           addTrainer={addTrainer}
                           handleTrainerField={handleTrainerField}
                           handleTotalHoursChange={handleTotalHoursChange}
+                          handleDailyHoursChange={handleDailyHoursChange}
                           removeTrainer={removeTrainer}
                           openSwapModal={openSwapModal}
                           isTrainerAvailable={isTrainerAvailable}
                           duplicates={duplicateTrainers}
-                          openDailySchedule={openDailySchedule} // Add this line
-                          setOpenDailySchedule={setOpenDailySchedule} // Add this line
-                          removeDailyDate={removeDailyDate}
                           refetchTrainers={refetchTrainers}
                           updateTrainerLocal={updateTrainerLocal}
-                          includeSundays={includeSundays}
+                          excludeDays={excludeDays}
+                          commonFields={commonFields}
+                          getTrainingHoursPerDay={getTrainingHoursPerDay}
                         />
                       ))}
                       {/* Add Batch Button */}
