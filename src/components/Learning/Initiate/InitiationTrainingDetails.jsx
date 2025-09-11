@@ -585,15 +585,30 @@ function InitiationTrainingDetails({ training, onBack }) {
         )}
       </div>
 
-      {showSendSchedule && (
-        <SendSchedule
-          training={training}
-          trainingData={trainingData}
-          phaseData={phaseData}
-          domainsData={domainsData}
-          onClose={() => setShowSendSchedule(false)}
-        />
-      )}
+     {showSendSchedule && (
+ // In your parent component
+<SendSchedule
+  training={training}
+  trainingData={trainingData}
+  phaseData={phaseData}
+  domainsData={domainsData}
+trainersData={domainsData.flatMap(domain => 
+  domain.table1Data?.flatMap(row => 
+    row.batches?.flatMap(batch => 
+      batch.trainers?.map(trainer => ({
+        ...trainer,
+        domain: domain.domain,
+        batchCode: batch.batchCode,
+        conveyance: trainer.conveyance || 0,
+        food: trainer.food || 0,
+        lodging: trainer.lodging || 0
+      })) || []
+    ) || []
+  ) || []
+)}
+  onClose={() => setShowSendSchedule(false)}
+/>
+)}
     </div>
   );
 }
