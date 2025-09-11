@@ -1,3 +1,4 @@
+// SendSchedule.jsx
 import React, { useState, useEffect } from "react";
 import {
   FiX,
@@ -7,15 +8,21 @@ import {
   FiCalendar,
   FiCheck,
 } from "react-icons/fi";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  getDoc,
+} from "firebase/firestore";
 import { db } from "../../firebase";
 import emailjs from "@emailjs/browser";
 
 function SendSchedule({
-  training,
-  trainingData,
-  phaseData,
-  domainsData,
+  training, // expects training.id and training.selectedPhase
+  trainingData, // (optional) from parent
+  phaseData, // (optional) from parent (collegeStartTime, lunchStartTime, etc.)
   onClose,
 }) {
   const [currentStep, setCurrentStep] = useState(1);
@@ -26,15 +33,103 @@ function SendSchedule({
   const [fetchingSchedule, setFetchingSchedule] = useState(false);
   const [emailData, setEmailData] = useState({
     to: "",
-    subject: "",
-    message: "",
+    venue: "",
+    contactPerson: "",
+    contactNumber: "",
   });
+
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
 
-  // ✅ Fetch trainers
+  // NEW: trainingForms + phase doc fetched here
+  const [trainingFormDoc, setTrainingFormDoc] = useState(null); // doc at trainingForms/{id}
+  const [phaseDocData, setPhaseDocData] = useState(null); // doc at trainingForms/{id}/trainings/{phase}
+
+  // Utility: format date (kept same as original)
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "";
+    return new Date(dateStr).toLocaleDateString("en-US", {
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+// Calculate hours from dayDuration string e.g., "09:00 - 13:00"
+const calculateHours = (dayDuration) => {
+  if (!dayDuration) return 0;
+
+  // Remove extra spaces
+  const [start, end] = dayDuration.split("-").map((s) => s.trim());
+  if (!start || !end) return 0;
+
+  const [startH, startM] = start.split(":").map(Number);
+  const [endH, endM] = end.split(":").map(Number);
+
+  if ([startH, startM, endH, endM].some(isNaN)) return 0;
+
+  const startDate = new Date(0, 0, 0, startH, startM);
+  const endDate = new Date(0, 0, 0, endH, endM);
+
+  let diff = (endDate - startDate) / (1000 * 60 * 60); // in hours
+  if (diff < 0) diff = 0;
+
+  return diff;
+};
+
+
+  // Utility: get timing string for dayDuration using phaseData (kept original logic)
+  const getTimingForSlot = (slot) => {
+    if (!slot) return "-";
+    const s = String(slot).toUpperCase();
+    const pd = phaseData || phaseDocData || {};
+    const { collegeStartTime, lunchStartTime, lunchEndTime, collegeEndTime } =
+      pd || {};
+
+    if (s.includes("AM")) {
+      if (collegeStartTime && lunchStartTime)
+        return `${collegeStartTime} - ${lunchStartTime}`;
+      return "AM";
+    }
+    if (s.includes("PM")) {
+      if (lunchEndTime && collegeEndTime)
+        return `${lunchEndTime} - ${collegeEndTime}`;
+      return "PM";
+    }
+    return slot;
+  };
+  useEffect(() => {
+    if ((trainingFormDoc || trainingData) && selectedTrainer) {
+      setEmailData((prev) => ({
+        ...prev,
+        to: selectedTrainer?.email || selectedTrainer?.trainerEmail || "",
+        venue:
+          trainingFormDoc?.address ||
+          trainingFormDoc?.venue ||
+          trainingFormDoc?.accountName ||
+          trainingData?.venue ||
+          "",
+        contactPerson:
+          trainingFormDoc?.tpoName ||
+          trainingFormDoc?.contactPerson ||
+          trainingFormDoc?.createdBy?.name ||
+          trainingData?.contactPerson ||
+          "",
+        contactNumber:
+          trainingFormDoc?.tpoPhone ||
+          trainingFormDoc?.trainingPhone ||
+          trainingFormDoc?.accountPhone ||
+          trainingData?.trainingPhone ||
+          trainingData?.tpoPhone ||
+          "",
+      }));
+    }
+  }, [trainingFormDoc, trainingData, selectedTrainer]);
+
+  // ---------- Fetch trainers assigned to this training ----------
   useEffect(() => {
     const fetchAssignedTrainers = async () => {
+      if (!training?.id) return;
       try {
         const q = query(
           collection(db, "trainerAssignments"),
@@ -59,6 +154,17 @@ function SendSchedule({
             trainerSnap.forEach((doc) => {
               assignedTrainers.push({ id: doc.id, ...doc.data() });
             });
+            // fallback: if no doc found by trainerId, try doc ID equal trainerId
+            if (trainerSnap.empty) {
+              try {
+                const docRef = doc(db, "trainers", trainerId);
+                const single = await getDoc(docRef);
+                if (single.exists())
+                  assignedTrainers.push({ id: single.id, ...single.data() });
+              } catch (e) {
+                // ignore
+              }
+            }
           } catch (err) {
             console.warn(`Error fetching trainer ${trainerId}:`, err);
           }
@@ -71,10 +177,40 @@ function SendSchedule({
       }
     };
 
-    if (training?.id) fetchAssignedTrainers();
+    fetchAssignedTrainers();
   }, [training?.id]);
 
-  // ✅ Fetch trainer assignments
+  // ---------- Fetch trainingForms doc and the phase doc ----------
+  useEffect(() => {
+    const fetchTrainingFormAndPhase = async () => {
+      if (!training?.id) return;
+      try {
+        const tfDocRef = doc(db, "trainingForms", training.id);
+        const tfSnap = await getDoc(tfDocRef);
+        if (tfSnap.exists()) setTrainingFormDoc(tfSnap.data());
+        else setTrainingFormDoc(null);
+
+        const phase = training.selectedPhase || "phase-1";
+        const phaseDocRef = doc(
+          db,
+          "trainingForms",
+          training.id,
+          "trainings",
+          phase
+        );
+        const phaseSnap = await getDoc(phaseDocRef);
+        if (phaseSnap.exists()) setPhaseDocData(phaseSnap.data());
+        else setPhaseDocData(null);
+      } catch (err) {
+        console.error("Error fetching training form/phase doc:", err);
+        setError("Failed to load training details");
+      }
+    };
+
+    fetchTrainingFormAndPhase();
+  }, [training?.id, training?.selectedPhase]);
+
+  // ---------- Fetch trainer-specific assignments ----------
   const fetchTrainerSchedule = async (trainerId) => {
     setFetchingSchedule(true);
     try {
@@ -101,16 +237,27 @@ function SendSchedule({
   const handleTrainerSelect = (trainer) => {
     setSelectedTrainer(trainer);
     setCurrentStep(2);
-    fetchTrainerSchedule(trainer.id);
+    fetchTrainerSchedule(trainer.trainerId || trainer.id);
   };
 
   const handleConfirmSchedule = () => {
     setCurrentStep(3);
-    setEmailData({
-      to: selectedTrainer?.email || "",
-      subject: `Training Schedule for ${selectedTrainer.name} - ${trainingData?.collegeName}`,
-      message: `Dear ${selectedTrainer.name},\n\nPlease find your training schedule details below:\n\nCollege: ${trainingData?.collegeName}\nCourse: ${trainingData?.course} - ${trainingData?.year}\nPhase: ${training?.selectedPhase}\n\nYour schedule has been confirmed. Please review the details attached.\n\nBest regards,\nTraining Team`,
-    });
+    setEmailData((prev) => ({
+      ...prev,
+      to: selectedTrainer?.email || selectedTrainer?.trainerEmail || "",
+      subject: `Training Schedule for ${
+        selectedTrainer?.name || selectedTrainer?.trainerName
+      } - ${trainingFormDoc?.collegeName || trainingData?.collegeName || ""}`,
+      message: `Dear ${
+        selectedTrainer?.name || selectedTrainer?.trainerName
+      },\n\nPlease find your training schedule details below:\n\nCollege: ${
+        trainingFormDoc?.collegeName || trainingData?.collegeName
+      }\nCourse: ${trainingFormDoc?.course || trainingData?.course} - ${
+        trainingFormDoc?.year || trainingData?.year
+      }\nPhase: ${
+        training?.selectedPhase || "phase-1"
+      }\n\nYour schedule has been confirmed. Please review the details attached.\n\nBest regards,\nTraining Team`,
+    }));
   };
 
   const handleInputChange = (e) => {
@@ -118,135 +265,144 @@ function SendSchedule({
     setEmailData((prev) => ({ ...prev, [name]: value }));
   };
 
-const handleSendEmail = async () => {
-  if (!emailData.to.trim()) {
-    setError("Please enter recipient email");
-    return;
-  }
+  // ---------- Send Email ----------
+  const handleSendEmail = async () => {
+    if (!emailData.to.trim()) {
+      setError("Please enter recipient email");
+      return;
+    }
 
-  setLoading(true);
-  setError("");
+    setLoading(true);
+    setError("");
 
-  try {
-    // Fetch trainer's rate from the trainers collection
-    let feePerHour = 0;
-
-    if (selectedTrainer) {
-      try {
-        const trainerQuery = query(
-          collection(db, "trainers"),
-          where("trainerId", "==", selectedTrainer.trainerId || selectedTrainer.id)
-        );
-        const trainerSnap = await getDocs(trainerQuery);
-
-        if (!trainerSnap.empty) {
-          const trainerData = trainerSnap.docs[0].data();
-          feePerHour = trainerData.charges || 0;
+    try {
+      let feePerHour = 0;
+      if (selectedTrainer) {
+        try {
+          const trainerQuery = query(
+            collection(db, "trainers"),
+            where(
+              "trainerId",
+              "==",
+              selectedTrainer.trainerId || selectedTrainer.id
+            )
+          );
+          const trainerSnap = await getDocs(trainerQuery);
+          if (!trainerSnap.empty) {
+            const trainerData = trainerSnap.docs[0].data();
+            feePerHour = trainerData.charges || trainerData.feePerHour || 0;
+          } else {
+            const tDocRef = doc(db, "trainers", selectedTrainer.id);
+            const tDocSnap = await getDoc(tDocRef);
+            if (tDocSnap.exists())
+              feePerHour =
+                tDocSnap.data().charges || tDocSnap.data().feePerHour || 0;
+          }
+        } catch (err) {
+          console.error("Error fetching trainer rate:", err);
         }
-      } catch (err) {
-        console.error("Error fetching trainer rate:", err);
       }
+      
+const totalHours = trainerAssignments.reduce((acc, assignment) => {
+  const duration =
+    assignment.dayDuration.includes("AM") || assignment.dayDuration.includes("PM")
+      ? getTimingForSlot(assignment.dayDuration)
+      : assignment.dayDuration;
+  return acc + calculateHours(duration);
+}, 0);
+
+
+const totalCost = totalHours * (feePerHour || 0);
+const tdsAmount = totalCost * 0.1; // 10% TDS
+const payableCost = totalCost - tdsAmount;;
+
+
+  const scheduleRows = trainerAssignments
+  .map((assignment) => {
+    const hours = calculateHours(assignment.dayDuration);
+    const perDayCost = (feePerHour || 0) * hours;
+
+    return `
+<tr>
+  <td>${assignment.domain || "-"}</td>
+  <td>${trainingFormDoc?.year || trainingData?.year || "-"}</td>
+  <td>${selectedTrainer?.name || selectedTrainer?.trainerName || "-"}</td>
+  <td>${formatDate(assignment.date)}</td>
+  <td>${assignment.batchCode || "-"}</td>
+  <td>${getTimingForSlot(assignment.dayDuration)}</td>
+<td>${assignment.dayDuration.includes("AM") || assignment.dayDuration.includes("PM")
+    ? calculateHours(getTimingForSlot(assignment.dayDuration))
+    : calculateHours(assignment.dayDuration)}
+</td>
+  <td>₹ ${feePerHour || 0}</td>
+  <td>₹ ${perDayCost.toFixed(2)}</td>
+</tr>`;
+  })
+  .join("");
+
+      const templateParams = {
+        to_email: emailData.to,
+        salutation: selectedTrainer?.salutation || "Dear",
+        trainer_last_name: (
+          selectedTrainer?.name ||
+          selectedTrainer?.trainerName ||
+          ""
+        )
+          .split(" ")
+          .slice(-1)
+          .join(" "),
+        college_name:
+          trainingFormDoc?.collegeName || trainingData?.collegeName || "",
+        venue_address: emailData.venue,
+        contact_person: emailData.contactPerson,
+        contact_number: emailData.contactNumber,
+
+        schedule_rows: scheduleRows,
+        total_days: trainerAssignments.length,
+        total_hours: totalHours,
+        start_date: trainerAssignments[0]
+          ? formatDate(trainerAssignments[0].date)
+          : "",
+        fee_per_hour: feePerHour,
+        fee_per_day:
+          trainerAssignments.length > 0
+            ? feePerHour * (totalHours / trainerAssignments.length)
+            : 0,
+        total_cost: totalCost,
+        tds_amount: tdsAmount,
+        payable_cost: payableCost,
+        project_code:
+          trainingFormDoc?.projectCode || trainingData?.projectCode || "",
+        payment_cycle:
+          trainingFormDoc?.payment_cycle ||
+          trainingFormDoc?.paymentCycle ||
+          "30",
+      };
+
+      console.log("Sending email with params:", templateParams);
+
+      await emailjs.send(
+        "service_pskknsn",
+        "template_p2as3pp",
+        templateParams,
+        "zEVWxxT-QvGIrhvTV"
+      );
+
+      setSuccess(true);
+      setTimeout(() => {
+        setSuccess(false);
+        onClose();
+      }, 2500);
+    } catch (err) {
+      console.error("Error sending email:", err);
+      setError("Failed to send email. Please try again.");
+    } finally {
+      setLoading(false);
     }
-
-    // Calculate total hours by summing all assignment hours
-    const totalHours = trainerAssignments.reduce(
-      (acc, assignment) => acc + (parseFloat(assignment.hours) || 0),
-      0
-    );
-
-    // Calculate financial details
-    const totalCost = totalHours * feePerHour;
-    const tdsAmount = totalCost * 0.1; // 10% TDS
-    const payableCost = totalCost - tdsAmount;
-console.log("Fee per Hour:", feePerHour);
-console.log("Total Cost:", totalCost);
-console.log("TDS (10%):", tdsAmount);
-console.log("Payable Amount:", payableCost);
-    // Generate schedule rows with correct per-session cost
-    const scheduleRows = trainerAssignments
-      .map(
-        (assignment) => `
-    <tr>
-      <td>${assignment.domain || "-"}</td>
-      <td>${trainingData?.year || "-"}</td>
-      <td>${selectedTrainer?.name || "-"}</td>
-      <td>${formatDate(assignment.date)}</td>
-      <td>${assignment.batchCode || "-"}</td>
-      <td>${getTimingForSlot(assignment.dayDuration)}</td>
-      <td>${assignment.hours || "0"}</td>
-      <td>₹ ${feePerHour}</td>
-      <td>₹ ${feePerHour * (parseFloat(assignment.hours) || 0)}</td>
-    </tr>`
-      )
-      .join("");
-
-    const templateParams = {
-      to_email: emailData.to,
-      // ... other template parameters
-      schedule_rows: scheduleRows,
-      total_days: trainerAssignments.length,
-      total_hours: totalHours,
-      start_date: trainerAssignments[0]
-        ? formatDate(trainerAssignments[0].date)
-        : "",
-      fee_per_hour: feePerHour,
-      total_cost: totalCost,
-      tds_amount: tdsAmount,
-      payable_cost: payableCost,
-      // ... other template parameters
-    };
-
-    console.log("Sending email with params:", templateParams);
-
-    await emailjs.send(
-      "service_pskknsn",
-      "template_p2as3pp",
-      templateParams,
-      "zEVWxxT-QvGIrhvTV"
-    );
-
-    setSuccess(true);
-    setTimeout(() => {
-      setSuccess(false);
-      onClose();
-    }, 3000);
-  } catch (err) {
-    console.error("Error sending email:", err);
-    setError("Failed to send email. Please try again.");
-  } finally {
-    setLoading(false);
-  }
-};
-
-const formatDate = (dateStr) => {
-  if (!dateStr) return "";
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    weekday: "short",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-};
-
-  const getTimingForSlot = (slot) => {
-    if (!slot) return "-";
-    const s = String(slot).toUpperCase();
-    const { collegeStartTime, lunchStartTime, lunchEndTime, collegeEndTime } =
-      phaseData || {};
-
-    if (s.includes("AM")) {
-      if (collegeStartTime && lunchStartTime)
-        return `${collegeStartTime} - ${lunchStartTime}`;
-      return "AM";
-    }
-    if (s.includes("PM")) {
-      if (lunchEndTime && collegeEndTime)
-        return `${lunchEndTime} - ${collegeEndTime}`;
-      return "PM";
-    }
-    return slot;
   };
 
+
+  // ---------- UI ----------
   return (
     <div className="fixed inset-0 bg-transparent bg-opacity-90 backdrop-blur-xl flex items-center justify-center z-500 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -418,6 +574,8 @@ const formatDate = (dateStr) => {
                           <td className="px-4 py-2 border border-gray-200">
                             {getTimingForSlot(assignment.dayDuration)}
                           </td>
+                          <td>{calculateHours(assignment.dayDuration)}</td> {/* Hours */}
+
                           <td className="px-4 py-2 border border-gray-200">
                             {assignment.domain || "-"}
                           </td>
@@ -425,7 +583,9 @@ const formatDate = (dateStr) => {
                             {assignment.batchCode || "-"}
                           </td>
                           <td className="px-4 py-2 border border-gray-200">
-                            {assignment.collegeName || "-"}
+                            {trainingFormDoc?.collegeName ||
+                              trainingData?.collegeName ||
+                              "-"}
                           </td>
                         </tr>
                       ))}
@@ -434,161 +594,120 @@ const formatDate = (dateStr) => {
                 </div>
               ) : (
                 <div className="text-center py-8 text-gray-500">
-                  No assignments found for this trainer in the selected phase
+                  No schedule assigned for this trainer
                 </div>
               )}
 
-              {trainerAssignments.length > 0 && (
-                <div className="mt-6 flex justify-end">
-                  <button
-                    onClick={handleConfirmSchedule}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
-                  >
-                    <FiCheck className="mr-2" />
-                    Confirm Schedule
-                  </button>
-                </div>
-              )}
+              <div className="mt-6 flex justify-end space-x-3">
+                <button
+                  onClick={() => setCurrentStep(1)}
+                  className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={handleConfirmSchedule}
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Confirm & Next
+                </button>
+              </div>
             </div>
           )}
 
-          {/* Step 3: Confirm & Email Setup */}
+          {/* Step 3: Confirm Email */}
+          {/* Step 3: Confirm Email */}
           {currentStep === 3 && (
             <div>
               <h3 className="text-lg font-medium text-gray-800 mb-4">
-                Confirm Schedule & Setup Email
+                Confirm Details
               </h3>
-
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-                <div className="flex items-center text-green-800">
-                  <FiCheck className="mr-2" />
-                  <span className="font-medium">
-                    Schedule Confirmed for {selectedTrainer?.name}
-                  </span>
-                </div>
-                <div className="text-sm text-green-700 mt-1">
-                  Total assignments: {trainerAssignments.length}
-                </div>
-              </div>
 
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Recipient Email *
+                    To
                   </label>
                   <input
                     type="email"
                     name="to"
                     value={emailData.to}
                     onChange={handleInputChange}
-                    placeholder="Enter recipient email"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
+                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
 
+                {/* Editable Venue */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Subject
+                    Venue
                   </label>
                   <input
                     type="text"
-                    name="subject"
-                    value={emailData.subject}
+                    name="venue"
+                    value={emailData.venue}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
 
+                {/* Editable Contact Person */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Message
+                    Contact Person
                   </label>
-                  <textarea
-                    name="message"
-                    value={emailData.message}
+                  <input
+                    type="text"
+                    name="contactPerson"
+                    value={emailData.contactPerson}
                     onChange={handleInputChange}
-                    rows={6}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Editable Contact Number */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Contact Number
+                  </label>
+                  <input
+                    type="text"
+                    name="contactNumber"
+                    value={emailData.contactNumber}
+                    onChange={handleInputChange}
+                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
               </div>
 
-              <div className="flex justify-between mt-6">
+              <div className="mt-6 flex justify-end space-x-3">
                 <button
                   onClick={() => setCurrentStep(2)}
-                  className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
-                >
-                  Back
-                </button>
-                <button
-                  onClick={() => setCurrentStep(4)}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  Proceed to Send
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Step 4: Send Email */}
-          {currentStep === 4 && (
-            <div>
-              <h3 className="text-lg font-medium text-gray-800 mb-4">
-                Send Email
-              </h3>
-
-              {success && (
-                <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
-                  Email sent successfully!
-                </div>
-              )}
-
-              <div className="bg-gray-50 p-4 rounded-lg mb-6">
-                <h4 className="font-medium text-gray-800 mb-2">
-                  Email Preview
-                </h4>
-                <div className="text-sm text-gray-600 space-y-2">
-                  <p>
-                    <strong>To:</strong> {emailData.to}
-                  </p>
-                  <p>
-                    <strong>Subject:</strong> {emailData.subject}
-                  </p>
-                  <div className="mt-3 p-3 bg-white rounded border">
-                    <pre className="whitespace-pre-wrap text-sm">
-                      {emailData.message}
-                    </pre>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-between">
-                <button
-                  onClick={() => setCurrentStep(3)}
-                  className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
-                  disabled={loading}
+                  className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
                 >
                   Back
                 </button>
                 <button
                   onClick={handleSendEmail}
                   disabled={loading}
-                  className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center"
+                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center"
                 >
                   {loading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Sending...
-                    </>
+                    <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-2" />
                   ) : (
-                    <>
-                      <FiSend className="mr-2" />
-                      Send Email
-                    </>
+                    <FiSend className="mr-2" />
                   )}
+                  Send Email
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Step 4: Success */}
+          {success && (
+            <div className="mt-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded flex items-center">
+              <FiCheck className="mr-2" />
+              Email sent successfully!
             </div>
           )}
         </div>

@@ -1,7 +1,14 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { db } from "../../firebase";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  doc,
+  getDoc,
+} from "firebase/firestore";
 import InvoiceModal from "./InvoiceModal";
 import { generateInvoicePDF } from "./invoiceUtils";
 import {
@@ -24,7 +31,7 @@ import {
   FiLayers,
   FiTrash2,
 } from "react-icons/fi";
-
+    import { FaEye } from 'react-icons/fa';
 
 function GenerateTrainerInvoice() {
   const [trainerData, setTrainerData] = useState([]);
@@ -41,6 +48,7 @@ function GenerateTrainerInvoice() {
   const [downloadingInvoice, setDownloadingInvoice] = useState(null);
   const [pdfStatus, setPdfStatus] = useState({});
   const [showOnlyActive, setShowOnlyActive] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState(null); // State for editing invoice
 
   // Combined filters dropdown state
   const [filtersDropdownOpen, setFiltersDropdownOpen] = useState(false);
@@ -141,6 +149,64 @@ function GenerateTrainerInvoice() {
       }));
     } finally {
       setDownloadingInvoice(null);
+    }
+  };
+
+  // Function to handle editing an invoice
+  const handleEditInvoice = async (trainer) => {
+    try {
+      // Find the invoice for this trainer
+      const q = query(
+        collection(db, "invoices"),
+        where("trainerId", "==", trainer.trainerId),
+        where("collegeName", "==", trainer.collegeName),
+        where("phase", "==", trainer.phase)
+      );
+
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        // If multiple invoices, show selection dialog
+        if (querySnapshot.size > 1) {
+          const invoiceNumbers = querySnapshot.docs.map(
+            (doc) => doc.data().billNumber
+          );
+          const selectedInvoice = prompt(
+            `Multiple invoices found for ${trainer.trainerName} at ${
+              trainer.collegeName
+            } (${
+              trainer.phase
+            }). Please enter the invoice number you want to edit:\n${invoiceNumbers.join(
+              "\n"
+            )}`
+          );
+
+          if (selectedInvoice) {
+            const selectedDoc = querySnapshot.docs.find(
+              (doc) => doc.data().billNumber === selectedInvoice
+            );
+            if (selectedDoc) {
+              const invoiceData = selectedDoc.data();
+              setEditingInvoice({ ...invoiceData, id: selectedDoc.id });
+              setSelectedTrainer(trainer);
+              setShowInvoiceModal(true);
+            } else {
+              alert("Invalid invoice number selected");
+            }
+          }
+        } else {
+          // Single invoice - edit it directly
+          const invoiceData = querySnapshot.docs[0].data();
+          setEditingInvoice({ ...invoiceData, id: querySnapshot.docs[0].id });
+          setSelectedTrainer(trainer);
+          setShowInvoiceModal(true);
+        }
+      } else {
+        alert("No invoice found for this trainer at this college and phase");
+      }
+    } catch (error) {
+      console.error("Error finding invoice for editing:", error);
+      alert("Failed to find invoice. Please try again.");
     }
   };
 
@@ -351,6 +417,7 @@ function GenerateTrainerInvoice() {
 
   const handleGenerateInvoice = (trainer) => {
     setSelectedTrainer(trainer);
+    setEditingInvoice(null); // Reset editing state
     setShowInvoiceModal(true);
   };
 
@@ -369,7 +436,8 @@ function GenerateTrainerInvoice() {
     const filteredTrainers = groupedData[phase].filter((trainer) => {
       // compute invoice availability
       const invoiceAvailable = trainer.latestEndDate
-        ? Date.now() >= new Date(trainer.latestEndDate).getTime() + 24 * 60 * 60 * 1000
+        ? Date.now() >=
+          new Date(trainer.latestEndDate).getTime() + 24 * 60 * 60 * 1000
         : false;
 
       // when showOnlyActive is true, only include trainers that either already have an invoice or are available
@@ -383,21 +451,32 @@ function GenerateTrainerInvoice() {
         trainer.projectCode.toLowerCase().includes(searchTerm.toLowerCase());
 
       // Date range filter
-      const matchesDateRange = 
-        (!startDateFilter || new Date(trainer.earliestStartDate) >= new Date(startDateFilter)) &&
-        (!endDateFilter || new Date(trainer.latestEndDate) <= new Date(endDateFilter));
-      
+      const matchesDateRange =
+        (!startDateFilter ||
+          new Date(trainer.earliestStartDate) >= new Date(startDateFilter)) &&
+        (!endDateFilter ||
+          new Date(trainer.latestEndDate) <= new Date(endDateFilter));
+
       // Project code filter
       const matchesProjectCode = projectCodeFilter
-        ? trainer.projectCode.toLowerCase().includes(projectCodeFilter.toLowerCase())
+        ? trainer.projectCode
+            .toLowerCase()
+            .includes(projectCodeFilter.toLowerCase())
         : true;
 
       // College name filter
       const matchesCollegeName = collegeNameFilter
-        ? trainer.collegeName.toLowerCase().includes(collegeNameFilter.toLowerCase())
+        ? trainer.collegeName
+            .toLowerCase()
+            .includes(collegeNameFilter.toLowerCase())
         : true;
 
-      return matchesSearch && matchesDateRange && matchesProjectCode && matchesCollegeName;
+      return (
+        matchesSearch &&
+        matchesDateRange &&
+        matchesProjectCode &&
+        matchesCollegeName
+      );
     });
 
     if (filteredTrainers.length > 0) {
@@ -408,14 +487,14 @@ function GenerateTrainerInvoice() {
   }, {});
 
   // Get unique project codes for filter
-  const projectCodes = [...new Set(trainerData.map((item) => item.projectCode))].filter(
-    Boolean
-  );
+  const projectCodes = [
+    ...new Set(trainerData.map((item) => item.projectCode)),
+  ].filter(Boolean);
 
   // Get unique college names for filter
-  const collegeNames = [...new Set(trainerData.map((item) => item.collegeName))].filter(
-    Boolean
-  );
+  const collegeNames = [
+    ...new Set(trainerData.map((item) => item.collegeName)),
+  ].filter(Boolean);
 
   // Get status icon and text for download button
   const getDownloadStatus = (trainerId, collegeName, phase) => {
@@ -458,16 +537,11 @@ function GenerateTrainerInvoice() {
     }
   };
 
-  const clearFilters = () => {
-    setSearchTerm("");
-    setStartDateFilter("");
-    setEndDateFilter("");
-    setProjectCodeFilter("");
-    setCollegeNameFilter("");
-  };
+
 
   // Check if any filters are active (for badge on Filters button)
-  const isAnyFilterActive = startDateFilter || endDateFilter || projectCodeFilter || collegeNameFilter;
+  const isAnyFilterActive =
+    startDateFilter || endDateFilter || projectCodeFilter || collegeNameFilter;
 
   // Handle filters dropdown toggle with always downward positioning
   const toggleFiltersDropdown = () => {
@@ -480,7 +554,8 @@ function GenerateTrainerInvoice() {
       let left = rect.left + window.scrollX - dropdownWidth; // Left side (aligned to button's left edge)
 
       // Adjust for left overflow only
-      if (left < 16) { // Minimum left margin
+      if (left < 16) {
+        // Minimum left margin
         left = 16;
       }
 
@@ -527,6 +602,8 @@ function GenerateTrainerInvoice() {
     };
   }, [filtersDropdownOpen]);
 
+
+  
   return (
     <div className="min-h-screen bg-gray-50 ">
       <div className=" mx-auto bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
@@ -534,9 +611,7 @@ function GenerateTrainerInvoice() {
         <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-4">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
             <div>
-              <h1 className="text-2xl font-bold mb-2">
-                Trainer Invoice
-              </h1>
+              <h1 className="text-2xl font-bold mb-2">Trainer Invoice</h1>
               <p className="text-blue-100 opacity-90">
                 Generate and manage invoices for trainers
               </p>
@@ -574,7 +649,9 @@ function GenerateTrainerInvoice() {
               <button
                 ref={filtersBtnRef}
                 onClick={toggleFiltersDropdown}
-                className={`inline-flex items-center px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${isAnyFilterActive ? 'ring-2 ring-blue-500/20' : ''}`}
+                className={`inline-flex items-center px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${
+                  isAnyFilterActive ? "ring-2 ring-blue-500/20" : ""
+                }`}
                 aria-label="Open filters"
               >
                 <FiFilter className="w-4 h-4 mr-1" />
@@ -583,106 +660,109 @@ function GenerateTrainerInvoice() {
                   <span className="ml-1 w-2 h-2 bg-blue-500 rounded-full"></span>
                 )}
               </button>
-              {filtersDropdownOpen && createPortal(
-                <div
-                  ref={filtersDropdownRef}
-                  className="z-50 w-full max-w-sm md:max-w-md bg-white border border-gray-200 rounded-xl shadow-xl py-4 px-4 flex flex-col space-y-4 animate-fade-in transition-opacity duration-200"
-                  style={{
-                    position: "absolute",
-                    top: dropdownPosition.top,
-                    left: dropdownPosition.left,
-                    maxHeight: "80vh",
-                    overflowY: "auto",
-                  }}
-                >
-                  {/* Project Code Filter */}
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 mb-2 flex items-center">
-                      <FiBook className="w-4 h-4 mr-1" />
-                      Project Code
-                    </label>
-                    <select
-                      value={projectCodeFilter}
-                      onChange={(e) => setProjectCodeFilter(e.target.value)}
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                    >
-                      <option value="">All Project Codes</option>
-                      {projectCodes.map((code) => (
-                        <option key={code} value={code}>
-                          {code}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* College Name Filter */}
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 mb-2 flex items-center">
-                      <FiUser className="w-4 h-4 mr-1" />
-                      College Name
-                    </label>
-                    <select
-                      value={collegeNameFilter}
-                      onChange={(e) => setCollegeNameFilter(e.target.value)}
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                    >
-                      <option value="">All Colleges</option>
-                      {collegeNames.map((college) => (
-                        <option key={college} value={college}>
-                          {college}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Date Filter */}
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 mb-2 flex items-center">
-                      <FiCalendar className="w-4 h-4 mr-1" />
-                      Date Range
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="date"
-                        value={startDateFilter}
-                        onChange={(e) => setStartDateFilter(e.target.value)}
-                        className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                        placeholder="Start Date"
-                      />
-                      <input
-                        type="date"
-                        value={endDateFilter}
-                        onChange={(e) => setEndDateFilter(e.target.value)}
-                        className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                        placeholder="End Date"
-                      />
+              {filtersDropdownOpen &&
+                createPortal(
+                  <div
+                    ref={filtersDropdownRef}
+                    className="z-50 w-full max-w-sm md:max-w-md bg-white border border-gray-200 rounded-xl shadow-xl py-4 px-4 flex flex-col space-y-4 animate-fade-in transition-opacity duration-200"
+                    style={{
+                      position: "absolute",
+                      top: dropdownPosition.top,
+                      left: dropdownPosition.left,
+                      maxHeight: "80vh",
+                      overflowY: "auto",
+                    }}
+                  >
+                    {/* Project Code Filter */}
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                        <FiBook className="w-4 h-4 mr-1" />
+                        Project Code
+                      </label>
+                      <select
+                        value={projectCodeFilter}
+                        onChange={(e) => setProjectCodeFilter(e.target.value)}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                      >
+                        <option value="">All Project Codes</option>
+                        {projectCodes.map((code) => (
+                          <option key={code} value={code}>
+                            {code}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                  </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex flex-col sm:flex-row justify-between gap-2 pt-2 border-t border-gray-100">
-                    <button
-                      onClick={clearAllFilters}
-                      className="flex-1 inline-flex items-center justify-center px-3 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all"
-                    >
-                      <FiTrash2 className="w-4 h-4 mr-1" />
-                      Clear All
-                    </button>
-                    <button
-                      onClick={applyFilters}
-                      className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all"
-                    >
-                      Apply
-                    </button>
-                  </div>
-                </div>,
-                document.body
-              )}
+                    {/* College Name Filter */}
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                        <FiUser className="w-4 h-4 mr-1" />
+                        College Name
+                      </label>
+                      <select
+                        value={collegeNameFilter}
+                        onChange={(e) => setCollegeNameFilter(e.target.value)}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                      >
+                        <option value="">All Colleges</option>
+                        {collegeNames.map((college) => (
+                          <option key={college} value={college}>
+                            {college}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Date Filter */}
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                        <FiCalendar className="w-4 h-4 mr-1" />
+                        Date Range
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="date"
+                          value={startDateFilter}
+                          onChange={(e) => setStartDateFilter(e.target.value)}
+                          className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                          placeholder="Start Date"
+                        />
+                        <input
+                          type="date"
+                          value={endDateFilter}
+                          onChange={(e) => setEndDateFilter(e.target.value)}
+                          className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                          placeholder="End Date"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-col sm:flex-row justify-between gap-2 pt-2 border-t border-gray-100">
+                      <button
+                        onClick={clearAllFilters}
+                        className="flex-1 inline-flex items-center justify-center px-3 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all"
+                      >
+                        <FiTrash2 className="w-4 h-4 mr-1" />
+                        Clear All
+                      </button>
+                      <button
+                        onClick={applyFilters}
+                        className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all"
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  </div>,
+                  document.body
+                )}
             </div>
 
             {/* Active-only toggle (label - switch - status) and Refresh Button */}
             <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-700">Only active invoices</span>
+              <span className="text-sm text-gray-700">
+                Only active invoices
+              </span>
 
               <button
                 role="switch"
@@ -700,7 +780,11 @@ function GenerateTrainerInvoice() {
                 />
               </button>
 
-              <span className={`text-sm font-medium ${showOnlyActive ? "text-blue-600" : "text-gray-500"}`}>
+              <span
+                className={`text-sm font-medium ${
+                  showOnlyActive ? "text-blue-600" : "text-gray-500"
+                }`}
+              >
                 {showOnlyActive ? "ON" : "OFF"}
               </span>
 
@@ -715,7 +799,11 @@ function GenerateTrainerInvoice() {
           </div>
 
           {/* Active filters indicator */}
-          {(searchTerm || startDateFilter || endDateFilter || projectCodeFilter || collegeNameFilter) && (
+          {(searchTerm ||
+            startDateFilter ||
+            endDateFilter ||
+            projectCodeFilter ||
+            collegeNameFilter) && (
             <div className="mt-3 flex flex-wrap items-center text-sm text-gray-500">
               <span className="mr-2">Active filters:</span>
               {searchTerm && (
@@ -844,133 +932,132 @@ function GenerateTrainerInvoice() {
                                 key={idx}
                                 className="hover:bg-gray-50/50 transition-colors"
                               >
-                              <td className="px-4 sm:px-6 py-4">
-                                <div className="flex items-center">
-                                  <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
-                                    <FiUser className="text-blue-600" />
-                                  </div>
-                                  <div className="ml-4">
-                                    <div className="text-sm font-medium text-gray-900">
-                                      {item.trainerName}
+                                <td className="px-4 sm:px-6 py-4">
+                                  <div className="flex items-center">
+                                    <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                      <FiUser className="text-blue-600" />
                                     </div>
-                                    <div className="text-sm text-gray-500">
-                                      ID: {item.trainerId}
-                                    </div>
-                                    <div className="text-xs text-blue-600 mt-1">
-                                      Phase: {item.phase}
+                                    <div className="ml-4">
+                                      <div className="text-sm font-medium text-gray-900">
+                                        {item.trainerName}
+                                      </div>
+                                      <div className="text-sm text-gray-500">
+                                        ID: {item.trainerId}
+                                      </div>
+                                      <div className="text-xs text-blue-600 mt-1">
+                                        Phase: {item.phase}
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              </td>
-                              <td className="px-4 sm:px-6 py-4">
-                                <div className="text-sm text-gray-900 font-medium max-w-xs truncate">
-                                  {item.collegeName}
-                                </div>
-                                <div className="text-sm text-gray-500">
-                                  {item.allProjects.join(", ")}
-                                </div>
-                              </td>
-                              <td className="px-4 sm:px-6 py-4">
-                                <div className="text-sm text-gray-900">
-                                  {item.allDomains.join(", ")}
-                                </div>
-                              </td>
-                              <td className="px-4 sm:px-6 py-4">
-                                <div className="flex items-center gap-1 text-sm text-gray-500">
-                                  <FiCalendar className="text-gray-400 flex-shrink-0" />
-                                  <span>
-                                    {formatDate(item.earliestStartDate)} -{" "}
-                                    {formatDate(item.latestEndDate)}
-                                  </span>
-                                </div>
-                                <div className="text-xs text-gray-500 mt-1 flex items-center">
-                                  <FiDollarSign className="text-gray-400 mr-1 flex-shrink-0" />
-                                  <span>
-                                    {item.totalCollegeHours} hrs •{" "}
-                                    {item.perHourCost
-                                      ? `₹${item.perHourCost}/hr`
-                                      : "Rate not set"}
-                                  </span>
-                                </div>
-                                {item.allBatches.length > 1 && (
-                                  <div className="text-xs text-blue-600 mt-1 flex items-center">
-                                    <FiLayers className="mr-1" />
-                                    {item.allBatches.length} batches combined
+                                </td>
+                                <td className="px-4 sm:px-6 py-4">
+                                  <div className="text-sm text-gray-900 font-medium max-w-xs truncate">
+                                    {item.collegeName}
                                   </div>
-                                )}
-                              </td>
-                              <td className="px-4 sm:px-6 py-4">
-                                <div className="flex flex-col gap-2 min-w-[180px]">
-                                  {!item.hasExistingInvoice ? (
-                                    invoiceAvailable ? (
-                                      
+                                  <div className="text-sm text-gray-500">
+                                    {item.allProjects.join(", ")}
+                                  </div>
+                                </td>
+                                <td className="px-4 sm:px-6 py-4">
+                                  <div className="text-sm text-gray-900">
+                                    {item.allDomains.join(", ")}
+                                  </div>
+                                </td>
+                                <td className="px-4 sm:px-6 py-4">
+                                  <div className="flex items-center gap-1 text-sm text-gray-500">
+                                    <FiCalendar className="text-gray-400 flex-shrink-0" />
+                                    <span>
+                                      {formatDate(item.earliestStartDate)} -{" "}
+                                      {formatDate(item.latestEndDate)}
+                                    </span>
+                                  </div>
+                                  <div className="text-xs text-gray-500 mt-1 flex items-center">
+                                    <FiDollarSign className="text-gray-400 mr-1 flex-shrink-0" />
+                                    <span>
+                                      {item.totalCollegeHours} hrs •{" "}
+                                      {item.perHourCost
+                                        ? `₹${item.perHourCost}/hr`
+                                        : "Rate not set"}
+                                    </span>
+                                  </div>
+                                  {item.allBatches.length > 1 && (
+                                    <div className="text-xs text-blue-600 mt-1 flex items-center">
+                                      <FiLayers className="mr-1" />
+                                      {item.allBatches.length} batches combined
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="px-4 sm:px-6 py-4">
+                                  <div className="flex flex-col gap-2">
+                                    {item.hasExistingInvoice ? (
+                                      <>
+                                        <div className="flex gap-2">
+                                          <button
+                                            onClick={() =>
+                                              handleDownloadInvoice(item)
+                                            }
+                                            disabled={
+                                              downloadingInvoice ===
+                                              `${item.trainerId}_${item.collegeName}_${item.phase}`
+                                            }
+                                            className="flex-1 inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-all"
+                                          >
+                                            <FiDownload className="w-4 h-4 mr-1" />
+                                            Download
+                                          </button>
+                                          <button
+                                            onClick={() =>
+                                              handleEditInvoice(item)
+                                            }
+                                            className="flex-1 inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all"
+                                          >
+                                            <FaEye  className="w-4 h-4 mr-1" />
+                                            View
+                                          </button>
+                                        </div>
+                                        {getDownloadStatus(
+                                          item.trainerId,
+                                          item.collegeName,
+                                          item.phase
+                                        )}
+                                        <div className="text-xs text-green-600 flex items-center">
+                                          <FiCheckCircle className="mr-1" />
+                                          Invoice generated ({item.invoiceCount}
+                                          )
+                                        </div>
+                                      </>
+                                    ) : invoiceAvailable ? (
                                       <button
                                         onClick={() =>
                                           handleGenerateInvoice(item)
                                         }
-                                        className="inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                        disabled={
-                                          !item.perHourCost ||
-                                          item.perHourCost === 0
-                                        }
-                                        aria-label={`Generate invoice for ${item.trainerName}`}
+                                        className="w-full inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all"
                                       >
-                                        <FiFileText className="mr-2" />
-                                        View Invoices
+                                        <FiFileText className="w-4 h-4 mr-1" />
+                                        Generate Invoice
                                       </button>
                                     ) : (
-                                      <button
-                                        className="inline-flex items-center justify-center px-3 py-2 border border-gray-200 text-sm font-medium rounded-md shadow-sm text-gray-500 bg-white cursor-default mb-2"
-                                        disabled
-                                        aria-label={`Invoices available on ${availableOn ? formatDate(availableOn) : 'N/A'}`}
-                                        title={`Invoices available on ${availableOn ? formatDate(availableOn) : 'N/A'}`}
-                                      >
-                                        <FiClock className="mr-2" />
-                                        Available on {availableOn ? formatDate(availableOn) : 'N/A'}
-                                      </button>
-                                    )
-                                  ) : (
-                                    <div className="flex flex-col">
-                                      {/* YEH NAYA BUTTON ADD KARO - Generated wala */}
-                                      <button
-                                        className="inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-yellow-800 bg-yellow-400 hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors cursor-default mb-2"
-                                        aria-label={`Invoice already generated for ${item.trainerName}`}
-                                      >
-                                        <FiCheckCircle className="mr-2" />
-                                        Generated
-                                      </button>
-
-                                      {/* Download button (existing code) */}
-                                      <button
-                                        onClick={() =>
-                                          handleDownloadInvoice(item)
-                                        }
-                                        className="inline-flex items-center justify-center px-3 py-2 border border-gray-200 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                                        disabled={
-                                          downloadingInvoice ===
-                                          `${item.trainerId}_${item.collegeName}_${item.phase}`
-                                        }
-                                        aria-label={`Download invoice for ${item.trainerName}`}
-                                      >
-                                        <FiDownload className="mr-2" />
-                                        {downloadingInvoice ===
-                                        `${item.trainerId}_${item.collegeName}_${item.phase}`
-                                          ? "Downloading..."
-                                          : item.invoiceCount > 1
-                                          ? `Download (${item.invoiceCount})`
-                                          : "Download Invoice"}
-                                      </button>
-                                      {getDownloadStatus(
-                                        item.trainerId,
-                                        item.collegeName,
-                                        item.phase
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          );
+                                      <div className="text-center">
+                                        <div className="text-xs text-amber-600 flex items-center justify-center mb-1">
+                                          <FiClock className="mr-1" />
+                                          Available on{" "}
+                                          {availableOn
+                                            ? formatDate(availableOn)
+                                            : "N/A"}
+                                        </div>
+                                        <button
+                                          disabled
+                                          className="w-full inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed"
+                                        >
+                                          <FiFileText className="w-4 h-4 mr-1" />
+                                          Generate Invoice
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
                           })}
                         </tbody>
                       </table>
@@ -982,16 +1069,14 @@ function GenerateTrainerInvoice() {
           )}
         </div>
       </div>
-
       {showInvoiceModal && selectedTrainer && (
         <InvoiceModal
           trainer={selectedTrainer}
           onClose={() => {
             setShowInvoiceModal(false);
             setSelectedTrainer(null);
-            fetchTrainers(); // Refresh data after generating invoice
           }}
-          onInvoiceGenerated={fetchTrainers} // Refresh after generation
+          onInvoiceGenerated={fetchTrainers}
         />
       )}
     </div>
