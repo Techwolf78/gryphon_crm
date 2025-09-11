@@ -266,6 +266,9 @@ function GenerateTrainerInvoice() {
                     dayDuration: trainer.dayDuration || "",
                     stdCount: trainer.stdCount || 0,
                     hrs: trainer.hrs || 0,
+                    conveyance: parseFloat(trainer.conveyance) || 0,
+                    food: parseFloat(trainer.food) || 0,
+                    lodging: parseFloat(trainer.lodging) || 0,
                   };
 
                   trainersList.push(trainerObj);

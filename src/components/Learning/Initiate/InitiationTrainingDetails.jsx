@@ -532,6 +532,12 @@ function InitiationTrainingDetails({ training, onBack }) {
                                                       
                                                       return dates.map((date, index) => {
                                                         const hoursForDay = hoursArray[index] || 0;
+                                                        // Calculate daily total cost including fixed costs distributed across training days
+                                                        const trainerCostForDay = hoursForDay * (trainer.perHourCost || 0);
+                                                        const fixedCosts = (trainer.conveyance || 0) + (trainer.food || 0) + (trainer.lodging || 0);
+                                                        const fixedCostPerDay = dates.length > 0 ? fixedCosts / dates.length : 0;
+                                                        const totalCostForDay = trainerCostForDay + fixedCostPerDay;
+                                                        
                                                         return (
                                                           <tr key={date.toISOString()} className="hover:bg-gray-50">
                                                             <td className="border-b border-gray-100 px-0.5 py-0">{formatCompactDate(date)}</td>
@@ -539,7 +545,7 @@ function InitiationTrainingDetails({ training, onBack }) {
                                                             <td className="border-b border-gray-100 px-0.5 py-0">{trainer.dayDuration || '-'}</td>
                                                             <td className="border-b border-gray-100 px-0.5 py-0">{getTimingForSlot(trainer.dayDuration, phaseData)}</td>
                                                             <td className="border-b border-gray-100 px-0.5 py-0">{DOMAIN_KEYWORDS[domainInfo.domain] || domainInfo.domain}</td>
-                                                            <td className="border-b border-gray-100 px-0.5 py-0">₹{(hoursForDay * (trainer.perHourCost || 0)).toFixed(2)}</td>
+                                                            <td className="border-b border-gray-100 px-0.5 py-0">₹{totalCostForDay.toFixed(2)}</td>
                                                           </tr>
                                                         );
                                                       });
