@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { db } from "../../firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import InvoiceModal from "./InvoiceModal";
-import logo from '../../assets/gryphon_logo.png';
+import { generateInvoicePDF } from "./invoiceUtils";
 import {
   FiUser,
   FiBook,
@@ -17,242 +17,13 @@ import {
   FiRefreshCw,
   FiDownload,
   FiCheckCircle,
+  FiClock,
   FiAlertCircle,
   FiXCircle,
   FiInfo,
   FiLayers,
   FiTrash2,
 } from "react-icons/fi";
-
-// Enhanced PDF generation function with robust error handling
-export const generateInvoicePDF = async (invoiceData) => {
-  try {
-    const { default: jsPDF } = await import('jspdf');
-    const autoTableModule = await import('jspdf-autotable');
-    const autoTable = autoTableModule.default;
-
-    const doc = new jsPDF();
-
-
-    doc.setDrawColor(100);      // Border color (dark gray/black)
-    doc.setLineWidth(0.5);      // Border thickness
-    doc.rect(8, 8, 195, 280);
-    // Logodoc.setGState(new doc.GState({ opacity: 0.25 })); 
-    // Add logo inside strip, taller so it covers full strip height
-    doc.addImage(logo, "PNG", 15, 9, 30, 15); 
-    // x=5 (padding from left), y=11 (top of strip), width=30, height=15 (same as strip)
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-
-    
-
-// Header text
-doc.setFontSize(17);
-doc.setFont(undefined, 'bold');
-doc.setTextColor(0, 0, 0); // Black text
-doc.text("Trainer Invoice", 105, 21, { align: 'center' });
-    // Header text
-    doc.setFontSize(17);
-    doc.setFont(undefined, 'bold');
-    doc.setTextColor(0, 0, 0); // Black text
-    doc.text("Trainer Invoice", 105, 21, { align: 'center' });
-
-    doc.setFontSize(9.8);
-    doc.setFont(undefined, 'normal');
-    let yPosition = 40;
-    let xPosition = 15;
-    doc.text("To", xPosition , yPosition);
-    yPosition += 6;
-    doc.text("Gryphon Academy", xPosition , yPosition);
-    yPosition += 4.5;
-    doc.text("9th Floor, Olympia Business House (Achnalare)", xPosition, yPosition);
-    yPosition += 4.5;
-    doc.text("Next to Supreme HQ, Mum - Pune Highway, Baner", xPosition, yPosition);
-    yPosition += 4.5;
-    doc.text("Pune, MH - 411045", xPosition, yPosition);
-    yPosition += 10;
-    doc.text("From", xPosition, yPosition);
-    yPosition += 6;
-    doc.text(`${invoiceData.trainerName}`, xPosition, yPosition);
-    yPosition += 4.5;
-    function formatDate(dateStr) {
-      if (!dateStr) return '';
-      const date = new Date(dateStr);
-      if (isNaN(date)) return dateStr; // if already formatted
-      const day = String(date.getDate()).padStart(2, '0');
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const year = date.getFullYear();
-      return `${day}/${month}/${year}`;
-    }
-    // Bill & Account details side by side
-   autoTable(doc, {
-      startY: yPosition,
-      body: [
-        ['Bill Details', 'Account Details of Trainer'],
-        [`Bill Number: ${invoiceData.billNumber}`, `Name in Bank: ${invoiceData.trainerName}`],
-        [`Project Code: ${invoiceData.projectCode}`, `Bank Name: ${invoiceData.bankName}`],
-        [`Domain: ${invoiceData.domain}`, `Bank Account No: ${invoiceData.accountNumber}`],
-        [`Topic: ${invoiceData.topics}`, `IFSC Code: ${invoiceData.ifscCode}`],
-        [`From: ${formatDate(invoiceData.startDate)}`, `PAN Card: ${invoiceData.panNumber}`],
-        [`To: ${formatDate(invoiceData.endDate)}`, `Billing Date: ${formatDate(invoiceData.billingDate)}`],
-      ],
-      theme: 'grid',
-      styles: {
-        textColor : [0, 0, 0], // black text
-        fontSize: 9,
-        cellPadding: 1.2,
-        valign: 'middle',
-        lineColor: [0, 0, 0],   // black border lines
-        lineWidth: 0.2          // thickness of border
-      },
-      tableWidth: '100%',   // ✅ makes table stretch full width
-      columnStyles: {
-        0: { cellWidth: 'auto' },   // auto distribute
-        1: { cellWidth: 'auto' }
-      },
-      didParseCell: function (data) {
-        // Make first row (index 0) bold
-        if (data.row.index === 0) {
-          data.cell.styles.fontStyle = 'bold';
-          data.cell.styles.cellPadding = 1.8;
-          data.cell.styles.fontSize = 10.5;
-
-        }
-      }
-    });
-
-    // Charges Table
-
-    const trainingAmount = invoiceData.totalHours * invoiceData.trainingRate;
-    const conveyance = invoiceData.conveyance || 0;
-    const food = invoiceData.food || 0;
-    const lodging = invoiceData.lodging || 0;
-    const subTotal = trainingAmount + conveyance + food + lodging;
-    const tdsAmount = (subTotal * (invoiceData.tds || 0)) / 100;
-    const adhocAdjustment = invoiceData.adhocAdjustment || 0;
-    const netPayable = subTotal - tdsAmount + adhocAdjustment;
-
-    autoTable(doc, {
-      startY: doc.lastAutoTable.finalY + 6,
-      body: [
-        ['Charges', 'Rate', 'Total Hrs/Days', 'Total Amount'],
-        ['Training Charges per Hour', `Rs. ${invoiceData.trainingRate}`, `${invoiceData.totalHours}`, `Rs. ${trainingAmount}`],
-        ['Conveyance', '-', '-', `Rs. ${conveyance}`],
-        ['Food', '-', '-', `Rs. ${food}`],
-        ['Lodging', '-', '-', `Rs. ${lodging}`],
-        [{ content: 'Total Amount', colSpan: 3, styles: { halign: 'left' } }, `Rs. ${subTotal}`],
-        ['Adhoc Addition/Deduction', '-', '-', `Rs. ${adhocAdjustment}`],
-        ['Less (TDS)', '-', '-', `Rs. ${tdsAmount}`],
-        [{ content: 'Net Payment', colSpan: 3, styles: { halign: 'left', fontStyle: 'bold' } }, `Rs. ${netPayable}`],
-      ],
-      theme: 'grid',
-      styles: { fontSize: 9, cellPadding: 1.2 ,lineColor: [0, 0, 0], lineWidth: 0.2,textColor : [0, 0, 0] },
-      didParseCell: function (data) {
-        // Make first row (index 0) bold
-        if (data.row.index === 0) {
-          data.cell.styles.fontStyle = 'bold';
-          data.cell.styles.cellPadding = 1.8;
-          data.cell.styles.fontSize = 10.5;
-        }
-        if( data.row.index === 8 || data.row.index === 5 || data.row.index === 6 || data.row.index === 7 ) {
-          data.cell.styles.fontStyle = 'bold';
-          data.cell.styles.fontSize = 10;
-        }
-      }
-    });
-
-    // Summary Table
-    autoTable(doc, {
-      startY: doc.lastAutoTable.finalY + 6,
-      body: [
-        [{ content: 'Summary of Training', colSpan: 2, styles: { halign: 'left' ,fontSize: 10.5, fonStyle:'bold',cellPadding:1.8} }],
-        ['No of Sessions', ''],
-        ['No of Hours', `${invoiceData.totalHours}`],
-        ['No of Attendees', ''],
-        ['Average Students/ Batch', '-']
-      ],
-      theme: 'grid',
-      styles: { fontSize: 9, cellPadding: 1.2 ,lineColor: [0, 0, 0], lineWidth: 0.2 ,textColor : [0, 0, 0]},
-      columnStyles: {
-        0: { cellWidth: 75 },   // auto distribute
-        1: { cellWidth: 'auto' }
-      },
-      didParseCell: function (data) {
-        // Make first row (index 0) bold
-        if (data.row.index === 0) {
-          data.cell.styles.fontStyle = 'bold';
-          data.cell.styles.fontSize = 10.5;
-        }
-      }
-    });
-
-    autoTable(doc, {
-      startY: doc.lastAutoTable.finalY + 10,
-      body: [
-        ['L & D Manager','Co-founder','Paid By','Date/Stamp','Ref. ID'],
-        ['','','','',''],
-      ],
-      theme: 'grid',
-      styles: { fontSize: 10, cellPadding: 1.2 ,lineColor: [0, 0, 0], lineWidth: 0.2,halign: 'center' ,textColor : [0, 0, 0]},
-      didParseCell: function (data) {
-        // Make first row (index 0) bold
-        if (data.row.index === 1) {
-          data.cell.styles.cellPadding = 6;
-        }
-      }
-    });
-
-    // Signatures Section
-    // Bill + Account details table (side by side row-wise)
-    
-
-    // Footer style
-    doc.setFontSize(8); // small font
-    doc.setFont("helvetica", "italic"); // thin/light style
-    doc.setTextColor(120); // gray text
-
-    // Footer text at bottom center
-    doc.text(
-      "This Invoice is issued in accordance with the provisions of the Information Technology Act, 2000 (21 of 2000),",
-      
-      doc.internal.pageSize.getWidth() / 2,
-      pageHeight - 16, // 10 units above bottom
-      { align: "center" }
-    );
-
-    doc.text("hence physical signature is not required.",
-      doc.internal.pageSize.getWidth() / 2,
-      pageHeight - 12, // 6 units above bottom
-      { align: "center" }
-    );
-    // Set watermark opacity (lighter)
-    doc.setGState(new doc.GState({ opacity: 0.2 }));
-
-    // Add logo in center
-    doc.addImage(
-      logo,              // image
-      "PNG",             // format
-      pageWidth / 2 - 40, // x position (centered by subtracting half width)
-      pageHeight / 2 - 40, // y position (centered by subtracting half height)
-      80,                // width
-      45                 // height
-    );
-
-    // Reset opacity for normal content
-    doc.setGState(new doc.GState({ opacity: 1 }));
-
-
-
-    // Save PDF
-    doc.save(`Invoice_${invoiceData.billNumber || 'NA'}.pdf`);
-    return true;
-  } catch (error) {
-    console.error("PDF generation failed:", error);
-    alert("Failed to generate PDF. Please try again.");
-
-    return false;
-  }
-};
 
 
 function GenerateTrainerInvoice() {
@@ -269,6 +40,7 @@ function GenerateTrainerInvoice() {
   const [collegeNameFilter, setCollegeNameFilter] = useState("");
   const [downloadingInvoice, setDownloadingInvoice] = useState(null);
   const [pdfStatus, setPdfStatus] = useState({});
+  const [showOnlyActive, setShowOnlyActive] = useState(false);
 
   // Combined filters dropdown state
   const [filtersDropdownOpen, setFiltersDropdownOpen] = useState(false);
@@ -595,6 +367,15 @@ function GenerateTrainerInvoice() {
   // Filter and search logic
   const filteredGroupedData = Object.keys(groupedData).reduce((acc, phase) => {
     const filteredTrainers = groupedData[phase].filter((trainer) => {
+      // compute invoice availability
+      const invoiceAvailable = trainer.latestEndDate
+        ? Date.now() >= new Date(trainer.latestEndDate).getTime() + 24 * 60 * 60 * 1000
+        : false;
+
+      // when showOnlyActive is true, only include trainers that either already have an invoice or are available
+      if (showOnlyActive && !trainer.hasExistingInvoice && !invoiceAvailable) {
+        return false;
+      }
       const matchesSearch =
         trainer.trainerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         trainer.trainerId.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -754,7 +535,7 @@ function GenerateTrainerInvoice() {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
             <div>
               <h1 className="text-2xl font-bold mb-2">
-                Trainer Invoice Generator
+                Trainer Invoice
               </h1>
               <p className="text-blue-100 opacity-90">
                 Generate and manage invoices for trainers
@@ -899,14 +680,38 @@ function GenerateTrainerInvoice() {
               )}
             </div>
 
-            {/* Refresh Button */}
-            <button
-              onClick={handleRefreshData}
-              className="inline-flex items-center px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
-            >
-              <FiRefreshCw className="w-4 h-4 mr-1" />
-              Refresh
-            </button>
+            {/* Active-only toggle (label - switch - status) and Refresh Button */}
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-700">Only active invoices</span>
+
+              <button
+                role="switch"
+                aria-checked={showOnlyActive}
+                onClick={() => setShowOnlyActive((s) => !s)}
+                className={`relative inline-flex items-center h-6 w-11 rounded-full transition-colors focus:outline-none ${
+                  showOnlyActive ? "bg-blue-600" : "bg-gray-300"
+                }`}
+                aria-label="Toggle show only active invoices"
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform bg-white rounded-full transition-transform ${
+                    showOnlyActive ? "translate-x-5" : "translate-x-1"
+                  }`}
+                />
+              </button>
+
+              <span className={`text-sm font-medium ${showOnlyActive ? "text-blue-600" : "text-gray-500"}`}>
+                {showOnlyActive ? "ON" : "OFF"}
+              </span>
+
+              <button
+                onClick={handleRefreshData}
+                className="inline-flex items-center px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+              >
+                <FiRefreshCw className="w-4 h-4 mr-1" />
+                Refresh
+              </button>
+            </div>
           </div>
 
           {/* Active filters indicator */}
@@ -964,15 +769,6 @@ function GenerateTrainerInvoice() {
               <h3 className="text-lg font-medium text-gray-700 mb-1">
                 No matching trainers
               </h3>
-              <p className="text-gray-500 mb-4">
-                Try adjusting your search or filter criteria
-              </p>
-              <button
-                onClick={clearFilters}
-                className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                Clear Filters
-              </button>
             </div>
           ) : (
             <div className="space-y-4">
@@ -1030,11 +826,24 @@ function GenerateTrainerInvoice() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                          {filteredGroupedData[phase].map((item, idx) => (
-                            <tr
-                              key={idx}
-                              className="hover:bg-gray-50/50 transition-colors"
-                            >
+                          {filteredGroupedData[phase].map((item, idx) => {
+                            const invoiceAvailable = item.latestEndDate
+                              ? Date.now() >=
+                                new Date(item.latestEndDate).getTime() +
+                                  24 * 60 * 60 * 1000
+                              : false;
+                            const availableOn = item.latestEndDate
+                              ? new Date(
+                                  new Date(item.latestEndDate).getTime() +
+                                    24 * 60 * 60 * 1000
+                                ).toISOString()
+                              : null;
+
+                            return (
+                              <tr
+                                key={idx}
+                                className="hover:bg-gray-50/50 transition-colors"
+                              >
                               <td className="px-4 sm:px-6 py-4">
                                 <div className="flex items-center">
                                   <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
@@ -1093,20 +902,33 @@ function GenerateTrainerInvoice() {
                               <td className="px-4 sm:px-6 py-4">
                                 <div className="flex flex-col gap-2 min-w-[180px]">
                                   {!item.hasExistingInvoice ? (
-                                    <button
-                                      onClick={() =>
-                                        handleGenerateInvoice(item)
-                                      }
-                                      className="inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                      disabled={
-                                        !item.perHourCost ||
-                                        item.perHourCost === 0
-                                      }
-                                      aria-label={`Generate invoice for ${item.trainerName}`}
-                                    >
-                                      <FiFileText className="mr-2" />
-                                     View Invoices
-                                    </button>
+                                    invoiceAvailable ? (
+                                      
+                                      <button
+                                        onClick={() =>
+                                          handleGenerateInvoice(item)
+                                        }
+                                        className="inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        disabled={
+                                          !item.perHourCost ||
+                                          item.perHourCost === 0
+                                        }
+                                        aria-label={`Generate invoice for ${item.trainerName}`}
+                                      >
+                                        <FiFileText className="mr-2" />
+                                        View Invoices
+                                      </button>
+                                    ) : (
+                                      <button
+                                        className="inline-flex items-center justify-center px-3 py-2 border border-gray-200 text-sm font-medium rounded-md shadow-sm text-gray-500 bg-white cursor-default mb-2"
+                                        disabled
+                                        aria-label={`Invoices available on ${availableOn ? formatDate(availableOn) : 'N/A'}`}
+                                        title={`Invoices available on ${availableOn ? formatDate(availableOn) : 'N/A'}`}
+                                      >
+                                        <FiClock className="mr-2" />
+                                        Available on {availableOn ? formatDate(availableOn) : 'N/A'}
+                                      </button>
+                                    )
                                   ) : (
                                     <div className="flex flex-col">
                                       {/* YEH NAYA BUTTON ADD KARO - Generated wala */}
@@ -1148,7 +970,8 @@ function GenerateTrainerInvoice() {
                                 </div>
                               </td>
                             </tr>
-                          ))}
+                          );
+                          })}
                         </tbody>
                       </table>
                     </div>

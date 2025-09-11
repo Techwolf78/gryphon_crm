@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 import { db } from "../../../firebase";
 import {
@@ -7,15 +7,12 @@ import {
   FiClock,
   FiBookOpen,
   FiLayers,
-  FiChevronDown,
-  FiChevronUp,
   FiLoader,
   FiMail,
-  FiPrinter,
-  FiDownload
-
 } from "react-icons/fi";
 import SendSchedule from "../SendSchedule";
+import CollegeSummaryReport from "../CollegeSummaryReport";
+
 const PHASE_LABELS = {
   "phase-1": "Phase 1",
   "phase-2": "Phase 2",
@@ -27,6 +24,16 @@ const DOMAIN_COLORS = {
   "Soft skills": "bg-green-100 border-green-300 text-green-800",
   Aptitude: "bg-purple-100 border-purple-300 text-purple-800",
   Tools: "bg-yellow-100 border-yellow-300 text-yellow-800",
+};
+
+// Domain keywords mapping for compact display
+const DOMAIN_KEYWORDS = {
+  Technical: "Tech",
+  "Soft skills": "Soft",
+  Aptitude: "Apt",
+  Tools: "Tools",
+  "Tools (Excel - Power BI)": "Excel",
+  "Tools (Looker Studio)": "Looker",
 };
 
 function getTimingForSlot(slot, training) {
@@ -48,180 +55,76 @@ function getTimingForSlot(slot, training) {
   return slot;
 }
 
-function formatDate(d) {
-  if (!d && d !== 0) return "";
-
-  if (typeof d === "object" && d !== null && typeof d.toDate === "function") {
-    d = d.toDate();
+function formatDate(input) {
+  if (!input && input !== 0) return "";
+  
+  let date;
+  
+  // Handle Firestore Timestamp
+  if (typeof input === "object" && input !== null && typeof input.toDate === "function") {
+    date = input.toDate();
+  } 
+  // Handle timestamp (number)
+  else if (typeof input === "number") {
+    date = new Date(input);
   }
-
-  if (typeof d === "number") {
-    d = new Date(d);
+  // Handle string date
+  else if (typeof input === "string") {
+    date = new Date(input);
+    if (isNaN(date.getTime())) return input; // Return original if invalid
   }
-
-  if (typeof d === "string") {
-    const parsed = new Date(d);
-    if (!isNaN(parsed)) d = parsed;
-    else return d;
+  // Handle Date object
+  else if (input instanceof Date) {
+    date = input;
+  } else {
+    return String(input);
   }
-
-  if (d instanceof Date && !isNaN(d)) {
-    const day = String(d.getDate()).padStart(2, "0");
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const year = d.getFullYear();
-    return `${day}/${month}/${year}`;
-  }
-
-  return String(d);
+  
+  // Validate date
+  if (isNaN(date.getTime())) return String(input);
+  
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  
+  return `${day}/${month}/${year}`;
 }
 
-// Add this function to generate an HTML table for better printing/visualization
-const generatePrintableTable = (trainingData, phaseData, domainsData, selectedPhase) => {
-  const printWindow = window.open('', '_blank');
-  const phaseName = PHASE_LABELS[selectedPhase] || selectedPhase;
+function formatCompactDate(input) {
+  if (!input && input !== 0) return "";
   
-  printWindow.document.write(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>${trainingData?.collegeName} - ${phaseName} Training Schedule</title>
-      <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        h1, h2, h3 { color: #333; }
-        .header { background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
-        .summary-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-        .summary-table th, .summary-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        .summary-table th { background-color: #4f46e5; color: white; }
-        .schedule-table { width: 100%; border-collapse: collapse; }
-        .schedule-table th, .schedule-table td { border: 1px solid #ddd; padding: 6px; text-align: left; font-size: 12px; }
-        .schedule-table th { background-color: #4f46e5; color: white; }
-        .domain-header { background-color: #e5e7eb; font-weight: bold; }
-        .batch-header { background-color: #f3f4f6; }
-        @media print {
-          body { margin: 0; }
-          .no-print { display: none; }
-        }
-      </style>
-    </head>
-    <body>
-      <h1>${trainingData?.collegeName} (${trainingData?.collegeCode})</h1>
-      <h2>${phaseName} Training Schedule</h2>
-      
-      <div class="header">
-        <p><strong>Course:</strong> ${trainingData?.course} - ${trainingData?.year}</p>
-        <p><strong>Period:</strong> ${formatDate(phaseData?.trainingStartDate)} to ${formatDate(phaseData?.trainingEndDate)}</p>
-        <p><strong>Timing:</strong> ${phaseData?.collegeStartTime} - ${phaseData?.collegeEndTime}</p>
-        <p><strong>Students:</strong> ${trainingData?.studentCount || 0} | <strong>Total Hours:</strong> ${trainingData?.totalHours || 0}</p>
-      </div>
-      
-      <h3>Domain Summary</h3>
-      <table class="summary-table">
-        <tr>
-          <th>Domain</th>
-          <th>Phase</th>
-          <th>Hours</th>
-          <th>Batches</th>
-        </tr>
-  `);
+  let date;
   
-  // Add domain summary rows
-  domainsData.forEach(domainInfo => {
-    const domainPhase = domainInfo.phase || selectedPhase;
-    const batchCount = Array.isArray(domainInfo.table1Data) ? domainInfo.table1Data.length : 0;
-    
-    printWindow.document.write(`
-      <tr>
-        <td>${domainInfo.domain}</td>
-        <td>${PHASE_LABELS[domainPhase] || domainPhase}</td>
-        <td>${domainInfo.domainHours || 0}</td>
-        <td>${batchCount}</td>
-      </tr>
-    `);
-  });
+  // Handle Firestore Timestamp
+  if (typeof input === "object" && input !== null && typeof input.toDate === "function") {
+    date = input.toDate();
+  } 
+  // Handle timestamp (number)
+  else if (typeof input === "number") {
+    date = new Date(input);
+  }
+  // Handle string date
+  else if (typeof input === "string") {
+    date = new Date(input);
+    if (isNaN(date.getTime())) return input; // Return original if invalid
+  }
+  // Handle Date object
+  else if (input instanceof Date) {
+    date = input;
+  } else {
+    return String(input);
+  }
   
-  printWindow.document.write(`
-      </table>
-      
-      <h3>Detailed Schedule</h3>
-      <table class="schedule-table">
-        <tr>
-          <th>Domain</th>
-          <th>Batch</th>
-          <th>Trainer</th>
-          <th>Date</th>
-          <th>Day</th>
-          <th>Slot</th>
-          <th>Timing</th>
-          <th>Hours</th>
-          <th>Cost</th>
-        </tr>
-  `);
+  // Validate date
+  if (isNaN(date.getTime())) return String(input);
   
-  // Add detailed schedule rows
-  domainsData.forEach(domainInfo => {
-    const domainPhase = domainInfo.phase || selectedPhase;
-    
-    if (Array.isArray(domainInfo.table1Data)) {
-      domainInfo.table1Data.forEach(row => {
-        if (row.batches) {
-          row.batches.forEach(batch => {
-            if (batch.trainers) {
-              batch.trainers.forEach(trainer => {
-                const trainerName = trainer.trainerName || "Unassigned";
-                
-                // Add trainer details
-                if (trainer.activeDates && trainer.activeDates.length > 0) {
-                  trainer.activeDates.forEach((date, index) => {
-                    const hours = trainer.dailyHours?.[index] || 0;
-                    const slot = trainer.slotInfo?.[index]?.slot || trainer.dayDuration || "-";
-                    const timing = getTimingForSlot(slot, phaseData);
-                    const cost = (trainer.perHourCost || 0) * hours;
-                    
-                    // Get day name
-                    let dayName = "";
-                    try {
-                      const dateObj = typeof date.toDate === 'function' ? date.toDate() : new Date(date);
-                      dayName = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
-                    } catch (e) {
-                      dayName = "";
-                    }
-                    
-                    printWindow.document.write(`
-                      <tr>
-                        <td>${domainInfo.domain}</td>
-                        <td>${batch.batchCode || row.batch}</td>
-                        <td>${trainerName}</td>
-                        <td>${formatDate(date)}</td>
-                        <td>${dayName}</td>
-                        <td>${slot}</td>
-                        <td>${timing}</td>
-                        <td>${hours}</td>
-                        <td>${cost > 0 ? '₹' + cost : '-'}</td>
-                      </tr>
-                    `);
-                  });
-                }
-              });
-            }
-          });
-        }
-      });
-    }
-  });
+  const day = String(date.getDate()).padStart(2, "0");
+  const monthNames = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+  const month = monthNames[date.getMonth()];
   
-  printWindow.document.write(`
-      </table>
-      
-      <div class="no-print" style="margin-top: 20px;">
-        <button onclick="window.print()">Print Schedule</button>
-        <button onclick="window.close()">Close</button>
-      </div>
-    </body>
-    </html>
-  `);
-  
-  printWindow.document.close();
-};
+  return `${day}/${month}`;
+}
+
 function InitiationTrainingDetails({ training, onBack }) {
   const [trainingData, setTrainingData] = useState(null);
   const [phaseData, setPhaseData] = useState(null);
@@ -231,9 +134,9 @@ function InitiationTrainingDetails({ training, onBack }) {
   const [showSendSchedule, setShowSendSchedule] = useState(false);
   const [showSchedule, setShowSchedule] = useState({});
 
-  const toggleSchedule = (key) => {
+  const toggleSchedule = useCallback((key) => {
     setShowSchedule(prev => ({ ...prev, [key]: !prev[key] }));
-  };
+  }, []);
 
   useEffect(() => {
     const fetchTrainingData = async () => {
@@ -265,17 +168,14 @@ function InitiationTrainingDetails({ training, onBack }) {
         }
         
         const phaseDocData = phaseSnap.data();
-        // Add phase ID to the data
-        phaseDocData.phaseId = training.selectedPhase;
         setPhaseData(phaseDocData);
 
         const domainsRef = collection(db, "trainingForms", training.id, "trainings", training.selectedPhase, "domains");
         const domainsSnap = await getDocs(domainsRef);
         
         const domains = [];
-        domainsSnap.forEach(domainDoc => {
+        for (const domainDoc of domainsSnap.docs) {
           const domainData = domainDoc.data();
-
           
           // Calculate total assigned hours from table1Data
           let totalAssignedHours = 0;
@@ -290,10 +190,10 @@ function InitiationTrainingDetails({ training, onBack }) {
           domains.push({
             id: domainDoc.id,
             domain: domainData.domain || domainDoc.id,
-            assignedHours: totalAssignedHours, // Add calculated total
+            assignedHours: totalAssignedHours,
             ...domainData
           });
-        });
+        }
         
         setDomainsData(domains);
         setLoading(false);
@@ -312,7 +212,7 @@ function InitiationTrainingDetails({ training, onBack }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 to-gray-200 ">
+      <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 to-gray-200">
         <button
           className="mb-2 flex items-center text-blue-600 hover:underline"
           onClick={onBack}
@@ -333,7 +233,7 @@ function InitiationTrainingDetails({ training, onBack }) {
     return (
       <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 to-gray-200 ">
         <button
-          className="mb-62 flex items-center text-blue-600 hover:underline"
+          className="mb-2 flex items-center text-blue-600 hover:underline"
           onClick={onBack}
         >
           <FiArrowLeft className="mr-2" /> Back to Dashboard
@@ -349,38 +249,34 @@ function InitiationTrainingDetails({ training, onBack }) {
   }
 
   return (
-
     <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 to-gray-200 ">
       <button
-        className="mb-2 flex items-center text-blue-600 hover:underline text-sm"
+        className="mb-4 flex items-center text-blue-600 hover:underline text-sm"
         onClick={onBack}
       >
         <FiArrowLeft className="mr-1" /> Back to Dashboard
       </button>
       
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Training Details</h1>
-        <div className="flex gap-3">
-          <button
-            onClick={() => generatePrintableTable(trainingData, phaseData, domainsData, training.selectedPhase)}
-            className="flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg shadow-md hover:bg-purple-700 hover:shadow-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
-          >
-            <FiDownload className="w-5 h-5" />
-            Download PDF
-          </button>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-xl font-bold text-gray-800">Training Details</h1>
+        <div className="flex gap-2">
+          <CollegeSummaryReport
+            training={training}
+            trainingData={trainingData}
+            phaseData={phaseData}
+            domainsData={domainsData}
+          />
           <button
             onClick={() => setShowSendSchedule(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 hover:shadow-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-sm"
           >
-            <FiMail className="w-5 h-5" />
+            <FiMail className="w-4 h-4" />
             Send Schedule
           </button>
         </div>
       </div>
       
-      <div className="w-full mx-auto bg-white rounded-xl shadow border border-gray-200 p-6">
-        {/* Training Form Header */}
-
+      <div className="w-full mx-auto bg-white rounded-xl shadow border border-gray-200 p-4 mb-6">
         <h2 className="text-2xl font-bold text-indigo-800 mb-2">
           {trainingData?.collegeName}{" "}
           <span className="text-gray-400">({trainingData?.collegeCode})</span>
@@ -402,8 +298,7 @@ function InitiationTrainingDetails({ training, onBack }) {
           </span>
         </div>
 
-
-        <div className="mb-4 p-2 bg-gray-50 rounded-lg">
+        <div className="mb-4 p-4 bg-gray-50 rounded-lg">
           <h3 className="font-semibold text-gray-800 mb-2">Phase Information</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
             <div>
@@ -427,70 +322,60 @@ function InitiationTrainingDetails({ training, onBack }) {
           </div>
         </div>
 
-        {/* Domain-wise Details */}
         <h3 className="font-semibold text-gray-800 mb-4">Domain-wise Training Details</h3>
         
         {domainsData.length > 0 ? (
-          <div className="space-y-8">
-            {domainsData.map((domainInfo) => {
-              // Use document ID as phase if phase field doesn't exist
-              const domainPhase = domainInfo.phase || training.selectedPhase;
-              
-              return (
-                <div
-                  key={domainInfo.id}
-                  className={`rounded-lg border-2 p-4 ${
-                    DOMAIN_COLORS[domainInfo.domain] || "bg-gray-100 border-gray-300 text-gray-800"
-                  }`}
-                >
-                  {/* Domain Header */}
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h4 className="text-lg font-bold">{domainInfo.domain}</h4>
-                      <div className="text-sm opacity-75">
-                        Domain Hours: {domainInfo.domainHours || 0} | 
-                        Assigned Hours: {domainInfo.assignedHours || 0} |
-                        Phase: {PHASE_LABELS[domainPhase] || domainPhase}
-                      </div>
-                    </div>
-                    <div className="text-right text-sm">
-                      {domainInfo.isMainPhase && (
-                        <div className="text-xs font-semibold">Main Phase</div>
-                      )}
-
+          <div className="space-y-6">
+            {domainsData.map((domainInfo) => (
+              <div
+                key={domainInfo.id}
+                className={`rounded-lg border-2 p-4 ${
+                  DOMAIN_COLORS[domainInfo.domain] || "bg-gray-100 border-gray-300 text-gray-800"
+                }`}
+              >
+                <div className="flex flex-col md:flex-row md:items-center justify-between mb-4">
+                  <div>
+                    <h4 className="text-lg font-bold">{domainInfo.domain}</h4>
+                    <div className="text-sm opacity-75">
+                      Domain Hours: {domainInfo.domainHours || 0} | 
+                      Assigned Hours: {domainInfo.assignedHours || 0}
                     </div>
                   </div>
+                  <div className="text-right text-sm mt-2 md:mt-0">
+                    <div>Phase: {PHASE_LABELS[domainInfo.phase] || domainInfo.phase}</div>
+                    {domainInfo.isMainPhase && (
+                      <div className="text-xs font-semibold">Main Phase</div>
+                    )}
+                  </div>
+                </div>
 
-                  {/* Batches for this domain */}
-                  {Array.isArray(domainInfo.table1Data) && domainInfo.table1Data.length > 0 ? (
-                    <div className="space-y-4">
-                      {domainInfo.table1Data.map((row, idx) => (
-                        <div
-                          key={idx}
-                          className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
-                        >
-                          <div className="flex items-center gap-4 mb-3">
-                            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold">
-                              {idx + 1}
-                            </div>
-                            <div>
-                              <div className="font-medium text-gray-900">{row.batch}</div>
-                              <div className="text-xs text-gray-500">
-                                {row.stdCount} students • {row.hrs} hours • {row.assignedHours} assigned
-                              </div>
-
+                {Array.isArray(domainInfo.table1Data) && domainInfo.table1Data.length > 0 ? (
+                  <div className="space-y-4">
+                    {domainInfo.table1Data.map((row, idx) => (
+                      <div
+                        key={idx}
+                        className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
+                      >
+                        <div className="flex items-center gap-4 mb-3">
+                          <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold">
+                            {idx + 1}
+                          </div>
+                          <div>
+                            <div className="font-medium text-gray-900">{row.batch}</div>
+                            <div className="text-xs text-gray-500">
+                              {row.stdCount} students • {row.assignedHours} assigned hours
                             </div>
                           </div>
-
+                        </div>
 
                         <div className="space-y-3">
                           {row.batches &&
                             row.batches.map((batch, bidx) => (
                               <div
                                 key={bidx}
-                                className="border rounded p-2 bg-gray-50"
+                                className="border rounded p-3 bg-gray-50"
                               >
-                                <div className="flex flex-wrap gap-4 items-center mb-1">
+                                <div className="flex flex-wrap gap-4 items-center mb-2">
                                   <span className="text-sm font-semibold text-gray-700">
                                     {batch.batchCode}
                                   </span>
@@ -507,7 +392,7 @@ function InitiationTrainingDetails({ training, onBack }) {
                                     Trainers:
                                   </div>
                                   {batch.trainers && batch.trainers.length > 0 ? (
-<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                                       {batch.trainers.map((trainer, tidx) => {
                                         const uniqueKey = `${domainInfo.id}_${batch.batchCode}_${trainer.trainerId || 'trainer'}_${tidx}_${trainer.dayDuration || 'noslot'}_${trainer.startDate || 'nostart'}`;
                                         return (
@@ -538,17 +423,19 @@ function InitiationTrainingDetails({ training, onBack }) {
                                                 <div>Topics: {Array.isArray(trainer.topics) ? trainer.topics.join(", ") : trainer.topics}</div>
                                               )}
                                             </div>
-                                            <div className="mt-1 flex justify-end">
+                                            
+                                            <div className="mt-2 flex justify-end">
                                               <button
                                                 onClick={() => toggleSchedule(uniqueKey)}
-                                                className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-200 hover:bg-blue-100 transition-colors"
+                                                className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded border border-blue-200 hover:bg-blue-100 transition-colors"
                                               >
-                                                {showSchedule[uniqueKey] ? 'Hide' : 'Show'}
+                                                {showSchedule[uniqueKey] ? 'Hide Schedule' : 'Show Schedule'}
                                               </button>
                                             </div>
+                                            
                                             {showSchedule[uniqueKey] && (
                                               <div className="mt-1 overflow-x-auto">
-                                                <table className="w-full text-[10px] border-collapse">
+                                                <table className="w-full border-collapse leading-none" style={{fontSize: '10px'}}>
                                                   <thead>
                                                     <tr className="bg-gray-50">
                                                       <th className="border-b border-gray-200 px-0.5 py-0 text-left font-medium">Date</th>
@@ -561,32 +448,56 @@ function InitiationTrainingDetails({ training, onBack }) {
                                                   </thead>
                                                   <tbody>
                                                     {(() => {
+                                                      // Generate dates between start and end date
                                                       const dates = [];
                                                       if (trainer.startDate && trainer.endDate) {
-                                                        let current = new Date(trainer.startDate);
-                                                        const end = new Date(trainer.endDate);
-                                                        const excludeDays = training?.excludeDays || "None";
-                                                        while (current <= end) {
-                                                          const dayOfWeek = current.getDay(); // 0 = Sunday, 6 = Saturday
-                                                          let shouldInclude = true;
+                                                        try {
+                                                          const startDate = new Date(trainer.startDate);
+                                                          const endDate = new Date(trainer.endDate);
                                                           
-                                                          if (excludeDays === "Saturday" && dayOfWeek === 6) {
-                                                            shouldInclude = false;
-                                                          } else if (excludeDays === "Sunday" && dayOfWeek === 0) {
-                                                            shouldInclude = false;
-                                                          } else if (excludeDays === "Both" && (dayOfWeek === 0 || dayOfWeek === 6)) {
-                                                            shouldInclude = false;
+                                                          if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+                                                            return (
+                                                              <tr>
+                                                                <td colSpan="6" className="px-0.5 py-0 text-center text-red-500">
+                                                                  Invalid date range
+                                                                </td>
+                                                              </tr>
+                                                            );
                                                           }
-                                                          // If excludeDays === "None", include all days
                                                           
-                                                          if (shouldInclude) {
-                                                            dates.push(new Date(current));
+                                                          const excludeDays = trainingData?.excludeDays || "None";
+                                                          let current = new Date(startDate);
+                                                          
+                                                          while (current <= endDate) {
+                                                            const dayOfWeek = current.getDay();
+                                                            let shouldInclude = true;
+                                                            
+                                                            if (excludeDays === "Saturday" && dayOfWeek === 6) {
+                                                              shouldInclude = false;
+                                                            } else if (excludeDays === "Sunday" && dayOfWeek === 0) {
+                                                              shouldInclude = false;
+                                                            } else if (excludeDays === "Both" && (dayOfWeek === 0 || dayOfWeek === 6)) {
+                                                              shouldInclude = false;
+                                                            }
+                                                            
+                                                            if (shouldInclude) {
+                                                              dates.push(new Date(current));
+                                                            }
+                                                            current.setDate(current.getDate() + 1);
                                                           }
-                                                          current.setDate(current.getDate() + 1);
+                                                        } catch (e) {
+                                                          console.error("Error generating dates:", e);
+                                                          return (
+                                                            <tr>
+                                                              <td colSpan="6" className="px-0.5 py-0 text-center text-red-500">
+                                                                Error generating schedule
+                                                              </td>
+                                                            </tr>
+                                                          );
                                                         }
                                                       }
                                                       
-                                                      // Use dailyHours if available, otherwise calculate equal distribution
+                                                      // Calculate hours per day
                                                       let hoursArray = [];
                                                       if (trainer.dailyHours && Array.isArray(trainer.dailyHours) && trainer.dailyHours.length === dates.length) {
                                                         hoursArray = trainer.dailyHours;
@@ -599,12 +510,12 @@ function InitiationTrainingDetails({ training, onBack }) {
                                                       return dates.map((date, index) => {
                                                         const hoursForDay = hoursArray[index] || 0;
                                                         return (
-                                                          <tr key={date.toISOString()} className="hover:bg-gray-25">
-                                                            <td className="border-b border-gray-100 px-0.5 py-0">{formatDate(date)}</td>
+                                                          <tr key={date.toISOString()} className="hover:bg-gray-50">
+                                                            <td className="border-b border-gray-100 px-0.5 py-0">{formatCompactDate(date)}</td>
                                                             <td className="border-b border-gray-100 px-0.5 py-0">{hoursForDay.toFixed(2)}</td>
                                                             <td className="border-b border-gray-100 px-0.5 py-0">{trainer.dayDuration || '-'}</td>
                                                             <td className="border-b border-gray-100 px-0.5 py-0">{getTimingForSlot(trainer.dayDuration, phaseData)}</td>
-                                                            <td className="border-b border-gray-100 px-0.5 py-0">{domainInfo.domain}</td>
+                                                            <td className="border-b border-gray-100 px-0.5 py-0">{DOMAIN_KEYWORDS[domainInfo.domain] || domainInfo.domain}</td>
                                                             <td className="border-b border-gray-100 px-0.5 py-0">₹{(hoursForDay * (trainer.perHourCost || 0)).toFixed(2)}</td>
                                                           </tr>
                                                         );
@@ -613,92 +524,30 @@ function InitiationTrainingDetails({ training, onBack }) {
                                                   </tbody>
                                                 </table>
                                               </div>
-
-                                              {/* Daily Hours Breakdown */}
-                                              {trainer.dailyHours && trainer.dailyHours.length > 0 && (
-                                                <div className="mt-3">
-                                                  <button
-                                                    className="flex items-center text-sm text-indigo-600 hover:underline"
-                                                    onClick={() => toggleExpand(uniqueKey)}
-                                                    type="button"
-                                                  >
-                                                    {expanded[uniqueKey] ? (
-                                                      <>
-                                                        <FiChevronUp className="mr-1" />
-                                                        Hide Schedule
-                                                      </>
-                                                    ) : (
-                                                      <>
-                                                        <FiChevronDown className="mr-1" />
-                                                        Show Schedule
-                                                      </>
-                                                    )}
-                                                  </button>
-
-                                                  {expanded[uniqueKey] && (
-                                                    <div className="mt-3 overflow-x-auto">
-                                                      <table className="w-full border-collapse text-xs">
-                                                        <thead className="bg-gray-100">
-                                                          <tr>
-                                                            <th className="px-2 py-1 text-left border font-normal">Date</th>
-                                                            <th className="px-2 py-1 text-left border font-normal">Hours</th>
-                                                            <th className="px-2 py-1 text-left border font-normal">Slot</th>
-                                                            <th className="px-2 py-1 text-left border font-normal">Timing</th>
-                                                            <th className="px-2 py-1 text-left border font-normal">Domain</th>
-                                                            <th className="px-2 py-1 text-left border font-normal">Cost</th>
-                                                          </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                          {(trainer.activeDates || []).map((date, didx) => {
-                                                            const hours = trainer.dailyHours?.[didx] || 0;
-                                                            const slot = trainer.slotInfo?.[didx]?.slot || trainer.dayDuration || "-";
-                                                            const timing = getTimingForSlot(slot, phaseData);
-                                                            const cost = (trainer.perHourCost || 0) * hours;
-                                                            const domain = trainer.slotInfo?.[didx]?.domain || domainInfo.domain;
-
-                                                            return (
-                                                              <tr key={didx}>
-                                                                <td className="px-2 py-1 border">{formatDate(date)}</td>
-                                                                <td className="px-2 py-1 border">{hours}</td>
-                                                                <td className="px-2 py-1 border">{slot}</td>
-                                                                <td className="px-2 py-1 border">{timing}</td>
-                                                                <td className="px-2 py-1 border">{domain}</td>
-                                                                <td className="px-2 py-1 border">
-                                                                  {cost > 0 ? `₹${cost}` : "-"}
-                                                                </td>
-                                                              </tr>
-                                                            );
-                                                          })}
-                                                        </tbody>
-                                                      </table>
-                                                    </div>
-                                                  )}
-                                                </div>
-                                              )}
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    ) : (
-                                      <div className="text-sm text-gray-400 italic">
-                                        No trainers assigned
-                                      </div>
-                                    )}
-                                  </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : (
+                                    <div className="text-sm text-gray-400 italic">
+                                      No trainers assigned
+                                    </div>
+                                  )}
                                 </div>
-                              ))}
-                          </div>
+                              </div>
+                            ))}
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-gray-500 text-sm italic">
-                      No batch data available for this domain.
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-gray-500 text-sm italic">
+                    No batch data available for this domain.
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         ) : (
           <div className="text-gray-400 text-center py-8">
