@@ -1,4 +1,3 @@
-// SendSchedule.jsx
 import React, { useState, useEffect } from "react";
 import {
   FiX,
@@ -20,10 +19,11 @@ import { db } from "../../firebase";
 import emailjs from "@emailjs/browser";
 
 function SendSchedule({
-  training, // expects training.id and training.selectedPhase
-  trainingData, // (optional) from parent
-  phaseData, // (optional) from parent (collegeStartTime, lunchStartTime, etc.)
+  training,
+  trainingData,
+  phaseData,
   onClose,
+  trainersData = [],
 }) {
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedTrainer, setSelectedTrainer] = useState(null);
@@ -37,15 +37,19 @@ function SendSchedule({
     contactPerson: "",
     contactNumber: "",
   });
+  const [trainerCostDetails, setTrainerCostDetails] = useState({
+    conveyance: 0,
+    food: 0,
+    lodging: 0
+  });
 
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
 
-  // NEW: trainingForms + phase doc fetched here
-  const [trainingFormDoc, setTrainingFormDoc] = useState(null); // doc at trainingForms/{id}
-  const [phaseDocData, setPhaseDocData] = useState(null); // doc at trainingForms/{id}/trainings/{phase}
+  const [trainingFormDoc, setTrainingFormDoc] = useState(null);
+  const [phaseDocData, setPhaseDocData] = useState(null);
 
-  // Utility: format date (kept same as original)
+  // Utility: format date
   const formatDate = (dateStr) => {
     if (!dateStr) return "";
     return new Date(dateStr).toLocaleDateString("en-US", {
@@ -55,36 +59,64 @@ function SendSchedule({
       day: "numeric",
     });
   };
-// Calculate hours from dayDuration string e.g., "09:00 - 13:00"
-const calculateHours = (dayDuration) => {
-  if (!dayDuration) return 0;
 
-  // Remove extra spaces
-  const [start, end] = dayDuration.split("-").map((s) => s.trim());
-  if (!start || !end) return 0;
+  // Calculate hours from dayDuration string
+  const calculateHours = (dayDuration) => {
+    if (!dayDuration) return 0;
 
-  const [startH, startM] = start.split(":").map(Number);
-  const [endH, endM] = end.split(":").map(Number);
+    const [start, end] = dayDuration.split("-").map((s) => s.trim());
+    if (!start || !end) return 0;
 
-  if ([startH, startM, endH, endM].some(isNaN)) return 0;
+    const [startH, startM] = start.split(":").map(Number);
+    const [endH, endM] = end.split(":").map(Number);
 
-  const startDate = new Date(0, 0, 0, startH, startM);
-  const endDate = new Date(0, 0, 0, endH, endM);
+    if ([startH, startM, endH, endM].some(isNaN)) return 0;
 
-  let diff = (endDate - startDate) / (1000 * 60 * 60); // in hours
-  if (diff < 0) diff = 0;
+    const startDate = new Date(0, 0, 0, startH, startM);
+    const endDate = new Date(0, 0, 0, endH, endM);
 
-  return diff;
-};
+    let diff = (endDate - startDate) / (1000 * 60 * 60);
+    if (diff < 0) diff = 0;
+
+    return diff;
+  };
+
+useEffect(() => {
+  if (!selectedTrainer || trainersData.length === 0) return;
+
+  const trainerDetails = trainersData.filter(trainer => {
+    console.log("Checking trainer:", trainer.trainerId, trainer.id, "against", selectedTrainer.trainerId, selectedTrainer.id);
+    return trainer.trainerId === selectedTrainer.trainerId || trainer.trainerId === selectedTrainer.id;
+  });
+
+  console.log("Matched trainer details:", trainerDetails);
+
+  let totalConveyance = 0;
+  let totalFood = 0;
+  let totalLodging = 0;
+
+  trainerDetails.forEach(detail => {
+    console.log("Detail values:", detail.conveyance, detail.food, detail.lodging);
+    totalConveyance += Number(detail.conveyance) || 0;
+    totalFood += Number(detail.food) || 0;
+    totalLodging += Number(detail.lodging) || 0;
+  });
+
+  setTrainerCostDetails({
+    conveyance: totalConveyance,
+    food: totalFood,
+    lodging: totalLodging
+  });
+}, [selectedTrainer, trainersData]);
 
 
-  // Utility: get timing string for dayDuration using phaseData (kept original logic)
+
+  // Utility: get timing string for dayDuration
   const getTimingForSlot = (slot) => {
     if (!slot) return "-";
     const s = String(slot).toUpperCase();
     const pd = phaseData || phaseDocData || {};
-    const { collegeStartTime, lunchStartTime, lunchEndTime, collegeEndTime } =
-      pd || {};
+    const { collegeStartTime, lunchStartTime, lunchEndTime, collegeEndTime } = pd || {};
 
     if (s.includes("AM")) {
       if (collegeStartTime && lunchStartTime)
@@ -98,6 +130,7 @@ const calculateHours = (dayDuration) => {
     }
     return slot;
   };
+
   useEffect(() => {
     if ((trainingFormDoc || trainingData) && selectedTrainer) {
       setEmailData((prev) => ({
@@ -154,7 +187,6 @@ const calculateHours = (dayDuration) => {
             trainerSnap.forEach((doc) => {
               assignedTrainers.push({ id: doc.id, ...doc.data() });
             });
-            // fallback: if no doc found by trainerId, try doc ID equal trainerId
             if (trainerSnap.empty) {
               try {
                 const docRef = doc(db, "trainers", trainerId);
@@ -240,6 +272,7 @@ const calculateHours = (dayDuration) => {
     fetchTrainerSchedule(trainer.trainerId || trainer.id);
   };
 
+  // ADD THIS MISSING FUNCTION
   const handleConfirmSchedule = () => {
     setCurrentStep(3);
     setEmailData((prev) => ({
@@ -260,6 +293,7 @@ const calculateHours = (dayDuration) => {
     }));
   };
 
+  // ADD THIS MISSING FUNCTION
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setEmailData((prev) => ({ ...prev, [name]: value }));
@@ -303,26 +337,27 @@ const calculateHours = (dayDuration) => {
         }
       }
       
-const totalHours = trainerAssignments.reduce((acc, assignment) => {
-  const duration =
-    assignment.dayDuration.includes("AM") || assignment.dayDuration.includes("PM")
-      ? getTimingForSlot(assignment.dayDuration)
-      : assignment.dayDuration;
-  return acc + calculateHours(duration);
-}, 0);
+      const totalHours = trainerAssignments.reduce((acc, assignment) => {
+        const duration =
+          assignment.dayDuration.includes("AM") || assignment.dayDuration.includes("PM")
+            ? getTimingForSlot(assignment.dayDuration)
+            : assignment.dayDuration;
+        return acc + calculateHours(duration);
+      }, 0);
 
+      // FIXED: Include expenses in total cost calculation
+      const trainingFees = totalHours * (feePerHour || 0);
+      const totalExpenses = trainerCostDetails.conveyance + trainerCostDetails.food + trainerCostDetails.lodging;
+      const totalCost = trainingFees + totalExpenses;
+      const tdsAmount = totalCost * 0.1; // 10% TDS
+      const payableCost = totalCost - tdsAmount;
 
-const totalCost = totalHours * (feePerHour || 0);
-const tdsAmount = totalCost * 0.1; // 10% TDS
-const payableCost = totalCost - tdsAmount;;
+      const scheduleRows = trainerAssignments
+        .map((assignment) => {
+          const hours = calculateHours(assignment.dayDuration);
+          const perDayCost = (feePerHour || 0) * hours;
 
-
-  const scheduleRows = trainerAssignments
-  .map((assignment) => {
-    const hours = calculateHours(assignment.dayDuration);
-    const perDayCost = (feePerHour || 0) * hours;
-
-    return `
+          return `
 <tr>
   <td>${assignment.domain || "-"}</td>
   <td>${trainingFormDoc?.year || trainingData?.year || "-"}</td>
@@ -330,15 +365,15 @@ const payableCost = totalCost - tdsAmount;;
   <td>${formatDate(assignment.date)}</td>
   <td>${assignment.batchCode || "-"}</td>
   <td>${getTimingForSlot(assignment.dayDuration)}</td>
-<td>${assignment.dayDuration.includes("AM") || assignment.dayDuration.includes("PM")
-    ? calculateHours(getTimingForSlot(assignment.dayDuration))
-    : calculateHours(assignment.dayDuration)}
-</td>
+  <td>${assignment.dayDuration.includes("AM") || assignment.dayDuration.includes("PM")
+      ? calculateHours(getTimingForSlot(assignment.dayDuration))
+      : calculateHours(assignment.dayDuration)}
+  </td>
   <td>₹ ${feePerHour || 0}</td>
   <td>₹ ${perDayCost.toFixed(2)}</td>
 </tr>`;
-  })
-  .join("");
+        })
+        .join("");
 
       const templateParams = {
         to_email: emailData.to,
@@ -347,15 +382,16 @@ const payableCost = totalCost - tdsAmount;;
           selectedTrainer?.name ||
           selectedTrainer?.trainerName ||
           ""
-        )
-          .split(" ")
-          .slice(-1)
-          .join(" "),
-        college_name:
-          trainingFormDoc?.collegeName || trainingData?.collegeName || "",
+        ).split(" ").slice(-1).join(" "),
+        college_name: trainingFormDoc?.collegeName || trainingData?.collegeName || "",
         venue_address: emailData.venue,
         contact_person: emailData.contactPerson,
         contact_number: emailData.contactNumber,
+
+        conveyance: trainerCostDetails.conveyance,
+        food: trainerCostDetails.food,
+        lodging: trainerCostDetails.lodging,
+        total_expenses: totalExpenses,
 
         schedule_rows: scheduleRows,
         total_days: trainerAssignments.length,
@@ -400,7 +436,6 @@ const payableCost = totalCost - tdsAmount;;
       setLoading(false);
     }
   };
-
 
   // ---------- UI ----------
   return (
