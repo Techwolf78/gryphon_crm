@@ -94,6 +94,8 @@ const TrainerRow = React.memo(
     const [newTopicInput, setNewTopicInput] = useState("");
     // ✅ ADD: State for daily hours dropdown
     const [showDailyHoursDropdown, setShowDailyHoursDropdown] = useState(false);
+    // ✅ ADD: Ref to track previous dates
+    const previousDatesRef = useRef({ startDate: null, endDate: null });
 
     // ✅ If trainer has no topics selected but the selected trainer document
     // provides specializations, default-select those topics once.
@@ -146,7 +148,7 @@ const TrainerRow = React.memo(
     ]);
 
     // ✅ ADD: Local function to generate date list with exclusions
-    const getDateList = (start, end, excludeDays) => {
+    const getDateList = (start, end, excludeDays, excludedDates = []) => {
       if (!start || !end) return [];
       const startDate = new Date(start);
       const endDate = new Date(end);
@@ -171,7 +173,10 @@ const TrainerRow = React.memo(
         // If excludeDays === "None", include all days
         
         if (shouldInclude) {
-          dates.push(new Date(current));
+          const dateStr = current.toISOString().slice(0, 10);
+          if (!excludedDates.includes(dateStr)) {
+            dates.push(new Date(current));
+          }
         }
         current.setDate(current.getDate() + 1);
       }
@@ -180,11 +185,20 @@ const TrainerRow = React.memo(
 
     // ✅ ADD: Initialize dailyHours when trainer data is loaded
     useEffect(() => {
+      // Track previous dates to detect changes
+      const previousStart = previousDatesRef.current.startDate;
+      const previousEnd = previousDatesRef.current.endDate;
+      
+      // If date range changed, reset excludedDates
+      if ((trainer.startDate !== previousStart || trainer.endDate !== previousEnd) && previousStart !== null) {
+        handleTrainerField(rowIndex, batchIndex, trainerIdx, "excludedDates", []);
+      }
+      previousDatesRef.current = { startDate: trainer.startDate, endDate: trainer.endDate };
+
       if (
         trainer.startDate &&
         trainer.endDate &&
-        trainer.dayDuration &&
-        (!trainer.dailyHours || trainer.dailyHours.length === 0)
+        trainer.dayDuration
       ) {
         // Calculate per day hours based on dayDuration
         const perDay = getTrainingHoursPerDay(commonFields);
@@ -194,23 +208,27 @@ const TrainerRow = React.memo(
           perDayHours = +(perDay / 2).toFixed(2);
 
         // Generate date list and populate dailyHours
-        const dateList = getDateList(trainer.startDate, trainer.endDate, excludeDays);
-        const dailyHoursArray = dateList.map(() => perDayHours);
+        const dateList = getDateList(trainer.startDate, trainer.endDate, excludeDays, trainer.excludedDates || []);
+        const currentDailyHours = trainer.dailyHours || [];
+        if (dateList.length !== currentDailyHours.length) {
+          const dailyHoursArray = dateList.map(() => perDayHours);
 
-        // Update the trainer data with the calculated dailyHours
-        handleTrainerField(
-          rowIndex,
-          batchIndex,
-          trainerIdx,
-          "dailyHours",
-          dailyHoursArray
-        );
+          // Update the trainer data with the calculated dailyHours
+          handleTrainerField(
+            rowIndex,
+            batchIndex,
+            trainerIdx,
+            "dailyHours",
+            dailyHoursArray
+          );
+        }
       }
     }, [
       trainer.startDate,
       trainer.endDate,
       trainer.dayDuration,
       trainer.dailyHours,
+      trainer.excludedDates,
       excludeDays,
       rowIndex,
       batchIndex,
@@ -413,7 +431,7 @@ const TrainerRow = React.memo(
           </td>
 
           {/* Daily Hours */}
-          <td className="px-2 py-1 relative bg-gradient-to-r from-gray-50 to-white rounded-md">
+          <td className="px-2 py-1 relative bg-gradient-to-r from-gray-50 to-white rounded-md overflow-visible">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-gray-700">
                 {trainer.dailyHours && trainer.dailyHours.length > 0
@@ -468,11 +486,12 @@ const TrainerRow = React.memo(
                       <th className="text-left py-1 px-0.5 font-medium text-gray-700 text-xs">Date</th>
                       <th className="text-left py-1 px-0.5 font-medium text-gray-700 text-xs">Day</th>
                       <th className="text-left py-1 px-0.5 font-medium text-gray-700 text-xs">Hours</th>
+                      <th className="text-left py-1 px-0.5 font-medium text-gray-700 text-xs">Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(() => {
-                      const dates = getDateList(trainer.startDate, trainer.endDate, excludeDays);
+                      const dates = getDateList(trainer.startDate, trainer.endDate, excludeDays, trainer.excludedDates || []);
                       return (
                         <>
                           {dates.map((date, index) => {
@@ -504,14 +523,36 @@ const TrainerRow = React.memo(
                                     placeholder="0"
                                   />
                                 </td>
+                                <td className="py-0.5 px-0.5 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const dateStr = date.toISOString().slice(0, 10);
+                                      const newExcluded = [...(trainer.excludedDates || []), dateStr];
+                                      handleTrainerField(rowIndex, batchIndex, trainerIdx, "excludedDates", newExcluded);
+                                      // Remove from dailyHours
+                                      const updatedDailyHours = [...(trainer.dailyHours || [])];
+                                      updatedDailyHours.splice(index, 1);
+                                      handleTrainerField(rowIndex, batchIndex, trainerIdx, "dailyHours", updatedDailyHours);
+                                      // Update assignedHours
+                                      const newTotal = updatedDailyHours.reduce((sum, h) => sum + Number(h || 0), 0);
+                                      handleTrainerField(rowIndex, batchIndex, trainerIdx, "assignedHours", newTotal);
+                                    }}
+                                    className="text-red-500 hover:text-red-700 p-1"
+                                    title="Delete this date"
+                                  >
+                                    <FiTrash2 size={12} />
+                                  </button>
+                                </td>
                               </tr>
                             );
                           })}
                           <tr className="bg-indigo-50 border-t border-indigo-200 font-semibold">
                             <td className="py-0.5 px-0.5 text-indigo-800 text-xs" colSpan={2}>Total:</td>
                             <td className="py-0.5 px-0.5 text-indigo-800 text-xs">
-                              {trainer.dailyHours.reduce((sum, hours) => sum + Number(hours || 0), 0)}h
+                              {(trainer.dailyHours || []).reduce((sum, hours) => sum + Number(hours || 0), 0)}h
                             </td>
+                            <td></td>
                           </tr>
                         </>
                       );
@@ -970,7 +1011,7 @@ const TrainersTable = React.memo(
 
         {trainers.length > 0 ? (
           <div className="overflow-visible">
-            <table className="min-w-full text-xs border border-gray-200 rounded">
+            <table className="min-w-full text-xs border border-gray-200 rounded overflow-visible">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-2 py-1 text-left">Trainer</th>
