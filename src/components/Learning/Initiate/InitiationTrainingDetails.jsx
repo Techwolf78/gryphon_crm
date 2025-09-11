@@ -42,6 +42,11 @@ function getTimingForSlot(slot, training) {
   const { collegeStartTime, lunchStartTime, lunchEndTime, collegeEndTime } =
     training || {};
 
+  if (s.includes("AM & PM") || (s.includes("AM") && s.includes("PM"))) {
+    if (collegeStartTime && collegeEndTime)
+      return `${collegeStartTime} - ${collegeEndTime}`;
+    return "AM & PM";
+  }
   if (s.includes("AM")) {
     if (collegeStartTime && lunchStartTime)
       return `${collegeStartTime} - ${lunchStartTime}`;
