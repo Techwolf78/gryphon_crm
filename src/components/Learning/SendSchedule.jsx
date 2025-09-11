@@ -60,26 +60,7 @@ function SendSchedule({
     });
   };
 
-  // Calculate hours from dayDuration string
-  const calculateHours = (dayDuration) => {
-    if (!dayDuration) return 0;
 
-    const [start, end] = dayDuration.split("-").map((s) => s.trim());
-    if (!start || !end) return 0;
-
-    const [startH, startM] = start.split(":").map(Number);
-    const [endH, endM] = end.split(":").map(Number);
-
-    if ([startH, startM, endH, endM].some(isNaN)) return 0;
-
-    const startDate = new Date(0, 0, 0, startH, startM);
-    const endDate = new Date(0, 0, 0, endH, endM);
-
-    let diff = (endDate - startDate) / (1000 * 60 * 60);
-    if (diff < 0) diff = 0;
-
-    return diff;
-  };
 
 useEffect(() => {
   if (!selectedTrainer || trainersData.length === 0) return;
@@ -140,7 +121,7 @@ useEffect(() => {
     if ((trainingFormDoc || trainingData) && selectedTrainer) {
       setEmailData((prev) => ({
         ...prev,
-        to: selectedTrainer?.email || selectedTrainer?.trainerEmail || "",
+        to: "", // Keep empty by default
         venue:
           trainingFormDoc?.address ||
           trainingFormDoc?.venue ||
@@ -280,9 +261,10 @@ useEffect(() => {
   // ADD THIS MISSING FUNCTION
   const handleConfirmSchedule = () => {
     setCurrentStep(3);
+    setError(""); // Clear any previous errors
     setEmailData((prev) => ({
       ...prev,
-      to: selectedTrainer?.email || selectedTrainer?.trainerEmail || "",
+      to: prev.to || "", // Keep existing email if already entered
       subject: `Training Schedule for ${
         selectedTrainer?.name || selectedTrainer?.trainerName
       } - ${trainingFormDoc?.collegeName || trainingData?.collegeName || ""}`,
@@ -304,10 +286,16 @@ useEffect(() => {
     setEmailData((prev) => ({ ...prev, [name]: value }));
   };
 
+  // Function to import email from trainer data
+  const handleImportEmail = () => {
+    const trainerEmail = selectedTrainer?.email || selectedTrainer?.trainerEmail || "";
+    setEmailData((prev) => ({ ...prev, to: trainerEmail }));
+  };
+
   // ---------- Send Email ----------
   const handleSendEmail = async () => {
     if (!emailData.to.trim()) {
-      setError("Please enter recipient email");
+      setError("Please enter recipient email or click 'Import Email' to load from trainer data");
       return;
     }
 
@@ -342,13 +330,24 @@ useEffect(() => {
         }
       }
       
-      const totalHours = trainerAssignments.reduce((acc, assignment) => {
-        const duration =
-          assignment.dayDuration.includes("AM") || assignment.dayDuration.includes("PM")
-            ? getTimingForSlot(assignment.dayDuration)
-            : assignment.dayDuration;
-        return acc + calculateHours(duration);
-      }, 0);
+      const totalHours = (() => {
+        // Find the trainer's assigned hours from trainersData
+        const trainerDetails = trainersData.find(trainer =>
+          trainer.trainerId === selectedTrainer.trainerId ||
+          trainer.trainerId === selectedTrainer.id ||
+          trainer.id === selectedTrainer.trainerId ||
+          trainer.id === selectedTrainer.id
+        );
+
+        if (trainerDetails && trainerDetails.assignedHours) {
+          return trainerDetails.assignedHours;
+        }
+
+        // Fallback: Calculate from assignment data
+        return trainerAssignments.reduce((acc, assignment) => {
+          return acc + (assignment.assignedHours || 0);
+        }, 0);
+      })();
 
       // FIXED: Include expenses in total cost calculation
       const trainingFees = totalHours * (feePerHour || 0);
@@ -359,8 +358,28 @@ useEffect(() => {
 
       const scheduleRows = trainerAssignments
         .map((assignment) => {
-          const hours = calculateHours(assignment.dayDuration);
-          const perDayCost = (feePerHour || 0) * hours;
+          // Find the trainer's assigned hours from trainersData
+          const trainerDetails = trainersData.find(trainer =>
+            trainer.trainerId === selectedTrainer.trainerId ||
+            trainer.trainerId === selectedTrainer.id ||
+            trainer.id === selectedTrainer.trainerId ||
+            trainer.id === selectedTrainer.id
+          );
+
+          let hoursPerDay = 0;
+          if (trainerDetails && trainerDetails.assignedHours) {
+            const totalAssignments = trainerAssignments.length;
+            hoursPerDay = totalAssignments > 0 ? trainerDetails.assignedHours / totalAssignments : 0;
+          } else {
+            // Fallback: Calculate from assignment data
+            const totalAssignments = trainerAssignments.length;
+            const totalAssignedHours = trainerAssignments.reduce((acc, assign) => {
+              return acc + (assign.assignedHours || 0);
+            }, 0);
+            hoursPerDay = totalAssignments > 0 ? totalAssignedHours / totalAssignments : 0;
+          }
+
+          const perDayCost = (feePerHour || 0) * hoursPerDay;
 
           return `
 <tr>
@@ -370,10 +389,7 @@ useEffect(() => {
   <td>${formatDate(assignment.date)}</td>
   <td>${assignment.batchCode || "-"}</td>
   <td>${getTimingForSlot(assignment.dayDuration)}</td>
-  <td>${assignment.dayDuration.includes("AM") || assignment.dayDuration.includes("PM")
-      ? calculateHours(getTimingForSlot(assignment.dayDuration))
-      : calculateHours(assignment.dayDuration)}
-  </td>
+  <td>${hoursPerDay.toFixed(2)}</td>
   <td>₹ ${feePerHour || 0}</td>
   <td>₹ ${perDayCost.toFixed(2)}</td>
 </tr>`;
@@ -407,7 +423,27 @@ useEffect(() => {
         fee_per_hour: feePerHour,
         fee_per_day:
           trainerAssignments.length > 0
-            ? feePerHour * (totalHours / trainerAssignments.length)
+            ? (() => {
+                // Find the trainer's assigned hours from trainersData
+                const trainerDetails = trainersData.find(trainer =>
+                  trainer.trainerId === selectedTrainer.trainerId ||
+                  trainer.trainerId === selectedTrainer.id ||
+                  trainer.id === selectedTrainer.trainerId ||
+                  trainer.id === selectedTrainer.id
+                );
+
+                let hoursPerDay = 0;
+                if (trainerDetails && trainerDetails.assignedHours) {
+                  hoursPerDay = trainerDetails.assignedHours / trainerAssignments.length;
+                } else {
+                  const totalAssignedHours = trainerAssignments.reduce((acc, assign) => {
+                    return acc + (assign.assignedHours || 0);
+                  }, 0);
+                  hoursPerDay = totalAssignedHours / trainerAssignments.length;
+                }
+
+                return feePerHour * hoursPerDay;
+              })()
             : 0,
         total_cost: totalCost,
         tds_amount: tdsAmount,
@@ -618,9 +654,30 @@ useEffect(() => {
                             {getTimingForSlot(assignment.dayDuration)}
                           </td>
                           <td className="px-4 py-2 border border-gray-200">
-                            {assignment.dayDuration.includes("AM") || assignment.dayDuration.includes("PM")
-                              ? calculateHours(getTimingForSlot(assignment.dayDuration))
-                              : calculateHours(assignment.dayDuration)}
+                            {(() => {
+                              // Find the trainer's assigned hours from trainersData
+                              const trainerDetails = trainersData.find(trainer =>
+                                trainer.trainerId === selectedTrainer.trainerId ||
+                                trainer.trainerId === selectedTrainer.id ||
+                                trainer.id === selectedTrainer.trainerId ||
+                                trainer.id === selectedTrainer.id
+                              );
+
+                              if (trainerDetails && trainerDetails.assignedHours) {
+                                // Calculate hours per day based on trainer's total assigned hours divided by number of days
+                                const totalAssignments = trainerAssignments.length;
+                                const hoursPerDay = totalAssignments > 0 ? trainerDetails.assignedHours / totalAssignments : 0;
+                                return hoursPerDay.toFixed(2);
+                              }
+
+                              // Fallback: Calculate from assignment data
+                              const totalAssignments = trainerAssignments.length;
+                              const totalAssignedHours = trainerAssignments.reduce((acc, assignment) => {
+                                return acc + (assignment.assignedHours || 0);
+                              }, 0);
+                              const hoursPerDay = totalAssignments > 0 ? totalAssignedHours / totalAssignments : 0;
+                              return hoursPerDay.toFixed(2);
+                            })()}
                           </td>
 
                           <td className="px-4 py-2 border border-gray-200">
@@ -673,15 +730,27 @@ useEffect(() => {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    To
+                    To <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="email"
-                    name="to"
-                    value={emailData.to}
-                    onChange={handleInputChange}
-                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      name="to"
+                      value={emailData.to}
+                      onChange={handleInputChange}
+                      required
+                      className="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      placeholder="Enter recipient email"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleImportEmail}
+                      className="px-3 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded hover:bg-gray-200 transition-colors text-sm whitespace-nowrap"
+                      title="Import email from trainer"
+                    >
+                      Import Email
+                    </button>
+                  </div>
                 </div>
 
                 {/* Editable Venue */}
