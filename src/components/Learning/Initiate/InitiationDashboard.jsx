@@ -39,6 +39,7 @@ import {
   FiTrendingUp,
   FiCornerLeftDown,
 } from "react-icons/fi";
+import ExportButton from './ExportButton';
 import ChangeTrainerDashboard from "./ChangeTrainerDashboard";
 import TrainerCalendar from "../TrainerCalendar/TrainerCalendar";
 
@@ -1252,16 +1253,20 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                 Refresh
               </button>
             </div>
-            <div className="mt-2 lg:mt-0 flex items-center space-x-2">
+            <div className="mt-2 lg:mt-0 flex items-center gap-3">
+              <div className="flex items-center">
+                <ExportButton trainings={trainings} />
+              </div>
+              <div className="w-px h-6 bg-gray-300"></div>
               <button
                 type="button"
                 onClick={() => {
                   setTrainerCalendarTraining(null);
                   setShowTrainerCalendar(true);
                 }}
-                className="inline-flex items-center px-3 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-all"
+                className="inline-flex items-center px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-all shadow-sm hover:shadow-md"
               >
-                <FiCalendar className="mr-2" /> Trainer Calendar
+                <FiCalendar className="mr-2 w-4 h-4" /> Trainer Calendar
               </button>
             </div>
           </div>

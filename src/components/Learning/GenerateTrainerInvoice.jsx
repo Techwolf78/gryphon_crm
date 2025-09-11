@@ -535,7 +535,7 @@ function GenerateTrainerInvoice() {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
             <div>
               <h1 className="text-2xl font-bold mb-2">
-                Trainer Invoice Generator
+                Trainer Invoice
               </h1>
               <p className="text-blue-100 opacity-90">
                 Generate and manage invoices for trainers
