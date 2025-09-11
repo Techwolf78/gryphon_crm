@@ -19,9 +19,9 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
     totalHours: trainer?.totalCollegeHours || 0,
     tds: 10,
     adhocAdjustment: 0,
-    conveyance: 0,
-    food: 0,
-    lodging: 0,
+    conveyance: trainer?.conveyance || 0,
+    food: trainer?.food || 0,
+    lodging: trainer?.lodging || 0,
     collegeName: trainer?.collegeName || "",
   });
   const [existingInvoice, setExistingInvoice] = useState(null);

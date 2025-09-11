@@ -118,6 +118,11 @@ useEffect(() => {
     const pd = phaseData || phaseDocData || {};
     const { collegeStartTime, lunchStartTime, lunchEndTime, collegeEndTime } = pd || {};
 
+    if (s.includes("AM & PM") || (s.includes("AM") && s.includes("PM"))) {
+      if (collegeStartTime && collegeEndTime)
+        return `${collegeStartTime} - ${collegeEndTime}`;
+      return "AM & PM";
+    }
     if (s.includes("AM")) {
       if (collegeStartTime && lunchStartTime)
         return `${collegeStartTime} - ${lunchStartTime}`;
@@ -193,7 +198,7 @@ useEffect(() => {
                 const single = await getDoc(docRef);
                 if (single.exists())
                   assignedTrainers.push({ id: single.id, ...single.data() });
-              } catch (e) {
+              } catch {
                 // ignore
               }
             }
@@ -581,6 +586,9 @@ useEffect(() => {
                           Timing
                         </th>
                         <th className="px-4 py-2 text-left border border-gray-200 font-medium">
+                          Hours
+                        </th>
+                        <th className="px-4 py-2 text-left border border-gray-200 font-medium">
                           Domain
                         </th>
                         <th className="px-4 py-2 text-left border border-gray-200 font-medium">
@@ -609,7 +617,11 @@ useEffect(() => {
                           <td className="px-4 py-2 border border-gray-200">
                             {getTimingForSlot(assignment.dayDuration)}
                           </td>
-                          <td>{calculateHours(assignment.dayDuration)}</td> {/* Hours */}
+                          <td className="px-4 py-2 border border-gray-200">
+                            {assignment.dayDuration.includes("AM") || assignment.dayDuration.includes("PM")
+                              ? calculateHours(getTimingForSlot(assignment.dayDuration))
+                              : calculateHours(assignment.dayDuration)}
+                          </td>
 
                           <td className="px-4 py-2 border border-gray-200">
                             {assignment.domain || "-"}
