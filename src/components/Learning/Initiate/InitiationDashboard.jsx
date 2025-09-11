@@ -39,7 +39,7 @@ import {
   FiTrendingUp,
   FiCornerLeftDown,
 } from "react-icons/fi";
-import ExportButton from './ExportButton';
+import InitiationDashboardExportButton from './InitiationDashboardExportButton';
 import ChangeTrainerDashboard from "./ChangeTrainerDashboard";
 import TrainerCalendar from "../TrainerCalendar/TrainerCalendar";
 
@@ -112,7 +112,8 @@ const STATUS_ICON_MAP = {
 function groupByCollege(trainings) {
   const map = {};
   trainings.forEach((t) => {
-    const key = `${t.collegeName} (${t.collegeCode})`;
+    const codeForDisplay = t.projectCode || t.collegeCode || '';
+    const key = `${t.collegeName} (${codeForDisplay})`;
     if (!map[key]) {
       map[key] = { phases: [], tcv: t.tcv || 0, totalCost: 0, totalNetPayable: 0, hasGST: false };
     }
@@ -462,7 +463,9 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
             trainingId: formDoc.id,
             phaseId: phaseDoc.id,
             collegeName: formData.collegeName,
-            collegeCode: formData.collegeCode,
+            // prefer projectCode when available; fall back to collegeCode for compatibility
+            projectCode: formData.projectCode || formData.collegeCode,
+            collegeCode: formData.projectCode || formData.collegeCode,
             domain: domainString || "-",
             domainsCount: domainsCount,
             totalHours: totalHours,
@@ -568,7 +571,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
     const matchesSearch =
       searchTerm === "" ||
       training.collegeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      training.collegeCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ( (training.projectCode || training.collegeCode || "").toLowerCase().includes(searchTerm.toLowerCase()) ) ||
       training.domain.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesPhase =
@@ -741,7 +744,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
       id: training.trainingId,
       selectedPhase: training.phaseId,
       collegeName: training.collegeName,
-      collegeCode: training.collegeCode,
+      projectCode: training.projectCode || training.collegeCode,
       ...training.originalFormData,
     };
 
@@ -757,7 +760,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
       id: training.trainingId,
       selectedPhase: training.phaseId,
       collegeName: training.collegeName,
-      collegeCode: training.collegeCode,
+      projectCode: training.projectCode || training.collegeCode,
       ...training.originalFormData,
       isEdit: true, // optional flag consumers can use to open modal in edit mode
     };
@@ -1255,7 +1258,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
             </div>
             <div className="mt-2 lg:mt-0 flex items-center gap-3">
               <div className="flex items-center">
-                <ExportButton trainings={trainings} />
+                <InitiationDashboardExportButton trainings={trainings} />
               </div>
               <div className="w-px h-6 bg-gray-300"></div>
               <button

@@ -424,6 +424,26 @@ function InitiationTrainingDetails({ training, onBack }) {
                                               )}
                                             </div>
                                             
+                                            {/* Cost Breakdown */}
+                                            <div className="mt-3 pt-3 border-t border-gray-200">
+                                              <div className="text-sm font-medium text-gray-700 mb-2">Cost Breakdown:</div>
+                                              <div className="text-sm text-gray-600 space-y-1">
+                                                <div>Conveyance: ₹{(trainer.conveyance || 0).toFixed(2)}</div>
+                                                <div>Food: ₹{(trainer.food || 0).toFixed(2)}</div>
+                                                <div>Lodging: ₹{(trainer.lodging || 0).toFixed(2)}</div>
+                                                <div>Trainer: ₹{((trainer.assignedHours || 0) * (trainer.perHourCost || 0)).toFixed(2)}</div>
+                                                <div>Misc: ₹{(((trainer.conveyance || 0) + (trainer.food || 0) + (trainer.lodging || 0)) || 0).toFixed(2)}</div>
+                                                <div className="font-semibold text-gray-800 border-t border-gray-300 pt-1">
+                                                  Total: ₹{(
+                                                    (trainer.conveyance || 0) +
+                                                    (trainer.food || 0) +
+                                                    (trainer.lodging || 0) +
+                                                    ((trainer.assignedHours || 0) * (trainer.perHourCost || 0))
+                                                  ).toFixed(2)}
+                                                </div>
+                                              </div>
+                                            </div>
+                                            
                                             <div className="mt-2 flex justify-end">
                                               <button
                                                 onClick={() => toggleSchedule(uniqueKey)}
@@ -481,7 +501,10 @@ function InitiationTrainingDetails({ training, onBack }) {
                                                             }
                                                             
                                                             if (shouldInclude) {
-                                                              dates.push(new Date(current));
+                                                              const dateStr = current.toISOString().slice(0, 10);
+                                                              if (!(trainer.excludedDates || []).includes(dateStr)) {
+                                                                dates.push(new Date(current));
+                                                              }
                                                             }
                                                             current.setDate(current.getDate() + 1);
                                                           }

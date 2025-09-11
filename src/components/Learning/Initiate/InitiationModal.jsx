@@ -91,7 +91,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
   // Validation state for duplicate trainers
   const [validationByDomain, setValidationByDomain] = useState({});
   const [batchMismatch, setBatchMismatch] = useState(false);
-  const [completedPhases, setCompletedPhases] = useState([]);
+  // completedPhases state removed because it's not used
   const [globalTrainerAssignments, setGlobalTrainerAssignments] = useState([]);
 
   const [submitDisabled, setSubmitDisabled] = useState(false);
@@ -1461,15 +1461,15 @@ function InitiationModal({ training, onClose, onConfirm }) {
               <div className="flex-1 text-center">
                 <h1 className="text-sm font-semibold text-gray-800 leading-tight">
                   {training?.collegeName ? (
-                    <>
-                      {training.collegeName}
-                      {training.collegeCode && (
-                        <span className="ml-1 text-gray-500 font-normal">
-                          ({training.collegeCode})
-                        </span>
-                      )}
-                    </>
-                  ) : (
+                      <>
+                        {training.collegeName}
+                        {(training.projectCode || training.collegeCode) && (
+                          <span className="ml-1 text-gray-500 font-normal">
+                            ({training.projectCode || training.collegeCode})
+                          </span>
+                        )}
+                      </>
+                    ) : (
                     <span className="text-gray-500 font-normal">
                       Training Setup
                     </span>
@@ -1820,7 +1820,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                       return (
                         <div
                           key={domain}
-                          className={`space-y-3 mt-4 border-l-4 pl-4 rounded ${
+                          className={`space-y-3 mt-4 border-l-4 pl-4 rounded overflow-visible ${
                             DOMAIN_COLORS[domain] ||
                             "border-gray-300 bg-gray-50"
                           }`}

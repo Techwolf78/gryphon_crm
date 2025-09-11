@@ -1,21 +1,21 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FiDownload, FiChevronDown, FiCheck, FiCalendar, FiColumns, FiFilter, FiRotateCcw } from 'react-icons/fi';
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
 
-const ExportButton = ({ trainings }) => {
+const InitiationDashboardExportButton = ({ trainings }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedColumns, setSelectedColumns] = useState(new Set([
-    'collegeName', 'collegeCode', 'phaseId', 'domain', 'computedStatus', 'totalCost', 'totalHours', 'tcv'
+    'collegeName', 'projectCode', 'phaseId', 'domain', 'computedStatus', 'totalCost', 'totalHours', 'tcv'
   ]));
 
   const dropdownRef = useRef(null);
   const buttonRef = useRef(null);
 
   const availableColumns = [
-    { key: 'collegeName', label: 'College Name', icon: '🏫' },
-    { key: 'collegeCode', label: 'College Code', icon: '📋' },
+  { key: 'collegeName', label: 'College Name', icon: '🏫' },
+  { key: 'projectCode', label: 'Project Code', icon: '📋' },
     { key: 'phaseId', label: 'Phase', icon: '📊' },
     { key: 'domain', label: 'Domain', icon: '🎯' },
     { key: 'computedStatus', label: 'Status', icon: '📈' },
@@ -58,7 +58,7 @@ const ExportButton = ({ trainings }) => {
     setStartDate('');
     setEndDate('');
     setSelectedColumns(new Set([
-      'collegeName', 'collegeCode', 'phaseId', 'domain', 'computedStatus', 'totalCost', 'totalHours', 'tcv'
+      'collegeName', 'projectCode', 'phaseId', 'domain', 'computedStatus', 'totalCost', 'totalHours', 'tcv'
     ]));
   };
 
@@ -120,6 +120,8 @@ const ExportButton = ({ trainings }) => {
 
     const data = filteredTrainings.map(t =>
       Array.from(selectedColumns).map(key => {
+        // Prefer projectCode but fall back to collegeCode for compatibility
+        if (key === 'projectCode') return t.projectCode || t.collegeCode || '';
         const value = t[key];
         // Handle different data types
         if (value === null || value === undefined) return '';
@@ -138,55 +140,46 @@ const ExportButton = ({ trainings }) => {
     });
     ws['!cols'] = maxLengths.map(len => ({ wch: len + 2 })); // add some padding
 
-    // Define unique colors for headers
-    const headerColors = [
-      '4F81BD', // Blue
-      '9BBB59', // Green
-      '8064A2', // Purple
-      'F79646', // Orange
-      'C0504D', // Red
-      '4BACC6', // Cyan
-      '9F4C7C', // Magenta
-      '948A54', // Olive
-      '4F6228', // Dark Green
-      'C00000', // Dark Red
-      '60497A'  // Dark Purple
-    ];
+  // (removed unused per-header color array; header now uses a single distinct color)
 
-    // Style headers with unique colors
+    // Style headers to match ExportLead: light-blue fill, black bold font, thin black borders
+    const headerFillColor = 'CCECFF'; // ExportLead uses light blues for phases; use similar light-blue here
     headers.forEach((header, i) => {
       const cellRef = XLSX.utils.encode_cell({ r: 0, c: i });
       if (!ws[cellRef]) ws[cellRef] = { t: 's', v: header };
-      const color = headerColors[i % headerColors.length];
       ws[cellRef].s = {
-        font: { bold: true, sz: 12, color: { rgb: "FFFFFF" } },
-        fill: { fgColor: { rgb: color } },
+        font: { bold: true, sz: 12, color: { rgb: '000000' } },
+        fill: { fgColor: { rgb: headerFillColor } },
         border: {
-          top: { style: "medium", color: { rgb: "000000" } },
-          bottom: { style: "medium", color: { rgb: "000000" } },
-          left: { style: "thin", color: { rgb: "000000" } },
-          right: { style: "thin", color: { rgb: "000000" } }
+          top: { style: 'thin', color: { rgb: '000000' } },
+          bottom: { style: 'thin', color: { rgb: '000000' } },
+          left: { style: 'thin', color: { rgb: '000000' } },
+          right: { style: 'thin', color: { rgb: '000000' } }
         },
-        alignment: { horizontal: "center", vertical: "center", wrapText: true }
+        alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
       };
     });
 
-    // Style data cells with alternating row colors and borders
+    // Style data cells with zebra striping and boxed thin borders
+    const rowLight = 'FFFFFF'; // white
+    const rowDark = 'EEF6FF'; // very light blue for contrast
+    const borderColor = 'D1D5DB'; // neutral border color
     data.forEach((row, r) => {
       const isEvenRow = (r + 1) % 2 === 0; // +1 because header is row 0
+      const fillColor = isEvenRow ? rowDark : rowLight;
       row.forEach((cell, c) => {
         const cellRef = XLSX.utils.encode_cell({ r: r + 1, c: c });
         if (!ws[cellRef]) ws[cellRef] = { v: cell };
         ws[cellRef].s = {
-          font: { sz: 10 },
-          fill: isEvenRow ? { fgColor: { rgb: "F9F9F9" } } : { fgColor: { rgb: "FFFFFF" } }, // very light gray for even rows
+          font: { sz: 10, color: { rgb: '111827' } },
+          fill: { fgColor: { rgb: fillColor } },
           border: {
-            top: { style: "thin", color: { rgb: "E0E0E0" } },
-            bottom: { style: "thin", color: { rgb: "E0E0E0" } },
-            left: { style: "thin", color: { rgb: "E0E0E0" } },
-            right: { style: "thin", color: { rgb: "E0E0E0" } }
+            top: { style: 'thin', color: { rgb: borderColor } },
+            bottom: { style: 'thin', color: { rgb: borderColor } },
+            left: { style: 'thin', color: { rgb: borderColor } },
+            right: { style: 'thin', color: { rgb: borderColor } }
           },
-          alignment: { horizontal: "left", vertical: "center", wrapText: true }
+          alignment: { horizontal: 'left', vertical: 'center', wrapText: true }
         };
       });
     });
@@ -196,6 +189,18 @@ const ExportButton = ({ trainings }) => {
 
     // Add filters to headers
     ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 0, c: headers.length - 1 } }) };
+
+    // Add a table object so Excel recognizes it as a structured table (improves UI: banded rows, header styling, filter)
+    try {
+      const startRef = 'A1';
+      const endRef = XLSX.utils.encode_cell({ r: data.length, c: headers.length - 1 }); // data.length + header row => last row index = data.length
+      const tableRef = `${startRef}:${endRef}`;
+      // SheetJS community recognizes '!tables' for table metadata; Excel will show it as a table when supported by reader
+      ws['!tables'] = [{ name: 'TrainingsTable', ref: tableRef, headerRow: true }];
+    } catch (e) {
+      // Non-critical: if table creation fails, continue without blocking export
+      console.warn('Could not create table object for worksheet:', e);
+    }
 
     // Create workbook
     const wb = XLSX.utils.book_new();
@@ -365,10 +370,10 @@ const ExportButton = ({ trainings }) => {
                 <button
                   onClick={handleExport}
                   className="inline-flex items-center px-2 py-0.5 text-xs font-medium text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 rounded shadow-sm hover:shadow-md transform hover:scale-105 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                  aria-label="Download CSV file"
+                  aria-label="Download XLSX file"
                 >
                   <FiDownload className="mr-0.5 w-2.5 h-2.5" />
-                  Download CSV
+                  Download XLSX
                 </button>
               </div>
             </div>
@@ -379,4 +384,4 @@ const ExportButton = ({ trainings }) => {
   );
 };
 
-export default ExportButton;
+export default InitiationDashboardExportButton;

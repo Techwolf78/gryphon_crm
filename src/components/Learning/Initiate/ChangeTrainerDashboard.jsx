@@ -35,6 +35,9 @@ const ChangeTrainerDashboard = ({
   const [changeEndDate, setChangeEndDate] = useState("");
   const [reason, setReason] = useState("");
   const [newTrainerCost, setNewTrainerCost] = useState("");
+  const [conveyance, setConveyance] = useState("0");
+  const [food, setFood] = useState("0");
+  const [lodging, setLodging] = useState("0");
   const [autoTrainerBaseCost, setAutoTrainerBaseCost] = useState(null);
   const [manualCostEdited, setManualCostEdited] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -95,7 +98,8 @@ const ChangeTrainerDashboard = ({
                   formId: formDoc.id,
                   phaseId: phaseDoc.id,
                   collegeName: formData.collegeName,
-                  collegeCode: formData.collegeCode,
+                  projectCode: formData.projectCode || formData.collegeCode,
+                  collegeCode: formData.projectCode || formData.collegeCode,
                   phaseData,
                   domains: domainsWithTrainers,
                 });
@@ -120,7 +124,8 @@ const ChangeTrainerDashboard = ({
           formId: preSelectedTraining.trainingId,
           phaseId: preSelectedTraining.phaseId,
           collegeName: preSelectedTraining.collegeName,
-          collegeCode: preSelectedTraining.collegeCode,
+          projectCode: preSelectedTraining.projectCode || preSelectedTraining.collegeCode,
+          collegeCode: preSelectedTraining.projectCode || preSelectedTraining.collegeCode,
           phaseData: {
             trainingStartDate: preSelectedTraining.trainingStartDate,
             trainingEndDate: preSelectedTraining.trainingEndDate,
@@ -425,6 +430,9 @@ const ChangeTrainerDashboard = ({
           endDate: changeEndDate,
           perHourCost:
             Number(newTrainerCost) || Number(newTrainerInfo?.charges) || Number(currentTrainer.perHourCost) || 0,
+          conveyance: Number(conveyance) || 0,
+          food: Number(food) || 0,
+          lodging: Number(lodging) || 0,
           activeDates: newActiveDates,
           dailyHours: newActiveDates.map(() => currentPerDayHours),
           assignedHours: newActiveDates.length * currentPerDayHours,
@@ -519,6 +527,9 @@ const ChangeTrainerDashboard = ({
     setChangeEndDate("");
     setReason("");
     setNewTrainerCost("");
+    setConveyance("0");
+    setFood("0");
+    setLodging("0");
     onClose();
   };
 
@@ -655,9 +666,9 @@ const ChangeTrainerDashboard = ({
                     >
                       <div className="flex items-center justify-between">
                         <div>
-                          <h4 className="font-medium text-gray-900">
-                            {training.collegeName} ({training.collegeCode})
-                          </h4>
+                                    <h4 className="font-medium text-gray-900">
+                                      {training.collegeName} ({training.projectCode || training.collegeCode})
+                                    </h4>
                           <p className="text-sm text-gray-600">
                             Phase {training.phaseId.replace("phase-", "")} •
                             {training.phaseData.trainingStartDate} to{" "}
@@ -695,8 +706,7 @@ const ChangeTrainerDashboard = ({
 
               <div className="bg-blue-50 p-4 rounded-lg mb-4">
                 <h4 className="font-medium text-blue-900">
-                  {selectedTraining.collegeName} ({selectedTraining.collegeCode}
-                  )
+                  {selectedTraining.collegeName} ({selectedTraining.projectCode || selectedTraining.collegeCode})
                 </h4>
                 <p className="text-sm text-blue-700">
                   Phase {selectedTraining.phaseId.replace("phase-", "")} •
@@ -805,7 +815,7 @@ const ChangeTrainerDashboard = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <FiCalendar className="inline w-4 h-4 mr-1" />
@@ -939,7 +949,49 @@ const ChangeTrainerDashboard = ({
                   </div>
                 </div>
 
-                <div className="md:col-span-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <FiDollarSign className="inline w-4 h-4 mr-1" />
+                    Conveyance Cost
+                  </label>
+                  <input
+                    type="number"
+                    value={conveyance}
+                    onChange={(e) => setConveyance(e.target.value)}
+                    placeholder="0"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <FiDollarSign className="inline w-4 h-4 mr-1" />
+                    Food Cost
+                  </label>
+                  <input
+                    type="number"
+                    value={food}
+                    onChange={(e) => setFood(e.target.value)}
+                    placeholder="0"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <FiDollarSign className="inline w-4 h-4 mr-1" />
+                    Lodging Cost
+                  </label>
+                  <input
+                    type="number"
+                    value={lodging}
+                    onChange={(e) => setLodging(e.target.value)}
+                    placeholder="0"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="lg:col-span-3">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <FiAlertTriangle className="inline w-4 h-4 mr-1" />
                     Reason for Change *
@@ -1049,6 +1101,15 @@ const ChangeTrainerDashboard = ({
                           ?.charges ||
                         selectedCurrentTrainer.perHourCost}
                       /hour
+                    </p>
+                    <p>
+                      <strong>Conveyance:</strong> ₹{conveyance || 0}
+                    </p>
+                    <p>
+                      <strong>Food:</strong> ₹{food || 0}
+                    </p>
+                    <p>
+                      <strong>Lodging:</strong> ₹{lodging || 0}
                     </p>
                   </div>
                 </div>
