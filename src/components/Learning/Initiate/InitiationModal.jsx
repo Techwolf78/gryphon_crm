@@ -10,9 +10,10 @@ import {
   collection,
   onSnapshot,
   writeBatch,
+  updateDoc,
+  deleteDoc,
   query,
   where,
-  updateDoc,
 } from "firebase/firestore";
 import { useAuth } from "../../../context/AuthContext";
 import {
@@ -96,7 +97,12 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
   const [submitDisabled, setSubmitDisabled] = useState(false);
 
+  const [totalAssignedHoursByDomain, setTotalAssignedHoursByDomain] = useState({});
+
   const { user } = useAuth();
+
+  const totalAssignedHours = selectedDomains.filter(d => d !== "Tools").reduce((sum, domain) => sum + (totalAssignedHoursByDomain[domain] || 0), 0);
+  const [showAssignHoursPopup, setShowAssignHoursPopup] = useState(false);
 
   // Global toggle for excluding days
   const [excludeDays, setExcludeDays] = useState("None");
@@ -131,6 +137,11 @@ function InitiationModal({ training, onClose, onConfirm }) {
       cur.setDate(cur.getDate() + 1);
     }
     return out;
+  };
+
+  // Helper to calculate training days
+  const getTrainingDays = (startDate, endDate) => {
+    return getDateList(startDate, endDate).length;
   };
 
   // Get domain hours - use custom hours if set, otherwise default from database
@@ -254,9 +265,24 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
       return updated;
     });
+    setTotalAssignedHoursByDomain(prev => {
+      const newPrev = { ...prev };
+      selectedDomains.forEach((domain) => {
+        if (domain === "Tools") return;
+        if (!newPrev[domain]) {
+          newPrev[domain] = 0;
+        }
+      });
+      if (selectedDomains.includes("Tools")) {
+        TOOL_SUBDOMAINS.forEach((s) => {
+          if (!newPrev[s.key]) {
+            newPrev[s.key] = 0;
+          }
+        });
+      }
+      return newPrev;
+    });
   }, [selectedDomains, courses, topics, getDomainHours, getMainPhase]);
-
-  // Allocation logic removed — table rows are managed by domain hours and loaded data
 
   const handlePhaseChange = (phase) => {
     setSelectedPhases((prev) => {
@@ -406,6 +432,45 @@ function InitiationModal({ training, onClose, onConfirm }) {
         ? domainsToSave
         : selectedDomains;
       const tableDataLookup = tableDataToSave || table1DataByDomain;
+      // Calculate denormalized data
+      let totalBatches = 0;
+      let totalMaxHours = 0; // Sum of user-input assigned hours
+      let totalCost = 0;
+      let totalTrainingHours = 0; // Sum of all trainer assigned hours
+      const domainsArray = [];
+      domainsList.forEach((domain) => {
+        domainsArray.push(domain);
+        const tableData = tableDataLookup[domain] || [];
+        let domainMaxHours = 0; // Track max hours for this domain
+        tableData.forEach((row) => {
+          const rowHours = Number(row.assignedHours || 0);
+          domainMaxHours = Math.max(domainMaxHours, rowHours);
+        });
+        // Add this domain's user-input hours to the total
+        totalMaxHours += totalAssignedHoursByDomain[domain] || 0;
+        // Calculate cost from all trainers and sum trainer hours
+        tableData.forEach((row) => {
+          if (row.batches) {
+            totalBatches += row.batches.length;
+            row.batches.forEach((batch) => {
+              if (batch.trainers) {
+                batch.trainers.forEach((trainer) => {
+                  const assignedHours = Number(trainer.assignedHours || 0);
+                  const perHourCost = Number(trainer.perHourCost || 0);
+                  const conveyance = Number(trainer.conveyance || 0);
+                  const food = Number(trainer.food || 0);
+                  const lodging = Number(trainer.lodging || 0);
+                  const days = getTrainingDays(trainer.startDate, trainer.endDate);
+                  totalCost +=
+                    assignedHours * perHourCost + conveyance + (food + lodging) * days;
+                  // Add trainer hours to total training hours
+                  totalTrainingHours += assignedHours;
+                });
+              }
+            });
+          }
+        });
+      });
 
       const phaseLevelPromises = selectedPhases.map((phase) => {
         const phaseDocRef = doc(
@@ -488,6 +553,29 @@ function InitiationModal({ training, onClose, onConfirm }) {
         }
 
         phaseDocData.status = computedStatus;
+
+        if (phase === mainPhase) {
+
+          phaseDocData.domainsCount = domainsList.length;
+
+          phaseDocData.totalBatches = totalBatches;
+
+          phaseDocData.totalHours = totalMaxHours;
+
+          phaseDocData.totaltraininghours = totalTrainingHours;
+
+          domainsList.forEach(domain => {
+            const key = `${domain.toLowerCase()}AssignedHours`;
+            phaseDocData[key] = totalAssignedHoursByDomain[domain] || 0;
+          });
+
+          phaseDocData.totalCost = totalCost;
+
+          phaseDocData.domains = domainsArray;
+
+          phaseDocData.updatedAt = serverTimestamp();
+
+        }
 
         if (phase === "phase-2") phaseDocData.phase2Dates = phase2Dates;
         if (phase === "phase-3") phaseDocData.phase3Dates = phase3Dates;
@@ -611,55 +699,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
       await Promise.all([...phaseLevelPromises, ...batchPromises]);
 
-      // After saving domains, update the phase document with denormalized fields
-      const phaseDocRef = doc(
-        db,
-        "trainingForms",
-        training.id,
-        "trainings",
-        mainPhase
-      );
-
-      // Calculate denormalized data
-      let totalBatches = 0;
-      let totalHours = 0;
-      let totalCost = 0;
-      const domainsArray = [];
-
-      domainsList.forEach((domain) => {
-        domainsArray.push(domain);
-        const tableData = tableDataLookup[domain] || [];
-        tableData.forEach((row) => {
-          if (row.batches) {
-            totalBatches += row.batches.length;
-            row.batches.forEach((batch) => {
-              if (batch.trainers) {
-                batch.trainers.forEach((trainer) => {
-                  const assignedHours = Number(trainer.assignedHours || 0);
-                  const perHourCost = Number(trainer.perHourCost || 0);
-                  const conveyance = Number(trainer.conveyance || 0);
-                  const food = Number(trainer.food || 0);
-                  const lodging = Number(trainer.lodging || 0);
-                  totalHours += assignedHours;
-                  totalCost +=
-                    assignedHours * perHourCost + conveyance + food + lodging;
-                });
-              }
-            });
-          }
-        });
-      });
-
-      // Update phase document with denormalized fields
-      await updateDoc(phaseDocRef, {
-        domainsCount: domainsList.length,
-        totalBatches: totalBatches,
-        totalHours: totalHours,
-        totalCost: totalCost,
-        domains: domainsArray,
-        updatedAt: serverTimestamp(),
-      });
-
       // --- centralized trainerAssignments update (create one doc per trainer-date) ---
       try {
         const normalizeDate = (d) => {
@@ -675,23 +714,25 @@ function InitiationModal({ training, onClose, onConfirm }) {
           return isNaN(dt.getTime()) ? null : dt.toISOString().slice(0, 10);
         };
 
-        // 1) delete existing assignments for this training (single source of truth)
-        const qExisting = query(
-          collection(db, "trainerAssignments"),
-          where("sourceTrainingId", "==", training.id)
-        );
-        const existingSnap = await getDocs(qExisting);
-        if (!existingSnap.empty) {
-          const delBatch = writeBatch(db);
-          existingSnap.forEach((docSnap) => {
-            delBatch.delete(doc(db, "trainerAssignments", docSnap.id));
-          });
-          await delBatch.commit();
-          console.log(
-            "[trainerAssignments] removed previous assignments for:",
-            training.id
-          );
+        // Parse training ID to get path components
+        const parts = training.id.split("-");
+        if (parts.length < 6) {
+          throw new Error("Invalid training ID format");
         }
+        const projectCode = parts[0];
+        const year = parts[1];
+        const branch = parts[2];
+        const specialization = parts[3];
+        const phaseBase = parts[4] + "-" + parts[5];
+        const phase = phaseBase + "-phase-" + mainPhase.split("-")[1];
+
+        // 1) delete existing assignments for this training and phase
+        const prefix = `${projectCode}-${year}-${branch}-${specialization}-${phase}`;
+        const q = query(collection(db, "trainerAssignments"), where('__name__', '>=', prefix), where('__name__', '<', prefix + '\uf8ff'));
+        const snap = await getDocs(q);
+        const deletePromises = snap.docs.map(doc => deleteDoc(doc.ref));
+        await Promise.all(deletePromises);
+        console.log(`[trainerAssignments] removed existing assignments for: ${prefix}`);
 
         // 2) collect new assignments from table data
         const assignments = [];
@@ -736,11 +777,14 @@ function InitiationModal({ training, onClose, onConfirm }) {
           });
         });
 
-        // 3) batch write new assignments
+        // 3) batch write new assignments with structured document IDs
         if (assignments.length > 0) {
           const wb = writeBatch(db);
           assignments.forEach((a) => {
-            const ref = doc(collection(db, "trainerAssignments"));
+            // Create structured document ID: {projectCode}-{year}-{branch}-{specialization}-{phase}-{trainerId}-{date}
+            const docId = `${prefix}-${a.trainerId}-${a.date}`;
+            
+            const ref = doc(db, "trainerAssignments", docId);
             wb.set(ref, a);
           });
           await wb.commit();
@@ -748,7 +792,8 @@ function InitiationModal({ training, onClose, onConfirm }) {
             "[trainerAssignments] wrote",
             assignments.length,
             "assignments for training:",
-            training.id
+            training.id,
+            "with structured IDs"
           );
         } else {
           console.log(
@@ -789,6 +834,10 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
   const handleSubmit = async (e) => {
     e?.preventDefault?.();
+    if (totalAssignedHours === 0) {
+      setShowAssignHoursPopup(true);
+      return;
+    }
     if (!validateForm()) {
       setSubmitDisabled(true);
       return;
@@ -842,10 +891,16 @@ function InitiationModal({ training, onClose, onConfirm }) {
   };
 
   useEffect(() => {
-    if (!error && !batchMismatch && !Object.values(validationByDomain).some((v) => v?.hasErrors)) {
+    if (!error && !batchMismatch && !Object.values(validationByDomain).some((v) => v?.hasErrors) && !showAssignHoursPopup) {
       setSubmitDisabled(false);
     }
-  }, [error, batchMismatch, validationByDomain]);
+  }, [error, batchMismatch, validationByDomain, showAssignHoursPopup]);
+
+  useEffect(() => {
+    if (totalAssignedHours > 0) {
+      setShowAssignHoursPopup(false);
+    }
+  }, [totalAssignedHours, setShowAssignHoursPopup]);
 
   useEffect(() => {
     const checkTrainingsCollection = async () => {
@@ -1138,6 +1193,19 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
       setSelectedDomains(loadedDomains);
       setTable1DataByDomain(loadedTable1Data);
+
+      // Load per-domain assigned hours from Firestore
+      const phaseDocRef = doc(db, "trainingForms", training.id, "trainings", currentPhase);
+      const phaseDocSnap = await getDoc(phaseDocRef);
+      let loadedAssignedHours = {};
+      if (phaseDocSnap.exists()) {
+        const phaseData = phaseDocSnap.data();
+        loadedDomains.forEach(domain => {
+          const key = `${domain.toLowerCase()}AssignedHours`;
+          loadedAssignedHours[domain] = phaseData[key] || 0;
+        });
+      }
+      setTotalAssignedHoursByDomain(loadedAssignedHours);
     };
     fetchPhaseDomains();
   }, [training?.id, currentPhase, courses, getDomainHours]);
@@ -1440,8 +1508,26 @@ function InitiationModal({ training, onClose, onConfirm }) {
           .small-datepicker-popper .react-datepicker { width: 180px; }
           .small-datepicker .react-datepicker__day { width: 22px; height: 22px; line-height: 22px; font-size: 10px; }
         }
+
+        /* Remove number input spinner arrows */
+        .no-spinner::-webkit-outer-spin-button,
+        .no-spinner::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        .no-spinner {
+          -moz-appearance: textfield;
+        }
+
+        /* Make placeholder text more visible */
+        .no-spinner::placeholder {
+          font-size: 11px;
+          font-weight: 400;
+          color: #9ca3af;
+        }
       `}</style>
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+
+      <div className={`min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 ${showAssignHoursPopup ? 'pointer-events-none' : ''}`}>
         {/* Page Header */}
         <div className="bg-white shadow-sm border-b border-gray-200">
           <div className="mx-auto p-3">
@@ -1480,11 +1566,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                     {selectedPhases.join(" • ")}
                   </p>
                 )}
-                {training?.originalFormData?.totalCost && (
-                  <p className="mt-0.5 text-[10px] text-gray-600">
-                    TCV: ₹{training.originalFormData.totalCost.toLocaleString()}
-                  </p>
-                )}
+      
               </div>
               {/* Right: Placeholder for spacing / future actions */}
               <div className="flex-1 text-right hidden sm:block">
@@ -1846,11 +1928,23 @@ function InitiationModal({ training, onClose, onConfirm }) {
                           </div>
                           <div className=" border-b border-gray-100">
                             <div className="flex items-center justify-between gap-4">
-                              <div className="text-xs text-gray-700">
-                                Domain total hours:{" "}
-                                <span className="font-semibold">
-                                  {getDomainHours(domain, currentPhase)}
-                                </span>
+                              <div className="flex gap-4">
+                                <div className="bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                                  <span className="text-xs text-blue-600 font-medium">Domain Total Hours</span>
+                                  <span className="text-sm font-semibold text-blue-800 ml-1">{getDomainHours(domain, currentPhase)}</span>
+                                </div>
+                                <div className="bg-green-50 px-1.5 py-0.5 rounded border border-green-200">
+                                  <span className="text-xs text-green-600 font-medium">Assigned Hours</span>
+                                  <input
+                                    type="number"
+                                    value={totalAssignedHoursByDomain[domain] || ""}
+                                    onChange={(e) => setTotalAssignedHoursByDomain(prev => ({...prev, [domain]: parseFloat(e.target.value) || 0}))}
+                                    placeholder="Enter hours"
+                                    className="w-20 ml-1 rounded border-gray-300 focus:border-green-500 focus:ring-green-500 text-sm font-semibold text-green-800 py-0.5 px-1 bg-white no-spinner"
+                                    min="0"
+                                    step="0.5"
+                                  />
+                                </div>
                               </div>
                               {/* allocation UI removed */}
                             </div>
@@ -1887,6 +1981,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                               }
                               excludeDays={excludeDays}
                               showPersistentWarnings={submitDisabled || batchMismatch}
+                              totalAssignedHoursByDomain={totalAssignedHoursByDomain}
                             />
                           )}
                         </div>

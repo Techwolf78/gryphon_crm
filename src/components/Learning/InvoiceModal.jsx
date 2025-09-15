@@ -6,7 +6,18 @@ import {  FiX, FiEdit2, FiEye, FiFileText, FiSave, FiArrowLeft } from "react-ico
 
 // Import the standardized PDF generation function
 
+function getTrainingDays(startDate, endDate) {
+  if (!startDate || !endDate) return 0;
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (isNaN(start) || isNaN(end) || end < start) return 0;
+  const diffTime = Math.abs(end - start);
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  return diffDays;
+}
+
 function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
+  const days = getTrainingDays(trainer?.earliestStartDate, trainer?.latestEndDate);
   const [invoiceData, setInvoiceData] = useState({
     billNumber: `INV-${Date.now()}`,
     projectCode: trainer?.projectCode || "",
@@ -20,8 +31,10 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
     tds: 10,
     adhocAdjustment: 0,
     conveyance: trainer?.conveyance || 0,
-    food: trainer?.food || 0,
-    lodging: trainer?.lodging || 0,
+    perDayFood: trainer?.food || 0,
+    perDayLodging: trainer?.lodging || 0,
+    food: (trainer?.food || 0) * days,
+    lodging: (trainer?.lodging || 0) * days,
     collegeName: trainer?.collegeName || "",
   });
   const [existingInvoice, setExistingInvoice] = useState(null);
@@ -437,10 +450,9 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
                 />
               </div>
 
-              {/* Allowances */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Conveyance (₹)
+                  Conveyance (₹) - One-time
                 </label>
                 <input
                   type="number"
@@ -456,7 +468,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Food (₹)
+                  Food (₹{invoiceData.perDayFood.toFixed(2)} × {days} d)
                 </label>
                 <input
                   type="number"
@@ -472,7 +484,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Lodging (₹)
+                  Lodging (₹{invoiceData.perDayLodging.toFixed(2)} × {days} d)
                 </label>
                 <input
                   type="number"
@@ -553,15 +565,15 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
                   {(invoiceData.trainingRate * invoiceData.totalHours).toFixed(2)}
                 </div>
                 <div className="text-sm">
-                  <span className="font-medium">Conveyance:</span> ₹
+                  <span className="font-medium">Conveyance (one-time):</span> ₹
                   {parseFloat(invoiceData.conveyance || 0).toFixed(2)}
                 </div>
                 <div className="text-sm">
-                  <span className="font-medium">Food:</span> ₹
+                  <span className="font-medium">Food ({invoiceData.perDayFood.toFixed(2)} × {days}):</span> ₹
                   {parseFloat(invoiceData.food || 0).toFixed(2)}
                 </div>
                 <div className="text-sm">
-                  <span className="font-medium">Lodging:</span> ₹
+                  <span className="font-medium">Lodging ({invoiceData.perDayLodging.toFixed(2)} × {days}):</span> ₹
                   {parseFloat(invoiceData.lodging || 0).toFixed(2)}
                 </div>
                 <div className="text-sm font-semibold border-t border-blue-200 pt-2">
