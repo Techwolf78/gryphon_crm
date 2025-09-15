@@ -6,7 +6,6 @@ import {
   browserLocalPersistence
 } from "firebase/auth";
 import {
-  getFirestore,
   initializeFirestore,
   persistentLocalCache,
 } from "firebase/firestore";

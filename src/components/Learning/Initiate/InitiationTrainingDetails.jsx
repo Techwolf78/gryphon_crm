@@ -130,6 +130,26 @@ function formatCompactDate(input) {
   return `${day}/${month}`;
 }
 
+// Helper to calculate training days
+function getTrainingDays(startDate, endDate, excludeDays = "None") {
+  if (!startDate || !endDate) return 0;
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (isNaN(start) || isNaN(end) || end < start) return 0;
+  let days = 0;
+  const cur = new Date(start);
+  while (cur <= end) {
+    const dayOfWeek = cur.getDay();
+    let shouldInclude = true;
+    if (excludeDays === "Saturday" && dayOfWeek === 6) shouldInclude = false;
+    else if (excludeDays === "Sunday" && dayOfWeek === 0) shouldInclude = false;
+    else if (excludeDays === "Both" && (dayOfWeek === 0 || dayOfWeek === 6)) shouldInclude = false;
+    if (shouldInclude) days++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return days;
+}
+
 function InitiationTrainingDetails({ training, onBack }) {
   const [trainingData, setTrainingData] = useState(null);
   const [phaseData, setPhaseData] = useState(null);
@@ -182,20 +202,36 @@ function InitiationTrainingDetails({ training, onBack }) {
         for (const domainDoc of domainsSnap.docs) {
           const domainData = domainDoc.data();
           
-          // Calculate total assigned hours from table1Data
-          let totalAssignedHours = 0;
+          // Calculate maximum assigned hours from table1Data (instead of sum)
+          let maxAssignedHours = 0;
           if (Array.isArray(domainData.table1Data)) {
-            domainData.table1Data.forEach(row => {
-              if (row.assignedHours) {
-                totalAssignedHours += Number(row.assignedHours);
+            // For each specialization (row), find the max assigned hours from its batches
+            const maxHoursPerSpecialization = domainData.table1Data.map(row => {
+              if (row.batches && Array.isArray(row.batches)) {
+                const batchHours = row.batches.map(batch => batch.assignedHours || 0);
+                return batchHours.length > 0 ? Math.max(...batchHours) : 0;
               }
+              return row.assignedHours || 0;
             });
+            if (maxHoursPerSpecialization.length > 0) {
+              maxAssignedHours = Math.max(...maxHoursPerSpecialization);
+            }
+          }
+
+          // Calculate domain hours as the maximum from all specializations (batches)
+          let maxDomainHours = 0;
+          if (Array.isArray(domainData.table1Data)) {
+            const hoursPerBatch = domainData.table1Data.map(batch => batch.domainHours || 0);
+            if (hoursPerBatch.length > 0) {
+              maxDomainHours = Math.max(...hoursPerBatch);
+            }
           }
           
           domains.push({
             id: domainDoc.id,
             domain: domainData.domain || domainDoc.id,
-            assignedHours: totalAssignedHours,
+            assignedHours: maxAssignedHours, // Use calculated max instead of sum
+            domainHours: maxDomainHours, // Use calculated max instead of stored value
             ...domainData
           });
         }
@@ -368,7 +404,14 @@ function InitiationTrainingDetails({ training, onBack }) {
                           <div>
                             <div className="font-medium text-gray-900">{row.batch}</div>
                             <div className="text-xs text-gray-500">
-                              {row.stdCount} students • {row.assignedHours} assigned hours
+                              {row.stdCount} students • {(() => {
+                                // Calculate max assigned hours from batches instead of sum
+                                if (row.batches && Array.isArray(row.batches)) {
+                                  const batchHours = row.batches.map(batch => batch.assignedHours || 0);
+                                  return batchHours.length > 0 ? Math.max(...batchHours) : 0;
+                                }
+                                return row.assignedHours || 0;
+                              })()} assigned hours
                             </div>
                           </div>
                         </div>
@@ -433,19 +476,27 @@ function InitiationTrainingDetails({ training, onBack }) {
                                             <div className="mt-3 pt-3 border-t border-gray-200">
                                               <div className="text-sm font-medium text-gray-700 mb-2">Cost Breakdown:</div>
                                               <div className="text-sm text-gray-600 space-y-1">
-                                                <div>Conveyance: ₹{(trainer.conveyance || 0).toFixed(2)}</div>
-                                                <div>Food: ₹{(trainer.food || 0).toFixed(2)}</div>
-                                                <div>Lodging: ₹{(trainer.lodging || 0).toFixed(2)}</div>
-                                                <div>Trainer: ₹{((trainer.assignedHours || 0) * (trainer.perHourCost || 0)).toFixed(2)}</div>
-                                                <div>Misc: ₹{(((trainer.conveyance || 0) + (trainer.food || 0) + (trainer.lodging || 0)) || 0).toFixed(2)}</div>
-                                                <div className="font-semibold text-gray-800 border-t border-gray-300 pt-1">
-                                                  Total: ₹{(
-                                                    (trainer.conveyance || 0) +
-                                                    (trainer.food || 0) +
-                                                    (trainer.lodging || 0) +
-                                                    ((trainer.assignedHours || 0) * (trainer.perHourCost || 0))
-                                                  ).toFixed(2)}
-                                                </div>
+                                                {(() => {
+                                                  const days = getTrainingDays(trainer.startDate, trainer.endDate, phaseData?.excludeDays || "None");
+                                                  const conveyanceTotal = trainer.conveyance || 0;
+                                                  const foodTotal = (trainer.food || 0) * days;
+                                                  const lodgingTotal = (trainer.lodging || 0) * days;
+                                                  const trainerCost = (trainer.assignedHours || 0) * (trainer.perHourCost || 0);
+                                                  const miscTotal = conveyanceTotal + foodTotal + lodgingTotal;
+                                                  const totalCost = trainerCost + miscTotal;
+                                                  return (
+                                                    <>
+                                                      <div>Conveyance: ₹{conveyanceTotal.toFixed(2)}</div>
+                                                      <div>Food: ₹{foodTotal.toFixed(2)} ({(trainer.food || 0).toFixed(2)} × {days})</div>
+                                                      <div>Lodging: ₹{lodgingTotal.toFixed(2)} ({(trainer.lodging || 0).toFixed(2)} × {days})</div>
+                                                      <div>Trainer: ₹{trainerCost.toFixed(2)}</div>
+                                                      <div>Misc: ₹{miscTotal.toFixed(2)}</div>
+                                                      <div className="font-semibold text-gray-800 border-t border-gray-300 pt-1">
+                                                        Total: ₹{totalCost.toFixed(2)}
+                                                      </div>
+                                                    </>
+                                                  );
+                                                })()}
                                               </div>
                                             </div>
                                             
@@ -539,9 +590,8 @@ function InitiationTrainingDetails({ training, onBack }) {
                                                         const hoursForDay = hoursArray[index] || 0;
                                                         // Calculate daily total cost including fixed costs distributed across training days
                                                         const trainerCostForDay = hoursForDay * (trainer.perHourCost || 0);
-                                                        const fixedCosts = (trainer.conveyance || 0) + (trainer.food || 0) + (trainer.lodging || 0);
-                                                        const fixedCostPerDay = dates.length > 0 ? fixedCosts / dates.length : 0;
-                                                        const totalCostForDay = trainerCostForDay + fixedCostPerDay;
+                                                        const dailyMiscCosts = (trainer.food || 0) + (trainer.lodging || 0);
+                                                        const totalCostForDay = trainerCostForDay + dailyMiscCosts;
                                                         
                                                         return (
                                                           <tr key={date.toISOString()} className="hover:bg-gray-50">

@@ -952,7 +952,7 @@ const ChangeTrainerDashboard = ({
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <FiDollarSign className="inline w-4 h-4 mr-1" />
-                    Conveyance Cost
+                    Conveyance Cost (one-time)
                   </label>
                   <input
                     type="number"
@@ -966,7 +966,7 @@ const ChangeTrainerDashboard = ({
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <FiDollarSign className="inline w-4 h-4 mr-1" />
-                    Food Cost
+                    Food Cost (per day)
                   </label>
                   <input
                     type="number"
@@ -980,7 +980,7 @@ const ChangeTrainerDashboard = ({
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <FiDollarSign className="inline w-4 h-4 mr-1" />
-                    Lodging Cost
+                    Lodging Cost (per day)
                   </label>
                   <input
                     type="number"
@@ -1059,61 +1059,79 @@ const ChangeTrainerDashboard = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-red-50 p-4 rounded-lg">
-                  <h4 className="font-medium text-red-900 mb-3">
-                    Current Trainer (Ending)
-                  </h4>
-                  <div className="text-sm space-y-1">
-                    <p>
-                      <strong>Name:</strong>{" "}
-                      {selectedCurrentTrainer.trainerName}
-                    </p>
-                    <p>
-                      <strong>Replacement Period:</strong>{" "}
-                      {changeStartDate} to {changeEndDate}
-                    </p>
-                    <p>
-                      <strong>Reason:</strong> {reason}
-                    </p>
-                  </div>
-                </div>
+              {(() => {
+                const newActiveDates = getDateListExcludingSundays(changeStartDate, changeEndDate);
+                const days = newActiveDates.length;
+                const perDayHours = getTrainingHoursPerDay(selectedTraining.phaseData);
+                const computePerDayHoursForSlot = (slot) => {
+                  if (slot === "AM & PM") return perDayHours;
+                  if (slot === "AM" || slot === "PM") return +(perDayHours / 2).toFixed(2);
+                  return 0;
+                };
+                const currentPerDayHours = computePerDayHoursForSlot(selectedCurrentTrainer.dayDuration);
+                const assignedHours = days * currentPerDayHours;
+                const perHourCost = Number(newTrainerCost) || Number(trainers.find((t) => t.id === selectedNewTrainer)?.charges) || Number(selectedCurrentTrainer.perHourCost) || 0;
+                const conveyanceCost = Number(conveyance) || 0;
+                const foodCost = Number(food) || 0;
+                const lodgingCost = Number(lodging) || 0;
+                const totalCost = assignedHours * perHourCost + conveyanceCost + (foodCost + lodgingCost) * days;
 
-                <div className="bg-green-50 p-4 rounded-lg">
-                  <h4 className="font-medium text-green-900 mb-3">
-                    New Trainer (Starting)
-                  </h4>
-                  <div className="text-sm space-y-1">
-                    <p>
-                      <strong>Name:</strong>{" "}
-                      {trainers.find((t) => t.id === selectedNewTrainer)?.name}
-                    </p>
-                    <p>
-                      <strong>Start Date:</strong> {changeStartDate}
-                    </p>
-                    <p>
-                      <strong>End Date:</strong> {changeEndDate}
-                    </p>
-                    <p>
-                      <strong>Cost:</strong> ₹
-                      {newTrainerCost ||
-                        trainers.find((t) => t.id === selectedNewTrainer)
-                          ?.charges ||
-                        selectedCurrentTrainer.perHourCost}
-                      /hour
-                    </p>
-                    <p>
-                      <strong>Conveyance:</strong> ₹{conveyance || 0}
-                    </p>
-                    <p>
-                      <strong>Food:</strong> ₹{food || 0}
-                    </p>
-                    <p>
-                      <strong>Lodging:</strong> ₹{lodging || 0}
-                    </p>
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-red-50 p-4 rounded-lg">
+                      <h4 className="font-medium text-red-900 mb-3">
+                        Current Trainer (Ending)
+                      </h4>
+                      <div className="text-sm space-y-1">
+                        <p>
+                          <strong>Name:</strong>{" "}
+                          {selectedCurrentTrainer.trainerName}
+                        </p>
+                        <p>
+                          <strong>Replacement Period:</strong>{" "}
+                          {changeStartDate} to {changeEndDate}
+                        </p>
+                        <p>
+                          <strong>Reason:</strong> {reason}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="bg-green-50 p-4 rounded-lg">
+                      <h4 className="font-medium text-green-900 mb-3">
+                        New Trainer (Starting)
+                      </h4>
+                      <div className="text-sm space-y-1">
+                        <p>
+                          <strong>Name:</strong>{" "}
+                          {trainers.find((t) => t.id === selectedNewTrainer)?.name}
+                        </p>
+                        <p>
+                          <strong>Start Date:</strong> {changeStartDate}
+                        </p>
+                        <p>
+                          <strong>End Date:</strong> {changeEndDate}
+                        </p>
+                        <p>
+                          <strong>Cost:</strong> ₹{perHourCost}/hour
+                        </p>
+                        <p>
+                          <strong>Conveyance:</strong> ₹{conveyanceCost}
+                        </p>
+                        <p>
+                          <strong>Food:</strong> ₹{foodCost} * {days} = ₹{(foodCost * days).toFixed(2)}
+                        </p>
+                        <p>
+                          <strong>Lodging:</strong> ₹{lodgingCost} * {days} = ₹{(lodgingCost * days).toFixed(2)}
+                        </p>
+                        <p>
+                          <strong>Total Cost:</strong> ₹{totalCost.toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                );
+              })()}
 
               <div className="flex justify-end space-x-3">
                 <button
