@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import InvoiceModal from "./InvoiceModal";
 import { generateInvoicePDF } from "./invoiceUtils";
+import InvoiceExcelExporter from "./Initiate/InvoiceExcelExporter";
 import {
   FiUser,
   FiBook,
@@ -30,8 +31,15 @@ import {
   FiInfo,
   FiLayers,
   FiTrash2,
+  FiFile,
 } from "react-icons/fi";
-    import { FaEye } from 'react-icons/fa';
+import { FaEye } from "react-icons/fa";
+
+
+
+
+
+
 
 function GenerateTrainerInvoice() {
   const [trainerData, setTrainerData] = useState([]);
@@ -49,6 +57,7 @@ function GenerateTrainerInvoice() {
   const [pdfStatus, setPdfStatus] = useState({});
   const [showOnlyActive, setShowOnlyActive] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null); // State for editing invoice
+  const [exporting, setExporting] = useState(false);
 
   // Combined filters dropdown state
   const [filtersDropdownOpen, setFiltersDropdownOpen] = useState(false);
@@ -56,101 +65,104 @@ function GenerateTrainerInvoice() {
   const filtersDropdownRef = useRef();
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
 
-  const handleDownloadInvoice = async (trainer) => {
-    setDownloadingInvoice(
-      `${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`
+
+
+const handleDownloadInvoice = async (trainer) => {
+  setDownloadingInvoice(
+    `${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`
+  );
+  setPdfStatus((prev) => ({
+    ...prev,
+    [`${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`]:
+      "downloading",
+  }));
+
+  try {
+    // Find invoices for this trainer, college, and phase combination
+    const q = query(
+      collection(db, "invoices"),
+      where("trainerId", "==", trainer.trainerId),
+      where("collegeName", "==", trainer.collegeName),
+      where("phase", "==", trainer.phase)
     );
-    setPdfStatus((prev) => ({
-      ...prev,
-      [`${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`]:
-        "downloading",
-    }));
 
-    try {
-      // Find invoices for this trainer, college, and phase combination
-      const q = query(
-        collection(db, "invoices"),
-        where("trainerId", "==", trainer.trainerId),
-        where("collegeName", "==", trainer.collegeName),
-        where("phase", "==", trainer.phase)
-      );
+    const querySnapshot = await getDocs(q);
 
-      const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+      // If multiple invoices, show selection dialog
+      if (querySnapshot.size > 1) {
+        const invoiceNumbers = querySnapshot.docs.map(
+          (doc) => doc.data().billNumber
+        );
+        const selectedInvoice = prompt(
+          `Multiple invoices found for ${trainer.trainerName} at ${
+            trainer.collegeName
+          } (${
+            trainer.phase
+          }). Please enter the invoice number you want to download:\n${invoiceNumbers.join(
+            "\n"
+          )}`
+        );
 
-      if (!querySnapshot.empty) {
-        // If multiple invoices, show selection dialog
-        if (querySnapshot.size > 1) {
-          const invoiceNumbers = querySnapshot.docs.map(
-            (doc) => doc.data().billNumber
+        if (selectedInvoice) {
+          const selectedDoc = querySnapshot.docs.find(
+            (doc) => doc.data().billNumber === selectedInvoice
           );
-          const selectedInvoice = prompt(
-            `Multiple invoices found for ${trainer.trainerName} at ${
-              trainer.collegeName
-            } (${
-              trainer.phase
-            }). Please enter the invoice number you want to download:\n${invoiceNumbers.join(
-              "\n"
-            )}`
-          );
-
-          if (selectedInvoice) {
-            const selectedDoc = querySnapshot.docs.find(
-              (doc) => doc.data().billNumber === selectedInvoice
-            );
-            if (selectedDoc) {
-              const invoiceData = selectedDoc.data();
-              const success = await generateInvoicePDF(invoiceData);
-              setPdfStatus((prev) => ({
-                ...prev,
-                [`${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`]:
-                  success ? "success" : "error",
-              }));
-            } else {
-              alert("Invalid invoice number selected");
-              setPdfStatus((prev) => ({
-                ...prev,
-                [`${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`]:
-                  "error",
-              }));
-            }
-          } else {
+          if (selectedDoc) {
+            const invoiceData = selectedDoc.data();
+            const success = await generateInvoicePDF(invoiceData);
             setPdfStatus((prev) => ({
               ...prev,
               [`${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`]:
-                "cancelled",
+                success ? "success" : "error",
+            }));
+          } else {
+            alert("Invalid invoice number selected");
+            setPdfStatus((prev) => ({
+              ...prev,
+              [`${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`]:
+                "error",
             }));
           }
         } else {
-          // Single invoice - download it directly
-          const success = await generateInvoicePDF(
-            querySnapshot.docs[0].data()
-          );
           setPdfStatus((prev) => ({
             ...prev,
             [`${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`]:
-              success ? "success" : "error",
+              "cancelled",
           }));
         }
       } else {
-        alert("No invoice found for this trainer at this college and phase");
+        // Single invoice - download it directly
+        const success = await generateInvoicePDF(
+          querySnapshot.docs[0].data()
+        );
         setPdfStatus((prev) => ({
           ...prev,
           [`${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`]:
-            "not_found",
+            success ? "success" : "error",
         }));
       }
-    } catch (error) {
-      console.error("Error downloading invoice:", error);
-      alert("Failed to download invoice. Please try again.");
+    } else {
+      alert("No invoice found for this trainer at this college and phase");
       setPdfStatus((prev) => ({
         ...prev,
         [`${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`]:
-          "error",
+          "not_found",
       }));
-    } finally {
-      setDownloadingInvoice(null);
     }
-  };
+  } catch (error) {
+    console.error("Error downloading invoice:", error);
+    alert("Failed to download invoice. Please try again.");
+    setPdfStatus((prev) => ({
+      ...prev,
+      [`${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`]:
+        "error",
+    }));
+  } finally {
+    setDownloadingInvoice(null);
+  }
+};
+
 
   // Function to handle editing an invoice
   const handleEditInvoice = async (trainer) => {
@@ -540,8 +552,6 @@ function GenerateTrainerInvoice() {
     }
   };
 
-
-
   // Check if any filters are active (for badge on Filters button)
   const isAnyFilterActive =
     startDateFilter || endDateFilter || projectCodeFilter || collegeNameFilter;
@@ -605,8 +615,6 @@ function GenerateTrainerInvoice() {
     };
   }, [filtersDropdownOpen]);
 
-
-  
   return (
     <div className="min-h-screen bg-gray-50 ">
       <div className=" mx-auto bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
@@ -791,6 +799,12 @@ function GenerateTrainerInvoice() {
                 {showOnlyActive ? "ON" : "OFF"}
               </span>
 
+              <InvoiceExcelExporter 
+  db={db} 
+  exporting={exporting} 
+  setExporting={setExporting} 
+/>
+
               <button
                 onClick={handleRefreshData}
                 className="inline-flex items-center px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
@@ -966,6 +980,7 @@ function GenerateTrainerInvoice() {
                                     {item.allDomains.join(", ")}
                                   </div>
                                 </td>
+
                                 <td className="px-4 sm:px-6 py-4">
                                   <div className="flex items-center gap-1 text-sm text-gray-500">
                                     <FiCalendar className="text-gray-400 flex-shrink-0" />
@@ -974,6 +989,7 @@ function GenerateTrainerInvoice() {
                                       {formatDate(item.latestEndDate)}
                                     </span>
                                   </div>
+                             
                                   <div className="text-xs text-gray-500 mt-1 flex items-center">
                                     <FiDollarSign className="text-gray-400 mr-1 flex-shrink-0" />
                                     <span>
@@ -1014,7 +1030,7 @@ function GenerateTrainerInvoice() {
                                             }
                                             className="flex-1 inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all"
                                           >
-                                            <FaEye  className="w-4 h-4 mr-1" />
+                                            <FaEye className="w-4 h-4 mr-1" />
                                             View
                                           </button>
                                         </div>
