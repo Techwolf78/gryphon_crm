@@ -148,6 +148,7 @@ const handleSubmit = async (e) => {
     onInvoiceGenerated();
     setEditMode(false);
     setViewMode(true);
+    onClose();
 
   } catch (error) {
     console.error("Error saving invoice: ", error);
@@ -268,7 +269,7 @@ const handleSubmit = async (e) => {
 
           {/* Trainer Info */}
           <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">Trainer Information</h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">Trainer  Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               <div><span className="font-medium">Name:</span> {trainer?.trainerName}</div>
               <div><span className="font-medium">ID:</span> {trainer?.trainerId}</div>
