@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { doc, updateDoc, getDoc, setDoc, query, where, getDocs, collection } from "firebase/firestore";
+import { doc, updateDoc, getDoc, setDoc, deleteDoc, query, where, getDocs, collection } from "firebase/firestore";
 import { db } from "../../../firebase";
 import {
   FiX,
@@ -31,10 +31,8 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
   const [isCustomDeliveryType, setIsCustomDeliveryType] = useState(false);
   const sections = ["basic", "contacts", "course", "topics", "financial"];
 
-  // Helper for number display
-  const numValue = (val) => (val === 0 || val === "0" ? "" : val);
-
-  useEffect(() => {
+// Helper for number display
+const numValue = (val) => (val === 0 || val === "0" ? "" : val);  useEffect(() => {
     if (lead) {
       const deliveryTypes = ["TP", "OT", "IP", "DM", "SNS"];
       setIsCustomDeliveryType(lead.deliveryType && !deliveryTypes.includes(lead.deliveryType));
@@ -285,9 +283,36 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
   const removeCourse = (index) => {
     const updatedCourses = [...formData.courses];
     updatedCourses.splice(index, 1);
+    
+    // Recalculate total students and cost after removal
+    const totalStudents = updatedCourses.reduce(
+      (sum, course) => sum + (parseInt(course.students) || 0),
+      0
+    );
+    const totalAmount = (formData.perStudentCost || 0) * totalStudents;
+    
     setFormData((prev) => ({
       ...prev,
       courses: updatedCourses,
+      studentCount: totalStudents,
+      totalCost: totalAmount,
+      // Update payment details to match new total
+      paymentDetails: prev.paymentDetails.map((payment) => {
+        const paymentAmount = totalAmount * ((payment.percentage || 0) / 100);
+        const gstRate = prev.gstType === "include" ? 0.18 : 0;
+        const baseAmount =
+          prev.gstType === "include"
+            ? paymentAmount / (1 + gstRate)
+            : paymentAmount;
+        const gstAmount = baseAmount * gstRate;
+
+        return {
+          ...payment,
+          totalAmount: paymentAmount,
+          baseAmount: baseAmount,
+          gstAmount: gstAmount,
+        };
+      }),
     }));
   };
 
@@ -310,157 +335,97 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setShowConfirmation(false); // Hide the confirmation dialog
+    setShowConfirmation(false);
     setLoading(true);
     setError(null);
 
     try {
-      // Prepare courses for saving:
-      // If a course has specialization === "Other" and othersSpecText is provided,
-      // store the custom text in the specialization field (and drop othersSpecText).
+      const originalProjectCode = lead.projectCode;
+      const newProjectCode = formData.projectCode;
+      const projectCodeChanged = newProjectCode !== originalProjectCode;
+
+      // Prepare courses for saving (unchanged)
       const coursesForSave = (formData.courses || []).map((c) => {
-        const spec =
-          c.specialization === "Other" && c.othersSpecText
-            ? c.othersSpecText
-            : c.specialization;
+        const spec = c.specialization === "Other" && c.othersSpecText ? c.othersSpecText : c.specialization;
         const { othersSpecText, ...rest } = c;
-        return {
-          ...rest,
-          specialization: spec,
-          students: parseInt(rest.students) || 0,
-        };
+        return { ...rest, specialization: spec, students: parseInt(rest.students) || 0 };
       });
 
-      // Update the main lead document (use transformed courses)
-      const leadRef = doc(db, "trainingForms", lead.id);
-      await updateDoc(leadRef, {
+      const updatedData = {
         ...formData,
         courses: coursesForSave,
         updatedAt: new Date(),
-      });
+      };
 
-      // Only proceed if projectCode exists
-      if (lead.projectCode) {
-        const projectDocId = projectCodeToDocId(lead.projectCode);
-        const trainingFormRef = doc(db, "trainingForms", projectDocId);
-
-        console.log("Checking document:", projectDocId); // Debugging
-        const docSnap = await getDoc(trainingFormRef);
-
-        if (docSnap.exists()) {
-          await updateDoc(trainingFormRef, {
-            collegeName: formData.collegeName,
-            collegeCode: formData.collegeCode,
-            city: formData.city,
-            state: formData.state,
-            address: formData.address,
-            pincode: formData.pincode,
-            totalCost: formData.totalCost,
-            tcv: formData.tcv,
-            perStudentCost: formData.perStudentCost,
-            studentCount: formData.studentCount,
-            gstAmount: formData.gstAmount,
-            netPayableAmount: formData.netPayableAmount,
-            gstNumber: formData.gstNumber,
-            gstType: formData.gstType,
-            course: formData.course,
-            courses: coursesForSave, // Save transformed courses here too
-            year: formData.year,
-            deliveryType: formData.deliveryType,
-            passingYear: formData.passingYear,
-            tpoName: formData.tpoName,
-            tpoEmail: formData.tpoEmail,
-            tpoPhone: formData.tpoPhone,
-            trainingName: formData.trainingName,
-            trainingEmail: formData.trainingEmail,
-            trainingPhone: formData.trainingPhone,
-            accountName: formData.accountName,
-            accountEmail: formData.accountEmail,
-            accountPhone: formData.accountPhone,
-            contractStartDate: formData.contractStartDate,
-            contractEndDate: formData.contractEndDate,
-            paymentType: formData.paymentType,
-            paymentDetails: formData.paymentDetails,
-            topics: formData.topics,
-            totalHours: formData.totalHours,
-            studentFileUrl: formData.studentFileUrl,
-            mouFileUrl: formData.mouFileUrl,
-            otherCourseText: formData.otherCourseText,
-            status: formData.status,
-            updatedAt: new Date(), // Always update the timestamp
-          });
-
-          // --- PlacementData update or create ---
-          const placementRef = doc(db, "placementData", projectDocId);
-          const placementSnap = await getDoc(placementRef);
-          const placementData = {
-            projectCode: formData.projectCode,
-            collegeName: formData.collegeName,
-            collegeCode: formData.collegeCode,
-            city: formData.city,
-            state: formData.state,
-            address: formData.address,
-            pincode: formData.pincode,
-            totalCost: formData.totalCost,
-            tcv: formData.tcv,
-            perStudentCost: formData.perStudentCost,
-            studentCount: formData.studentCount,
-            gstAmount: formData.gstAmount,
-            netPayableAmount: formData.netPayableAmount,
-            gstNumber: formData.gstNumber,
-            gstType: formData.gstType,
-            course: formData.course,
-            courses: coursesForSave, // Save transformed courses here too
-            year: formData.year,
-            deliveryType: formData.deliveryType,
-            passingYear: formData.passingYear,
-            tpoName: formData.tpoName,
-            tpoEmail: formData.tpoEmail,
-            tpoPhone: formData.tpoPhone,
-            trainingName: formData.trainingName,
-            trainingEmail: formData.trainingEmail,
-            trainingPhone: formData.trainingPhone,
-            accountName: formData.accountName,
-            accountEmail: formData.accountEmail,
-            accountPhone: formData.accountPhone,
-            contractStartDate: formData.contractStartDate,
-            contractEndDate: formData.contractEndDate,
-            paymentType: formData.paymentType,
-            paymentDetails: formData.paymentDetails,
-            topics: formData.topics,
-            totalHours: formData.totalHours,
-            studentFileUrl: formData.studentFileUrl,
-            mouFileUrl: formData.mouFileUrl,
-            otherCourseText: formData.otherCourseText,
-            status: formData.status,
-            updatedAt: new Date(),
-          };
-
-          if (placementSnap.exists()) {
-            await updateDoc(placementRef, placementData);
-          } else {
-            await setDoc(placementRef, placementData);
-          }
-          // --- END PlacementData update or create ---
-        } else {
-          console.warn("Document not found:", projectDocId);
-          setError("Training form data not found in Firestore!");
+      if (projectCodeChanged) {
+        // Fetch the full original document data
+        const oldDocId = projectCodeToDocId(originalProjectCode);
+        const oldDocRef = doc(db, "trainingForms", oldDocId);
+        const oldDocSnap = await getDoc(oldDocRef);
+        if (!oldDocSnap.exists()) {
+          setError("Original document not found!");
           return;
         }
-      }
+        const originalData = oldDocSnap.data();
 
-      // Update totalCost in leads collection based on projectCode
-      if (formData.projectCode) {
-        const leadsQuery = query(
-          collection(db, "leads"),
-          where("projectCode", "==", formData.projectCode)
-        );
+        // Merge original data with updated data
+        const mergedData = {
+          ...originalData,
+          ...updatedData,
+          projectCode: newProjectCode,
+        };
+
+        // Delete old document in trainingForms
+        await deleteDoc(oldDocRef);
+
+        // Create new document with merged data
+        const newDocId = projectCodeToDocId(newProjectCode);
+        const newDocRef = doc(db, "trainingForms", newDocId);
+        await setDoc(newDocRef, mergedData);
+
+        // Handle placementData: Fetch old, delete, and create new with merged data
+        const oldPlacementRef = doc(db, "placementData", oldDocId);
+        const oldPlacementSnap = await getDoc(oldPlacementRef);
+        if (oldPlacementSnap.exists()) {
+          await deleteDoc(oldPlacementRef);
+        }
+        const newPlacementRef = doc(db, "placementData", newDocId);
+        await setDoc(newPlacementRef, { ...mergedData, projectCode: newProjectCode });
+
+        // Update leads collection with new projectCode
+        const leadsQuery = query(collection(db, "leads"), where("projectCode", "==", originalProjectCode));
         const leadsSnapshot = await getDocs(leadsQuery);
         leadsSnapshot.forEach(async (docSnap) => {
-          await updateDoc(docSnap.ref, {
-            totalCost: formData.totalCost,
-            updatedAt: new Date(),
-          });
+          await updateDoc(docSnap.ref, { projectCode: newProjectCode, totalCost: formData.totalCost, updatedAt: new Date() });
+        });
+      } else {
+        // Normal update if Project Code didn't change
+        const leadRef = doc(db, "trainingForms", lead.id);
+        await updateDoc(leadRef, updatedData);
+
+        // Update placementData (existing logic)
+        const projectDocId = projectCodeToDocId(newProjectCode);
+        const trainingFormRef = doc(db, "trainingForms", projectDocId);
+        const docSnap = await getDoc(trainingFormRef);
+        if (docSnap.exists()) {
+          await updateDoc(trainingFormRef, updatedData);
+        } else {
+          await setDoc(trainingFormRef, updatedData);
+        }
+
+        const placementRef = doc(db, "placementData", projectDocId);
+        const placementSnap = await getDoc(placementRef);
+        if (placementSnap.exists()) {
+          await updateDoc(placementRef, updatedData);
+        } else {
+          await setDoc(placementRef, updatedData);
+        }
+
+        // Update leads (existing logic)
+        const leadsQuery = query(collection(db, "leads"), where("projectCode", "==", newProjectCode));
+        const leadsSnapshot = await getDocs(leadsQuery);
+        leadsSnapshot.forEach(async (docSnap) => {
+          await updateDoc(docSnap.ref, { totalCost: formData.totalCost, updatedAt: new Date() });
         });
       }
 
@@ -468,10 +433,7 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
       onClose();
     } catch (err) {
       console.error("Error updating documents:", err);
-      setError(
-        err.message ||
-          "Failed to update lead. Please check your connection and try again."
-      );
+      setError(err.message || "Failed to update lead. Please check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -492,15 +454,20 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
     }
   };
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
+// Update handleChange to auto-update projectCode when collegeCode changes
+const handleChange = (e) => {
+  const { name, value } = e.target;
+  let updatedFormData = { ...formData, [name]: value };
 
-  if (!lead) return null;
+  // Auto-update projectCode if collegeCode changes
+  if (name === "collegeCode") {
+    const parts = lead.projectCode.split('/');
+    parts[0] = value; // Replace only the collegeCode part
+    updatedFormData.projectCode = parts.join('/');
+  }
+
+  setFormData(updatedFormData);
+};  if (!lead) return null;
 
   return (
     <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-54 p-4">
@@ -625,8 +592,8 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                       type="text"
                       name="projectCode"
                       value={formData.projectCode}
-                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm bg-gray-100 cursor-not-allowed"
-                      disabled
+                      onChange={handleChange}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
 
@@ -639,9 +606,8 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
                       name="collegeCode"
                       value={formData.collegeCode}
                       onChange={handleChange}
-                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm cursor-not-allowed focus:ring-blue-500 focus:border-blue-500"
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
                       placeholder="TST"
-                      disabled
                     />
                   </div>
 
