@@ -14,6 +14,8 @@ import {
   deleteField,
   query,
   where,
+  writeBatch,
+  deleteDoc,
 } from "firebase/firestore";
 import { db } from "../../../firebase";
 import { useAuth } from "../../../context/AuthContext";
@@ -124,10 +126,11 @@ function groupByCollege(trainings) {
       map[key].hasGST = true;
     }
   });
-  // Calculate health
+  // Calculate health: show cost% of TCV (higher % = higher cost utilization)
   Object.keys(map).forEach((key) => {
     const { tcv, totalCost } = map[key];
-    map[key].health = tcv > 0 ? ((tcv - totalCost) / tcv) * 100 : 0;
+    // If TCV is zero, default to 0 to avoid NaN
+    map[key].health = tcv > 0 ? (totalCost / tcv) * 100 : 0;
     console.log(
       `College: ${key}, TCV: ${tcv}, Total Cost: ${totalCost}, Health: ${map[
         key
@@ -169,6 +172,10 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
   // Assign To dropdown state
   const [assignDropdownOpenId, setAssignDropdownOpenId] = useState(null);
   const assignDropdownRef = useRef();
+
+  // Delete confirmation state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [selectedTrainingForDelete, setSelectedTrainingForDelete] = useState(null);
 
   // Assign training to another user
   const handleAssignToUser = async (training, userOption) => {
@@ -285,10 +292,8 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
   }, [availableUsers, user?.department]);
 
   const defaultSelectedUserFilter = useMemo(() => {
-    if (user?.role === "Director") {
+    if (user?.role === "Director" || user?.role === "Head") {
       return "all";
-    } else if (user?.role === "Head") {
-      return user.uid;
     } else {
       return user?.uid || "";
     }
@@ -772,6 +777,90 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
     e.stopPropagation(); // Prevent row click
     setSelectedTrainingForChange(training);
     setChangeTrainerModalOpen(true);
+  };
+
+  // Delete training handler
+  const handleDeleteTraining = async (training) => {
+    try {
+      // Helper function to delete all documents in a collection
+      const deleteCollection = async (collectionRef) => {
+        const snapshot = await getDocs(collectionRef);
+        const batch = writeBatch(db);
+        snapshot.docs.forEach(docSnap => batch.delete(docSnap.ref));
+        await batch.commit();
+      };
+
+      // Start a batch for atomic operations
+      const batch = writeBatch(db);
+      
+      // 1. Delete known subcollections under the phase document
+      const phaseDocRef = doc(db, "trainingForms", training.trainingId, "trainings", training.phaseId);
+      
+      // Delete domains subcollection
+      const domainsRef = collection(phaseDocRef, "domains");
+      await deleteCollection(domainsRef);
+      
+      // Delete batches subcollection (if exists)
+      const batchesRef = collection(phaseDocRef, "batches");
+      await deleteCollection(batchesRef);
+      
+      // 2. Delete the phase document itself
+      batch.delete(phaseDocRef);
+      
+      // 3. Delete trainer assignments for this specific phase
+      const parts = training.trainingId.split("-");
+      if (parts.length >= 6) {
+        const projectCode = parts[0];
+        const year = parts[1];
+        const branch = parts[2];
+        const specialization = parts[3];
+        const phaseBase = parts[4] + "-" + parts[5];
+        const phaseNumber = training.phaseId.split("-")[1]; // "1" for "phase-1"
+        const phase = phaseBase + "-phase-" + phaseNumber;
+        const prefix = `${projectCode}-${year}-${branch}-${specialization}-${phase}`;
+        
+        console.log(`🔍 [DELETE] Looking for trainer assignments with prefix: ${prefix}`);
+        console.log(`📋 [DELETE] Project: ${projectCode}, Year: ${year}, Branch: ${branch}, Specialization: ${specialization}, Phase: ${phase}`);
+        
+        const q = query(collection(db, "trainerAssignments"), where('__name__', '>=', prefix), where('__name__', '<', prefix + '\uf8ff'));
+        const snap = await getDocs(q);
+        
+        console.log(`🎯 [DELETE] Found ${snap.docs.length} trainer assignments to delete:`);
+        snap.docs.forEach((doc) => {
+          const data = doc.data();
+          console.log(`   - Trainer: ${data.trainerName} (${data.trainerId}), Date: ${data.date}, Domain: ${data.domain}`);
+        });
+        
+        const deletePromises = snap.docs.map(doc => deleteDoc(doc.ref));
+        await Promise.all(deletePromises);
+        
+        console.log(`✅ [DELETE] Successfully deleted ${snap.docs.length} trainer assignments for phase: ${prefix}`);
+      } else {
+        console.warn("❌ [DELETE] Could not parse training ID for assignment deletion:", training.trainingId);
+      }
+      
+      // Commit all deletions
+      await batch.commit();
+      
+      // Update local state
+      setTrainings(prev => prev.filter(t => t.id !== training.id));
+      
+      // Clear cache
+      try {
+        localStorage.removeItem(`ld_initiation_trainings_${selectedUserFilter || user?.uid}`);
+      } catch (cacheError) {
+        console.warn("Failed to clear cache:", cacheError);
+      }
+      
+      setShowDeleteConfirm(false);
+      setSelectedTrainingForDelete(null);
+    } catch (error) {
+      console.error("Error deleting training:", error);
+      // Optionally show error toast or alert
+      alert("Failed to delete training. Please try again.");
+      setShowDeleteConfirm(false);
+      setSelectedTrainingForDelete(null);
+    }
   };
 
   // Move a phase to a specific status (manual override). Updates Firestore and local state optimistically.
@@ -1341,7 +1430,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                     <p className="text-2xl font-bold text-gray-900 mt-1">
                       {trainings
                         .filter((t) => t.computedStatus !== "Not Started")
-                        .reduce((acc, t) => acc + (t.totalHours || 0), 0)}
+                        .reduce((acc, t) => acc + (t.totaltraininghours || 0), 0)}
                     </p>
                   </div>
                   <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center">
@@ -1802,6 +1891,21 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                                               </button>
                                             </>
                                           ) : null}
+
+                                          {/* Delete Training */}
+                                          <div className="border-t border-gray-100 mt-1" />
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setSelectedTrainingForDelete(training);
+                                              setShowDeleteConfirm(true);
+                                              setOpenDropdownId(null);
+                                            }}
+                                            className="flex items-center px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                                          >
+                                            <FiTrash2 className="w-4 h-4 mr-2" />
+                                            <span>Delete</span>
+                                          </button>
                                         </div>,
                                         document.body
                                       )}
@@ -1967,6 +2071,19 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                                   <FiUserCheck className="w-3 h-3" />
                                 </button>
                               )}
+
+                              {/* Delete Button */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedTrainingForDelete(training);
+                                  setShowDeleteConfirm(true);
+                                }}
+                                className="flex-1 inline-flex items-center justify-center px-2 py-1 bg-red-500 text-white text-xs font-medium rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500/20 transition-all"
+                              >
+                                <FiTrash2 className="w-3 h-3 mr-1" />
+                                Delete
+                              </button>
                             </div>
                           </div>
                         );
@@ -2011,6 +2128,39 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
         selectedTraining={selectedTrainingForChange}
         includeSundays={false}
       />
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && selectedTrainingForDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
+            <div className="flex items-center mb-4">
+              <FiTrash2 className="w-6 h-6 text-red-500 mr-3" />
+              <h3 className="text-lg font-semibold text-gray-900">Delete Training</h3>
+            </div>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete this training phase? This will remove all associated trainer assignments and cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setSelectedTrainingForDelete(null);
+                }}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteTraining(selectedTrainingForDelete)}
+                className="px-4 py-2 text-white bg-red-600 rounded-lg hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Undo toast */}
       {toast && (
         <div className="fixed right-4 bottom-6 z-50">

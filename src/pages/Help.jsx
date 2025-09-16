@@ -33,7 +33,6 @@ import { db } from "../firebase";
 import emailjs from "@emailjs/browser";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import QRCodePage from "./QRCodePage";
 
 emailjs.init("CXYkFqg_8EWTsrN8M");
 
@@ -48,7 +47,6 @@ const Help = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [remark, setRemark] = useState("");
-  const [showQRPage, setShowQRPage] = useState(false);
 
 
 
@@ -60,13 +58,9 @@ const Help = () => {
 
   const isAdmin = user?.department === "Admin";
 
-  const handleKnowledgeItemClick = (title, action) => {
-    if (action === "qr-code") {
-      setShowQRPage(true);
-    } else {
-      setPopupTitle(title);
-      setShowPopup(true);
-    }
+  const handleKnowledgeItemClick = (title) => {
+    setPopupTitle(title);
+    setShowPopup(true);
   };
 
   const handleTicketFormChange = (e) => {
@@ -272,25 +266,11 @@ const Help = () => {
       desc: "New user onboarding guide",
       category: "Guides",
     },
-    {
-      icon: <FiGrid className="w-5 h-5" />,
-      title: "QR Code Generator",
-      desc: "Generate QR codes for easy sharing and access",
-      category: "Tools",
-      action: "qr-code",
-    },
   ];
 
   return (
     <div className="min-h-screen bg-gray-50/50">
-      {/* QR Code Page */}
-      {showQRPage && (
-        <QRCodePage onBack={() => setShowQRPage(false)} />
-      )}
-
-      {!showQRPage && (
-        <>
-          {/* Under Development Popup */}
+      {/* Under Development Popup */}
       {showPopup && (
         <div className="fixed inset-0 bg-gray-900/70 backdrop-blur-sm flex items-center justify-center z-54 p-4 animate-fadeIn">
           <div className="bg-white rounded-xl p-6 max-w-md w-full relative overflow-hidden border border-gray-100 shadow-2xl animate-scaleIn">
@@ -801,7 +781,7 @@ const Help = () => {
                 {knowledgeBaseItems.map((item, index) => (
                   <div
                     key={index}
-                    onClick={() => handleKnowledgeItemClick(item.title, item.action)}
+                    onClick={() => handleKnowledgeItemClick(item.title)}
                     className="bg-white rounded-xl p-5 border border-gray-100 shadow-xs hover:shadow-sm transition-all cursor-pointer"
                   >
                     <div className="mb-3 flex items-center gap-3">
@@ -868,8 +848,6 @@ const Help = () => {
         pauseOnHover
         theme="light"
       />
-        </>
-      )}
     </div>
   );
 };

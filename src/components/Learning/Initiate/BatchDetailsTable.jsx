@@ -28,6 +28,7 @@ import {
   FiX,
 } from "react-icons/fi";
 import { FaRupeeSign } from "react-icons/fa";
+import Select from 'react-select';
 
 const DAY_DURATION_OPTIONS = ["AM", "PM", "AM & PM"];
 
@@ -183,6 +184,12 @@ const TrainerRow = React.memo(
       return dates;
     };
 
+    // ✅ ADD: Helper function to calculate training days
+    const getTrainingDays = (startDate, endDate, excludeDays) => {
+      const dates = getDateList(startDate, endDate, excludeDays, trainer.excludedDates || []);
+      return dates.length;
+    };
+
     // ✅ ADD: Initialize dailyHours when trainer data is loaded
     useEffect(() => {
       // Track previous dates to detect changes
@@ -238,6 +245,22 @@ const TrainerRow = React.memo(
       getTrainingHoursPerDay,
     ]);
 
+  const trainerOptions = useMemo(() => {
+    return trainers.map((tr) => {
+      const isAvailable = isTrainerAvailable(
+        tr.trainerId,
+        trainer.startDate,
+        trainer.dayDuration,
+        `${rowIndex}-${batchIndex}-${trainerIdx}`
+      );
+      return {
+        value: tr.trainerId,
+        label: `${tr.name || tr.trainerName || tr.displayName || tr.trainerId} (${tr.trainerId})${!isAvailable ? " (Already booked)" : ""}`,
+        isDisabled: !isAvailable,
+      };
+    });
+  }, [trainers, trainer.startDate, trainer.dayDuration, rowIndex, batchIndex, trainerIdx, isTrainerAvailable]);
+
   return (
     <>
       <tr
@@ -264,40 +287,77 @@ const TrainerRow = React.memo(
                 Duplicate
               </div>
             )}
-            <select
-              value={trainer.trainerId || ""}
-              onChange={(e) =>
+            <Select
+              value={trainerOptions.find(option => option.value === trainer.trainerId) || null}
+              onChange={(selectedOption) =>
                 handleTrainerField(
                   rowIndex,
                   batchIndex,
                   trainerIdx,
                   "trainerId",
-                  e.target.value
+                  selectedOption ? selectedOption.value : ""
                 )
               }
-              className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
-            >
-              <option value="">Select Trainer</option>
-              {trainers.map((tr) => {
-                const isAvailable = isTrainerAvailable(
-                  tr.trainerId,
-                  trainer.startDate,
-                  trainer.dayDuration,
-                  `${rowIndex}-${batchIndex}-${trainerIdx}`
-                );
-                return (
-                  <option
-                    key={tr.trainerId}
-                    value={tr.trainerId}
-                    disabled={!isAvailable}
-                    className={!isAvailable ? "text-gray-400" : ""}
-                  >
-                    {tr.name} ({tr.trainerId})
-                    {!isAvailable && " (Already booked)"}
-                  </option>
-                );
-              })}
-            </select>
+              options={trainerOptions}
+              placeholder="Select Trainer"
+              isSearchable={true}
+              className="text-xs"
+              styles={{
+                control: (provided, state) => ({
+                  ...provided,
+                  minHeight: '24px',
+                  height: '24px',
+                  fontSize: '11px',
+                  borderColor: state.isFocused ? '#6366f1' : '#d1d5db',
+                  '&:hover': {
+                    borderColor: '#6366f1',
+                  },
+                  boxShadow: state.isFocused ? '0 0 0 1px #6366f1' : provided.boxShadow,
+                  padding: '0 2px',
+                }),
+                valueContainer: (provided) => ({
+                  ...provided,
+                  padding: '0 4px',
+                  minHeight: '22px',
+                }),
+                input: (provided) => ({
+                  ...provided,
+                  fontSize: '11px',
+                  margin: '0',
+                  padding: '0',
+                }),
+                indicatorSeparator: (provided) => ({
+                  ...provided,
+                  display: 'none',
+                }),
+                dropdownIndicator: (provided) => ({
+                  ...provided,
+                  padding: '0 2px',
+                }),
+                option: (provided, state) => ({
+                  ...provided,
+                  fontSize: '11px',
+                  padding: '4px 8px',
+                  minHeight: '24px',
+                  backgroundColor: state.isDisabled ? '#f9fafb' : state.isSelected ? '#6366f1' : state.isFocused ? '#eef2ff' : provided.backgroundColor,
+                  color: state.isDisabled ? '#9ca3af' : state.isSelected ? 'white' : provided.color,
+                  cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                }),
+                placeholder: (provided) => ({
+                  ...provided,
+                  fontSize: '11px',
+                  color: '#6b7280',
+                }),
+                singleValue: (provided) => ({
+                  ...provided,
+                  fontSize: '11px',
+                }),
+                menu: (provided) => ({
+                  ...provided,
+                  fontSize: '11px',
+                }),
+              }}
+            />
           </td>
 
           {/* Duration dropdown */}
@@ -447,15 +507,18 @@ const TrainerRow = React.memo(
               <button
                 type="button"
                 onClick={() => setShowDailyHoursDropdown(!showDailyHoursDropdown)}
-                className="ml-2 p-1.5 rounded-md bg-white border border-gray-200 hover:bg-indigo-50 hover:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition-all duration-200 shadow-sm"
-                title={showDailyHoursDropdown ? "Hide daily breakdown" : "Show daily breakdown"}
+                disabled={!trainer.assignedHours || Number(trainer.assignedHours) <= 0}
+                className={`ml-2 p-1.5 rounded-md bg-white border border-gray-200 hover:bg-indigo-50 hover:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition-all duration-200 shadow-sm ${
+                  (!trainer.assignedHours || Number(trainer.assignedHours) <= 0) ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+                title={(!trainer.assignedHours || Number(trainer.assignedHours) <= 0) ? "Enter total hours first to view daily breakdown." : (showDailyHoursDropdown ? "Hide daily breakdown" : "Show daily breakdown")}
                 aria-expanded={showDailyHoursDropdown}
                 aria-controls="daily-hours-dropdown"
               >
                 {showDailyHoursDropdown ? (
-                  <FiEyeOff className="w-3.5 h-3.5 text-indigo-600" />
+                  <FiEyeOff className={`w-3.5 h-3.5 ${(!trainer.assignedHours || Number(trainer.assignedHours) <= 0) ? 'text-gray-300' : 'text-indigo-600'}`} />
                 ) : (
-                  <FiEye className="w-3.5 h-3.5 text-gray-500 hover:text-indigo-600 transition-colors" />
+                  <FiEye className={`w-3.5 h-3.5 ${(!trainer.assignedHours || Number(trainer.assignedHours) <= 0) ? 'text-gray-300' : 'text-gray-500 hover:text-indigo-600'} transition-colors`} />
                 )}
               </button>
             </div>
@@ -625,6 +688,14 @@ const TrainerRow = React.memo(
                     placeholder="0"
                   />
                 </div>
+                {(() => {
+                  const perDay = Number(trainer.conveyance) || 0;
+                  const total = perDay; // Conveyance is one-time, no multiplication
+                  if (perDay > 0) {
+                    return <div className="text-[9px] text-slate-500 mt-0.5">₹{total.toFixed(2)}</div>;
+                  }
+                  return null;
+                })()}
               </div>
 
               {/** Food */}
@@ -657,6 +728,15 @@ const TrainerRow = React.memo(
                     placeholder="0"
                   />
                 </div>
+                {(() => {
+                  const days = getTrainingDays(trainer.startDate, trainer.endDate, excludeDays);
+                  const perDay = Number(trainer.food) || 0;
+                  const total = perDay * days;
+                  if (days > 0 && perDay > 0) {
+                    return <div className="text-[9px] text-slate-500 mt-0.5">{perDay}*{days} = {total}</div>;
+                  }
+                  return null;
+                })()}
               </div>
 
               {/** Lodging */}
@@ -689,13 +769,26 @@ const TrainerRow = React.memo(
                     placeholder="0"
                   />
                 </div>
+                {(() => {
+                  const days = getTrainingDays(trainer.startDate, trainer.endDate, excludeDays);
+                  const perDay = Number(trainer.lodging) || 0;
+                  const total = perDay * days;
+                  if (days > 0 && perDay > 0) {
+                    return <div className="text-[9px] text-slate-500 mt-0.5">{perDay}*{days} = {total}</div>;
+                  }
+                  return null;
+                })()}
               </div>
 
               {/* Cost + Topics inline wrapper spans remaining 8 cols */}
               <div className="sm:col-span-2 lg:col-span-6 flex flex-col md:flex-row gap-2 items-stretch">
                 {(() => {
                   const trainerCost = ((Number(trainer.assignedHours) || 0) * (Number(trainer.perHourCost) || 0)) || 0;
-                  const miscCost = ((Number(trainer.conveyance) || 0) + (Number(trainer.food) || 0) + (Number(trainer.lodging) || 0)) || 0;
+                  const days = getTrainingDays(trainer.startDate, trainer.endDate, excludeDays);
+                  const conveyanceTotal = Number(trainer.conveyance) || 0;
+                  const foodTotal = (Number(trainer.food) || 0) * days;
+                  const lodgingTotal = (Number(trainer.lodging) || 0) * days;
+                  const miscCost = conveyanceTotal + foodTotal + lodgingTotal;
                   const totalCost = trainerCost + miscCost;
                   const boxBase = "flex items-center gap-1 bg-white/70 border border-gray-100 rounded-md px-2 py-1";
                   const valueCls = "text-xs font-semibold";
@@ -1294,11 +1387,16 @@ const BatchDetailsTable = ({
   onValidationChange,
   globalTrainerAssignments = [], // <-- pass this from parent (InitiationModal)
   excludeDays = "None",
+  totalAssignedHoursByDomain = {},
 }) => {
   const [mergeModal, setMergeModal] = useState({
     open: false,
     sourceRowIndex: null,
     targetRowIndex: null,
+    mergeType: "whole-phase", // "whole-phase" or "specific-date"
+    startDate: "",
+    endDate: "",
+    assignedHours: "",
   });
 
   // Helper function to generate consistent colors for specializations
@@ -1321,16 +1419,9 @@ const BatchDetailsTable = ({
   const [duplicateTrainers, setDuplicateTrainers] = useState([]);
 
   // ✅ 4. Memoize filtered trainers to prevent unnecessary re-filtering
-  const filteredTrainers = useMemo(() => {
-    return trainers.filter(
-      (tr) =>
-        tr.domain &&
-        typeof tr.domain === "string" &&
-        tr.domain.toLowerCase().trim() === selectedDomain.toLowerCase().trim()
-    );
-  }, [trainers, selectedDomain]);
-
-  // ✅ 5. Memoize batch statistics to prevent recalculation on every render
+const filteredTrainers = useMemo(() => {
+  return trainers;
+}, [trainers]);  // ✅ 5. Memoize batch statistics to prevent recalculation on every render
   const batchStatistics = useMemo(() => {
     return table1Data.map((row, rowIndex) => {
       const totalAssignedStudents = row.batches.reduce(
@@ -1536,7 +1627,14 @@ const BatchDetailsTable = ({
   };
 
   // Optional prop: mergeFirestoreConfig = { collectionPath: 'trainings', docIdField: 'id' }
-  const handleMergeBatch = async (sourceRowIndex, targetRowIndex) => {
+  const handleMergeBatch = async (
+    sourceRowIndex,
+    targetRowIndex,
+    mergeType = "whole-phase",
+    startDate = "",
+    endDate = "",
+    assignedHours = ""
+  ) => {
     const updatedData = [...table1Data];
     const sourceRow = updatedData[sourceRowIndex];
     const targetRow = updatedData[targetRowIndex];
@@ -1556,39 +1654,100 @@ const BatchDetailsTable = ({
     const originalSourceCopy = JSON.parse(JSON.stringify(sourceRow));
     const originalTargetCopy = JSON.parse(JSON.stringify(targetRow));
 
-    const mergedRow = {
-      ...targetRow,
-      batch: `${sourceRow.batch}+${targetRow.batch}`,
-      stdCount: combinedStudents,
-      hrs: domainHours,
-      assignedHours: domainHours,
-      isMerged: true,
-      originalData: {
-        source: originalSourceCopy,
-        target: originalTargetCopy,
-        sourceIndex: sourceRowIndex,
-        targetIndex: targetRowIndex,
-      },
-      batches: [
-        {
-          batchPerStdCount: combinedStudents,
-          batchCode: mergedBatchCode,
-          isMerged: true,
-          mergedFrom: `${sourceRow.batch}+${targetRow.batch}`,
-          assignedHours: domainHours,
-          trainers: [],
+    if (mergeType === "whole-phase") {
+      // Original whole-phase merge logic
+      const mergedRow = {
+        ...targetRow,
+        batch: `${sourceRow.batch}+${targetRow.batch}`,
+        stdCount: combinedStudents,
+        hrs: domainHours,
+        assignedHours: domainHours,
+        isMerged: true,
+        originalData: {
+          source: originalSourceCopy,
+          target: originalTargetCopy,
+          sourceIndex: sourceRowIndex,
+          targetIndex: targetRowIndex,
         },
-      ],
-    };
+        batches: [
+          {
+            batchPerStdCount: combinedStudents,
+            batchCode: mergedBatchCode,
+            isMerged: true,
+            mergedFrom: `${sourceRow.batch}+${targetRow.batch}`,
+            assignedHours: domainHours,
+            trainers: [],
+          },
+        ],
+      };
 
-    // Replace target with mergedRow and remove source
-    updatedData[targetRowIndex] = mergedRow;
-    // If sourceIndex < targetIndex and we removed earlier element, indexes shift; handle by removing the correct index
-    if (sourceRowIndex > targetRowIndex) {
-      updatedData.splice(sourceRowIndex, 1);
-    } else {
-      // sourceRowIndex < targetRowIndex => after replacing target, removing source at its index (original)
-      updatedData.splice(sourceRowIndex, 1);
+      // Replace target with mergedRow and remove source
+      updatedData[targetRowIndex] = mergedRow;
+      if (sourceRowIndex > targetRowIndex) {
+        updatedData.splice(sourceRowIndex, 1);
+      } else {
+        updatedData.splice(sourceRowIndex, 1);
+      }
+    } else if (mergeType === "specific-date") {
+      // Specific-date merge logic - keep both original specializations visible
+      const mergeStartDate = new Date(startDate);
+      const mergeEndDate = new Date(endDate);
+      const mergeHours = Number(assignedHours);
+
+      // Validate date range
+      if (isNaN(mergeStartDate.getTime()) || isNaN(mergeEndDate.getTime())) {
+        alert("Invalid date range provided for merge");
+        return;
+      }
+
+      if (mergeStartDate > mergeEndDate) {
+        alert("Start date cannot be after end date");
+        return;
+      }
+
+      // Calculate hours to deduct from each batch
+      const hoursToDeduct = mergeHours;
+
+      // Update source and target rows with reduced hours
+      sourceRow.hrs = Math.max(0, sourceRow.hrs - hoursToDeduct);
+      sourceRow.assignedHours = sourceRow.hrs;
+      targetRow.hrs = Math.max(0, targetRow.hrs - hoursToDeduct);
+      targetRow.assignedHours = targetRow.hrs;
+
+      // Create merged batch as a new row
+      const mergedRow = {
+        ...targetRow,
+        batch: `${sourceRow.batch}+${targetRow.batch} (${startDate} to ${endDate})`,
+        stdCount: combinedStudents,
+        hrs: mergeHours,
+        assignedHours: mergeHours,
+        isMerged: true,
+        originalData: {
+          source: originalSourceCopy,
+          target: originalTargetCopy,
+          sourceIndex: sourceRowIndex,
+          targetIndex: targetRowIndex,
+          mergeType: "specific-date",
+          mergeStartDate: startDate,
+          mergeEndDate: endDate,
+          mergeHours: mergeHours,
+        },
+        batches: [
+          {
+            batchPerStdCount: combinedStudents,
+            batchCode: mergedBatchCode,
+            isMerged: true,
+            mergedFrom: `${sourceRow.batch}+${targetRow.batch}`,
+            assignedHours: mergeHours,
+            startDate: startDate,
+            endDate: endDate,
+            trainers: [],
+          },
+        ],
+      };
+
+      // Insert merged row after the target row
+      updatedData.splice(targetRowIndex + 1, 0, mergedRow);
     }
 
     setTable1Data(updatedData);
@@ -1606,9 +1765,9 @@ const BatchDetailsTable = ({
             collectionPath,
             String(targetRow[docIdField])
           );
-          await updateDoc(targetDocRef, mergedRow);
+          await updateDoc(targetDocRef, targetRow);
         } else {
-          await addDoc(collection(db, collectionPath), mergedRow);
+          await addDoc(collection(db, collectionPath), targetRow);
         }
       } catch {
         // Error persisting merged batch
@@ -1619,6 +1778,10 @@ const BatchDetailsTable = ({
       open: false,
       sourceRowIndex: null,
       targetRowIndex: null,
+      mergeType: "whole-phase",
+      startDate: "",
+      endDate: "",
+      assignedHours: "",
     });
   };
   // When changing assignedHours for a batch, never allow sum to exceed row.hrs
@@ -1638,7 +1801,7 @@ const BatchDetailsTable = ({
       currentRow.batches[batchIndex][field] = finalValue;
     } else if (field === "assignedHours") {
       let val = Number(value);
-      if (val > currentRow.hrs) val = currentRow.hrs;
+      // Removed validation limit - users can now enter more than domain hours
       currentRow.batches[batchIndex][field] = val;
       // If batch 1, update all other batches to match
       if (batchIndex === 0) {
@@ -2265,35 +2428,72 @@ const BatchDetailsTable = ({
       return;
     }
 
-    // avoid unused-var eslint by prefixing unused locals with leading underscore
     const {
       source,
       target,
       sourceIndex,
-      targetIndex: _targetIndex,
+      targetIndex,
+      mergeType,
+      mergeStartDate: _mergeStartDate,
+      mergeEndDate: _mergeEndDate,
+      mergeHours: _mergeHours,
     } = mergedRow.originalData;
 
-    // Restore shallow copies
-    const restoredTarget = { ...target };
-    const restoredSource = { ...source };
+    if (mergeType === "specific-date") {
+      // For specific-date merge undo:
+      // 1. Remove the merged row
+      // 2. Restore original hours to source and target rows
+      // 3. Remove merge-related properties
 
-    // Replace merged row position with restoredTarget
-    updated[mergedRowIndex] = restoredTarget;
+      // Find source and target rows by their original indices
+      const sourceRow = updated[sourceIndex];
+      const targetRow = updated[targetIndex];
 
-    // Insert source back. Prefer original sourceIndex if valid, else insert after restoredTarget
-    const insertIdx =
-      typeof sourceIndex === "number" &&
-      sourceIndex >= 0 &&
-      sourceIndex <= updated.length
-        ? sourceIndex
-        : mergedRowIndex + 1;
+      if (sourceRow && targetRow) {
+        // Restore original hours
+        sourceRow.hrs = source.hrs;
+        sourceRow.assignedHours = source.hrs;
+        targetRow.hrs = target.hrs;
+        targetRow.assignedHours = target.hrs;
 
-    updated.splice(insertIdx, 0, restoredSource);
+        // Remove merge-related properties
+        delete sourceRow.isMerged;
+        delete sourceRow.originalData;
+        delete targetRow.isMerged;
+        delete targetRow.originalData;
+
+        // Restore original batch names (remove date range from target)
+        if (targetRow.batch.includes("(")) {
+          targetRow.batch = targetRow.batch.split(" (")[0];
+        }
+      }
+
+      // Remove the merged row
+      updated.splice(mergedRowIndex, 1);
+    } else {
+      // Original whole-phase merge undo logic
+      // Restore shallow copies
+      const restoredTarget = { ...target };
+      const restoredSource = { ...source };
+
+      // Replace merged row position with restoredTarget
+      updated[mergedRowIndex] = restoredTarget;
+
+      // Insert source back. Prefer original sourceIndex if valid, else insert after restoredTarget
+      const insertIdx =
+        typeof sourceIndex === "number" &&
+        sourceIndex >= 0 &&
+        sourceIndex <= updated.length
+          ? sourceIndex
+          : mergedRowIndex + 1;
+
+      updated.splice(insertIdx, 0, restoredSource);
+    }
 
     setTable1Data(updated);
     console.log("[BatchDetailsTable] undoMerge completed", {
       mergedRowIndex,
-      insertIdx,
+      mergeType,
     });
 
     // Optional: revert persisted merge in Firestore if mergeFirestoreConfig provided
@@ -2475,6 +2675,8 @@ const BatchDetailsTable = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [table1Data, selectedDomain, globalTrainerAssignments]);
 
+
+
   return (
     <div className="space-y-6">
       {/* Duplicate prompt banner inside the table component */}
@@ -2518,12 +2720,44 @@ const BatchDetailsTable = ({
       )}
       {/* Merge Modal */}
       {mergeModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-30 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 z-54 flex items-center justify-center bg-gray-900 bg-opacity-30 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Merge Batches
+              {mergeModal.mergeType === "specific-date" ? "Merge Batches for Date Range" : "Merge Batches"}
             </h3>
             <div className="space-y-4">
+              {/* Merge Type Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Merge Type
+                </label>
+                <div className="space-y-2">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="mergeType"
+                      value="whole-phase"
+                      checked={mergeModal.mergeType === "whole-phase"}
+                      onChange={(e) => setMergeModal(prev => ({ ...prev, mergeType: e.target.value }))}
+                      className="mr-2"
+                    />
+                    <span className="text-sm">Merge for whole phase</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="mergeType"
+                      value="specific-date"
+                      checked={mergeModal.mergeType === "specific-date"}
+                      onChange={(e) => setMergeModal(prev => ({ ...prev, mergeType: e.target.value }))}
+                      className="mr-2"
+                    />
+                    <span className="text-sm">Merge for specific date range</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Target Selection */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Merge with:
@@ -2532,18 +2766,7 @@ const BatchDetailsTable = ({
                   className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
                   value={mergeModal.targetRowIndex ?? ""}
                   onChange={(e) => {
-                    const val =
-                      e.target.value === "" ? null : Number(e.target.value);
-                    console.log("[BatchDetailsTable] merge select changed", {
-                      selectedValue: val,
-                      sourceRowIndex: mergeModal.sourceRowIndex,
-                    });
-                    if (val !== null && table1Data && table1Data[val]) {
-                      console.log(
-                        "[BatchDetailsTable] selected target spec:",
-                        table1Data[val]
-                      );
-                    }
+                    const val = e.target.value === "" ? null : Number(e.target.value);
                     setMergeModal((prev) => ({
                       ...prev,
                       targetRowIndex: val,
@@ -2561,39 +2784,132 @@ const BatchDetailsTable = ({
                   )}
                 </select>
               </div>
+
+              {/* Date Range Fields for Specific Date Merge */}
+              {mergeModal.mergeType === "specific-date" && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Start Date
+                      </label>
+                      <input
+                        type="date"
+                        value={mergeModal.startDate}
+                        onChange={(e) => setMergeModal(prev => ({ ...prev, startDate: e.target.value }))}
+                        className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        End Date
+                      </label>
+                      <input
+                        type="date"
+                        value={mergeModal.endDate}
+                        onChange={(e) => setMergeModal(prev => ({ ...prev, endDate: e.target.value }))}
+                        className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Assigned Hours for Merged Batch
+                    </label>
+                    <input
+                      type="number"
+                      value={mergeModal.assignedHours}
+                      onChange={(e) => setMergeModal(prev => ({ ...prev, assignedHours: e.target.value }))}
+                      placeholder="Enter hours for merged batch"
+                      className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
+                      min="0"
+                      step="0.5"
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Confirmation summary */}
               {mergeModal.targetRowIndex !== null &&
                 mergeModal.sourceRowIndex !== null &&
                 (() => {
                   const src = table1Data[mergeModal.sourceRowIndex];
                   const tgt = table1Data[mergeModal.targetRowIndex];
-                  const combined =
-                    Number(src.stdCount || 0) + Number(tgt.stdCount || 0);
-                  const hrs = tgt.hrs;
-                  return (
-                    <div className="rounded border border-gray-100 p-3 bg-gray-50 text-sm">
-                      <div className="flex items-center justify-between">
-                        <div>
+                  const combined = Number(src.stdCount || 0) + Number(tgt.stdCount || 0);
+
+                  if (mergeModal.mergeType === "specific-date") {
+                    const hoursToDeduct = Number(mergeModal.assignedHours || 0);
+                    const sourceRemaining = Math.max(0, src.hrs - hoursToDeduct);
+                    const targetRemaining = Math.max(0, tgt.hrs - hoursToDeduct);
+
+                    return (
+                      <div className="rounded border border-gray-100 p-3 bg-gray-50 text-sm">
+                        <div className="mb-3">
                           <div className="font-medium">Summary</div>
                           <div className="text-xs text-gray-600">
                             {src.batch} + {tgt.batch}
+                            {mergeModal.startDate && mergeModal.endDate && (
+                              <span className="block text-xs text-blue-600 mt-1">
+                                {mergeModal.startDate} to {mergeModal.endDate}
+                              </span>
+                            )}
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-xs text-gray-500">
-                            Combined students
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="text-xs text-gray-500">
+                              {src.batch} remaining hours
+                            </div>
+                            <div className="font-medium">{sourceRemaining} hrs</div>
                           </div>
-                          <div className="font-medium">{combined}</div>
-                        </div>
-                        <div className="text-right ml-4">
-                          <div className="text-xs text-gray-500">
-                            Resulting hrs
+                          <div className="flex items-center justify-between">
+                            <div className="text-xs text-gray-500">
+                              {tgt.batch} remaining hours
+                            </div>
+                            <div className="font-medium">{targetRemaining} hrs</div>
                           </div>
-                          <div className="font-medium">{hrs}</div>
+                          <div className="flex items-center justify-between">
+                            <div className="text-xs text-gray-500">
+                              Merged batch hours
+                            </div>
+                            <div className="font-medium">{mergeModal.assignedHours || 0} hrs</div>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <div className="text-xs text-gray-500">
+                              Combined students
+                            </div>
+                            <div className="font-medium">{combined}</div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
+                    );
+                  } else {
+                    // Whole-phase merge summary
+                    return (
+                      <div className="rounded border border-gray-100 p-3 bg-gray-50 text-sm">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">Summary</div>
+                            <div className="text-xs text-gray-600">
+                              {src.batch} + {tgt.batch}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xs text-gray-500">
+                              Combined students
+                            </div>
+                            <div className="font-medium">{combined}</div>
+                          </div>
+                          <div className="text-right ml-4">
+                            <div className="text-xs text-gray-500">
+                              Resulting hrs
+                            </div>
+                            <div className="font-medium">{tgt.hrs}</div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
                 })()}
               <div className="flex justify-end space-x-3">
                 <button
@@ -2602,6 +2918,10 @@ const BatchDetailsTable = ({
                       open: false,
                       sourceRowIndex: null,
                       targetRowIndex: null,
+                      mergeType: "whole-phase",
+                      startDate: "",
+                      endDate: "",
+                      assignedHours: "",
                     })
                   }
                   className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
@@ -2612,17 +2932,27 @@ const BatchDetailsTable = ({
                   onClick={() =>
                     handleMergeBatch(
                       mergeModal.sourceRowIndex,
-                      mergeModal.targetRowIndex
+                      mergeModal.targetRowIndex,
+                      mergeModal.mergeType,
+                      mergeModal.startDate,
+                      mergeModal.endDate,
+                      mergeModal.assignedHours
                     )
                   }
-                  disabled={mergeModal.targetRowIndex === null}
+                  disabled={
+                    mergeModal.targetRowIndex === null ||
+                    (mergeModal.mergeType === "specific-date" && 
+                     (!mergeModal.startDate || !mergeModal.endDate || !mergeModal.assignedHours))
+                  }
                   className={`px-4 py-2 rounded-lg text-sm font-medium text-white ${
-                    mergeModal.targetRowIndex !== null
+                    mergeModal.targetRowIndex !== null &&
+                    (mergeModal.mergeType === "whole-phase" || 
+                     (mergeModal.startDate && mergeModal.endDate && mergeModal.assignedHours))
                       ? "bg-indigo-600 hover:bg-indigo-700"
                       : "bg-indigo-300 cursor-not-allowed"
                   } transition-colors`}
                 >
-                  Confirm Merge
+                  {mergeModal.mergeType === "specific-date" ? "Merge for Dates" : "Merge Batches"}
                 </button>
               </div>
             </div>
@@ -2632,7 +2962,7 @@ const BatchDetailsTable = ({
 
       {/* Swap Modal */}
       {swapModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
+        <div className="fixed inset-0 z-54 flex items-center justify-center bg-black bg-opacity-30">
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-3xl">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
               Select Trainer to Swap Batches With
@@ -2729,6 +3059,7 @@ const BatchDetailsTable = ({
                   : "Select a domain to configure batches"}
               </p>
             </div>
+
           </div>
         </div>
 
@@ -2765,10 +3096,21 @@ const BatchDetailsTable = ({
                 <div key={rowIndex} className="transition-all duration-200">
                   {/* Batch Header */}
                   <div
-                    className={`px-4 py-2 flex items-center justify-between cursor-pointer hover:bg-gray-50 ${
-                      isExpanded ? "bg-gray-50" : ""
+                    className={`px-4 py-2 flex items-center justify-between ${
+                      !(totalAssignedHoursByDomain[selectedDomain] > 0)
+                        ? "cursor-not-allowed opacity-50"
+                        : "cursor-pointer hover:bg-gray-50"
                     }`}
-                    onClick={() => toggleBatchExpansion(rowIndex)}
+                    onClick={() =>
+                      totalAssignedHoursByDomain[selectedDomain] > 0
+                        ? toggleBatchExpansion(rowIndex)
+                        : undefined
+                    }
+                    title={
+                      !(totalAssignedHoursByDomain[selectedDomain] > 0)
+                        ? "Please assign training hours first"
+                        : ""
+                    }
                   >
                     <div className="flex items-center space-x-3">
                       <div
@@ -2809,7 +3151,7 @@ const BatchDetailsTable = ({
                           memoizedGetColorsForBatch(row.batch).badge
                         }`}
                       >
-                        {stats.totalAssignedHours}/{row.hrs} hours
+                        {stats.totalAssignedHours}/{totalAssignedHoursByDomain[selectedDomain] || row.hrs} hours
                       </div>
 
                       {/* Merge button - always visible */}

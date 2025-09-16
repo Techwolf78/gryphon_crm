@@ -11,6 +11,8 @@ export default function SessionManager() {
   useEffect(() => {
     if (!user) return;
 
+    if (user.department === "L & D") return;
+
     let warningTimer;
     let logoutTimer;
     let lastActiveTime = Date.now();

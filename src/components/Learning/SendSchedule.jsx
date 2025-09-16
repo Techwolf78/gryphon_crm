@@ -745,9 +745,10 @@ useEffect(() => {
                     <button
                       type="button"
                       onClick={handleImportEmail}
-                      className="px-3 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded hover:bg-gray-200 transition-colors text-sm whitespace-nowrap"
-                      title="Import email from trainer"
+                      className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white border border-blue-500 rounded-lg hover:from-blue-600 hover:to-blue-700 hover:border-blue-600 transition-all duration-200 text-sm font-medium whitespace-nowrap shadow-sm hover:shadow-md transform hover:scale-105 flex items-center gap-2"
+                      title="Import email from trainer database"
                     >
+                      <FiMail className="w-4 h-4" />
                       Import Email
                     </button>
                   </div>

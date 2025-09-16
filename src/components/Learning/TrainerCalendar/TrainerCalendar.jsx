@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import { db } from "../../../firebase";
-import { collection, getDocs, onSnapshot, query as fsQuery, where, orderBy } from "firebase/firestore";
+import { collection, getDocs, onSnapshot, query as fsQuery, where, orderBy, doc, deleteDoc } from "firebase/firestore";
 import {
   FiX,
   FiDownload,
@@ -12,6 +12,7 @@ import {
   FiLayers,
   FiMaximize2,
   FiMinimize2,
+  FiTrash2,
 } from "react-icons/fi";
 import TrainerCalendarPDF from './TrainerCalendarPDF';
 import TrainerCalendarExcel from './TrainerCalendarExcel';
@@ -306,6 +307,26 @@ function TrainerCalendar({
     assignments.forEach((a) => a.collegeName && set.add(a.collegeName));
     return Array.from(set);
   }, [assignments]);
+
+  // Delete specific trainer assignment
+  const deleteTrainerAssignment = async (assignment) => {
+    if (!assignment || !assignment.id) {
+      console.error('Invalid assignment for deletion');
+      return;
+    }
+
+    try {
+      const assignmentRef = doc(db, 'trainerAssignments', assignment.id);
+      await deleteDoc(assignmentRef);
+      console.log(`✅ Deleted trainer assignment: ${assignment.trainerName || assignment.trainerId} - ${assignment.date}`);
+      
+      // Refresh assignments by triggering a re-fetch
+      setAssignments(prev => prev.filter(a => a.id !== assignment.id));
+    } catch (error) {
+      console.error('Error deleting trainer assignment:', error);
+      alert('Failed to delete trainer assignment. Please try again.');
+    }
+  };
 
   const filteredTrainers = useMemo(() => {
     const q = trainerSearchValue.trim().toLowerCase();
@@ -843,7 +864,18 @@ function TrainerCalendar({
                                   >
                                     Info
                                   </button>
-                                  {/* Delete disabled */}
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (window.confirm(`Delete trainer assignment for ${b.trainerName || b.trainerId} on ${b.dateISO}? This action cannot be undone.`)) {
+                                        deleteTrainerAssignment(b);
+                                      }
+                                    }} 
+                                    aria-label="Delete trainer assignment" 
+                                    className="p-2 rounded-md bg-red-600 text-white hover:bg-red-700 text-xs font-medium shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                                  >
+                                    <FiTrash2 className="w-3 h-3" />
+                                  </button>
                                 </div>
                               </div>
                             </div>
@@ -955,7 +987,18 @@ function TrainerCalendar({
                             >
                               Info
                             </button>
-                            {/* Delete disabled */}
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (window.confirm(`Delete trainer assignment for ${b.trainerName || b.trainerId} on ${b.dateISO}? This action cannot be undone.`)) {
+                                  deleteTrainerAssignment(b);
+                                }
+                              }} 
+                              aria-label="Delete trainer assignment" 
+                              className="p-2 rounded-md bg-red-600 text-white hover:bg-red-700 text-xs font-medium shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                            >
+                              <FiTrash2 className="w-3 h-3" />
+                            </button>
                           </div>
                         </div>
                       </div>
