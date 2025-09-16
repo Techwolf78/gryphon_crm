@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { doc, getDoc, collection, getDocs } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, updateDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
 import {
   FiArrowLeft,
@@ -9,6 +9,7 @@ import {
   FiLayers,
   FiLoader,
   FiMail,
+  FiTrash2,
 } from "react-icons/fi";
 import SendSchedule from "../SendSchedule";
 import CollegeSummaryReport from "../CollegeSummaryReport";
@@ -162,6 +163,62 @@ function InitiationTrainingDetails({ training, onBack }) {
   const toggleSchedule = useCallback((key) => {
     setShowSchedule(prev => ({ ...prev, [key]: !prev[key] }));
   }, []);
+
+  const handleDeleteBatch = async (domainId, rowIdx, batchIdx) => {
+    if (!window.confirm('Are you sure you want to delete this batch? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // Get the current domain data
+      const domainRef = doc(db, "trainingForms", training.id, "trainings", training.selectedPhase, "domains", domainId);
+      const domainSnap = await getDoc(domainRef);
+      
+      if (!domainSnap.exists()) {
+        throw new Error("Domain not found");
+      }
+      
+      const domainData = domainSnap.data();
+      const table1Data = domainData.table1Data || [];
+      
+      if (!table1Data[rowIdx] || !table1Data[rowIdx].batches || !table1Data[rowIdx].batches[batchIdx]) {
+        throw new Error("Batch not found");
+      }
+      
+      // Remove the batch from the row
+      table1Data[rowIdx].batches.splice(batchIdx, 1);
+      
+      // If no batches left in the row, remove the entire row
+      if (table1Data[rowIdx].batches.length === 0) {
+        table1Data.splice(rowIdx, 1);
+      }
+      
+      // Update Firestore
+      await updateDoc(domainRef, {
+        table1Data: table1Data
+      });
+      
+      // Update local state
+      setDomainsData(prev => prev.map(domain => {
+        if (domain.id === domainId) {
+          const updatedTable1Data = [...table1Data];
+          return {
+            ...domain,
+            table1Data: updatedTable1Data
+          };
+        }
+        return domain;
+      }));
+      
+      setLoading(false);
+    } catch (err) {
+      console.error("Error deleting batch:", err);
+      setError("Failed to delete batch. Please try again.");
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchTrainingData = async () => {
@@ -423,16 +480,26 @@ function InitiationTrainingDetails({ training, onBack }) {
                                 key={bidx}
                                 className="border rounded p-3 bg-gray-50"
                               >
-                                <div className="flex flex-wrap gap-4 items-center mb-2">
-                                  <span className="text-sm font-semibold text-gray-700">
-                                    {batch.batchCode}
-                                  </span>
-                                  <span className="text-sm text-gray-600">
-                                    Students: {batch.batchPerStdCount || 0}
-                                  </span>
-                                  <span className="text-sm text-gray-600">
-                                    Hours: {batch.assignedHours || 0}
-                                  </span>
+                                <div className="flex flex-wrap gap-4 items-center justify-between mb-2">
+                                  <div className="flex flex-wrap gap-4 items-center">
+                                    <span className="text-sm font-semibold text-gray-700">
+                                      {batch.batchCode}
+                                    </span>
+                                    <span className="text-sm text-gray-600">
+                                      Students: {batch.batchPerStdCount || 0}
+                                    </span>
+                                    <span className="text-sm text-gray-600">
+                                      Hours: {batch.assignedHours || 0}
+                                    </span>
+                                  </div>
+                                  <button
+                                    onClick={() => handleDeleteBatch(domainInfo.id, idx, bidx)}
+                                    className="text-red-500 hover:text-red-700 p-1 rounded transition-colors"
+                                    title="Delete this batch"
+                                    disabled={loading}
+                                  >
+                                    <FiTrash2 className="w-4 h-4" />
+                                  </button>
                                 </div>
 
                                 <div>

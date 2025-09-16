@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import { db } from "../../../firebase";
-import { collection, getDocs, onSnapshot, query as fsQuery, where, orderBy, doc, deleteDoc } from "firebase/firestore";
+import { collection, getDocs, onSnapshot, query as fsQuery, where, orderBy } from "firebase/firestore";
 import {
   FiX,
   FiDownload,
@@ -17,6 +17,8 @@ import {
 import TrainerCalendarPDF from './TrainerCalendarPDF';
 import TrainerCalendarExcel from './TrainerCalendarExcel';
 import BookingDetail from './BookingDetail';
+import DeleteConfirmationModal from './TrainerAssignmentDelete';
+import { deleteTrainerAssignment } from './trainerAssignmentUtils';
 
 // TrainerCalendar
 // Purpose: dashboard to view trainer bookings (booked dates, details).
@@ -51,7 +53,6 @@ function formatDateISO(d) {
     return "";
   }
 }
-
 function DateBookingsModal({ dateBookings, date, onClose, onBookingDetail }) {
   if (!dateBookings) return null;
   
@@ -139,6 +140,8 @@ function DateBookingsModal({ dateBookings, date, onClose, onBookingDetail }) {
   );
 }
 
+
+
 function TrainerCalendar({
   onClose,
   initialTrainerId = "",
@@ -161,6 +164,7 @@ function TrainerCalendar({
   const [showBookingsFull, setShowBookingsFull] = useState(false); // full-screen bookings overlay
   const [selectedDateBookings, setSelectedDateBookings] = useState(null); // for showing all bookings for a specific date
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState(null); // { assignment, isOpen }
   // Persistence key
   const PERSIST_KEY = 'trainerCalendarPrefs_v1';
 
@@ -308,25 +312,7 @@ function TrainerCalendar({
     return Array.from(set);
   }, [assignments]);
 
-  // Delete specific trainer assignment
-  const deleteTrainerAssignment = async (assignment) => {
-    if (!assignment || !assignment.id) {
-      console.error('Invalid assignment for deletion');
-      return;
-    }
 
-    try {
-      const assignmentRef = doc(db, 'trainerAssignments', assignment.id);
-      await deleteDoc(assignmentRef);
-      console.log(`✅ Deleted trainer assignment: ${assignment.trainerName || assignment.trainerId} - ${assignment.date}`);
-      
-      // Refresh assignments by triggering a re-fetch
-      setAssignments(prev => prev.filter(a => a.id !== assignment.id));
-    } catch (error) {
-      console.error('Error deleting trainer assignment:', error);
-      alert('Failed to delete trainer assignment. Please try again.');
-    }
-  };
 
   const filteredTrainers = useMemo(() => {
     const q = trainerSearchValue.trim().toLowerCase();
@@ -867,9 +853,7 @@ function TrainerCalendar({
                                   <button 
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      if (window.confirm(`Delete trainer assignment for ${b.trainerName || b.trainerId} on ${b.dateISO}? This action cannot be undone.`)) {
-                                        deleteTrainerAssignment(b);
-                                      }
+                                      setDeleteConfirmation(b);
                                     }} 
                                     aria-label="Delete trainer assignment" 
                                     className="p-2 rounded-md bg-red-600 text-white hover:bg-red-700 text-xs font-medium shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
@@ -904,6 +888,17 @@ function TrainerCalendar({
       date={selectedDateBookings.date} 
       onClose={() => setSelectedDateBookings(null)}
       onBookingDetail={setBookingDetail}
+    />
+  )}
+  {deleteConfirmation && (
+    <DeleteConfirmationModal
+      assignment={deleteConfirmation}
+      onConfirm={() => {
+        deleteTrainerAssignment(deleteConfirmation, () => {
+          setDeleteConfirmation(null);
+        });
+      }}
+      onCancel={() => setDeleteConfirmation(null)}
     />
   )}
   {showBookingsFull && (
@@ -990,9 +985,7 @@ function TrainerCalendar({
                             <button 
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (window.confirm(`Delete trainer assignment for ${b.trainerName || b.trainerId} on ${b.dateISO}? This action cannot be undone.`)) {
-                                  deleteTrainerAssignment(b);
-                                }
+                                setDeleteConfirmation(b);
                               }} 
                               aria-label="Delete trainer assignment" 
                               className="p-2 rounded-md bg-red-600 text-white hover:bg-red-700 text-xs font-medium shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"

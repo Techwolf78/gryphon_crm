@@ -1392,7 +1392,7 @@ const BatchDetailsTable = ({
   const [mergeModal, setMergeModal] = useState({
     open: false,
     sourceRowIndex: null,
-    targetRowIndex: null,
+    targetRowIndices: [], // Changed from targetRowIndex to targetRowIndices
     mergeType: "whole-phase", // "whole-phase" or "specific-date"
     startDate: "",
     endDate: "",
@@ -1629,7 +1629,7 @@ const filteredTrainers = useMemo(() => {
   // Optional prop: mergeFirestoreConfig = { collectionPath: 'trainings', docIdField: 'id' }
   const handleMergeBatch = async (
     sourceRowIndex,
-    targetRowIndex,
+    targetRowIndices,
     mergeType = "whole-phase",
     startDate = "",
     endDate = "",
@@ -1637,59 +1637,67 @@ const filteredTrainers = useMemo(() => {
   ) => {
     const updatedData = [...table1Data];
     const sourceRow = updatedData[sourceRowIndex];
-    const targetRow = updatedData[targetRowIndex];
+    const targetRows = targetRowIndices.map(idx => updatedData[idx]).filter(Boolean);
 
-    if (!sourceRow || !targetRow) {
+    if (!sourceRow || targetRows.length === 0) {
       return;
     }
 
-    // Combine students; keep target hrs as authoritative
-    const combinedStudents =
-      Number(sourceRow.stdCount || 0) + Number(targetRow.stdCount || 0);
-    const domainHours = targetRow.hrs; // Keep hours as per domain
+    // Combine students and hours from all targets
+    const combinedStudents = targetRows.reduce((sum, tgt) => sum + Number(tgt.stdCount || 0), Number(sourceRow.stdCount || 0));
+    const combinedHours = targetRows.reduce((sum, tgt) => sum + Number(tgt.hrs || 0), Number(sourceRow.hrs || 0));
 
-    const mergedBatchCode = `${sourceRow.batch}-${targetRow.batch}-1`;
+    // Create merged batch name
+    const allSpecializations = [sourceRow.batch, ...targetRows.map(t => t.batch)];
+    const mergedBatchName = allSpecializations.join('+');
 
     // Save shallow copies of originals for undo
     const originalSourceCopy = JSON.parse(JSON.stringify(sourceRow));
-    const originalTargetCopy = JSON.parse(JSON.stringify(targetRow));
+    const originalTargetCopies = targetRowIndices.map(idx => ({
+      ...JSON.parse(JSON.stringify(updatedData[idx])),
+      originalIndex: idx
+    }));
 
     if (mergeType === "whole-phase") {
-      // Original whole-phase merge logic
+      // Original whole-phase merge logic adapted for multiple targets
       const mergedRow = {
-        ...targetRow,
-        batch: `${sourceRow.batch}+${targetRow.batch}`,
+        ...sourceRow,
+        batch: mergedBatchName,
         stdCount: combinedStudents,
-        hrs: domainHours,
-        assignedHours: domainHours,
+        hrs: combinedHours,
+        assignedHours: combinedHours,
         isMerged: true,
         originalData: {
           source: originalSourceCopy,
-          target: originalTargetCopy,
+          targets: originalTargetCopies,
           sourceIndex: sourceRowIndex,
-          targetIndex: targetRowIndex,
+          targetIndices: targetRowIndices,
         },
         batches: [
           {
             batchPerStdCount: combinedStudents,
-            batchCode: mergedBatchCode,
+            batchCode: `${mergedBatchName}-1`,
             isMerged: true,
-            mergedFrom: `${sourceRow.batch}+${targetRow.batch}`,
-            assignedHours: domainHours,
+            mergedFrom: mergedBatchName,
+            assignedHours: combinedHours,
             trainers: [],
           },
         ],
       };
 
-      // Replace target with mergedRow and remove source
-      updatedData[targetRowIndex] = mergedRow;
-      if (sourceRowIndex > targetRowIndex) {
-        updatedData.splice(sourceRowIndex, 1);
-      } else {
-        updatedData.splice(sourceRowIndex, 1);
-      }
+      // Replace source with mergedRow and remove all targets
+      updatedData[sourceRowIndex] = mergedRow;
+      
+      // Remove targets in reverse order to maintain indices
+      targetRowIndices.sort((a, b) => b - a).forEach(idx => {
+        if (idx > sourceRowIndex) {
+          updatedData.splice(idx, 1);
+        } else {
+          updatedData.splice(idx, 1);
+        }
+      });
     } else if (mergeType === "specific-date") {
-      // Specific-date merge logic - keep both original specializations visible
+      // Specific-date merge logic adapted for multiple targets
       const mergeStartDate = new Date(startDate);
       const mergeEndDate = new Date(endDate);
       const mergeHours = Number(assignedHours);
@@ -1711,22 +1719,24 @@ const filteredTrainers = useMemo(() => {
       // Update source and target rows with reduced hours
       sourceRow.hrs = Math.max(0, sourceRow.hrs - hoursToDeduct);
       sourceRow.assignedHours = sourceRow.hrs;
-      targetRow.hrs = Math.max(0, targetRow.hrs - hoursToDeduct);
-      targetRow.assignedHours = targetRow.hrs;
+      targetRows.forEach(tgt => {
+        tgt.hrs = Math.max(0, tgt.hrs - hoursToDeduct);
+        tgt.assignedHours = tgt.hrs;
+      });
 
       // Create merged batch as a new row
       const mergedRow = {
-        ...targetRow,
-        batch: `${sourceRow.batch}+${targetRow.batch} (${startDate} to ${endDate})`,
+        ...sourceRow,
+        batch: `${mergedBatchName} (${startDate} to ${endDate})`,
         stdCount: combinedStudents,
         hrs: mergeHours,
         assignedHours: mergeHours,
         isMerged: true,
         originalData: {
           source: originalSourceCopy,
-          target: originalTargetCopy,
+          targets: originalTargetCopies,
           sourceIndex: sourceRowIndex,
-          targetIndex: targetRowIndex,
+          targetIndices: targetRowIndices,
           mergeType: "specific-date",
           mergeStartDate: startDate,
           mergeEndDate: endDate,
@@ -1735,9 +1745,9 @@ const filteredTrainers = useMemo(() => {
         batches: [
           {
             batchPerStdCount: combinedStudents,
-            batchCode: mergedBatchCode,
+            batchCode: `${mergedBatchName}-1`,
             isMerged: true,
-            mergedFrom: `${sourceRow.batch}+${targetRow.batch}`,
+            mergedFrom: mergedBatchName,
             assignedHours: mergeHours,
             startDate: startDate,
             endDate: endDate,
@@ -1746,8 +1756,9 @@ const filteredTrainers = useMemo(() => {
         ],
       };
 
-      // Insert merged row after the target row
-      updatedData.splice(targetRowIndex + 1, 0, mergedRow);
+      // Insert merged row after the last target row
+      const insertIndex = Math.max(sourceRowIndex, ...targetRowIndices) + 1;
+      updatedData.splice(insertIndex, 0, mergedRow);
     }
 
     setTable1Data(updatedData);
@@ -1759,15 +1770,15 @@ const filteredTrainers = useMemo(() => {
     ) {
       try {
         const { collectionPath, docIdField } = mergeFirestoreConfig;
-        if (docIdField && targetRow[docIdField]) {
-          const targetDocRef = doc(
+        if (docIdField && sourceRow[docIdField]) {
+          const sourceDocRef = doc(
             db,
             collectionPath,
-            String(targetRow[docIdField])
+            String(sourceRow[docIdField])
           );
-          await updateDoc(targetDocRef, targetRow);
+          await updateDoc(sourceDocRef, sourceRow);
         } else {
-          await addDoc(collection(db, collectionPath), targetRow);
+          await addDoc(collection(db, collectionPath), sourceRow);
         }
       } catch {
         // Error persisting merged batch
@@ -1777,7 +1788,7 @@ const filteredTrainers = useMemo(() => {
     setMergeModal({
       open: false,
       sourceRowIndex: null,
-      targetRowIndex: null,
+      targetRowIndices: [],
       mergeType: "whole-phase",
       startDate: "",
       endDate: "",
@@ -2430,9 +2441,9 @@ const filteredTrainers = useMemo(() => {
 
     const {
       source,
-      target,
+      targets,
       sourceIndex,
-      targetIndex,
+      targetIndices,
       mergeType,
       mergeStartDate: _mergeStartDate,
       mergeEndDate: _mergeEndDate,
@@ -2447,47 +2458,54 @@ const filteredTrainers = useMemo(() => {
 
       // Find source and target rows by their original indices
       const sourceRow = updated[sourceIndex];
-      const targetRow = updated[targetIndex];
+      const targetRows = targetIndices.map(idx => updated.find((row, i) => i === idx)).filter(Boolean);
 
-      if (sourceRow && targetRow) {
+      if (sourceRow && targetRows.length > 0) {
         // Restore original hours
         sourceRow.hrs = source.hrs;
         sourceRow.assignedHours = source.hrs;
-        targetRow.hrs = target.hrs;
-        targetRow.assignedHours = target.hrs;
+        targetRows.forEach((tgt, idx) => {
+          const originalTarget = targets[idx];
+          if (originalTarget) {
+            tgt.hrs = originalTarget.hrs;
+            tgt.assignedHours = originalTarget.hrs;
+          }
+        });
 
         // Remove merge-related properties
         delete sourceRow.isMerged;
         delete sourceRow.originalData;
-        delete targetRow.isMerged;
-        delete targetRow.originalData;
+        targetRows.forEach(tgt => {
+          delete tgt.isMerged;
+          delete tgt.originalData;
+        });
 
         // Restore original batch names (remove date range from target)
-        if (targetRow.batch.includes("(")) {
-          targetRow.batch = targetRow.batch.split(" (")[0];
-        }
+        targetRows.forEach(tgt => {
+          if (tgt.batch.includes("(")) {
+            tgt.batch = tgt.batch.split(" (")[0];
+          }
+        });
       }
 
       // Remove the merged row
       updated.splice(mergedRowIndex, 1);
     } else {
-      // Original whole-phase merge undo logic
+      // Original whole-phase merge undo logic adapted for multiple targets
       // Restore shallow copies
-      const restoredTarget = { ...target };
       const restoredSource = { ...source };
+      const restoredTargets = targets.map(target => ({ ...target }));
 
-      // Replace merged row position with restoredTarget
-      updated[mergedRowIndex] = restoredTarget;
+      // Replace merged row position with restored source
+      updated[mergedRowIndex] = restoredSource;
 
-      // Insert source back. Prefer original sourceIndex if valid, else insert after restoredTarget
-      const insertIdx =
-        typeof sourceIndex === "number" &&
-        sourceIndex >= 0 &&
-        sourceIndex <= updated.length
-          ? sourceIndex
-          : mergedRowIndex + 1;
-
-      updated.splice(insertIdx, 0, restoredSource);
+      // Insert targets back in their original positions
+      targetIndices.forEach((originalIdx, i) => {
+        const restoredTarget = restoredTargets[i];
+        if (restoredTarget) {
+          updated.splice(originalIdx, 0, restoredTarget);
+        }
+      });
     }
 
     setTable1Data(updated);
@@ -2762,27 +2780,91 @@ const filteredTrainers = useMemo(() => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Merge with:
                 </label>
-                <select
-                  className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
-                  value={mergeModal.targetRowIndex ?? ""}
-                  onChange={(e) => {
-                    const val = e.target.value === "" ? null : Number(e.target.value);
+                <Select
+                  isMulti
+                  value={mergeModal.targetRowIndices?.map(idx => 
+                    getAvailableSpecializations(mergeModal.sourceRowIndex).find(spec => spec.idx === idx)
+                  ).filter(Boolean).map(specObj => ({
+                    value: specObj.idx,
+                    label: `${specObj.specialization} — ${specObj.stdCount} students — ${specObj.hrs} hrs`,
+                    specialization: specObj.specialization,
+                    idx: specObj.idx
+                  })) || []}
+                  onChange={(selectedOptions) => {
+                    const selectedIndices = selectedOptions ? selectedOptions.map(option => option.idx) : [];
                     setMergeModal((prev) => ({
                       ...prev,
-                      targetRowIndex: val,
+                      targetRowIndices: selectedIndices,
                     }));
                   }}
-                >
-                  <option value="">Select specialization</option>
-                  {getAvailableSpecializations(mergeModal.sourceRowIndex).map(
-                    (specObj) => (
-                      <option key={specObj.idx} value={specObj.idx}>
-                        {specObj.specialization} — {specObj.stdCount} students —{" "}
-                        {specObj.hrs} hrs
-                      </option>
-                    )
-                  )}
-                </select>
+                  options={getAvailableSpecializations(mergeModal.sourceRowIndex).map(specObj => ({
+                    value: specObj.idx,
+                    label: `${specObj.specialization} — ${specObj.stdCount} students — ${specObj.hrs} hrs`,
+                    specialization: specObj.specialization,
+                    idx: specObj.idx
+                  }))}
+                  formatOptionLabel={(option, { context }) => 
+                    context === 'menu' ? option.label : option.specialization
+                  }
+                  placeholder="Select specializations"
+                  className="text-sm"
+                  styles={{
+                    control: (provided, state) => ({
+                      ...provided,
+                      borderColor: state.isFocused ? '#6366f1' : '#d1d5db',
+                      '&:hover': {
+                        borderColor: '#6366f1',
+                      },
+                      boxShadow: state.isFocused ? '0 0 0 1px #6366f1' : provided.boxShadow,
+                      minHeight: '38px',
+                    }),
+                    valueContainer: (provided) => ({
+                      ...provided,
+                      padding: '2px 8px',
+                    }),
+                    input: (provided) => ({
+                      ...provided,
+                      fontSize: '14px',
+                      margin: '0',
+                      padding: '0',
+                    }),
+                    placeholder: (provided) => ({
+                      ...provided,
+                      fontSize: '14px',
+                      color: '#6b7280',
+                    }),
+                    multiValue: (provided) => ({
+                      ...provided,
+                      backgroundColor: '#eef2ff',
+                      borderRadius: '4px',
+                    }),
+                    multiValueLabel: (provided) => ({
+                      ...provided,
+                      color: '#6366f1',
+                      fontSize: '12px',
+                    }),
+                    multiValueRemove: (provided) => ({
+                      ...provided,
+                      color: '#6366f1',
+                      ':hover': {
+                        backgroundColor: '#c7d2fe',
+                        color: '#4338ca',
+                      },
+                    }),
+                    option: (provided, state) => ({
+                      ...provided,
+                      fontSize: '14px',
+                      padding: '8px 12px',
+                      backgroundColor: state.isSelected ? '#6366f1' : state.isFocused ? '#eef2ff' : provided.backgroundColor,
+                      color: state.isSelected ? 'white' : provided.color,
+                      cursor: 'pointer',
+                    }),
+                    menu: (provided) => ({
+                      ...provided,
+                      fontSize: '14px',
+                    }),
+                  }}
+                />
               </div>
 
               {/* Date Range Fields for Specific Date Merge */}
@@ -2830,24 +2912,27 @@ const filteredTrainers = useMemo(() => {
               )}
 
               {/* Confirmation summary */}
-              {mergeModal.targetRowIndex !== null &&
+              {mergeModal.targetRowIndices && mergeModal.targetRowIndices.length > 0 &&
                 mergeModal.sourceRowIndex !== null &&
                 (() => {
                   const src = table1Data[mergeModal.sourceRowIndex];
-                  const tgt = table1Data[mergeModal.targetRowIndex];
-                  const combined = Number(src.stdCount || 0) + Number(tgt.stdCount || 0);
+                  const targets = mergeModal.targetRowIndices.map(idx => table1Data[idx]).filter(Boolean);
+                  const totalCombinedStudents = targets.reduce((sum, tgt) => sum + Number(tgt.stdCount || 0), Number(src.stdCount || 0));
 
                   if (mergeModal.mergeType === "specific-date") {
                     const hoursToDeduct = Number(mergeModal.assignedHours || 0);
                     const sourceRemaining = Math.max(0, src.hrs - hoursToDeduct);
-                    const targetRemaining = Math.max(0, tgt.hrs - hoursToDeduct);
+                    const targetsRemaining = targets.map(tgt => ({
+                      ...tgt,
+                      remainingHours: Math.max(0, tgt.hrs - hoursToDeduct)
+                    }));
 
                     return (
                       <div className="rounded border border-gray-100 p-3 bg-gray-50 text-sm">
                         <div className="mb-3">
                           <div className="font-medium">Summary</div>
                           <div className="text-xs text-gray-600">
-                            {src.batch} + {tgt.batch}
+                            {src.batch} + {targets.map(t => t.batch).join(', ')}
                             {mergeModal.startDate && mergeModal.endDate && (
                               <span className="block text-xs text-blue-600 mt-1">
                                 {mergeModal.startDate} to {mergeModal.endDate}
@@ -2862,12 +2947,14 @@ const filteredTrainers = useMemo(() => {
                             </div>
                             <div className="font-medium">{sourceRemaining} hrs</div>
                           </div>
-                          <div className="flex items-center justify-between">
-                            <div className="text-xs text-gray-500">
-                              {tgt.batch} remaining hours
+                          {targetsRemaining.map((tgt, idx) => (
+                            <div key={idx} className="flex items-center justify-between">
+                              <div className="text-xs text-gray-500">
+                                {tgt.batch} remaining hours
+                              </div>
+                              <div className="font-medium">{tgt.remainingHours} hrs</div>
                             </div>
-                            <div className="font-medium">{targetRemaining} hrs</div>
-                          </div>
+                          ))}
                           <div className="flex items-center justify-between">
                             <div className="text-xs text-gray-500">
                               Merged batch hours
@@ -2876,9 +2963,9 @@ const filteredTrainers = useMemo(() => {
                           </div>
                           <div className="flex items-center justify-between">
                             <div className="text-xs text-gray-500">
-                              Combined students
+                              Total combined students
                             </div>
-                            <div className="font-medium">{combined}</div>
+                            <div className="font-medium">{totalCombinedStudents}</div>
                           </div>
                         </div>
                       </div>
@@ -2891,20 +2978,20 @@ const filteredTrainers = useMemo(() => {
                           <div>
                             <div className="font-medium">Summary</div>
                             <div className="text-xs text-gray-600">
-                              {src.batch} + {tgt.batch}
+                              {src.batch} + {targets.map(t => t.batch).join(', ')}
                             </div>
                           </div>
                           <div className="text-right">
                             <div className="text-xs text-gray-500">
-                              Combined students
+                              Total combined students
                             </div>
-                            <div className="font-medium">{combined}</div>
+                            <div className="font-medium">{totalCombinedStudents}</div>
                           </div>
                           <div className="text-right ml-4">
                             <div className="text-xs text-gray-500">
                               Resulting hrs
                             </div>
-                            <div className="font-medium">{tgt.hrs}</div>
+                            <div className="font-medium">{src.hrs}</div>
                           </div>
                         </div>
                       </div>
@@ -2917,7 +3004,7 @@ const filteredTrainers = useMemo(() => {
                     setMergeModal({
                       open: false,
                       sourceRowIndex: null,
-                      targetRowIndex: null,
+                      targetRowIndices: [],
                       mergeType: "whole-phase",
                       startDate: "",
                       endDate: "",
@@ -2932,7 +3019,7 @@ const filteredTrainers = useMemo(() => {
                   onClick={() =>
                     handleMergeBatch(
                       mergeModal.sourceRowIndex,
-                      mergeModal.targetRowIndex,
+                      mergeModal.targetRowIndices,
                       mergeModal.mergeType,
                       mergeModal.startDate,
                       mergeModal.endDate,
@@ -2940,12 +3027,12 @@ const filteredTrainers = useMemo(() => {
                     )
                   }
                   disabled={
-                    mergeModal.targetRowIndex === null ||
+                    !mergeModal.targetRowIndices || mergeModal.targetRowIndices.length === 0 ||
                     (mergeModal.mergeType === "specific-date" && 
                      (!mergeModal.startDate || !mergeModal.endDate || !mergeModal.assignedHours))
                   }
                   className={`px-4 py-2 rounded-lg text-sm font-medium text-white ${
-                    mergeModal.targetRowIndex !== null &&
+                    (mergeModal.targetRowIndices && mergeModal.targetRowIndices.length > 0) &&
                     (mergeModal.mergeType === "whole-phase" || 
                      (mergeModal.startDate && mergeModal.endDate && mergeModal.assignedHours))
                       ? "bg-indigo-600 hover:bg-indigo-700"
@@ -3170,7 +3257,7 @@ const filteredTrainers = useMemo(() => {
                           setMergeModal({
                             open: true,
                             sourceRowIndex: rowIndex,
-                            targetRowIndex: null,
+                            targetRowIndices: [],
                           });
                         }}
                         className="p-1 rounded hover:bg-indigo-50 text-indigo-600 transition-colors text-xs"

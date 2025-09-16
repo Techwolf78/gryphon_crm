@@ -35,15 +35,15 @@ const CollegeInfoSection = ({
           />
         </div>
 
-        {/* College Code */}
+        {/* College Name Short Form */}
         <div>
           <label className="font-medium block mb-1">
-            College Code <span className="text-red-500">*</span>
+            College Name Short Form <span className="text-red-500">*</span>
           </label>
           <input
             name="collegeCode"
             className={inputClass}
-            placeholder="Enter College Code (UPPERCASE)"
+            placeholder="ICEM"
             value={formData.collegeCode}
             onChange={handleChange}
             required
