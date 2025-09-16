@@ -15,7 +15,7 @@ import {
   FiChevronDown,
   FiRefreshCw
 } from "react-icons/fi";
-import { collection, getDocs, updateDoc, doc, query, orderBy ,getDoc} from "firebase/firestore";
+import { collection, getDocs, updateDoc, doc, query, orderBy ,getDoc,where} from "firebase/firestore";
 import { db } from "../firebase";
 import TrainerLeadDetails from "../components/Learning/TrainerLeadDetails"; // Import the details component
 const HR = () => {
@@ -47,10 +47,11 @@ const HR = () => {
       try {
         setLoading(true);
 
-        const q = query(
-          collection(db, "invoices"),
-          orderBy("createdAt", "desc")
-        );
+const q = query(
+  collection(db, "invoices"),
+  where("invoice", "==", true)
+);
+
         const querySnapshot = await getDocs(q);
 
         const billsData = querySnapshot.docs.map((doc) => {

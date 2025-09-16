@@ -148,6 +148,7 @@ const handleSubmit = async (e) => {
     onInvoiceGenerated();
     setEditMode(false);
     setViewMode(true);
+    onClose();
 
   } catch (error) {
     console.error("Error saving invoice: ", error);
