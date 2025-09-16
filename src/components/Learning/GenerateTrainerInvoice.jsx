@@ -122,7 +122,7 @@ function GenerateTrainerInvoice() {
             trainer.assignedHours;
           collegePhaseBasedGrouping[collegePhaseKey].allBatches.push(trainer);
 
-          // Update dates to show the full range
+          // Update dates to show the full rang
           if (
             new Date(trainer.startDate) <
             new Date(
