@@ -1,8 +1,8 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { FiSearch, FiFilter, FiRefreshCw, FiTrash2, FiBook, FiUser, FiCalendar } from "react-icons/fi";
-import InvoiceExcelExporter from "../../components/Learning/Initiate/InvoiceExcelExporter";
-import { db } from "../../firebase";
+import InvoiceExcelExporter from "../../Learning/Initiate/InvoiceExcelExporter";
+import { db } from "../../../firebase";
 function FiltersSection({
   searchTerm,
   setSearchTerm,

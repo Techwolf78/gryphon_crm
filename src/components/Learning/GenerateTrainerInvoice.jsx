@@ -4,13 +4,13 @@ import { db } from "../../firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import InvoiceModal from "./InvoiceModal";
 import { generateInvoicePDF } from "./invoiceUtils";
-import InvoiceExcelExporter from "./Initiate/InvoiceExcelExporter";
 import { FiSearch, FiFilter, FiRefreshCw, FiTrash2 } from "react-icons/fi";
-import Header from "../../components/Learning/Header";
-import FiltersSection from "../../components/Learning/FiltersSection";
-import TrainerTable from "../../components/Learning/TrainerTable";
-import LoadingState from "../../components/Learning/LoadingState";
-import EmptyState from "../../components/Learning/EmptyState";
+import Header from "./Invoice/Header";
+import FiltersSection from "../../components/Learning/Invoice/FiltersSection";
+import TrainerTable from "./Invoice/TrainerTable";
+import LoadingState from "./Invoice/LoadingState";
+import EmptyState from "./Invoice/EmptyState";
+import { FiCheckCircle } from "react-icons/fi";
 
 function GenerateTrainerInvoice() {
   const [trainerData, setTrainerData] = useState([]);
