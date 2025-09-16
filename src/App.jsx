@@ -73,7 +73,7 @@ const AppContent = () => {
 const App = () => (
   <MsalProviderWrapper>
     <AuthProvider>
-      <Router basename="/sync">
+      <Router basename="/">
         <AppContent />
       </Router>
     </AuthProvider>
