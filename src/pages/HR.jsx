@@ -12,8 +12,11 @@ import {
   FiX,
   FiDollarSign,
   FiBarChart2,
-  FiChevronDown
+  FiChevronDown,
+  FiRefreshCw
 } from "react-icons/fi";
+import { collection, getDocs, updateDoc, doc, query, orderBy } from "firebase/firestore";
+import { db } from "../firebase";
 
 const HR = () => {
   const [bills, setBills] = useState([]);
@@ -32,102 +35,55 @@ const HR = () => {
     totalAmount: 0,
     paidAmount: 0
   });
-  const [showBanner, setShowBanner] = useState(true);
+  const [showBanner, setShowBanner] = useState(false); // Set to false since we're using real data now
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Sample data
-  useEffect(() => {
-    const sampleBills = [
-      {
-        id: 1,
-        trainerName: "Rajesh Kumar",
-        course: "React Fundamentals",
-        batch: "RF-2023-01",
-        hours: 40,
-        rate: 1200,
-        totalAmount: 48000,
-        submittedDate: "2023-10-15",
-        status: "pending",
-        remarks: ""
-      },
-      {
-        id: 2,
-        trainerName: "Priya Sharma",
-        course: "Advanced JavaScript",
-        batch: "AJ-2023-02",
-        hours: 32,
-        rate: 1500,
-        totalAmount: 48000,
-        submittedDate: "2023-10-10",
-        status: "approved",
-        remarks: "Timely submission",
-        approvedDate: "2023-10-12",
-        approvedBy: "HR Manager"
-      },
-      {
-        id: 3,
-        trainerName: "Amit Patel",
-        course: "Node.js Backend",
-        batch: "NB-2023-03",
-        hours: 48,
-        rate: 1400,
-        totalAmount: 67200,
-        submittedDate: "2023-10-05",
-        status: "onHold",
-        remarks: "Need clarification on extra hours"
-      },
-      {
-        id: 4,
-        trainerName: "Sneha Desai",
-        course: "UI/UX Design",
-        batch: "UD-2023-04",
-        hours: 36,
-        rate: 1300,
-        totalAmount: 46800,
-        submittedDate: "2023-10-18",
-        status: "rejected",
-        remarks: "Incorrect hours reported",
-        rejectedDate: "2023-10-20",
-        rejectedBy: "HR Executive"
-      },
-      {
-        id: 5,
-        trainerName: "Vikram Singh",
-        course: "Python Data Science",
-        batch: "PDS-2023-05",
-        hours: 45,
-        rate: 1600,
-        totalAmount: 72000,
-        submittedDate: "2023-10-22",
-        status: "pending",
-        remarks: ""
-      }
-    ];
+  // Fetch real data from Firebase
+useEffect(() => {
+  const fetchBills = async () => {
+    try {
+      setLoading(true);
 
-    setBills(sampleBills);
-    setFilteredBills(sampleBills);
-    
-    // Calculate stats
-    const total = sampleBills.length;
-    const approved = sampleBills.filter(bill => bill.status === "approved").length;
-    const rejected = sampleBills.filter(bill => bill.status === "rejected").length;
-    const pending = sampleBills.filter(bill => bill.status === "pending").length;
-    const onHold = sampleBills.filter(bill => bill.status === "onHold").length;
-    const totalAmount = sampleBills.reduce((sum, bill) => sum + bill.totalAmount, 0);
-    const paidAmount = sampleBills
-      .filter(bill => bill.status === "approved")
-      .reduce((sum, bill) => sum + bill.totalAmount, 0);
-    
-    setStats({
-      total,
-      approved,
-      rejected,
-      pending,
-      onHold,
-      totalAmount,
-      paidAmount
-    });
-  }, []);
+      const q = query(
+        collection(db, "invoices"),
+        orderBy("createdAt", "desc") // ya submittedDate agar wo field use kar raha hai
+      );
+      const querySnapshot = await getDocs(q);
+
+      const billsData = querySnapshot.docs.map((doc) => {
+        const data = doc.data();
+        console.log("📄 Firestore Bill Data:", doc.id, data); // Debugging log
+
+        return {
+          id: doc.id,  // ✅ Yeh zaruri hai
+          trainerName: data.trainerName || "",
+          trainerId: data.trainerId || "",
+          collegeName: data.collegeName || "",
+          phase: data.phase || "",
+          domain: data.domain || "",
+          totalAmount: data.totalAmount || 0,
+          totalHours: data.totalHours || 0,
+          trainingRate: data.trainingRate || 0,
+          invoice: data.invoice || false,
+          status: data.status || "pending",
+          createdAt: data.createdAt?.toDate?.() || new Date(), // agar timestamp hai
+        };
+      });
+
+      console.log("✅ Final Bills Array:", billsData); // Debug log
+      setBills(billsData);
+      setFilteredBills(billsData);
+
+    } catch (error) {
+      console.error("❌ Error fetching bills:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchBills();
+}, []);
 
   // Filter bills based on status and search term
   useEffect(() => {
@@ -143,39 +99,58 @@ const HR = () => {
         bill =>
           bill.trainerName.toLowerCase().includes(term) ||
           bill.course.toLowerCase().includes(term) ||
-          bill.batch.toLowerCase().includes(term)
+          bill.batch.toLowerCase().includes(term) ||
+          bill.collegeName.toLowerCase().includes(term)
       );
     }
     
     setFilteredBills(result);
   }, [statusFilter, searchTerm, bills]);
 
-  const handleStatusUpdate = (billId, newStatus) => {
-    const updatedBills = bills.map(bill => {
-      if (bill.id === billId) {
-        const updatedBill = {
-          ...bill,
-          status: newStatus,
-          remarks: remarks
-        };
-        
-        if (newStatus === "approved") {
-          updatedBill.approvedDate = new Date().toISOString().split('T')[0];
-          updatedBill.approvedBy = "Current User";
-        } else if (newStatus === "rejected") {
-          updatedBill.rejectedDate = new Date().toISOString().split('T')[0];
-          updatedBill.rejectedBy = "Current User";
-        }
-        
-        return updatedBill;
-      }
-      return bill;
-    });
-    
+const handleStatusUpdate = async (billId, newStatus) => {
+  try {
+    const billRef = doc(db, "invoices", billId);
+    const remarkData = {
+      text: remarks,
+      addedBy: "Current User",
+      addedAt: new Date().toISOString()
+    };
+
+    const updatePayload = {
+      status: newStatus,
+      remarks: remarkData,
+      ...(newStatus === "approved" && {
+        approvedDate: new Date().toISOString().split('T')[0],
+        approvedBy: "Current User",
+        payment: true   // ✅ payment true kar diya
+      }),
+      ...(newStatus === "rejected" && {
+        rejectedDate: new Date().toISOString().split('T')[0],
+        rejectedBy: "Current User"
+      }),
+      ...(newStatus === "onHold" && {
+        holdDate: new Date().toISOString().split('T')[0],
+        holdBy: "Current User"
+      })
+    };
+
+    await updateDoc(billRef, updatePayload);
+
+    // Local state bhi update karo
+    const updatedBills = bills.map(bill =>
+      bill.id === billId
+        ? { ...bill, ...updatePayload }
+        : bill
+    );
+
     setBills(updatedBills);
     setShowModal(false);
     setRemarks("");
-  };
+  } catch (error) {
+    console.error("Error updating bill status:", error);
+    alert("Failed to update bill status. Please try again.");
+  }
+};
 
   const openModal = (bill) => {
     setSelectedBill(bill);
@@ -206,27 +181,19 @@ const HR = () => {
     );
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4 md:p-6 flex items-center justify-center">
+        <div className="text-center">
+          <FiRefreshCw className="animate-spin h-10 w-10 text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading bills data...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-      {/* Under Construction Banner */}
-      {showBanner && (
-        <div className="bg-amber-50 border-l-4 border-amber-400 text-amber-800 p-4 mb-6 rounded-md flex items-start justify-between">
-          <div className="flex-1">
-            <p className="text-sm font-medium">
-              <strong>Notice:</strong> This is dummy data for demonstration purposes only.
-            </p>
-            <p className="text-sm mt-1">The dashboard is under construction and should not be referenced for production use.</p>
-          </div>
-          <button
-            onClick={() => setShowBanner(false)}
-            className="ml-4 text-amber-600 hover:text-amber-800 focus:outline-none"
-            aria-label="Close banner"
-          >
-            <FiX className="h-5 w-5" />
-          </button>
-        </div>
-      )}
-      
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Trainer Bill Approvals</h1>
@@ -329,7 +296,7 @@ const HR = () => {
               </div>
               <input
                 type="text"
-                placeholder="Search trainers, courses..."
+                placeholder="Search trainers, courses, colleges..."
                 className="pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -382,6 +349,9 @@ const HR = () => {
                   Trainer & Course
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  College
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Hours & Rate
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -405,6 +375,10 @@ const HR = () => {
                     <div className="text-sm font-medium text-gray-900">{bill.trainerName}</div>
                     <div className="text-sm text-gray-600">{bill.course}</div>
                     <div className="text-xs text-gray-400">{bill.batch}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">{bill.collegeName}</div>
+                    <div className="text-xs text-gray-500">ID: {bill.trainerId}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">{bill.hours} hours</div>
@@ -460,6 +434,9 @@ const HR = () => {
               <div className="mb-4 text-sm text-gray-600">
                 <p>
                   <span className="font-medium">Course:</span> {selectedBill.course} ({selectedBill.batch})
+                </p>
+                <p className="mt-1">
+                  <span className="font-medium">College:</span> {selectedBill.collegeName}
                 </p>
                 <p className="mt-1">
                   <span className="font-medium">Amount:</span> ₹{selectedBill.totalAmount.toLocaleString()}

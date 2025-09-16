@@ -107,54 +107,56 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
     fetchTrainerBankDetails();
   }, [trainer?.trainerId, trainer?.collegeName, trainer?.phase]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsGenerating(true);
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setIsGenerating(true);
 
-    try {
-      // Prepare invoice data
-      const invoiceToSave = {
-        ...invoiceData,
-        trainerId: trainer?.trainerId,
-        trainerName: trainer?.trainerName,
-        collegeName: trainer?.collegeName,
-        phase: trainer?.phase,
-        totalAmount: calculateTotalAmount(),
-        netPayment: calculateNetPayment(),
-        updatedAt: new Date(),
-        status: "generated",
-      };
+  try {
+    // Prepare invoice data
+    const invoiceToSave = {
+      ...invoiceData,
+      trainerId: trainer?.trainerId,
+      trainerName: trainer?.trainerName,
+      collegeName: trainer?.collegeName,
+      phase: trainer?.phase,
+      totalAmount: calculateTotalAmount(),
+      netPayment: calculateNetPayment(),
+      updatedAt: new Date(),
+      status: "generated",
 
-      let updatedInvoiceId = existingInvoice?.id;
+      // 👇 add these defaults
+      payment: false,
+      invoice: false,
+    };
 
-      // If editing existing invoice, update it instead of creating new
-      if (existingInvoice && editMode) {
-        await updateDoc(doc(db, "invoices", existingInvoice.id), invoiceToSave);
-        console.log("Invoice updated with ID: ", existingInvoice.id);
-        alert("Invoice updated successfully!");
-        updatedInvoiceId = existingInvoice.id;
-      } else {
-        // Add to Firestore as new invoice
-        invoiceToSave.createdAt = new Date();
-        const docRef = await addDoc(collection(db, "invoices"), invoiceToSave);
-        console.log("Invoice saved with ID: ", docRef.id);
-        alert("Invoice generated successfully!");
-        updatedInvoiceId = docRef.id;
-        setExistingInvoice({ id: docRef.id, ...invoiceToSave });
-      }
+    let updatedInvoiceId = existingInvoice?.id;
 
-      // Refresh parent component and reset modes
-      onInvoiceGenerated();
-      setEditMode(false);
-      setViewMode(true);
-
-    } catch (error) {
-      console.error("Error saving invoice: ", error);
-      alert("Error saving invoice. Please try again.");
-    } finally {
-      setIsGenerating(false);
+    if (existingInvoice && editMode) {
+      await updateDoc(doc(db, "invoices", existingInvoice.id), invoiceToSave);
+      console.log("Invoice updated with ID: ", existingInvoice.id);
+      alert("Invoice updated successfully!");
+      updatedInvoiceId = existingInvoice.id;
+    } else {
+      invoiceToSave.createdAt = new Date();
+      const docRef = await addDoc(collection(db, "invoices"), invoiceToSave);
+      console.log("Invoice saved with ID: ", docRef.id);
+      alert("Invoice generated successfully!");
+      updatedInvoiceId = docRef.id;
+      setExistingInvoice({ id: docRef.id, ...invoiceToSave });
     }
-  };
+
+    onInvoiceGenerated();
+    setEditMode(false);
+    setViewMode(true);
+
+  } catch (error) {
+    console.error("Error saving invoice: ", error);
+    alert("Error saving invoice. Please try again.");
+  } finally {
+    setIsGenerating(false);
+  }
+};
+
 
   const handleEditToggle = () => {
     setEditMode(!editMode);
