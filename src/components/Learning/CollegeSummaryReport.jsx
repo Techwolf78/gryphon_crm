@@ -85,317 +85,105 @@ function CollegeSummaryReport({
   const generatePDF = () => {
     const doc = new jsPDF();
 
-    // Header
-    doc.setFontSize(20);
+    // Set compact margins
+    const marginLeft = 15;
+    const marginRight = 15;
+    const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
+
+    let yPosition = 20;
+
+    // Header - Simple and compact
+    doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text("College Summary Report", 105, 20, { align: "center" });
-
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "normal");
-    doc.text(
-      `${trainingData?.collegeName} (${trainingData?.collegeCode})`,
-      105,
-      35,
-      { align: "center" }
-    );
-
-    doc.setFontSize(12);
-    doc.text(`Course: ${trainingData?.course} - ${trainingData?.year}`, 20, 50);
-    doc.text(
-      `Phase: ${
-        PHASE_LABELS[training.selectedPhase] || training.selectedPhase
-      }`,
-      20,
-      60
-    );
-    doc.text(
-      `Training Period: ${formatDate(
-        phaseData?.trainingStartDate
-      )} to ${formatDate(phaseData?.trainingEndDate)}`,
-      20,
-      70
-    );
-    doc.text(
-      `College Timing: ${phaseData?.collegeStartTime} - ${phaseData?.collegeEndTime}`,
-      20,
-      80
-    );
-
-    let yPosition = 100;
-
-    // Summary
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text("Summary", 20, yPosition);
-    yPosition += 15;
+    doc.text("College Summary Report", pageWidth / 2, yPosition, { align: "center" });
+    yPosition += 8;
 
     doc.setFontSize(12);
     doc.setFont("helvetica", "normal");
-    doc.text(
-      `Total Students: ${trainingData?.studentCount || 0}`,
-      20,
-      yPosition
-    );
+    doc.text(`${trainingData?.collegeName} (${trainingData?.collegeCode})`, pageWidth / 2, yPosition, { align: "center" });
+    yPosition += 8;
+
+    doc.setFontSize(10);
+    doc.text(`Course: ${trainingData?.course} - ${trainingData?.year}`, marginLeft, yPosition);
+    yPosition += 6;
+    doc.text(`Phase: ${PHASE_LABELS[training.selectedPhase] || training.selectedPhase}`, marginLeft, yPosition);
+    yPosition += 6;
+    doc.text(`Training Period: ${formatDate(phaseData?.trainingStartDate)} to ${formatDate(phaseData?.trainingEndDate)}`, marginLeft, yPosition);
+    yPosition += 6;
+    doc.text(`College Timing: ${phaseData?.collegeStartTime} - ${phaseData?.collegeEndTime}`, marginLeft, yPosition);
     yPosition += 10;
-    doc.text(`Total Hours: ${trainingData?.totalHours || 0}`, 20, yPosition);
-    yPosition += 10;
-    doc.text(`Domains: ${domainsData.length}`, 20, yPosition);
-    yPosition += 25;
 
-    // Domain-wise details
-    domainsData.forEach((domainInfo) => {
-      if (yPosition > 250) {
-        doc.addPage();
-        yPosition = 20;
-      }
+    // Summary Table
+    const summaryData = [
+      ["Total Students", trainingData?.studentCount || 0],
+      ["Total Hours", trainingData?.totalHours || 0],
+      ["Domains", domainsData.length]
+    ];
 
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.text(`Domain: ${domainInfo.domain}`, 20, yPosition);
-      yPosition += 10;
-
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "normal");
-      doc.text(
-        `Domain Hours: ${domainInfo.domainHours || 0} | Assigned Hours: ${
-          domainInfo.assignedHours || 0
-        }`,
-        20,
-        yPosition
-      );
-      yPosition += 15;
-
-      if (
-        Array.isArray(domainInfo.table1Data) &&
-        domainInfo.table1Data.length > 0
-      ) {
-        domainInfo.table1Data.forEach((row) => {
-          if (yPosition > 250) {
-            doc.addPage();
-            yPosition = 20;
-          }
-
-          if (row.batches && row.batches.length > 0) {
-            // Filter out empty batches
-            const filteredBatches = row.batches.filter(batch =>
-                batch.trainers && batch.trainers.length > 0
-              );
-
-            // Only show batch if it has filtered batches
-            if (filteredBatches.length > 0) {
-              // Print batch header with better formatting
-              doc.setFontSize(14);
-              doc.setFont("helvetica", "bold");
-              doc.setTextColor(41, 128, 185); // Blue color
-              doc.text(`Batch: ${row.batch}`, 20, yPosition);
-              yPosition += 8;
-
-              doc.setFontSize(10);
-              doc.setFont("helvetica", "normal");
-              doc.setTextColor(100, 100, 100); // Gray color
-              doc.text(`${row.stdCount} students • ${row.assignedHours} hours assigned`, 20, yPosition);
-              yPosition += 15;
-
-              filteredBatches.forEach((batch) => {
-              if (yPosition > 250) {
-                doc.addPage();
-                yPosition = 20;
-              }
-
-              // Batch header with background
-              doc.setFillColor(248, 249, 250); // Light gray background
-              doc.rect(15, yPosition - 5, 180, 12, 'F');
-
-              doc.setFontSize(11);
-              doc.setFont("helvetica", "bold");
-              doc.setTextColor(52, 73, 94); // Dark blue
-              doc.text(`Batch: ${batch.batchCode}`, 20, yPosition + 2);
-              yPosition += 8;
-
-              doc.setFontSize(9);
-              doc.setFont("helvetica", "normal");
-              doc.setTextColor(100, 100, 100);
-              doc.text(`${batch.batchPerStdCount || 0} students • ${batch.assignedHours || 0} hours`, 20, yPosition);
-              yPosition += 12;
-
-              if (
-                batch.trainers &&
-                batch.trainers.length > 0
-              ) {
-                batch.trainers.forEach((trainer) => {
-                  if (yPosition > 240) {
-                    doc.addPage();
-                    yPosition = 20;
-                  }
-
-                  // Trainer card background
-                  doc.setFillColor(255, 255, 255); // White background
-                  doc.setDrawColor(200, 200, 200); // Light gray border
-                  doc.setLineWidth(0.5);
-                  doc.rect(18, yPosition - 3, 170, 35, 'FD'); // Filled rectangle with border
-
-                  // Trainer name and ID
-                  doc.setFontSize(10);
-                  doc.setFont("helvetica", "bold");
-                  doc.setTextColor(46, 49, 49); // Dark gray
-                  doc.text(`${trainer.trainerName || "Unassigned"}`, 25, yPosition + 2);
-
-                  doc.setFontSize(8);
-                  doc.setFont("helvetica", "normal");
-                  doc.setTextColor(100, 100, 100);
-                  doc.text(`ID: ${trainer.trainerId}`, 25, yPosition + 7);
-
-                  // Trainer details in two columns
-                  const leftX = 25;
-                  const rightX = 100;
-                  let detailY = yPosition + 12;
-
-                  doc.setFontSize(8);
-                  doc.setFont("helvetica", "normal");
-                  doc.setTextColor(52, 73, 94);
-
-                  // Left column
-                  doc.text(`Duration: ${trainer.dayDuration || "-"}`, leftX, detailY);
-                  doc.text(`Hours: ${trainer.assignedHours || 0}`, leftX, detailY + 4);
-                  doc.text(`Period: ${formatDate(trainer.startDate)} - ${formatDate(trainer.endDate)}`, leftX, detailY + 8);
-
-                  // Right column
-                  if (trainer.topics && trainer.topics.length > 0) {
-                    const topicsText = `Topics: ${Array.isArray(trainer.topics) ? trainer.topics.join(", ") : trainer.topics}`;
-                    // Handle long topics text by wrapping
-                    const maxWidth = 80;
-                    const wrappedTopics = doc.splitTextToSize(topicsText, maxWidth);
-                    doc.text(wrappedTopics, rightX, detailY);
-                  }
-
-                  yPosition += 40;
-
-                  // Schedule table
-                  if (
-                    trainer.startDate &&
-                    trainer.endDate
-                  ) {
-                    const dates = [];
-                    const startDate = new Date(trainer.startDate);
-                    const endDate = new Date(trainer.endDate);
-                    const excludeDays = trainingData?.excludeDays || "None";
-                    let current = new Date(startDate);
-
-                    while (current <= endDate) {
-                      const dayOfWeek = current.getDay();
-                      let shouldInclude = true;
-
-                      if (excludeDays === "Saturday" && dayOfWeek === 6) {
-                        shouldInclude = false;
-                      } else if (
-                        excludeDays === "Sunday" &&
-                        dayOfWeek === 0
-                      ) {
-                        shouldInclude = false;
-                      } else if (
-                        excludeDays === "Both" &&
-                        (dayOfWeek === 0 || dayOfWeek === 6)
-                      ) {
-                        shouldInclude = false;
-                      }
-
-                      if (shouldInclude) {
-                        dates.push(new Date(current));
-                      }
-                      current.setDate(current.getDate() + 1);
-                    }
-
-                    let hoursArray = [];
-                    if (
-                      trainer.dailyHours &&
-                      Array.isArray(trainer.dailyHours) &&
-                      trainer.dailyHours.length === dates.length
-                    ) {
-                      hoursArray = trainer.dailyHours;
-                    } else {
-                      const totalDays = dates.length;
-                      const hoursPerDay =
-                        totalDays > 0
-                          ? (trainer.assignedHours || 0) / totalDays
-                          : 0;
-                      hoursArray = new Array(totalDays).fill(hoursPerDay);
-                    }
-
-                    const scheduleData = dates.map((date, index) => [
-                      formatDate(date),
-                      hoursArray[index]?.toFixed(2) || "0.00",
-                      trainer.dayDuration || "-",
-                      getTimingForSlot(trainer.dayDuration, phaseData),
-                      domainInfo.domain,
-                    ]);
-
-                    if (scheduleData.length > 0) {
-                      autoTable(doc, {
-                        startY: yPosition + 5,
-                        head: [
-                          [
-                            "Date",
-                            "Hours",
-                            "Slot",
-                            "Timing",
-                            "Domain",
-                          ],
-                        ],
-                        body: scheduleData,
-                        styles: { fontSize: 8 },
-                        headStyles: { fillColor: [41, 128, 185] },
-                      });
-                      yPosition = doc.lastAutoTable.finalY + 10;
-                    }
-                  }
-
-                  yPosition += 10;
-                });
-              } else {
-                // No trainers message with styled background
-                doc.setFillColor(255, 248, 248); // Light red background
-                doc.setDrawColor(220, 53, 69); // Red border
-                doc.setLineWidth(0.3);
-                doc.rect(18, yPosition - 2, 170, 8, 'FD');
-
-                doc.setFontSize(9);
-                doc.setFont("helvetica", "italic");
-                doc.setTextColor(220, 53, 69);
-                doc.text("No trainers assigned", 25, yPosition + 3);
-                yPosition += 12;
-              }
-
-              yPosition += 8;
-            });
-            } // Close batch display condition
-          }
-
-          yPosition += 15;
-        });
-      } else {
-        doc.setFontSize(10);
-        doc.text("No batch data available for this domain.", 20, yPosition);
-        yPosition += 10;
-      }
-
-      yPosition += 15;
+    autoTable(doc, {
+      startY: yPosition,
+      head: [["Summary", ""]],
+      body: summaryData,
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: { fillColor: [173, 216, 230], fontSize: 10, textColor: [0, 0, 0] }, // Light blue
+      columnStyles: { 0: { fontStyle: 'bold' } },
+      margin: { left: marginLeft, right: marginRight },
     });
+    yPosition = doc.lastAutoTable.finalY + 8;
+
+    // Trainer Assignment Summary Table
+    const trainerData = [];
+
+    domainsData.forEach((domainInfo) => {
+      if (Array.isArray(domainInfo.table1Data) && domainInfo.table1Data.length > 0) {
+        domainInfo.table1Data.forEach((row) => {
+          if (row.batches && row.batches.length > 0) {
+            const filteredBatches = row.batches.filter(batch => batch.trainers && batch.trainers.length > 0);
+
+            filteredBatches.forEach((batch) => {
+              if (batch.trainers && batch.trainers.length > 0) {
+                batch.trainers.forEach((trainer) => {
+                  trainerData.push([
+                    domainInfo.domain,
+                    row.batch,
+                    batch.batchCode,
+                    trainer.trainerName || "Unassigned",
+                    trainer.trainerId,
+                    trainer.dayDuration || "-",
+                    formatDate(trainer.startDate),
+                    formatDate(trainer.endDate)
+                  ]);
+                });
+              }
+            });
+          }
+        });
+      }
+    });
+
+    if (trainerData.length > 0) {
+      autoTable(doc, {
+        startY: yPosition,
+        head: [["Domain", "Batch", "Batch Code", "Trainer", "ID", "Slot", "Start Date", "End Date"]],
+        body: trainerData,
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [173, 216, 230], fontSize: 9, textColor: [0, 0, 0] }, // Light blue
+        margin: { left: marginLeft, right: marginRight },
+      });
+      yPosition = doc.lastAutoTable.finalY + 8;
+    }
 
     // Footer
     const pageCount = doc.internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
       doc.setFontSize(8);
-      doc.text(`Page ${i} of ${pageCount}`, 105, 290, { align: "center" });
-      doc.text("Generated by Gryphon Academy CRM", 105, 295, {
-        align: "center",
-      });
+      doc.text(`Page ${i} of ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: "center" });
+      doc.text("Generated by Gryphon Academy CRM", pageWidth / 2, pageHeight - 5, { align: "center" });
     }
 
-    // Download the PDF
-    doc.save(
-      `College_Summary_Report_${trainingData?.collegeCode}_${training.selectedPhase}.pdf`
-    );
+    doc.save(`College_Summary_Report_${trainingData?.collegeCode}_${training.selectedPhase}.pdf`);
   };
 
   const handleDownload = () => {

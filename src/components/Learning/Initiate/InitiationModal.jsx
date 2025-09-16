@@ -110,6 +110,14 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
   const dropdownRef = useRef(null);
 
+  // Original data state to preserve original values for undo functionality
+  const [originalTable1DataByDomain, setOriginalTable1DataByDomain] = useState({});
+  const [originalTopics, setOriginalTopics] = useState([]);
+  const [originalCustomPhaseHours, setOriginalCustomPhaseHours] = useState({});
+  const [originalTotalAssignedHoursByDomain, setOriginalTotalAssignedHoursByDomain] = useState({});
+  const [originalSelectedDomains, setOriginalSelectedDomains] = useState([]);
+  const [hasChanges, setHasChanges] = useState(false);
+
   // Helper to generate date list, respecting excludeDays
   const getDateList = (start, end) => {
     if (!start || !end) return [];
@@ -207,6 +215,9 @@ function InitiationModal({ training, onClose, onConfirm }) {
         const data = snap.data();
         setTopics(data.topics || []);
         setCourses(data.courses || []);
+        
+        // Store original topics for undo functionality
+        setOriginalTopics(JSON.parse(JSON.stringify(data.topics || [])));
       }
     };
     fetchTrainingDetails();
@@ -263,6 +274,11 @@ function InitiationModal({ training, onClose, onConfirm }) {
         });
       }
 
+      // Store original table data for undo functionality (only if not already set)
+      if (Object.keys(originalTable1DataByDomain).length === 0) {
+        setOriginalTable1DataByDomain(JSON.parse(JSON.stringify(updated)));
+      }
+
       return updated;
     });
     setTotalAssignedHoursByDomain(prev => {
@@ -280,9 +296,52 @@ function InitiationModal({ training, onClose, onConfirm }) {
           }
         });
       }
+      
+      // Store original assigned hours for undo functionality (only if not already set)
+      if (Object.keys(originalTotalAssignedHoursByDomain).length === 0) {
+        setOriginalTotalAssignedHoursByDomain(JSON.parse(JSON.stringify(newPrev)));
+      }
+      
       return newPrev;
     });
-  }, [selectedDomains, courses, topics, getDomainHours, getMainPhase]);
+    
+    // Store original custom phase hours for undo functionality (only if not already set)
+    if (Object.keys(originalCustomPhaseHours).length === 0) {
+      setOriginalCustomPhaseHours(JSON.parse(JSON.stringify(customPhaseHours)));
+    }
+    
+    // Store original selected domains for undo functionality (only if not already set)
+    if (originalSelectedDomains.length === 0) {
+      setOriginalSelectedDomains([...selectedDomains]);
+    }
+    
+  }, [selectedDomains, courses, topics, getDomainHours, getMainPhase, originalTable1DataByDomain, originalTotalAssignedHoursByDomain, originalCustomPhaseHours, originalSelectedDomains, customPhaseHours]);
+
+  // Track changes for undo functionality
+  useEffect(() => {
+    const hasTableDataChanged = JSON.stringify(table1DataByDomain) !== JSON.stringify(originalTable1DataByDomain);
+    const hasTopicsChanged = JSON.stringify(topics) !== JSON.stringify(originalTopics);
+    const hasCustomHoursChanged = JSON.stringify(customPhaseHours) !== JSON.stringify(originalCustomPhaseHours);
+    const hasAssignedHoursChanged = JSON.stringify(totalAssignedHoursByDomain) !== JSON.stringify(originalTotalAssignedHoursByDomain);
+    const hasSelectedDomainsChanged = JSON.stringify(selectedDomains) !== JSON.stringify(originalSelectedDomains);
+    
+    setHasChanges(hasTableDataChanged || hasTopicsChanged || hasCustomHoursChanged || hasAssignedHoursChanged || hasSelectedDomainsChanged);
+  }, [table1DataByDomain, topics, customPhaseHours, totalAssignedHoursByDomain, selectedDomains, originalTable1DataByDomain, originalTopics, originalCustomPhaseHours, originalTotalAssignedHoursByDomain, originalSelectedDomains]);
+
+  // Undo function to revert to original state
+  const handleUndo = () => {
+    if (window.confirm("Are you sure you want to undo all changes and revert to the original state? This will restore all original data including hours.")) {
+      setTable1DataByDomain(JSON.parse(JSON.stringify(originalTable1DataByDomain)));
+      setTopics(JSON.parse(JSON.stringify(originalTopics)));
+      setCustomPhaseHours(JSON.parse(JSON.stringify(originalCustomPhaseHours)));
+      setTotalAssignedHoursByDomain(JSON.parse(JSON.stringify(originalTotalAssignedHoursByDomain)));
+      setSelectedDomains([...originalSelectedDomains]);
+      setHasChanges(false);
+      setError(null);
+      setSuccess("All changes have been undone. Original state restored.");
+      setTimeout(() => setSuccess(null), 3000);
+    }
+  };
 
   const handlePhaseChange = (phase) => {
     setSelectedPhases((prev) => {
@@ -387,18 +446,20 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
       const serializeTable1Data = (data) => {
         return data.map((row) => {
-          // Remove legacy merge fields and correct assignedHours
+          // Preserve merge metadata for persistent undo functionality
           const cleanedRow = { ...row };
-          delete cleanedRow.isMerged;
-          delete cleanedRow.mergedFrom;
-          delete cleanedRow.originalData;
+          // Keep merge-related properties for undo functionality
+          // delete cleanedRow.isMerged; // Commented out to preserve merge state
+          // delete cleanedRow.mergedFrom; // Commented out to preserve merge state
+          // delete cleanedRow.originalData; // Commented out to preserve merge state
           
           // Recalculate assignedHours as sum of trainer hours in batches
           let totalAssigned = 0;
           cleanedRow.batches = (row.batches || []).map((batch) => {
             const cleanedBatch = { ...batch };
-            delete cleanedBatch.isMerged;
-            delete cleanedBatch.mergedFrom;
+            // Keep merge-related properties for batches too
+            // delete cleanedBatch.isMerged; // Commented out to preserve merge state
+            // delete cleanedBatch.mergedFrom; // Commented out to preserve merge state
             
             // Sum assignedHours from trainers
             let batchAssigned = 0;
@@ -1155,12 +1216,26 @@ function InitiationModal({ training, onClose, onConfirm }) {
             assignedHours: Math.min(Number(b.assignedHours || 0), remaining),
           }));
 
-          return {
+          // Restore merge state from persisted data
+          const restoredRow = {
             ...row,
             hrs: remaining,
             assignedHours: Math.min(Number(row.assignedHours || 0), remaining),
             batches: adjustedBatches,
           };
+
+          // Preserve merge metadata if it exists in the persisted data
+          if (row.isMerged !== undefined) {
+            restoredRow.isMerged = row.isMerged;
+          }
+          if (row.mergedFrom !== undefined) {
+            restoredRow.mergedFrom = row.mergedFrom;
+          }
+          if (row.originalData !== undefined) {
+            restoredRow.originalData = row.originalData;
+          }
+
+          return restoredRow;
         });
 
         // if there is no table data in current phase but courses exist, fallback to auto-generated rows
@@ -1206,6 +1281,12 @@ function InitiationModal({ training, onClose, onConfirm }) {
         });
       }
       setTotalAssignedHoursByDomain(loadedAssignedHours);
+
+      // Store original data for undo functionality
+      setOriginalTable1DataByDomain(JSON.parse(JSON.stringify(loadedTable1Data)));
+      setOriginalTotalAssignedHoursByDomain(JSON.parse(JSON.stringify(loadedAssignedHours)));
+      setOriginalSelectedDomains([...loadedDomains]);
+      setHasChanges(false);
     };
     fetchPhaseDomains();
   }, [training?.id, currentPhase, courses, getDomainHours]);
@@ -2115,6 +2196,19 @@ function InitiationModal({ training, onClose, onConfirm }) {
             <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 rounded-b-lg">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
+                  {/* Undo button - only show if there are changes */}
+                  {hasChanges && (
+                    <button
+                      type="button"
+                      onClick={handleUndo}
+                      className="inline-flex items-center px-3 py-1.5 border border-yellow-300 shadow-sm text-xs font-medium rounded text-yellow-700 bg-yellow-50 hover:bg-yellow-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors"
+                      disabled={loading}
+                      title="Undo all changes and revert to original state"
+                    >
+                      <FiX className="w-3 h-3 mr-1" />
+                      Undo Changes
+                    </button>
+                  )}
                   {/* Trainer Calendar button moved to InitiationDashboard */}
                   <button
                     type="button"
