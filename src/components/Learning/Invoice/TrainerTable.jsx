@@ -1,7 +1,7 @@
 import React from "react";
 import { FiChevronUp, FiChevronDown, FiUser, FiCalendar, FiDollarSign, FiLayers, FiFileText, FiDownload, FiCheckCircle, FiClock } from "react-icons/fi";
 import { FaEye } from "react-icons/fa";
-import TrainerRow from "./TrainerRow";
+import TrainerRow from "../TrainerRow";
 
 function TrainerTable({
   filteredGroupedData,

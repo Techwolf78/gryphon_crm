@@ -15,9 +15,9 @@ import {
   FiChevronDown,
   FiRefreshCw
 } from "react-icons/fi";
-import { collection, getDocs, updateDoc, doc, query, orderBy } from "firebase/firestore";
+import { collection, getDocs, updateDoc, doc, query, orderBy ,getDoc} from "firebase/firestore";
 import { db } from "../firebase";
-
+import TrainerLeadDetails from "../components/Learning/TrainerLeadDetails"; // Import the details component
 const HR = () => {
   const [bills, setBills] = useState([]);
   const [filteredBills, setFilteredBills] = useState([]);
@@ -35,55 +35,89 @@ const HR = () => {
     totalAmount: 0,
     paidAmount: 0
   });
-  const [showBanner, setShowBanner] = useState(false); // Set to false since we're using real data now
+  const [showBanner, setShowBanner] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showTrainerDetails, setShowTrainerDetails] = useState(false); // New state for trainer details
+  const [selectedTrainer, setSelectedTrainer] = useState(null); // New state for selected trainer
 
   // Fetch real data from Firebase
-useEffect(() => {
-  const fetchBills = async () => {
-    try {
-      setLoading(true);
+  useEffect(() => {
+    const fetchBills = async () => {
+      try {
+        setLoading(true);
 
-      const q = query(
-        collection(db, "invoices"),
-        orderBy("createdAt", "desc") // ya submittedDate agar wo field use kar raha hai
-      );
-      const querySnapshot = await getDocs(q);
+        const q = query(
+          collection(db, "invoices"),
+          orderBy("createdAt", "desc")
+        );
+        const querySnapshot = await getDocs(q);
 
-      const billsData = querySnapshot.docs.map((doc) => {
-        const data = doc.data();
-        console.log("📄 Firestore Bill Data:", doc.id, data); // Debugging log
+        const billsData = querySnapshot.docs.map((doc) => {
+          const data = doc.data();
+          console.log("📄 Firestore Bill Data:", doc.id, data);
 
-        return {
-          id: doc.id,  // ✅ Yeh zaruri hai
-          trainerName: data.trainerName || "",
-          trainerId: data.trainerId || "",
-          collegeName: data.collegeName || "",
-          phase: data.phase || "",
-          domain: data.domain || "",
-          totalAmount: data.totalAmount || 0,
-          totalHours: data.totalHours || 0,
-          trainingRate: data.trainingRate || 0,
-          invoice: data.invoice || false,
-          status: data.status || "pending",
-          createdAt: data.createdAt?.toDate?.() || new Date(), // agar timestamp hai
-        };
+          return {
+            id: doc.id,
+            trainerName: data.trainerName || "",
+            trainerId: data.trainerId || "",
+            collegeName: data.collegeName || "",
+            phase: data.phase || "",
+            domain: data.domain || "",
+            totalAmount: data.totalAmount || 0,
+            totalHours: data.totalHours || 0,
+            trainingRate: data.trainingRate || 0,
+            invoice: data.invoice || false,
+            status: data.status || "pending",
+            createdAt: data.createdAt?.toDate?.() || new Date(),
+            // Add these fields if they exist in your Firestore
+            course: data.course || "",
+            batch: data.batch || "",
+            hours: data.hours || data.totalHours || 0,
+            rate: data.rate || data.trainingRate || 0,
+            submittedDate: data.submittedDate || data.createdAt?.toDate?.() || new Date(),
+          };
+        });
+
+        console.log("✅ Final Bills Array:", billsData);
+        setBills(billsData);
+        setFilteredBills(billsData);
+
+      } catch (error) {
+        console.error("❌ Error fetching bills:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBills();
+  }, []);
+
+  // Calculate stats whenever bills change
+  useEffect(() => {
+    if (bills.length > 0) {
+      const total = bills.length;
+      const approved = bills.filter(bill => bill.status === "approved").length;
+      const rejected = bills.filter(bill => bill.status === "rejected").length;
+      const pending = bills.filter(bill => bill.status === "pending").length;
+      const onHold = bills.filter(bill => bill.status === "onHold").length;
+      
+      const totalAmount = bills.reduce((sum, bill) => sum + (bill.totalAmount || 0), 0);
+      const paidAmount = bills
+        .filter(bill => bill.status === "approved")
+        .reduce((sum, bill) => sum + (bill.totalAmount || 0), 0);
+      
+      setStats({
+        total,
+        approved,
+        rejected,
+        pending,
+        onHold,
+        totalAmount,
+        paidAmount
       });
-
-      console.log("✅ Final Bills Array:", billsData); // Debug log
-      setBills(billsData);
-      setFilteredBills(billsData);
-
-    } catch (error) {
-      console.error("❌ Error fetching bills:", error);
-    } finally {
-      setLoading(false);
     }
-  };
-
-  fetchBills();
-}, []);
+  }, [bills]);
 
   // Filter bills based on status and search term
   useEffect(() => {
@@ -98,8 +132,8 @@ useEffect(() => {
       result = result.filter(
         bill =>
           bill.trainerName.toLowerCase().includes(term) ||
-          bill.course.toLowerCase().includes(term) ||
-          bill.batch.toLowerCase().includes(term) ||
+          (bill.course && bill.course.toLowerCase().includes(term)) ||
+          (bill.batch && bill.batch.toLowerCase().includes(term)) ||
           bill.collegeName.toLowerCase().includes(term)
       );
     }
@@ -107,56 +141,101 @@ useEffect(() => {
     setFilteredBills(result);
   }, [statusFilter, searchTerm, bills]);
 
-const handleStatusUpdate = async (billId, newStatus) => {
-  try {
-    const billRef = doc(db, "invoices", billId);
-    const remarkData = {
-      text: remarks,
-      addedBy: "Current User",
-      addedAt: new Date().toISOString()
-    };
+  const handleStatusUpdate = async (billId, newStatus) => {
+    try {
+      const billRef = doc(db, "invoices", billId);
+      const remarkData = {
+        text: remarks,
+        addedBy: "Current User",
+        addedAt: new Date().toISOString()
+      };
 
-    const updatePayload = {
-      status: newStatus,
-      remarks: remarkData,
-      ...(newStatus === "approved" && {
-        approvedDate: new Date().toISOString().split('T')[0],
-        approvedBy: "Current User",
-        payment: true   // ✅ payment true kar diya
-      }),
-      ...(newStatus === "rejected" && {
-        rejectedDate: new Date().toISOString().split('T')[0],
-        rejectedBy: "Current User"
-      }),
-      ...(newStatus === "onHold" && {
-        holdDate: new Date().toISOString().split('T')[0],
-        holdBy: "Current User"
-      })
-    };
+      const updatePayload = {
+        status: newStatus,
+        remarks: remarkData,
+        ...(newStatus === "approved" && {
+          approvedDate: new Date().toISOString().split('T')[0],
+          approvedBy: "Current User",
+          payment: true
+        }),
+        ...(newStatus === "rejected" && {
+          rejectedDate: new Date().toISOString().split('T')[0],
+          rejectedBy: "Current User"
+        }),
+        ...(newStatus === "onHold" && {
+          holdDate: new Date().toISOString().split('T')[0],
+          holdBy: "Current User"
+        })
+      };
 
-    await updateDoc(billRef, updatePayload);
+      await updateDoc(billRef, updatePayload);
 
-    // Local state bhi update karo
-    const updatedBills = bills.map(bill =>
-      bill.id === billId
-        ? { ...bill, ...updatePayload }
-        : bill
-    );
+      // Update local state
+      const updatedBills = bills.map(bill =>
+        bill.id === billId
+          ? { ...bill, ...updatePayload }
+          : bill
+      );
 
-    setBills(updatedBills);
-    setShowModal(false);
-    setRemarks("");
-  } catch (error) {
-    console.error("Error updating bill status:", error);
-    alert("Failed to update bill status. Please try again.");
-  }
-};
+      setBills(updatedBills);
+      setShowModal(false);
+      setRemarks("");
+    } catch (error) {
+      console.error("Error updating bill status:", error);
+      alert("Failed to update bill status. Please try again.");
+    }
+  };
 
   const openModal = (bill) => {
     setSelectedBill(bill);
     setRemarks(bill.remarks || "");
     setShowModal(true);
   };
+
+
+
+const openTrainerDetails = async (bill) => {
+  if (!bill.trainerId) {
+    alert("Trainer ID missing for this bill");
+    return;
+  }
+
+  try {
+    const trainerRef = doc(db, "trainers", bill.trainerId);
+    const trainerSnap = await getDoc(trainerRef);
+
+    let trainerData = {};
+    if (trainerSnap.exists()) {
+      trainerData = trainerSnap.data();
+    }
+
+    const trainer = {
+      name: trainerData.name || bill.trainerName,
+      trainerId: bill.trainerId,
+      domain: bill.domain,
+      charges: bill.trainingRate,
+      paymentType: "per hour",
+      contact: trainerData.contact || "",
+      email: trainerData.email || "",
+      specialization: trainerData.specialization || [bill.domain],
+      accountNumber: trainerData.accountNumber || "",
+      bankName: trainerData.bankName || "",
+      ifsc: trainerData.ifsc || "",
+      nameAsPerBank: trainerData.nameAsPerBank || bill.trainerName,
+      pan: trainerData.pan || "",
+      aadhar: trainerData.aadhar || "",
+      bankAddress: trainerData.bankAddress || "",
+      createdAt: bill.createdAt
+    };
+
+    setSelectedTrainer(trainer);
+    setShowTrainerDetails(true);
+  } catch (error) {
+    console.error("Error fetching trainer details:", error);
+    alert("Failed to fetch trainer details.");
+  }
+};
+
 
   const getStatusBadge = (status) => {
     const statusClasses = {
@@ -401,7 +480,11 @@ const handleStatusUpdate = async (billId, newStatus) => {
                     >
                       <FiEdit className="inline mr-1 h-4 w-4" /> Review
                     </button>
-                    <button className="text-gray-600 hover:text-gray-800 transition-colors" aria-label="View bill details">
+                    <button 
+                      onClick={() => openTrainerDetails(bill)}
+                      className="text-gray-600 hover:text-gray-800 transition-colors" 
+                      aria-label="View bill details"
+                    >
                       <FiEye className="inline mr-1 h-4 w-4" /> View
                     </button>
                   </td>
@@ -497,6 +580,15 @@ const handleStatusUpdate = async (billId, newStatus) => {
           </div>
         </div>
       )}
+
+      {/* Trainer Details Modal */}
+     {showTrainerDetails && selectedTrainer && (
+  <TrainerLeadDetails 
+    trainer={selectedTrainer} 
+    onClose={() => setShowTrainerDetails(false)} 
+  />
+)}
+
     </div>
   );
 };
