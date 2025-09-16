@@ -12,7 +12,7 @@ import {
 } from "react-icons/fi";
 import { FaEye } from "react-icons/fa";
 import { collection, query, where, getDocs, doc, updateDoc } from "firebase/firestore";
-import { db } from "../../firebase";
+import { db } from "../../../firebase";
 
 function TrainerRow({
   item,
@@ -186,48 +186,10 @@ function TrainerRow({
         <div className="flex flex-col gap-2">
           {item.hasExistingInvoice ? (
             <>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleDownloadInvoice(item)}
-                  disabled={
-                    downloadingInvoice ===
-                    `${item.trainerId}_${item.collegeName}_${item.phase}`
-                  }
-                  className="flex-1 inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-all"
-                >
-                  <FiDownload className="w-4 h-4 mr-1" />
-                  Download
-                </button>
-                <button
-                  onClick={() => handleEditInvoice(item)}
-                  className="flex-1 inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all"
-                >
-                  <FaEye className="w-4 h-4 mr-1" />
-                  View
-                </button>
-              </div>
-
-              {/* Status Display */}
               <div className="flex flex-col gap-2">
-                {uiStatus === "approve" && (
-                  <button
-                    onClick={updateInvoiceStatus}
-                    disabled={updatingStatus}
-                    className="w-full inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all disabled:opacity-50"
-                  >
-                    {updatingStatus ? (
-                      <>
-                        <FiRefreshCw className="animate-spin w-4 h-4 mr-1" />
-                        Updating...
-                      </>
-                    ) : (
-                      "Approve Invoice"
-                    )}
-                  </button>
-                )}
-
+                {/* Status Badge */}
                 <div
-                  className={`text-xs px-3 py-2 rounded-full text-center font-medium ${
+                  className={`text-xs px-3 py-1.5 rounded-full text-center font-medium ${
                     uiStatus === "done"
                       ? "bg-green-100 text-green-800 flex items-center justify-center"
                       : uiStatus === "pending"
@@ -241,6 +203,43 @@ function TrainerRow({
                     : uiStatus === "pending"
                     ? "Pending Payment"
                     : "Payment Done"}
+                </div>
+
+                {/* Action Buttons in a single line */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleDownloadInvoice(item)}
+                    disabled={
+                      downloadingInvoice ===
+                      `${item.trainerId}_${item.collegeName}_${item.phase}`
+                    }
+                    className="flex-1 inline-flex items-center justify-center px-2 py-1.5 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 transition-all"
+                  >
+                    <FiDownload className="w-3 h-3 mr-1" />
+                    Download
+                  </button>
+                  
+                  <button
+                    onClick={() => handleEditInvoice(item)}
+                    className="flex-1 inline-flex items-center justify-center px-2 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-all"
+                  >
+                    <FaEye className="w-3 h-3 mr-1" />
+                    View
+                  </button>
+                  
+                  {uiStatus === "approve" && (
+                    <button
+                      onClick={updateInvoiceStatus}
+                      disabled={updatingStatus}
+                      className="flex-1 inline-flex items-center justify-center px-2 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-all disabled:opacity-50"
+                    >
+                      {updatingStatus ? (
+                        <FiRefreshCw className="animate-spin w-3 h-3" />
+                      ) : (
+                        "Approve"
+                      )}
+                    </button>
+                  )}
                 </div>
 
                 {/* ✅ Remarks Section */}
