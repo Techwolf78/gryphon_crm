@@ -4,7 +4,13 @@ import { db } from "../../firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import InvoiceModal from "./InvoiceModal";
 import { generateInvoicePDF } from "./invoiceUtils";
-import { FiSearch, FiFilter, FiRefreshCw, FiTrash2, FiCheckCircle, FiUser, FiAlertCircle, FiXCircle, FiInfo } from "react-icons/fi";
+import { FiSearch, FiFilter, FiRefreshCw, FiTrash2 } from "react-icons/fi";
+import Header from "./Invoice/Header";
+import FiltersSection from "../../components/Learning/Invoice/FiltersSection";
+import TrainerTable from "./Invoice/TrainerTable";
+import LoadingState from "./Invoice/LoadingState";
+import EmptyState from "./Invoice/EmptyState";
+import { FiCheckCircle } from "react-icons/fi";
 
 function GenerateTrainerInvoice() {
   const [trainerData, setTrainerData] = useState([]);
@@ -122,7 +128,7 @@ function GenerateTrainerInvoice() {
             trainer.assignedHours;
           collegePhaseBasedGrouping[collegePhaseKey].allBatches.push(trainer);
 
-          // Update dates to show the full rang
+          // Update dates to show the full range
           if (
             new Date(trainer.startDate) <
             new Date(
@@ -625,6 +631,11 @@ function GenerateTrainerInvoice() {
           exporting={exporting}
           setExporting={setExporting}
           filteredGroupedData={filteredGroupedData}
+          searchTerm={searchTerm}
+          startDateFilter={startDateFilter}
+          endDateFilter={endDateFilter}
+          projectCodeFilter={projectCodeFilter}
+          collegeNameFilter={collegeNameFilter}
         />
 
         <div className="p-4 sm:p-6">
