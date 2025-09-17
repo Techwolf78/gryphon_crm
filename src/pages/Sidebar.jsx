@@ -32,6 +32,7 @@ const roleLinks = {
   placement: [{ label: "Placement", path: "/dashboard/placement", icon: <FiBriefcase /> }],
   "learning-development": [{ label: "L & D", path: "/dashboard/learning-development", icon: <FiBook /> }],
   marketing: [{ label: "D M", path: "/dashboard/marketing", icon: <FiTrendingUp /> }],
+  hr: [{ label: "HR", path: "/dashboard/hr", icon: <FiUserCheck /> }],
 };
 
 const normalizeRole = (role) => {
@@ -42,6 +43,7 @@ const normalizeRole = (role) => {
   if (norm.includes("placement")) return "placement";
   if (norm.includes("learning") || norm.includes("l&d") || norm.includes("ld")) return "learning-development";
   if (norm.includes("marketing") || norm.includes("dm")) return "marketing";
+  if (norm.includes("hr")) return "hr";
   return "";
 };
 

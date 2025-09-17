@@ -9,6 +9,9 @@ import InitiationDashboard from "../components/Learning/Initiate/InitiationDashb
 import InitiationTrainingDetails from "../components/Learning/Initiate/InitiationTrainingDetails";
 import InitiationModal from "../components/Learning/Initiate/InitiationModal";
 import GenerateTrainerInvoice from "../components/Learning/GenerateTrainerInvoice";
+import ContractInvoiceTable from "../components/Learning/ContractInvoices/ContractInvoiceTable";
+import LearningDevelopmentTour from "../components/tours/LearningDevelopmentTour";
+import { useAuth } from "../context/AuthContext";
 
 import { useNavigate } from "react-router-dom";
 
@@ -35,6 +38,7 @@ function LearningDevelopment() {
     useState(null);
 
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   // Calculate active tab index for sliding indicator
   const getActiveTabIndex = () => {
@@ -42,6 +46,7 @@ function LearningDevelopment() {
       case "newContact": return 0;
       case "initiation": return 1;
       case "trainerInvoice": return 2;
+      case "contractInvoices": return 3;
       default: return 0;
     }
   };
@@ -166,14 +171,16 @@ function LearningDevelopment() {
 
   return (
     <>
+      <LearningDevelopmentTour userId={user?.uid} />
       <div className="bg-gray-50 min-h-screen">
-        <div className="flex justify-between items-center mb-3">
+        <div className="flex justify-between items-center mb-3" data-tour="ld-header">
           <h1 className="text-3xl font-bold text-blue-800">
             Training Dashboard
           </h1>
           <button
             onClick={handleViewTrainers}
             className="px-5 py-1.5 bg-black text-white font-medium rounded-full shadow-md hover:bg-gray-800 hover:shadow-lg transform hover:scale-105 transition-all duration-200 border border-gray-300"
+            data-tour="view-trainers-button"
           >
             View Trainers
           </button>
@@ -189,6 +196,7 @@ function LearningDevelopment() {
                   : "text-gray-500 hover:text-gray-700"
               }`}
               onClick={() => setActiveTab("newContact")}
+              data-tour="new-contract-tab"
             >
               New Contract ({trainings.length})
             </button>
@@ -199,6 +207,7 @@ function LearningDevelopment() {
                   : "text-gray-500 hover:text-gray-700"
               }`}
               onClick={() => setActiveTab("initiation")}
+              data-tour="trainings-tab"
             >
               Trainings
             </button>
@@ -209,15 +218,27 @@ function LearningDevelopment() {
                   : "text-gray-500 hover:text-gray-700"
               }`}
               onClick={() => setActiveTab("trainerInvoice")}
+              data-tour="trainer-invoice-tab"
             >
               Trainer Invoice
+            </button>
+            <button
+              className={`flex-1 px-6 py-3 font-medium text-sm transition-all duration-150 ${
+                activeTab === "contractInvoices"
+                  ? "text-blue-600 bg-blue-50"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+              onClick={() => setActiveTab("contractInvoices")}
+              data-tour="contract-invoices-tab"
+            >
+              Contract Invoices
             </button>
           </div>
           {/* Sliding Indicator */}
           <div
             className="absolute bottom-0 h-0.5 bg-blue-600 transition-transform duration-150 ease-out"
             style={{
-              width: '33.333%',
+              width: '25%',
               transform: `translateX(${getActiveTabIndex() * 100}%)`,
             }}
           ></div>
@@ -276,6 +297,8 @@ function LearningDevelopment() {
           )
         ) : activeTab === "trainerInvoice" ? (
           <GenerateTrainerInvoice />
+        ) : activeTab === "contractInvoices" ? (
+          <ContractInvoiceTable />
         ) : null}
       </div>
     </>
