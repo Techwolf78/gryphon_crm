@@ -5,7 +5,7 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import InvoiceModal from "./InvoiceModal";
 import { generateInvoicePDF } from "./invoiceUtils";
 import { FiSearch, FiFilter, FiRefreshCw, FiTrash2 } from "react-icons/fi";
-import Header from "./Invoice/Header";
+import Header from "../Learning/Invoice/Header";
 import FiltersSection from "../../components/Learning/Invoice/FiltersSection";
 import TrainerTable from "./Invoice/TrainerTable";
 import LoadingState from "./Invoice/LoadingState";

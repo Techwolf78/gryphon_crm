@@ -76,6 +76,7 @@ const TrainingForm = ({
     invoiceNumber: "",
     additionalNotes: "",
     splitTotal: 0,
+    predictedstdcount: "",
   });
   const [collegeCodeError, setCollegeCodeError] = useState("");
   const [pincodeError, setPincodeError] = useState("");
@@ -107,6 +108,7 @@ const TrainingForm = ({
       formData.year,
       formData.deliveryType,
       formData.passingYear,
+      formData.predictedstdcount,
       formData.paymentType,
       formData.gstType,
       contractStartDate,
@@ -157,6 +159,7 @@ const TrainingForm = ({
         tpoName: lead.pocName || "",
         tpoEmail: lead.email || "",
         tpoPhone: lead.phoneNo || "",
+        predictedstdcount: lead.predictedstdcount || "",
       }));
       setContractStartDate(lead.contractStartDate || "");
       setContractEndDate(lead.contractEndDate || "");
@@ -179,6 +182,7 @@ const TrainingForm = ({
         tpoName: lead.pocName || "",
         tpoEmail: lead.email || "",
         tpoPhone: lead.phoneNo || "",
+        predictedstdcount: lead.predictedstdcount || "",
       }));
       setContractStartDate(lead.contractStartDate || "");
       setContractEndDate(lead.contractEndDate || "");

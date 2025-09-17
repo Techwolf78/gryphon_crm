@@ -120,6 +120,7 @@ const DropdownActions = ({
       ref={dropdownRef}
       className="absolute z-50 bg-white rounded-xl shadow-xl w-48 overflow-visible -right-4 top-full mt-1 animate-fadeIn"
       onClick={(e) => e.stopPropagation()}
+      data-tour="lead-actions"
     >
       <div className="py-1 relative">
         {/* Meetings */}
@@ -131,6 +132,7 @@ const DropdownActions = ({
             setShowFollowUpModal(true);
             closeDropdown();
           }}
+          data-tour="follow-up-action"
         >
           <FaCalendarCheck className="text-purple-500 mr-3" />
           Meetings
@@ -146,6 +148,7 @@ const DropdownActions = ({
               setShowDetailsModal(true);
               closeDropdown();
             }}
+            data-tour="view-details-action"
           >
             <FaEdit className="text-indigo-500 mr-3" />
             Edit
@@ -158,6 +161,7 @@ const DropdownActions = ({
           onMouseEnter={() => setAssignHovered(true)}
           onMouseLeave={() => setAssignHovered(false)}
           onClick={(e) => e.stopPropagation()}
+          data-tour="assign-action"
         >
           <FaArrowRight className="text-indigo-500 mr-3" />
           Assign
@@ -199,7 +203,7 @@ const DropdownActions = ({
         </div>
 
         {/* Phase Change Header */}
-        <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+        <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider" data-tour="move-phase-action">
           Move to
         </div>
 
@@ -250,6 +254,7 @@ const DropdownActions = ({
               setShowClosureModal(true);
               closeDropdown();
             }}
+            data-tour="closure-action"
           >
             <FaCheckCircle className="text-green-500 mr-3" />
             Closure

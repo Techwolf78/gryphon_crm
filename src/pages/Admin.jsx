@@ -24,12 +24,14 @@ import {
   getDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { motion } from "framer-motion";
 import NewUser from "../components/Admin/NewUser";
 import AuditLogs from "../components/Admin/AuditLogs";
 import LoginAnalytics from "../components/Admin/LoginAnalytics";
 import UserAvatar from "../components/Admin/UserAvatar";
 import EditUser from "../components/Admin/EditUserModle"; // New component
+import AdminTour from "../components/tours/AdminTour";
 
 const Admin = () => {
   const [users, setUsers] = useState([]);
@@ -43,6 +45,7 @@ const Admin = () => {
   const [departmentFilter, setDepartmentFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
     const cachedLogs = sessionStorage.getItem("auditLogs");
@@ -55,6 +58,15 @@ const Admin = () => {
     }
 
     handleRefresh();
+  }, []);
+
+  // Auth state listener
+  useEffect(() => {
+    const auth = getAuth();
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+    });
+    return () => unsubscribe();
   }, []);
 
   const handleRefresh = async () => {
@@ -171,6 +183,7 @@ const Admin = () => {
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
+        data-tour="admin-header"
       >
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
@@ -180,13 +193,13 @@ const Admin = () => {
             Manage users and view system analytics
           </p>
         </div>
-        <div className="w-full sm:w-auto">
+        <div className="w-full sm:w-auto" data-tour="add-user-button">
           <NewUser onUserAdded={handleRefresh} />
         </div>
       </motion.header>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6" data-tour="stats-cards">
         <motion.div
           whileHover={{ y: -2 }}
           className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6"
@@ -250,6 +263,7 @@ const Admin = () => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
+        data-tour="user-management-section"
       >
         <div className="p-4 sm:p-6">
           <div className="flex flex-col gap-4 mb-6">
@@ -266,7 +280,7 @@ const Admin = () => {
             {/* Mobile-first filters */}
             <div className="space-y-3">
               {/* Search */}
-              <div className="relative">
+              <div className="relative" data-tour="user-search">
                 <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
@@ -278,7 +292,7 @@ const Admin = () => {
               </div>
 
               {/* Filters row */}
-              <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex flex-col sm:flex-row gap-3" data-tour="user-filters">
                 <select
                   value={roleFilter}
                   onChange={(e) => setRoleFilter(e.target.value)}
@@ -321,7 +335,7 @@ const Admin = () => {
           </div>
 
           {/* Mobile Card View / Desktop Table View */}
-          <div className="block lg:hidden">
+          <div className="block lg:hidden" data-tour="user-table">
             {/* Mobile Card Layout */}
             <div className="space-y-4">
               {paginatedUsers.length > 0 ? (
@@ -346,7 +360,7 @@ const Admin = () => {
                           </p>
                         </div>
                       </div>
-                      <div className="flex gap-2 ml-2">
+                      <div className="flex gap-2 ml-2" data-tour="user-actions">
                         <button
                           onClick={async () => {
                             try {
@@ -397,7 +411,7 @@ const Admin = () => {
           </div>
 
           {/* Desktop Table Layout */}
-          <div className="hidden lg:block">
+          <div className="hidden lg:block" data-tour="user-table">
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
@@ -438,7 +452,7 @@ const Admin = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-gray-500">
                           {user.department}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right space-x-2">
+                        <td className="px-6 py-4 whitespace-nowrap text-right space-x-2" data-tour="user-actions">
                           <button
                             onClick={async () => {
                               try {
@@ -547,8 +561,12 @@ const Admin = () => {
         </div>
       </motion.section>
 
-      <LoginAnalytics logs={logs} />
-      <AuditLogs logs={logs} />
+      <div data-tour="login-analytics">
+        <LoginAnalytics logs={logs} />
+      </div>
+      <div data-tour="audit-logs">
+        <AuditLogs logs={logs} />
+      </div>
 
       {/* Delete Confirmation Modal - Make responsive */}
       {deleteUser && (
@@ -621,6 +639,8 @@ const Admin = () => {
           </motion.div>
         </div>
       )}
+
+      <AdminTour userId={currentUser?.uid} />
     </div>
   );
 };

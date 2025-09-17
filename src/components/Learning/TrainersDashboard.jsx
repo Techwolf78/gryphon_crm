@@ -9,6 +9,8 @@ import DeleteTrainer from "./DeleteTrainer.jsx";
 import TrainerLeadDetails from "./TrainerLeadDetails.jsx";
 import { FiPlusCircle, FiEdit, FiTrash2, FiChevronLeft } from "react-icons/fi";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import TrainersDashboardTour from "../tours/TrainersDashboardTour";
+import { useAuth } from "../../context/AuthContext";
 
 const DOMAIN_COLORS = {
   Technical: "bg-blue-100 border border-blue-300 text-blue-800",
@@ -37,6 +39,7 @@ function TrainersDashboard() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const didInitRef = useRef(false);
+  const { user } = useAuth();
   useEffect(() => {
     const loadAll = async () => {
       try {
@@ -204,9 +207,10 @@ function TrainersDashboard() {
 
   return (
     <div className="bg-gray-50 min-h-screen text-sm">
+      <TrainersDashboardTour userId={user?.uid} />
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-2">
-        <h1 className="text-lg sm:text-xl font-bold text-blue-800">
+        <h1 className="text-lg sm:text-xl font-bold text-blue-800" data-tour="trainers-header">
           Trainers Management
         </h1>
         <button
@@ -229,6 +233,7 @@ function TrainersDashboard() {
               className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              data-tour="trainers-search"
             />
             <svg
               className="absolute left-2 top-2 h-4 w-4 text-gray-400"
@@ -248,6 +253,7 @@ function TrainersDashboard() {
           <button
             onClick={() => setShowAddTrainer(true)}
             className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-3 py-1.5 rounded-xl font-semibold hover:opacity-90 transition-all shadow-sm flex items-center text-sm"
+            data-tour="add-trainer-button"
           >
             <FiPlusCircle className="h-4 w-4 mr-2" />
             Add Trainer
@@ -270,11 +276,11 @@ function TrainersDashboard() {
           <div className="relative">
             <>
             {/* Table with horizontal scroll */}
-            <div className="overflow-x-auto mb-3" style={{ maxWidth: "100%" }}>
+            <div className="overflow-x-auto mb-3" style={{ maxWidth: "100%" }} data-tour="trainers-table">
               <table className="min-w-full text-xs divide-y divide-gray-200">
                 <thead className="bg-gray-50 text-[10px] uppercase font-medium text-gray-500">
                   <tr>
-                    <th className="px-2 py-1 text-left cursor-pointer" onClick={toggleSortOrder}>
+                    <th className="px-2 py-1 text-left cursor-pointer" onClick={toggleSortOrder} data-tour="trainer-id-column">
                       ID{" "}
                       <span className="inline-block ml-1">
                         {sortOrder === "asc" ? "↑" : "↓"}
@@ -319,7 +325,7 @@ function TrainersDashboard() {
                       <td className="px-2 py-1 text-gray-700 text-sm">
                         {trainer.contact}
                       </td>
-                      <td className="px-2 py-1 flex space-x-1" onClick={e => e.stopPropagation()}>
+                      <td className="px-2 py-1 flex space-x-1" onClick={e => e.stopPropagation()} data-tour="trainer-actions">
                         <button
                           className="text-blue-600 hover:text-blue-900 text-sm p-1"
                           onClick={() => {

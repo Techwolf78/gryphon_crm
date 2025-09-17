@@ -19,6 +19,7 @@ import LeadDetailsModal from "../components/Sales/EditDetailsModal";
 import ExpectedDateModal from "../components/Sales/ExpectedDateWarning";
 import LeadsTable from "../components/Sales/LeadTable";
 import LeadFilters from "../components/Sales/LeadFilters";
+import SalesTour from "../components/tours/SalesTour";
 
 const tabLabels = {
   hot: "Hot",
@@ -544,7 +545,7 @@ function Sales() {
         {/* Sticky Header Section */}
         <div className="sticky top-0 z-20 bg-gradient-to-br from-gray-50 to-gray-100 pb-2 border-b border-gray-200">
           {/* Dashboard Title and Description */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4" data-tour="sales-header">
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
                 Sales Dashboard
@@ -557,6 +558,7 @@ function Sales() {
             <button
               onClick={() => setShowModal(true)}
               className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-5 py-2.5 rounded-xl font-semibold hover:opacity-90 transition-all shadow-md flex items-center"
+              data-tour="add-college-button"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -576,53 +578,57 @@ function Sales() {
 
           {/* View Mode and Filters */}
           <div className="flex items-center justify-between mb-2">
-            {currentUser &&
-              (() => {
-                const role = Object.values(users).find(
-                  (u) => u.uid === currentUser.uid
-                )?.role;
-                const isHigherRole = ["Director", "Head", "Manager"].includes(
-                  role
-                );
+            <div data-tour="view-mode-toggle">
+              {currentUser &&
+                (() => {
+                  const role = Object.values(users).find(
+                    (u) => u.uid === currentUser.uid
+                  )?.role;
+                  const isHigherRole = ["Director", "Head", "Manager"].includes(
+                    role
+                  );
 
-                return isViewModeLoading ? (
-                  <div className="h-8 w-48 bg-gray-100 rounded-full animate-pulse"></div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <p
-                      className={`text-xs font-medium px-3 py-1 rounded-full ${
-                        isHigherRole
-                          ? "bg-green-100 text-green-700"
-                          : "bg-blue-100 text-blue-700"
-                      }`}
-                    >
-                      Viewing:{" "}
-                      {isHigherRole
-                        ? viewMyLeadsOnly
-                          ? "My Leads Only"
-                          : "All Sales Leads"
-                        : "My Leads Only"}
-                    </p>
-                    <ViewModeToggle isHigherRole={isHigherRole} />
-                  </div>
-                );
-              })()}
+                  return isViewModeLoading ? (
+                    <div className="h-8 w-48 bg-gray-100 rounded-full animate-pulse"></div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <p
+                        className={`text-xs font-medium px-3 py-1 rounded-full ${
+                          isHigherRole
+                            ? "bg-green-100 text-green-700"
+                            : "bg-blue-100 text-blue-700"
+                        }`}
+                      >
+                        Viewing:{" "}
+                        {isHigherRole
+                          ? viewMyLeadsOnly
+                            ? "My Leads Only"
+                            : "All Sales Leads"
+                          : "My Leads Only"}
+                      </p>
+                      <ViewModeToggle isHigherRole={isHigherRole} />
+                    </div>
+                  );
+                })()}
+            </div>
 
-            <LeadFilters
-              filteredLeads={filteredLeads}
-              handleImportComplete={handleImportComplete}
-              filters={rawFilters}
-              setFilters={setRawFilters}
-              isFilterOpen={isFilterOpen}
-              setIsFilterOpen={setIsFilterOpen}
-              users={users}
-              leads={leads}
-              activeTab={activeTab}
-            />
+            <div data-tour="lead-filters">
+              <LeadFilters
+                filteredLeads={filteredLeads}
+                handleImportComplete={handleImportComplete}
+                filters={rawFilters}
+                setFilters={setRawFilters}
+                isFilterOpen={isFilterOpen}
+                setIsFilterOpen={setIsFilterOpen}
+                users={users}
+                leads={leads}
+                activeTab={activeTab}
+              />
+            </div>
           </div>
 
           {/* Phase Tabs */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2" data-tour="phase-tabs">
             {Object.keys(tabLabels).map((key) => (
               <button
                 key={key}
@@ -646,6 +652,7 @@ function Sales() {
                       : "ring-green-500"
                     : ""
                 }`}
+                data-tour={`${key}-leads-tab`}
               >
                 {tabLabels[key]}{" "}
                 <span className="ml-1 text-xs font-bold">
@@ -739,6 +746,8 @@ function Sales() {
         pendingPhaseChange={pendingPhaseChange}
         setPendingPhaseChange={setPendingPhaseChange}
       />
+
+      <SalesTour userId={currentUser?.uid} />
     </div>
   );
 }
