@@ -335,6 +335,7 @@ export default function LeadsTable({
                             ? "Close actions menu"
                             : "Open actions menu"
                         }
+                        data-tour="lead-actions"
                       >
                         {dropdownOpenId === id ? (
                           <FaTimes size={16} />

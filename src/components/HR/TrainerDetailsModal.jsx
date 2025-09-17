@@ -2,16 +2,16 @@ import React from "react";
 import TrainerLeadDetails from "../Learning/TrainerLeadDetails";
 
 const TrainerDetailsModal = ({
-  showTrainerDetails,
-  selectedTrainer,
-  setShowTrainerDetails
+  trainer,
+  isOpen,
+  onClose
 }) => {
-  if (!showTrainerDetails || !selectedTrainer) return null;
+  if (!isOpen || !trainer) return null;
 
   return (
     <TrainerLeadDetails
-      trainer={selectedTrainer}
-      onClose={() => setShowTrainerDetails(false)}
+      trainer={trainer}
+      onClose={onClose}
     />
   );
 };

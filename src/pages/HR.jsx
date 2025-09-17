@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { FiRefreshCw } from "react-icons/fi";
-import { collection, getDocs, updateDoc, doc, query, getDoc, where } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  updateDoc,
+  doc,
+  query,
+  getDoc,
+  where,
+} from "firebase/firestore";
 import { db } from "../firebase";
 import StatsCards from "../components/HR/StatsCards";
 import FinancialSummary from "../components/HR/FinancialSummary";
@@ -9,6 +17,8 @@ import BillsTable from "../components/HR/BillsTable";
 import ActionModal from "../components/HR/ActionModal";
 import TrainerDetailsModal from "../components/HR/TrainerDetailsModal";
 import LoadingState from "../components/HR/LoadingState";
+import HRBillsTour from "../components/tours/HRBillsTour";
+import { useAuth } from "../context/AuthContext";
 const HR = () => {
   const [bills, setBills] = useState([]);
   const [filteredBills, setFilteredBills] = useState([]);
@@ -20,14 +30,13 @@ const HR = () => {
   const [showActionModal, setShowActionModal] = useState(false);
   const [showTrainerModal, setShowTrainerModal] = useState(false);
 
+  const { user } = useAuth();
+
   const fetchBills = async () => {
     try {
       setLoading(true);
 
-      const q = query(
-        collection(db, "invoices"),
-        where("invoice", "==", true)
-      );
+      const q = query(collection(db, "invoices"), where("invoice", "==", true));
 
       const querySnapshot = await getDocs(q);
 
@@ -53,7 +62,8 @@ const HR = () => {
           batch: data.batch || "",
           hours: data.hours || data.totalHours || 0,
           rate: data.rate || data.trainingRate || 0,
-          submittedDate: data.submittedDate || data.createdAt?.toDate?.() || new Date(),
+          submittedDate:
+            data.submittedDate || data.createdAt?.toDate?.() || new Date(),
           amount: data.totalAmount || 0,
           trainerEmail: data.trainerEmail || "",
         };
@@ -62,7 +72,6 @@ const HR = () => {
       console.log("✅ Final Bills Array:", billsData);
       setBills(billsData);
       setFilteredBills(billsData);
-
     } catch (error) {
       console.error("❌ Error fetching bills:", error);
     } finally {
@@ -72,42 +81,51 @@ const HR = () => {
 
   // Calculate stats whenever bills change
   const totalBills = bills.length;
-  const approvedBills = bills.filter(bill => bill.status === "approved").length;
-  const pendingBills = bills.filter(bill => bill.status === "pending").length;
-  const rejectedBills = bills.filter(bill => bill.status === "rejected").length;
-  
+  const approvedBills = bills.filter(
+    (bill) => bill.status === "approved"
+  ).length;
+  const pendingBills = bills.filter((bill) => bill.status === "pending").length;
+  const rejectedBills = bills.filter(
+    (bill) => bill.status === "rejected"
+  ).length;
+
   const totalAmount = bills.reduce((sum, bill) => sum + (bill.amount || 0), 0);
   const approvedAmount = bills
-    .filter(bill => bill.status === "approved")
+    .filter((bill) => bill.status === "approved")
     .reduce((sum, bill) => sum + (bill.amount || 0), 0);
   const pendingAmount = bills
-    .filter(bill => bill.status === "pending")
+    .filter((bill) => bill.status === "pending")
     .reduce((sum, bill) => sum + (bill.amount || 0), 0);
   const rejectedAmount = bills
-    .filter(bill => bill.status === "rejected")
+    .filter((bill) => bill.status === "rejected")
     .reduce((sum, bill) => sum + (bill.amount || 0), 0);
 
   // Filter bills based on status and search term
   useEffect(() => {
     let result = bills;
-    
+
     if (statusFilter !== "all") {
-      result = result.filter(bill => bill.status === statusFilter);
+      result = result.filter((bill) => bill.status === statusFilter);
     }
-    
+
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       result = result.filter(
-        bill =>
+        (bill) =>
           bill.trainerName.toLowerCase().includes(term) ||
           (bill.course && bill.course.toLowerCase().includes(term)) ||
           (bill.batch && bill.batch.toLowerCase().includes(term)) ||
           bill.collegeName.toLowerCase().includes(term)
       );
     }
-    
+
     setFilteredBills(result);
   }, [statusFilter, searchTerm, bills]);
+
+  // Fetch bills on component mount
+  useEffect(() => {
+    fetchBills();
+  }, []);
 
   const handleViewDetails = async (bill) => {
     if (!bill.trainerId) {
@@ -140,7 +158,7 @@ const HR = () => {
         pan: trainerData.pan || "",
         aadhar: trainerData.aadhar || "",
         bankAddress: trainerData.bankAddress || "",
-        createdAt: bill.createdAt
+        createdAt: bill.createdAt,
       };
 
       setSelectedTrainer(trainer);
@@ -151,16 +169,18 @@ const HR = () => {
     }
   };
 
-  const handleAction = (bill, action) => {
+  const handleAction = (bill, action, remarks = "") => {
     setSelectedBill(bill);
-    if (action === 'approved' || action === 'rejected') {
+    if (action === "approved") {
       handleUpdateStatus(action);
+    } else if (action === "rejected") {
+      handleUpdateStatus(action, remarks);
     } else {
       setShowActionModal(true);
     }
   };
 
-  const handleUpdateStatus = async (status) => {
+  const handleUpdateStatus = async (status, remarks = "") => {
     if (!selectedBill) return;
 
     try {
@@ -168,23 +188,22 @@ const HR = () => {
       const updatePayload = {
         status: status,
         ...(status === "approved" && {
-          approvedDate: new Date().toISOString().split('T')[0],
+          approvedDate: new Date().toISOString().split("T")[0],
           approvedBy: "Current User",
-          payment: true
+          payment: true,
         }),
         ...(status === "rejected" && {
-          rejectedDate: new Date().toISOString().split('T')[0],
-          rejectedBy: "Current User"
-        })
+          rejectedDate: new Date().toISOString().split("T")[0],
+          rejectedBy: "Current User",
+          rejectionRemarks: remarks,
+        }),
       };
 
       await updateDoc(billRef, updatePayload);
 
       // Update local state
-      const updatedBills = bills.map(bill =>
-        bill.id === selectedBill.id
-          ? { ...bill, ...updatePayload }
-          : bill
+      const updatedBills = bills.map((bill) =>
+        bill.id === selectedBill.id ? { ...bill, ...updatePayload } : bill
       );
 
       setBills(updatedBills);
@@ -196,16 +215,9 @@ const HR = () => {
     }
   };
 
-
-
-
-
-
-
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-4 md:p-6 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 w-full flex items-center justify-center">
         <div className="text-center">
           <FiRefreshCw className="animate-spin h-10 w-10 text-blue-600 mx-auto mb-4" />
           <p className="text-gray-600">Loading bills data...</p>
@@ -215,38 +227,49 @@ const HR = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+    <div className="min-h-screen bg-gray-50 w-full">
+      <HRBillsTour userId={user?.uid} />
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Trainer Bill Approvals</h1>
-        <p className="text-gray-600 mt-1">Approve, reject or hold trainer bills with remarks</p>
+      <div className=" " data-tour="hr-header">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+          Trainer Bill Approvals
+        </h1>
+        <p className="text-gray-600 mt-1">
+          Approve, reject or hold trainer bills with remarks
+        </p>
       </div>
 
       {/* Stats Cards */}
-      <StatsCards
-        totalBills={totalBills}
-        approvedBills={approvedBills}
-        pendingBills={pendingBills}
-        rejectedBills={rejectedBills}
-      />
+      <div data-tour="stats-cards">
+        <StatsCards
+          totalBills={totalBills}
+          approvedBills={approvedBills}
+          pendingBills={pendingBills}
+          rejectedBills={rejectedBills}
+        />
+      </div>
 
       {/* Financial Summary */}
-      <FinancialSummary
-        totalAmount={totalAmount}
-        approvedAmount={approvedAmount}
-        pendingAmount={pendingAmount}
-        rejectedAmount={rejectedAmount}
-        onRefresh={fetchBills}
-        isLoading={loading}
-      />
+      <div data-tour="financial-summary">
+        <FinancialSummary
+          totalAmount={totalAmount}
+          approvedAmount={approvedAmount}
+          pendingAmount={pendingAmount}
+          rejectedAmount={rejectedAmount}
+        />
+      </div>
 
       {/* Filters and Search */}
-      <FiltersSection
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        statusFilter={statusFilter}
-        onStatusFilterChange={setStatusFilter}
-      />
+      <div data-tour="filters-section">
+        <FiltersSection
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
+          onRefresh={fetchBills}
+          isLoading={loading}
+        />
+      </div>
 
       {/* Bills Table */}
       {loading ? (
@@ -277,7 +300,6 @@ const HR = () => {
           onClose={() => setShowTrainerModal(false)}
         />
       )}
-
     </div>
   );
 };

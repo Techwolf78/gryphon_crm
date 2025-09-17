@@ -195,6 +195,7 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
                   aria-haspopup="menu"
                   aria-expanded={menuOpenId === item.id}
                   aria-label="Row menu"
+                  data-tour="training-actions"
                 >
                   {menuOpenId === item.id ? <FaTimes size={12} /> : <FaEllipsisV size={12} />}
                 </button>
@@ -217,6 +218,7 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
                       disabled={!item.studentFileUrl}
                       className={`w-full px-3 py-2 text-left flex items-center gap-2 transition group ${item.studentFileUrl ? 'hover:bg-indigo-50 focus:bg-indigo-50 text-gray-700' : 'text-gray-400 cursor-not-allowed'}`}
                       role="menuitem"
+                      data-tour="view-students-button"
                     >
                       <FaUsers className="text-blue-500 text-xs" />
                       <span className="font-medium text-[12px]">View Students</span>
@@ -226,6 +228,7 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
                       disabled={!item.mouFileUrl}
                       className={`w-full px-3 py-2 text-left flex items-center gap-2 transition group ${item.mouFileUrl ? 'hover:bg-indigo-50 focus:bg-indigo-50 text-gray-700' : 'text-gray-400 cursor-not-allowed'}`}
                       role="menuitem"
+                      data-tour="view-mou-button"
                     >
                       <FaFileContract className="text-blue-500 text-xs" />
                       <span className="font-medium text-[12px]">View MOU</span>
@@ -234,6 +237,7 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
                       onClick={() => { onInitiate(item); setMenuOpenId(null); }}
                       className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-indigo-50 focus:bg-indigo-50 text-gray-700 transition group"
                       role="menuitem"
+                      data-tour="start-training-button"
                     >
                       <FaPlay className="text-blue-500 text-xs" />
                       <span className="font-medium text-[12px]">{item.isInitiated ? "View Training" : "Start Training"}</span>
