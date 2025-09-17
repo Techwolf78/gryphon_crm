@@ -2,6 +2,7 @@ import React from "react";
 import { FaPlus, FaTrash } from "react-icons/fa";
 
 const inputClass = "w-full px-3 py-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white";
+const numberInputClass = "w-full px-3 py-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 
 const TopicBreakdownSection = ({ formData, setFormData }) => {
 
@@ -83,7 +84,7 @@ const TopicBreakdownSection = ({ formData, setFormData }) => {
                 <input
                   type="number"
                   placeholder="Enter Hours"
-                  className={inputClass}
+                  className={numberInputClass}
                   value={item.hours}
                   onChange={(e) => updateTopic(index, "hours", e.target.value)}
                   required

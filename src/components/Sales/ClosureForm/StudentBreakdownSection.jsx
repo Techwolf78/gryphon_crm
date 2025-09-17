@@ -4,6 +4,7 @@ import FileUploader from "../ClosureForm/FileUploader";
 
 const inputClass = "w-full px-3 py-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white";
 const selectClass = "w-full px-3 py-2 border rounded-lg border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500";
+const numberInputClass = "w-full px-3 py-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 
 const courseOptions = ["Engineering", "MBA", "BBA", "BCA", "MCA", "Diploma", "BSC", "MSC", "Others"];
 const courseYears = {
@@ -212,6 +213,22 @@ const StudentBreakdownSection = ({ formData, setFormData, studentFile, setStuden
           </div>
         </div>
 
+        {/* Predicted Student Count - Full Row */}
+        <div className="grid grid-cols-1 gap-4">
+          <div className="space-y-1 max-w-md">
+            <label className="font-medium">Predicted Student Count <span className="text-red-500">*</span></label>
+            <input
+              type="number"
+              className={numberInputClass}
+              value={formData.predictedstdcount}
+              min="0"
+              onChange={(e) => handleChange("predictedstdcount", e.target.value)}
+              placeholder="Enter predicted student count"
+              required
+            />
+          </div>
+        </div>
+
         <div className="space-y-4">
           {(formData.courses || []).map((item, index) => {
             const isCustomSpec = customSpecializations[index] || false;
@@ -265,7 +282,7 @@ const StudentBreakdownSection = ({ formData, setFormData, studentFile, setStuden
                   <label className="font-medium">No. of Students <span className="text-red-500">*</span></label>
                   <input
                     type="number"
-                    className={inputClass}
+                    className={numberInputClass}
                     value={item.students}
                     min="1"
                     onChange={(e) => updateCourseDetail(index, "students", Math.max(1, e.target.value))}
