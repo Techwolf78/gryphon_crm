@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, doc, updateDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
+import RaiseInvoiceModal from "./RaiseInvoiceModal";
 
 export default function ContractInvoiceTable() {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
 
   useEffect(() => {
     const fetchInvoices = async () => {
@@ -51,6 +54,30 @@ export default function ContractInvoiceTable() {
       return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(amount));
     } catch {
       return `₹${amount}`;
+    }
+  };
+
+  const handleRaiseInvoice = (invoice) => {
+    setSelectedInvoice(invoice);
+    setShowModal(true);
+  };
+
+  const handleSubmit = async (formData, invoice) => {
+    if (!invoice) return;
+    try {
+      const invoiceRef = doc(db, "trainingForms", invoice.id);
+      await updateDoc(invoiceRef, {
+        totalContractValue: formData.totalContractValue,
+        paymentType: formData.paymentType,
+        installment: formData.installment,
+        amountRaised: formData.amountRaised,
+        status: 'raised'
+      });
+      setShowModal(false);
+      setSelectedInvoice(null);
+    } catch (err) {
+      console.error("Error updating invoice:", err);
+      alert("Failed to raise invoice. Please try again.");
     }
   };
 
@@ -119,7 +146,7 @@ export default function ContractInvoiceTable() {
                     Due Date
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
+                    Action
                   </th>
                 </tr>
               </thead>
@@ -142,17 +169,12 @@ export default function ContractInvoiceTable() {
                       {invoice.paymentDetails?.[0]?.dueDate || invoice.contractEndDate || "N/A"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        invoice.status === 'active'
-                          ? 'bg-green-100 text-green-800'
-                          : invoice.status === 'completed'
-                          ? 'bg-blue-100 text-blue-800'
-                          : invoice.status === 'pending'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {invoice.status || 'draft'}
-                      </span>
+                      <button
+                        onClick={() => handleRaiseInvoice(invoice)}
+                        className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                      >
+                        Raised Invoice
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -161,6 +183,13 @@ export default function ContractInvoiceTable() {
           </div>
         )}
       </div>
+
+      <RaiseInvoiceModal
+        isOpen={showModal}
+        invoice={selectedInvoice}
+        onClose={() => setShowModal(false)}
+        onSubmit={handleSubmit}
+      />
     </div>
   );
 }
