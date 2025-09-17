@@ -10,7 +10,7 @@ import FiltersSection from "../../components/Learning/Invoice/FiltersSection";
 import TrainerTable from "./Invoice/TrainerTable";
 import LoadingState from "./Invoice/LoadingState";
 import EmptyState from "./Invoice/EmptyState";
-import { FiCheckCircle } from "react-icons/fi";
+import { FiCheckCircle ,FiUser} from "react-icons/fi";
 
 function GenerateTrainerInvoice() {
   const [trainerData, setTrainerData] = useState([]);
