@@ -19,6 +19,8 @@ import TrainerDetailsModal from "../components/HR/TrainerDetailsModal";
 import LoadingState from "../components/HR/LoadingState";
 import HRBillsTour from "../components/tours/HRBillsTour";
 import { useAuth } from "../context/AuthContext";
+import ContractInvoicesTab from "../components/HR/ContractInvoicesTab";
+
 const HR = () => {
   const [bills, setBills] = useState([]);
   const [filteredBills, setFilteredBills] = useState([]);
@@ -29,8 +31,24 @@ const HR = () => {
   const [loading, setLoading] = useState(true);
   const [showActionModal, setShowActionModal] = useState(false);
   const [showTrainerModal, setShowTrainerModal] = useState(false);
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      return localStorage.getItem("hr_activeTab") || "trainerBills";
+    } catch {
+      return "trainerBills";
+    }
+  });
 
   const { user } = useAuth();
+
+  // Calculate active tab index for sliding indicator
+  const getActiveTabIndex = () => {
+    switch (activeTab) {
+      case "trainerBills": return 0;
+      case "contractInvoices": return 1;
+      default: return 0;
+    }
+  };
 
   const fetchBills = async () => {
     try {
@@ -122,10 +140,12 @@ const HR = () => {
     setFilteredBills(result);
   }, [statusFilter, searchTerm, bills]);
 
-  // Fetch bills on component mount
+  // Fetch bills on component mount and when switching to trainerBills tab
   useEffect(() => {
-    fetchBills();
-  }, []);
+    if (activeTab === "trainerBills") {
+      fetchBills();
+    }
+  }, [activeTab]);
 
   const handleViewDetails = async (bill) => {
     if (!bill.trainerId) {
@@ -229,58 +249,102 @@ const HR = () => {
   return (
     <div className="min-h-screen bg-gray-50 w-full">
       <HRBillsTour userId={user?.uid} />
-      {/* Header */}
-      <div className=" " data-tour="hr-header">
+
+      {/* Common Header */}
+      <div className="mb-4" data-tour="hr-header">
         <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
-          Trainer Bill Approvals
+          HR Dashboard
         </h1>
         <p className="text-gray-600 mt-1">
-          Approve, reject or hold trainer bills with remarks
+          Approve trainer bills and manage contract invoices
         </p>
       </div>
 
-      {/* Stats Cards */}
-      <div data-tour="stats-cards">
-        <StatsCards
-          totalBills={totalBills}
-          approvedBills={approvedBills}
-          pendingBills={pendingBills}
-          rejectedBills={rejectedBills}
-        />
+      {/* Enhanced Tab Navigation with Sliding Indicator */}
+      <div className="relative mb-4">
+        <div className="flex border-b border-gray-200">
+          <button
+            className={`flex-1 px-6 py-3 font-medium text-sm transition-all duration-150 ${
+              activeTab === "trainerBills"
+                ? "text-blue-600 bg-blue-50"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+            onClick={() => setActiveTab("trainerBills")}
+            data-tour="trainer-bills-tab"
+          >
+            Trainer Bills ({bills.length})
+          </button>
+          <button
+            className={`flex-1 px-6 py-3 font-medium text-sm transition-all duration-150 ${
+              activeTab === "contractInvoices"
+                ? "text-blue-600 bg-blue-50"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+            onClick={() => setActiveTab("contractInvoices")}
+            data-tour="contract-invoices-tab"
+          >
+            Contract Invoices
+          </button>
+        </div>
+        {/* Sliding Indicator */}
+        <div
+          className="absolute bottom-0 h-0.5 bg-blue-600 transition-transform duration-150 ease-out"
+          style={{
+            width: '50%',
+            transform: `translateX(${getActiveTabIndex() * 100}%)`,
+          }}
+        ></div>
       </div>
 
-      {/* Financial Summary */}
-      <div data-tour="financial-summary">
-        <FinancialSummary
-          totalAmount={totalAmount}
-          approvedAmount={approvedAmount}
-          pendingAmount={pendingAmount}
-          rejectedAmount={rejectedAmount}
-        />
-      </div>
+      {/* Tab Content */}
+      {activeTab === "trainerBills" ? (
+        <>
+          {/* Stats Cards */}
+          <div data-tour="stats-cards">
+            <StatsCards
+              totalBills={totalBills}
+              approvedBills={approvedBills}
+              pendingBills={pendingBills}
+              rejectedBills={rejectedBills}
+            />
+          </div>
 
-      {/* Filters and Search */}
-      <div data-tour="filters-section">
-        <FiltersSection
-          searchTerm={searchTerm}
-          onSearchChange={setSearchTerm}
-          statusFilter={statusFilter}
-          onStatusFilterChange={setStatusFilter}
-          onRefresh={fetchBills}
-          isLoading={loading}
-        />
-      </div>
+          {/* Financial Summary */}
+          <div data-tour="financial-summary">
+            <FinancialSummary
+              totalAmount={totalAmount}
+              approvedAmount={approvedAmount}
+              pendingAmount={pendingAmount}
+              rejectedAmount={rejectedAmount}
+            />
+          </div>
 
-      {/* Bills Table */}
-      {loading ? (
-        <LoadingState />
-      ) : (
-        <BillsTable
-          bills={filteredBills}
-          onViewDetails={handleViewDetails}
-          onAction={handleAction}
-        />
-      )}
+          {/* Filters and Search */}
+          <div data-tour="filters-section">
+            <FiltersSection
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              statusFilter={statusFilter}
+              onStatusFilterChange={setStatusFilter}
+              onRefresh={fetchBills}
+              isLoading={loading}
+            />
+          </div>
+
+          {/* Bills Table */}
+          {loading ? (
+            <LoadingState />
+          ) : (
+            <BillsTable
+              bills={filteredBills}
+              onViewDetails={handleViewDetails}
+              onAction={handleAction}
+            />
+          )}
+        </>
+      ) : activeTab === "contractInvoices" ? (
+        <ContractInvoicesTab />
+      ) : null}
 
       {/* Action Modal */}
       {selectedBill && (
