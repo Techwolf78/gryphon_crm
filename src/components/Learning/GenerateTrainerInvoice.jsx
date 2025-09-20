@@ -8,6 +8,7 @@ import Header from "./Invoice/Header";
 import FiltersSection from "./Invoice/FiltersSection";
 import LoadingState from "./Invoice/LoadingState";
 import EmptyState from "./Invoice/EmptyState";
+
 import TrainerTable from "./Invoice/TrainerTable";
 
 function GenerateTrainerInvoice() {
