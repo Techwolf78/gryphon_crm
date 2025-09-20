@@ -257,7 +257,7 @@ const DropdownActions = ({
             data-tour="closure-action"
           >
             <FaCheckCircle className="text-green-500 mr-3" />
-            Closure
+            Client Onboarding
           </button>
         )}
 

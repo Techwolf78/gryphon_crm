@@ -1301,13 +1301,13 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                             All Health ({healthCounts.all || 0})
                           </option>
                           <option value="low">
-                            Low (&lt;20%) ({healthCounts.low || 0})
+                            Good (≤20%) ({healthCounts.low || 0})
                           </option>
                           <option value="medium">
-                            Medium (20-50%) ({healthCounts.medium || 0})
+                            Concerning (20-50%) ({healthCounts.medium || 0})
                           </option>
                           <option value="high">
-                            High (&gt;50%) ({healthCounts.high || 0})
+                            Bad (&gt;50%) ({healthCounts.high || 0})
                           </option>
                         </select>
                       </div>
@@ -1451,7 +1451,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                       {trainings
                         .filter((t) => t.computedStatus !== "Not Started")
                         .reduce((acc, t) => acc + (t.totalCost || 0), 0)
-                        .toLocaleString()}
+                        .toLocaleString('en-IN')}
                     </p>
                   </div>
                   <div className="w-10 h-10 bg-yellow-50 rounded-lg flex items-center justify-center">
@@ -1497,9 +1497,11 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                           <p className="text-blue-100 text-sm mt-1">
                             {phases.length} phase
                             {phases.length !== 1 ? "s" : ""} configured • TCV: ₹
-                            {data.tcv.toLocaleString()} • Training Cost: ₹
-                            {data.totalCost.toLocaleString()} • Health: {health.toFixed(1)}% • Total Contract Amount (including GST): ₹
-                            {data.hasGST ? data.totalNetPayable.toLocaleString() : "NA"}
+                            {data.hasGST ? data.totalNetPayable.toLocaleString('en-IN') : "NA"} • Training Cost: ₹
+                            {data.totalCost.toLocaleString('en-IN')} • Health: <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${health <= 20 ? "bg-green-500 text-white" : "bg-red-500 text-white"}`}>
+                              {health <= 20 ? "✓" : "⚠"} {health.toFixed(1)}%
+                            </span> • Total Contract Amount (including GST): ₹
+                            {data.tcv.toLocaleString('en-IN')}
                           </p>
                         </div>
                         <div className="text-blue-100">

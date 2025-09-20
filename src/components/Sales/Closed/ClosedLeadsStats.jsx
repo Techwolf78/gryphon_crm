@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useMemo, useCallback } from "react";
 import PropTypes from "prop-types";
 import TargetWithEdit from "./TargetWithEdit";
 // 🔝 Top of ClosedLeadsStats.js
@@ -21,9 +21,7 @@ const ClosedLeadsStats = ({
   selectedTeamUserId,
   setSelectedTeamUserId,
 }) => {
-  const [selectedFY, setSelectedFY] = useState(
-    propSelectedFY || getCurrentFinancialYear()
-  );
+  const selectedFY = propSelectedFY || getCurrentFinancialYear();
 
   const userObj = Object.values(users).find((u) => u.uid === currentUser?.uid);
   const isHead = userObj?.role === "Head";
@@ -31,26 +29,28 @@ const ClosedLeadsStats = ({
 
   const isManager = userObj?.role === "Manager";
 
-  let teamMembers = [];
-  if (isAdminOrDirector) {
-    teamMembers = Object.values(users).filter(
-      (u) =>
-        ["Head", "Manager", "Assistant Manager", "Executive"].includes(
-          u.role
-        ) && u.department === "Sales"
-    );
-  } else if (isHead) {
-    teamMembers = Object.values(users).filter(
-      (u) => ["Manager"].includes(u.role) && u.department === "Sales"
-    );
-  } else if (isManager) {
-    teamMembers = Object.values(users).filter(
-      (u) =>
-        ["Assistant Manager", "Executive"].includes(u.role) &&
-        u.reportingManager === userObj.name &&
-        u.department === "Sales"
-    );
-  }
+  const teamMembers = useMemo(() => {
+    if (isAdminOrDirector) {
+      return Object.values(users).filter(
+        (u) =>
+          ["Head", "Manager", "Assistant Manager", "Executive"].includes(
+            u.role
+          ) && u.department === "Sales"
+      );
+    } else if (isHead) {
+      return Object.values(users).filter(
+        (u) => ["Manager"].includes(u.role) && u.department === "Sales"
+      );
+    } else if (isManager) {
+      return Object.values(users).filter(
+        (u) =>
+          ["Assistant Manager", "Executive"].includes(u.role) &&
+          u.reportingManager === userObj.name &&
+          u.department === "Sales"
+      );
+    }
+    return [];
+  }, [isAdminOrDirector, isHead, isManager, users, userObj.name]);
 
   let targetUser;
 
@@ -58,13 +58,9 @@ const ClosedLeadsStats = ({
     userObj?.role
   );
 
-  if (isAssistant) {
-    viewMyLeadsOnly = true;
-  }
-  if (viewMyLeadsOnly) {
+  const effectiveViewMyLeadsOnly = isAssistant || viewMyLeadsOnly;
+  if (effectiveViewMyLeadsOnly) {
     targetUser = userObj;
-  } else if (isAssistant) {
-    targetUser = userObj; // ✅ Assistant/Executive ka khud ka target
   } else if (selectedTeamUserId !== "all") {
     targetUser = teamMembers.find((u) => u.uid === selectedTeamUserId);
   } else if (isManager) {
@@ -85,7 +81,7 @@ const ClosedLeadsStats = ({
     return "Q4";
   };
 
-  const getAchievedAmount = (uid, quarter) => {
+  const getAchievedAmount = useMemo(() => (uid, quarter) => {
     return Object.values(leads)
       .filter((l) => l.assignedTo?.uid === uid && l.phase === "closed")
       .filter((l) => {
@@ -94,9 +90,9 @@ const ClosedLeadsStats = ({
         return closedQuarter === quarter;
       })
       .reduce((sum, l) => sum + (l.totalCost || 0), 0);
-  };
+  }, [leads]);
 
-  const getQuarterTargetWithCarryForward = (uid) => {
+  const getQuarterTargetWithCarryForward = useCallback((uid) => {
     if (activeQuarter === "all") {
       const totalTarget = ["Q1", "Q2", "Q3", "Q4"].reduce((sum, q) => {
         const t = targets.find(
@@ -111,7 +107,7 @@ const ClosedLeadsStats = ({
       const achieved = getAchievedAmount(uid, "all");
       const deficit = Math.max(totalTarget - achieved, 0);
 
-      return { adjustedTarget: totalTarget, achieved, deficit };
+      return { adjustedTarget: totalTarget, achieved, deficit, baseTarget: totalTarget };
     }
 
     // Existing logic for single quarter
@@ -138,39 +134,41 @@ const ClosedLeadsStats = ({
       if (q === activeQuarter) {
         return {
           adjustedTarget,
-
           achieved,
-
           deficit: diff, // ← send raw value (can be negative for surplus)
+          baseTarget,
         };
       }
     }
 
-    return { adjustedTarget: 0, achieved: 0, deficit: 0 };
-  };
+    return { adjustedTarget: 0, achieved: 0, deficit: 0, baseTarget: 0 };
+  }, [activeQuarter, selectedFY, targets, getAchievedAmount]);
 
-  const getTotalAchievedAmount = (uids, quarter) => {
+  const getTotalAchievedAmount = useCallback((uids, quarter) => {
     return uids.reduce((sum, uid) => sum + getAchievedAmount(uid, quarter), 0);
-  };
+  }, [getAchievedAmount]);
 
-  const getCombinedQuarterTarget = (uids) => {
+  const getCombinedQuarterTarget = useCallback((uids) => {
     let totalAdjustedTarget = 0;
     let totalAchieved = 0;
     let totalDeficit = 0;
+    let totalBaseTarget = 0;
 
     uids.forEach((uid) => {
       const quarterData = getQuarterTargetWithCarryForward(uid);
       totalAdjustedTarget += quarterData.adjustedTarget;
       totalAchieved += quarterData.achieved;
       totalDeficit += quarterData.deficit;
+      totalBaseTarget += quarterData.baseTarget;
     });
 
     return {
       adjustedTarget: totalAdjustedTarget,
       achieved: totalAchieved,
       deficit: totalDeficit,
+      baseTarget: totalBaseTarget,
     };
-  };
+  }, [getQuarterTargetWithCarryForward]);
 
   const isHeadViewingManager =
     isHead && selectedTeamUserId !== "all" && targetUser?.role === "Manager";
@@ -188,13 +186,8 @@ const ClosedLeadsStats = ({
   }
 
   // Calculate aggregate values for "All Team Members"
-  const allTeamMembers = [userObj, ...teamMembers];
-  const uniqueTeamMembers = allTeamMembers.filter(
-    (member, index, self) =>
-      index === self.findIndex((m) => m.uid === member.uid)
-  );
   const aggregateValues = useMemo(() => {
-    if (selectedTeamUserId !== "all" || viewMyLeadsOnly) {
+    if (selectedTeamUserId !== "all" || effectiveViewMyLeadsOnly) {
       return null;
     }
 
@@ -247,6 +240,7 @@ const ClosedLeadsStats = ({
     let totalAchieved = 0;
     let totalDeficit = 0;
     let totalAnnualTarget = 0;
+    let totalBaseTarget = 0;
 
     allUids.forEach((uid) => {
       const quarterData = getQuarterTargetWithCarryForward(uid);
@@ -254,6 +248,7 @@ const ClosedLeadsStats = ({
       totalAdjustedTarget += quarterData.adjustedTarget;
       totalAchieved += quarterData.achieved;
       totalDeficit += quarterData.deficit;
+      totalBaseTarget += quarterData.baseTarget;
 
       const memberAnnualTarget = ["Q1", "Q2", "Q3", "Q4"].reduce((total, q) => {
         const t = targets.find(
@@ -273,32 +268,38 @@ const ClosedLeadsStats = ({
       achieved: totalAchieved,
       deficit: totalDeficit,
       annualTarget: totalAnnualTarget,
+      baseTarget: totalBaseTarget,
     };
   }, [
     selectedTeamUserId,
-    viewMyLeadsOnly,
+    effectiveViewMyLeadsOnly,
     targets,
     selectedFY,
-    activeQuarter,
-    leads,
     users,
+    getQuarterTargetWithCarryForward,
+    isAdminOrDirector,
+    isHead,
+    isManager,
+    teamMembers,
+    userObj.name,
+    userObj.uid,
   ]);
 
   // Display targets and achieved values
   const displayQuarterTarget = isHeadViewingManager
     ? getCombinedQuarterTarget(allUids)
-    : selectedTeamUserId === "all" && !viewMyLeadsOnly && aggregateValues
+    : selectedTeamUserId === "all" && !effectiveViewMyLeadsOnly && aggregateValues
     ? aggregateValues
     : getQuarterTargetWithCarryForward(targetUid);
 
   const achievedValue = isHeadViewingManager
     ? getTotalAchievedAmount(allUids, activeQuarter)
-    : selectedTeamUserId === "all" && !viewMyLeadsOnly && aggregateValues
+    : selectedTeamUserId === "all" && !effectiveViewMyLeadsOnly && aggregateValues
     ? aggregateValues.achieved
     : getAchievedAmount(targetUid, activeQuarter);
 
   const annualTarget =
-    selectedTeamUserId === "all" && !viewMyLeadsOnly && aggregateValues
+    selectedTeamUserId === "all" && !effectiveViewMyLeadsOnly && aggregateValues
       ? aggregateValues.annualTarget
       : ["Q1", "Q2", "Q3", "Q4"].reduce((total, q) => {
           const t = targets.find(
@@ -321,85 +322,92 @@ const ClosedLeadsStats = ({
         )
       : 0;
 
-  const completionStatus = achievementPercentage >= 100 ? "Ahead" : "Behind";
-  const statusColor =
-    achievementPercentage >= 100 ? "text-green-600" : "text-red-600";
+  const quarterLabel = displayQuarterTarget.adjustedTarget > displayQuarterTarget.baseTarget ? "Adjusted Quarter Target:" : "Quarter Target:";
+
+  const annualLabel = (selectedTeamUserId === "all" && !effectiveViewMyLeadsOnly) ? "Annual Total Target" : "Annual Target";
 
   return (
-    // ... your existing UI (cards) as is, no change needed ...
-    <>
-      <div className="bg-white shadow-lg border border-gray-100 overflow-hidden transition-all duration-300 hover:shadow-xl">
-        {/* Header Section */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-800">
-              Sales Performance Dashboard
-            </h2>
-            <div className="flex flex-wrap items-center gap-2 mt-2">
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 shadow-sm">
-                {selectedFY}
-              </span>
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 shadow-sm">
-                {activeQuarter}
-              </span>
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 shadow-sm">
-                {selectedTeamUserId === "all" && !viewMyLeadsOnly
-                  ? "All Team Members"
-                  : targetUser?.name}
-              </span>
-              <span
-                className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${statusColor} bg-opacity-20`}
-              >
-                {completionStatus} {achievementPercentage}%
-              </span>
-            </div>
-          </div>
-
-          {!viewMyLeadsOnly && teamMembers.length > 0 && (
-            <div className="mt-3 sm:mt-0 w-full sm:w-auto">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Team Member
-              </label>
-              <div className="relative">
-                <select
-                  value={selectedTeamUserId}
-                  onChange={(e) => setSelectedTeamUserId(e.target.value)}
-                  className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white shadow-sm appearance-none"
+    <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 overflow-hidden">
+      {/* Header Section */}
+      <div className="relative bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-6 text-white">
+        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="relative">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold bg-white/20 backdrop-blur-sm border border-white/30">
+                  📅 {selectedFY}
+                </span>
+                <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold bg-white/20 backdrop-blur-sm border border-white/30">
+                  🎯 {activeQuarter}
+                </span>
+                <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold bg-white/20 backdrop-blur-sm border border-white/30">
+                  👤{" "}
+                  {selectedTeamUserId === "all" && !effectiveViewMyLeadsOnly
+                    ? "All Team Members"
+                    : targetUser?.name}
+                </span>
+                <span
+                  className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold ${
+                    achievementPercentage >= 100
+                      ? "bg-emerald-500/20 border border-emerald-400/30"
+                      : "bg-amber-500/20 border border-amber-400/30"
+                  }`}
                 >
-                  <option value="all">All Team Members</option>
-                  {teamMembers.map((u) => (
-                    <option key={u.uid} value={u.uid}>
-                      {u.name} ({u.role})
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                  <svg
-                    className="h-4 w-4"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </div>
+                  {achievementPercentage >= 100 ? "🚀 Ahead" : "📈 Behind"}{" "}
+                  {achievementPercentage}%
+                </span>
               </div>
             </div>
-          )}
-        </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-gray-100">
-          {/* Achieved Card */}
-          <div className="p-6 hover:bg-gray-50 transition-colors duration-200">
-            <div className="flex flex-col items-center">
-              <div className="flex items-center justify-center w-14 h-14 rounded-full bg-green-50 mb-4 shadow-inner border border-green-100">
+            {!effectiveViewMyLeadsOnly && teamMembers.length > 0 && (
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                <label className="block text-sm font-semibold text-white/90 mb-2">
+                  Team Member
+                </label>
+                <div className="relative">
+                  <select
+                    value={selectedTeamUserId}
+                    onChange={(e) => setSelectedTeamUserId(e.target.value)}
+                    className="block w-full pl-4 pr-10 py-2.5 text-base border border-white/30 rounded-lg bg-white/95 text-gray-900 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 sm:text-sm backdrop-blur-sm"
+                  >
+                    <option value="all">All Team Members</option>
+                    {teamMembers.map((u) => (
+                      <option key={u.uid} value={u.uid}>
+                        {u.name} ({u.role})
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-white/70">
+                    <svg
+                      className="h-5 w-5"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Cards Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
+        {/* Achieved Card */}
+        <div className="group bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl p-4 border border-emerald-100/50 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-r from-emerald-500 to-green-600 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-7 w-7 text-green-600"
+                  className="h-4 w-4 text-white"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -412,42 +420,43 @@ const ClosedLeadsStats = ({
                   />
                 </svg>
               </div>
-              <h3 className="text-lg font-medium text-gray-700 mb-1">
-                Achieved
-              </h3>
-              <p className="text-3xl font-bold text-gray-900 mb-4">
-                {formatCurrency(achievedValue)}
-              </p>
-              {displayQuarterTarget.adjustedTarget > 0 && (
-                <div className="w-full max-w-xs">
-                  <div className="flex justify-between text-sm text-gray-600 mb-1">
-                    <span>Progress</span>
-                    <span className="font-medium">
-                      {achievementPercentage}%
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
-                    <div
-                      className="bg-gradient-to-r from-green-400 to-green-600 h-2.5 rounded-full transition-all duration-500 ease-out"
-                      style={{ width: `${achievementPercentage}%` }}
-                    ></div>
-                  </div>
-                  <div className="flex justify-between text-xs text-gray-500 mt-1">
-                    <span>0%</span>
-                    <span>100%</span>
-                  </div>
-                </div>
-              )}
+              <div>
+                <p className="text-sm font-semibold text-emerald-700">
+                  Achieved
+                </p>
+                <p className="text-xs text-emerald-600">This Quarter</p>
+              </div>
             </div>
           </div>
+          {/* Centered big achieved amount */}
+          <div className="text-center mb-4">
+            <p className="text-3xl font-bold text-gray-900 mb-2">
+              {formatCurrency(achievedValue)}
+            </p>
+            {displayQuarterTarget.adjustedTarget > 0 && (
+              <div className="flex items-center justify-center gap-2">
+                <div className="w-20 bg-gray-200 rounded-full h-3 overflow-hidden">
+                  <div
+                    className="bg-gradient-to-r from-emerald-400 to-green-600 h-3 rounded-full transition-all duration-700 ease-out shadow-sm"
+                    style={{ width: `${achievementPercentage}%` }}
+                  />
+                </div>
+                <span className="text-sm font-semibold text-emerald-700">
+                  {achievementPercentage}%
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
 
-          {/* Target Card */}
-          <div className="p-6 hover:bg-gray-50 transition-colors duration-200">
-            <div className="flex flex-col items-center">
-              <div className="flex items-center justify-center w-14 h-14 rounded-full bg-blue-50 mb-4 shadow-inner border border-blue-100">
+        {/* Target Card */}
+        <div className="group bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100/50 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-7 w-7 text-blue-600"
+                  className="h-4 w-4 text-white"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -460,71 +469,82 @@ const ClosedLeadsStats = ({
                   />
                 </svg>
               </div>
-              <h3 className="text-lg font-medium text-gray-700 mb-1">
-                Annual Target
-              </h3>
-              <div className="min-h-[48px] flex items-center justify-center mb-3">
-                {annualTarget > 0 ? (
-                  <p className="text-2xl font-bold text-gray-900">
-                    {formatCurrency(annualTarget)}
-                  </p>
-                ) : (
-                  <p className="text-2xl font-bold text-gray-500">
-                    Not Assigned
-                  </p>
-                )}
+              <div>
+                <p className="text-sm font-semibold text-blue-700">
+                  {annualLabel}
+                </p>
+                <p className="text-xs text-blue-600">Full Year Goal</p>
               </div>
-
-              {/* Show edit button only for individual users, not for "All Team Members" */}
-              {selectedTeamUserId !== "all" || viewMyLeadsOnly ? (
-                <div className="mb-3">
-                  <TargetWithEdit
-                    value={annualTarget}
-                    fy={selectedFY}
-                    currentUser={currentUser}
-                    targetUser={
-                      !viewMyLeadsOnly && selectedTeamUserId !== "all"
-                        ? targetUser
-                        : null
-                    }
-                    users={users}
-                    onUpdate={handleTargetUpdate}
-                    viewMyLeadsOnly={viewMyLeadsOnly}
-                  />
-                </div>
-              ) : null}
-
-              <div className="w-full max-w-xs bg-gray-50 rounded-lg p-3 border border-gray-200">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Quarter Target:</span>
-                  <span className="text-sm font-semibold text-gray-800">
-                    {formatCurrency(displayQuarterTarget.adjustedTarget)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center mt-1">
-                  <span className="text-sm text-gray-600">Achieved:</span>
-                  <span className="text-sm font-semibold text-green-600">
-                    {formatCurrency(achievedValue)}
-                  </span>
-                </div>
-              </div>
+            </div>
+            <div className="text-right">
+              {annualTarget > 0 ? (
+                <p className="text-xl font-bold text-gray-900">
+                  {formatCurrency(annualTarget)}
+                </p>
+              ) : (
+                <p className="text-lg font-bold text-gray-500">Not Assigned</p>
+              )}
             </div>
           </div>
 
-          {/* Deficit Card */}
-          <div className="p-6 hover:bg-gray-50 transition-colors duration-200">
-            <div className="flex flex-col items-center">
+          {/* Show edit button only for individual users, not for "All Team Members" */}
+          {selectedTeamUserId !== "all" || effectiveViewMyLeadsOnly ? (
+            <div className="mt-3 flex justify-end">
+              <TargetWithEdit
+                value={annualTarget}
+                fy={selectedFY}
+                currentUser={currentUser}
+                targetUser={
+                  !effectiveViewMyLeadsOnly && selectedTeamUserId !== "all"
+                    ? targetUser
+                    : null
+                }
+                users={users}
+                onUpdate={handleTargetUpdate}
+                viewMyLeadsOnly={effectiveViewMyLeadsOnly}
+              />
+            </div>
+          ) : null}
+
+          <div className="mt-3 bg-white/60 rounded-lg p-3 border border-blue-100/50">
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <span className="text-gray-600">{quarterLabel}</span>
+                <p className="font-semibold text-blue-700">
+                  {formatCurrency(displayQuarterTarget.adjustedTarget)}
+                </p>
+              </div>
+              <div>
+                <span className="text-gray-600">Achieved:</span>
+                <p className="font-semibold text-emerald-600">
+                  {formatCurrency(achievedValue)}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Deficit/Surplus Card */}
+        <div
+          className={`group rounded-xl p-4 border hover:shadow-lg transition-all duration-300 hover:-translate-y-1 ${
+            displayDeficit > 0
+              ? "bg-gradient-to-br from-red-50 to-rose-50 border-red-100/50"
+              : "bg-gradient-to-br from-emerald-50 to-green-50 border-emerald-100/50"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
               <div
-                className={`flex items-center justify-center w-14 h-14 rounded-full mb-4 shadow-inner border ${
+                className={`p-2 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300 ${
                   displayDeficit > 0
-                    ? "bg-red-50 border-red-100"
-                    : "bg-green-50 border-green-100"
+                    ? "bg-gradient-to-r from-red-500 to-rose-600"
+                    : "bg-gradient-to-r from-emerald-500 to-green-600"
                 }`}
               >
                 {displayDeficit > 0 ? (
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="h-7 w-7 text-red-600"
+                    className="h-4 w-4 text-white"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -539,7 +559,7 @@ const ClosedLeadsStats = ({
                 ) : (
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="h-7 w-7 text-green-600"
+                    className="h-4 w-4 text-white"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -553,65 +573,85 @@ const ClosedLeadsStats = ({
                   </svg>
                 )}
               </div>
-              <h3 className="text-lg font-medium text-gray-700 mb-1">
-                {displayDeficit > 0 ? "Deficit" : "Surplus"}
-              </h3>
+              <div>
+                <p
+                  className={`text-sm font-semibold ${
+                    displayDeficit > 0 ? "text-red-700" : "text-emerald-700"
+                  }`}
+                >
+                  {displayDeficit > 0 ? "Deficit" : "Surplus"}
+                </p>
+                <p
+                  className={`text-xs ${
+                    displayDeficit > 0 ? "text-red-600" : "text-emerald-600"
+                  }`}
+                >
+                  {displayDeficit > 0 ? "Gap to Fill" : "Extra Achievement"}
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
               <p
-                className="text-3xl font-bold mb-2"
-                style={{
-                  color: displayDeficit > 0 ? "#DC2626" : "#10B981",
-                }}
+                className={`text-xl font-bold ${
+                  displayDeficit > 0 ? "text-red-600" : "text-emerald-600"
+                }`}
               >
                 {formatCurrency(Math.abs(displayDeficit))}
               </p>
-              {displayQuarterTarget.adjustedTarget > 0 && (
-                <div
-                  className={`w-full max-w-xs p-3 rounded-lg ${
-                    displayDeficit > 0
-                      ? "bg-red-50 border-red-100"
-                      : "bg-green-50 border-green-100"
-                  } border`}
-                >
-                  <p
-                    className={`text-sm text-center font-medium ${
-                      displayDeficit > 0 ? "text-red-700" : "text-green-700"
-                    }`}
-                  >
-                    {displayDeficit > 0 ? (
-                      <span>
-                        You need{" "}
-                        <span className="font-bold">
-                          {Math.round(
-                            (displayDeficit /
-                              displayQuarterTarget.adjustedTarget) *
-                              100
-                          )}
-                          %
-                        </span>{" "}
-                        more to reach target
-                      </span>
-                    ) : (
-                      <span>
-                        You're{" "}
-                        <span className="font-bold">
-                          {Math.round(
-                            (Math.abs(displayDeficit) /
-                              displayQuarterTarget.adjustedTarget) *
-                              100
-                          )}
-                          %
-                        </span>{" "}
-                        above target
-                      </span>
-                    )}
-                  </p>
-                </div>
-              )}
+              <div
+                className={`text-xs mt-1 ${
+                  displayDeficit > 0 ? "text-red-500" : "text-emerald-500"
+                }`}
+              >
+                {displayDeficit > 0 ? "⚠️ Action Required" : "✅ On Track"}
+              </div>
             </div>
           </div>
+
+          {displayQuarterTarget.adjustedTarget > 0 && (
+            <div
+              className={`mt-3 bg-white/60 rounded-lg p-3 border ${
+                displayDeficit > 0
+                  ? "border-red-100/50"
+                  : "border-emerald-100/50"
+              }`}
+            >
+              <p
+                className={`text-xs text-center font-medium ${
+                  displayDeficit > 0 ? "text-red-700" : "text-emerald-700"
+                }`}
+              >
+                {displayDeficit > 0 ? (
+                  <span>
+                    Need{" "}
+                    <span className="font-bold">
+                      {Math.round(
+                        (displayDeficit / displayQuarterTarget.adjustedTarget) *
+                          100
+                      )}
+                      %
+                    </span>{" "}
+                    more to reach target
+                  </span>
+                ) : (
+                  <span>
+                    <span className="font-bold">
+                      {Math.round(
+                        (Math.abs(displayDeficit) /
+                          displayQuarterTarget.adjustedTarget) *
+                          100
+                      )}
+                      %
+                    </span>{" "}
+                    above target
+                  </span>
+                )}
+              </p>
+            </div>
+          )}
         </div>
       </div>
-    </>
+    </div>
   );
 };
 

@@ -532,7 +532,7 @@ function InitiationTrainingDetails({ training, onBack }) {
                                                 Period: {formatDate(trainer.startDate)} - {formatDate(trainer.endDate)}
                                               </div>
                                               {trainer.perHourCost && (
-                                                <div>Rate: ₹{trainer.perHourCost}/hour</div>
+                                                <div>Rate: ₹{trainer.perHourCost.toLocaleString('en-IN')}/hour</div>
                                               )}
                                               {trainer.topics && trainer.topics.length > 0 && (
                                                 <div>Topics: {Array.isArray(trainer.topics) ? trainer.topics.join(", ") : trainer.topics}</div>
@@ -553,13 +553,13 @@ function InitiationTrainingDetails({ training, onBack }) {
                                                   const totalCost = trainerCost + miscTotal;
                                                   return (
                                                     <>
-                                                      <div>Conveyance: ₹{conveyanceTotal.toFixed(2)}</div>
-                                                      <div>Food: ₹{foodTotal.toFixed(2)} ({(trainer.food || 0).toFixed(2)} × {days})</div>
-                                                      <div>Lodging: ₹{lodgingTotal.toFixed(2)} ({(trainer.lodging || 0).toFixed(2)} × {days})</div>
-                                                      <div>Trainer: ₹{trainerCost.toFixed(2)}</div>
-                                                      <div>Misc: ₹{miscTotal.toFixed(2)}</div>
+                                                      <div>Conveyance: ₹{conveyanceTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                                      <div>Food: ₹{foodTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({(trainer.food || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} × {days})</div>
+                                                      <div>Lodging: ₹{lodgingTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({(trainer.lodging || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} × {days})</div>
+                                                      <div>Trainer: ₹{trainerCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                                      <div>Misc: ₹{miscTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                                       <div className="font-semibold text-gray-800 border-t border-gray-300 pt-1">
-                                                        Total: ₹{totalCost.toFixed(2)}
+                                                        Total: ₹{totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                       </div>
                                                     </>
                                                   );
@@ -667,7 +667,7 @@ function InitiationTrainingDetails({ training, onBack }) {
                                                             <td className="border-b border-gray-100 px-0.5 py-0">{trainer.dayDuration || '-'}</td>
                                                             <td className="border-b border-gray-100 px-0.5 py-0">{getTimingForSlot(trainer.dayDuration, phaseData)}</td>
                                                             <td className="border-b border-gray-100 px-0.5 py-0">{DOMAIN_KEYWORDS[domainInfo.domain] || domainInfo.domain}</td>
-                                                            <td className="border-b border-gray-100 px-0.5 py-0">₹{totalCostForDay.toFixed(2)}</td>
+                                                            <td className="border-b border-gray-100 px-0.5 py-0">₹{totalCostForDay.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                                           </tr>
                                                         );
                                                       });
