@@ -11,7 +11,6 @@ import {
   addDoc,
   doc,
   updateDoc,
-  arrayUnion,
 } from "firebase/firestore";
 import { db } from "../../../firebase";
 import {
@@ -82,7 +81,6 @@ const TrainerRow = React.memo(
     openSwapModal,
     isTrainerAvailable,
     isDuplicate = false,
-    updateTrainerLocal,
     excludeDays,
     commonFields,
     getTrainingHoursPerDay,
@@ -822,15 +820,36 @@ const TrainerRow = React.memo(
                 {/** Topics area */}
                 <div className="flex-1 min-w-[240px]">
                   <div className="flex items-center justify-between mb-0.5">
-                  <h4 className="text-[10px] font-semibold text-slate-700">
-                    Topics
-                  </h4>
-                  <span className="text-[10px] text-slate-500">
-                    Select or add
-                  </span>
-                </div>
+                    <div className="flex items-center space-x-1">
+                      <h4 className="text-sm font-semibold text-slate-700">
+                        Topics
+                      </h4>
+                      <div className="relative group">
+                        <button
+                          type="button"
+                          className="text-slate-400 hover:text-slate-600 text-xs"
+                          title="How to use topics"
+                        >
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                        <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block bg-slate-800 text-white text-xs rounded py-2 px-3 shadow-lg z-50 max-w-xs">
+                          <div className="font-semibold mb-1">How to manage topics:</div>
+                          <ul className="space-y-1">
+                            <li>• Click topic buttons to select/deselect</li>
+                            <li>• Type in the box below to add new topics</li>
+                            <li>• Press Enter or click Add to save</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-xs text-slate-500">
+                      Click to select • Type to add
+                    </span>
+                  </div>
 
-                  <div className="bg-white rounded-md border border-gray-100 p-1 shadow-sm">
+                  <div className="bg-white rounded-md border border-gray-100 p-2 shadow-sm">
                   {/* Simplified topics selection UI */}
                   {(() => {
                     const trainerDoc = trainers.find(
@@ -869,18 +888,18 @@ const TrainerRow = React.memo(
                     };
 
                     return (
-                      <div className="space-y-1.5">
+                      <div className="space-y-2">
                         <div
                           role="group"
                           aria-label="Topics"
-                          className="min-h-[22px] max-h-24 overflow-auto rounded border border-dashed border-gray-200 p-0.5 bg-gray-50"
+                          className="min-h-[28px] max-h-32 overflow-auto rounded border border-dashed border-gray-200 p-1 bg-gray-50"
                         >
                           {allTopics.length === 0 ? (
-                            <div className="text-[10px] text-slate-400 py-2 text-center">
-                              No topics yet. Add below.
+                            <div className="text-xs text-slate-400 py-3 text-center">
+                              No topics available. Add one below.
                             </div>
                           ) : (
-                            <div className="flex flex-wrap gap-0.5">
+                            <div className="flex flex-wrap gap-1">
                               {allTopics.map((topic) => {
                                 const active = selected.includes(topic);
                                 return (
@@ -890,22 +909,22 @@ const TrainerRow = React.memo(
                                     role="checkbox"
                                     aria-checked={active}
                                     onClick={() => toggleTopic(topic)}
-                                    className={`text-[9px] px-1 py-0.5 rounded-full border transition-all focus:outline-none focus:ring-1 focus:ring-indigo-400 truncate ${
+                                    className={`text-xs px-2 py-1 rounded-full border transition-all focus:outline-none focus:ring-1 focus:ring-indigo-400 truncate ${
                                       active
-                                        ? "bg-indigo-600 text-white border-indigo-600 shadow"
+                                        ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
                                         : "bg-white text-slate-700 border-gray-300 hover:border-indigo-400 hover:bg-indigo-50"
                                     }`}
-                                    title={topic}
+                                    title={`${active ? 'Deselect' : 'Select'} topic: ${topic}`}
                                   >
                                     {topic}
-                                    {active && <span className="ml-1">✓</span>}
+                                    {active && <span className="ml-1 text-xs">✓</span>}
                                   </button>
                                 );
                               })}
                             </div>
                           )}
                         </div>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-2">
                           <input
                             aria-label={`Add topic for trainer ${
                               trainer.trainerName ||
@@ -932,34 +951,11 @@ const TrainerRow = React.memo(
                                   "topics",
                                   next
                                 );
-                                if (trainer.trainerId) {
-                                  (async () => {
-                                    try {
-                                      const trainerDocRef = doc(
-                                        db,
-                                        "trainers",
-                                        String(trainer.trainerId)
-                                      );
-                                      await updateDoc(trainerDocRef, {
-                                        otherSpecialization: arrayUnion(t),
-                                      });
-                                      updateTrainerLocal?.(
-                                        trainer.trainerId,
-                                        t
-                                      );
-                                    } catch (err) {
-                                      console.error(
-                                        "Failed to persist new topic:",
-                                        err
-                                      );
-                                    }
-                                  })();
-                                }
                                 setNewTopicInput("");
                               }
                             }}
-                            placeholder="Add topic & Enter"
-                            className="flex-1 rounded border border-gray-200 px-2 py-0.5 text-[10px] focus:outline-none focus:ring-1 focus:ring-indigo-200"
+                            placeholder="Type new topic here..."
+                            className="flex-1 rounded border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-200"
                           />
                           <button
                             type="button"
@@ -978,31 +974,12 @@ const TrainerRow = React.memo(
                                 "topics",
                                 next
                               );
-                              if (trainer.trainerId) {
-                                (async () => {
-                                  try {
-                                    const trainerDocRef = doc(
-                                      db,
-                                      "trainers",
-                                      String(trainer.trainerId)
-                                    );
-                                    await updateDoc(trainerDocRef, {
-                                      otherSpecialization: arrayUnion(t),
-                                    });
-                                    updateTrainerLocal?.(trainer.trainerId, t);
-                                  } catch (err) {
-                                    console.error(
-                                      "Failed to persist new topic:",
-                                      err
-                                    );
-                                  }
-                                })();
-                              }
                               setNewTopicInput("");
                             }}
-                            className="inline-flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-0.5 rounded text-[10px] focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                            className="inline-flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={!newTopicInput.trim()}
                           >
-                            <FiPlus size={10} />
+                            <FiPlus size={14} />
                             <span>Add</span>
                           </button>
                         </div>
@@ -1041,7 +1018,6 @@ const TrainersTable = React.memo(
     isTrainerAvailable,
     duplicates = [],
     refetchTrainers,
-    updateTrainerLocal,
     excludeDays,
     commonFields,
     getTrainingHoursPerDay,
@@ -1139,7 +1115,6 @@ const TrainersTable = React.memo(
                       isTrainerAvailable={isTrainerAvailable}
                       isDuplicate={isDuplicate}
                       refetchTrainers={refetchTrainers}
-                      updateTrainerLocal={updateTrainerLocal}
                       excludeDays={excludeDays}
                       commonFields={commonFields}
                       getTrainingHoursPerDay={getTrainingHoursPerDay}
@@ -1183,7 +1158,6 @@ const BatchComponent = React.memo(
     isTrainerAvailable,
     duplicates = [],
     refetchTrainers,
-    updateTrainerLocal,
     excludeDays,
     commonFields,
     getTrainingHoursPerDay,
@@ -1359,7 +1333,6 @@ const BatchComponent = React.memo(
             isTrainerAvailable={isTrainerAvailable}
             duplicates={duplicates}
             refetchTrainers={refetchTrainers}
-            updateTrainerLocal={updateTrainerLocal}
             excludeDays={excludeDays}
             commonFields={commonFields}
             getTrainingHoursPerDay={getTrainingHoursPerDay}
@@ -1566,23 +1539,6 @@ const filteredTrainers = useMemo(() => {
   useEffect(() => {
     refetchTrainers();
   }, [refetchTrainers]);
-
-  // Update a trainer in the local `trainers` state to avoid a full refetch
-  const updateTrainerLocal = useCallback((trainerId, newTopic) => {
-    if (!trainerId || !newTopic) return;
-    setTrainers((prev) =>
-      prev.map((t) => {
-        if (!t || (!t.id && !t.trainerId)) return t;
-        const id = t.id || t.trainerId;
-        if (id !== trainerId) return t;
-        const existing = Array.isArray(t.otherSpecialization)
-          ? t.otherSpecialization
-          : [];
-        const merged = Array.from(new Set([...existing, newTopic]));
-        return { ...t, otherSpecialization: merged };
-      })
-    );
-  }, []);
 
   const generateBatchCode = (specialization, index) => {
     return `${specialization}${index}`;
@@ -3318,7 +3274,6 @@ const filteredTrainers = useMemo(() => {
                           isTrainerAvailable={isTrainerAvailable}
                           duplicates={duplicateTrainers}
                           refetchTrainers={refetchTrainers}
-                          updateTrainerLocal={updateTrainerLocal}
                           excludeDays={excludeDays}
                           commonFields={commonFields}
                           getTrainingHoursPerDay={getTrainingHoursPerDay}

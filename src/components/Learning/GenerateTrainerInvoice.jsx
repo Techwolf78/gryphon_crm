@@ -68,6 +68,24 @@ function GenerateTrainerInvoice() {
                   const endDate =
                     trainer.endDate || trainer.activeDates?.slice(-1)[0] || "";
 
+                  // Collect all topics from trainer, batch, and domain levels
+                  const allTopics = new Set();
+
+                  // Add domain-level topics
+                  if (domainData.topics && Array.isArray(domainData.topics)) {
+                    domainData.topics.forEach(topic => allTopics.add(topic));
+                  }
+
+                  // Add trainer-level topics (from trainer.topics if available)
+                  if (trainer.topics && Array.isArray(trainer.topics)) {
+                    trainer.topics.forEach(topic => allTopics.add(topic));
+                  }
+
+                  // Add batch-level topics if available in the batch data
+                  if (batch.topics && Array.isArray(batch.topics)) {
+                    batch.topics.forEach(topic => allTopics.add(topic));
+                  }
+
                   const trainerObj = {
                     trainerName: trainer.trainerName || "N/A",
                     trainerId: trainer.trainerId || "",
@@ -77,7 +95,7 @@ function GenerateTrainerInvoice() {
                     projectCode: formData.projectCode || "",
                     startDate,
                     endDate,
-                    topics: domainData.topics || [],
+                    topics: Array.from(allTopics), // All aggregated topics
                     batches: batch.batches || [],
                     mergedBreakdown: trainer.mergedBreakdown || [],
                     activeDates: trainer.activeDates || [],
@@ -118,6 +136,8 @@ function GenerateTrainerInvoice() {
             allProjects: [trainer.projectCode],
             // Keep track of all domains for this trainer at this college and phase
             allDomains: [trainer.domain],
+            // Aggregate all topics from all batches
+            allTopics: new Set(trainer.topics || []),
           };
         } else {
           // Add hours from this batch to total
@@ -163,12 +183,22 @@ function GenerateTrainerInvoice() {
               trainer.domain
             );
           }
+
+          // Aggregate topics from this batch
+          if (trainer.topics && Array.isArray(trainer.topics)) {
+            trainer.topics.forEach(topic => {
+              collegePhaseBasedGrouping[collegePhaseKey].allTopics.add(topic);
+            });
+          }
         }
       });
 
       const collegePhaseBasedTrainers = Object.values(
         collegePhaseBasedGrouping
-      );
+      ).map(trainer => ({
+        ...trainer,
+        topics: Array.from(trainer.allTopics), // Convert Set to Array for topics
+      }));
 
       // Check invoices for each trainer-college-phase combination
       const updatedTrainersList = await Promise.all(
