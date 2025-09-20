@@ -67,7 +67,8 @@ export const exportClosedLeads = async (filteredLeads, db) => {
         Year: form.year || "-",
         "Delivery Mode": form.deliveryType || "-",
         "Passing Year": form.passingYear || "-",
-        "Total Students": form.studentCount || "-",
+        "Total no. of std. in contract": form.studentCount || "-",
+        "Total No of stds. in a year": form.predictedstdcount || "500",
         "Total Hours": form.totalHours ? `${form.totalHours} hrs` : "-",
         Specializations: specializationText,
         "Topics Covered": topicsText,
@@ -193,6 +194,7 @@ export const exportClosedLeads = async (filteredLeads, db) => {
       { wch: 15 }, // Delivery Mode
       { wch: 15 }, // Passing Year
       { wch: 15 }, // Total Students
+      { wch: 20 }, // Total No of stds. in a year
       { wch: 15 }, // Total Hours
       { wch: 25 }, // Specializations
       { wch: 30 }, // Topics Covered

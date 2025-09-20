@@ -98,42 +98,40 @@ const TrainerRow = React.memo(
     // ✅ ADD: Ref to track previous dates
     const previousDatesRef = useRef({ startDate: null, endDate: null });
 
-    // ✅ If trainer has no topics selected but the selected trainer document
-    // provides specializations, default-select those topics once.
-    useEffect(() => {
+    // ✅ FIXED: Use useCallback for auto-select topics to prevent render-time state updates
+    const autoSelectTopics = useCallback(() => {
       try {
-        const hasTopics =
-          Array.isArray(trainer.topics) && trainer.topics.length > 0;
-        if (
-          !hasTopics &&
-          trainer.trainerId &&
-          Array.isArray(trainers) &&
-          trainers.length > 0
-        ) {
-          const trDoc = trainers.find(
-            (t) =>
-              t.id === trainer.trainerId || t.trainerId === trainer.trainerId
+        const trainerDoc = trainers.find(
+          (t) => t.trainerId === trainer.trainerId
+        );
+        const base = [];
+        if (trainerDoc) {
+          if (Array.isArray(trainerDoc.specialization))
+            base.push(...trainerDoc.specialization);
+          if (Array.isArray(trainerDoc.otherSpecialization))
+            base.push(...trainerDoc.otherSpecialization);
+        }
+        const allTopics = Array.from(
+          new Set([...base, ...addedTopics])
+        )
+          .filter(Boolean)
+          .sort();
+        const selected = Array.isArray(trainer.topics)
+          ? trainer.topics
+          : trainer.topics
+          ? [trainer.topics]
+          : [];
+
+        // Auto-select all existing topics (from Firestore) if none selected yet
+        if (allTopics.length > 0 && selected.length === 0) {
+          // Prevent infinite loop: only trigger when strictly empty
+          handleTrainerField(
+            rowIndex,
+            batchIndex,
+            trainerIdx,
+            "topics",
+            allTopics
           );
-          if (trDoc) {
-            const s1 = Array.isArray(trDoc.specialization)
-              ? trDoc.specialization
-              : [];
-            const s2 = Array.isArray(trDoc.otherSpecialization)
-              ? trDoc.otherSpecialization
-              : [];
-            const defaults = Array.from(
-              new Set([...s1, ...s2].filter(Boolean))
-            );
-            if (defaults.length > 0) {
-              handleTrainerField(
-                rowIndex,
-                batchIndex,
-                trainerIdx,
-                "topics",
-                defaults
-              );
-            }
-          }
         }
       } catch {
         // swallow - non-critical UI defaulting
@@ -141,12 +139,18 @@ const TrainerRow = React.memo(
     }, [
       trainer.trainerId,
       trainers,
+      addedTopics,
+      trainer.topics,
       rowIndex,
       batchIndex,
       trainerIdx,
       handleTrainerField,
-      trainer.topics,
     ]);
+
+    // ✅ FIXED: Use useEffect to call the callback, preventing render-time state updates
+    useEffect(() => {
+      autoSelectTopics();
+    }, [autoSelectTopics]);
 
     // ✅ ADD: Local function to generate date list with exclusions
     const getDateList = (start, end, excludeDays, excludedDates = []) => {
@@ -190,12 +194,12 @@ const TrainerRow = React.memo(
       return dates.length;
     };
 
-    // ✅ ADD: Initialize dailyHours when trainer data is loaded
-    useEffect(() => {
+    // ✅ FIXED: Use useCallback for dailyHours initialization to prevent render-time state updates
+    const initializeDailyHours = useCallback(() => {
       // Track previous dates to detect changes
       const previousStart = previousDatesRef.current.startDate;
       const previousEnd = previousDatesRef.current.endDate;
-      
+
       // If date range changed, reset excludedDates
       if ((trainer.startDate !== previousStart || trainer.endDate !== previousEnd) && previousStart !== null) {
         handleTrainerField(rowIndex, batchIndex, trainerIdx, "excludedDates", []);
@@ -244,6 +248,11 @@ const TrainerRow = React.memo(
       commonFields,
       getTrainingHoursPerDay,
     ]);
+
+    // ✅ FIXED: Use useEffect to call the callback, preventing render-time state updates
+    useEffect(() => {
+      initializeDailyHours();
+    }, [initializeDailyHours]);
 
   const trainerOptions = useMemo(() => {
     return trainers.map((tr) => {
@@ -844,18 +853,6 @@ const TrainerRow = React.memo(
                       : trainer.topics
                       ? [trainer.topics]
                       : [];
-
-                    // Auto-select all existing topics (from Firestore) if none selected yet
-                    if (allTopics.length > 0 && selected.length === 0) {
-                      // Prevent infinite loop: only trigger when strictly empty
-                      handleTrainerField(
-                        rowIndex,
-                        batchIndex,
-                        trainerIdx,
-                        "topics",
-                        allTopics
-                      );
-                    }
 
                     const toggleTopic = (topic) => {
                       const isActive = selected.includes(topic);

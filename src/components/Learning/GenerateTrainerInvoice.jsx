@@ -1,16 +1,14 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { createPortal } from "react-dom";
 import { db } from "../../firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import InvoiceModal from "./InvoiceModal";
 import { generateInvoicePDF } from "./invoiceUtils";
-import { FiSearch, FiFilter, FiRefreshCw, FiTrash2 } from "react-icons/fi";
-import Header from "../Learning/Invoice/Header";
-import FiltersSection from "../../components/Learning/Invoice/FiltersSection";
-import TrainerTable from "./Invoice/TrainerTable";
+import { FiSearch, FiFilter, FiRefreshCw, FiTrash2, FiUser, FiCheckCircle, FiAlertCircle, FiXCircle, FiInfo } from "react-icons/fi";
+import Header from "./Invoice/Header";
+import FiltersSection from "./Invoice/FiltersSection";
 import LoadingState from "./Invoice/LoadingState";
 import EmptyState from "./Invoice/EmptyState";
-import { FiCheckCircle } from "react-icons/fi";
+import TrainerTable from "./Invoice/TrainerTable";
 
 function GenerateTrainerInvoice() {
   const [trainerData, setTrainerData] = useState([]);
@@ -27,7 +25,6 @@ function GenerateTrainerInvoice() {
   const [downloadingInvoice, setDownloadingInvoice] = useState(null);
   const [pdfStatus, setPdfStatus] = useState({});
   const [showOnlyActive, setShowOnlyActive] = useState(false);
-  const [editingInvoice, setEditingInvoice] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [filtersDropdownOpen, setFiltersDropdownOpen] = useState(false);
   const filtersBtnRef = useRef();
@@ -262,7 +259,6 @@ function GenerateTrainerInvoice() {
 
   const handleGenerateInvoice = (trainer) => {
     setSelectedTrainer(trainer);
-    setEditingInvoice(null); // Reset editing state
     setShowInvoiceModal(true);
   };
 
@@ -575,8 +571,6 @@ function GenerateTrainerInvoice() {
               (doc) => doc.data().billNumber === selectedInvoice
             );
             if (selectedDoc) {
-              const invoiceData = selectedDoc.data();
-              setEditingInvoice({ ...invoiceData, id: selectedDoc.id });
               setSelectedTrainer(trainer);
               setShowInvoiceModal(true);
             } else {
@@ -585,8 +579,6 @@ function GenerateTrainerInvoice() {
           }
         } else {
           // Single invoice - edit it directly
-          const invoiceData = querySnapshot.docs[0].data();
-          setEditingInvoice({ ...invoiceData, id: querySnapshot.docs[0].id });
           setSelectedTrainer(trainer);
           setShowInvoiceModal(true);
         }
@@ -631,11 +623,6 @@ function GenerateTrainerInvoice() {
           exporting={exporting}
           setExporting={setExporting}
           filteredGroupedData={filteredGroupedData}
-          searchTerm={searchTerm}
-          startDateFilter={startDateFilter}
-          endDateFilter={endDateFilter}
-          projectCodeFilter={projectCodeFilter}
-          collegeNameFilter={collegeNameFilter}
         />
 
         <div className="p-4 sm:p-6">

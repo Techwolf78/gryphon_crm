@@ -205,7 +205,7 @@ const handleSubmit = async (e) => {
   const isReadOnly = viewMode || (existingInvoice && !editMode);
 
   return (
-    <div className="fixed inset-0 backdrop-blur-md bg-black bg-opacity-50 flex items-center justify-center p-4 z-500">
+    <div className="fixed inset-0 backdrop-blur-md bg-transparent bg-opacity-50 flex items-center justify-center p-4 z-500">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           {/* Header */}

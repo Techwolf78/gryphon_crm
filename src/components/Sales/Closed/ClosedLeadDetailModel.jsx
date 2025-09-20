@@ -36,7 +36,7 @@ const ClosedLeadDetailModal = ({ lead, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex justify-center items-center z-54 p-4 animate-fadeIn">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex justify-center items-center z-[100] p-4 animate-fadeIn">
       <div
         ref={modalRef}
         className="bg-white rounded-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden shadow-2xl border border-gray-100 animate-slideUp transform transition-all duration-300"

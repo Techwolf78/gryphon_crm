@@ -99,12 +99,7 @@ function TrainersDashboard() {
   });
 
   const handleBack = () => {
-    if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      // Fallback to parent route if no history
-      navigate('/dashboard/learning-development');
-    }
+    navigate('/dashboard/learning-development');
   };
 
   const handleTrainerAdded = (newTrainerOrArray) => {
