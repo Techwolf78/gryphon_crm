@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { collection, getDocs, query, orderBy, doc, updateDoc, addDoc,  } from "firebase/firestore";
 import { db } from "../../../firebase";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faChevronUp, faChevronDown } from '@fortawesome/free-solid-svg-icons';
 import RaiseInvoiceModal from "./RaiseInvoiceModal";
-import ViewInvoiceModal from "./ViewInvoiceModal";
+import InvoiceDetailModal from "./InvoiceDetailModal ";
 
 export default function ContractInvoiceTable() {
   const [invoices, setInvoices] = useState([]);
@@ -10,10 +12,11 @@ export default function ContractInvoiceTable() {
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
-  const [viewInvoice, setViewInvoice] = useState(null);
   const [editInvoice, setEditInvoice] = useState(null);
   const [paymentType, setPaymentType] = useState("");
   const [existingInvoices, setExistingInvoices] = useState([]);
+  const [expandedRows, setExpandedRows] = useState(new Set());
+  const [selectedInvoiceDetail, setSelectedInvoiceDetail] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -65,6 +68,30 @@ export default function ContractInvoiceTable() {
     }
   };
 
+  const getDate = (dateValue) => {
+    if (!dateValue) return new Date().toLocaleDateString();
+    if (dateValue && typeof dateValue.toDate === 'function') {
+      return dateValue.toDate().toLocaleDateString();
+    }
+    try {
+      return new Date(dateValue).toLocaleDateString();
+    } catch {
+      return new Date().toLocaleDateString();
+    }
+  };
+
+  const toggleExpand = (id) => {
+    setExpandedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
   const generateInvoiceNumber = (paymentType, installment) => {
     const timestamp = new Date().getTime();
     const random = Math.floor(Math.random() * 1000);
@@ -98,33 +125,16 @@ return availableInstallment ? availableInstallment.name : null;};
     setShowModal(true);
   };
 
-  const handleViewInvoice = (invoice) => {
-    // Get all invoices for this contract to show in view modal
-    const contractInvoices = existingInvoices.filter(
-      inv => inv.originalInvoiceId === invoice.id
-    );
-    
-    setViewInvoice({
-      contract: invoice,
-      invoices: contractInvoices
-    });
-  };
-
 const handleEditInvoice = (invoice) => {
-  // Pehle original contract (trainingForm) find karo
+  // Find the original contract for this invoice
   const originalContract = invoices.find(inv => inv.id === invoice.originalInvoiceId);
-  
-  if (originalContract) {
-    setEditInvoice({
-      ...invoice,
-      // Original contract data add karo
-      ...originalContract
-    });
-    setPaymentType(invoice.paymentType);
-    setShowModal(true);
-  } else {
-    alert("Original contract not found!");
-  }
+  setSelectedInvoiceDetail({ invoice, contract: originalContract, initialEditMode: true });
+};
+
+const handleViewInvoiceDetail = (invoice) => {
+  // Find the original contract for this invoice
+  const originalContract = invoices.find(inv => inv.id === invoice.originalInvoiceId);
+  setSelectedInvoiceDetail({ invoice, contract: originalContract, initialEditMode: false });
 };
 
 // ContractInvoiceTable.js mein handleDownloadInvoice function ko update karo
@@ -360,9 +370,9 @@ const getGeneratedInvoicesDisplay = (contractInvoices, invoice) => {
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-      <div className="p-6 border-b border-gray-200">
-        <h2 className="text-xl font-semibold text-gray-900">Contract Invoices</h2>
-        <p className="text-gray-600 mt-1">Manage and view contract invoices</p>
+      <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-500 to-blue-700 text-white">
+        <h2 className="text-xl font-semibold">Contract Invoices</h2>
+        <p className="text-gray-100 mt-1">Manage and view contract invoices</p>
       </div>
 
       <div className="p-6">
@@ -427,7 +437,10 @@ const getGeneratedInvoicesDisplay = (contractInvoices, invoice) => {
       
       return (
         <React.Fragment key={invoice.id}>
-          <tr className="hover:bg-gray-50">
+          <tr 
+            className="hover:bg-gray-50 cursor-pointer" 
+            onClick={() => toggleExpand(invoice.id)}
+          >
             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
               {invoice.projectCode || invoice.id}
             </td>
@@ -457,24 +470,75 @@ const getGeneratedInvoicesDisplay = (contractInvoices, invoice) => {
   ) : (
 <span className="text-gray-400">0/{getPaymentInstallmentCount(invoice.paymentType, invoice.paymentDetails)}</span>  )}
 </td>
-            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium flex space-x-2">
+            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium flex items-center justify-end space-x-2">
               <button
-                onClick={() => handleRaiseInvoice(invoice)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRaiseInvoice(invoice);
+                }}
                 className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded text-xs"
                 disabled={!nextInstallment}
                 title={nextInstallment ? `Generate ${nextInstallment} Invoice` : 'All invoices generated'}
               >
                 {nextInstallment ? `Generate ${getInstallmentName(nextInstallment)}` : 'All Generated'}
               </button>
-              <button
-                onClick={() => handleViewInvoice(invoice)}
-                className="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded text-xs"
-                title="View All Invoices"
-              >
-                <i className="fas fa-eye"></i> View
-              </button>
+              <span className="text-gray-400">
+                <FontAwesomeIcon icon={expandedRows.has(invoice.id) ? faChevronUp : faChevronDown} />
+              </span>
             </td>
           </tr>
+          {expandedRows.has(invoice.id) && (
+            <tr>
+              <td colSpan="8">
+                <div className="p-4 bg-gray-50">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-100">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Invoice</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Installment</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {contractInvoices.length > 0 ? (
+                          contractInvoices.map(inv => (
+                            <tr key={inv.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-2 text-sm text-gray-900">{inv.invoiceNumber || `INV-${inv.id}`}</td>
+                              <td className="px-4 py-2 text-sm text-gray-500">{getDate(inv.raisedDate)}</td>
+                              <td className="px-4 py-2 text-sm text-gray-500">{inv.installment}</td>
+                              <td className="px-4 py-2 text-sm text-gray-500 font-semibold">{formatCurrency(inv.amountRaised || inv.netPayableAmount)}</td>
+                              <td className="px-4 py-2 text-sm">
+                                <span className={`px-2 py-1 rounded text-xs ${inv.status === 'approved' ? 'bg-green-100 text-green-800' : inv.status === 'raised' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'}`}>
+                                  {inv.status || 'draft'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2 text-sm">
+                                <div className="flex gap-2">
+                                  <button onClick={() => handleViewInvoiceDetail(inv)} className="bg-gray-500 hover:bg-gray-700 text-white py-1 px-2 rounded text-xs">View Details</button>
+                                  <button onClick={() => handleDownloadInvoice(inv)} className="bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded text-xs">Download</button>
+                                  <button onClick={() => handleEditInvoice(inv)} className="bg-yellow-500 hover:bg-yellow-700 text-white py-1 px-2 rounded text-xs">Edit</button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan="6" className="px-4 py-8 text-center text-gray-500 italic">
+                              No invoices generated
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          )}
         </React.Fragment>
       );
     })}
@@ -500,14 +564,16 @@ const getGeneratedInvoicesDisplay = (contractInvoices, invoice) => {
         isEdit={!!editInvoice}
       />
 
-      {/* View Invoice Modal */}
-     <ViewInvoiceModal
-  isOpen={!!viewInvoice}
-  invoiceData={viewInvoice}
-  onClose={() => setViewInvoice(null)}
-  onDownload={handleDownloadInvoice}
-  onEdit={handleEditInvoice}
-/>
+      {/* Invoice Detail Modal */}
+      {selectedInvoiceDetail && (
+        <InvoiceDetailModal
+          invoice={selectedInvoiceDetail.invoice}
+          contract={selectedInvoiceDetail.contract}
+          onClose={() => setSelectedInvoiceDetail(null)}
+          onDownload={handleDownloadInvoice}
+          initialEditMode={selectedInvoiceDetail.initialEditMode || false}
+        />
+      )}
     </div>
   );
 }
