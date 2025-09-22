@@ -61,19 +61,6 @@ const SubmissionChecklist = ({
       })
     },
     {
-      id: 'trainerAssignment',
-      label: 'Trainer Assignment',
-      description: 'Assign trainers to batches',
-      isComplete: selectedDomains && selectedDomains.length > 0 && selectedDomains.every(domain => {
-        const tableData = table1DataByDomain?.[domain];
-        return tableData && tableData.length > 0 && tableData.every(row =>
-          row.batches && row.batches.length > 0 && row.batches.every(batch =>
-            batch.trainers && batch.trainers.length > 0
-          )
-        );
-      })
-    },
-    {
       id: 'validationErrors',
       label: 'Validation Check',
       description: 'No conflicts or errors',

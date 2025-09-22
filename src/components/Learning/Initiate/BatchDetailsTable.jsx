@@ -109,8 +109,16 @@ const TrainerRow = React.memo(
           if (Array.isArray(trainerDoc.otherSpecialization))
             base.push(...trainerDoc.otherSpecialization);
         }
+        
+        // Include existing session-specific topics assigned to this trainer
+        const existingSessionTopics = Array.isArray(trainer.topics) 
+          ? trainer.topics 
+          : trainer.topics 
+          ? [trainer.topics] 
+          : [];
+        
         const allTopics = Array.from(
-          new Set([...base, ...addedTopics])
+          new Set([...base, ...existingSessionTopics, ...addedTopics])
         )
           .filter(Boolean)
           .sort();
@@ -120,7 +128,7 @@ const TrainerRow = React.memo(
           ? [trainer.topics]
           : [];
 
-        // Auto-select all existing topics (from Firestore) if none selected yet
+        // Auto-select all existing topics (from Firestore + session-specific) if none selected yet
         if (allTopics.length > 0 && selected.length === 0) {
           // Prevent infinite loop: only trigger when strictly empty
           handleTrainerField(
@@ -862,8 +870,16 @@ const TrainerRow = React.memo(
                       if (Array.isArray(trainerDoc.otherSpecialization))
                         base.push(...trainerDoc.otherSpecialization);
                     }
+                    
+                    // Include existing session-specific topics assigned to this trainer
+                    const existingSessionTopics = Array.isArray(trainer.topics) 
+                      ? trainer.topics 
+                      : trainer.topics 
+                      ? [trainer.topics] 
+                      : [];
+                    
                     const allTopics = Array.from(
-                      new Set([...base, ...addedTopics])
+                      new Set([...base, ...existingSessionTopics, ...addedTopics])
                     )
                       .filter(Boolean)
                       .sort();
