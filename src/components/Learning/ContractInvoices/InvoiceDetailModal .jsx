@@ -3,8 +3,8 @@ import React, { useState } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
 
-const InvoiceDetailModal = ({ invoice, contract, onClose, onDownload }) => {
-  const [isEditing, setIsEditing] = useState(false);
+const InvoiceDetailModal = ({ invoice, contract, onClose, onDownload, initialEditMode = false }) => {
+  const [isEditing, setIsEditing] = useState(initialEditMode);
   const [formData, setFormData] = useState({ ...invoice });
   const [saving, setSaving] = useState(false);
 

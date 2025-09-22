@@ -1,16 +1,15 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { createPortal } from "react-dom";
 import { db } from "../../firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import InvoiceModal from "./InvoiceModal";
 import { generateInvoicePDF } from "./invoiceUtils";
-import { FiSearch, FiFilter, FiRefreshCw, FiTrash2 } from "react-icons/fi";
-import Header from "../Learning/Invoice/Header";
-import FiltersSection from "../../components/Learning/Invoice/FiltersSection";
-import TrainerTable from "./Invoice/TrainerTable";
+import { FiSearch, FiFilter, FiRefreshCw, FiTrash2, FiUser, FiCheckCircle, FiAlertCircle, FiXCircle, FiInfo } from "react-icons/fi";
+import Header from "./Invoice/Header";
+import FiltersSection from "./Invoice/FiltersSection";
 import LoadingState from "./Invoice/LoadingState";
 import EmptyState from "./Invoice/EmptyState";
-import { FiCheckCircle ,FiUser} from "react-icons/fi";
+
+import TrainerTable from "./Invoice/TrainerTable";
 
 function GenerateTrainerInvoice() {
   const [trainerData, setTrainerData] = useState([]);
@@ -23,11 +22,10 @@ function GenerateTrainerInvoice() {
   const [startDateFilter, setStartDateFilter] = useState("");
   const [endDateFilter, setEndDateFilter] = useState("");
   const [projectCodeFilter, setProjectCodeFilter] = useState("");
-  const [collegeNameFilter, setCollegeNameFilter] = useState("");
+  const [businessNameFilter, setBusinessNameFilter] = useState("");
   const [downloadingInvoice, setDownloadingInvoice] = useState(null);
   const [pdfStatus, setPdfStatus] = useState({});
   const [showOnlyActive, setShowOnlyActive] = useState(false);
-  const [editingInvoice, setEditingInvoice] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [filtersDropdownOpen, setFiltersDropdownOpen] = useState(false);
   const filtersBtnRef = useRef();
@@ -71,16 +69,34 @@ function GenerateTrainerInvoice() {
                   const endDate =
                     trainer.endDate || trainer.activeDates?.slice(-1)[0] || "";
 
+                  // Collect all topics from trainer, batch, and domain levels
+                  const allTopics = new Set();
+
+                  // Add domain-level topics
+                  if (domainData.topics && Array.isArray(domainData.topics)) {
+                    domainData.topics.forEach(topic => allTopics.add(topic));
+                  }
+
+                  // Add trainer-level topics (from trainer.topics if available)
+                  if (trainer.topics && Array.isArray(trainer.topics)) {
+                    trainer.topics.forEach(topic => allTopics.add(topic));
+                  }
+
+                  // Add batch-level topics if available in the batch data
+                  if (batch.topics && Array.isArray(batch.topics)) {
+                    batch.topics.forEach(topic => allTopics.add(topic));
+                  }
+
                   const trainerObj = {
                     trainerName: trainer.trainerName || "N/A",
                     trainerId: trainer.trainerId || "",
                     phase: phaseId,
                     domain: domainData.domain || domainDoc.id,
-                    collegeName: formData.collegeName || "",
+                    businessName: formData.businessName || "",
                     projectCode: formData.projectCode || "",
                     startDate,
                     endDate,
-                    topics: domainData.topics || [],
+                    topics: Array.from(allTopics), // All aggregated topics
                     batches: batch.batches || [],
                     mergedBreakdown: trainer.mergedBreakdown || [],
                     activeDates: trainer.activeDates || [],
@@ -108,7 +124,7 @@ function GenerateTrainerInvoice() {
 
       trainersList.forEach((trainer) => {
         // Create a unique key for each trainer-college-phase combination
-        const collegePhaseKey = `${trainer.collegeName}_${trainer.trainerId}_${trainer.phase}`;
+        const collegePhaseKey = `${trainer.businessName}_${trainer.trainerId}_${trainer.phase}`;
 
         if (!collegePhaseBasedGrouping[collegePhaseKey]) {
           collegePhaseBasedGrouping[collegePhaseKey] = {
@@ -121,6 +137,8 @@ function GenerateTrainerInvoice() {
             allProjects: [trainer.projectCode],
             // Keep track of all domains for this trainer at this college and phase
             allDomains: [trainer.domain],
+            // Aggregate all topics from all batches
+            allTopics: new Set(trainer.topics || []),
           };
         } else {
           // Add hours from this batch to total
@@ -166,12 +184,22 @@ function GenerateTrainerInvoice() {
               trainer.domain
             );
           }
+
+          // Aggregate topics from this batch
+          if (trainer.topics && Array.isArray(trainer.topics)) {
+            trainer.topics.forEach(topic => {
+              collegePhaseBasedGrouping[collegePhaseKey].allTopics.add(topic);
+            });
+          }
         }
       });
 
       const collegePhaseBasedTrainers = Object.values(
         collegePhaseBasedGrouping
-      );
+      ).map(trainer => ({
+        ...trainer,
+        topics: Array.from(trainer.allTopics), // Convert Set to Array for topics
+      }));
 
       // Check invoices for each trainer-college-phase combination
       const updatedTrainersList = await Promise.all(
@@ -180,7 +208,7 @@ function GenerateTrainerInvoice() {
             const q = query(
               collection(db, "invoices"),
               where("trainerId", "==", trainer.trainerId),
-              where("collegeName", "==", trainer.collegeName),
+              where("businessName", "==", trainer.businessName),
               where("phase", "==", trainer.phase)
             );
 
@@ -262,7 +290,6 @@ function GenerateTrainerInvoice() {
 
   const handleGenerateInvoice = (trainer) => {
     setSelectedTrainer(trainer);
-    setEditingInvoice(null); // Reset editing state
     setShowInvoiceModal(true);
   };
 
@@ -292,7 +319,7 @@ function GenerateTrainerInvoice() {
       const matchesSearch =
         trainer.trainerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         trainer.trainerId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        trainer.collegeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        trainer.businessName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         trainer.projectCode.toLowerCase().includes(searchTerm.toLowerCase());
 
       // Date range filter
@@ -310,17 +337,17 @@ function GenerateTrainerInvoice() {
         : true;
 
       // College name filter
-      const matchesCollegeName = collegeNameFilter
-        ? trainer.collegeName
+      const matchesBusinessName = businessNameFilter
+        ? trainer.businessName
             .toLowerCase()
-            .includes(collegeNameFilter.toLowerCase())
+            .includes(businessNameFilter.toLowerCase())
         : true;
 
       return (
         matchesSearch &&
         matchesDateRange &&
         matchesProjectCode &&
-        matchesCollegeName
+        matchesBusinessName
       );
     });
 
@@ -337,13 +364,13 @@ function GenerateTrainerInvoice() {
   ].filter(Boolean);
 
   // Get unique college names for filter
-  const collegeNames = [
-    ...new Set(trainerData.map((item) => item.collegeName)),
+  const businessNames = [
+    ...new Set(trainerData.map((item) => item.businessName)),
   ].filter(Boolean);
 
   // Get status icon and text for download button
-  const getDownloadStatus = (trainerId, collegeName, phase) => {
-    const status = pdfStatus[`${trainerId}_${collegeName}_${phase}`];
+  const getDownloadStatus = (trainerId, businessName, phase) => {
+    const status = pdfStatus[`${trainerId}_${businessName}_${phase}`];
     if (!status) return null;
 
     switch (status) {
@@ -384,7 +411,7 @@ function GenerateTrainerInvoice() {
 
   // Check if any filters are active (for badge on Filters button)
   const isAnyFilterActive =
-    startDateFilter || endDateFilter || projectCodeFilter || collegeNameFilter;
+    startDateFilter || endDateFilter || projectCodeFilter || businessNameFilter;
 
   // Handle filters dropdown toggle with always downward positioning
   const toggleFiltersDropdown = () => {
@@ -417,7 +444,7 @@ function GenerateTrainerInvoice() {
     setStartDateFilter("");
     setEndDateFilter("");
     setProjectCodeFilter("");
-    setCollegeNameFilter("");
+    setBusinessNameFilter("");
     setFiltersDropdownOpen(false);
   };
 
@@ -447,11 +474,11 @@ function GenerateTrainerInvoice() {
 
   const handleDownloadInvoice = async (trainer) => {
     setDownloadingInvoice(
-      `${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`
+      `${trainer.trainerId}_${trainer.businessName}_${trainer.phase}`
     );
     setPdfStatus((prev) => ({
       ...prev,
-      [`${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`]:
+      [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}`]:
         "downloading",
     }));
 
@@ -460,7 +487,7 @@ function GenerateTrainerInvoice() {
       const q = query(
         collection(db, "invoices"),
         where("trainerId", "==", trainer.trainerId),
-        where("collegeName", "==", trainer.collegeName),
+        where("businessName", "==", trainer.businessName),
         where("phase", "==", trainer.phase)
       );
 
@@ -474,7 +501,7 @@ function GenerateTrainerInvoice() {
           );
           const selectedInvoice = prompt(
             `Multiple invoices found for ${trainer.trainerName} at ${
-              trainer.collegeName
+              trainer.businessName
             } (${
               trainer.phase
             }). Please enter the invoice number you want to download:\n${invoiceNumbers.join(
@@ -491,21 +518,21 @@ function GenerateTrainerInvoice() {
               const success = await generateInvoicePDF(invoiceData);
               setPdfStatus((prev) => ({
                 ...prev,
-                [`${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`]:
+                [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}`]:
                   success ? "success" : "error",
               }));
             } else {
               alert("Invalid invoice number selected");
               setPdfStatus((prev) => ({
                 ...prev,
-                [`${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`]:
+                [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}`]:
                   "error",
               }));
             }
           } else {
             setPdfStatus((prev) => ({
               ...prev,
-              [`${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`]:
+              [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}`]:
                 "cancelled",
             }));
           }
@@ -516,7 +543,7 @@ function GenerateTrainerInvoice() {
           );
           setPdfStatus((prev) => ({
             ...prev,
-            [`${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`]:
+            [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}`]:
               success ? "success" : "error",
           }));
         }
@@ -524,7 +551,7 @@ function GenerateTrainerInvoice() {
         alert("No invoice found for this trainer at this college and phase");
         setPdfStatus((prev) => ({
           ...prev,
-          [`${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`]:
+          [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}`]:
             "not_found",
         }));
       }
@@ -533,7 +560,7 @@ function GenerateTrainerInvoice() {
       alert("Failed to download invoice. Please try again.");
       setPdfStatus((prev) => ({
         ...prev,
-        [`${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`]:
+        [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}`]:
           "error",
       }));
     } finally {
@@ -548,7 +575,7 @@ function GenerateTrainerInvoice() {
       const q = query(
         collection(db, "invoices"),
         where("trainerId", "==", trainer.trainerId),
-        where("collegeName", "==", trainer.collegeName),
+        where("businessName", "==", trainer.businessName),
         where("phase", "==", trainer.phase)
       );
 
@@ -562,7 +589,7 @@ function GenerateTrainerInvoice() {
           );
           const selectedInvoice = prompt(
             `Multiple invoices found for ${trainer.trainerName} at ${
-              trainer.collegeName
+              trainer.businessName
             } (${
               trainer.phase
             }). Please enter the invoice number you want to edit:\n${invoiceNumbers.join(
@@ -575,8 +602,6 @@ function GenerateTrainerInvoice() {
               (doc) => doc.data().billNumber === selectedInvoice
             );
             if (selectedDoc) {
-              const invoiceData = selectedDoc.data();
-              setEditingInvoice({ ...invoiceData, id: selectedDoc.id });
               setSelectedTrainer(trainer);
               setShowInvoiceModal(true);
             } else {
@@ -585,8 +610,6 @@ function GenerateTrainerInvoice() {
           }
         } else {
           // Single invoice - edit it directly
-          const invoiceData = querySnapshot.docs[0].data();
-          setEditingInvoice({ ...invoiceData, id: querySnapshot.docs[0].id });
           setSelectedTrainer(trainer);
           setShowInvoiceModal(true);
         }
@@ -616,9 +639,9 @@ function GenerateTrainerInvoice() {
           projectCodeFilter={projectCodeFilter}
           setProjectCodeFilter={setProjectCodeFilter}
           projectCodes={projectCodes}
-          collegeNameFilter={collegeNameFilter}
-          setCollegeNameFilter={setCollegeNameFilter}
-          collegeNames={collegeNames}
+          businessNameFilter={businessNameFilter}
+          setBusinessNameFilter={setBusinessNameFilter}
+          businessNames={businessNames}
           startDateFilter={startDateFilter}
           setStartDateFilter={setStartDateFilter}
           endDateFilter={endDateFilter}
@@ -631,11 +654,6 @@ function GenerateTrainerInvoice() {
           exporting={exporting}
           setExporting={setExporting}
           filteredGroupedData={filteredGroupedData}
-          searchTerm={searchTerm}
-          startDateFilter={startDateFilter}
-          endDateFilter={endDateFilter}
-          projectCodeFilter={projectCodeFilter}
-          collegeNameFilter={collegeNameFilter}
         />
 
         <div className="p-4 sm:p-6">

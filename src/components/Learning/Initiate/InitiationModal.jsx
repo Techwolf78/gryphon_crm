@@ -30,6 +30,7 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import "rc-time-picker/assets/index.css";
 import TrainingConfiguration from './TrainingConfiguration';
+import SubmissionChecklist from './SubmissionChecklist';
 
 const PHASE_OPTIONS = ["phase-1", "phase-2", "phase-3"];
 const DOMAIN_OPTIONS = ["Technical", "Soft skills", "Aptitude", "Tools"];
@@ -104,6 +105,9 @@ function InitiationModal({ training, onClose, onConfirm }) {
   const totalAssignedHours = selectedDomains.filter(d => d !== "Tools").reduce((sum, domain) => sum + (totalAssignedHoursByDomain[domain] || 0), 0);
   const [showAssignHoursPopup, setShowAssignHoursPopup] = useState(false);
 
+  // Checklist completion state
+  const [isChecklistComplete, setIsChecklistComplete] = useState(false);
+
   // Global toggle for excluding days
   const [excludeDays, setExcludeDays] = useState("None");
   const [excludeDropdownOpen, setExcludeDropdownOpen] = useState(false);
@@ -111,11 +115,11 @@ function InitiationModal({ training, onClose, onConfirm }) {
   const dropdownRef = useRef(null);
 
   // Original data state to preserve original values for undo functionality
-  const [originalTable1DataByDomain, setOriginalTable1DataByDomain] = useState({});
-  const [originalTopics, setOriginalTopics] = useState([]);
-  const [originalCustomPhaseHours, setOriginalCustomPhaseHours] = useState({});
-  const [originalTotalAssignedHoursByDomain, setOriginalTotalAssignedHoursByDomain] = useState({});
-  const [originalSelectedDomains, setOriginalSelectedDomains] = useState([]);
+  const originalTable1DataByDomain = useRef({});
+  const originalTopics = useRef([]);
+  const originalCustomPhaseHours = useRef({});
+  const originalTotalAssignedHoursByDomain = useRef({});
+  const originalSelectedDomains = useRef([]);
   const [hasChanges, setHasChanges] = useState(false);
 
   // Helper to generate date list, respecting excludeDays
@@ -217,7 +221,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
         setCourses(data.courses || []);
         
         // Store original topics for undo functionality
-        setOriginalTopics(JSON.parse(JSON.stringify(data.topics || [])));
+        originalTopics.current = JSON.parse(JSON.stringify(data.topics || []));
       }
     };
     fetchTrainingDetails();
@@ -275,8 +279,8 @@ function InitiationModal({ training, onClose, onConfirm }) {
       }
 
       // Store original table data for undo functionality (only if not already set)
-      if (Object.keys(originalTable1DataByDomain).length === 0) {
-        setOriginalTable1DataByDomain(JSON.parse(JSON.stringify(updated)));
+      if (Object.keys(originalTable1DataByDomain.current).length === 0) {
+        originalTable1DataByDomain.current = JSON.parse(JSON.stringify(updated));
       }
 
       return updated;
@@ -298,44 +302,44 @@ function InitiationModal({ training, onClose, onConfirm }) {
       }
       
       // Store original assigned hours for undo functionality (only if not already set)
-      if (Object.keys(originalTotalAssignedHoursByDomain).length === 0) {
-        setOriginalTotalAssignedHoursByDomain(JSON.parse(JSON.stringify(newPrev)));
+      if (Object.keys(originalTotalAssignedHoursByDomain.current).length === 0) {
+        originalTotalAssignedHoursByDomain.current = JSON.parse(JSON.stringify(newPrev));
       }
       
       return newPrev;
     });
     
     // Store original custom phase hours for undo functionality (only if not already set)
-    if (Object.keys(originalCustomPhaseHours).length === 0) {
-      setOriginalCustomPhaseHours(JSON.parse(JSON.stringify(customPhaseHours)));
+    if (Object.keys(originalCustomPhaseHours.current).length === 0) {
+      originalCustomPhaseHours.current = JSON.parse(JSON.stringify(customPhaseHours));
     }
     
     // Store original selected domains for undo functionality (only if not already set)
-    if (originalSelectedDomains.length === 0) {
-      setOriginalSelectedDomains([...selectedDomains]);
+    if (originalSelectedDomains.current.length === 0) {
+      originalSelectedDomains.current = [...selectedDomains];
     }
     
-  }, [selectedDomains, courses, topics, getDomainHours, getMainPhase, originalTable1DataByDomain, originalTotalAssignedHoursByDomain, originalCustomPhaseHours, originalSelectedDomains, customPhaseHours]);
+  }, [selectedDomains, courses, topics, getDomainHours, getMainPhase, customPhaseHours]);
 
   // Track changes for undo functionality
   useEffect(() => {
-    const hasTableDataChanged = JSON.stringify(table1DataByDomain) !== JSON.stringify(originalTable1DataByDomain);
-    const hasTopicsChanged = JSON.stringify(topics) !== JSON.stringify(originalTopics);
-    const hasCustomHoursChanged = JSON.stringify(customPhaseHours) !== JSON.stringify(originalCustomPhaseHours);
-    const hasAssignedHoursChanged = JSON.stringify(totalAssignedHoursByDomain) !== JSON.stringify(originalTotalAssignedHoursByDomain);
-    const hasSelectedDomainsChanged = JSON.stringify(selectedDomains) !== JSON.stringify(originalSelectedDomains);
+    const hasTableDataChanged = JSON.stringify(table1DataByDomain) !== JSON.stringify(originalTable1DataByDomain.current);
+    const hasTopicsChanged = JSON.stringify(topics) !== JSON.stringify(originalTopics.current);
+    const hasCustomHoursChanged = JSON.stringify(customPhaseHours) !== JSON.stringify(originalCustomPhaseHours.current);
+    const hasAssignedHoursChanged = JSON.stringify(totalAssignedHoursByDomain) !== JSON.stringify(originalTotalAssignedHoursByDomain.current);
+    const hasSelectedDomainsChanged = JSON.stringify(selectedDomains) !== JSON.stringify(originalSelectedDomains.current);
     
     setHasChanges(hasTableDataChanged || hasTopicsChanged || hasCustomHoursChanged || hasAssignedHoursChanged || hasSelectedDomainsChanged);
-  }, [table1DataByDomain, topics, customPhaseHours, totalAssignedHoursByDomain, selectedDomains, originalTable1DataByDomain, originalTopics, originalCustomPhaseHours, originalTotalAssignedHoursByDomain, originalSelectedDomains]);
+  }, [table1DataByDomain, topics, customPhaseHours, totalAssignedHoursByDomain, selectedDomains]);
 
   // Undo function to revert to original state
   const handleUndo = () => {
     if (window.confirm("Are you sure you want to undo all changes and revert to the original state? This will restore all original data including hours.")) {
-      setTable1DataByDomain(JSON.parse(JSON.stringify(originalTable1DataByDomain)));
-      setTopics(JSON.parse(JSON.stringify(originalTopics)));
-      setCustomPhaseHours(JSON.parse(JSON.stringify(originalCustomPhaseHours)));
-      setTotalAssignedHoursByDomain(JSON.parse(JSON.stringify(originalTotalAssignedHoursByDomain)));
-      setSelectedDomains([...originalSelectedDomains]);
+      setTable1DataByDomain(JSON.parse(JSON.stringify(originalTable1DataByDomain.current)));
+      setTopics(JSON.parse(JSON.stringify(originalTopics.current)));
+      setCustomPhaseHours(JSON.parse(JSON.stringify(originalCustomPhaseHours.current)));
+      setTotalAssignedHoursByDomain(JSON.parse(JSON.stringify(originalTotalAssignedHoursByDomain.current)));
+      setSelectedDomains([...originalSelectedDomains.current]);
       setHasChanges(false);
       setError(null);
       setSuccess("All changes have been undone. Original state restored.");
@@ -1283,9 +1287,9 @@ function InitiationModal({ training, onClose, onConfirm }) {
       setTotalAssignedHoursByDomain(loadedAssignedHours);
 
       // Store original data for undo functionality
-      setOriginalTable1DataByDomain(JSON.parse(JSON.stringify(loadedTable1Data)));
-      setOriginalTotalAssignedHoursByDomain(JSON.parse(JSON.stringify(loadedAssignedHours)));
-      setOriginalSelectedDomains([...loadedDomains]);
+      originalTable1DataByDomain.current = JSON.parse(JSON.stringify(loadedTable1Data));
+      originalTotalAssignedHoursByDomain.current = JSON.parse(JSON.stringify(loadedAssignedHours));
+      originalSelectedDomains.current = [...loadedDomains];
       setHasChanges(false);
     };
     fetchPhaseDomains();
@@ -2222,7 +2226,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                 <button
                   type="submit"
                   onClick={handleSubmit}
-                  disabled={loading || submitDisabled}
+                  disabled={loading || submitDisabled || !isChecklistComplete}
                   className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-green-400 disabled:cursor-not-allowed transition-colors"
                 >
                   {loading ? (
@@ -2231,9 +2235,32 @@ function InitiationModal({ training, onClose, onConfirm }) {
                       Processing...
                     </>
                   ) : (
-                    "Submit"
+                    !isChecklistComplete ? (
+                      "Complete All Requirements to Submit"
+                    ) : (
+                      "Submit"
+                    )
                   )}
                 </button>
+              </div>
+
+              {/* Submission Requirements Checklist - Below buttons */}
+              <div className="mt-4">
+                <SubmissionChecklist
+                  selectedPhases={selectedPhases}
+                  selectedDomains={selectedDomains}
+                  trainingStartDate={commonFields.trainingStartDate}
+                  trainingEndDate={commonFields.trainingEndDate}
+                  collegeStartTime={commonFields.collegeStartTime}
+                  collegeEndTime={commonFields.collegeEndTime}
+                  lunchStartTime={commonFields.lunchStartTime}
+                  lunchEndTime={commonFields.lunchEndTime}
+                  totalAssignedHours={totalAssignedHours}
+                  table1DataByDomain={table1DataByDomain}
+                  batchMismatch={batchMismatch}
+                  hasValidationErrors={hasValidationErrors()}
+                  onChecklistComplete={setIsChecklistComplete}
+                />
               </div>
             </div>
           </div>

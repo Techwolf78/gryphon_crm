@@ -45,9 +45,9 @@ export const generateInvoicePDF = async (invoiceData) => {
     yPosition += 6;
     doc.text('Gryphon Academy', xPosition, yPosition);
     yPosition += 4.5;
-    doc.text('9th Floor, Olympia Business House (Achnalare)', xPosition, yPosition);
+    doc.text('9th Floor, Olympia Business House (Archlare)', xPosition, yPosition);
     yPosition += 4.5;
-    doc.text('Next to Supreme HQ, Mum - Pune Highway, Baner', xPosition, yPosition);
+    doc.text('Next to Supreme HQ, Mumbai - Pune Highway, Baner', xPosition, yPosition);
     yPosition += 4.5;
     doc.text('Pune, MH - 411045', xPosition, yPosition);
     yPosition += 10;
