@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 
-// RaiseInvoiceModal.js mein changes karo
 const RaiseInvoiceModal = ({
   isOpen,
   invoice,
@@ -20,7 +19,6 @@ const RaiseInvoiceModal = ({
 
   useEffect(() => {
     if (invoice) {
-      // Agar edit mode mein hain, toh existing invoice data se form fill karo
       if (isEdit) {
         setFormData({
           totalContractValue:
@@ -31,7 +29,6 @@ const RaiseInvoiceModal = ({
           invoiceType: invoice.invoiceType || "Tax Invoice",
         });
       } else {
-        // Naya invoice create kar rahe hain
         setFormData({
           totalContractValue:
             invoice.netPayableAmount || invoice.totalCost || "",
@@ -44,25 +41,46 @@ const RaiseInvoiceModal = ({
     }
   }, [invoice, paymentType, isEdit]);
 
-  // Get available installments that haven't been generated yet
-  const getAvailableInstallments = () => {
-    if (!invoice || !invoice.paymentDetails) return [];
-
-    // Get all existing invoices for this contract
-    const contractInvoices = existingInvoices.filter(
-      (inv) => inv.originalInvoiceId === invoice.id
-    );
-
-    // Filter out installments that have already been generated
-    return invoice.paymentDetails.filter((payment) => {
-      return !contractInvoices.some((inv) => inv.installment === payment.name);
-    });
+  // Improved payment type names with full forms
+  const getPaymentTypeName = (type) => {
+    const paymentTypes = {
+      "AT": "Advanced Training (AT)",
+      "ATP": "Advanced Training Placement (ATP)", 
+      "ATTP": "Advanced Training Training Placement (ATTP)",
+      "ATTT": "Advanced Training Training Training (ATTT)",
+      "EMI": "Equated Monthly Installment (EMI)"
+    };
+    return paymentTypes[type] || type;
   };
+
+  // Get available installments that haven't been generated yet
+  // Get available installments that haven't been generated yet
+const getAvailableInstallments = () => {
+  if (!invoice || !invoice.paymentDetails) return [];
+
+  const contractInvoices = existingInvoices.filter(
+    (inv) => inv.originalInvoiceId === invoice.id
+  );
+
+  // Create unique identifiers for each installment
+  
+  return invoice.paymentDetails.filter((payment, index) => {
+    // Create unique key using name + index
+    
+    // Check if this specific installment (with index) already exists
+    const alreadyExists = contractInvoices.some((inv, invIndex) => {
+      // For existing invoices, we need to track which index they correspond to
+      return inv.installment === payment.name && 
+             invIndex === index; // Match by position
+    });
+    
+    return !alreadyExists;
+  });
+};
 
   const handleFormChange = (e) => {
     const { name, value } = e.target;
 
-    // If installment is changed, update the amount automatically
     if (name === "installment" && invoice && invoice.paymentDetails) {
       const selectedInstallment = invoice.paymentDetails.find(
         (p) => p.name === value
@@ -81,23 +99,6 @@ const RaiseInvoiceModal = ({
 
   const handleSubmit = () => {
     onSubmit(formData, invoice);
-  };
-
-  const getPaymentTypeName = (type) => {
-    switch (type) {
-      case "AT":
-        return "Advanced Training";
-      case "ATP":
-        return "Advanced Training Placement";
-      case "ATTP":
-        return "Advanced Training Training Placement";
-      case "ATTT":
-        return "Advanced Training Training Training";
-      case "EMI":
-        return "Equated Monthly Installment";
-      default:
-        return type;
-    }
   };
 
   if (!isOpen) return null;
@@ -140,6 +141,13 @@ const RaiseInvoiceModal = ({
                 readOnly
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100"
               />
+              <p className="text-xs text-gray-500 mt-1">
+                {formData.paymentType === "AT" && "One-time payment for Advanced Training"}
+                {formData.paymentType === "ATP" && "Installments for Training + Placement"}
+                {formData.paymentType === "ATTP" && "Multiple installments for extended training"}
+                {formData.paymentType === "ATTT" && "Comprehensive training program with multiple phases"}
+                {formData.paymentType === "EMI" && "Monthly installment payments"}
+              </p>
             </div>
             <div className="mb-3">
               <label className="block text-sm font-medium text-gray-700">
