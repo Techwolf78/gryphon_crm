@@ -16,6 +16,11 @@ function getTrainingDays(startDate, endDate) {
   return diffDays;
 }
 
+// Helper function to round numbers to nearest whole number
+const roundToNearestWhole = (num) => {
+  return Math.round(num);
+};
+
 function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
   const days = getTrainingDays(trainer?.earliestStartDate, trainer?.latestEndDate);
   const [invoiceData, setInvoiceData] = useState({
@@ -35,7 +40,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
     perDayLodging: trainer?.lodging || 0,
     food: (trainer?.food || 0) * days,
     lodging: (trainer?.lodging || 0) * days,
-    collegeName: trainer?.collegeName || "",
+    businessName: trainer?.businessName || "",
   });
   const [existingInvoice, setExistingInvoice] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -70,14 +75,15 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
     };
 
     const checkExistingInvoice = async () => {
-      if (!trainer?.trainerId || !trainer?.collegeName) return;
+      if (!trainer?.trainerId || !trainer?.businessName) return;
 
       try {
         const q = query(
           collection(db, "invoices"),
           where("trainerId", "==", trainer.trainerId),
-          where("collegeName", "==", trainer.collegeName),
-          where("phase", "==", trainer.phase)
+          where("businessName", "==", trainer.businessName),
+          where("phase", "==", trainer.phase),
+          where("projectCode", "==", trainer.projectCode)
         );
 
         const querySnapshot = await getDocs(q);
@@ -105,7 +111,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
 
     checkExistingInvoice();
     fetchTrainerBankDetails();
-  }, [trainer?.trainerId, trainer?.collegeName, trainer?.phase]);
+  }, [trainer?.trainerId, trainer?.businessName, trainer?.phase, trainer?.projectCode]);
 
 const handleSubmit = async (e) => {
   e.preventDefault();
@@ -117,8 +123,9 @@ const handleSubmit = async (e) => {
       ...invoiceData,
       trainerId: trainer?.trainerId,
       trainerName: trainer?.trainerName,
-      collegeName: trainer?.collegeName,
+      businessName: trainer?.businessName,
       phase: trainer?.phase,
+      projectCode: trainer?.projectCode,
       totalAmount: calculateTotalAmount(),
       netPayment: calculateNetPayment(),
       updatedAt: new Date(),
@@ -186,7 +193,7 @@ const handleSubmit = async (e) => {
   };
 
   const calculateTotalAmount = () => {
-    return (
+    return roundToNearestWhole(
       (invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0) +
       (parseFloat(invoiceData.conveyance) || 0) +
       (parseFloat(invoiceData.food) || 0) +
@@ -195,9 +202,10 @@ const handleSubmit = async (e) => {
   };
 
   const calculateNetPayment = () => {
+    const trainingFees = roundToNearestWhole((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0));
+    const tdsAmount = roundToNearestWhole((trainingFees * (parseFloat(invoiceData.tds) || 0)) / 100);
     const totalAmount = calculateTotalAmount();
-    const tdsAmount = (totalAmount * (parseFloat(invoiceData.tds) || 0)) / 100;
-    return (
+    return roundToNearestWhole(
       totalAmount + (parseFloat(invoiceData.adhocAdjustment) || 0) - tdsAmount
     );
   };
@@ -273,7 +281,7 @@ const handleSubmit = async (e) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               <div><span className="font-medium">Name:</span> {trainer?.trainerName}</div>
               <div><span className="font-medium">ID:</span> {trainer?.trainerId}</div>
-              <div><span className="font-medium">College:</span> {trainer?.collegeName}</div>
+              <div><span className="font-medium">College:</span> {trainer?.businessName}</div>
               <div><span className="font-medium">Phase:</span> {trainer?.phase}</div>
             </div>
           </div>
@@ -565,35 +573,35 @@ const handleSubmit = async (e) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="text-sm">
                   <span className="font-medium">Training Fees:</span> ₹
-                  {(invoiceData.trainingRate * invoiceData.totalHours).toFixed(2)}
+                  {roundToNearestWhole((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0)).toLocaleString()}
                 </div>
                 <div className="text-sm">
                   <span className="font-medium">Conveyance (one-time):</span> ₹
-                  {parseFloat(invoiceData.conveyance || 0).toFixed(2)}
+                  {roundToNearestWhole(parseFloat(invoiceData.conveyance) || 0).toLocaleString()}
                 </div>
                 <div className="text-sm">
                   <span className="font-medium">Food ({invoiceData.perDayFood.toFixed(2)} × {days}):</span> ₹
-                  {parseFloat(invoiceData.food || 0).toFixed(2)}
+                  {roundToNearestWhole(parseFloat(invoiceData.food) || 0).toLocaleString()}
                 </div>
                 <div className="text-sm">
                   <span className="font-medium">Lodging ({invoiceData.perDayLodging.toFixed(2)} × {days}):</span> ₹
-                  {parseFloat(invoiceData.lodging || 0).toFixed(2)}
+                  {roundToNearestWhole(parseFloat(invoiceData.lodging) || 0).toLocaleString()}
                 </div>
                 <div className="text-sm font-semibold border-t border-blue-200 pt-2">
                   <span className="text-blue-800">Total Amount:</span> ₹
-                  {calculateTotalAmount().toFixed(2)}
+                  {calculateTotalAmount().toLocaleString()}
                 </div>
                 <div className="text-sm">
-                  <span className="font-medium">TDS ({invoiceData.tds}%):</span> ₹
-                  {((calculateTotalAmount() * (parseFloat(invoiceData.tds) || 0)) / 100).toFixed(2)}
+                  <span className="font-medium">TDS ({invoiceData.tds}% on Training Fees):</span> ₹
+                  {roundToNearestWhole((((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0) * (parseFloat(invoiceData.tds) || 0)) / 100)).toLocaleString()}
                 </div>
                 <div className="text-sm">
                   <span className="font-medium">Adhoc Adjustment:</span> ₹
-                  {parseFloat(invoiceData.adhocAdjustment || 0).toFixed(2)}
+                  {roundToNearestWhole(parseFloat(invoiceData.adhocAdjustment) || 0).toLocaleString()}
                 </div>
                 <div className="text-sm font-semibold border-t border-blue-200 pt-2 text-green-600">
                   <span className="font-bold">Net Payment:</span> ₹
-                  {calculateNetPayment().toFixed(2)}
+                  {calculateNetPayment().toLocaleString()}
                 </div>
               </div>
             </div>

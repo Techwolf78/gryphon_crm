@@ -110,6 +110,42 @@ const STATUS_ICON_MAP = {
   Done: FiCheckCircle,
 };
 
+// Helper function to format Firestore timestamps
+function formatDate(input) {
+  if (!input && input !== 0) return "";
+  
+  let date;
+  
+  // Handle Firestore Timestamp
+  if (typeof input === "object" && input !== null && typeof input.toDate === "function") {
+    date = input.toDate();
+  } 
+  // Handle timestamp (number)
+  else if (typeof input === "number") {
+    date = new Date(input);
+  }
+  // Handle string date
+  else if (typeof input === "string") {
+    date = new Date(input);
+    if (isNaN(date.getTime())) return input; // Return original if invalid
+  }
+  // Handle Date object
+  else if (input instanceof Date) {
+    date = input;
+  } else {
+    return String(input);
+  }
+  
+  // Validate date
+  if (isNaN(date.getTime())) return String(input);
+  
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  
+  return `${day}/${month}/${year}`;
+}
+
 // Helper to group trainings by college
 function groupByCollege(trainings) {
   const map = {};
@@ -1599,8 +1635,8 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                                       <div className="flex items-center text-xs text-gray-600">
                                         <FiCalendar className="w-3 h-3 mr-1" />
                                         <span>
-                                          {training.trainingStartDate} -{" "}
-                                          {training.trainingEndDate}
+                                          {formatDate(training.trainingStartDate)} -{" "}
+                                          {formatDate(training.trainingEndDate)}
                                         </span>
                                       </div>
                                     ) : (
@@ -1996,8 +2032,8 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                                     <div className="flex items-center text-xs text-gray-600">
                                       <FiCalendar className="w-3 h-3 mr-1" />
                                       <span>
-                                        {training.trainingStartDate} -{" "}
-                                        {training.trainingEndDate}
+                                        {formatDate(training.trainingStartDate)} -{" "}
+                                        {formatDate(training.trainingEndDate)}
                                       </span>
                                     </div>
                                   </div>

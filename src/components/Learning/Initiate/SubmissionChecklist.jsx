@@ -10,9 +10,7 @@ const SubmissionChecklist = ({
   collegeEndTime,
   lunchStartTime,
   lunchEndTime,
-  totalAssignedHours,
   table1DataByDomain,
-  batchMismatch,
   hasValidationErrors,
   onChecklistComplete
 }) => {
@@ -46,12 +44,6 @@ const SubmissionChecklist = ({
                   lunchStartTime.trim() !== '' && lunchEndTime.trim() !== ''
     },
     {
-      id: 'assignedHours',
-      label: 'Domain Hours',
-      description: 'Assign hours to domains',
-      isComplete: totalAssignedHours && totalAssignedHours > 0
-    },
-    {
       id: 'batchCreation',
       label: 'Batch Setup',
       description: 'Create batches for domains',
@@ -64,7 +56,7 @@ const SubmissionChecklist = ({
       id: 'validationErrors',
       label: 'Validation Check',
       description: 'No conflicts or errors',
-      isComplete: !hasValidationErrors && !batchMismatch
+      isComplete: !hasValidationErrors
     }
   ];
 

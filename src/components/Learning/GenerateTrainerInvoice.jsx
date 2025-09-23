@@ -123,8 +123,8 @@ function GenerateTrainerInvoice() {
       const collegePhaseBasedGrouping = {};
 
       trainersList.forEach((trainer) => {
-        // Create a unique key for each trainer-college-phase combination
-        const collegePhaseKey = `${trainer.businessName}_${trainer.trainerId}_${trainer.phase}`;
+        // Create a unique key for each trainer-college-phase-project combination
+        const collegePhaseKey = `${trainer.businessName}_${trainer.trainerId}_${trainer.phase}_${trainer.projectCode}`;
 
         if (!collegePhaseBasedGrouping[collegePhaseKey]) {
           collegePhaseBasedGrouping[collegePhaseKey] = {
@@ -209,7 +209,8 @@ function GenerateTrainerInvoice() {
               collection(db, "invoices"),
               where("trainerId", "==", trainer.trainerId),
               where("businessName", "==", trainer.businessName),
-              where("phase", "==", trainer.phase)
+              where("phase", "==", trainer.phase),
+              where("projectCode", "==", trainer.projectCode)
             );
 
             const querySnapshot = await getDocs(q);
@@ -369,8 +370,8 @@ function GenerateTrainerInvoice() {
   ].filter(Boolean);
 
   // Get status icon and text for download button
-  const getDownloadStatus = (trainerId, businessName, phase) => {
-    const status = pdfStatus[`${trainerId}_${businessName}_${phase}`];
+  const getDownloadStatus = (trainerId, businessName, phase, projectCode) => {
+    const status = pdfStatus[`${trainerId}_${businessName}_${phase}_${projectCode}`];
     if (!status) return null;
 
     switch (status) {
@@ -474,21 +475,22 @@ function GenerateTrainerInvoice() {
 
   const handleDownloadInvoice = async (trainer) => {
     setDownloadingInvoice(
-      `${trainer.trainerId}_${trainer.businessName}_${trainer.phase}`
+      `${trainer.trainerId}_${trainer.businessName}_${trainer.phase}_${trainer.projectCode}`
     );
     setPdfStatus((prev) => ({
       ...prev,
-      [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}`]:
+      [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}_${trainer.projectCode}`]:
         "downloading",
     }));
 
     try {
-      // Find invoices for this trainer, college, and phase combination
+      // Find invoices for this trainer, college, phase, and project combination
       const q = query(
         collection(db, "invoices"),
         where("trainerId", "==", trainer.trainerId),
         where("businessName", "==", trainer.businessName),
-        where("phase", "==", trainer.phase)
+        where("phase", "==", trainer.phase),
+        where("projectCode", "==", trainer.projectCode)
       );
 
       const querySnapshot = await getDocs(q);
@@ -518,21 +520,21 @@ function GenerateTrainerInvoice() {
               const success = await generateInvoicePDF(invoiceData);
               setPdfStatus((prev) => ({
                 ...prev,
-                [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}`]:
+                [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}_${trainer.projectCode}`]:
                   success ? "success" : "error",
               }));
             } else {
               alert("Invalid invoice number selected");
               setPdfStatus((prev) => ({
                 ...prev,
-                [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}`]:
+                [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}_${trainer.projectCode}`]:
                   "error",
               }));
             }
           } else {
             setPdfStatus((prev) => ({
               ...prev,
-              [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}`]:
+              [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}_${trainer.projectCode}`]:
                 "cancelled",
             }));
           }
@@ -543,7 +545,7 @@ function GenerateTrainerInvoice() {
           );
           setPdfStatus((prev) => ({
             ...prev,
-            [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}`]:
+            [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}_${trainer.projectCode}`]:
               success ? "success" : "error",
           }));
         }
@@ -551,7 +553,7 @@ function GenerateTrainerInvoice() {
         alert("No invoice found for this trainer at this college and phase");
         setPdfStatus((prev) => ({
           ...prev,
-          [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}`]:
+          [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}_${trainer.projectCode}`]:
             "not_found",
         }));
       }
@@ -560,7 +562,7 @@ function GenerateTrainerInvoice() {
       alert("Failed to download invoice. Please try again.");
       setPdfStatus((prev) => ({
         ...prev,
-        [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}`]:
+        [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}_${trainer.projectCode}`]:
           "error",
       }));
     } finally {
@@ -576,7 +578,8 @@ function GenerateTrainerInvoice() {
         collection(db, "invoices"),
         where("trainerId", "==", trainer.trainerId),
         where("businessName", "==", trainer.businessName),
-        where("phase", "==", trainer.phase)
+        where("phase", "==", trainer.phase),
+        where("projectCode", "==", trainer.projectCode)
       );
 
       const querySnapshot = await getDocs(q);

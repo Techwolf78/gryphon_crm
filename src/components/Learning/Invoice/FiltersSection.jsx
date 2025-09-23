@@ -15,9 +15,9 @@ function FiltersSection({
   projectCodeFilter,
   setProjectCodeFilter,
   projectCodes,
-  collegeNameFilter,
-  setCollegeNameFilter,
-  collegeNames,
+  businessNameFilter,
+  setBusinessNameFilter,
+  businessNames,
   startDateFilter,
   setStartDateFilter,
   endDateFilter,
@@ -29,12 +29,7 @@ function FiltersSection({
   handleRefreshData,
   exporting,
   setExporting,
-  filteredGroupedData,
-  searchTerm: searchTermActive,
-  startDateFilter: startDateFilterActive,
-  endDateFilter: endDateFilterActive,
-  projectCodeFilter: projectCodeFilterActive,
-  collegeNameFilter: collegeNameFilterActive
+  filteredGroupedData
 }) {
   return (
     <div className="p-6 border-b border-gray-100 bg-gray-50/50">
@@ -117,12 +112,12 @@ function FiltersSection({
                     College Name
                   </label>
                   <select
-                    value={collegeNameFilter}
-                    onChange={(e) => setCollegeNameFilter(e.target.value)}
+                    value={businessNameFilter}
+                    onChange={(e) => setBusinessNameFilter(e.target.value)}
                     className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                   >
                     <option value="">All Colleges</option>
-                    {collegeNames.map((college) => (
+                    {businessNames.map((college) => (
                       <option key={college} value={college}>
                         {college}
                       </option>
@@ -223,36 +218,36 @@ function FiltersSection({
       </div>
 
       {/* Active filters indicator */}
-      {(searchTermActive ||
-        startDateFilterActive ||
-        endDateFilterActive ||
-        projectCodeFilterActive ||
-        collegeNameFilterActive) && (
+      {(searchTerm ||
+        startDateFilter ||
+        endDateFilter ||
+        projectCodeFilter ||
+        businessNameFilter) && (
         <div className="mt-3 flex flex-wrap items-center text-sm text-gray-500">
           <span className="mr-2">Active filters:</span>
-          {searchTermActive && (
+          {searchTerm && (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-2 mb-2">
-              Search: {searchTermActive}
+              Search: {searchTerm}
             </span>
           )}
-          {projectCodeFilterActive && (
+          {projectCodeFilter && (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 mr-2 mb-2">
-              Project Code: {projectCodeFilterActive}
+              Project Code: {projectCodeFilter}
             </span>
           )}
-          {collegeNameFilterActive && (
+          {businessNameFilter && (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 mr-2 mb-2">
-              College: {collegeNameFilterActive}
+              College: {businessNameFilter}
             </span>
           )}
-          {startDateFilterActive && (
+          {startDateFilter && (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 mr-2 mb-2">
-              Start Date: {startDateFilterActive}
+              Start Date: {startDateFilter}
             </span>
           )}
-          {endDateFilterActive && (
+          {endDateFilter && (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 mr-2 mb-2">
-              End Date: {endDateFilterActive}
+              End Date: {endDateFilter}
             </span>
           )}
         </div>

@@ -39,7 +39,7 @@ function TrainerRow({
         const q = query(
           collection(db, "invoices"),
           where("trainerId", "==", item.trainerId),
-          where("collegeName", "==", item.collegeName),
+          where("businessName", "==", item.businessName),
           where("phase", "==", item.phase)
         );
 
@@ -78,7 +78,7 @@ function TrainerRow({
         query(
           collection(db, "invoices"),
           where("trainerId", "==", item.trainerId),
-          where("collegeName", "==", item.collegeName),
+          where("businessName", "==", item.businessName),
           where("phase", "==", item.phase)
         )
       );
@@ -149,7 +149,7 @@ function TrainerRow({
       </td>
       <td className="px-4 sm:px-6 py-4">
         <div className="text-sm text-gray-900 font-medium max-w-xs truncate">
-          {item.collegeName}
+          {item.businessName}
         </div>
         <div className="text-sm text-gray-500">
           {item.allProjects.join(", ")}
@@ -257,7 +257,7 @@ function TrainerRow({
                 )}
               </div>
 
-              {getDownloadStatus(item.trainerId, item.collegeName, item.phase)}
+              {getDownloadStatus(item.trainerId, item.businessName, item.phase, item.projectCode)}
             </>
           ) : invoiceAvailable ? (
             <button

@@ -26,7 +26,7 @@ const safeParseDate = (date) => {
   if (!date) return null;
   try {
     const parsed = date?.toDate?.() ?? new Date(date);
-    return isNaN(parsed) ? null : parsed;
+    return isNaN(parsed.getTime()) ? null : parsed;
   } catch {
     return null;
   }
@@ -40,7 +40,7 @@ const process1MData = (logs, currentMonthIndex, currentYear) => {
 
   logs.forEach((log) => {
     if (log.action === "Logged in") {
-      const dateObj = safeParseDate(log.date);
+      const dateObj = safeParseDate(log.timestamp);
       if (dateObj && 
           dateObj.getMonth() === currentMonthIndex && 
           dateObj.getFullYear() === currentYear) {
@@ -64,7 +64,7 @@ const processMultiMonthData = (logs, rangeCount, currentMonthIndex) => {
 
   logs.forEach((log) => {
     if (log.action === "Logged in") {
-      const dateObj = safeParseDate(log.date);
+      const dateObj = safeParseDate(log.timestamp);
       if (dateObj) {
         const month = dateObj.toLocaleString("en-US", { month: "short" });
         counts[month] = (counts[month] || 0) + 1;
@@ -338,7 +338,7 @@ LoginAnalytics.propTypes = {
   logs: PropTypes.arrayOf(
     PropTypes.shape({
       action: PropTypes.string.isRequired,
-      date: PropTypes.oneOfType([
+      timestamp: PropTypes.oneOfType([
         PropTypes.instanceOf(Date),
         PropTypes.object, // for Firestore Timestamp
         PropTypes.string

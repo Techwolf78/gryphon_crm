@@ -26,12 +26,14 @@ const roleLinks = {
     { label: "L & D", path: "/dashboard/learning-development", icon: <FiBook /> },
     { label: "Placement", path: "/dashboard/placement", icon: <FiBriefcase /> },
     { label: "D M", path: "/dashboard/marketing", icon: <FiTrendingUp /> },
+    { label: "CA", path: "/dashboard/ca", icon: <FiUserCheck /> },
     { label: "HR", path: "/dashboard/hr", icon: <FiUserCheck /> },
   ],
   sales: [{ label: "Sales", path: "/dashboard/sales", icon: <MdOutlineCurrencyRupee /> }],
   placement: [{ label: "Placement", path: "/dashboard/placement", icon: <FiBriefcase /> }],
   "learning-development": [{ label: "L & D", path: "/dashboard/learning-development", icon: <FiBook /> }],
   marketing: [{ label: "D M", path: "/dashboard/marketing", icon: <FiTrendingUp /> }],
+  ca: [{ label: "CA", path: "/dashboard/ca", icon: <FiUserCheck /> }],
   hr: [{ label: "HR", path: "/dashboard/hr", icon: <FiUserCheck /> }],
 };
 
@@ -43,6 +45,7 @@ const normalizeRole = (role) => {
   if (norm.includes("placement")) return "placement";
   if (norm.includes("learning") || norm.includes("l&d") || norm.includes("ld")) return "learning-development";
   if (norm.includes("marketing") || norm.includes("dm")) return "marketing";
+  if (norm.includes("ca")) return "ca";
   if (norm.includes("hr")) return "hr";
   return "";
 };
