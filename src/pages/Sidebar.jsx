@@ -18,7 +18,7 @@ import {
   FiMenu,
   FiUserCheck,
 } from "react-icons/fi";
-
+ 
 const roleLinks = {
   admin: [
     { label: "Admin", path: "/dashboard/admin", icon: <FiUsers /> },
@@ -26,15 +26,17 @@ const roleLinks = {
     { label: "L & D", path: "/dashboard/learning-development", icon: <FiBook /> },
     { label: "Placement", path: "/dashboard/placement", icon: <FiBriefcase /> },
     { label: "D M", path: "/dashboard/marketing", icon: <FiTrendingUp /> },
+    { label: "CA", path: "/dashboard/ca", icon: <FiUserCheck /> },
     { label: "HR", path: "/dashboard/hr", icon: <FiUserCheck /> },
   ],
   sales: [{ label: "Sales", path: "/dashboard/sales", icon: <MdOutlineCurrencyRupee /> }],
   placement: [{ label: "Placement", path: "/dashboard/placement", icon: <FiBriefcase /> }],
   "learning-development": [{ label: "L & D", path: "/dashboard/learning-development", icon: <FiBook /> }],
   marketing: [{ label: "D M", path: "/dashboard/marketing", icon: <FiTrendingUp /> }],
+  ca: [{ label: "CA", path: "/dashboard/ca", icon: <FiUserCheck /> }],
   hr: [{ label: "HR", path: "/dashboard/hr", icon: <FiUserCheck /> }],
 };
-
+ 
 const normalizeRole = (role) => {
   if (!role) return "";
   const norm = String(role).toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -43,16 +45,17 @@ const normalizeRole = (role) => {
   if (norm.includes("placement")) return "placement";
   if (norm.includes("learning") || norm.includes("l&d") || norm.includes("ld")) return "learning-development";
   if (norm.includes("marketing") || norm.includes("dm")) return "marketing";
+  if (norm.includes("ca")) return "ca";
   if (norm.includes("hr")) return "hr";
   return "";
 };
-
+ 
 const Sidebar = ({ collapsed, onToggle }) => {
   const { user } = useContext(AuthContext);
   const location = useLocation();
   const [isAIDrawerOpen, setIsAIDrawerOpen] = useState(false);
   const initializedRef = useRef(false);
-
+ 
   // Sync stored preference on mount (run once). If stored value differs from current prop, call onToggle to sync parent.
   useEffect(() => {
     if (initializedRef.current) return;
@@ -69,7 +72,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
       // ignore storage errors
     }
   }, [collapsed, onToggle]);
-
+ 
   const handleToggle = useCallback(() => {
     try {
       const newVal = !collapsed;
@@ -79,18 +82,18 @@ const Sidebar = ({ collapsed, onToggle }) => {
     }
     if (typeof onToggle === 'function') onToggle();
   }, [collapsed, onToggle]);
-
+ 
   if (!user) return null;
-
+ 
   const normalizedRole = normalizeRole(user.department) || normalizeRole(user.role);
   const isActive = (path) => path === "/dashboard" ? location.pathname === "/dashboard" : location.pathname.startsWith(path);
-
+ 
   const links = [
     { label: "Dashboard", path: "/dashboard", icon: <FiHome />, skipRedirect: true },
     ...(roleLinks[normalizedRole] || []),
     { label: "Help", path: "/dashboard/help", icon: <FiHelpCircle />, skipRedirect: true },
   ];
-
+ 
   return (
     <>
       {/* Mobile Menu Button */}
@@ -103,20 +106,20 @@ const Sidebar = ({ collapsed, onToggle }) => {
           <FiMenu className="w-5 h-5 text-gray-700" />
         </button>
       )}
-
+ 
       {/* Overlay for mobile when sidebar is open */}
       {!collapsed && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
           onClick={handleToggle}
         />
       )}
-
+ 
       <aside className={`
-        ${collapsed ? "w-16" : "w-64 sm:w-72 lg:w-44"} 
-        bg-white border-r border-gray-200 flex flex-col fixed h-full z-50 
+        ${collapsed ? "w-16" : "w-64 sm:w-72 lg:w-44"}
+        bg-white border-r border-gray-200 flex flex-col fixed h-full z-50
         transition-all duration-300
-        ${collapsed 
+        ${collapsed
           ? "-translate-x-full lg:translate-x-0" // Hide on mobile when collapsed, show on desktop
           : "translate-x-0" // Always show when expanded
         }
@@ -124,20 +127,20 @@ const Sidebar = ({ collapsed, onToggle }) => {
       `}>
         {/* Header */}
     <div className={`p-3 border-b border-gray-200 ${collapsed ? "flex flex-col items-center space-y-2" : "flex items-center justify-between"}`}>
-          <img 
-            src={collapsed ? compactLogo : logo} 
-            alt="SYNC" 
-            className={collapsed ? "w-6 h-6" : "h-5 max-w-[120px] sm:max-w-none"} 
+          <img
+            src={collapsed ? compactLogo : logo}
+            alt="SYNC"
+            className={collapsed ? "w-6 h-6" : "h-5 max-w-[120px] sm:max-w-none"}
           />
-          <button 
-      onClick={handleToggle} 
-            className="p-1 rounded hover:bg-gray-100 lg:block" 
+          <button
+      onClick={handleToggle}
+            className="p-1 rounded hover:bg-gray-100 lg:block"
             aria-label={collapsed ? "Expand" : "Collapse"}
           >
             <img src={collapsed ? expandIcon : collapseIcon} alt="" className="w-4 h-4" />
           </button>
         </div>
-
+ 
         {/* Navigation */}
         <nav className="flex-1 p-3 space-y-2 overflow-y-auto">
           {links.map(({ label, path, icon, skipRedirect }) => (
@@ -160,7 +163,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
               {!collapsed && <span className="ml-2 truncate">{label}</span>}
             </Link>
           ))}
-
+ 
           {/* AI Button */}
           <div className="pt-3 border-t border-gray-200">
             <button
@@ -180,10 +183,11 @@ const Sidebar = ({ collapsed, onToggle }) => {
           </div>
         </nav>
       </aside>
-
+ 
       <AiBot isOpen={isAIDrawerOpen} onClose={() => setIsAIDrawerOpen(false)} />
     </>
   );
 };
-
+ 
 export default Sidebar;
+ 
