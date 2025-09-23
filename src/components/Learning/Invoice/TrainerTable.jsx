@@ -15,7 +15,7 @@ function TrainerTable({
   formatDate
 }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {Object.keys(filteredGroupedData).map((phase) => (
         <div
           key={phase}
@@ -23,7 +23,7 @@ function TrainerTable({
         >
           {/* Phase Header */}
           <div
-            className="bg-gray-50 p-4 flex justify-between items-center cursor-pointer hover:bg-gray-100 transition-colors"
+            className="bg-gray-50 p-2 flex justify-between items-center cursor-pointer hover:bg-gray-100 transition-colors"
             onClick={() => togglePhase(phase)}
             aria-expanded={expandedPhases[phase]}
           >
@@ -52,19 +52,19 @@ function TrainerTable({
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Trainer
                     </th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       College & Projects
                     </th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Domains
                     </th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Dates & Hours
                     </th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>

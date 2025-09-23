@@ -65,9 +65,9 @@ function GenerateTrainerInvoice() {
               (batch.batches || []).forEach((b) => {
                 (b.trainers || []).forEach((trainer) => {
                   const startDate =
-                    trainer.startDate || trainer.activeDates?.[0] || "";
+                    trainer.startDate || domainData.trainingStartDate || trainer.activeDates?.[0] || "";
                   const endDate =
-                    trainer.endDate || trainer.activeDates?.slice(-1)[0] || "";
+                    trainer.endDate || domainData.trainingEndDate || trainer.activeDates?.slice(-1)[0] || "";
 
                   // Collect all topics from trainer, batch, and domain levels
                   const allTopics = new Set();
@@ -659,7 +659,7 @@ function GenerateTrainerInvoice() {
           filteredGroupedData={filteredGroupedData}
         />
 
-        <div className="p-4 sm:p-6">
+        <div className="p-1 sm:p-2">
           {loading ? (
             <LoadingState />
           ) : trainerData.length === 0 ? (

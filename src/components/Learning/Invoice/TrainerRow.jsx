@@ -121,7 +121,7 @@ function TrainerRow({
   if (loading) {
     return (
       <tr>
-        <td colSpan="5" className="px-4 sm:px-6 py-4 text-center">
+        <td colSpan="5" className="px-2 sm:px-4 py-2 text-center">
           <FiRefreshCw className="animate-spin inline mr-2" />
           Loading invoice data...
         </td>
@@ -131,7 +131,7 @@ function TrainerRow({
 
   return (
     <tr className="hover:bg-gray-50/50 transition-colors">
-      <td className="px-4 sm:px-6 py-4">
+      <td className="px-2 sm:px-4 py-2">
         <div className="flex items-center">
           <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
             <FiUser className="text-blue-600" />
@@ -147,7 +147,7 @@ function TrainerRow({
           </div>
         </div>
       </td>
-      <td className="px-4 sm:px-6 py-4">
+      <td className="px-2 sm:px-4 py-2">
         <div className="text-sm text-gray-900 font-medium max-w-xs truncate">
           {item.businessName}
         </div>
@@ -155,11 +155,11 @@ function TrainerRow({
           {item.allProjects.join(", ")}
         </div>
       </td>
-      <td className="px-4 sm:px-6 py-4">
+      <td className="px-2 sm:px-4 py-2">
         <div className="text-sm text-gray-900">{item.allDomains.join(", ")}</div>
       </td>
 
-      <td className="px-4 sm:px-6 py-4">
+      <td className="px-2 sm:px-4 py-2">
         <div className="flex items-center gap-1 text-sm text-gray-500">
           <FiCalendar className="text-gray-400 flex-shrink-0" />
           <span>
@@ -182,14 +182,14 @@ function TrainerRow({
           </div>
         )}
       </td>
-      <td className="px-4 sm:px-6 py-4">
+      <td className="px-2 sm:px-4 py-2">
         <div className="flex flex-col gap-2">
           {item.hasExistingInvoice ? (
             <>
               <div className="flex flex-col gap-2">
                 {/* Status Badge */}
                 <div
-                  className={`text-xs px-3 py-1.5 rounded-full text-center font-medium ${
+                  className={`text-xs px-2 py-1 rounded-full text-center font-medium ${
                     uiStatus === "done"
                       ? "bg-green-100 text-green-800 flex items-center justify-center"
                       : uiStatus === "pending"
@@ -213,7 +213,7 @@ function TrainerRow({
                       downloadingInvoice ===
                       `${item.trainerId}_${item.collegeName}_${item.phase}`
                     }
-                    className="flex-1 inline-flex items-center justify-center px-2 py-1.5 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 transition-all"
+                    className="flex-1 inline-flex items-center justify-center px-1 py-1 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 transition-all"
                   >
                     <FiDownload className="w-3 h-3 mr-1" />
                     Download
@@ -221,7 +221,7 @@ function TrainerRow({
                   
                   <button
                     onClick={() => handleEditInvoice(item)}
-                    className="flex-1 inline-flex items-center justify-center px-2 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-all"
+                    className="flex-1 inline-flex items-center justify-center px-1 py-1 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-all"
                   >
                     <FaEye className="w-3 h-3 mr-1" />
                     View
@@ -231,7 +231,7 @@ function TrainerRow({
                     <button
                       onClick={updateInvoiceStatus}
                       disabled={updatingStatus}
-                      className="flex-1 inline-flex items-center justify-center px-2 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-all disabled:opacity-50"
+                      className="flex-1 inline-flex items-center justify-center px-1 py-1 text-xs font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-all disabled:opacity-50"
                     >
                       {updatingStatus ? (
                         <FiRefreshCw className="animate-spin w-3 h-3" />
@@ -262,7 +262,7 @@ function TrainerRow({
           ) : invoiceAvailable ? (
             <button
               onClick={() => handleGenerateInvoice(item)}
-              className="w-full inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all"
+              className="w-full inline-flex items-center justify-center px-2 py-1 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all"
             >
               <FiFileText className="w-4 h-4 mr-1" />
               Generate Invoice
@@ -283,7 +283,7 @@ function TrainerRow({
               </div>
               <button
                 disabled
-                className="w-full inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed"
+                className="w-full inline-flex items-center justify-center px-2 py-1 text-sm font-medium text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed"
               >
                 <FiFileText className="w-4 h-4 mr-1" />
                 Generate Invoice
