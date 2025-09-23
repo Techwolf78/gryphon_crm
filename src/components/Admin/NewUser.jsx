@@ -26,15 +26,15 @@ import {
 import emailjs from "@emailjs/browser";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-
-const departments = ["Sales", "Placement", "L & D", "DM", "Admin", "HR"];
+ 
+const departments = ["Sales", "Placement", "L & D", "DM", "Admin", "CA", "HR"];
 const roles = ["Director", "Head", "Manager", "Assistant Manager", "Executive"];
-
+ 
 // Validation constants
 const MIN_PASSWORD_LENGTH = 8;
 const PASSWORD_COMPLEXITY_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
+ 
 const NewUser = ({ onUserAdded }) => {
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
@@ -47,7 +47,7 @@ const NewUser = ({ onUserAdded }) => {
   const [error, setError] = useState("");
   const [reportingManagers, setReportingManagers] = useState([]);
   const [selectedReportingManager, setSelectedReportingManager] = useState("");
-
+ 
   useEffect(() => {
     const fetchManagers = async () => {
       if (
@@ -61,12 +61,12 @@ const NewUser = ({ onUserAdded }) => {
             where("department", "==", "Sales")
           );
           const querySnapshot = await getDocs(q);
-
+ 
           const managers = querySnapshot.docs.map((doc) => ({
             id: doc.id,
             name: doc.data().name,
           }));
-
+ 
           setReportingManagers(managers);
         } catch (err) {
           console.error("Error fetching managers:", err);
@@ -77,10 +77,10 @@ const NewUser = ({ onUserAdded }) => {
         setSelectedReportingManager("");
       }
     };
-
+ 
     fetchManagers();
   }, [role, department]);
-
+ 
   const resetForm = () => {
     setName("");
     setEmail("");
@@ -92,7 +92,7 @@ const NewUser = ({ onUserAdded }) => {
     setSelectedReportingManager("");
     setReportingManagers([]);
   };
-
+ 
   useEffect(() => {
     const handleEsc = (e) => {
       if (e.key === "Escape") {
@@ -103,7 +103,7 @@ const NewUser = ({ onUserAdded }) => {
     window.addEventListener("keydown", handleEsc);
     return () => window.removeEventListener("keydown", handleEsc);
   }, []);
-
+ 
   useEffect(() => {
     if (showForm) {
       setTimeout(() => {
@@ -111,43 +111,43 @@ const NewUser = ({ onUserAdded }) => {
       }, 100);
     }
   }, [showForm]);
-
+ 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-
+ 
     // Validation checks
     if (!name || !email || !password) {
       setError("All fields are required.");
       setLoading(false);
       return;
     }
-
+ 
     if (!EMAIL_REGEX.test(email)) {
       setError("Please enter a valid email address.");
       setLoading(false);
       return;
     }
-
+ 
     if (password.length < MIN_PASSWORD_LENGTH) {
       setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters long.`);
       setLoading(false);
       return;
     }
-
+ 
     if (!PASSWORD_COMPLEXITY_REGEX.test(password)) {
       setError("Password must contain at least one uppercase letter, one lowercase letter, and one number.");
       setLoading(false);
       return;
     }
-
+ 
     if (!roles.includes(role) || !departments.includes(department)) {
       setError("Invalid role or department selected.");
       setLoading(false);
       return;
     }
-
+ 
     if (
       (role === "Assistant Manager" || role === "Executive") &&
       department === "Sales" &&
@@ -157,7 +157,7 @@ const NewUser = ({ onUserAdded }) => {
       setLoading(false);
       return;
     }
-
+ 
     try {
       // Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
@@ -165,10 +165,10 @@ const NewUser = ({ onUserAdded }) => {
         email,
         password
       );
-      
+     
       // Update user profile with display name
       await updateProfile(userCredential.user, { displayName: name });
-
+ 
       // Save user data to Firestore
       await addDoc(collection(db, "users"), {
         uid: userCredential.user.uid,
@@ -182,7 +182,7 @@ const NewUser = ({ onUserAdded }) => {
             : null,
         createdAt: serverTimestamp(),
       });
-
+ 
       // Send welcome email
       try {
         await emailjs.send(
@@ -205,10 +205,10 @@ const NewUser = ({ onUserAdded }) => {
         console.error("EmailJS Error:", emailErr);
         toast.warning("User added, but email not sent.");
       }
-
+ 
       // Sign out from secondary auth
       await signOut(secondaryAuth);
-
+ 
       // Reset form and show success
       resetForm();
       setShowForm(false);
@@ -222,7 +222,7 @@ const NewUser = ({ onUserAdded }) => {
       setLoading(false);
     }
   };
-
+ 
   return (
     <div>
       <button
@@ -232,7 +232,7 @@ const NewUser = ({ onUserAdded }) => {
         <AiOutlineUserAdd className="text-2xl" />
         Add User
       </button>
-
+ 
       {showForm && (
         <div
           className="fixed inset-0 backdrop-blur-sm bg-black/30 z-40"
@@ -242,7 +242,7 @@ const NewUser = ({ onUserAdded }) => {
           }}
         ></div>
       )}
-
+ 
       <div
         className={`fixed top-0 right-0 h-full w-full sm:w-[380px] lg:w-[420px] xl:w-[450px] bg-white/95 backdrop-blur-xl z-[100] transform transition-transform duration-300 shadow-2xl ${
           showForm ? "translate-x-0" : "translate-x-full"
@@ -265,7 +265,7 @@ const NewUser = ({ onUserAdded }) => {
             &times;
           </button>
         </div>
-
+ 
         {/* Compact Form */}
         <form
           onSubmit={handleSubmit}
@@ -290,7 +290,7 @@ const NewUser = ({ onUserAdded }) => {
               />
             </div>
           </div>
-
+ 
           {/* Compact Email Field */}
           <div className="space-y-1.5">
             <label htmlFor="emailInput" className="block text-sm font-medium text-gray-700">
@@ -310,7 +310,7 @@ const NewUser = ({ onUserAdded }) => {
               />
             </div>
           </div>
-
+ 
           {/* Compact Password Field */}
           <div className="space-y-1.5">
             <label htmlFor="passwordInput" className="block text-sm font-medium text-gray-700">
@@ -359,7 +359,7 @@ const NewUser = ({ onUserAdded }) => {
               </ul>
             </div>
           </div>
-
+ 
           {/* Compact Department & Role Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Department Field */}
@@ -384,7 +384,7 @@ const NewUser = ({ onUserAdded }) => {
                 </select>
               </div>
             </div>
-
+ 
             {/* Role Field */}
             <div className="space-y-1.5">
               <label htmlFor="roleSelect" className="block text-sm font-medium text-gray-700">
@@ -408,7 +408,7 @@ const NewUser = ({ onUserAdded }) => {
               </div>
             </div>
           </div>
-
+ 
           {/* Compact Reporting Manager Field */}
           {(role === "Assistant Manager" || role === "Executive") && department === "Sales" && (
             <div className="space-y-1.5 bg-blue-50 p-3 rounded-lg border border-blue-200">
@@ -437,7 +437,7 @@ const NewUser = ({ onUserAdded }) => {
               </p>
             </div>
           )}
-
+ 
           {/* Compact Error Message */}
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm font-medium flex items-start">
@@ -447,7 +447,7 @@ const NewUser = ({ onUserAdded }) => {
               {error}
             </div>
           )}
-
+ 
           {/* Compact Form Buttons */}
           <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3 pt-4 border-t border-gray-200">
             <button
@@ -499,9 +499,9 @@ const NewUser = ({ onUserAdded }) => {
           </div>
         </form>
       </div>
-
+ 
       {/* Enhanced Toast Container for mobile */}
-      <ToastContainer 
+      <ToastContainer
         position="top-center"
         autoClose={4000}
         hideProgressBar={false}
@@ -518,5 +518,6 @@ const NewUser = ({ onUserAdded }) => {
     </div>
   );
 };
-
+ 
 export default NewUser;
+ 

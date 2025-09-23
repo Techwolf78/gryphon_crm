@@ -2,10 +2,10 @@ import React, { useState, useEffect } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import { FiX } from "react-icons/fi";
-
-const departments = ["Sales", "Placement", "L & D", "DM", "Admin", "HR"];
+ 
+const departments = ["Sales", "Placement", "L & D", "DM", "Admin", "CA", "HR"];
 const roles = ["Director", "Head", "Manager", "Assistant Manager", "Executive"];
-
+ 
 const EditUser = ({ user, onCancel, onSuccess }) => {
   const [formData, setFormData] = useState({
     name: "",
@@ -13,10 +13,10 @@ const EditUser = ({ user, onCancel, onSuccess }) => {
     role: "",
     department: "",
   });
-
+ 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
+ 
   useEffect(() => {
     if (user) {
       setFormData({
@@ -27,17 +27,17 @@ const EditUser = ({ user, onCancel, onSuccess }) => {
       });
     }
   }, [user]);
-
+ 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
-
+ 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
-
+ 
     try {
       const userRef = doc(db, "users", user.id);
       await updateDoc(userRef, {
@@ -47,7 +47,7 @@ const EditUser = ({ user, onCancel, onSuccess }) => {
         department: formData.department,
         updatedAt: new Date(),
       });
-
+ 
       onSuccess();
     } catch (err) {
       setError("Failed to update user: " + err.message);
@@ -56,7 +56,7 @@ const EditUser = ({ user, onCancel, onSuccess }) => {
       setLoading(false);
     }
   };
-
+ 
   return (
     <div className="w-full max-w-md mx-auto">
       <div className="flex items-center justify-between mb-4 sm:mb-6">
@@ -70,13 +70,13 @@ const EditUser = ({ user, onCancel, onSuccess }) => {
           <FiX className="w-5 h-5" />
         </button>
       </div>
-
+ 
       {error && (
         <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm">
           {error}
         </div>
       )}
-
+ 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -90,7 +90,7 @@ const EditUser = ({ user, onCancel, onSuccess }) => {
             required
           />
         </div>
-
+ 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Email
@@ -104,7 +104,7 @@ const EditUser = ({ user, onCancel, onSuccess }) => {
             required
           />
         </div>
-
+ 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Role
@@ -124,7 +124,7 @@ const EditUser = ({ user, onCancel, onSuccess }) => {
             ))}
           </select>
         </div>
-
+ 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Department
@@ -144,7 +144,7 @@ const EditUser = ({ user, onCancel, onSuccess }) => {
             ))}
           </select>
         </div>
-
+ 
         <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
           <button
             type="button"
@@ -167,5 +167,6 @@ const EditUser = ({ user, onCancel, onSuccess }) => {
     </div>
   );
 };
-
+ 
 export default EditUser;
+ 
