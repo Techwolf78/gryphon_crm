@@ -4,6 +4,16 @@ import React from "react";
 const InvoiceModal = ({ invoice, onClose, onRegister,isViewOnly }) => {
   if (!invoice) return null;
 
+    const getInvoiceTypeDisplay = () => {
+    if (invoice.invoiceType) {
+      return invoice.invoiceType;
+    }
+    return invoice.type || "Tax Invoice"; // fallback
+  };
+
+  const getInvoiceNumberDisplay = () => {
+    return invoice.invoiceNumber || "N/A";
+  };
   // Amount ko words mein convert karne ka function
   const convertAmountToWords = (amount) => {
     if (!amount) return "Rupees Zero Only";
@@ -92,14 +102,30 @@ const InvoiceModal = ({ invoice, onClose, onRegister,isViewOnly }) => {
       <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           {/* Header */}
-          <div className="flex justify-between items-center mb-6 border-b pb-4">
-            <h3 className="text-2xl font-bold text-gray-800">Tax Invoice</h3>
-            <button
-              onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
-            >
-              ×
-            </button>
+         <div className="flex justify-between items-start mb-6 border-b pb-4">
+            <div>
+              <h3 className="text-2xl font-bold text-gray-800">Invoice</h3>
+              <p className="text-gray-600 mt-1">
+                College: {invoice.collegeName || "N/A"} | 
+                Project: {invoice.projectCode || "N/A"}
+              </p>
+            </div>
+            <div className="text-right">
+              <div className="bg-blue-100 px-3 py-2 rounded-lg">
+                <p className="font-bold text-blue-800 text-lg">
+                  {getInvoiceTypeDisplay()}
+                </p>
+                <p className="text-sm text-blue-600 font-semibold">
+                  {getInvoiceNumberDisplay()}
+                </p>
+              </div>
+              {invoice.installment && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Installment: {invoice.installment}
+                </p>
+              )}
+              
+            </div>
           </div>
 
           {/* Company Details */}

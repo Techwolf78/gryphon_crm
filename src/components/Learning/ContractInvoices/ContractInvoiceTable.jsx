@@ -739,31 +739,32 @@ export default function ContractInvoiceTable() {
                       {/* Installments Table */}
                       <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                Installment
-                              </th>
-                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                Percentage
-                              </th>
-                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                Amount
-                              </th>
-                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                Invoice Number
-                              </th>
-                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                Received Amount
-                              </th>
-                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                Due Amount
-                              </th>
-                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                Actions
-                              </th>
-                            </tr>
-                          </thead>
+                        <thead className="bg-gray-50">
+  <tr>
+    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+      Installment
+    </th>
+    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+      Percentage
+    </th>
+    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+      Amount
+    </th>
+    {/* YAHAN CHANGE - Invoice Number ki jagah Invoice Type */}
+    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+      Invoice Type
+    </th>
+    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+      Received Amount
+    </th>
+    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+      Due Amount
+    </th>
+    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+      Actions
+    </th>
+  </tr>
+</thead>
                           <tbody className="bg-white divide-y divide-gray-200">
                             {invoice.paymentDetails?.map(
                               (installment, index) => {
@@ -791,9 +792,25 @@ export default function ContractInvoiceTable() {
                                     <td className="px-4 py-2 text-sm text-gray-500 font-semibold">
                                       {formatCurrency(installment.totalAmount)}
                                     </td>
-                                    <td className="px-4 py-2 text-sm text-gray-500">
-                                      {existingInvoice?.invoiceNumber || "-"}
-                                    </td>
+                                    {/* Alternative - Invoice Type aur Number dono dikhaye */}
+<td className="px-4 py-2 text-sm text-gray-500">
+  {existingInvoice ? (
+    <div>
+      <div className={`font-semibold ${
+        existingInvoice.invoiceType === "Tax Invoice" 
+          ? "text-green-600" 
+          : "text-blue-600"
+      }`}>
+        {existingInvoice.invoiceType || "Tax Invoice"}
+      </div>
+      <div className="text-xs text-gray-400 mt-0.5">
+        {existingInvoice.invoiceNumber || "N/A"}
+      </div>
+    </div>
+  ) : (
+    "-"
+  )}
+</td>
                                     <td className="px-4 py-2 text-sm">
                                       <span
                                         className={`font-semibold ${
@@ -845,16 +862,7 @@ export default function ContractInvoiceTable() {
                                             >
                                               View
                                             </button>
-                                            <button
-                                              onClick={() =>
-                                                handleDownloadInvoice(
-                                                  existingInvoice
-                                                )
-                                              }
-                                              className="bg-green-500 hover:bg-green-700 text-white py-1 px-2 rounded text-xs"
-                                            >
-                                              Download
-                                            </button>
+                                            
                                             <button
                                               onClick={() =>
                                                 handleConvertToTax(
@@ -878,16 +886,7 @@ export default function ContractInvoiceTable() {
                                             >
                                               View
                                             </button>
-                                            <button
-                                              onClick={() =>
-                                                handleEditInvoice(
-                                                  existingInvoice
-                                                )
-                                              }
-                                              className="bg-yellow-500 hover:bg-yellow-700 text-white py-1 px-2 rounded text-xs"
-                                            >
-                                              Edit
-                                            </button>
+                                            
                                           </>
                                         )}
                                       </div>
