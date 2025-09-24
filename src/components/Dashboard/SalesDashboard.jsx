@@ -36,8 +36,6 @@ const TeamPerformance = ({
   selectedUserId,
   onMemberClick,
 }) => {
-  // Add console log for total numbers in Team Performance table
-  console.log("TeamPerformance table total numbers:", teamPerformance.map(m => ({ name: m.name, value: m.value })));
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -70,7 +68,7 @@ const TeamPerformance = ({
     <div className="space-y-4">
       {teamPerformance.map((member) => (
         <div
-          key={member.name}
+          key={member.id}
           className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer"
           onClick={() => onMemberClick && onMemberClick(member)}
         >
@@ -218,7 +216,7 @@ RecentActivity.defaultProps = {
   isLoading: false,
 };
 const EducationDistribution = ({ leadCategories, isLoading }) => {
-  const COLORS = ["#3B82F6", "#10B981", "#F59E0B"]; // Blue, Green, Amber
+  const COLORS = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444"]; // Blue, Green, Amber, Red
 
   const renderCustomizedLabel = ({
     cx,
@@ -505,6 +503,7 @@ const SalesDashboard = ({ filters }) => {
     leadSources: [],
     teamPerformance: [],
     recentActivity: [],
+    studentCategories: [],
   });
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState("Team");
@@ -761,6 +760,7 @@ const getPreviousQuarterDateRange = () => {
     const leadCategories = {
       Engineering: 0,
       MBA: 0,
+      MCA: 0,
       Others: 0,
     };
 
@@ -815,6 +815,13 @@ const getPreviousQuarterDateRange = () => {
         ? 3
         : 12;
 
+    const studentCategories = {
+      Engineering: 0,
+      MBA: 0,
+      MCA: 0,
+      Others: 0,
+    };
+
     forEachFn((doc) => {
       const lead = docs === input ? doc : doc.data();
 
@@ -825,16 +832,32 @@ if (selectedUserId) {
     return;
   }
 }
-      if (lead.courseType) {
-        if (lead.courseType.includes("Engineering")) {
+      if (lead.courses?.[0]?.courseType) {
+        const courseType = lead.courses[0].courseType;
+        if (courseType.includes("Engineering")) {
           leadCategories.Engineering++;
-        } else if (lead.courseType.includes("MBA")) {
+        } else if (courseType.includes("MBA")) {
           leadCategories.MBA++;
+        } else if (courseType.includes("MCA")) {
+          leadCategories.MCA++;
         } else {
           leadCategories.Others++;
         }
       } else {
         leadCategories.Others++;
+      }
+
+      if (lead.studentCount != null && lead.courses?.[0]?.courseType) {
+        const courseType = lead.courses[0].courseType;
+        if (courseType.includes("Engineering")) {
+          studentCategories.Engineering += Number(lead.studentCount) || 0;
+        } else if (courseType.includes("MBA")) {
+          studentCategories.MBA += Number(lead.studentCount) || 0;
+        } else if (courseType.includes("MCA")) {
+          studentCategories.MCA += Number(lead.studentCount) || 0;
+        } else {
+          studentCategories.Others += Number(lead.studentCount) || 0;
+        }
       }
 
       if (lead.phase === "hot") {
@@ -934,12 +957,13 @@ if (lead.assignedTo && lead.assignedTo.uid) {
 
         if (!teamPerformance[memberId]) {
           teamPerformance[memberId] = {
+            id: memberId,
             name: memberName,
             value: 0,
             role: lead.assignedTo.role || "Sales Rep",
           };
         }
-        teamPerformance[memberId].value++;
+        teamPerformance[memberId].value += lead.studentCount || 0;
       }
 
       let createdDate = new Date(lead.createdAt);
@@ -1046,12 +1070,19 @@ if (lead.assignedTo && lead.assignedTo.uid) {
       leadCategories: [
         { name: "Engineering", value: leadCategories.Engineering },
         { name: "MBA", value: leadCategories.MBA },
+        { name: "MCA", value: leadCategories.MCA },
         { name: "Others", value: leadCategories.Others },
       ],
       leadSources: [
         { name: "Hot", value: leadSources.hot },
         { name: "Warm", value: leadSources.warm },
         { name: "Cold", value: leadSources.cold },
+      ],
+      studentCategories: [
+        { name: "Engineering", value: studentCategories.Engineering },
+        { name: "MBA", value: studentCategories.MBA },
+        { name: "MCA", value: studentCategories.MCA },
+        { name: "Others", value: studentCategories.Others },
       ],
       teamPerformance: Object.values(teamPerformance).sort(
         (a, b) => b.value - a.value
@@ -1111,7 +1142,7 @@ if (lead.assignedTo && lead.assignedTo.uid) {
       // Add more filters as needed...
 
       const snapshot = await getDocs(leadsQuery);
-      let leads = snapshot.docs.map(doc => doc.data());
+      let leads = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
       // Filter by date range in JS, but include leads with missing createdAt
       leads = leads.filter(lead => {
@@ -1140,6 +1171,7 @@ if (lead.assignedTo && lead.assignedTo.uid) {
         leadSources: [],
         teamPerformance: [],
         recentActivity: [],
+        studentCategories: [],
       });
     } finally {
       setIsLoading(false);
@@ -1235,11 +1267,8 @@ if (lead.assignedTo && lead.assignedTo.uid) {
       if (!user) return;
       const leadsQuery = query(leadsRef, where("assignedTo.uid", "==", user.uid));
       const snapshot = await getDocs(leadsQuery);
-      const leads = snapshot.docs.map((doc) => doc.data());
+      const leads = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setModalLeads(leads);
-
-      // Add console log for total numbers in the modal
-      console.log(`Modal total for ${member.name}:`, leads.length, leads.map(l => l.businessName));
     } catch (e) {
       setModalLeads([]);
     }
@@ -1483,128 +1512,132 @@ if (lead.assignedTo && lead.assignedTo.uid) {
 
         {/* Charts & Distribution */}
         <div className="w-full overflow-x-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 min-w-0">
-            <div className="bg-white p-3 md:p-5 rounded-xl border border-gray-200 shadow-sm lg:col-span-2 min-w-0">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Revenue Trend
-                </h2>
-                <div className="flex space-x-2">
-                  {["week", "month", "quarter", "year"].map((period) => (
-                    <button
-                      type="button"
-                      key={period}
-                      onClick={() => setTimePeriod(period)}
-                      className={`text-xs px-3 py-1 rounded-full ${
-                        timePeriod === period
-                          ? "bg-indigo-600 text-white"
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                      }`}
-                    >
-                      {period.charAt(0).toUpperCase() + period.slice(1)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="h-80">
-                {isLoading ? (
-                  <div className="h-full flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500" />
-                  </div>
-                ) : dashboardData.chartData.every((d) => d.revenue === 0) ? (
-                  <div className="h-full flex items-center justify-center">
-      <span className="text-gray-400 text-lg font-medium">
-        No revenue data for this period
-      </span>
-    </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart
-                      data={dashboardData.chartData}
-                      margin={{ top: 10, right: 30, left: 30, bottom: 0 }} // Increased left margin from 10 to 50
-                    >
-                      <defs>
-                        <linearGradient
-                          id="colorRevenue"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
-                        >
-                          <stop
-                            offset="5%"
-                            stopColor="#4F46E5"
-                            stopOpacity={0.8}
-                          />
-                          <stop
-                            offset="95%"
-                            stopColor="#4F46E5"
-                            stopOpacity={0}
-                          />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        vertical={false}
-                        stroke="#E5E7EB"
-                      />
-                      <XAxis
-                        dataKey="name"
-                        tick={{ fill: "#6B7280", fontSize: 8 }}
-                        axisLine={false}
-                        tickLine={false}
-                        interval={0}
-                        tickFormatter={(value) => {
-                          // For quarter/year, show month and year for clarity
-                          if (timePeriod === "quarter" || timePeriod === "year") {
-                            return `${value} ${new Date().getFullYear()}`;
-                          }
-                          return value;
-                        }}
-                      />
-                      <YAxis
-                        width={30} // Keep width for large numbers
-                        tick={{ fill: "#6B7280", fontSize: 10 }} // Reduce font size for Y-axis numbers
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <Tooltip
-                        content={<CustomTooltip timePeriod={timePeriod} />}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="revenue"
-                        stroke="#4F46E5"
-                        fillOpacity={1}
-                        fill="url(#colorRevenue)"
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                )}
+          <div className="bg-white p-3 md:p-5 rounded-xl border border-gray-200 shadow-sm mb-6 min-w-0">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Revenue Trend
+              </h2>
+              <div className="flex space-x-2">
+                {["week", "month", "quarter", "year"].map((period) => (
+                  <button
+                    type="button"
+                    key={period}
+                    onClick={() => setTimePeriod(period)}
+                    className={`text-xs px-3 py-1 rounded-full ${
+                      timePeriod === period
+                        ? "bg-indigo-600 text-white"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
+                  >
+                    {period.charAt(0).toUpperCase() + period.slice(1)}
+                  </button>
+                ))}
               </div>
             </div>
+            <div className="h-80">
+              {isLoading ? (
+                <div className="h-full flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500" />
+                </div>
+              ) : dashboardData.chartData.every((d) => d.revenue === 0) ? (
+                <div className="h-full flex items-center justify-center">
+    <span className="text-gray-400 text-lg font-medium">
+      No revenue data for this period
+    </span>
+  </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart
+                    data={dashboardData.chartData}
+                    margin={{ top: 10, right: 30, left: 30, bottom: 0 }} // Increased left margin from 10 to 50
+                  >
+                    <defs>
+                      <linearGradient
+                        id="colorRevenue"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor="#4F46E5"
+                          stopOpacity={0.8}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="#4F46E5"
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke="#E5E7EB"
+                    />
+                    <XAxis
+                      dataKey="name"
+                      tick={{ fill: "#6B7280", fontSize: 8 }}
+                      axisLine={false}
+                      tickLine={false}
+                      interval={0}
+                      tickFormatter={(value) => {
+                        // For quarter/year, show month and year for clarity
+                        if (timePeriod === "quarter" || timePeriod === "year") {
+                          return `${value} ${new Date().getFullYear()}`;
+                        }
+                        return value;
+                      }}
+                    />
+                    <YAxis
+                      width={30} // Keep width for large numbers
+                      tick={{ fill: "#6B7280", fontSize: 10 }} // Reduce font size for Y-axis numbers
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      content={<CustomTooltip timePeriod={timePeriod} />}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="revenue"
+                      stroke="#4F46E5"
+                      fillOpacity={1}
+                      fill="url(#colorRevenue)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 min-w-0">
             <div className="bg-white p-3 md:p-5 rounded-xl border border-gray-200 shadow-sm min-w-0">
-              {/* Lead Distribution Box */}
-              <div className="">
-                <h3 className="text-md font-semibold text-gray-800 mb-3">
-                  Lead Distribution
-                </h3>
-                <LeadDistribution
-                  leadSources={dashboardData.leadSources}
-                  isLoading={isLoading}
-                />
-              </div>
-
-              {/* Education Distribution Box */}
-              <div className="">
-                <h3 className="text-md font-semibold text-gray-800 mb-3">
-                  Education Distribution
-                </h3>
-                <EducationDistribution
-                  leadCategories={dashboardData.leadCategories}
-                  isLoading={isLoading}
-                />
-              </div>
+              <h3 className="text-md font-semibold text-gray-800 mb-3">
+                Lead Distribution
+              </h3>
+              <LeadDistribution
+                leadSources={dashboardData.leadSources}
+                isLoading={isLoading}
+              />
+            </div>
+            <div className="bg-white p-3 md:p-5 rounded-xl border border-gray-200 shadow-sm min-w-0">
+              <h3 className="text-md font-semibold text-gray-800 mb-3">
+                Education Distribution
+              </h3>
+              <EducationDistribution
+                leadCategories={dashboardData.leadCategories}
+                isLoading={isLoading}
+              />
+            </div>
+            <div className="bg-white p-3 md:p-5 rounded-xl border border-gray-200 shadow-sm min-w-0">
+              <h3 className="text-md font-semibold text-gray-800 mb-3">
+                Student Distribution
+              </h3>
+              <EducationDistribution
+                leadCategories={dashboardData.studentCategories}
+                isLoading={isLoading}
+              />
             </div>
           </div>
         </div>
@@ -1703,9 +1736,9 @@ if (lead.assignedTo && lead.assignedTo.uid) {
               </tr>
             </thead>
             <tbody>
-              {modalLeads.map((lead, idx) => (
+              {modalLeads.map((lead) => (
                 <tr
-                  key={idx}
+                  key={lead.id}
                   className="hover:bg-indigo-50 transition-colors group"
                 >
 <td className="px-3 py-2 whitespace-nowrap text-gray-900 font-medium flex items-center gap-2">

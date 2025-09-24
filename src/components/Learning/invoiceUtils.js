@@ -81,12 +81,12 @@ export const generateInvoicePDF = async (invoiceData) => {
       }
     });
 
-    const trainingAmount = invoiceData.totalHours * invoiceData.trainingRate;
+    const trainingAmount = Math.round(invoiceData.totalHours * invoiceData.trainingRate);
     const conveyance = invoiceData.conveyance || 0;
     const food = invoiceData.food || 0;
     const lodging = invoiceData.lodging || 0;
     const subTotal = trainingAmount + conveyance + food + lodging;
-    const tdsAmount = (subTotal * (invoiceData.tds || 0)) / 100;
+    const tdsAmount = (trainingAmount * (invoiceData.tds || 0)) / 100;
     const adhocAdjustment = invoiceData.adhocAdjustment || 0;
     const netPayable = subTotal - tdsAmount + adhocAdjustment;
 

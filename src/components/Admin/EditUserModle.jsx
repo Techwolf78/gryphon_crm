@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import { FiX } from "react-icons/fi";
- 
 const departments = ["Sales", "Placement", "L & D", "DM", "Admin", "CA", "HR"];
 const roles = ["Director", "Head", "Manager", "Assistant Manager", "Executive"];
  

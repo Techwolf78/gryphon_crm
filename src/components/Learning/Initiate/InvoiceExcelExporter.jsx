@@ -233,7 +233,7 @@ const InvoiceExcelExporter = ({ db, filteredData, exporting, setExporting }) => 
     <button
       onClick={handleExportToExcel}
       disabled={exporting}
-      className="inline-flex items-center px-3 py-2.5 bg-green-600 text-white border border-green-700 rounded-lg text-sm font-medium hover:bg-green-700 hover:border-green-800 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all disabled:opacity-50"
+      className="inline-flex items-center px-2 py-1.5 bg-green-600 text-white border border-green-700 rounded-lg text-sm font-medium hover:bg-green-700 hover:border-green-800 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all disabled:opacity-50"
     >
       <FiFile className="w-4 h-4 mr-1" />
       {exporting ? "Exporting..." : "Export to Excel"}

@@ -33,12 +33,7 @@ import TrainingConfiguration from './TrainingConfiguration';
 import SubmissionChecklist from './SubmissionChecklist';
 
 const PHASE_OPTIONS = ["phase-1", "phase-2", "phase-3"];
-const DOMAIN_OPTIONS = ["Technical", "Soft skills", "Aptitude", "Tools"];
-// Keep top-level "Tools" option in the UI but expand to two sub-domains:
-const TOOL_SUBDOMAINS = [
-  { key: "Tools (Excel - Power BI)", topic: "Excel - Power BI" },
-  { key: "Tools (Looker Studio)", topic: "Looker Studio" },
-];
+const DOMAIN_OPTIONS = ["Technical", "Soft skills", "Aptitude", "Tools (Excel - Power BI)", "Tools (Looker Studio)"];
 
 // Add a color for each domain for visual clarity
 const DOMAIN_COLORS = {
@@ -92,18 +87,12 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
   // Validation state for duplicate trainers
   const [validationByDomain, setValidationByDomain] = useState({});
-  const [batchMismatch, setBatchMismatch] = useState(false);
   // completedPhases state removed because it's not used
   const [globalTrainerAssignments, setGlobalTrainerAssignments] = useState([]);
 
   const [submitDisabled, setSubmitDisabled] = useState(false);
 
-  const [totalAssignedHoursByDomain, setTotalAssignedHoursByDomain] = useState({});
-
   const { user } = useAuth();
-
-  const totalAssignedHours = selectedDomains.filter(d => d !== "Tools").reduce((sum, domain) => sum + (totalAssignedHoursByDomain[domain] || 0), 0);
-  const [showAssignHoursPopup, setShowAssignHoursPopup] = useState(false);
 
   // Checklist completion state
   const [isChecklistComplete, setIsChecklistComplete] = useState(false);
@@ -118,7 +107,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
   const originalTable1DataByDomain = useRef({});
   const originalTopics = useRef([]);
   const originalCustomPhaseHours = useRef({});
-  const originalTotalAssignedHoursByDomain = useRef({});
   const originalSelectedDomains = useRef([]);
   const [hasChanges, setHasChanges] = useState(false);
 
@@ -164,26 +152,19 @@ function InitiationModal({ training, onClose, onConfirm }) {
       }
       if (!domain) return 0;
       // Support for Tools subdomains:
-      // - If domain is legacy "Tools" -> sum both topics (backwards compatible)
       // - If domain is "Tools (Excel - Power BI)" or "Tools (Looker Studio)"
       //   -> return hours for the specific topic only.
-      const toolsMatch = TOOL_SUBDOMAINS.find((s) => s.key === domain);
-      if (toolsMatch) {
+      if (domain === "Tools (Excel - Power BI)") {
         const t = topics?.find(
-          (x) => x?.topic?.trim()?.toLowerCase() === toolsMatch.topic.toLowerCase()
+          (x) => x?.topic?.trim()?.toLowerCase() === "Excel - Power BI".toLowerCase()
         );
         return Number(t?.hours || 0);
       }
-      if (domain === "Tools") {
-        const toolsTopics = ["Excel - Power BI", "Looker Studio"];
-        let total = 0;
-        toolsTopics.forEach((tn) => {
-          const t = topics?.find(
-            (x) => x?.topic?.trim()?.toLowerCase() === tn.toLowerCase()
-          );
-          if (t && t.hours) total += Number(t.hours || 0);
-        });
-        return total;
+      if (domain === "Tools (Looker Studio)") {
+        const t = topics?.find(
+          (x) => x?.topic?.trim()?.toLowerCase() === "Looker Studio".toLowerCase()
+        );
+        return Number(t?.hours || 0);
       }
 
       const topicMap = {
@@ -233,9 +214,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
     setTable1DataByDomain((prev) => {
       const updated = { ...prev };
       selectedDomains.forEach((domain) => {
-        // Skip "Tools" as it doesn't have its own batch assignment section
-        if (domain === "Tools") return;
-
         if (!updated[domain] || updated[domain].length === 0) {
           const domainHours = getDomainHours(domain, getMainPhase());
           updated[domain] = courses.map((course) => ({
@@ -255,58 +233,12 @@ function InitiationModal({ training, onClose, onConfirm }) {
         }
       });
 
-      // Special handling for Tools: ensure sub-domains have data when Tools is selected
-      if (selectedDomains.includes("Tools")) {
-        TOOL_SUBDOMAINS.forEach((s) => {
-          if (!updated[s.key] || updated[s.key].length === 0) {
-            const domainHours = getDomainHours(s.key, getMainPhase());
-            updated[s.key] = courses.map((course) => ({
-              batch: course.specialization,
-              stdCount: course.students,
-              hrs: domainHours,
-              assignedHours: 0,
-              batches: [
-                {
-                  batchPerStdCount: "",
-                  batchCode: `${course.specialization}1`,
-                  assignedHours: 0,
-                  trainers: [],
-                },
-              ],
-            }));
-          }
-        });
-      }
-
       // Store original table data for undo functionality (only if not already set)
       if (Object.keys(originalTable1DataByDomain.current).length === 0) {
         originalTable1DataByDomain.current = JSON.parse(JSON.stringify(updated));
       }
 
       return updated;
-    });
-    setTotalAssignedHoursByDomain(prev => {
-      const newPrev = { ...prev };
-      selectedDomains.forEach((domain) => {
-        if (domain === "Tools") return;
-        if (!newPrev[domain]) {
-          newPrev[domain] = 0;
-        }
-      });
-      if (selectedDomains.includes("Tools")) {
-        TOOL_SUBDOMAINS.forEach((s) => {
-          if (!newPrev[s.key]) {
-            newPrev[s.key] = 0;
-          }
-        });
-      }
-      
-      // Store original assigned hours for undo functionality (only if not already set)
-      if (Object.keys(originalTotalAssignedHoursByDomain.current).length === 0) {
-        originalTotalAssignedHoursByDomain.current = JSON.parse(JSON.stringify(newPrev));
-      }
-      
-      return newPrev;
     });
     
     // Store original custom phase hours for undo functionality (only if not already set)
@@ -326,11 +258,10 @@ function InitiationModal({ training, onClose, onConfirm }) {
     const hasTableDataChanged = JSON.stringify(table1DataByDomain) !== JSON.stringify(originalTable1DataByDomain.current);
     const hasTopicsChanged = JSON.stringify(topics) !== JSON.stringify(originalTopics.current);
     const hasCustomHoursChanged = JSON.stringify(customPhaseHours) !== JSON.stringify(originalCustomPhaseHours.current);
-    const hasAssignedHoursChanged = JSON.stringify(totalAssignedHoursByDomain) !== JSON.stringify(originalTotalAssignedHoursByDomain.current);
     const hasSelectedDomainsChanged = JSON.stringify(selectedDomains) !== JSON.stringify(originalSelectedDomains.current);
     
-    setHasChanges(hasTableDataChanged || hasTopicsChanged || hasCustomHoursChanged || hasAssignedHoursChanged || hasSelectedDomainsChanged);
-  }, [table1DataByDomain, topics, customPhaseHours, totalAssignedHoursByDomain, selectedDomains]);
+    setHasChanges(hasTableDataChanged || hasTopicsChanged || hasCustomHoursChanged || hasSelectedDomainsChanged);
+  }, [table1DataByDomain, topics, customPhaseHours, selectedDomains]);
 
   // Undo function to revert to original state
   const handleUndo = () => {
@@ -338,7 +269,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
       setTable1DataByDomain(JSON.parse(JSON.stringify(originalTable1DataByDomain.current)));
       setTopics(JSON.parse(JSON.stringify(originalTopics.current)));
       setCustomPhaseHours(JSON.parse(JSON.stringify(originalCustomPhaseHours.current)));
-      setTotalAssignedHoursByDomain(JSON.parse(JSON.stringify(originalTotalAssignedHoursByDomain.current)));
       setSelectedDomains([...originalSelectedDomains.current]);
       setHasChanges(false);
       setError(null);
@@ -499,20 +429,13 @@ function InitiationModal({ training, onClose, onConfirm }) {
       const tableDataLookup = tableDataToSave || table1DataByDomain;
       // Calculate denormalized data
       let totalBatches = 0;
-      let totalMaxHours = 0; // Sum of user-input assigned hours
+      let totalMaxHours = 0; // Sum of all trainer assigned hours
       let totalCost = 0;
       let totalTrainingHours = 0; // Sum of all trainer assigned hours
       const domainsArray = [];
       domainsList.forEach((domain) => {
         domainsArray.push(domain);
         const tableData = tableDataLookup[domain] || [];
-        let domainMaxHours = 0; // Track max hours for this domain
-        tableData.forEach((row) => {
-          const rowHours = Number(row.assignedHours || 0);
-          domainMaxHours = Math.max(domainMaxHours, rowHours);
-        });
-        // Add this domain's user-input hours to the total
-        totalMaxHours += totalAssignedHoursByDomain[domain] || 0;
         // Calculate cost from all trainers and sum trainer hours
         tableData.forEach((row) => {
           if (row.batches) {
@@ -536,6 +459,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
           }
         });
       });
+      totalMaxHours = totalTrainingHours;
 
       const phaseLevelPromises = selectedPhases.map((phase) => {
         const phaseDocRef = doc(
@@ -628,11 +552,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
           phaseDocData.totalHours = totalMaxHours;
 
           phaseDocData.totaltraininghours = totalTrainingHours;
-
-          domainsList.forEach(domain => {
-            const key = `${domain.toLowerCase()}AssignedHours`;
-            phaseDocData[key] = totalAssignedHoursByDomain[domain] || 0;
-          });
 
           phaseDocData.totalCost = totalCost;
 
@@ -899,16 +818,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
   const handleSubmit = async (e) => {
     e?.preventDefault?.();
-    if (totalAssignedHours === 0) {
-      setShowAssignHoursPopup(true);
-      return;
-    }
     if (!validateForm()) {
-      setSubmitDisabled(true);
-      return;
-    }
-    if (batchMismatch) {
-      setError("Assigned Hours exceed trainer hours sum in one or more batches. Please fix the mismatch before submitting.");
       setSubmitDisabled(true);
       return;
     }
@@ -945,7 +855,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
       ...prev,
       [domain]: validationStatus,
     }));
-    setBatchMismatch(validationStatus.hasBatchMismatch || false);
   }, []);
 
   // Check if there are any validation errors across all domains
@@ -956,16 +865,10 @@ function InitiationModal({ training, onClose, onConfirm }) {
   };
 
   useEffect(() => {
-    if (!error && !batchMismatch && !Object.values(validationByDomain).some((v) => v?.hasErrors) && !showAssignHoursPopup) {
+    if (!error && !Object.values(validationByDomain).some((v) => v?.hasErrors)) {
       setSubmitDisabled(false);
     }
-  }, [error, batchMismatch, validationByDomain, showAssignHoursPopup]);
-
-  useEffect(() => {
-    if (totalAssignedHours > 0) {
-      setShowAssignHoursPopup(false);
-    }
-  }, [totalAssignedHours, setShowAssignHoursPopup]);
+  }, [error, validationByDomain]);
 
   useEffect(() => {
     const checkTrainingsCollection = async () => {
@@ -1159,9 +1062,8 @@ function InitiationModal({ training, onClose, onConfirm }) {
         // remove legacy "Tools" entry and add the two subdomains
         const idx = loadedDomains.indexOf("Tools");
         if (idx !== -1) loadedDomains.splice(idx, 1);
-        TOOL_SUBDOMAINS.forEach((s) => {
-          if (!loadedDomains.includes(s.key)) loadedDomains.push(s.key);
-        });
+        loadedDomains.push("Tools (Excel - Power BI)");
+        loadedDomains.push("Tools (Looker Studio)");
       }
 
       for (const domain of loadedDomains) {
@@ -1273,22 +1175,8 @@ function InitiationModal({ training, onClose, onConfirm }) {
       setSelectedDomains(loadedDomains);
       setTable1DataByDomain(loadedTable1Data);
 
-      // Load per-domain assigned hours from Firestore
-      const phaseDocRef = doc(db, "trainingForms", training.id, "trainings", currentPhase);
-      const phaseDocSnap = await getDoc(phaseDocRef);
-      let loadedAssignedHours = {};
-      if (phaseDocSnap.exists()) {
-        const phaseData = phaseDocSnap.data();
-        loadedDomains.forEach(domain => {
-          const key = `${domain.toLowerCase()}AssignedHours`;
-          loadedAssignedHours[domain] = phaseData[key] || 0;
-        });
-      }
-      setTotalAssignedHoursByDomain(loadedAssignedHours);
-
       // Store original data for undo functionality
       originalTable1DataByDomain.current = JSON.parse(JSON.stringify(loadedTable1Data));
-      originalTotalAssignedHoursByDomain.current = JSON.parse(JSON.stringify(loadedAssignedHours));
       originalSelectedDomains.current = [...loadedDomains];
       setHasChanges(false);
     };
@@ -1612,7 +1500,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
         }
       `}</style>
 
-      <div className={`min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 ${showAssignHoursPopup ? 'pointer-events-none' : ''}`}>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
         {/* Page Header */}
         <div className="bg-white shadow-sm border-b border-gray-200">
           <div className="mx-auto p-3">
@@ -1868,10 +1756,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                       {/* Checkbox list for all domains in a single row */}
                       <div className="flex flex-row gap-3">
                         {DOMAIN_OPTIONS.map((domain) => {
-                          // Special logic for Tools: consider it selected if any of its sub-domains are selected
-                          const isSelected = domain === "Tools"
-                            ? selectedDomains.includes("Tools") || TOOL_SUBDOMAINS.some(s => selectedDomains.includes(s.key))
-                            : selectedDomains.includes(domain);
+                          const isSelected = selectedDomains.includes(domain);
                           const isZero = zeroHourDomains.includes(domain);
                           // highlight classes for zero-hour domains
                           const zeroClasses = isZero
@@ -1900,59 +1785,14 @@ function InitiationModal({ training, onClose, onConfirm }) {
                                 checked={isSelected}
                                 onChange={(e) => {
                                   const checked = e.target.checked;
-                                  // Special handling for Tools: expand into two separate entries
-                                  if (domain === "Tools") {
-                                    if (checked) {
-                                      // add Tools and both tool subdomains
-                                      const toAdd = ["Tools", ...TOOL_SUBDOMAINS.map((s) => s.key)];
-                                      setSelectedDomains((prev) => {
-                                        const merged = Array.from(new Set([...prev, ...toAdd]));
-                                        return merged;
-                                      });
-                                      setTable1DataByDomain((prev) => {
-                                        const updated = { ...prev };
-                                        TOOL_SUBDOMAINS.forEach((s) => {
-                                          if (!updated[s.key] || updated[s.key].length === 0) {
-                                            const domainHours = getDomainHours(s.key, getMainPhase());
-                                            updated[s.key] = (courses || []).map((course) => ({
-                                              batch: course.specialization,
-                                              stdCount: course.students,
-                                              hrs: domainHours,
-                                              assignedHours: 0,
-                                              batches: [
-                                                {
-                                                  batchPerStdCount: "",
-                                                  batchCode: `${course.specialization}1`,
-                                                  assignedHours: 0,
-                                                  trainers: [],
-                                                },
-                                              ],
-                                            }));
-                                          }
-                                        });
-                                        return updated;
-                                      });
-                                    } else {
-                                      // remove Tools and both tool subdomains
-                                      const toRemove = ["Tools", ...TOOL_SUBDOMAINS.map((s) => s.key)];
-                                      setSelectedDomains((prev) => prev.filter((d) => !toRemove.includes(d)));
-                                      setTable1DataByDomain((prev) => {
-                                        const updated = { ...prev };
-                                        TOOL_SUBDOMAINS.forEach((s) => delete updated[s.key]);
-                                        return updated;
-                                      });
-                                    }
+                                  if (checked) {
+                                    setSelectedDomains([...selectedDomains, domain]);
+                                    setTable1DataByDomain((prev) => ({
+                                      ...prev,
+                                      [domain]: prev[domain] || [],
+                                    }));
                                   } else {
-                                    // Normal domain toggle
-                                    if (checked) {
-                                      setSelectedDomains([...selectedDomains, domain]);
-                                      setTable1DataByDomain((prev) => ({
-                                        ...prev,
-                                        [domain]: prev[domain] || [],
-                                      }));
-                                    } else {
-                                      setSelectedDomains(selectedDomains.filter((d) => d !== domain));
-                                    }
+                                    setSelectedDomains(selectedDomains.filter((d) => d !== domain));
                                   }
                                   // clear any previous zero-hour marks for this domain on user action
                                   setZeroHourDomains((prev) =>
@@ -2018,18 +1858,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
                                   <span className="text-xs text-blue-600 font-medium">Domain Total Hours</span>
                                   <span className="text-sm font-semibold text-blue-800 ml-1">{getDomainHours(domain, currentPhase)}</span>
                                 </div>
-                                <div className="bg-green-50 px-1.5 py-0.5 rounded border border-green-200">
-                                  <span className="text-xs text-green-600 font-medium">Assigned Hours</span>
-                                  <input
-                                    type="number"
-                                    value={totalAssignedHoursByDomain[domain] || ""}
-                                    onChange={(e) => setTotalAssignedHoursByDomain(prev => ({...prev, [domain]: parseFloat(e.target.value) || 0}))}
-                                    placeholder="Enter hours"
-                                    className="w-20 ml-1 rounded border-gray-300 focus:border-green-500 focus:ring-green-500 text-sm font-semibold text-green-800 py-0.5 px-1 bg-white no-spinner"
-                                    min="0"
-                                    step="0.5"
-                                  />
-                                </div>
                               </div>
                               {/* allocation UI removed */}
                             </div>
@@ -2065,8 +1893,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                                 globalTrainerAssignments
                               }
                               excludeDays={excludeDays}
-                              showPersistentWarnings={submitDisabled || batchMismatch}
-                              totalAssignedHoursByDomain={totalAssignedHoursByDomain}
+                              showPersistentWarnings={submitDisabled}
                             />
                           )}
                         </div>
@@ -2255,9 +2082,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                   collegeEndTime={commonFields.collegeEndTime}
                   lunchStartTime={commonFields.lunchStartTime}
                   lunchEndTime={commonFields.lunchEndTime}
-                  totalAssignedHours={totalAssignedHours}
                   table1DataByDomain={table1DataByDomain}
-                  batchMismatch={batchMismatch}
                   hasValidationErrors={hasValidationErrors()}
                   onChecklistComplete={setIsChecklistComplete}
                 />

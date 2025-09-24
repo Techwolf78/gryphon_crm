@@ -16,6 +16,11 @@ function getTrainingDays(startDate, endDate) {
   return diffDays;
 }
 
+// Helper function to round numbers to nearest whole number
+const roundToNearestWhole = (num) => {
+  return Math.round(num);
+};
+
 function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
   const days = getTrainingDays(trainer?.earliestStartDate, trainer?.latestEndDate);
   const [invoiceData, setInvoiceData] = useState({
@@ -35,7 +40,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
     perDayLodging: trainer?.lodging || 0,
     food: (trainer?.food || 0) * days,
     lodging: (trainer?.lodging || 0) * days,
-    collegeName: trainer?.collegeName || "",
+    businessName: trainer?.businessName || "",
   });
   const [existingInvoice, setExistingInvoice] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -70,14 +75,15 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
     };
 
     const checkExistingInvoice = async () => {
-      if (!trainer?.trainerId || !trainer?.collegeName) return;
+      if (!trainer?.trainerId || !trainer?.businessName) return;
 
       try {
         const q = query(
           collection(db, "invoices"),
           where("trainerId", "==", trainer.trainerId),
-          where("collegeName", "==", trainer.collegeName),
-          where("phase", "==", trainer.phase)
+          where("businessName", "==", trainer.businessName),
+          where("phase", "==", trainer.phase),
+          where("projectCode", "==", trainer.projectCode)
         );
 
         const querySnapshot = await getDocs(q);
@@ -105,7 +111,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
 
     checkExistingInvoice();
     fetchTrainerBankDetails();
-  }, [trainer?.trainerId, trainer?.collegeName, trainer?.phase]);
+  }, [trainer?.trainerId, trainer?.businessName, trainer?.phase, trainer?.projectCode]);
 
 const handleSubmit = async (e) => {
   e.preventDefault();
@@ -117,8 +123,9 @@ const handleSubmit = async (e) => {
       ...invoiceData,
       trainerId: trainer?.trainerId,
       trainerName: trainer?.trainerName,
-      collegeName: trainer?.collegeName,
+      businessName: trainer?.businessName,
       phase: trainer?.phase,
+      projectCode: trainer?.projectCode,
       totalAmount: calculateTotalAmount(),
       netPayment: calculateNetPayment(),
       updatedAt: new Date(),
@@ -186,7 +193,7 @@ const handleSubmit = async (e) => {
   };
 
   const calculateTotalAmount = () => {
-    return (
+    return roundToNearestWhole(
       (invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0) +
       (parseFloat(invoiceData.conveyance) || 0) +
       (parseFloat(invoiceData.food) || 0) +
@@ -195,9 +202,10 @@ const handleSubmit = async (e) => {
   };
 
   const calculateNetPayment = () => {
+    const trainingFees = roundToNearestWhole((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0));
+    const tdsAmount = roundToNearestWhole((trainingFees * (parseFloat(invoiceData.tds) || 0)) / 100);
     const totalAmount = calculateTotalAmount();
-    const tdsAmount = (totalAmount * (parseFloat(invoiceData.tds) || 0)) / 100;
-    return (
+    return roundToNearestWhole(
       totalAmount + (parseFloat(invoiceData.adhocAdjustment) || 0) - tdsAmount
     );
   };
@@ -206,12 +214,12 @@ const handleSubmit = async (e) => {
 
   return (
     <div className="fixed inset-0 backdrop-blur-md bg-transparent bg-opacity-50 flex items-center justify-center p-4 z-500">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="p-4">
           {/* Header */}
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex justify-between items-center mb-4">
             <div className="flex items-center">
-              <h2 className="text-2xl font-bold text-gray-800">
+              <h2 className="text-xl font-bold text-gray-800">
                 {editMode ? "Edit Invoice" : 
                  viewMode ? "View Invoice" : "Generate Invoice"}
               </h2>
@@ -268,21 +276,21 @@ const handleSubmit = async (e) => {
           </div>
 
           {/* Trainer Info */}
-          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">Trainer  Information</h3>
+          <div className="mb-4 p-2 bg-gray-50 rounded-lg">
+            <h3 className="text-base font-semibold text-gray-800 mb-2">Trainer  Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               <div><span className="font-medium">Name:</span> {trainer?.trainerName}</div>
               <div><span className="font-medium">ID:</span> {trainer?.trainerId}</div>
-              <div><span className="font-medium">College:</span> {trainer?.collegeName}</div>
+              <div><span className="font-medium">College:</span> {trainer?.businessName}</div>
               <div><span className="font-medium">Phase:</span> {trainer?.phase}</div>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {/* Bill Information */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-0.5">
                   Bill Number
                 </label>
                 <input
@@ -290,14 +298,14 @@ const handleSubmit = async (e) => {
                   name="billNumber"
                   value={invoiceData.billNumber}
                   onChange={handleChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className="w-full p-1.5 border border-gray-300 rounded-md"
                   required
                   readOnly={isReadOnly}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-0.5">
                   Billing Date
                 </label>
                 <input
@@ -313,7 +321,7 @@ const handleSubmit = async (e) => {
 
               {/* Project Information */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-0.5">
                   Project Code
                 </label>
                 <input
@@ -328,7 +336,7 @@ const handleSubmit = async (e) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-0.5">
                   Domain
                 </label>
                 <input
@@ -343,7 +351,7 @@ const handleSubmit = async (e) => {
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-0.5">
                   Topics Covered
                 </label>
                 <input
@@ -358,7 +366,7 @@ const handleSubmit = async (e) => {
 
               {/* Training Dates */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-0.5">
                   Start Date
                 </label>
                 <input
@@ -372,7 +380,7 @@ const handleSubmit = async (e) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-0.5">
                   End Date
                 </label>
                 <input
@@ -387,7 +395,7 @@ const handleSubmit = async (e) => {
 
               {/* Financial Information */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-0.5">
                   Training Rate (₹/hour)
                 </label>
                 <input
@@ -404,7 +412,7 @@ const handleSubmit = async (e) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-0.5">
                   Total Hours
                 </label>
                 <input
@@ -421,7 +429,7 @@ const handleSubmit = async (e) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-0.5">
                   TDS (%)
                 </label>
                 <input
@@ -439,7 +447,7 @@ const handleSubmit = async (e) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-0.5">
                   Adhoc Adjustment (₹)
                 </label>
                 <input
@@ -454,7 +462,7 @@ const handleSubmit = async (e) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-0.5">
                   Conveyance (₹) - One-time
                 </label>
                 <input
@@ -470,7 +478,7 @@ const handleSubmit = async (e) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-0.5">
                   Food (₹{invoiceData.perDayFood.toFixed(2)} × {days} d)
                 </label>
                 <input
@@ -486,7 +494,7 @@ const handleSubmit = async (e) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-0.5">
                   Lodging (₹{invoiceData.perDayLodging.toFixed(2)} × {days} d)
                 </label>
                 <input
@@ -503,7 +511,7 @@ const handleSubmit = async (e) => {
 
               {/* Bank Details */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-0.5">
                   Bank Name
                 </label>
                 <input
@@ -517,7 +525,7 @@ const handleSubmit = async (e) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-0.5">
                   Account Number
                 </label>
                 <input
@@ -531,7 +539,7 @@ const handleSubmit = async (e) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-0.5">
                   IFSC Code
                 </label>
                 <input
@@ -545,7 +553,7 @@ const handleSubmit = async (e) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-0.5">
                   PAN Number
                 </label>
                 <input
@@ -560,58 +568,58 @@ const handleSubmit = async (e) => {
             </div>
 
             {/* Calculation Summary */}
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h3 className="text-lg font-semibold text-blue-800 mb-3">Payment Summary</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="p-2 bg-blue-50 border border-blue-200 rounded-lg">
+              <h3 className="text-base font-semibold text-blue-800 mb-2">Payment Summary</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 <div className="text-sm">
                   <span className="font-medium">Training Fees:</span> ₹
-                  {(invoiceData.trainingRate * invoiceData.totalHours).toFixed(2)}
+                  {roundToNearestWhole((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0)).toLocaleString()}
                 </div>
                 <div className="text-sm">
                   <span className="font-medium">Conveyance (one-time):</span> ₹
-                  {parseFloat(invoiceData.conveyance || 0).toFixed(2)}
+                  {roundToNearestWhole(parseFloat(invoiceData.conveyance) || 0).toLocaleString()}
                 </div>
                 <div className="text-sm">
                   <span className="font-medium">Food ({invoiceData.perDayFood.toFixed(2)} × {days}):</span> ₹
-                  {parseFloat(invoiceData.food || 0).toFixed(2)}
+                  {roundToNearestWhole(parseFloat(invoiceData.food) || 0).toLocaleString()}
                 </div>
                 <div className="text-sm">
                   <span className="font-medium">Lodging ({invoiceData.perDayLodging.toFixed(2)} × {days}):</span> ₹
-                  {parseFloat(invoiceData.lodging || 0).toFixed(2)}
+                  {roundToNearestWhole(parseFloat(invoiceData.lodging) || 0).toLocaleString()}
                 </div>
                 <div className="text-sm font-semibold border-t border-blue-200 pt-2">
                   <span className="text-blue-800">Total Amount:</span> ₹
-                  {calculateTotalAmount().toFixed(2)}
+                  {calculateTotalAmount().toLocaleString()}
                 </div>
                 <div className="text-sm">
-                  <span className="font-medium">TDS ({invoiceData.tds}%):</span> ₹
-                  {((calculateTotalAmount() * (parseFloat(invoiceData.tds) || 0)) / 100).toFixed(2)}
+                  <span className="font-medium">TDS ({invoiceData.tds}% on Training Fees):</span> ₹
+                  {roundToNearestWhole((((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0) * (parseFloat(invoiceData.tds) || 0)) / 100)).toLocaleString()}
                 </div>
                 <div className="text-sm">
                   <span className="font-medium">Adhoc Adjustment:</span> ₹
-                  {parseFloat(invoiceData.adhocAdjustment || 0).toFixed(2)}
+                  {roundToNearestWhole(parseFloat(invoiceData.adhocAdjustment) || 0).toLocaleString()}
                 </div>
                 <div className="text-sm font-semibold border-t border-blue-200 pt-2 text-green-600">
                   <span className="font-bold">Net Payment:</span> ₹
-                  {calculateNetPayment().toFixed(2)}
+                  {calculateNetPayment().toLocaleString()}
                 </div>
               </div>
             </div>
 
             {/* Action Buttons for New Invoice */}
             {!existingInvoice && !viewMode && (
-              <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+              <div className="flex justify-end space-x-2 pt-2 border-t border-gray-200">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="px-3 py-1.5 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isGenerating}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                  className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
                 >
                   {isGenerating ? "Generating..." : "Generate Invoice"}
                 </button>
