@@ -66,6 +66,28 @@ const DEFAULT_COLORS = {
   badge: "bg-gray-100 text-gray-800",
 };
 
+// Helper function to format numbers in Indian numbering system
+const formatIndianNumber = (num) => {
+  if (num === null || num === undefined || isNaN(num)) return "0";
+  const numStr = num.toString();
+  const [integerPart, decimalPart] = numStr.split('.');
+  
+  // Format integer part in Indian system
+  const lastThree = integerPart.substring(integerPart.length - 3);
+  const otherNumbers = integerPart.substring(0, integerPart.length - 3);
+  const formattedInteger = otherNumbers !== '' 
+    ? otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + "," + lastThree
+    : lastThree;
+  
+  // Return with decimal part if it exists
+  return decimalPart ? `${formattedInteger}.${decimalPart}` : formattedInteger;
+};
+
+// Helper function to round numbers to nearest whole number
+const roundToNearestWhole = (num) => {
+  return Math.round(num);
+};
+
 // ✅ 1. Memoized Trainer Row Component
 const TrainerRow = React.memo(
   ({
@@ -98,65 +120,19 @@ const TrainerRow = React.memo(
 
     // ✅ FIXED: Use useCallback for auto-select topics to prevent render-time state updates
     const autoSelectTopics = useCallback(() => {
-      try {
-        const trainerDoc = trainers.find(
-          (t) => t.trainerId === trainer.trainerId
-        );
-        const base = [];
-        if (trainerDoc) {
-          if (Array.isArray(trainerDoc.specialization))
-            base.push(...trainerDoc.specialization);
-          if (Array.isArray(trainerDoc.otherSpecialization))
-            base.push(...trainerDoc.otherSpecialization);
-        }
-        
-        // Include existing session-specific topics assigned to this trainer
-        const existingSessionTopics = Array.isArray(trainer.topics) 
-          ? trainer.topics 
-          : trainer.topics 
-          ? [trainer.topics] 
-          : [];
-        
-        const allTopics = Array.from(
-          new Set([...base, ...existingSessionTopics, ...addedTopics])
-        )
-          .filter(Boolean)
-          .sort();
-        const selected = Array.isArray(trainer.topics)
-          ? trainer.topics
-          : trainer.topics
-          ? [trainer.topics]
-          : [];
-
-        // Auto-select all existing topics (from Firestore + session-specific) if none selected yet
-        if (allTopics.length > 0 && selected.length === 0) {
-          // Prevent infinite loop: only trigger when strictly empty
-          handleTrainerField(
-            rowIndex,
-            batchIndex,
-            trainerIdx,
-            "topics",
-            allTopics
-          );
-        }
-      } catch {
-        // swallow - non-critical UI defaulting
-      }
-    }, [
-      trainer.trainerId,
-      trainers,
-      addedTopics,
-      trainer.topics,
-      rowIndex,
-      batchIndex,
-      trainerIdx,
-      handleTrainerField,
-    ]);
+      // Auto-selection disabled - topics must be selected manually
+    }, []);
 
     // ✅ FIXED: Use useEffect to call the callback, preventing render-time state updates
     useEffect(() => {
       autoSelectTopics();
     }, [autoSelectTopics]);
+
+    // ✅ ADD: Reset added topics when trainer changes
+    useEffect(() => {
+      setAddedTopics([]);
+      setNewTopicInput("");
+    }, [trainer.trainerId]);
 
     // ✅ ADD: Local function to generate date list with exclusions
     const getDateList = (start, end, excludeDays, excludedDates = []) => {
@@ -672,177 +648,195 @@ const TrainerRow = React.memo(
       <tr className="bg-transparent text-[11px]">
   <td colSpan={6} className="px-2 py-2">
             <div className="grid grid-cols-1 sm:grid-cols-4 lg:grid-cols-12 gap-1.5 items-start">
-              {/* Small card inputs */}
-              {/** Conveyance */}
-              <div className="flex flex-col bg-white/70 border border-gray-100 rounded-md p-0.5 sm:col-span-1 lg:col-span-2">
-                <label className="text-[10px] font-semibold text-slate-600 mb-0.5">
-                  Conveyance
-                </label>
-                <div className="relative">
-                  <FaRupeeSign className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-500 w-3 h-3" />
-                  <input
-                    aria-label={`Conveyance for trainer ${
-                      trainer.trainerName || trainer.trainerId || trainerIdx
-                    }`}
-                    type="number"
-                    min="0"
-                    step="0.5"
-                    value={trainer.conveyance ?? ""}
-                    onChange={(e) =>
-                      handleTrainerField(
-                        rowIndex,
-                        batchIndex,
-                        trainerIdx,
-                        "conveyance",
-                        e.target.value === ""
-                          ? ""
-                          : parseFloat(e.target.value) || 0
-                      )
-                    }
-                    className="w-full pl-6 rounded border border-gray-200 bg-white text-[10px] py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-200"
-                    placeholder="0"
-                  />
-                </div>
-                {(() => {
-                  const perDay = Number(trainer.conveyance) || 0;
-                  const total = perDay; // Conveyance is one-time, no multiplication
-                  if (perDay > 0) {
-                    return <div className="text-[9px] text-slate-500 mt-0.5">₹{total.toFixed(2)}</div>;
-                  }
-                  return null;
-                })()}
-              </div>
-
-              {/** Food */}
-              <div className="flex flex-col bg-white/70 border border-gray-100 rounded-md p-0.5 sm:col-span-1 lg:col-span-2">
-                <label className="text-[10px] font-semibold text-slate-600 mb-0.5">
-                  Food
-                </label>
-                <div className="relative">
-                  <FaRupeeSign className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-500 w-3 h-3" />
-                  <input
-                    aria-label={`Food for trainer ${
-                      trainer.trainerName || trainer.trainerId || trainerIdx
-                    }`}
-                    type="number"
-                    min="0"
-                    step="0.5"
-                    value={trainer.food ?? ""}
-                    onChange={(e) =>
-                      handleTrainerField(
-                        rowIndex,
-                        batchIndex,
-                        trainerIdx,
-                        "food",
-                        e.target.value === ""
-                          ? ""
-                          : parseFloat(e.target.value) || 0
-                      )
-                    }
-                    className="w-full pl-6 rounded border border-gray-200 bg-white text-[10px] py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-200"
-                    placeholder="0"
-                  />
-                </div>
-                {(() => {
-                  const days = getTrainingDays(trainer.startDate, trainer.endDate, excludeDays);
-                  const perDay = Number(trainer.food) || 0;
-                  const total = perDay * days;
-                  if (days > 0 && perDay > 0) {
-                    return <div className="text-[9px] text-slate-500 mt-0.5">{perDay}*{days} = {total}</div>;
-                  }
-                  return null;
-                })()}
-              </div>
-
-              {/** Lodging */}
-              <div className="flex flex-col bg-white/70 border border-gray-100 rounded-md p-0.5 sm:col-span-1 lg:col-span-2">
-                <label className="text-[10px] font-semibold text-slate-600 mb-0.5">
-                  Lodging
-                </label>
-                <div className="relative">
-                  <FaRupeeSign className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-500 w-3 h-3" />
-                  <input
-                    aria-label={`Lodging for trainer ${
-                      trainer.trainerName || trainer.trainerId || trainerIdx
-                    }`}
-                    type="number"
-                    min="0"
-                    step="0.5"
-                    value={trainer.lodging ?? ""}
-                    onChange={(e) =>
-                      handleTrainerField(
-                        rowIndex,
-                        batchIndex,
-                        trainerIdx,
-                        "lodging",
-                        e.target.value === ""
-                          ? ""
-                          : parseFloat(e.target.value) || 0
-                      )
-                    }
-                    className="w-full pl-6 rounded border border-gray-200 bg-white text-[10px] py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-200"
-                    placeholder="0"
-                  />
-                </div>
-                {(() => {
-                  const days = getTrainingDays(trainer.startDate, trainer.endDate, excludeDays);
-                  const perDay = Number(trainer.lodging) || 0;
-                  const total = perDay * days;
-                  if (days > 0 && perDay > 0) {
-                    return <div className="text-[9px] text-slate-500 mt-0.5">{perDay}*{days} = {total}</div>;
-                  }
-                  return null;
-                })()}
-              </div>
-
-              {/* Cost + Topics inline wrapper spans remaining 8 cols */}
-              <div className="sm:col-span-2 lg:col-span-6 flex flex-col md:flex-row gap-2 items-stretch">
-                {(() => {
-                  const trainerCost = ((Number(trainer.assignedHours) || 0) * (Number(trainer.perHourCost) || 0)) || 0;
-                  const days = getTrainingDays(trainer.startDate, trainer.endDate, excludeDays);
-                  const conveyanceTotal = Number(trainer.conveyance) || 0;
-                  const foodTotal = (Number(trainer.food) || 0) * days;
-                  const lodgingTotal = (Number(trainer.lodging) || 0) * days;
-                  const miscCost = conveyanceTotal + foodTotal + lodgingTotal;
-                  const totalCost = trainerCost + miscCost;
-                  const boxBase = "flex items-center gap-1 bg-white/70 border border-gray-100 rounded-md px-2 py-1";
-                  const valueCls = "text-xs font-semibold";
-                  return (
-                    <div className="flex flex-wrap md:flex-nowrap gap-1 md:w-auto">
-                      <div className={`${boxBase} text-indigo-700`}> 
-                        <span className="text-[10px] font-medium">Trainer:</span>
-                        <span className={`${valueCls} text-indigo-900`}>₹{trainerCost.toFixed(2)}</span>
-                      </div>
-                      <div className={`${boxBase} text-amber-700`}> 
-                        <span className="text-[10px] font-medium">Misc:</span>
-                        <span className={`${valueCls} text-amber-900`}>₹{miscCost.toFixed(2)}</span>
-                      </div>
-                      <div className={`${boxBase} text-emerald-700`}> 
-                        <span className="text-[10px] font-medium">Total:</span>
-                        <span className={`${valueCls} text-emerald-900`}>₹{totalCost.toFixed(2)}</span>
-                      </div>
+              {/* All three sections in one horizontal row */}
+              <div className="sm:col-span-3 lg:col-span-9 flex flex-row gap-2 items-stretch">
+                {/* Conveyance, Food, Lodging section */}
+                <div className="flex flex-row gap-2 self-start">
+                  {/* Conveyance */}
+                  <div className="flex flex-col bg-white/70 border border-gray-100 rounded-md p-0.5 min-w-[90px]">
+                    <label className="text-[10px] font-semibold text-slate-600 mb-0.5">
+                      Conveyance
+                    </label>
+                    <div className="relative">
+                      <FaRupeeSign className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-500 w-3 h-3" />
+                      <input
+                        aria-label={`Conveyance for trainer ${
+                          trainer.trainerName || trainer.trainerId || trainerIdx
+                        }`}
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={trainer.conveyance ?? ""}
+                        onChange={(e) =>
+                          handleTrainerField(
+                            rowIndex,
+                            batchIndex,
+                            trainerIdx,
+                            "conveyance",
+                            e.target.value === ""
+                              ? ""
+                              : parseFloat(e.target.value) || 0
+                          )
+                        }
+                        className="w-full pl-6 rounded border border-gray-200 bg-white text-[10px] py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-200"
+                        placeholder="0"
+                      />
                     </div>
-                  );
-                })()}
+                    {(() => {
+                      const perDay = Number(trainer.conveyance) || 0;
+                      const total = perDay; // Conveyance is one-time, no multiplication
+                      if (perDay > 0) {
+                        return <div className="text-[9px] text-slate-500 mt-0.5">₹{formatIndianNumber(total)}</div>;
+                      }
+                      return null;
+                    })()}
+                  </div>
 
-                {/** Topics area */}
-                <div className="flex-1 min-w-[240px]">
+                  {/* Food */}
+                  <div className="flex flex-col bg-white/70 border border-gray-100 rounded-md p-0.5 min-w-[90px]">
+                    <label className="text-[10px] font-semibold text-slate-600 mb-0.5">
+                      Food
+                    </label>
+                    <div className="relative">
+                      <FaRupeeSign className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-500 w-3 h-3" />
+                      <input
+                        aria-label={`Food for trainer ${
+                          trainer.trainerName || trainer.trainerId || trainerIdx
+                        }`}
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={trainer.food ?? ""}
+                        onChange={(e) =>
+                          handleTrainerField(
+                            rowIndex,
+                            batchIndex,
+                            trainerIdx,
+                            "food",
+                            e.target.value === ""
+                              ? ""
+                              : parseFloat(e.target.value) || 0
+                          )
+                        }
+                        className="w-full pl-6 rounded border border-gray-200 bg-white text-[10px] py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-200"
+                        placeholder="0"
+                      />
+                    </div>
+                    {(() => {
+                      const days = getTrainingDays(trainer.startDate, trainer.endDate, excludeDays);
+                      const perDay = Number(trainer.food) || 0;
+                      const total = perDay * days;
+                      if (days > 0 && perDay > 0) {
+                        return <div className="text-[9px] text-slate-500 mt-0.5">{formatIndianNumber(perDay)}*{days} = {formatIndianNumber(total)}</div>;
+                      }
+                      return null;
+                    })()}
+                  </div>
+
+                  {/* Lodging */}
+                  <div className="flex flex-col bg-white/70 border border-gray-100 rounded-md p-0.5 min-w-[90px]">
+                    <label className="text-[10px] font-semibold text-slate-600 mb-0.5">
+                      Lodging
+                    </label>
+                    <div className="relative">
+                      <FaRupeeSign className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-500 w-3 h-3" />
+                      <input
+                        aria-label={`Lodging for trainer ${
+                          trainer.trainerName || trainer.trainerId || trainerIdx
+                        }`}
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={trainer.lodging ?? ""}
+                        onChange={(e) =>
+                          handleTrainerField(
+                            rowIndex,
+                            batchIndex,
+                            trainerIdx,
+                            "lodging",
+                            e.target.value === ""
+                              ? ""
+                              : parseFloat(e.target.value) || 0
+                          )
+                        }
+                        className="w-full pl-6 rounded border border-gray-200 bg-white text-[10px] py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-200"
+                        placeholder="0"
+                      />
+                    </div>
+                    {(() => {
+                      const days = getTrainingDays(trainer.startDate, trainer.endDate, excludeDays);
+                      const perDay = Number(trainer.lodging) || 0;
+                      const total = perDay * days;
+                      if (days > 0 && perDay > 0) {
+                        return <div className="text-[9px] text-slate-500 mt-0.5">{formatIndianNumber(perDay)}*{days} = {formatIndianNumber(total)}</div>;
+                      }
+                      return null;
+                    })()}
+                  </div>
+                </div>
+
+                {/* Cost section */}
+                <div className="flex flex-wrap md:flex-nowrap gap-1 md:w-auto self-start">
+                  {(() => {
+                    const trainerCost = roundToNearestWhole(((Number(trainer.assignedHours) || 0) * (Number(trainer.perHourCost) || 0)) || 0);
+                    const perHourCost = Number(trainer.perHourCost) || 0;
+                    const assignedHours = Number(trainer.assignedHours) || 0;
+                    const days = getTrainingDays(trainer.startDate, trainer.endDate, excludeDays);
+                    const conveyanceTotal = Number(trainer.conveyance) || 0;
+                    const foodTotal = (Number(trainer.food) || 0) * days;
+                    const lodgingTotal = (Number(trainer.lodging) || 0) * days;
+                    const miscCost = roundToNearestWhole(conveyanceTotal + foodTotal + lodgingTotal);
+                    const totalCost = roundToNearestWhole(trainerCost + miscCost);
+                    const boxBase = "flex items-center gap-1 bg-white/70 border border-gray-100 rounded-md px-2 py-1";
+                    const valueCls = "text-xs font-semibold";
+                    return (
+                      <>
+                        <div className={`${boxBase} text-indigo-700 flex flex-col`}>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-medium">Trainer:</span>
+                            <span className={`${valueCls} text-indigo-900`}>₹{formatIndianNumber(trainerCost)}</span>
+                          </div>
+                          {perHourCost > 0 && assignedHours > 0 && (
+                            <div className="text-[9px] text-slate-500 mt-1 text-center border-t border-indigo-100 pt-1">
+                              <span className="font-mono">{formatIndianNumber(perHourCost)} × {assignedHours} = {formatIndianNumber(trainerCost)}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className={`${boxBase} text-amber-700 flex flex-col`}>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-medium">Misc:</span>
+                            <span className={`${valueCls} text-amber-900`}>₹{formatIndianNumber(miscCost)}</span>
+                          </div>
+                        </div>
+                        <div className={`${boxBase} text-emerald-700 flex flex-col`}>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-medium">Total:</span>
+                            <span className={`${valueCls} text-emerald-900`}>₹{formatIndianNumber(totalCost)}</span>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+
+                {/* Topics section */}
+                <div className="flex-1 min-w-[200px]">
                   <div className="flex items-center justify-between mb-0.5">
                     <div className="flex items-center space-x-1">
-                      <h4 className="text-sm font-semibold text-slate-700">
+                      <h4 className="text-[10px] font-semibold text-slate-700">
                         Topics
                       </h4>
                       <div className="relative group">
                         <button
                           type="button"
-                          className="text-slate-400 hover:text-slate-600 text-xs"
+                          className="text-slate-400 hover:text-slate-600 text-[10px]"
                           title="How to use topics"
                         >
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                           </svg>
                         </button>
-                        <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block bg-slate-800 text-white text-xs rounded py-2 px-3 shadow-lg z-50 max-w-xs">
+                        <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block bg-slate-800 text-white text-[10px] rounded py-2 px-3 shadow-lg z-50 max-w-xs">
                           <div className="font-semibold mb-1">How to manage topics:</div>
                           <ul className="space-y-1">
                             <li>• Click topic buttons to select/deselect</li>
@@ -852,107 +846,129 @@ const TrainerRow = React.memo(
                         </div>
                       </div>
                     </div>
-                    <span className="text-xs text-slate-500">
+                    <span className="text-[10px] text-slate-500">
                       Click to select • Type to add
                     </span>
                   </div>
-
                   <div className="bg-white rounded-md border border-gray-100 p-2 shadow-sm">
-                  {/* Simplified topics selection UI */}
-                  {(() => {
-                    const trainerDoc = trainers.find(
-                      (t) => t.trainerId === trainer.trainerId
-                    );
-                    const base = [];
-                    if (trainerDoc) {
-                      if (Array.isArray(trainerDoc.specialization))
-                        base.push(...trainerDoc.specialization);
-                      if (Array.isArray(trainerDoc.otherSpecialization))
-                        base.push(...trainerDoc.otherSpecialization);
-                    }
-                    
-                    // Include existing session-specific topics assigned to this trainer
-                    const existingSessionTopics = Array.isArray(trainer.topics) 
-                      ? trainer.topics 
-                      : trainer.topics 
-                      ? [trainer.topics] 
-                      : [];
-                    
-                    const allTopics = Array.from(
-                      new Set([...base, ...existingSessionTopics, ...addedTopics])
-                    )
-                      .filter(Boolean)
-                      .sort();
-                    const selected = Array.isArray(trainer.topics)
-                      ? trainer.topics
-                      : trainer.topics
-                      ? [trainer.topics]
-                      : [];
-
-                    const toggleTopic = (topic) => {
-                      const isActive = selected.includes(topic);
-                      const next = isActive
-                        ? selected.filter((t) => t !== topic)
-                        : [...selected, topic];
-                      handleTrainerField(
-                        rowIndex,
-                        batchIndex,
-                        trainerIdx,
-                        "topics",
-                        next
+                    {/* Simplified topics selection UI */}
+                    {(() => {
+                      const trainerDoc = trainers.find(
+                        (t) => t.trainerId === trainer.trainerId
                       );
-                    };
+                      const base = [];
+                      if (trainerDoc) {
+                        if (Array.isArray(trainerDoc.specialization))
+                          base.push(...trainerDoc.specialization);
+                        if (Array.isArray(trainerDoc.otherSpecialization))
+                          base.push(...trainerDoc.otherSpecialization);
+                      }
 
-                    return (
-                      <div className="space-y-2">
-                        <div
-                          role="group"
-                          aria-label="Topics"
-                          className="min-h-[28px] max-h-32 overflow-auto rounded border border-dashed border-gray-200 p-1 bg-gray-50"
-                        >
-                          {allTopics.length === 0 ? (
-                            <div className="text-xs text-slate-400 py-3 text-center">
-                              No topics available. Add one below.
-                            </div>
-                          ) : (
-                            <div className="flex flex-wrap gap-1">
-                              {allTopics.map((topic) => {
-                                const active = selected.includes(topic);
-                                return (
-                                  <button
-                                    key={topic}
-                                    type="button"
-                                    role="checkbox"
-                                    aria-checked={active}
-                                    onClick={() => toggleTopic(topic)}
-                                    className={`text-xs px-2 py-1 rounded-full border transition-all focus:outline-none focus:ring-1 focus:ring-indigo-400 truncate ${
-                                      active
-                                        ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
-                                        : "bg-white text-slate-700 border-gray-300 hover:border-indigo-400 hover:bg-indigo-50"
-                                    }`}
-                                    title={`${active ? 'Deselect' : 'Select'} topic: ${topic}`}
-                                  >
-                                    {topic}
-                                    {active && <span className="ml-1 text-xs">✓</span>}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input
-                            aria-label={`Add topic for trainer ${
-                              trainer.trainerName ||
-                              trainer.trainerId ||
-                              trainerIdx
-                            }`}
-                            type="text"
-                            value={newTopicInput}
-                            onChange={(e) => setNewTopicInput(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
+                      // Include existing session-specific topics assigned to this trainer
+                      const existingSessionTopics = Array.isArray(trainer.topics)
+                        ? trainer.topics
+                        : trainer.topics
+                        ? [trainer.topics]
+                        : [];
+
+                      const allTopics = Array.from(
+                        new Set([...base, ...existingSessionTopics, ...addedTopics])
+                      )
+                        .filter(Boolean)
+                        .sort();
+                      const selected = Array.isArray(trainer.topics)
+                        ? trainer.topics
+                        : trainer.topics
+                        ? [trainer.topics]
+                        : [];
+
+                      const toggleTopic = (topic) => {
+                        const isActive = selected.includes(topic);
+                        const next = isActive
+                          ? selected.filter((t) => t !== topic)
+                          : [...selected, topic];
+                        handleTrainerField(
+                          rowIndex,
+                          batchIndex,
+                          trainerIdx,
+                          "topics",
+                          next
+                        );
+                      };
+
+                      return (
+                        <div className="space-y-1">
+                          <div
+                            role="group"
+                            aria-label="Topics"
+                            className="min-h-[20px] max-h-24 overflow-auto rounded border border-dashed border-gray-200 p-0.5 bg-gray-50"
+                          >
+                            {allTopics.length === 0 ? (
+                              <div className="text-[9px] text-slate-400 py-1 text-center">
+                                No topics available. Add one below.
+                              </div>
+                            ) : (
+                              <div className="flex flex-wrap gap-0.5">
+                                {allTopics.map((topic) => {
+                                  const active = selected.includes(topic);
+                                  return (
+                                    <button
+                                      key={topic}
+                                      type="button"
+                                      role="checkbox"
+                                      aria-checked={active}
+                                      onClick={() => toggleTopic(topic)}
+                                      className={`text-[9px] px-1 py-0.5 rounded-full border transition-all focus:outline-none focus:ring-1 focus:ring-indigo-400 truncate ${
+                                        active
+                                          ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                                          : "bg-white text-slate-700 border-gray-300 hover:border-indigo-400 hover:bg-indigo-50"
+                                      }`}
+                                      title={`${active ? 'Deselect' : 'Select'} topic: ${topic}`}
+                                    >
+                                      {topic}
+                                      {active && <span className="ml-0.5 text-[9px]">✓</span>}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-0.5">
+                            <input
+                              aria-label={`Add topic for trainer ${
+                                trainer.trainerName ||
+                                trainer.trainerId ||
+                                trainerIdx
+                              }`}
+                              type="text"
+                              value={newTopicInput}
+                              onChange={(e) => setNewTopicInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  const t = (newTopicInput || "").trim();
+                                  if (!t) return;
+                                  if (!addedTopics.includes(t))
+                                    setAddedTopics((s) => [...s, t]);
+                                  const next = Array.from(
+                                    new Set([...selected, t])
+                                  );
+                                  handleTrainerField(
+                                    rowIndex,
+                                    batchIndex,
+                                    trainerIdx,
+                                    "topics",
+                                    next
+                                  );
+                                  setNewTopicInput("");
+                                }
+                              }}
+                              placeholder="Type new topic here and press Enter"
+                              className="flex-1 rounded border border-gray-200 px-1 py-0.5 text-[9px] focus:outline-none focus:ring-1 focus:ring-indigo-200"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
                                 const t = (newTopicInput || "").trim();
                                 if (!t) return;
                                 if (!addedTopics.includes(t))
@@ -968,43 +984,20 @@ const TrainerRow = React.memo(
                                   next
                                 );
                                 setNewTopicInput("");
-                              }
-                            }}
-                            placeholder="Type new topic here..."
-                            className="flex-1 rounded border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-200"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const t = (newTopicInput || "").trim();
-                              if (!t) return;
-                              if (!addedTopics.includes(t))
-                                setAddedTopics((s) => [...s, t]);
-                              const next = Array.from(
-                                new Set([...selected, t])
-                              );
-                              handleTrainerField(
-                                rowIndex,
-                                batchIndex,
-                                trainerIdx,
-                                "topics",
-                                next
-                              );
-                              setNewTopicInput("");
-                            }}
-                            className="inline-flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                            disabled={!newTopicInput.trim()}
-                          >
-                            <FiPlus size={14} />
-                            <span>Add</span>
-                          </button>
+                              }}
+                              className="inline-flex items-center gap-0.5 bg-indigo-600 hover:bg-indigo-700 text-white px-1.5 py-0.5 rounded text-[9px] focus:outline-none focus:ring-1 focus:ring-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                              disabled={!newTopicInput.trim()}
+                            >
+                              <FiPlus size={10} />
+                              <span>Add</span>
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })()}
+                      );
+                    })()}
                   </div> {/* end topics card */}
                 </div> {/* end topics container */}
-              </div> {/* end cost+topics wrapper */}
+              </div> {/* end horizontal wrapper */}
             </div> {/* end grid */}
         </td>
       </tr>
@@ -1102,7 +1095,7 @@ const TrainersTable = React.memo(
                   <th className="px-2 py-1 text-left">End Date</th>
                   <th className="px-2 py-1 text-left">No. of Days</th>
                   <th className="px-2 py-1 text-left">Total Hours</th>
-                  <th className="px-2 py-1 text-left">Per Hour Cost</th>
+                  <th className="px-2 py-1 text-left min-w-[100px]">Per Hour Cost</th>
                   <th className="px-2 py-1 text-left">Daily Hours</th>
                   <th className="px-2 py-1 text-left">Actions</th>
                 </tr>
@@ -1260,76 +1253,39 @@ const BatchComponent = React.memo(
               <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-0.5">
                 Assigned Hours
               </label>
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                className={`w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2 ${
-                  batchIndex !== 0 ? "bg-gray-100 cursor-not-allowed" : ""
-                }`}
-                value={
-                  batch.assignedHours === undefined ||
-                  batch.assignedHours === null
-                    ? ""
-                    : batch.assignedHours
-                }
-                onChange={(e) => {
-                  if (batchIndex === 0) {
-                    let val = e.target.value.replace(/\D/g, "");
-                    handleBatchChange(
-                      rowIndex,
-                      batchIndex,
-                      "assignedHours",
-                      val
-                    );
-                  }
-                }}
-                min="0"
-                placeholder="0"
-                disabled={batchIndex !== 0}
-              />
+              <div className="w-full rounded border-gray-300 bg-gray-50 text-xs py-1 px-2 text-gray-700 font-medium">
+                {batch.trainers.reduce(
+                  (sum, t) => sum + Number(t.assignedHours || 0),
+                  0
+                )}
+              </div>
             </div>
           </div>
 
           {/* Progress Bar */}
-          {batch.assignedHours > 0 && (
-            <div className="mb-2">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-xs text-gray-600 font-medium">
-                  Assigned Trainer Hours:{" "}
-                  {batch.trainers.reduce(
-                    (sum, t) => sum + Number(t.assignedHours || 0),
-                    0
-                  )}{" "}
-                  / {batch.assignedHours}
-                </span>
-                <span className="text-xs text-gray-500">
-                  {batch.assignedHours -
-                    batch.trainers.reduce(
-                      (sum, t) => sum + Number(t.assignedHours || 0),
-                      0
-                    )}{" "}
-                  hours left
-                </span>
+          {(() => {
+            const assignedHours = batch.trainers.reduce(
+              (sum, t) => sum + Number(t.assignedHours || 0),
+              0
+            );
+            return assignedHours > 0 ? (
+              <div className="mb-2">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-xs text-gray-600 font-medium">
+                    Assigned Hours: {assignedHours} / {assignedHours}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded h-2">
+                  <div
+                    className="bg-indigo-500 h-2 rounded"
+                    style={{
+                      width: "100%",
+                    }}
+                  ></div>
+                </div>
               </div>
-              <div className="w-full bg-gray-200 rounded h-2">
-                <div
-                  className="bg-indigo-500 h-2 rounded"
-                  style={{
-                    width: `${Math.min(
-                      100,
-                      (batch.trainers.reduce(
-                        (sum, t) => sum + Number(t.assignedHours || 0),
-                        0
-                      ) /
-                        (batch.assignedHours || 1)) *
-                        100
-                    )}%`,
-                  }}
-                ></div>
-              </div>
-            </div>
-          )}
+            ) : null;
+          })()}
 
           {/* Trainers Table */}
           <TrainersTable
@@ -1373,7 +1329,6 @@ const BatchDetailsTable = ({
   onValidationChange,
   globalTrainerAssignments = [], // <-- pass this from parent (InitiationModal)
   excludeDays = "None",
-  totalAssignedHoursByDomain = {},
 }) => {
   const [mergeModal, setMergeModal] = useState({
     open: false,
@@ -1382,7 +1337,6 @@ const BatchDetailsTable = ({
     mergeType: "whole-phase", // "whole-phase" or "specific-date"
     startDate: "",
     endDate: "",
-    assignedHours: "",
   });
 
   // Helper function to generate consistent colors for specializations
@@ -1414,8 +1368,15 @@ const filteredTrainers = useMemo(() => {
         (sum, b) => sum + Number(b.batchPerStdCount || 0),
         0
       );
-      const totalAssignedHours =
-        row.batches.length > 0 ? Number(row.batches[0].assignedHours || 0) : 0;
+      const totalAssignedHours = row.batches.reduce(
+        (sum, batch) =>
+          sum +
+          (batch.trainers || []).reduce(
+            (bSum, trainer) => bSum + Number(trainer.assignedHours || 0),
+            0
+          ),
+        0
+      );
 
       return {
         rowIndex,
@@ -1564,8 +1525,6 @@ const filteredTrainers = useMemo(() => {
   const addBatch = (rowIndex) => {
     const updatedData = [...table1Data];
     const batches = updatedData[rowIndex].batches;
-    const batch1AssignedHours =
-      batches.length > 0 ? batches[0].assignedHours : 0;
     const newBatchIndex = batches.length;
     updatedData[rowIndex].batches.push({
       batchPerStdCount: "",
@@ -1573,7 +1532,7 @@ const filteredTrainers = useMemo(() => {
         updatedData[rowIndex].batch,
         newBatchIndex + 1
       ),
-      assignedHours: batch1AssignedHours, // always match batch 1's assigned hours
+      assignedHours: 0, // Start with 0, will be calculated from trainers
       trainers: [],
     });
     setTable1Data(updatedData);
@@ -1601,8 +1560,7 @@ const filteredTrainers = useMemo(() => {
     targetRowIndices,
     mergeType = "whole-phase",
     startDate = "",
-    endDate = "",
-    assignedHours = ""
+    endDate = ""
   ) => {
     const updatedData = [...table1Data];
     const sourceRow = updatedData[sourceRowIndex];
@@ -1669,7 +1627,7 @@ const filteredTrainers = useMemo(() => {
       // Specific-date merge logic adapted for multiple targets
       const mergeStartDate = new Date(startDate);
       const mergeEndDate = new Date(endDate);
-      const mergeHours = Number(assignedHours);
+      const mergeHours = combinedHours;
 
       // Validate date range
       if (isNaN(mergeStartDate.getTime()) || isNaN(mergeEndDate.getTime())) {
@@ -1682,21 +1640,13 @@ const filteredTrainers = useMemo(() => {
         return;
       }
 
-      // Calculate hours to deduct from each batch
-      const hoursToDeduct = mergeHours;
-
-      // Update source and target rows with reduced hours
-      sourceRow.hrs = Math.max(0, sourceRow.hrs - hoursToDeduct);
-      sourceRow.assignedHours = sourceRow.hrs;
-      targetRows.forEach(tgt => {
-        tgt.hrs = Math.max(0, tgt.hrs - hoursToDeduct);
-        tgt.assignedHours = tgt.hrs;
-      });
+      // For specific-date merge, keep original specializations unchanged
+      // Just create the merged batch with combined hours
 
       // Create merged batch as a new row
       const mergedRow = {
         ...sourceRow,
-        batch: `${mergedBatchName} (${startDate} to ${endDate})`,
+        batch: mergedBatchName,
         stdCount: combinedStudents,
         hrs: mergeHours,
         assignedHours: mergeHours,
@@ -1761,7 +1711,6 @@ const filteredTrainers = useMemo(() => {
       mergeType: "whole-phase",
       startDate: "",
       endDate: "",
-      assignedHours: "",
     });
   };
   // When changing assignedHours for a batch, never allow sum to exceed row.hrs
@@ -1779,17 +1728,8 @@ const filteredTrainers = useMemo(() => {
       const maxAllowed = currentRow.stdCount - otherBatchTotal;
       const finalValue = inputValue > maxAllowed ? maxAllowed : inputValue;
       currentRow.batches[batchIndex][field] = finalValue;
-    } else if (field === "assignedHours") {
-      let val = Number(value);
-      // Removed validation limit - users can now enter more than domain hours
-      currentRow.batches[batchIndex][field] = val;
-      // If batch 1, update all other batches to match
-      if (batchIndex === 0) {
-        currentRow.batches.forEach((batch, idx) => {
-          if (idx !== 0) batch.assignedHours = val;
-        });
-      }
     } else {
+      // assignedHours is now read-only and calculated from trainers
       currentRow.batches[batchIndex][field] = value;
     }
 
@@ -1949,6 +1889,9 @@ const filteredTrainers = useMemo(() => {
       trainer.trainerName =
         tr?.name || tr?.trainerName || tr?.displayName || "";
       trainer.perHourCost = tr?.paymentType === "Per Hour" ? tr?.charges : 0;
+
+      // ✅ ADDED: Reset topics when trainer changes
+      trainer.topics = [];
 
       // ✅ ADDED: Set trainerId to ensure the dropdown shows the selection
       trainer.trainerId = value;
@@ -2863,20 +2806,6 @@ const filteredTrainers = useMemo(() => {
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Assigned Hours for Merged Batch
-                    </label>
-                    <input
-                      type="number"
-                      value={mergeModal.assignedHours}
-                      onChange={(e) => setMergeModal(prev => ({ ...prev, assignedHours: e.target.value }))}
-                      placeholder="Enter hours for merged batch"
-                      className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
-                      min="0"
-                      step="0.5"
-                    />
-                  </div>
                 </div>
               )}
 
@@ -2889,46 +2818,21 @@ const filteredTrainers = useMemo(() => {
                   const totalCombinedStudents = targets.reduce((sum, tgt) => sum + Number(tgt.stdCount || 0), Number(src.stdCount || 0));
 
                   if (mergeModal.mergeType === "specific-date") {
-                    const hoursToDeduct = Number(mergeModal.assignedHours || 0);
-                    const sourceRemaining = Math.max(0, src.hrs - hoursToDeduct);
-                    const targetsRemaining = targets.map(tgt => ({
-                      ...tgt,
-                      remainingHours: Math.max(0, tgt.hrs - hoursToDeduct)
-                    }));
-
+                    const combinedHours = targets.reduce((sum, tgt) => sum + Number(tgt.hrs || 0), Number(src.hrs || 0));
                     return (
                       <div className="rounded border border-gray-100 p-3 bg-gray-50 text-sm">
                         <div className="mb-3">
                           <div className="font-medium">Summary</div>
                           <div className="text-xs text-gray-600">
                             {src.batch} + {targets.map(t => t.batch).join(', ')}
-                            {mergeModal.startDate && mergeModal.endDate && (
-                              <span className="block text-xs text-blue-600 mt-1">
-                                {mergeModal.startDate} to {mergeModal.endDate}
-                              </span>
-                            )}
                           </div>
                         </div>
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <div className="text-xs text-gray-500">
-                              {src.batch} remaining hours
-                            </div>
-                            <div className="font-medium">{sourceRemaining} hrs</div>
-                          </div>
-                          {targetsRemaining.map((tgt, idx) => (
-                            <div key={idx} className="flex items-center justify-between">
-                              <div className="text-xs text-gray-500">
-                                {tgt.batch} remaining hours
-                              </div>
-                              <div className="font-medium">{tgt.remainingHours} hrs</div>
-                            </div>
-                          ))}
-                          <div className="flex items-center justify-between">
-                            <div className="text-xs text-gray-500">
                               Merged batch hours
                             </div>
-                            <div className="font-medium">{mergeModal.assignedHours || 0} hrs</div>
+                            <div className="font-medium">{combinedHours} hrs</div>
                           </div>
                           <div className="flex items-center justify-between">
                             <div className="text-xs text-gray-500">
@@ -2977,7 +2881,6 @@ const filteredTrainers = useMemo(() => {
                       mergeType: "whole-phase",
                       startDate: "",
                       endDate: "",
-                      assignedHours: "",
                     })
                   }
                   className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
@@ -2991,19 +2894,18 @@ const filteredTrainers = useMemo(() => {
                       mergeModal.targetRowIndices,
                       mergeModal.mergeType,
                       mergeModal.startDate,
-                      mergeModal.endDate,
-                      mergeModal.assignedHours
+                      mergeModal.endDate
                     )
                   }
                   disabled={
                     !mergeModal.targetRowIndices || mergeModal.targetRowIndices.length === 0 ||
                     (mergeModal.mergeType === "specific-date" && 
-                     (!mergeModal.startDate || !mergeModal.endDate || !mergeModal.assignedHours))
+                     (!mergeModal.startDate || !mergeModal.endDate))
                   }
                   className={`px-4 py-2 rounded-lg text-sm font-medium text-white ${
                     (mergeModal.targetRowIndices && mergeModal.targetRowIndices.length > 0) &&
                     (mergeModal.mergeType === "whole-phase" || 
-                     (mergeModal.startDate && mergeModal.endDate && mergeModal.assignedHours))
+                     (mergeModal.startDate && mergeModal.endDate))
                       ? "bg-indigo-600 hover:bg-indigo-700"
                       : "bg-indigo-300 cursor-not-allowed"
                   } transition-colors`}
@@ -3152,21 +3054,8 @@ const filteredTrainers = useMemo(() => {
                 <div key={rowIndex} className="transition-all duration-200">
                   {/* Batch Header */}
                   <div
-                    className={`px-4 py-2 flex items-center justify-between ${
-                      !(totalAssignedHoursByDomain[selectedDomain] > 0)
-                        ? "cursor-not-allowed opacity-50"
-                        : "cursor-pointer hover:bg-gray-50"
-                    }`}
-                    onClick={() =>
-                      totalAssignedHoursByDomain[selectedDomain] > 0
-                        ? toggleBatchExpansion(rowIndex)
-                        : undefined
-                    }
-                    title={
-                      !(totalAssignedHoursByDomain[selectedDomain] > 0)
-                        ? "Please assign training hours first"
-                        : ""
-                    }
+                    className="px-4 py-2 flex items-center justify-between cursor-pointer hover:bg-gray-50"
+                    onClick={() => toggleBatchExpansion(rowIndex)}
                   >
                     <div className="flex items-center space-x-3">
                       <div
@@ -3207,7 +3096,7 @@ const filteredTrainers = useMemo(() => {
                           memoizedGetColorsForBatch(row.batch).badge
                         }`}
                       >
-                        {stats.totalAssignedHours}/{totalAssignedHoursByDomain[selectedDomain] || row.hrs} hours
+                        {stats.totalAssignedHours}/{row.hrs} hours
                       </div>
 
                       {/* Merge button - always visible */}

@@ -436,7 +436,24 @@ function InitiationTrainingDetails({ training, onBack }) {
                     <h4 className="text-lg font-bold">{domainInfo.domain}</h4>
                     <div className="text-sm opacity-75">
                       Domain Hours: {domainInfo.domainHours || 0} | 
-                      Assigned Hours: {domainInfo.assignedHours || 0}
+                      Assigned Hours: {(() => {
+                        // Calculate total assigned hours from all trainers in this domain
+                        let totalAssigned = 0;
+                        if (Array.isArray(domainInfo.table1Data)) {
+                          domainInfo.table1Data.forEach(row => {
+                            if (row.batches && Array.isArray(row.batches)) {
+                              row.batches.forEach(batch => {
+                                if (batch.trainers && Array.isArray(batch.trainers)) {
+                                  batch.trainers.forEach(trainer => {
+                                    totalAssigned += Number(trainer.assignedHours || 0);
+                                  });
+                                }
+                              });
+                            }
+                          });
+                        }
+                        return totalAssigned;
+                      })()}
                     </div>
                   </div>
                   <div className="text-right text-sm mt-2 md:mt-0">
@@ -461,7 +478,14 @@ function InitiationTrainingDetails({ training, onBack }) {
                           <div>
                             <div className="font-medium text-gray-900">{row.batch}</div>
                             <div className="text-xs text-gray-500">
-                              {row.stdCount} students • {(() => {
+                              {(() => {
+                                // Calculate total students from all batches
+                                if (row.batches && Array.isArray(row.batches)) {
+                                  const totalStudents = row.batches.reduce((sum, batch) => sum + (batch.batchPerStdCount || 0), 0);
+                                  return totalStudents;
+                                }
+                                return row.stdCount || 0;
+                              })()} students • {(() => {
                                 // Calculate max assigned hours from batches instead of sum
                                 if (row.batches && Array.isArray(row.batches)) {
                                   const batchHours = row.batches.map(batch => batch.assignedHours || 0);

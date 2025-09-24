@@ -10,9 +10,13 @@ const AuditLogs = ({ logs, className = "" }) => {
 
   const sortedLogs = useMemo(() => {
     return [...logs].sort((a, b) => {
-      const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.date);
-      const dateB = b.date?.toDate ? b.date.toDate() : new Date(b.date);
-      return dateB - dateA;
+      const dateA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp);
+      const dateB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp);
+      
+      const timeA = dateA && !isNaN(dateA.getTime()) ? dateA.getTime() : 0;
+      const timeB = dateB && !isNaN(dateB.getTime()) ? dateB.getTime() : 0;
+      
+      return timeB - timeA;
     });
   }, [logs]);
 
@@ -86,9 +90,10 @@ const AuditLogs = ({ logs, className = "" }) => {
           <div className="space-y-4 p-4">
             {currentLogs.length > 0 ? (
               currentLogs.map((log) => {
-                const dateObj = log.date?.toDate ? log.date.toDate() : new Date(log.date);
-                const dateFormatted = format(dateObj, "MMM dd, yyyy");
-                const timeFormatted = format(dateObj, "hh:mm a");
+                const dateObj = log.timestamp?.toDate ? log.timestamp.toDate() : new Date(log.timestamp);
+                const isValidDate = dateObj && !isNaN(dateObj.getTime());
+                const dateFormatted = isValidDate ? format(dateObj, "MMM dd, yyyy") : "Invalid Date";
+                const timeFormatted = isValidDate ? format(dateObj, "hh:mm a") : "—";
 
                 return (
                   <div key={log.id} className="border border-gray-200 rounded-lg p-4 space-y-3">
@@ -142,9 +147,10 @@ const AuditLogs = ({ logs, className = "" }) => {
               <tbody className="divide-y divide-gray-100">
                 {currentLogs.length > 0 ? (
                   currentLogs.map((log) => {
-                    const dateObj = log.date?.toDate ? log.date.toDate() : new Date(log.date);
-                    const dateFormatted = format(dateObj, "MMM dd, yyyy");
-                    const timeFormatted = format(dateObj, "hh:mm a");
+                    const dateObj = log.timestamp?.toDate ? log.timestamp.toDate() : new Date(log.timestamp);
+                    const isValidDate = dateObj && !isNaN(dateObj.getTime());
+                    const dateFormatted = isValidDate ? format(dateObj, "MMM dd, yyyy") : "Invalid Date";
+                    const timeFormatted = isValidDate ? format(dateObj, "hh:mm a") : "—";
 
                     return (
                       <tr key={log.id} className="hover:bg-gray-50">
@@ -232,7 +238,7 @@ AuditLogs.propTypes = {
       id: PropTypes.string.isRequired,
       action: PropTypes.string.isRequired,
       user: PropTypes.string.isRequired,
-      date: PropTypes.oneOfType([
+      timestamp: PropTypes.oneOfType([
         PropTypes.instanceOf(Date),
         PropTypes.object, // for Firestore Timestamp
         PropTypes.string

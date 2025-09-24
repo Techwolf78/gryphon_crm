@@ -155,12 +155,12 @@ const numValue = (val) => (val === 0 || val === "0" ? "" : val);
         projectCode: lead.projectCode || "",
         city: lead.city || "",
         state: lead.state || "",
-        totalCost: lead.totalCost || 0,
-        tcv: lead.tcv || 0,
-        perStudentCost: lead.perStudentCost || 0,
-        studentCount: lead.studentCount || 0,
-        gstAmount: lead.gstAmount || 0,
-        netPayableAmount: lead.netPayableAmount || 0,
+        totalCost: parseFloat(lead.totalCost) || 0,
+        tcv: parseFloat(lead.tcv) || 0,
+        perStudentCost: parseFloat(lead.perStudentCost) || 0,
+        studentCount: parseInt(lead.studentCount) || 0,
+        gstAmount: parseFloat(lead.gstAmount) || 0,
+        netPayableAmount: parseFloat(lead.netPayableAmount) || 0,
         gstNumber: lead.gstNumber || "",
         gstType: lead.gstType || "include",
         course: lead.course || "",
@@ -192,7 +192,7 @@ const numValue = (val) => (val === 0 || val === "0" ? "" : val);
             hours: "",
           },
         ],
-        totalHours: lead.totalHours || 0,
+        totalHours: parseInt(lead.totalHours) || 0,
         studentFileUrl: lead.studentFileUrl || "",
         mouFileUrl: lead.mouFileUrl || "",
         otherCourseText: lead.otherCourseText || "", // Add this field for custom courses
@@ -201,21 +201,7 @@ const numValue = (val) => (val === 0 || val === "0" ? "" : val);
     }
   }, [lead, courseSpecializations]);
 
-  const handlePaymentDetailChange = (index, field, value) => {
-    const updatedPaymentDetails = [...formData.paymentDetails];
-    updatedPaymentDetails[index][field] =
-      field === "percentage" ||
-      field === "baseAmount" ||
-      field === "gstAmount" ||
-      field === "totalAmount"
-        ? parseFloat(value) || 0
-        : value;
 
-    setFormData((prev) => ({
-      ...prev,
-      paymentDetails: updatedPaymentDetails,
-    }));
-  };
 
   // 1. Update handleCourseChange to always update studentCount
   const handleCourseChange = (index, field, value) => {
@@ -416,6 +402,12 @@ const numValue = (val) => (val === 0 || val === "0" ? "" : val);
     setError(null);
 
     try {
+      // Validate required fields
+      if (!formData.businessName || formData.businessName.trim() === "") {
+        setError("College Name is required. Please enter a college name before submitting.");
+        return;
+      }
+
       const originalProjectCode = lead.projectCode;
       const newProjectCode = formData.projectCode;
       const projectCodeChanged = newProjectCode !== originalProjectCode;
@@ -651,6 +643,7 @@ const handleChange = (e) => {
                         onChange={handleChange}
                         className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
                         placeholder="College Name"
+                        required
                       />
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <FiUser className="h-5 w-5 text-gray-400" />
@@ -958,9 +951,7 @@ const handleChange = (e) => {
                       <input
                         type="number"
                         value={
-                          formData.netPayableAmount
-                            ? formData.netPayableAmount.toFixed(2)
-                            : ""
+                          (parseFloat(formData.netPayableAmount) || 0).toFixed(2)
                         }
                         readOnly
                         className="block w-full pl-10 pr-3 py-2 border border-orange-300 rounded-lg shadow-sm bg-orange-100"
@@ -987,9 +978,7 @@ const handleChange = (e) => {
                       <input
                         type="number"
                         value={
-                          formData.totalCost
-                            ? formData.totalCost.toFixed(2)
-                            : ""
+                          (parseFloat(formData.totalCost) || 0).toFixed(2)
                         }
                         readOnly
                         className="block w-full pl-10 pr-3 py-2 border border-green-300 rounded-lg shadow-sm bg-green-100"

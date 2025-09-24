@@ -77,7 +77,7 @@ const Admin = () => {
         getDocs(
           query(
             collection(db, "audit_logs"),
-            orderBy("date", "desc"),
+            orderBy("timestamp", "desc"),
             limit(50)
           )
         ),
@@ -168,7 +168,10 @@ const Admin = () => {
   const todayLogins = logs.filter((log) => {
     if (log.action !== "Logged in") return false;
     const today = new Date();
-    const logDate = log.date?.toDate ? log.date.toDate() : new Date(log.date);
+    const logDate = log.timestamp?.toDate ? log.timestamp.toDate() : new Date(log.timestamp);
+    
+    if (!logDate || isNaN(logDate.getTime())) return false;
+    
     return (
       logDate.getDate() === today.getDate() &&
       logDate.getMonth() === today.getMonth() &&
