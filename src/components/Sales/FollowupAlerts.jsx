@@ -190,7 +190,6 @@ const FollowupAlerts = ({
   // Join meeting action
   const handleJoinMeeting = useCallback(() => {
     // In a real app, this would launch the meeting URL
-    console.log('Joining meeting:', reminderPopup?.meetingUrl);
     setReminderPopup(null);
   }, [reminderPopup, setReminderPopup]);
 

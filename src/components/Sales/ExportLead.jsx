@@ -318,7 +318,6 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
     try {
       const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
       saveAs(new Blob([wbout], { type: "application/octet-stream" }), fileName);
-      console.log(`Export successful: ${fileName} with ${sheetsAdded} sheets`);
     } catch (error) {
       console.error("Export error:", error);
       alert("Export failed. Please try again or contact support.");

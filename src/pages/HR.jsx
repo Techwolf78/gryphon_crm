@@ -60,7 +60,6 @@ const HR = () => {
 
       const billsData = querySnapshot.docs.map((doc) => {
         const data = doc.data();
-        console.log("📄 Firestore Bill Data:", doc.id, data);
 
         return {
           id: doc.id,
@@ -87,7 +86,6 @@ const HR = () => {
         };
       });
 
-      console.log("✅ Final Bills Array:", billsData);
       setBills(billsData);
       setFilteredBills(billsData);
     } catch (error) {

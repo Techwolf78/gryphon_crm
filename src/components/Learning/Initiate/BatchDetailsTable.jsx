@@ -2157,10 +2157,6 @@ const filteredTrainers = useMemo(() => {
     }
 
     if (onSwapTrainer) {
-      console.log(
-        "✅ [SWAP] Calling onSwapTrainer with cross-batch swap data:"
-      );
-
       try {
         onSwapTrainer({
           domain: selectedDomain, // ✅ ADD: Pass current domain context
@@ -2421,10 +2417,6 @@ const filteredTrainers = useMemo(() => {
     }
 
     setTable1Data(updated);
-    console.log("[BatchDetailsTable] undoMerge completed", {
-      mergedRowIndex,
-      mergeType,
-    });
 
     // Optional: revert persisted merge in Firestore if mergeFirestoreConfig provided
     if (
@@ -3103,15 +3095,6 @@ const filteredTrainers = useMemo(() => {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          console.log(
-                            "[BatchDetailsTable] open merge modal for row",
-                            {
-                              rowIndex,
-                              batchName: row.batch,
-                              stdCount: row.stdCount,
-                              hrs: row.hrs,
-                            }
-                          );
                           setMergeModal({
                             open: true,
                             sourceRowIndex: rowIndex,
@@ -3130,10 +3113,6 @@ const filteredTrainers = useMemo(() => {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            console.log(
-                              "[BatchDetailsTable] undo merge clicked",
-                              { rowIndex, batch: row.batch }
-                            );
                             undoMerge(rowIndex);
                           }}
                           className="ml-2 p-1 rounded bg-yellow-50 text-yellow-700 text-xs hover:bg-yellow-100 transition-colors"

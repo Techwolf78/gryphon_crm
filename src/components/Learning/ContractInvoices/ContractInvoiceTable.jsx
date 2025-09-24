@@ -36,7 +36,6 @@ export default function ContractInvoiceTable() {
       try {
         setLoading(true);
         setError(null);
-        console.log("Fetching contract invoices...");
 
         // Fetch training forms
         const trainingFormsQuery = query(
@@ -68,11 +67,9 @@ export default function ContractInvoiceTable() {
           status: doc.data().status || "registered",
         }));
 
-        console.log("Existing invoices:", invoicesData);
         setExistingInvoices(invoicesData);
         setInvoices(trainingFormsData);
-      } catch (err) {
-        console.error("Error fetching data:", err);
+      } catch {
         setError("Failed to load data. Please try again.");
       } finally {
         setLoading(false);
@@ -179,8 +176,7 @@ export default function ContractInvoiceTable() {
 
       const invoiceNumber = nextInvoiceNumber.toString().padStart(3, "0");
       return `GAPL/${financialYear.year}/${prefix}/${invoiceNumber}`;
-    } catch (error) {
-      console.error("Error generating invoice number:", error);
+    } catch {
       const timestamp = new Date().getTime();
       return `GAPL/${financialYear.year}/${prefix}/F${timestamp}`;
     }
@@ -231,7 +227,6 @@ export default function ContractInvoiceTable() {
   };
 
   const handleConvertToTax = async (invoice) => {
-    console.log("Converting invoice:", invoice);
 
     if (!invoice.id) {
       alert("Error: Invoice ID not found. Cannot convert to tax invoice.");
@@ -255,7 +250,6 @@ export default function ContractInvoiceTable() {
 
       // Save to ProformaInvoices collection
       await addDoc(collection(db, "ProformaInvoices"), proformaDataWithoutId);
-      console.log("Proforma Invoice saved successfully");
 
       // 🔹 Step 2: Then proceed with Tax Invoice conversion
       setEditInvoice(invoice);
@@ -265,13 +259,11 @@ export default function ContractInvoiceTable() {
       setSelectedContract(originalContract);
       setSelectedInstallment({ name: invoice.installment });
       setShowModal(true);
-    } catch (error) {
-      console.error("Error saving proforma invoice:", error);
+    } catch {
       alert("Failed to save proforma invoice. Please try again.");
     }
   };
   const handleViewInvoiceDetail = (invoice) => {
-    console.log("View invoice:", invoice);
     const originalContract = invoices.find(
       (inv) => inv.id === invoice.originalInvoiceId
     );
@@ -283,7 +275,6 @@ export default function ContractInvoiceTable() {
   };
 
   const handleEditInvoice = (invoice) => {
-    console.log("Edit invoice:", invoice);
     const originalContract = invoices.find(
       (inv) => inv.id === invoice.originalInvoiceId
     );
@@ -549,13 +540,8 @@ export default function ContractInvoiceTable() {
       setSelectedContract(null);
       setSelectedInstallment(null);
       setEditInvoice(null);
-    } catch (err) {
-      console.error("Error processing invoice:", err);
-      alert(
-        `Failed to ${isEdit ? "convert" : "raise"} invoice. Error: ${
-          err.message
-        }`
-      );
+    } catch {
+      alert(`Failed to ${isEdit ? "convert" : "raise"} invoice. Please try again.`);
     }
   };
   const handleRegisterInvoice = async (invoice) => {
@@ -570,8 +556,7 @@ export default function ContractInvoiceTable() {
       );
 
       alert("Invoice registered successfully!");
-    } catch (err) {
-      console.error("Error registering invoice:", err);
+    } catch {
       alert("Failed to register invoice");
     }
   };

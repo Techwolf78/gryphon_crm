@@ -460,7 +460,6 @@ const TrainingForm = ({
             try {
               await setDoc(doc(db, "trainingForms", sanitizedProjectCode), formDocData);
               await setDoc(doc(db, "placementData", sanitizedProjectCode), formDocData);
-              console.log("Both documents saved successfully ✅");
             } catch (error) {
               console.error("Error while saving to placementData: ", error);
             }

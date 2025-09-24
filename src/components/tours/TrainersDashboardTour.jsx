@@ -140,8 +140,7 @@ export default function TrainersDashboardTour({ userId, enabled = true }) {
 
     // If a target is missing (e.g., conditional UI), continue gracefully
     if (type === EVENTS.TARGET_NOT_FOUND) {
-      // Log for debugging
-      console.log("Target not found, continuing tour");
+      // Continue gracefully without logging
     }
   };
 

@@ -502,7 +502,7 @@ function Sales() {
   }, []);
 
   const handleImportComplete = useCallback((importedData) => {
-    console.log("Imported data:", importedData);
+    // Handle imported data if needed
   }, []);
 
   const handleTabChange = useCallback((tab) => setActiveTab(tab), []);

@@ -70,7 +70,7 @@ const ContractInvoicesTab = () => {
               return;
             }
           } catch (altError) {
-            console.log(`Error accessing ${colName}:`, altError.message);
+            // Error accessing collection
           }
         }
       } else {
@@ -163,7 +163,6 @@ const ContractInvoicesTab = () => {
   // Invoice register handle karna
   const handleRegisterInvoice = (invoice) => {
     // Yahan aap register ka logic add kar sakte hain
-    console.log("Register invoice:", invoice);
     alert(`Invoice ${invoice.invoiceNumber} registered successfully!`);
   };
 

@@ -140,13 +140,11 @@ const handleSubmit = async (e) => {
 
     if (existingInvoice && editMode) {
       await updateDoc(doc(db, "invoices", existingInvoice.id), invoiceToSave);
-      console.log("Invoice updated with ID: ", existingInvoice.id);
       alert("Invoice updated successfully!");
       updatedInvoiceId = existingInvoice.id;
     } else {
       invoiceToSave.createdAt = new Date();
       const docRef = await addDoc(collection(db, "invoices"), invoiceToSave);
-      console.log("Invoice saved with ID: ", docRef.id);
       alert("Invoice generated successfully!");
       updatedInvoiceId = docRef.id;
       setExistingInvoice({ id: docRef.id, ...invoiceToSave });

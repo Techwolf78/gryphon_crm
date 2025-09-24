@@ -173,7 +173,6 @@ export const universityOptions = [
   "Mangalore University, Mangalore",
   "Maulana Azad National Institute of Technology (MANIT) Bhopal",
   "Maulana Azad National Urdu University",
-  "Maulana Azad National Urdu University",
   "MIT World Peace University",
   "Mizoram University",
   "Mumbai Technical University",

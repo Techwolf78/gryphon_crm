@@ -169,7 +169,6 @@ function AddJD({ show, onClose }) {
       
       const trainingFormSnapshot = await getDocs(trainingFormQuery);
       if (trainingFormSnapshot.empty) {
-        console.log(`No training form found for college: ${college}`);
         setStudentsData(prev => ({ ...prev, [college]: [] }));
         return;
       }
@@ -293,7 +292,6 @@ resumes in a zip folder by 10th July 2025 by 2:00 pm.*
             
             const trainingFormSnapshot = await getDocs(trainingFormQuery);
             if (trainingFormSnapshot.empty) {
-              console.log(`No training form found for college: ${college}`);
               return { college, tpoEmail: null };
             }
             

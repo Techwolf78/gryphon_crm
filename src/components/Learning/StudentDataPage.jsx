@@ -27,7 +27,6 @@ function StudentDataPage({ trainingId, onBack }) {
   ];
 
   useEffect(() => {
-    console.log("Fetching student data for trainingId:", trainingId);
     fetchStudentData();
   }, [trainingId]);
 
@@ -38,7 +37,6 @@ function StudentDataPage({ trainingId, onBack }) {
       const snapshot = await getDocs(studentsRef);
 
       if (snapshot.empty) {
-        console.log("No documents found");
         setStudentData([]);
         return;
       }
@@ -47,8 +45,6 @@ function StudentDataPage({ trainingId, onBack }) {
         id: doc.id,
         ...doc.data()
       }));
-
-      console.log("First raw document:", data[0]);
 
       // Complete mapping for all fields
       const formatted = data.map(item => ({

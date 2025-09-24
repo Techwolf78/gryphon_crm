@@ -716,7 +716,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
         const snap = await getDocs(q);
         const deletePromises = snap.docs.map(doc => deleteDoc(doc.ref));
         await Promise.all(deletePromises);
-        console.log(`[trainerAssignments] removed existing assignments for: ${prefix}`);
 
         // 2) collect new assignments from table data
         const assignments = [];
@@ -772,18 +771,8 @@ function InitiationModal({ training, onClose, onConfirm }) {
             wb.set(ref, a);
           });
           await wb.commit();
-          console.log(
-            "[trainerAssignments] wrote",
-            assignments.length,
-            "assignments for training:",
-            training.id,
-            "with structured IDs"
-          );
         } else {
-          console.log(
-            "[trainerAssignments] no trainer assignments to write for training:",
-            training.id
-          );
+          // no assignments to write
         }
       } catch (assignmentErr) {
         console.error("Error updating trainerAssignments:", assignmentErr);
@@ -1262,11 +1251,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
   }, [excludeDropdownOpen]);
 
   const swapTrainers = (swapData) => {
-    console.log("🔄 [INITIATION MODAL] swapTrainers called with:", {
-      swapData: swapData,
-      selectedDomainsLength: selectedDomains.length,
-      table1DataByDomainKeys: Object.keys(table1DataByDomain),
-    });
 
     if (!swapData || !swapData.source || !swapData.target) {
       console.error("❌ [INITIATION MODAL] Missing swap data:", { swapData });
@@ -1277,19 +1261,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
     // Use the domain from swapData or fallback to first selected domain
     const currentDomain = domain || selectedDomains[0];
-
-    console.log(
-      "🔄 [INITIATION MODAL] Processing cross-batch swap for domain:",
-      {
-        currentDomain,
-        sourceTrainer: source.trainerData?.trainerName,
-        targetTrainer: target.trainerData?.trainerName,
-        sourceOriginalBatch:
-          table1DataByDomain[currentDomain]?.[source.rowIdx]?.batch,
-        targetOriginalBatch:
-          table1DataByDomain[currentDomain]?.[target.rowIdx]?.batch,
-      }
-    );
 
     if (!table1DataByDomain[currentDomain]) {
       console.error(
@@ -1319,8 +1290,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
       return;
     }
 
-    console.log("🔄 [INITIATION MODAL] Performing CROSS-BATCH trainer swap...");
-
     // CROSS-BATCH SWAP: Create trainers for opposite batches
     const sourceNewTrainer = {
       ...source.trainerData,
@@ -1332,51 +1301,12 @@ function InitiationModal({ training, onClose, onConfirm }) {
       dayDuration: target.newTimeSlot,
     };
 
-    console.log("🔄 [INITIATION MODAL] Cross-batch swap details:", {
-      sourceTrainerMoving: {
-        name: sourceNewTrainer.trainerName,
-        fromBatch: currentDomainData[source.rowIdx].batch,
-        toBatch: currentDomainData[target.rowIdx].batch,
-        originalTimeSlot: source.trainerData.dayDuration,
-        newTimeSlot: sourceNewTrainer.dayDuration,
-      },
-      targetTrainerMoving: {
-        name: targetNewTrainer.trainerName,
-        fromBatch: currentDomainData[target.rowIdx].batch,
-        toBatch: currentDomainData[source.rowIdx].batch,
-        originalTimeSlot: target.trainerData.dayDuration,
-        newTimeSlot: targetNewTrainer.dayDuration,
-      },
-    });
-
     // CROSS-BATCH SWAP: Add source trainer to TARGET batch, target trainer to SOURCE batch
     currentDomainData[target.rowIdx].batches[target.batchIdx].trainers.push(
       sourceNewTrainer
     );
     currentDomainData[source.rowIdx].batches[source.batchIdx].trainers.push(
       targetNewTrainer
-    );
-
-    console.log(
-      "✅ [INITIATION MODAL] Cross-batch trainers added successfully:",
-      {
-        sourceTrainerAddedTo: `${
-          currentDomainData[target.rowIdx].batch
-        } batch (${
-          currentDomainData[target.rowIdx].batches[target.batchIdx].batchCode
-        })`,
-        targetTrainerAddedTo: `${
-          currentDomainData[source.rowIdx].batch
-        } batch (${
-          currentDomainData[source.rowIdx].batches[source.batchIdx].batchCode
-        })`,
-        sourceBatchTrainerCount:
-          currentDomainData[source.rowIdx].batches[source.batchIdx].trainers
-            .length,
-        targetBatchTrainerCount:
-          currentDomainData[target.rowIdx].batches[target.batchIdx].trainers
-            .length,
-      }
     );
 
     // Update the state with the modified data
@@ -1386,39 +1316,8 @@ function InitiationModal({ training, onClose, onConfirm }) {
         [currentDomain]: currentDomainData,
       };
 
-      console.log(
-        "📊 [INITIATION MODAL] table1DataByDomain updated with cross-batch swap:",
-        {
-          domain: currentDomain,
-          crossBatchSwapCompleted: {
-            sourceBatch: {
-              batchCode:
-                newState[currentDomain][source.rowIdx].batches[source.batchIdx]
-                  .batchCode,
-              trainerCount:
-                newState[currentDomain][source.rowIdx].batches[source.batchIdx]
-                  .trainers.length,
-              specialization: newState[currentDomain][source.rowIdx].batch,
-            },
-            targetBatch: {
-              batchCode:
-                newState[currentDomain][target.rowIdx].batches[target.batchIdx]
-                  .batchCode,
-              trainerCount:
-                newState[currentDomain][target.rowIdx].batches[target.batchIdx]
-                  .trainers.length,
-              specialization: newState[currentDomain][target.rowIdx].batch,
-            },
-          },
-        }
-      );
-
       return newState;
     });
-
-    console.log(
-      "✅ [INITIATION MODAL] Cross-batch trainer swap completed successfully - trainers swapped batches and time slots"
-    );
   };
 
   return (

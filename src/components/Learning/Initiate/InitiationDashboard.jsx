@@ -167,11 +167,6 @@ function groupByCollege(trainings) {
     const { tcv, totalCost } = map[key];
     // If TCV is zero, default to 0 to avoid NaN
     map[key].health = tcv > 0 ? (totalCost / tcv) * 100 : 0;
-    console.log(
-      `College: ${key}, TCV: ${tcv}, Total Cost: ${totalCost}, Health: ${map[
-        key
-      ].health.toFixed(2)}%`
-    );
   });
   return map;
 }
@@ -669,14 +664,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
   const trainingsForHealth = filteredByStatus.filter(
     (t) => t.computedStatus !== "Not Started"
   );
-  console.log(
-    `Trainings for Health:`,
-    trainingsForHealth.map((t) => ({
-      college: `${t.collegeName} (${t.collegeCode})`,
-      cost: t.totalCost,
-      status: t.computedStatus,
-    }))
-  );
+
   const totalTrainingCost = trainingsForHealth.reduce(
     (acc, t) => acc + (t.totalCost || 0),
     0
@@ -693,12 +681,6 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
       ? Object.values(grouped).reduce((acc, data) => acc + data.health, 0) /
         Object.keys(grouped).length
       : 0;
-  console.log(
-    `Overall Health Calculation: Total TCV: ${totalTcv}, Total Training Cost: ${totalTrainingCost}, Overall Health: ${overallHealth.toFixed(
-      2
-    )}%`
-  );
-
   // Health counts
   const healthCounts = useMemo(() => {
     const counts = {
@@ -855,22 +837,15 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
         const phase = phaseBase + "-phase-" + phaseNumber;
         const prefix = `${projectCode}-${year}-${branch}-${specialization}-${phase}`;
         
-        console.log(`🔍 [DELETE] Looking for trainer assignments with prefix: ${prefix}`);
-        console.log(`📋 [DELETE] Project: ${projectCode}, Year: ${year}, Branch: ${branch}, Specialization: ${specialization}, Phase: ${phase}`);
-        
         const q = query(collection(db, "trainerAssignments"), where('__name__', '>=', prefix), where('__name__', '<', prefix + '\uf8ff'));
         const snap = await getDocs(q);
         
-        console.log(`🎯 [DELETE] Found ${snap.docs.length} trainer assignments to delete:`);
         snap.docs.forEach((doc) => {
           const data = doc.data();
-          console.log(`   - Trainer: ${data.trainerName} (${data.trainerId}), Date: ${data.date}, Domain: ${data.domain}`);
         });
         
         const deletePromises = snap.docs.map(doc => deleteDoc(doc.ref));
         await Promise.all(deletePromises);
-        
-        console.log(`✅ [DELETE] Successfully deleted ${snap.docs.length} trainer assignments for phase: ${prefix}`);
       } else {
         console.warn("❌ [DELETE] Could not parse training ID for assignment deletion:", training.trainingId);
       }
