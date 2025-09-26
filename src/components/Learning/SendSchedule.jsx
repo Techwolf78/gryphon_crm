@@ -66,18 +66,14 @@ useEffect(() => {
   if (!selectedTrainer || trainersData.length === 0) return;
 
   const trainerDetails = trainersData.filter(trainer => {
-    console.log("Checking trainer:", trainer.trainerId, trainer.id, "against", selectedTrainer.trainerId, selectedTrainer.id);
     return trainer.trainerId === selectedTrainer.trainerId || trainer.trainerId === selectedTrainer.id;
   });
-
-  console.log("Matched trainer details:", trainerDetails);
 
   let totalConveyance = 0;
   let totalFood = 0;
   let totalLodging = 0;
 
   trainerDetails.forEach(detail => {
-    console.log("Detail values:", detail.conveyance, detail.food, detail.lodging);
     totalConveyance += Number(detail.conveyance) || 0;
     totalFood += Number(detail.food) || 0;
     totalLodging += Number(detail.lodging) || 0;
@@ -455,8 +451,6 @@ useEffect(() => {
           trainingFormDoc?.paymentCycle ||
           "30",
       };
-
-      console.log("Sending email with params:", templateParams);
 
       await emailjs.send(
         "service_pskknsn",

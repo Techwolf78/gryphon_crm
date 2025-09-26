@@ -129,11 +129,9 @@ const MOUUploadModal = ({ isOpen, onClose, leadData, onUploadSuccess }) => {
 
       // Find the training form document based on the leadData
       const projectCode = leadData.projectCode;
-      console.log("Found project code:", projectCode);
 
       // Convert project code to document ID for trainingForms collection
       const trainingFormDocId = projectCodeToDocId(projectCode);
-      console.log("Training form document ID:", trainingFormDocId);
 
       const trainingFormRef = doc(db, "trainingForms", trainingFormDocId);
 
@@ -180,8 +178,6 @@ const MOUUploadModal = ({ isOpen, onClose, leadData, onUploadSuccess }) => {
         mouDocument: mouDocumentData,
         lastUpdated: serverTimestamp()
       });
-
-      console.log("MOU document uploaded successfully for project:", projectCode);
 
       setUploadProgress(100);
       setUploadSuccess(true);

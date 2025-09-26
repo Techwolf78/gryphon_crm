@@ -12,7 +12,6 @@ export const deleteTrainerAssignment = async (assignment, onSuccess, onError) =>
   try {
     const assignmentRef = doc(db, 'trainerAssignments', assignment.id);
     await deleteDoc(assignmentRef);
-    console.log(`✅ Deleted trainer assignment: ${assignment.trainerName || assignment.trainerId} - ${assignment.date}`);
 
     // Call success callback if provided
     if (onSuccess) {

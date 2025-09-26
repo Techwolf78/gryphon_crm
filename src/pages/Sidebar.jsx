@@ -17,6 +17,8 @@ import {
   FiMessageSquare,
   FiMenu,
   FiUserCheck,
+  FiUser,
+  FiShield,
 } from "react-icons/fi";
  
 const roleLinks = {
@@ -27,14 +29,14 @@ const roleLinks = {
     { label: "Placement", path: "/dashboard/placement", icon: <FiBriefcase /> },
     { label: "D M", path: "/dashboard/marketing", icon: <FiTrendingUp /> },
     { label: "CA", path: "/dashboard/ca", icon: <FiUserCheck /> },
-    { label: "HR", path: "/dashboard/hr", icon: <FiUserCheck /> },
+    { label: "HR", path: "/dashboard/hr", icon: <FiShield /> },
   ],
   sales: [{ label: "Sales", path: "/dashboard/sales", icon: <MdOutlineCurrencyRupee /> }],
   placement: [{ label: "Placement", path: "/dashboard/placement", icon: <FiBriefcase /> }],
   "learning-development": [{ label: "L & D", path: "/dashboard/learning-development", icon: <FiBook /> }],
   marketing: [{ label: "D M", path: "/dashboard/marketing", icon: <FiTrendingUp /> }],
   ca: [{ label: "CA", path: "/dashboard/ca", icon: <FiUserCheck /> }],
-  hr: [{ label: "HR", path: "/dashboard/hr", icon: <FiUserCheck /> }],
+  hr: [{ label: "HR", path: "/dashboard/hr", icon: <FiShield /> }],
 };
  
 const normalizeRole = (role) => {

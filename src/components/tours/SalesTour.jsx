@@ -143,8 +143,6 @@ export default function SalesTour({ userId, enabled = true }) {
   const handleCallback = async (data) => {
     const { status, type, index, step } = data;
 
-    console.log("Tour callback:", { status, type, index, step: step?.target });
-
     // If user finishes or skips, persist completion so it never shows again
     if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
       try {
@@ -158,7 +156,7 @@ export default function SalesTour({ userId, enabled = true }) {
 
     // Prevent tour from ending prematurely on missing targets
     if (type === EVENTS.TOUR_END && status !== STATUS.FINISHED && status !== STATUS.SKIPPED) {
-      console.log("Tour ended unexpectedly, status:", status);
+      // Tour ended unexpectedly
     }
 
     // When going back from tab steps (6-9) to top elements (0-4), scroll to top
@@ -171,7 +169,6 @@ export default function SalesTour({ userId, enabled = true }) {
         '[data-tour="phase-tabs"]'
       ];
       if (topTargets.includes(step.target)) {
-        console.log("Scrolling to top for top targets");
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     }
@@ -185,7 +182,6 @@ export default function SalesTour({ userId, enabled = true }) {
         '[data-tour="closed-leads-tab"]'
       ];
       if (tabTargets.includes(step.target)) {
-        console.log("Scrolling to tabs for tab targets");
         // Scroll to a position that shows the tabs area
         const tabsElement = document.querySelector('[data-tour="phase-tabs"]');
         if (tabsElement) {
@@ -196,7 +192,6 @@ export default function SalesTour({ userId, enabled = true }) {
 
     // When moving to the lead actions step, scroll to top to show the first leads
     if (type === EVENTS.STEP_BEFORE && index === 9) {
-      console.log("Scrolling to top for lead actions step");
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };

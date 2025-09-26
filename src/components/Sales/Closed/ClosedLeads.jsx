@@ -229,8 +229,6 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
   ]);
 
   // ⭐⭐ Yeh line add karo ⭐⭐
-  console.log("🔥 Selected Team User ID:", selectedTeamUserId);
-  console.log("🔥 Filtered Leads:", filteredLeads);
 
   const startIdx = (currentPage - 1) * rowsPerPage;
   const currentRows = filteredLeads.slice(startIdx, startIdx + rowsPerPage);
@@ -245,7 +243,6 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
       (sum, [, lead]) => sum + (lead.totalCost || 0),
       0
     );
-    console.log("🔥 Achieved Value (ClosedLeads):", value);
     return value;
   }, [filteredLeads]);
 
@@ -536,7 +533,6 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
           leadData={selectedLeadForModal}
           onUploadSuccess={() => {
             // Refresh data or handle success
-            console.log("Student list uploaded successfully");
           }}
         />
 
@@ -546,7 +542,6 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
           leadData={activeLeadData}
           onUploadSuccess={() => {
             // Refresh data or handle success
-            console.log("MOU uploaded successfully");
           }}
         />
 

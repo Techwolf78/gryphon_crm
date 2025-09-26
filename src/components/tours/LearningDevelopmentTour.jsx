@@ -134,8 +134,7 @@ export default function LearningDevelopmentTour({ userId, enabled = true }) {
 
     // If a target is missing (e.g., conditional UI), continue gracefully
     if (type === EVENTS.TARGET_NOT_FOUND) {
-      // Log for debugging
-      console.log("Target not found, continuing tour");
+      // Continue gracefully without logging
     }
 
     // When going back from the last step (index 5) to step 5 (index 4), scroll to top to show tabs

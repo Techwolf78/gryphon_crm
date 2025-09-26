@@ -246,7 +246,7 @@ const EducationDistribution = ({ leadCategories, isLoading }) => {
 
   if (isLoading) {
     return (
-      <div className="h-60 flex items-center justify-center">
+      <div className="h-48 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500" />
       </div>
     );
@@ -258,7 +258,7 @@ const EducationDistribution = ({ leadCategories, isLoading }) => {
     leadCategories.reduce((sum, cat) => sum + cat.value, 0) === 0
   ) {
     return (
-      <div className="h-60 flex items-center justify-center">
+      <div className="h-48 flex items-center justify-center">
         <p className="text-gray-500">No education data available</p>
       </div>
     );
@@ -266,7 +266,20 @@ const EducationDistribution = ({ leadCategories, isLoading }) => {
 
   return (
     <>
-      <div className="h-60">
+      <div className="mb-2 flex flex-wrap justify-center gap-2">
+        {leadCategories.map((category, index) => (
+          <div key={index} className="flex items-center">
+            <div
+              className="w-3 h-3 rounded-full mr-2"
+              style={{ backgroundColor: COLORS[index % COLORS.length] }}
+            />
+            <span className="text-xs text-gray-600">
+              {category.name}: {category.value}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="h-48">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -289,19 +302,6 @@ const EducationDistribution = ({ leadCategories, isLoading }) => {
             <Tooltip />
           </PieChart>
         </ResponsiveContainer>
-      </div>
-      <div className="mt-2 flex flex-wrap justify-center gap-2">
-        {leadCategories.map((category, index) => (
-          <div key={index} className="flex items-center">
-            <div
-              className="w-3 h-3 rounded-full mr-2"
-              style={{ backgroundColor: COLORS[index % COLORS.length] }}
-            />
-            <span className="text-xs text-gray-600">
-              {category.name}: {category.value}
-            </span>
-          </div>
-        ))}
       </div>
     </>
   );
@@ -353,7 +353,7 @@ const LeadDistribution = ({ leadSources, isLoading }) => {
 
   if (isLoading) {
     return (
-      <div className="h-80 flex items-center justify-center">
+      <div className="h-56 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500" />
       </div>
     );
@@ -361,7 +361,7 @@ const LeadDistribution = ({ leadSources, isLoading }) => {
 
   if (!leadSources || leadSources.length === 0) {
     return (
-      <div className="h-80 flex items-center justify-center">
+      <div className="h-56 flex items-center justify-center">
         <p className="text-gray-500">No lead data available</p>
       </div>
     );
@@ -369,7 +369,20 @@ const LeadDistribution = ({ leadSources, isLoading }) => {
 
   return (
     <>
-      <div className="h-80">
+      <div className="mb-2 flex flex-wrap justify-center gap-2">
+        {leadSources.map((source, index) => (
+          <div key={index} className="flex items-center">
+            <div
+              className="w-3 h-3 rounded-full mr-2"
+              style={{ backgroundColor: COLORS[index % COLORS.length] }}
+            />
+            <span className="text-xs text-gray-600">
+              {source.name}: {source.value}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="h-48">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -378,7 +391,7 @@ const LeadDistribution = ({ leadSources, isLoading }) => {
               cy="50%"
               labelLine={false}
               label={renderCustomizedLabel}
-              outerRadius={80}
+              outerRadius={70}
               fill="#8884d8"
               dataKey="value"
             >
@@ -392,19 +405,6 @@ const LeadDistribution = ({ leadSources, isLoading }) => {
             <Tooltip />
           </PieChart>
         </ResponsiveContainer>
-      </div>
-      <div className="mt-4 flex flex-wrap justify-center gap-2">
-        {leadSources.map((source, index) => (
-          <div key={index} className="flex items-center">
-            <div
-              className="w-3 h-3 rounded-full mr-2"
-              style={{ backgroundColor: COLORS[index % COLORS.length] }}
-            />
-            <span className="text-xs text-gray-600">
-              {source.name}: {source.value}
-            </span>
-          </div>
-        ))}
       </div>
     </>
   );
@@ -481,12 +481,13 @@ CustomTooltip.defaultProps = {
 const SalesDashboard = ({ filters }) => {
   const userDropdownRef = useRef(null);
   const filterDropdownRef = useRef(null);
+  const yearDropdownRef = useRef(null);
 
   const [timePeriod, setTimePeriod] = useState("quarter");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isUserFilterOpen, setIsUserFilterOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [dashboardData, setDashboardData] = useState({
     revenue: 0,
     revenuePrevQuarter: 0,
@@ -517,6 +518,7 @@ const SalesDashboard = ({ filters }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalLeads, setModalLeads] = useState([]);
   const [modalMember, setModalMember] = useState(null);
+  const [isYearDropdownOpen, setIsYearDropdownOpen] = useState(false);
 
   const getCurrentQuarter = () => {
     const now = new Date();
@@ -527,9 +529,8 @@ const SalesDashboard = ({ filters }) => {
     return "Q4 (Jan-Mar)";
   };
 
-  const getDateRange = (period) => {
+  const getDateRange = (period, year = selectedYear) => {
     const now = new Date();
-    const year = now.getFullYear();
     const month = now.getMonth();
     const day = now.getDate();
 
@@ -575,7 +576,7 @@ const SalesDashboard = ({ filters }) => {
         break;
 
       default:
-        return getDateRange("quarter");
+        return getDateRange("quarter", year);
     }
 
     return { start, end };
@@ -599,23 +600,25 @@ const SalesDashboard = ({ filters }) => {
         break;
 
       case "quarter":
-        const quarterMonth = start.getMonth();
-        if (quarterMonth >= 0 && quarterMonth <= 2) {
-          // Q4 -> Q1
-          newStart = new Date(start.getFullYear(), 3, 1);
-          newEnd = new Date(start.getFullYear(), 5, 30);
-        } else if (quarterMonth >= 3 && quarterMonth <= 5) {
-          // Q1 -> Q2
-          newStart = new Date(start.getFullYear(), 6, 1);
-          newEnd = new Date(start.getFullYear(), 8, 30);
-        } else if (quarterMonth >= 6 && quarterMonth <= 8) {
-          // Q2 -> Q3
-          newStart = new Date(start.getFullYear(), 9, 1);
-          newEnd = new Date(start.getFullYear(), 11, 31);
-        } else {
-          // Q3 -> Q4
-          newStart = new Date(start.getFullYear() + 1, 0, 1);
-          newEnd = new Date(start.getFullYear() + 1, 2, 31);
+        {
+          const quarterMonth = start.getMonth();
+          if (quarterMonth >= 0 && quarterMonth <= 2) {
+            // Q4 -> Q1
+            newStart = new Date(start.getFullYear(), 3, 1);
+            newEnd = new Date(start.getFullYear(), 5, 30);
+          } else if (quarterMonth >= 3 && quarterMonth <= 5) {
+            // Q1 -> Q2
+            newStart = new Date(start.getFullYear(), 6, 1);
+            newEnd = new Date(start.getFullYear(), 8, 30);
+          } else if (quarterMonth >= 6 && quarterMonth <= 8) {
+            // Q2 -> Q3
+            newStart = new Date(start.getFullYear(), 9, 1);
+            newEnd = new Date(start.getFullYear(), 11, 31);
+          } else {
+            // Q3 -> Q4
+            newStart = new Date(start.getFullYear() + 1, 0, 1);
+            newEnd = new Date(start.getFullYear() + 1, 2, 31);
+          }
         }
         break;
 
@@ -625,7 +628,7 @@ const SalesDashboard = ({ filters }) => {
         break;
 
       default:
-        return getDateRange(period);
+        return getDateRange(period, selectedYear);
     }
 
     return { start: newStart, end: newEnd };
@@ -649,19 +652,21 @@ const SalesDashboard = ({ filters }) => {
         break;
 
       case "quarter":
-        const quarterMonth = start.getMonth();
-        if (quarterMonth >= 0 && quarterMonth <= 2) {
-          newStart = new Date(start.getFullYear() - 1, 9, 1);
-          newEnd = new Date(start.getFullYear() - 1, 11, 31);
-        } else if (quarterMonth >= 3 && quarterMonth <= 5) {
-          newStart = new Date(start.getFullYear(), 0, 1);
-          newEnd = new Date(start.getFullYear(), 2, 31);
-        } else if (quarterMonth >= 6 && quarterMonth <= 8) {
-          newStart = new Date(start.getFullYear(), 3, 1);
-          newEnd = new Date(start.getFullYear(), 5, 30);
-        } else {
-          newStart = new Date(start.getFullYear(), 6, 1);
-          newEnd = new Date(start.getFullYear(), 8, 30);
+        {
+          const quarterMonth = start.getMonth();
+          if (quarterMonth >= 0 && quarterMonth <= 2) {
+            newStart = new Date(start.getFullYear() - 1, 9, 1);
+            newEnd = new Date(start.getFullYear() - 1, 11, 31);
+          } else if (quarterMonth >= 3 && quarterMonth <= 5) {
+            newStart = new Date(start.getFullYear(), 0, 1);
+            newEnd = new Date(start.getFullYear(), 2, 31);
+          } else if (quarterMonth >= 6 && quarterMonth <= 8) {
+            newStart = new Date(start.getFullYear(), 3, 1);
+            newEnd = new Date(start.getFullYear(), 5, 30);
+          } else {
+            newStart = new Date(start.getFullYear(), 6, 1);
+            newEnd = new Date(start.getFullYear(), 8, 30);
+          }
         }
         break;
 
@@ -671,39 +676,12 @@ const SalesDashboard = ({ filters }) => {
         break;
 
       default:
-        return getDateRange(period);
+        return getDateRange(period, selectedYear);
     }
 
     return { start: newStart, end: newEnd };
   };
 
-const getPreviousQuarterDateRange = () => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-
-  let start, end;
-
-  if (month >= 3 && month <= 5) {
-    // Apr-Jun, previous is Jan-Mar of current year
-    start = new Date(year, 0, 1);
-    end = new Date(year, 2, 31);
-  } else if (month >= 6 && month <= 8) {
-    // Jul-Sep, previous is Apr-Jun
-    start = new Date(year, 3, 1);
-    end = new Date(year, 5, 30);
-  } else if (month >= 9 && month <= 11) {
-    // Oct-Dec, previous is Jul-Sep
-    start = new Date(year, 6, 1);
-    end = new Date(year, 8, 30);
-  } else {
-    // Jan-Mar, previous is Oct-Dec of previous year
-    start = new Date(year - 1, 9, 1);
-    end = new Date(year - 1, 11, 31);
-  }
-
-  return { start, end };
-};
   const updatePeriodInfo = (range, isCurrentPeriod = true) => {
     const { start, end } = range;
     let info = "";
@@ -723,34 +701,32 @@ const getPreviousQuarterDateRange = () => {
         )} ${start.getFullYear()}`;
         break;
       case "quarter":
-        const month = start.getMonth();
-        let quarter, quarterMonths;
+        {
+          const month = start.getMonth();
+          let quarter, quarterMonths;
 
-        if (month >= 3 && month <= 5) {
-          quarter = "Q1";
-          quarterMonths = "Apr-Jun";
-        } else if (month >= 6 && month <= 8) {
-          quarter = "Q2";
-          quarterMonths = "Jul-Sep";
-        } else if (month >= 9 && month <= 11) {
-          quarter = "Q3";
-          quarterMonths = "Oct-Dec";
-        } else {
-          quarter = "Q4";
-          quarterMonths = "Jan-Mar";
+          if (month >= 3 && month <= 5) {
+            quarter = "Q1";
+            quarterMonths = "Apr-Jun";
+          } else if (month >= 6 && month <= 8) {
+            quarter = "Q2";
+            quarterMonths = "Jul-Sep";
+          } else if (month >= 9 && month <= 11) {
+            quarter = "Q3";
+            quarterMonths = "Oct-Dec";
+          } else {
+            quarter = "Q4";
+            quarterMonths = "Jan-Mar";
+          }
+
+          info = `${quarter} (${quarterMonths}) ${start.getFullYear()}`;
         }
-
-        info = `${
-          isCurrent ? "Current " : ""
-        }Quarter: ${quarter} (${quarterMonths}) ${start.getFullYear()}`;
         break;
       case "year":
-        info = `${
-          isCurrent ? "Current " : ""
-        }Fiscal Year: ${start.getFullYear()}-${end.getFullYear()}`;
+        info = `Fiscal Year: ${start.getFullYear()}-${end.getFullYear()}`;
         break;
       default:
-        info = `${isCurrent ? "Current " : ""}Quarter: ${getCurrentQuarter()}`;
+        info = `${getCurrentQuarter()}`;
     }
 
     setCurrentPeriodInfo(info);
@@ -847,16 +823,16 @@ if (selectedUserId) {
         leadCategories.Others++;
       }
 
-      if (lead.studentCount != null && lead.courses?.[0]?.courseType) {
+      if (lead.courses?.[0]?.studentCount != null && lead.courses?.[0]?.courseType) {
         const courseType = lead.courses[0].courseType;
         if (courseType.includes("Engineering")) {
-          studentCategories.Engineering += Number(lead.studentCount) || 0;
+          studentCategories.Engineering += Number(lead.courses?.[0]?.studentCount) || 0;
         } else if (courseType.includes("MBA")) {
-          studentCategories.MBA += Number(lead.studentCount) || 0;
+          studentCategories.MBA += Number(lead.courses?.[0]?.studentCount) || 0;
         } else if (courseType.includes("MCA")) {
-          studentCategories.MCA += Number(lead.studentCount) || 0;
+          studentCategories.MCA += Number(lead.courses?.[0]?.studentCount) || 0;
         } else {
-          studentCategories.Others += Number(lead.studentCount) || 0;
+          studentCategories.Others += Number(lead.courses?.[0]?.studentCount) || 0;
         }
       }
 
@@ -963,7 +939,7 @@ if (lead.assignedTo && lead.assignedTo.uid) {
             role: lead.assignedTo.role || "Sales Rep",
           };
         }
-        teamPerformance[memberId].value += lead.studentCount || 0;
+        teamPerformance[memberId].value += 1; // Count of leads
       }
 
       let createdDate = new Date(lead.createdAt);
@@ -1094,7 +1070,7 @@ if (lead.assignedTo && lead.assignedTo.uid) {
   };
 
   const fetchAllUsers = async () => {
-    setIsLoadingUsers(true);
+    setIsLoading(true);
     
     try {
       const usersRef = collection(db, "users");
@@ -1124,7 +1100,7 @@ if (lead.assignedTo && lead.assignedTo.uid) {
       console.error("Error fetching users:", error.message);
       setUsers([]);
     } finally {
-      setIsLoadingUsers(false);
+      setIsLoading(false);
     }
   };
 
@@ -1202,7 +1178,7 @@ if (lead.assignedTo && lead.assignedTo.uid) {
   };
 
   const handleRefresh = () => {
-    const newRange = getDateRange(timePeriod);
+    const newRange = getDateRange(timePeriod, selectedYear);
     setCurrentDateRange(newRange);
     updatePeriodInfo(newRange);
     fetchDataForRange(newRange);
@@ -1211,19 +1187,21 @@ if (lead.assignedTo && lead.assignedTo.uid) {
   // WITH THIS:
   useEffect(() => {
     fetchAllUsers(); // Changed function name here
-    const initialRange = getDateRange(timePeriod);
+    const initialRange = getDateRange(timePeriod, selectedYear);
     setCurrentDateRange(initialRange);
     updatePeriodInfo(initialRange);
     fetchDataForRange(initialRange);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (users.length === 0) return; // wait for users
-    const newRange = getDateRange(timePeriod);
+    const newRange = getDateRange(timePeriod, selectedYear);
     setCurrentDateRange(newRange);
     updatePeriodInfo(newRange);
     fetchDataForRange(newRange);
-  }, [timePeriod, selectedUserId, users, filters]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timePeriod, selectedUserId, users, filters, selectedYear]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -1239,6 +1217,13 @@ if (lead.assignedTo && lead.assignedTo.uid) {
         !filterDropdownRef.current.contains(event.target)
       ) {
         setIsFilterOpen(false);
+      }
+
+      if (
+        yearDropdownRef.current &&
+        !yearDropdownRef.current.contains(event.target)
+      ) {
+        setIsYearDropdownOpen(false);
       }
     };
 
@@ -1263,13 +1248,21 @@ if (lead.assignedTo && lead.assignedTo.uid) {
 
     try {
       const leadsRef = collection(db, "leads");
-      const user = users.find((u) => u.name === member.name);
+      const user = users.find((u) => u.name.toLowerCase().trim() === member.name.toLowerCase().trim());
       if (!user) return;
       const leadsQuery = query(leadsRef, where("assignedTo.uid", "==", user.uid));
       const snapshot = await getDocs(leadsQuery);
-      const leads = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      let leads = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
+      // Filter by the current date range (selected year) like the dashboard does
+      leads = leads.filter(lead => {
+        if (!lead.createdAt) return true; // Include if missing createdAt
+        const created = new Date(lead.createdAt);
+        return created >= currentDateRange.start && created <= currentDateRange.end;
+      });
+
       setModalLeads(leads);
-    } catch (e) {
+    } catch {
       setModalLeads([]);
     }
   };
@@ -1309,6 +1302,54 @@ if (lead.assignedTo && lead.assignedTo.uid) {
           </div>
 
           <div className="flex items-center space-x-3 mt-4 md:mt-0">
+            {/* Year Selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-gray-700">Year:</span>
+              <div className="relative year-dropdown" ref={yearDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsYearDropdownOpen(!isYearDropdownOpen)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500 flex items-center gap-2"
+                >
+                  <span>{selectedYear}</span>
+                  {isYearDropdownOpen ? (
+                    <FiChevronUp className="text-gray-500 h-4 w-4" />
+                  ) : (
+                    <FiChevronDown className="text-gray-500 h-4 w-4" />
+                  )}
+                </button>
+
+                {isYearDropdownOpen && (
+                  <div className="absolute top-full mt-1 w-full bg-white rounded-lg shadow-lg border border-gray-200 z-10 max-h-48 overflow-y-auto">
+                    {Array.from({ length: 10 }, (_, i) => {
+                      const year = new Date().getFullYear() - 5 + i;
+                      const currentYear = new Date().getFullYear();
+                      return (
+                        <button
+                          key={year}
+                          type="button"
+                          onClick={() => {
+                            setSelectedYear(year);
+                            setIsYearDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors flex items-center gap-2 ${
+                            selectedYear === year ? 'text-indigo-600 font-medium' : 'text-gray-700'
+                          }`}
+                        >
+                          {year === currentYear && (
+                            <span className="text-blue-500 text-xs">●</span>
+                          )}
+                          <span className={year === currentYear ? 'ml-0' : 'ml-4'}>
+                            {year}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="relative" ref={userDropdownRef}>
               <button
                 type="button"
@@ -1585,7 +1626,7 @@ if (lead.assignedTo && lead.assignedTo.uid) {
                       tickFormatter={(value) => {
                         // For quarter/year, show month and year for clarity
                         if (timePeriod === "quarter" || timePeriod === "year") {
-                          return `${value} ${new Date().getFullYear()}`;
+                          return `${value} ${selectedYear}`;
                         }
                         return value;
                       }}
@@ -1612,7 +1653,7 @@ if (lead.assignedTo && lead.assignedTo.uid) {
             </div>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 min-w-0">
-            <div className="bg-white p-3 md:p-5 rounded-xl border border-gray-200 shadow-sm min-w-0">
+            <div className="bg-white p-2 md:p-3 rounded-xl border border-gray-200 shadow-sm min-w-0">
               <h3 className="text-md font-semibold text-gray-800 mb-3">
                 Lead Distribution
               </h3>
@@ -1621,7 +1662,7 @@ if (lead.assignedTo && lead.assignedTo.uid) {
                 isLoading={isLoading}
               />
             </div>
-            <div className="bg-white p-3 md:p-5 rounded-xl border border-gray-200 shadow-sm min-w-0">
+            <div className="bg-white p-2 md:p-3 rounded-xl border border-gray-200 shadow-sm min-w-0">
               <h3 className="text-md font-semibold text-gray-800 mb-3">
                 Education Distribution
               </h3>
@@ -1630,7 +1671,7 @@ if (lead.assignedTo && lead.assignedTo.uid) {
                 isLoading={isLoading}
               />
             </div>
-            <div className="bg-white p-3 md:p-5 rounded-xl border border-gray-200 shadow-sm min-w-0">
+            <div className="bg-white p-2 md:p-3 rounded-xl border border-gray-200 shadow-sm min-w-0">
               <h3 className="text-md font-semibold text-gray-800 mb-3">
                 Student Distribution
               </h3>
@@ -1647,7 +1688,7 @@ if (lead.assignedTo && lead.assignedTo.uid) {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 min-w-0">
             <div className="bg-white p-3 md:p-5 rounded-xl border border-gray-200 shadow-sm lg:col-span-2 min-w-0">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                {selectedUserId ? "Your Performance" : "Team Performance"}
+                {selectedUserId ? "Individual Pipeline" : "Sales Team Pipeline"}
               </h2>
               <TeamPerformance
                 teamPerformance={dashboardData.teamPerformance}
@@ -1667,6 +1708,9 @@ if (lead.assignedTo && lead.assignedTo.uid) {
             </div>
           </div>
         </div>
+
+
+
         {/* Modal for showing leads */}
       <ReactModal
   isOpen={isModalOpen}

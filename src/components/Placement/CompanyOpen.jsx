@@ -347,8 +347,6 @@ const fetchStudents = async () => {
     setStudentDataError(null);
 
     const collegeAbbr = getCollegeAbbreviation(selectedCompany.college);
-    console.log("[DEBUG] selectedCompany =", selectedCompany);
-    console.log("[DEBUG] collegeAbbr =", collegeAbbr);
 
     // Yahan full trainingForms collection fetch kar rahe hain
     const trainingFormsSnapshot = await getDocs(collection(db, "trainingForms"));
@@ -360,7 +358,6 @@ const fetchStudents = async () => {
 
       // Sirf wahi document consider karo jisme collegeAbbr match karta ho
       if (docId.startsWith(collegeAbbr)) {
-        console.log("[DEBUG] Matching docId found:", docId);
 
         const studentsRef = collection(doc(db, "trainingForms", docId), "students");
         const studentsSnapshot = await getDocs(studentsRef);
@@ -374,7 +371,6 @@ const fetchStudents = async () => {
       }
     }
 
-    console.log("[DEBUG] Total students fetched:", allStudents.length);
     setStudents(allStudents);
 
     if (allStudents.length === 0) {
@@ -385,7 +381,6 @@ const fetchStudents = async () => {
     setStudentDataError("Failed to load student data. Please try again.");
   } finally {
     setLoadingStudents(false);
-    console.log("[DEBUG] Done fetching students.");
   }
 };
 
