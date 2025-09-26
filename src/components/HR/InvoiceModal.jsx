@@ -1,97 +1,87 @@
-// components/InvoiceModal.js
 import React from "react";
 
-const InvoiceModal = ({ invoice, onClose, onRegister,isViewOnly }) => {
+const InvoiceModal = ({ invoice, onClose, onRegister, isViewOnly }) => {
   if (!invoice) return null;
 
-    const getInvoiceTypeDisplay = () => {
+  // Temporary debug - yeh add karo
+  // console.log("Invoice data:", invoice);
+  // console.log("Raised date raw:", invoice.raisedDate);
+  // console.log("Raised date formatted:", formatDate(invoice.raisedDate));
+
+  const getInvoiceTypeDisplay = () => {
     if (invoice.invoiceType) {
       return invoice.invoiceType;
     }
-    return invoice.type || "Tax Invoice"; // fallback
+    return invoice.type || "Tax Invoice";
   };
 
   const getInvoiceNumberDisplay = () => {
     return invoice.invoiceNumber || "N/A";
   };
-  // Amount ko words mein convert karne ka function
-  const convertAmountToWords = (amount) => {
-    if (!amount) return "Rupees Zero Only";
 
-    const a = [
-      "",
-      "One ",
-      "Two ",
-      "Three ",
-      "Four ",
-      "Five ",
-      "Six ",
-      "Seven ",
-      "Eight ",
-      "Nine ",
-      "Ten ",
-      "Eleven ",
-      "Twelve ",
-      "Thirteen ",
-      "Fourteen ",
-      "Fifteen ",
-      "Sixteen ",
-      "Seventeen ",
-      "Eighteen ",
-      "Nineteen ",
-    ];
-    const b = [
-      "",
-      "",
-      "Twenty",
-      "Thirty",
-      "Forty",
-      "Fifty",
-      "Sixty",
-      "Seventy",
-      "Eighty",
-      "Ninety",
-    ];
-
-    const num = parseInt(amount);
-    if (isNaN(num)) return "Invalid Amount";
-
-    if (num === 0) return "Zero Rupees Only";
-
-    const convert = (n) => {
-      if (n < 20) return a[n];
-      if (n < 100) return b[Math.floor(n / 10)] + " " + a[n % 10];
-      if (n < 1000)
-        return a[Math.floor(n / 100)] + "Hundred " + convert(n % 100);
-      if (n < 100000)
-        return convert(Math.floor(n / 1000)) + "Thousand " + convert(n % 1000);
-      if (n < 10000000)
-        return convert(Math.floor(n / 100000)) + "Lakh " + convert(n % 100000);
-      return (
-        convert(Math.floor(n / 10000000)) + "Crore " + convert(n % 10000000)
-      );
-    };
-
-    return "Rupees " + convert(num).trim() + " Only";
-  };
-
-  // Payment details se amounts nikalna
+  // ✅ Missing function add karo - Payment details se amounts nikalna
   const getPaymentAmounts = () => {
     if (!invoice.paymentDetails || invoice.paymentDetails.length === 0) {
       return {
-        baseAmount: invoice.amount || 0,
-        gstAmount: 0,
-        totalAmount: invoice.amount || 0,
+        baseAmount: invoice.amount || invoice.netPayableAmount || invoice.amountRaised || 0,
+        gstAmount: invoice.gstAmount || 0,
+        totalAmount: invoice.amount || invoice.netPayableAmount || invoice.amountRaised || 0,
       };
     }
 
     // Pehla payment detail use karna (Advance wala)
     const payment = invoice.paymentDetails[0];
     return {
-      baseAmount: payment.baseAmount || 0,
-      gstAmount: payment.gstAmount || 0,
-      totalAmount: payment.totalAmount || 0,
+      baseAmount: payment.baseAmount || payment.totalAmount || 0,
+      gstAmount: payment.gstAmount || invoice.gstAmount || 0,
+      totalAmount: payment.totalAmount || invoice.netPayableAmount || invoice.amountRaised || 0,
     };
+  };
+
+  // ✅ Date format karne ka function
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    
+    try {
+      const date = dateString.toDate ? dateString.toDate() : new Date(dateString);
+      return date.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    } catch (error) {
+      console.error("Date formatting error:", error);
+      return "Invalid Date";
+    }
+  };
+
+  // Amount ko words mein convert karne ka function
+  const convertAmountToWords = (amount) => {
+    if (!amount) return "Rupees Zero Only";
+
+    const a = [
+      "", "One ", "Two ", "Three ", "Four ", "Five ", "Six ", "Seven ", "Eight ", "Nine ", "Ten ",
+      "Eleven ", "Twelve ", "Thirteen ", "Fourteen ", "Fifteen ", "Sixteen ", "Seventeen ", 
+      "Eighteen ", "Nineteen "
+    ];
+    const b = [
+      "", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"
+    ];
+
+    const num = parseInt(amount);
+    if (isNaN(num)) return "Invalid Amount";
+    if (num === 0) return "Zero Rupees Only";
+
+    const convert = (n) => {
+      if (n < 20) return a[n];
+      if (n < 100) return b[Math.floor(n / 10)] + " " + a[n % 10];
+      if (n < 1000) return a[Math.floor(n / 100)] + "Hundred " + convert(n % 100);
+      if (n < 100000) return convert(Math.floor(n / 1000)) + "Thousand " + convert(n % 1000);
+      if (n < 10000000) return convert(Math.floor(n / 100000)) + "Lakh " + convert(n % 100000);
+      return convert(Math.floor(n / 10000000)) + "Crore " + convert(n % 10000000);
+    };
+
+    return "Rupees " + convert(num).trim() + " Only";
   };
 
   const amounts = getPaymentAmounts();
@@ -102,13 +92,34 @@ const InvoiceModal = ({ invoice, onClose, onRegister,isViewOnly }) => {
       <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           {/* Header */}
-         <div className="flex justify-between items-start mb-6 border-b pb-4">
+          <div className="flex justify-between items-start mb-6 border-b pb-4">
             <div>
               <h3 className="text-2xl font-bold text-gray-800">Invoice</h3>
               <p className="text-gray-600 mt-1">
                 College: {invoice.collegeName || "N/A"} | 
                 Project: {invoice.projectCode || "N/A"}
               </p>
+              {/* Invoice Date Display */}
+              <div className="mt-2">
+                <span className="text-sm font-semibold text-gray-700">
+                  Invoice Date: 
+                </span>
+                <span className="text-sm text-gray-600 ml-2">
+                  {formatDate(invoice.raisedDate || invoice.createdAt)}
+                </span>
+                
+                {/* Due Date agar hai to */}
+                {invoice.dueDate && (
+                  <>
+                    <span className="text-sm font-semibold text-gray-700 ml-4">
+                      Due Date: 
+                    </span>
+                    <span className="text-sm text-red-600 ml-2">
+                      {formatDate(invoice.dueDate)}
+                    </span>
+                  </>
+                )}
+              </div>
             </div>
             <div className="text-right">
               <div className="bg-blue-100 px-3 py-2 rounded-lg">
@@ -125,6 +136,16 @@ const InvoiceModal = ({ invoice, onClose, onRegister,isViewOnly }) => {
                 </p>
               )}
               
+              {/* Approval Status Display */}
+              {invoice.approvalStatus && (
+                <div className={`mt-1 text-xs font-semibold px-2 py-1 rounded ${
+                  invoice.approvalStatus === 'approved' ? 'bg-green-100 text-green-800' :
+                  invoice.approvalStatus === 'cancelled' ? 'bg-red-100 text-red-800' :
+                  'bg-yellow-100 text-yellow-800'
+                }`}>
+                  {invoice.approvalStatus.toUpperCase()}
+                </div>
+              )}
             </div>
           </div>
 
@@ -301,31 +322,20 @@ const InvoiceModal = ({ invoice, onClose, onRegister,isViewOnly }) => {
           </div>
 
           {/* Action Buttons */}
-       <div className="flex justify-end space-x-3 mt-6 pt-4 border-t">
-    {!isViewOnly && !invoice.registered && (
-      <button
-        onClick={() => {
-          onRegister(invoice);
-          onClose();
-        }}
-        className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 font-semibold"
-      >
-        Register Invoice
-      </button>
-    )}
-    <button
-      onClick={() => window.print()}
-      className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 font-semibold"
-    >
-      Print/Download
-    </button>
-    <button
-      onClick={onClose}
-      className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 font-semibold"
-    >
-      Close
-    </button>
-  </div>
+          <div className="flex justify-end space-x-3 mt-6 pt-4 border-t">
+            <button
+              onClick={() => window.print()}
+              className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 font-semibold"
+            >
+              Print/Download
+            </button>
+            <button
+              onClick={onClose}
+              className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 font-semibold"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </div>
