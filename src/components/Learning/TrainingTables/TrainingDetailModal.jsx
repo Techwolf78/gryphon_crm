@@ -1,8 +1,7 @@
 import React, { useRef, useEffect } from "react";
-import { FaTimes, FaCalendarAlt, FaFileExcel, FaFilePdf, FaMapMarkerAlt } from "react-icons/fa";
+import { FaTimes, FaCalendarAlt, FaFileExcel, FaFilePdf, FaMapMarkerAlt, FaRupeeSign } from "react-icons/fa";
 import { IoIosSchool, IoMdBusiness } from "react-icons/io";
 import { MdPayment, MdPeople, MdEmail, MdPhone } from "react-icons/md";
-import { RiMoneyDollarCircleLine } from "react-icons/ri";
 
 const TrainingDetailModal = ({ training, onClose }) => {
   const modalRef = useRef();
@@ -208,8 +207,8 @@ const TrainingDetailModal = ({ training, onClose }) => {
           {/* 4. Financials */}
           <ModernSection
             title="Financial Information"
-            icon={<RiMoneyDollarCircleLine className="text-amber-500" />}
-            badge={formatCurrency(training?.totalCost)}
+            icon={<FaRupeeSign className="text-amber-500" />}
+            badge={formatCurrency(training?.netPayableAmount || training?.totalCost)}
             className="bg-gradient-to-br from-amber-50 to-amber-50/70"
           >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -224,8 +223,18 @@ const TrainingDetailModal = ({ training, onClose }) => {
                 iconColor="text-amber-400"
               />
               <DetailCard
-                label="Total Amount"
+                label="Base Amount (excl. GST)"
                 value={formatCurrency(training?.totalCost)}
+                iconColor="text-amber-400"
+              />
+              <DetailCard
+                label="GST Amount (18%)"
+                value={formatCurrency(training?.gstAmount || 0)}
+                iconColor="text-amber-400"
+              />
+              <DetailCard
+                label="Net Payable Amount"
+                value={formatCurrency(training?.netPayableAmount || training?.totalCost)}
                 highlight
                 iconColor="text-amber-400"
               />

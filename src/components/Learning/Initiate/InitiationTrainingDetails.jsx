@@ -377,7 +377,7 @@ function InitiationTrainingDetails({ training, onBack }) {
       <div className="w-full mx-auto bg-white rounded-xl shadow border border-gray-200 p-4 mb-6">
         <h2 className="text-2xl font-bold text-indigo-800 mb-2">
           {trainingData?.collegeName}{" "}
-          <span className="text-gray-400">({trainingData?.collegeCode})</span>
+          <span className="text-gray-400">({trainingData?.projectCode})</span>
         </h2>
         
         <div className="mb-4 text-gray-700">
@@ -401,11 +401,45 @@ function InitiationTrainingDetails({ training, onBack }) {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
             <div>
               <span className="text-gray-500">Total Students:</span>
-              <div className="font-medium">{trainingData?.studentCount || 0}</div>
+              <div className="font-medium">{(() => {
+                // Calculate total students from all batches across all domains
+                let totalStudents = 0;
+                domainsData.forEach(domain => {
+                  if (Array.isArray(domain.table1Data)) {
+                    domain.table1Data.forEach(row => {
+                      if (row.batches && Array.isArray(row.batches)) {
+                        row.batches.forEach(batch => {
+                          totalStudents += Number(batch.batchPerStdCount || 0);
+                        });
+                      }
+                    });
+                  }
+                });
+                return totalStudents;
+              })()}</div>
             </div>
             <div>
               <span className="text-gray-500">Total Hours:</span>
-              <div className="font-medium">{trainingData?.totalHours || 0}</div>
+              <div className="font-medium">{(() => {
+                // Calculate total assigned hours from all trainers across all domains
+                let totalAssignedHours = 0;
+                domainsData.forEach(domain => {
+                  if (Array.isArray(domain.table1Data)) {
+                    domain.table1Data.forEach(row => {
+                      if (row.batches && Array.isArray(row.batches)) {
+                        row.batches.forEach(batch => {
+                          if (batch.trainers && Array.isArray(batch.trainers)) {
+                            batch.trainers.forEach(trainer => {
+                              totalAssignedHours += Number(trainer.assignedHours || 0);
+                            });
+                          }
+                        });
+                      }
+                    });
+                  }
+                });
+                return totalAssignedHours;
+              })()}</div>
             </div>
             <div>
               <span className="text-gray-500">College Timing:</span>

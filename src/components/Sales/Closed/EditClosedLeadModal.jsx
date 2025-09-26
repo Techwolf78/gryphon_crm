@@ -182,7 +182,7 @@ const numValue = (val) => (val === 0 || val === "0" ? "" : val);
         paymentType: lead.paymentType || "",
         paymentDetails: lead.paymentDetails || [],
         collegeCode: lead.collegeCode || "",
-        collegeName: lead.businessName || "", // Use businessName as collegeName
+        collegeName: lead.collegeName || lead.businessName || "", // Check collegeName first, then businessName
         address: lead.address || "",
         pincode: lead.pincode || "",
         status: lead.status || "active",
@@ -222,33 +222,26 @@ const numValue = (val) => (val === 0 || val === "0" ? "" : val);
       (sum, course) => sum + (parseInt(course.students) || 0),
       0
     );
-    const totalAmount = (formData.perStudentCost || 0) * totalStudents;
+    const baseAmount = (formData.perStudentCost || 0) * totalStudents;
+    const gstAmount = formData.gstType === "include" ? baseAmount * 0.18 : 0;
+    const netPayableAmount = baseAmount + gstAmount;
 
     const newFormData = {
       ...formData,
       courses: updatedCourses,
       studentCount: totalStudents,
-      netPayableAmount: totalAmount,
-      totalCost: totalAmount,
+      totalCost: baseAmount,
+      gstAmount,
+      netPayableAmount,
     };
 
     // Update payment details to match new total
-    newFormData.paymentDetails = formData.paymentDetails.map((payment) => {
-      const paymentAmount = totalAmount * ((payment.percentage || 0) / 100);
-      const gstRate = formData.gstType === "include" ? 0.18 : 0;
-      const baseAmount =
-        formData.gstType === "include"
-          ? paymentAmount / (1 + gstRate)
-          : paymentAmount;
-      const gstAmount = baseAmount * gstRate;
-
-      return {
-        ...payment,
-        totalAmount: paymentAmount,
-        baseAmount: baseAmount,
-        gstAmount: gstAmount,
-      };
-    });
+    newFormData.paymentDetails = formData.paymentDetails.map((payment) => ({
+      ...payment,
+      baseAmount: (parseFloat(payment.percentage) / 100) * baseAmount,
+      gstAmount: formData.gstType === "include" ? (parseFloat(payment.percentage) / 100) * gstAmount : 0,
+      totalAmount: (parseFloat(payment.percentage) / 100) * netPayableAmount,
+    }));
 
     setFormData(newFormData);
   };
@@ -303,31 +296,24 @@ const numValue = (val) => (val === 0 || val === "0" ? "" : val);
         (sum, course) => sum + (parseInt(course.students) || 0),
         0
       );
-      const totalAmount = (prev.perStudentCost || 0) * totalStudents;
+      const baseAmount = (prev.perStudentCost || 0) * totalStudents;
+      const gstAmount = prev.gstType === "include" ? baseAmount * 0.18 : 0;
+      const netPayableAmount = baseAmount + gstAmount;
       
       return {
         ...prev,
         courses: updatedCourses,
         studentCount: totalStudents,
-        netPayableAmount: totalAmount,
-        totalCost: totalAmount,
+        totalCost: baseAmount,
+        gstAmount,
+        netPayableAmount,
         // Update payment details to match new total
-        paymentDetails: prev.paymentDetails.map((payment) => {
-          const paymentAmount = totalAmount * ((payment.percentage || 0) / 100);
-          const gstRate = prev.gstType === "include" ? 0.18 : 0;
-          const baseAmount =
-            prev.gstType === "include"
-              ? paymentAmount / (1 + gstRate)
-              : paymentAmount;
-          const gstAmount = baseAmount * gstRate;
-
-          return {
-            ...payment,
-            totalAmount: paymentAmount,
-            baseAmount: baseAmount,
-            gstAmount: gstAmount,
-          };
-        }),
+        paymentDetails: prev.paymentDetails.map((payment) => ({
+          ...payment,
+          baseAmount: (parseFloat(payment.percentage) / 100) * baseAmount,
+          gstAmount: prev.gstType === "include" ? (parseFloat(payment.percentage) / 100) * gstAmount : 0,
+          totalAmount: (parseFloat(payment.percentage) / 100) * netPayableAmount,
+        })),
       };
     });
   };
@@ -350,31 +336,24 @@ const numValue = (val) => (val === 0 || val === "0" ? "" : val);
       (sum, course) => sum + (parseInt(course.students) || 0),
       0
     );
-    const totalAmount = (formData.perStudentCost || 0) * totalStudents;
+    const baseAmount = (formData.perStudentCost || 0) * totalStudents;
+    const gstAmount = formData.gstType === "include" ? baseAmount * 0.18 : 0;
+    const netPayableAmount = baseAmount + gstAmount;
     
     setFormData((prev) => ({
       ...prev,
       courses: updatedCourses,
       studentCount: totalStudents,
-      netPayableAmount: totalAmount,
-      totalCost: totalAmount,
+      totalCost: baseAmount,
+      gstAmount,
+      netPayableAmount,
       // Update payment details to match new total
-      paymentDetails: prev.paymentDetails.map((payment) => {
-        const paymentAmount = totalAmount * ((payment.percentage || 0) / 100);
-        const gstRate = prev.gstType === "include" ? 0.18 : 0;
-        const baseAmount =
-          prev.gstType === "include"
-            ? paymentAmount / (1 + gstRate)
-            : paymentAmount;
-        const gstAmount = baseAmount * gstRate;
-
-        return {
-          ...payment,
-          totalAmount: paymentAmount,
-          baseAmount: baseAmount,
-          gstAmount: gstAmount,
-        };
-      }),
+      paymentDetails: prev.paymentDetails.map((payment) => ({
+        ...payment,
+        baseAmount: (parseFloat(payment.percentage) / 100) * baseAmount,
+        gstAmount: formData.gstType === "include" ? (parseFloat(payment.percentage) / 100) * gstAmount : 0,
+        totalAmount: (parseFloat(payment.percentage) / 100) * netPayableAmount,
+      })),
     }));
   };
 
@@ -403,7 +382,7 @@ const numValue = (val) => (val === 0 || val === "0" ? "" : val);
 
     try {
       // Validate required fields
-      if (!formData.businessName || formData.businessName.trim() === "") {
+      if (!formData.collegeName || formData.collegeName.trim() === "") {
         setError("College Name is required. Please enter a college name before submitting.");
         return;
       }
@@ -421,6 +400,8 @@ const numValue = (val) => (val === 0 || val === "0" ? "" : val);
       const updatedData = {
         ...formData,
         courses: coursesForSave,
+        collegeName: formData.collegeName,
+        businessName: formData.collegeName, // Sync both fields
         updatedAt: new Date(),
       };
 
@@ -440,6 +421,8 @@ const numValue = (val) => (val === 0 || val === "0" ? "" : val);
           ...originalData,
           ...updatedData,
           projectCode: newProjectCode,
+          collegeName: formData.collegeName,
+          businessName: formData.collegeName, // Sync both fields
         };
 
         // Delete old document in trainingForms
@@ -463,7 +446,7 @@ const numValue = (val) => (val === 0 || val === "0" ? "" : val);
         const leadsQuery = query(collection(db, "leads"), where("projectCode", "==", originalProjectCode));
         const leadsSnapshot = await getDocs(leadsQuery);
         leadsSnapshot.forEach(async (docSnap) => {
-          await updateDoc(docSnap.ref, { projectCode: newProjectCode, businessName: formData.businessName, totalCost: formData.totalCost, updatedAt: new Date() });
+          await updateDoc(docSnap.ref, { projectCode: newProjectCode, collegeName: formData.collegeName, businessName: formData.collegeName, totalCost: formData.totalCost, updatedAt: new Date() });
         });
       } else {
         // Normal update if Project Code didn't change
@@ -492,7 +475,7 @@ const numValue = (val) => (val === 0 || val === "0" ? "" : val);
         const leadsQuery = query(collection(db, "leads"), where("projectCode", "==", newProjectCode));
         const leadsSnapshot = await getDocs(leadsQuery);
         leadsSnapshot.forEach(async (docSnap) => {
-          await updateDoc(docSnap.ref, { businessName: formData.businessName, totalCost: formData.totalCost, updatedAt: new Date() });
+          await updateDoc(docSnap.ref, { collegeName: formData.collegeName, businessName: formData.collegeName, totalCost: formData.totalCost, updatedAt: new Date() });
         });
       }
 
@@ -638,8 +621,8 @@ const handleChange = (e) => {
                     <div className="relative">
                       <input
                         type="text"
-                        name="businessName"
-                        value={formData.businessName}
+                        name="collegeName"
+                        value={formData.collegeName || formData.businessName}
                         onChange={handleChange}
                         className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
                         placeholder="College Name"
@@ -815,35 +798,22 @@ const handleChange = (e) => {
                             parseFloat(e.target.value) || 0;
                           const totalStudents = formData.studentCount || 0;
                           const baseAmount = perStudentCost * totalStudents;
-                          const totalAmount = formData.gstType === "include" 
-                            ? baseAmount * 1.18 
-                            : baseAmount;
+                          const gstAmount = formData.gstType === "include" ? baseAmount * 0.18 : 0;
+                          const netPayableAmount = baseAmount + gstAmount;
 
                           setFormData((prev) => ({
                             ...prev,
                             perStudentCost,
-                            netPayableAmount: baseAmount,
-                            totalCost: totalAmount,
+                            totalCost: baseAmount,
+                            gstAmount,
+                            netPayableAmount,
                             paymentDetails: prev.paymentDetails.map(
-                              (payment) => {
-                                const paymentAmount =
-                                  totalAmount *
-                                  ((payment.percentage || 0) / 100);
-                                const gstRate =
-                                  prev.gstType === "include" ? 0.18 : 0;
-                                const baseAmount =
-                                  prev.gstType === "include"
-                                    ? paymentAmount / (1 + gstRate)
-                                    : paymentAmount;
-                                const gstAmount = baseAmount * gstRate;
-
-                                return {
-                                  ...payment,
-                                  totalAmount: paymentAmount,
-                                  baseAmount: baseAmount,
-                                  gstAmount: gstAmount,
-                                };
-                              }
+                              (payment) => ({
+                                ...payment,
+                                baseAmount: (parseFloat(payment.percentage) / 100) * baseAmount,
+                                gstAmount: formData.gstType === "include" ? (parseFloat(payment.percentage) / 100) * gstAmount : 0,
+                                totalAmount: (parseFloat(payment.percentage) / 100) * netPayableAmount,
+                              })
                             ),
                           }));
                         }}
@@ -868,29 +838,21 @@ const handleChange = (e) => {
                           value="include"
                           checked={formData.gstType === "include"}
                           onChange={() => {
-                            // If switching from exclude to include, add GST
-                            const currentTotalCost = formData.totalCost || 0;
-                            const newTotalCost = formData.gstType === "exclude"
-                              ? currentTotalCost * 1.18
-                              : currentTotalCost;
-                            const updatedPaymentDetails = formData.paymentDetails.map(payment => {
-                              const percentage = parseFloat(payment.percentage) || 0;
-                              const paymentAmount = newTotalCost * (percentage / 100);
-                              const gstRate = 0.18;
-                              const baseAmount = paymentAmount / (1 + gstRate);
-                              const gstAmount = baseAmount * gstRate;
-                              return {
-                                ...payment,
-                                baseAmount: baseAmount.toFixed(2),
-                                gstAmount: gstAmount.toFixed(2),
-                                totalAmount: paymentAmount.toFixed(2)
-                              };
-                            });
+                            // If switching to include, add GST
+                            const baseAmount = formData.totalCost || 0;
+                            const gstAmount = baseAmount * 0.18;
+                            const netPayableAmount = baseAmount + gstAmount;
+                            const updatedPaymentDetails = formData.paymentDetails.map(payment => ({
+                              ...payment,
+                              baseAmount: (parseFloat(payment.percentage) / 100) * baseAmount,
+                              gstAmount: (parseFloat(payment.percentage) / 100) * gstAmount,
+                              totalAmount: (parseFloat(payment.percentage) / 100) * netPayableAmount
+                            }));
                             setFormData(prev => ({
                               ...prev,
                               gstType: "include",
-                              netPayableAmount: prev.netPayableAmount,
-                              totalCost: newTotalCost,
+                              gstAmount,
+                              netPayableAmount,
                               paymentDetails: updatedPaymentDetails
                             }));
                           }}
@@ -905,26 +867,21 @@ const handleChange = (e) => {
                           value="exclude"
                           checked={formData.gstType === "exclude"}
                           onChange={() => {
-                            // If switching from include to exclude, remove GST
-                            const currentTotalCost = formData.totalCost || 0;
-                            const newTotalCost = formData.gstType === "include"
-                              ? currentTotalCost / 1.18
-                              : currentTotalCost;
-                            const updatedPaymentDetails = formData.paymentDetails.map(payment => {
-                              const percentage = parseFloat(payment.percentage) || 0;
-                              const paymentAmount = newTotalCost * (percentage / 100);
-                              return {
-                                ...payment,
-                                baseAmount: paymentAmount.toFixed(2),
-                                gstAmount: "0.00",
-                                totalAmount: paymentAmount.toFixed(2)
-                              };
-                            });
+                            // If switching to exclude, remove GST
+                            const baseAmount = formData.totalCost || 0;
+                            const gstAmount = 0;
+                            const netPayableAmount = baseAmount;
+                            const updatedPaymentDetails = formData.paymentDetails.map(payment => ({
+                              ...payment,
+                              baseAmount: (parseFloat(payment.percentage) / 100) * baseAmount,
+                              gstAmount: 0,
+                              totalAmount: (parseFloat(payment.percentage) / 100) * netPayableAmount
+                            }));
                             setFormData(prev => ({
                               ...prev,
                               gstType: "exclude",
-                              netPayableAmount: prev.netPayableAmount,
-                              totalCost: newTotalCost,
+                              gstAmount,
+                              netPayableAmount,
                               paymentDetails: updatedPaymentDetails
                             }));
                           }}
@@ -942,6 +899,29 @@ const handleChange = (e) => {
                     </p>
                   </div>
 
+                  {/* GST Amount (auto-calculated) */}
+                  <div className="bg-red-50 p-4 rounded-lg">
+                    <label className="block text-sm font-medium text-red-700 mb-1">
+                      GST Amount (18%)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        value={
+                          (parseFloat(formData.gstAmount) || 0).toFixed(2)
+                        }
+                        readOnly
+                        className="block w-full pl-10 pr-3 py-2 border border-red-300 rounded-lg shadow-sm bg-red-100"
+                      />
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <FiDollarSign className="h-5 w-5 text-red-400" />
+                      </div>
+                    </div>
+                    <p className="text-xs text-red-600 mt-1">
+                      Stored in gstAmount
+                    </p>
+                  </div>
+
                   {/* Base Amount (auto-calculated) */}
                   <div className="bg-orange-50 p-4 rounded-lg">
                     <label className="block text-sm font-medium text-orange-700 mb-1">
@@ -951,7 +931,7 @@ const handleChange = (e) => {
                       <input
                         type="number"
                         value={
-                          (parseFloat(formData.netPayableAmount) || 0).toFixed(2)
+                          (parseFloat(formData.totalCost) || 0).toFixed(2)
                         }
                         readOnly
                         className="block w-full pl-10 pr-3 py-2 border border-orange-300 rounded-lg shadow-sm bg-orange-100"
@@ -961,7 +941,7 @@ const handleChange = (e) => {
                       </div>
                     </div>
                     <p className="text-xs text-orange-600 mt-1">
-                      Stored in netPayableAmount
+                      Stored in totalCost
                     </p>
                   </div>
 
@@ -978,7 +958,7 @@ const handleChange = (e) => {
                       <input
                         type="number"
                         value={
-                          (parseFloat(formData.totalCost) || 0).toFixed(2)
+                          (parseFloat(formData.netPayableAmount) || 0).toFixed(2)
                         }
                         readOnly
                         className="block w-full pl-10 pr-3 py-2 border border-green-300 rounded-lg shadow-sm bg-green-100"
@@ -988,13 +968,7 @@ const handleChange = (e) => {
                       </div>
                     </div>
                     <p className="text-xs text-green-600 mt-1">
-                      {formData.gstType === "include"
-                        ? `(Base: ₹${(formData.totalCost / 1.18).toFixed(
-                            2
-                          )} + GST: ₹${(
-                            (formData.totalCost * 0.18) / 1.18
-                          ).toFixed(2)}) - Stored in totalCost`
-                        : "No GST applied - Stored in totalCost"}
+                      Stored in netPayableAmount
                     </p>
                   </div>
                 </div>
@@ -1027,7 +1001,7 @@ const handleChange = (e) => {
                         const emiCount = prompt("Enter number of EMI installments:", "3");
                         const emiMonths = parseInt(emiCount) || 3;
                         
-                        // Create equal installments, adjusting the last one to ensure total is 100%
+                        // Create equal installments
                         const basePercentage = Math.floor((100 / emiMonths) * 100) / 100;
                         newPaymentDetails = Array(emiMonths).fill().map((_, i) => {
                           const isLast = i === emiMonths - 1;
@@ -1035,23 +1009,20 @@ const handleChange = (e) => {
                             ? (100 - basePercentage * (emiMonths - 1)).toFixed(2)
                             : basePercentage.toFixed(2);
                           
-                          const paymentAmount = totalCost * (parseFloat(percentage) / 100);
-                          const gstRate = formData.gstType === "include" ? 0.18 : 0;
-                          const baseAmount = formData.gstType === "include" 
-                            ? paymentAmount / (1 + gstRate) 
-                            : paymentAmount;
-                          const gstAmount = baseAmount * gstRate;
+                          const baseAmount = totalCost * (parseFloat(percentage) / 100);
+                          const gstAmount = formData.gstType === "include" ? baseAmount * 0.18 : 0;
+                          const totalAmount = baseAmount + gstAmount;
 
                           return {
                             name: `Installment ${i + 1}`,
                             percentage: percentage,
                             baseAmount: baseAmount.toFixed(2),
                             gstAmount: gstAmount.toFixed(2),
-                            totalAmount: paymentAmount.toFixed(2)
+                            totalAmount: totalAmount.toFixed(2)
                           };
                         });
                       } else {
-                        // For other payment types, create equal splits, adjusting the last one to ensure total is 100%
+                        // For other payment types, create equal splits
                         const basePercentage = Math.floor((100 / fields.length) * 100) / 100;
                         newPaymentDetails = fields.map((fieldName, i) => {
                           const isLast = i === fields.length - 1;
@@ -1059,19 +1030,16 @@ const handleChange = (e) => {
                             ? (100 - basePercentage * (fields.length - 1)).toFixed(2)
                             : basePercentage.toFixed(2);
                           
-                          const paymentAmount = totalCost * (parseFloat(percentage) / 100);
-                          const gstRate = formData.gstType === "include" ? 0.18 : 0;
-                          const baseAmount = formData.gstType === "include" 
-                            ? paymentAmount / (1 + gstRate) 
-                            : paymentAmount;
-                          const gstAmount = baseAmount * gstRate;
+                          const baseAmount = totalCost * (parseFloat(percentage) / 100);
+                          const gstAmount = formData.gstType === "include" ? baseAmount * 0.18 : 0;
+                          const totalAmount = baseAmount + gstAmount;
 
                           return {
                             name: fieldName,
                             percentage: percentage,
                             baseAmount: baseAmount.toFixed(2),
                             gstAmount: gstAmount.toFixed(2),
-                            totalAmount: paymentAmount.toFixed(2)
+                            totalAmount: totalAmount.toFixed(2)
                           };
                         });
                       }
@@ -1202,29 +1170,25 @@ const handleChange = (e) => {
                                     const baseCost =
                                       formData.perStudentCost *
                                       (formData.studentCount || 0);
-                                    const totalCost = formData.gstType === "include" 
-                                      ? baseCost * 1.18 
-                                      : baseCost;
+                                    const gstAmount = formData.gstType === "include" ? baseCost * 0.18 : 0;
+                                    const netPayableAmount = baseCost + gstAmount;
 
                                     details.forEach((payment) => {
-                                      const paymentAmount = totalCost * ((payment.percentage || 0) / 100);
-                                      const gstRate = formData.gstType === "include" ? 0.18 : 0;
-                                      const baseAmount =
-                                        formData.gstType === "include"
-                                          ? paymentAmount / (1 + gstRate)
-                                          : paymentAmount;
-                                      const gstAmount = baseAmount * gstRate;
+                                      const baseAmount = baseCost * ((payment.percentage || 0) / 100);
+                                      const paymentGstAmount = formData.gstType === "include" ? gstAmount * ((payment.percentage || 0) / 100) : 0;
+                                      const totalAmount = baseAmount + paymentGstAmount;
 
-                                      payment.totalAmount = paymentAmount;
+                                      payment.totalAmount = totalAmount;
                                       payment.baseAmount = baseAmount;
-                                      payment.gstAmount = gstAmount;
+                                      payment.gstAmount = paymentGstAmount;
                                     });
 
                                     setFormData((prev) => ({
                                       ...prev,
                                       paymentDetails: details,
-                                      netPayableAmount: totalCost,
-                                      totalCost: totalCost,
+                                      totalCost: baseCost,
+                                      gstAmount,
+                                      netPayableAmount,
                                     }));
                                     setPaymentErrors(errors);
                                   }}

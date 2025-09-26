@@ -62,6 +62,11 @@ function getTimingForSlot(slot, training) {
   const { collegeStartTime, lunchStartTime, lunchEndTime, collegeEndTime } =
     training || {};
 
+  if (s.includes("AM & PM")) {
+    if (collegeStartTime && collegeEndTime)
+      return `${collegeStartTime} - ${collegeEndTime}`;
+    return "AM & PM";
+  }
   if (s.includes("AM")) {
     if (collegeStartTime && lunchStartTime)
       return `${collegeStartTime} - ${lunchStartTime}`;
@@ -103,7 +108,7 @@ function CollegeSummaryReport({
 
     doc.setFontSize(12);
     doc.setFont("helvetica", "normal");
-    doc.text(`${trainingData?.collegeName} (${trainingData?.collegeCode})`, pageWidth / 2, yPosition, { align: "center" });
+    doc.text(`${trainingData?.collegeName} (${trainingData?.projectCode})`, pageWidth / 2, yPosition, { align: "center" });
     yPosition += 8;
 
     doc.setFontSize(10);
@@ -118,8 +123,26 @@ function CollegeSummaryReport({
 
     // Summary Table
     const summaryData = [
-      ["Total Students", trainingData?.studentCount || 0],
-      ["Total Hours", trainingData?.totalHours || 0],
+      ["Total Hours", (() => {
+        // Calculate total assigned hours from all trainers across all domains
+        let totalAssignedHours = 0;
+        domainsData.forEach(domain => {
+          if (Array.isArray(domain.table1Data)) {
+            domain.table1Data.forEach(row => {
+              if (row.batches && Array.isArray(row.batches)) {
+                row.batches.forEach(batch => {
+                  if (batch.trainers && Array.isArray(batch.trainers)) {
+                    batch.trainers.forEach(trainer => {
+                      totalAssignedHours += Number(trainer.assignedHours || 0);
+                    });
+                  }
+                });
+              }
+            });
+          }
+        });
+        return totalAssignedHours;
+      })()],
       ["Domains", domainsData.length]
     ];
 
@@ -134,28 +157,143 @@ function CollegeSummaryReport({
     });
     yPosition = doc.lastAutoTable.finalY + 8;
 
-    // Trainer Assignment Summary Table
-    const trainerData = [];
+    // Batch Table - Hours by Domain
+    const batchCodes = new Set();
+    const batchHoursByDomain = {};
+    const allDomains = new Set();
+
+    // Collect all unique batch codes and domains, and calculate hours by domain
+    domainsData.forEach((domainInfo) => {
+      allDomains.add(domainInfo.domain);
+      
+      if (Array.isArray(domainInfo.table1Data) && domainInfo.table1Data.length > 0) {
+        domainInfo.table1Data.forEach((row) => {
+          if (row.batches && row.batches.length > 0) {
+            row.batches.forEach((batch) => {
+              if (batch.batchCode) {
+                batchCodes.add(batch.batchCode);
+                
+                // Initialize domain hours for this batch if not exists
+                if (!batchHoursByDomain[batch.batchCode]) {
+                  batchHoursByDomain[batch.batchCode] = {};
+                  allDomains.forEach(domain => {
+                    batchHoursByDomain[batch.batchCode][domain] = 0;
+                  });
+                }
+                
+                // Calculate total hours for this batch in this domain
+                if (batch.trainers && Array.isArray(batch.trainers)) {
+                  batch.trainers.forEach((trainer) => {
+                    const hours = Number(trainer.assignedHours || 0);
+                    batchHoursByDomain[batch.batchCode][domainInfo.domain] += hours;
+                  });
+                }
+              }
+            });
+          }
+        });
+      }
+    });
+
+    // Create batch table data with dynamic columns
+    const domainArray = Array.from(allDomains);
+    const batchTableData = Array.from(batchCodes).map(batchCode => {
+      const row = [batchCode];
+      domainArray.forEach(domain => {
+        const hours = batchHoursByDomain[batchCode][domain];
+        row.push(hours > 0 ? hours.toString() : "-");
+      });
+      return row;
+    });
+
+    // Create table headers
+    const tableHeaders = ["Batch Code", ...domainArray];
+
+    if (batchTableData.length > 0) {
+      autoTable(doc, {
+        startY: yPosition,
+        head: [tableHeaders],
+        body: batchTableData,
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [173, 216, 230], fontSize: 9, textColor: [0, 0, 0] }, // Light blue
+        margin: { left: marginLeft, right: marginRight },
+      });
+      yPosition = doc.lastAutoTable.finalY + 8;
+    }
+
+    // Daily Schedule Details Table
+    const dailyScheduleData = [];
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
     domainsData.forEach((domainInfo) => {
       if (Array.isArray(domainInfo.table1Data) && domainInfo.table1Data.length > 0) {
         domainInfo.table1Data.forEach((row) => {
           if (row.batches && row.batches.length > 0) {
-            const filteredBatches = row.batches.filter(batch => batch.trainers && batch.trainers.length > 0);
+            const filteredBatches = row.batches.filter(batch =>
+              batch.trainers && batch.trainers.length > 0
+            );
 
             filteredBatches.forEach((batch) => {
               if (batch.trainers && batch.trainers.length > 0) {
                 batch.trainers.forEach((trainer) => {
-                  trainerData.push([
-                    domainInfo.domain,
-                    row.batch,
-                    batch.batchCode,
-                    trainer.trainerName || "Unassigned",
-                    trainer.trainerId,
-                    trainer.dayDuration || "-",
-                    formatDate(trainer.startDate),
-                    formatDate(trainer.endDate)
-                  ]);
+                  if (trainer.startDate && trainer.endDate) {
+                    const dates = [];
+                    const startDate = new Date(trainer.startDate);
+                    const endDate = new Date(trainer.endDate);
+                    const excludeDays = trainingData?.excludeDays || "None";
+                    let current = new Date(startDate);
+
+                    while (current <= endDate) {
+                      const dayOfWeek = current.getDay();
+                      let shouldInclude = true;
+
+                      if (excludeDays === "Saturday" && dayOfWeek === 6) {
+                        shouldInclude = false;
+                      } else if (excludeDays === "Sunday" && dayOfWeek === 0) {
+                        shouldInclude = false;
+                      } else if (excludeDays === "Both" && (dayOfWeek === 0 || dayOfWeek === 6)) {
+                        shouldInclude = false;
+                      }
+
+                      if (shouldInclude) {
+                        const dateStr = current.toISOString().slice(0, 10);
+                        if (!(trainer.excludedDates || []).includes(dateStr)) {
+                          dates.push(new Date(current));
+                        }
+                      }
+                      current.setDate(current.getDate() + 1);
+                    }
+
+                    let hoursArray = [];
+                    if (trainer.dailyHours && Array.isArray(trainer.dailyHours) && trainer.dailyHours.length === dates.length) {
+                      hoursArray = trainer.dailyHours;
+                    } else {
+                      const totalDays = dates.length;
+                      const hoursPerDay = totalDays > 0 ? (trainer.assignedHours || 0) / totalDays : 0;
+                      hoursArray = new Array(totalDays).fill(hoursPerDay);
+                    }
+
+                    dates.forEach((date, index) => {
+                      const hoursForDay = hoursArray[index] || 0;
+                      const dailyCost = hoursForDay * (trainer.perHourCost || 0);
+
+                      dailyScheduleData.push({
+                        date: date,
+                        formattedDate: formatDate(date),
+                        day: dayNames[date.getDay()],
+                        domain: domainInfo.domain,
+                        batch: row.batch,
+                        batchCode: batch.batchCode,
+                        trainerName: trainer.trainerName || "Unassigned",
+                        trainerId: trainer.trainerId,
+                        hours: hoursForDay.toFixed(2),
+                        slot: trainer.dayDuration || "-",
+                        timing: getTimingForSlot(trainer.dayDuration, phaseData),
+                        rate: trainer.perHourCost ? `₹${trainer.perHourCost}` : "-",
+                        dailyCost: dailyCost ? `₹${dailyCost.toFixed(2)}` : "-"
+                      });
+                    });
+                  }
                 });
               }
             });
@@ -164,12 +302,39 @@ function CollegeSummaryReport({
       }
     });
 
-    if (trainerData.length > 0) {
+    // Sort by date
+    dailyScheduleData.sort((a, b) => a.date - b.date);
+
+    // Group by date: set date and day to empty for subsequent rows on same date
+    let lastDate = null;
+    const groupedData = dailyScheduleData.map(item => {
+      const currentDate = item.formattedDate;
+      const isSameDate = currentDate === lastDate;
+      lastDate = currentDate;
+      return {
+        ...item,
+        formattedDate: isSameDate ? "" : item.formattedDate,
+        day: isSameDate ? "" : item.day
+      };
+    });
+
+    // Convert to array format for autoTable: merge Trainer and ID, Timing
+    const tableData = groupedData.map(item => [
+      item.formattedDate,
+      item.day,
+      item.timing,
+      item.batchCode,
+      item.trainerName || "Unassigned",
+      item.hours,
+      item.domain
+    ]);
+
+    if (tableData.length > 0) {
       autoTable(doc, {
         startY: yPosition,
-        head: [["Domain", "Batch", "Batch Code", "Trainer", "ID", "Slot", "Start Date", "End Date"]],
-        body: trainerData,
-        styles: { fontSize: 8, cellPadding: 2 },
+        head: [["Date", "Day", "Timing", "Batch Code", "Trainer", "Hours", "Domain"]],
+        body: tableData,
+        styles: { fontSize: 8, cellPadding: 1 },
         headStyles: { fillColor: [173, 216, 230], fontSize: 9, textColor: [0, 0, 0] }, // Light blue
         margin: { left: marginLeft, right: marginRight },
       });
@@ -182,7 +347,6 @@ function CollegeSummaryReport({
       doc.setPage(i);
       doc.setFontSize(8);
       doc.text(`Page ${i} of ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: "center" });
-      doc.text("Generated by Gryphon Academy CRM", pageWidth / 2, pageHeight - 5, { align: "center" });
     }
 
     return doc.output('blob');
@@ -221,17 +385,6 @@ function CollegeSummaryReport({
       }
     };
     
-    const sectionHeaderStyle = {
-      font: { bold: true, sz: 12 },
-      alignment: { horizontal: "center", vertical: "center" },
-      border: {
-        top: { style: "thin", color: { rgb: "000000" } },
-        bottom: { style: "thin", color: { rgb: "000000" } },
-        left: { style: "thin", color: { rgb: "000000" } },
-        right: { style: "thin", color: { rgb: "000000" } }
-      }
-    };
-    
     const tableHeaderStyle = {
       font: { bold: true, sz: 12, color: { rgb: "FFFFFF" } },
       fill: { fgColor: { rgb: "4472C4" } },
@@ -255,18 +408,6 @@ function CollegeSummaryReport({
       }
     };
     
-    const summaryStyle = {
-      font: { bold: true, sz: 11 },
-      fill: { fgColor: { rgb: "E6F3FF" } },
-      alignment: { horizontal: "left", vertical: "center" },
-      border: {
-        top: { style: "thin", color: { rgb: "000000" } },
-        bottom: { style: "thin", color: { rgb: "000000" } },
-        left: { style: "thin", color: { rgb: "000000" } },
-        right: { style: "thin", color: { rgb: "000000" } }
-      }
-    };
-
     const costStyle = {
       font: { sz: 10, color: { rgb: "228B22" } },
       alignment: { horizontal: "right", vertical: "center" },
@@ -281,77 +422,48 @@ function CollegeSummaryReport({
     // Create single comprehensive sheet
     const allData = [];
 
-    // Add Summary Section
-    allData.push([{ v: "College Summary Report", s: headerStyle }]);
-    allData.push([{ v: `${trainingData?.collegeName} (${trainingData?.collegeCode})`, s: subHeaderStyle }]);
+    // Add Header
+    allData.push([{ v: "College Summary Report - Daily Schedule", s: headerStyle }]);
+    allData.push([{ v: `${trainingData?.collegeName} (${trainingData?.projectCode})`, s: subHeaderStyle }]);
     allData.push([{ v: `Course: ${trainingData?.course} - ${trainingData?.year}`, s: dataStyle }]);
     allData.push([{ v: `Phase: ${PHASE_LABELS[training.selectedPhase] || training.selectedPhase}`, s: dataStyle }]);
     allData.push([{ v: `Training Period: ${formatDate(phaseData?.trainingStartDate)} to ${formatDate(phaseData?.trainingEndDate)}`, s: dataStyle }]);
     allData.push([{ v: `College Timing: ${phaseData?.collegeStartTime} - ${phaseData?.collegeEndTime}`, s: dataStyle }]);
     allData.push([""]);
-    allData.push([{ v: "SUMMARY", s: subHeaderStyle }]);
-    allData.push([{ v: "Total Students", s: summaryStyle }, { v: trainingData?.studentCount || 0, s: dataStyle }]);
-    allData.push([{ v: "Total Hours", s: summaryStyle }, { v: trainingData?.totalHours || 0, s: dataStyle }]);
-    allData.push([{ v: "Domains", s: summaryStyle }, { v: domainsData.length, s: dataStyle }]);
-    
-    // Add vertical gap
-    allData.push([""]);
-    allData.push([""]);
-    allData.push([""]);
 
-    // Add Trainer Details Section
-    allData.push([{ v: "Trainer Details", s: sectionHeaderStyle }]);
-    allData.push([""]);
+    // Batch Table - Hours by Domain
+    allData.push([{ v: "Batch Table - Hours by Domain", s: tableHeaderStyle }]);
     
-    // Trainer Details Headers
-    allData.push([
-      { v: "Domain", s: tableHeaderStyle },
-      { v: "Batch", s: tableHeaderStyle },
-      { v: "Batch Code", s: tableHeaderStyle },
-      { v: "Trainer Name", s: tableHeaderStyle },
-      { v: "Trainer ID", s: tableHeaderStyle },
-      { v: "Duration", s: tableHeaderStyle },
-      { v: "Hours", s: tableHeaderStyle },
-      { v: "Rate/Hour", s: tableHeaderStyle },
-      { v: "Total Cost", s: tableHeaderStyle },
-      { v: "Start Date", s: tableHeaderStyle },
-      { v: "End Date", s: tableHeaderStyle },
-      { v: "Topics", s: tableHeaderStyle }
-    ]);
+    const batchCodesExcel = new Set();
+    const batchHoursByDomainExcel = {};
+    const allDomainsExcel = new Set();
 
-    // Add Trainer Details Data
+    // Collect all unique batch codes and domains, and calculate hours by domain
     domainsData.forEach((domainInfo) => {
+      allDomainsExcel.add(domainInfo.domain);
+      
       if (Array.isArray(domainInfo.table1Data) && domainInfo.table1Data.length > 0) {
         domainInfo.table1Data.forEach((row) => {
           if (row.batches && row.batches.length > 0) {
-            const filteredBatches = row.batches.filter(batch =>
-              batch.trainers && batch.trainers.length > 0
-            );
-
-            filteredBatches.forEach((batch) => {
-              if (batch.trainers && batch.trainers.length > 0) {
-                batch.trainers.forEach((trainer) => {
-                  const topics = trainer.topics && trainer.topics.length > 0 
-                    ? (Array.isArray(trainer.topics) ? trainer.topics.join("; ") : trainer.topics)
-                    : "";
-                  
-                  const totalCost = (trainer.assignedHours || 0) * (trainer.perHourCost || 0);
-
-                  allData.push([
-                    { v: domainInfo.domain, s: dataStyle },
-                    { v: row.batch, s: dataStyle },
-                    { v: batch.batchCode, s: dataStyle },
-                    { v: trainer.trainerName || "Unassigned", s: dataStyle },
-                    { v: trainer.trainerId, s: dataStyle },
-                    { v: trainer.dayDuration || "-", s: dataStyle },
-                    { v: trainer.assignedHours || 0, s: dataStyle },
-                    { v: trainer.perHourCost ? `₹${trainer.perHourCost}` : "-", s: costStyle },
-                    { v: totalCost ? `₹${totalCost.toFixed(2)}` : "-", s: costStyle },
-                    { v: formatDate(trainer.startDate), s: dataStyle },
-                    { v: formatDate(trainer.endDate), s: dataStyle },
-                    { v: topics, s: dataStyle }
-                  ]);
-                });
+            row.batches.forEach((batch) => {
+              if (batch.batchCode) {
+                batchCodesExcel.add(batch.batchCode);
+                
+                // Initialize domain hours for this batch if not exists
+                if (!batchHoursByDomainExcel[batch.batchCode]) {
+                  batchHoursByDomainExcel[batch.batchCode] = {};
+                  allDomainsExcel.forEach(domain => {
+                    batchHoursByDomainExcel[batch.batchCode][domain] = 0;
+                  });
+                }
+                
+                // Calculate total hours for this batch in this domain
+                if (batch.trainers && Array.isArray(batch.trainers)) {
+                  batch.trainers.forEach((trainer) => {
+                    const hours = Number(trainer.assignedHours || 0);
+                    batchHoursByDomainExcel[batch.batchCode][domainInfo.domain] += hours;
+                  });
+                }
               }
             });
           }
@@ -359,15 +471,26 @@ function CollegeSummaryReport({
       }
     });
 
-    // Add vertical gap
-    allData.push([""]);
-    allData.push([""]);
+    // Create Excel headers for batch table
+    const domainArrayExcel = Array.from(allDomainsExcel);
+    const batchTableHeaders = [{ v: "Batch Code", s: tableHeaderStyle }];
+    domainArrayExcel.forEach(domain => {
+      batchTableHeaders.push({ v: domain, s: tableHeaderStyle });
+    });
+    allData.push(batchTableHeaders);
+
+    // Add batch table data to Excel
+    Array.from(batchCodesExcel).forEach(batchCode => {
+      const row = [{ v: batchCode, s: dataStyle }];
+      domainArrayExcel.forEach(domain => {
+        const hours = batchHoursByDomainExcel[batchCode][domain];
+        row.push({ v: hours > 0 ? hours.toString() : "-", s: dataStyle });
+      });
+      allData.push(row);
+    });
+
     allData.push([""]);
 
-    // Add Daily Schedule Section
-    allData.push([{ v: "Daily Schedule Details", s: sectionHeaderStyle }]);
-    allData.push([""]);
-    
     // Daily Schedule Headers
     allData.push([
       { v: "Domain", s: tableHeaderStyle },
@@ -463,102 +586,28 @@ function CollegeSummaryReport({
       }
     });
 
-    // Add vertical gap
-    allData.push([""]);
-    allData.push([""]);
-    allData.push([""]);
-
-    // Add Cost Summary Section
-    allData.push([{ v: "Cost Summary", s: sectionHeaderStyle }]);
-    allData.push([""]);
-    
-    // Cost Summary Headers
-    allData.push([
-      { v: "Domain", s: tableHeaderStyle },
-      { v: "Trainer Name", s: tableHeaderStyle },
-      { v: "Trainer ID", s: tableHeaderStyle },
-      { v: "Total Hours", s: tableHeaderStyle },
-      { v: "Rate/Hour", s: tableHeaderStyle },
-      { v: "Total Cost", s: tableHeaderStyle }
-    ]);
-
-    let totalOverallCost = 0;
-
-    // Add Cost Summary Data
-    domainsData.forEach((domainInfo) => {
-      if (Array.isArray(domainInfo.table1Data) && domainInfo.table1Data.length > 0) {
-        domainInfo.table1Data.forEach((row) => {
-          if (row.batches && row.batches.length > 0) {
-            const filteredBatches = row.batches.filter(batch =>
-              batch.trainers && batch.trainers.length > 0
-            );
-
-            filteredBatches.forEach((batch) => {
-              if (batch.trainers && batch.trainers.length > 0) {
-                batch.trainers.forEach((trainer) => {
-                  const totalCost = (trainer.assignedHours || 0) * (trainer.perHourCost || 0);
-                  totalOverallCost += totalCost;
-
-                  allData.push([
-                    { v: domainInfo.domain, s: dataStyle },
-                    { v: trainer.trainerName || "Unassigned", s: dataStyle },
-                    { v: trainer.trainerId, s: dataStyle },
-                    { v: trainer.assignedHours || 0, s: dataStyle },
-                    { v: trainer.perHourCost ? `₹${trainer.perHourCost}` : "-", s: costStyle },
-                    { v: totalCost ? `₹${totalCost.toFixed(2)}` : "-", s: costStyle }
-                  ]);
-                });
-              }
-            });
-          }
-        });
-      }
-    });
-
-    // Add total row
-    allData.push([""]);
-    allData.push([
-      { v: "TOTAL COST", s: summaryStyle },
-      { v: "", s: dataStyle },
-      { v: "", s: dataStyle },
-      { v: "", s: dataStyle },
-      { v: "", s: dataStyle },
-      { v: `₹${totalOverallCost.toFixed(2)}`, s: costStyle }
-    ]);
-
     // Create the single sheet
     const worksheet = XLSX.utils.aoa_to_sheet(allData);
-    worksheet['!cols'] = [
-      { width: 25 }, { width: 20 }, { width: 18 }, { width: 22 }, { width: 18 }, 
-      { width: 15 }, { width: 15 }, { width: 12 }, { width: 12 }, { width: 18 }, 
-      { width: 15 }, { width: 15 }
-    ];
-
-    // Add merges for headings
-    const merges = [];
-    let currentRow = 0;
-
-    // Summary section heading merge
-    merges.push({ s: { r: currentRow, c: 0 }, e: { r: currentRow, c: 11 } });
-    currentRow += 15; // Skip to trainer details section
-
-    // Trainer Details section heading merge
-    merges.push({ s: { r: currentRow, c: 0 }, e: { r: currentRow, c: 11 } });
-    currentRow += 20; // Skip to daily schedule section
-
-    // Daily Schedule section heading merge
-    merges.push({ s: { r: currentRow, c: 0 }, e: { r: currentRow, c: 11 } });
-    currentRow += 25; // Skip to cost summary section
-
-    // Cost Summary section heading merge
-    merges.push({ s: { r: currentRow, c: 0 }, e: { r: currentRow, c: 11 } });
-
-    worksheet['!merges'] = merges;
+    
+    // Calculate column widths dynamically based on content
+    const colWidths = [];
+    // Batch table columns (Batch Code + domains)
+    const batchTableCols = 1 + Array.from(allDomainsExcel).length; // Batch Code + number of domains
+    for (let i = 0; i < batchTableCols; i++) {
+      colWidths.push({ width: 15 }); // Fixed width for batch table columns
+    }
+    // Daily schedule columns
+    colWidths.push(
+      { width: 25 }, { width: 20 }, { width: 18 }, { width: 22 }, { width: 18 }, { width: 15 }, 
+      { width: 15 }, { width: 12 }, { width: 12 }, { width: 18 }, { width: 15 }, { width: 15 }
+    );
+    
+    worksheet['!cols'] = colWidths;
 
     XLSX.utils.book_append_sheet(workbook, worksheet, "Complete Report");
 
     // Generate and download the file
-    XLSX.writeFile(workbook, `College_Summary_Report_${trainingData?.collegeCode}_${training.selectedPhase}.xlsx`);
+    XLSX.writeFile(workbook, `College_Summary_Report_${trainingData?.projectCode}_${training.selectedPhase}.xlsx`);
   };
 
   return (
@@ -598,7 +647,7 @@ function CollegeSummaryReport({
       )}
 
       {showPreview && pdfBlob && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-transparent backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] overflow-hidden">
             <div className="flex justify-between items-center p-4 border-b">
               <h3 className="text-lg font-bold text-gray-800">PDF Preview</h3>
@@ -630,7 +679,7 @@ function CollegeSummaryReport({
                   const url = URL.createObjectURL(pdfBlob);
                   const a = document.createElement('a');
                   a.href = url;
-                  a.download = `College_Summary_Report_${trainingData?.collegeCode}_${training.selectedPhase}.pdf`;
+                  a.download = `College_Summary_Report_${trainingData?.projectCode}_${training.selectedPhase}.pdf`;
                   document.body.appendChild(a);
                   a.click();
                   document.body.removeChild(a);

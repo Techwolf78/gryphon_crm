@@ -3,7 +3,6 @@ import { useAuth } from "../../context/AuthContext"; // Adjust the path as neede
 import PropTypes from "prop-types";
 import {
   FiTrendingUp,
-  FiDollarSign,
   FiUsers,
   FiFilter,
   FiChevronDown,
@@ -14,6 +13,7 @@ import {
   FiCalendar,
   FiRefreshCw,
 } from "react-icons/fi";
+import { FaRupeeSign } from "react-icons/fa";
 import {
   PieChart,
   Pie,
@@ -157,7 +157,7 @@ const RecentActivity = ({ recentActivity, isLoading }) => {
                   }`}
                 >
                   {activity.amount ? (
-                    <FiDollarSign size={16} />
+                    <FaRupeeSign size={16} />
                   ) : (
                     <FiUsers size={16} />
                   )}
@@ -1471,7 +1471,7 @@ if (lead.assignedTo && lead.assignedTo.uid) {
                 title: selectedUserId ? "Your Revenue" : "Team Revenue",
                 value: `₹${dashboardData.revenue.toLocaleString()}`,
                 change: dashboardData.growth,
-                icon: <FiDollarSign className="text-white" size={16} />, // changed size
+                icon: <FaRupeeSign className="text-white" size={16} />, // changed size
                 color: "bg-indigo-600",
               },
               {

@@ -23,6 +23,9 @@ const ClosedLeadsStats = ({
 }) => {
   const selectedFY = propSelectedFY || getCurrentFinancialYear();
 
+  // Remove GST toggle - always show without GST
+  // const [showWithGST, setShowWithGST] = useState(false);
+
   const userObj = Object.values(users).find((u) => u.uid === currentUser?.uid);
   const isHead = userObj?.role === "Head";
   const isAdminOrDirector = ["Admin", "Director"].includes(userObj?.role);
@@ -89,7 +92,11 @@ const ClosedLeadsStats = ({
         const closedQuarter = getQuarter(new Date(l.closedDate));
         return closedQuarter === quarter;
       })
-      .reduce((sum, l) => sum + (l.totalCost || 0), 0);
+      .reduce((sum, l) => {
+        // Always show without GST - use base amount only
+        const baseAmount = parseFloat(l.totalCost) || 0;
+        return sum + baseAmount;
+      }, 0);
   }, [leads]);
 
   const getQuarterTargetWithCarryForward = useCallback((uid) => {

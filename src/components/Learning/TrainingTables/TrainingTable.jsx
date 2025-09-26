@@ -129,7 +129,7 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
                   </div>
                   <div className="flex items-center text-gray-600 text-sm">
                     <FaUniversity className="mr-2 text-blue-500 flex-shrink-0" />
-                    <span className="truncate font-medium text-gray-800">{item.collegeName}</span>
+                    <span className="truncate font-medium text-gray-800">{item.collegeName || item.businessName}</span>
                   </div>
                   {item.city && (
                     <div className="text-[11px] text-gray-500 mt-1 ml-6">{item.city}</div>
@@ -174,7 +174,7 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
                 </div>
               </div>
               <div className="col-span-3 truncate">
-                <span className="font-medium text-gray-800">{item.collegeName}</span>
+                <span className="font-medium text-gray-800">{item.collegeName || item.businessName}</span>
                 {item.city && (
                   <div className="text-[11px] text-gray-500 mt-0.5">{item.city}</div>
                 )}

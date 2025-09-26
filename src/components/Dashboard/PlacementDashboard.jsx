@@ -1,13 +1,13 @@
 import React from 'react';
-import { FiBriefcase, FiDollarSign, FiUserCheck, FiMapPin, FiUsers, FiBarChart2 } from 'react-icons/fi';
+import { FiBriefcase, FiUserCheck, FiMapPin, FiUsers, FiBarChart2 } from 'react-icons/fi';
 import { motion } from 'framer-motion';
-import { FaHandshake } from 'react-icons/fa';
+import { FaHandshake, FaRupeeSign } from 'react-icons/fa';
 
 const PlacementDashboard = () => {
   // Metrics data
   const placementMetrics = [
     { title: 'Placements', value: '56', icon: <FiBriefcase size={20} />, color: 'bg-indigo-600' },
-    { title: 'Avg. Salary', value: '$85k', icon: <FiDollarSign size={20} />, color: 'bg-green-600' },
+    { title: 'Avg. Salary', value: '₹85k', icon: <FaRupeeSign size={20} />, color: 'bg-green-600' },
     { title: 'Active Candidates', value: '132', icon: <FiUserCheck size={20} />, color: 'bg-amber-500' },
     { title: 'Top Location', value: 'Remote', icon: <FiMapPin size={20} />, color: 'bg-red-500' }
   ];

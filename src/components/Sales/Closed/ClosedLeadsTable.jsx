@@ -85,6 +85,8 @@ const ClosedLeadsTable = ({
                 studentCount: trainingFormData.studentCount || lead.studentCount,
                 perStudentCost: trainingFormData.perStudentCost || lead.perStudentCost,
                 totalCost: trainingFormData.totalCost || lead.totalCost,
+                gstAmount: trainingFormData.gstAmount || 0,
+                netPayableAmount: trainingFormData.netPayableAmount || lead.totalCost,
               }];
             } else {
               return [id, lead];
@@ -356,6 +358,10 @@ const ClosedLeadsTable = ({
                 <div>
                   <p className="text-xs text-slate-500 uppercase tracking-wider font-medium mb-1">Total Value</p>
                   <p className="text-lg font-semibold text-slate-900">{formatCurrency(lead.totalCost)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 uppercase tracking-wider font-medium mb-1">GST Amount</p>
+                  <p className="text-lg font-semibold text-slate-900">{formatCurrency(lead.gstAmount || 0)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 uppercase tracking-wider font-medium mb-1">Closed Date</p>
