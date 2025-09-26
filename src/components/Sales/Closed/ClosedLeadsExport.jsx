@@ -80,14 +80,13 @@ export const exportClosedLeads = async (filteredLeads, db) => {
         "EMI Months": form.emiMonths || "-",
 
         "GST Type": form.gstType || "-",
-        "Net Amount (₹)": form.netPayableAmount
-          ? Number(form.netPayableAmount)
+        "Base Amount (₹)": form.totalCost
+          ? Number(form.totalCost)
           : "-",
         "GST Amount (₹)": form.gstAmount ? Number(form.gstAmount) : "-",
-        "Total Amount (₹)":
-          form.netPayableAmount && form.gstAmount
-            ? Number(form.netPayableAmount) + Number(form.gstAmount)
-            : "-",
+        "Total Amount (₹)": form.totalCost
+          ? Number(form.totalCost)
+          : "-",
       };
     });
 
@@ -205,7 +204,7 @@ export const exportClosedLeads = async (filteredLeads, db) => {
       { wch: 15 }, // Contract End
       { wch: 12 }, // EMI Months
       { wch: 12 }, // GST Type (NEW COLUMN WIDTH)
-      { wch: 15 }, // Net Amount (₹)
+      { wch: 15 }, // Base Amount (₹)
       { wch: 15 }, // GST Amount (₹)
       { wch: 15 }, // Total Amount (₹)
     ];

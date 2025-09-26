@@ -15,6 +15,7 @@ import { db } from "../../../firebase";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faChevronUp, faChevronDown } from "@fortawesome/free-solid-svg-icons";
 import RaiseInvoiceModal from "./RaiseInvoiceModal";
+import RegenerateInvoiceModal from "./RegenerateInvoiceModal";
 import InvoiceModal from "../../../components/HR/InvoiceModal";
 
 export default function ContractInvoiceTable() {
@@ -29,6 +30,7 @@ export default function ContractInvoiceTable() {
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [existingProformas, setExistingProformas] = useState([]);
+  const [isRegenerateModal, setIsRegenerateModal] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -238,53 +240,8 @@ export default function ContractInvoiceTable() {
     
     setSelectedContract(contract);
     setSelectedInstallment(installment);
+    setIsRegenerateModal(isRegenerate);
     setShowModal(true);
-  };
-
-  const getExistingInvoiceForInstallment = (contractId, installmentName) => {
-    // Pehle active invoices check karo (jo cancelled na ho)
-    const activeTaxInvoice = existingInvoices.find(
-      (inv) =>
-        inv.originalInvoiceId === contractId &&
-        inv.installment === installmentName &&
-        inv.approvalStatus !== 'cancelled'
-    );
-
-    if (activeTaxInvoice) return activeTaxInvoice;
-
-    // Active Proforma invoices check karo
-    const activeProformaInvoice = existingProformas.find(
-      (inv) =>
-        inv.originalInvoiceId === contractId &&
-        inv.installment === installmentName &&
-        inv.approvalStatus !== 'cancelled'
-    );
-
-    if (activeProformaInvoice) return activeProformaInvoice;
-
-    return null;
-  };
-
-  const getCancelledInvoicesForInstallment = (contractId, installmentName) => {
-    const cancelledInvoices = [];
-    
-    // Cancelled Tax Invoices
-    const cancelledTax = existingInvoices.filter(
-      (inv) =>
-        inv.originalInvoiceId === contractId &&
-        inv.installment === installmentName &&
-        inv.approvalStatus === 'cancelled'
-    );
-    
-    // Cancelled Proforma Invoices
-    const cancelledProforma = existingProformas.filter(
-      (inv) =>
-        inv.originalInvoiceId === contractId &&
-        inv.installment === installmentName &&
-        inv.approvalStatus === 'cancelled'
-    );
-    
-    return [...cancelledTax, ...cancelledProforma];
   };
 
   const handleConvertToTax = async (invoice) => {
@@ -306,7 +263,7 @@ export default function ContractInvoiceTable() {
         invoiceType: "Proforma Invoice",
       };
 
-      const { id, ...proformaDataWithoutId } = proformaInvoiceData;
+      const { id: _, ...proformaDataWithoutId } = proformaInvoiceData;
 
       // Save to ProformaInvoices collection
       await addDoc(collection(db, "ProformaInvoices"), proformaDataWithoutId);
@@ -336,87 +293,29 @@ export default function ContractInvoiceTable() {
       const financialYear = getCurrentFinancialYear();
       const currentDate = new Date(); // 👈 Current date capture karo
 
-      if (isEdit && editInvoice) {
-        // 🔹 Step 3: Create new Tax Invoice first
-        const newInvoiceNumber = await generateInvoiceNumber("Tax Invoice");
+      if (isEdit && !isRegenerate && editInvoice) {
+        // Convert Proforma to Tax: update the existing document with same invoice number changed to TI
+        const updatedInvoiceNumber = editInvoice.invoiceNumber.replace("PI", "TI");
 
-        const totalAmount =
-          editInvoice.netPayableAmount || editInvoice.amountRaised || 0;
-        const receivedAmount = editInvoice.receivedAmount || 0;
-
-        // Create a clean copy without the id field
-        const taxInvoiceData = { ...editInvoice };
-
-        // Remove the id field completely
-        delete taxInvoiceData.id;
-
-        // Update with tax invoice details
-        Object.assign(taxInvoiceData, {
+        const updateData = {
           invoiceType: "Tax Invoice",
-          invoiceNumber: newInvoiceNumber,
-          raisedDate: currentDate, // 👈 Current date use karo
-          updatedDate: currentDate,
-          status: "registered",
-          financialYear: financialYear.year,
-          dueAmount: totalAmount - receivedAmount,
-          // Proforma invoice ka reference rakho
+          invoiceNumber: updatedInvoiceNumber,
           convertedFromProforma: true,
           originalProformaNumber: editInvoice.invoiceNumber,
-          originalInvoiceId: editInvoice.originalInvoiceId || contract.id,
-          paymentType: editInvoice.paymentType || contract.paymentType,
-        });
-
-        // 🔹 Step 4: Add new Tax Invoice to ContractInvoices collection
-        const docRef = await addDoc(
-          collection(db, "ContractInvoices"),
-          taxInvoiceData
-        );
-
-        // 🔹 Step 5: Update the proforma invoice with tax invoice reference
-        const proformaUpdateData = {
-          convertedToTax: true,
-          taxInvoiceNumber: newInvoiceNumber,
-          conversionDate: currentDate,
+          updatedDate: currentDate,
         };
 
-        // Update ProformaInvoices collection
-        const proformaQuery = query(
-          collection(db, "ProformaInvoices"),
-          where(
-            "originalInvoiceId",
-            "==",
-            editInvoice.originalInvoiceId || contract.id
-          ),
-          where("installment", "==", editInvoice.installment)
-        );
-        const proformaSnapshot = await getDocs(proformaQuery);
-
-        if (!proformaSnapshot.empty) {
-          const proformaDoc = proformaSnapshot.docs[0];
-          await updateDoc(
-            doc(db, "ProformaInvoices", proformaDoc.id),
-            proformaUpdateData
-          );
-        }
-
-        // 🔹 Step 6: Delete the original invoice from ContractInvoices
-        const originalInvoiceRef = doc(db, "ContractInvoices", editInvoice.id);
-        await deleteDoc(originalInvoiceRef);
+        // Update the existing document in ContractInvoices
+        await updateDoc(doc(db, "ContractInvoices", editInvoice.id), updateData);
 
         // Update local state
-        const newTaxInvoice = {
-          ...taxInvoiceData,
-          id: docRef.id,
-        };
-
-        setExistingInvoices((prev) => [
-          ...prev.filter((inv) => inv.id !== editInvoice.id),
-          newTaxInvoice,
-        ]);
-
-        alert(
-          `Invoice converted to Tax Invoice successfully! New Invoice Number: ${newInvoiceNumber}`
+        setExistingInvoices((prev) =>
+          prev.map((inv) =>
+            inv.id === editInvoice.id ? { ...inv, ...updateData } : inv
+          )
         );
+
+        alert(`Invoice converted to Tax Invoice successfully! Invoice Number: ${updatedInvoiceNumber}`);
       } else if (isRegenerate && editInvoice) {
         // 🔹 REGENERATE CASE - Cancelled invoice ko regenerate karna
         const newInvoiceNumber = await generateInvoiceNumber(formData.invoiceType);
@@ -437,11 +336,13 @@ export default function ContractInvoiceTable() {
           // Cancelled status hatao
           cancelled: false,
           cancellationDate: null,
-          cancellationReason: null
+          cancellationReason: null,
+          // Mark as regenerated from cancelled
+          regeneratedFrom: editInvoice.invoiceNumber,
         };
 
         // ID remove karo for new document
-        const { id, ...dataWithoutId } = regenerateData;
+        const { id: _, ...dataWithoutId } = regenerateData;
 
         let collectionName = "ContractInvoices";
         if (formData.invoiceType === "Proforma Invoice") {
@@ -460,6 +361,21 @@ export default function ContractInvoiceTable() {
           setExistingInvoices(prev => [...prev, newInvoice]);
         } else {
           setExistingProformas(prev => [...prev, newInvoice]);
+        }
+
+        // Mark the cancelled invoice as regenerated
+        const cancelledDocRef = doc(db, collectionName, editInvoice.id);
+        await updateDoc(cancelledDocRef, { regenerated: true });
+
+        // Update local state for the cancelled invoice
+        if (collectionName === "ContractInvoices") {
+          setExistingInvoices(prev => prev.map(inv => 
+            inv.id === editInvoice.id ? { ...inv, regenerated: true } : inv
+          ));
+        } else {
+          setExistingProformas(prev => prev.map(inv => 
+            inv.id === editInvoice.id ? { ...inv, regenerated: true } : inv
+          ));
         }
 
         alert(`Invoice regenerated successfully! New Invoice Number: ${newInvoiceNumber}`);
@@ -565,25 +481,25 @@ export default function ContractInvoiceTable() {
   const getApprovalStatusBadge = (invoice) => {
     if (!invoice) return null;
     
-    const approvalStatus = invoice.approvalStatus || "pending";
+    const status = invoice.approvalStatus || invoice.status;
     
-    if (approvalStatus === "approved") {
+    if (status === "approved") {
       return (
         <span className="ml-1 px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-800 border border-green-300">
-          ✓
+          Approved
         </span>
       );
-    } else if (approvalStatus === "cancelled") {
+    } else if (status === "cancelled") {
       return (
         <span className="ml-1 px-1.5 py-0.5 rounded text-xs bg-red-100 text-red-800 border border-red-300">
-          ✗
+          Cancelled
         </span>
       );
     }
     
     return (
       <span className="ml-1 px-1.5 py-0.5 rounded text-xs bg-yellow-100 text-yellow-800 border border-yellow-300">
-        ⏳
+        Pending
       </span>
     );
   };
@@ -781,198 +697,155 @@ export default function ContractInvoiceTable() {
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
-                            {invoice.paymentDetails?.map(
-                              (installment, index) => {
-                                const existingInvoice = getExistingInvoiceForInstallment(
-                                  invoice.id,
-                                  installment.name
+                            {(() => {
+                              const allInvoicesForContract = existingInvoices
+                                .filter((inv) => inv.originalInvoiceId === invoice.id)
+                                .concat(
+                                  existingProformas.filter(
+                                    (inv) => inv.originalInvoiceId === invoice.id && !inv.convertedToTax
+                                  )
                                 );
-                                const cancelledInvoices = getCancelledInvoicesForInstallment(
-                                  invoice.id,
-                                  installment.name
+
+                              return invoice.paymentDetails?.map((installment, index) => {
+                                const invoicesForInstallment = allInvoicesForContract.filter(
+                                  (inv) => inv.installment === installment.name
                                 );
-                                const hasCancelledInvoices = cancelledInvoices.length > 0;
 
-                                const totalAmount =
-                                  existingInvoice?.amountRaised ||
-                                  existingInvoice?.netPayableAmount ||
-                                  installment.totalAmount;
-                                const receivedAmount =
-                                  existingInvoice?.receivedAmount || 0;
-                                const dueAmount = totalAmount - receivedAmount;
+                                // Sort: active first, then cancelled, by raisedDate desc
+                                invoicesForInstallment.sort((a, b) => {
+                                  const aCancelled = a.status === 'cancelled' || a.approvalStatus === 'cancelled';
+                                  const bCancelled = b.status === 'cancelled' || b.approvalStatus === 'cancelled';
+                                  if (aCancelled && !bCancelled) return 1;
+                                  if (bCancelled && !aCancelled) return -1;
+                                  return new Date(b.raisedDate || 0) - new Date(a.raisedDate || 0);
+                                });
 
-                                return (
-                                  <tr key={index} className="hover:bg-gray-50">
-                                    <td className="px-4 py-2 text-sm text-gray-900">
-                                      {installment.name}
-                                      {hasCancelledInvoices && (
-                                        <span className="ml-1 text-xs text-red-500">
-                                          ({cancelledInvoices.length} cancelled)
-                                        </span>
-                                      )}
-                                    </td>
-                                    <td className="px-4 py-2 text-sm text-gray-500">
-                                      {installment.percentage}%
-                                    </td>
-                                    <td className="px-4 py-2 text-sm text-gray-500 font-semibold">
-                                      {formatCurrency(installment.totalAmount)}
-                                    </td>
-                                    <td className="px-4 py-2 text-sm text-gray-500">
-                                      {existingInvoice ? (
-                                        <div className="text-center">
-                                          {/* Invoice Type */}
-                                          <div
+                                if (invoicesForInstallment.length > 0) {
+                                  return invoicesForInstallment.map((inv, invIndex) => {
+                                    const isCancelled = inv.status === 'cancelled' || inv.approvalStatus === 'cancelled';
+                                    const totalAmount =
+                                      inv.amountRaised || inv.netPayableAmount || installment.totalAmount;
+                                    const receivedAmount = inv.receivedAmount || 0;
+                                    const dueAmount = totalAmount - receivedAmount;
+
+                                    return (
+                                      <tr
+                                        key={`${index}-${invIndex}`}
+                                        className={`hover:bg-gray-50 ${isCancelled ? 'bg-red-50' : ''}`}
+                                      >
+                                        <td className="px-4 py-2 text-sm text-gray-900">
+                                          {installment.name}
+                                          {isCancelled && (
+                                            <span className="ml-1 text-xs text-red-500">(Cancelled)</span>
+                                          )}
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-gray-500">
+                                          {installment.percentage}%
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-gray-500 font-semibold">
+                                          {formatCurrency(installment.totalAmount)}
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-gray-500">
+                                          <div className="text-center">
+                                            {/* Invoice Type */}
+                                            <div
+                                              className={`font-semibold ${
+                                                inv.invoiceType === "Tax Invoice"
+                                                  ? "text-green-600"
+                                                  : "text-blue-600"
+                                              }`}
+                                            >
+                                              {inv.invoiceType === "Proforma Invoice" ? "Proforma" : "Tax"}
+                                              {isCancelled && inv.regenerated && " (Cancelled - Regenerated)"}
+                                              {!isCancelled && inv.regeneratedFrom && ` (Regenerated from ${inv.regeneratedFrom})`}
+                                            </div>
+                                            {getApprovalStatusBadge(inv)}
+                                            {/* Invoice Number */}
+                                            <div className="text-xs text-gray-400 mt-0.5">
+                                              {inv.invoiceNumber || "N/A"}
+                                            </div>
+                                          </div>
+                                        </td>
+
+                                        <td className="px-4 py-2 text-sm">
+                                          <span
                                             className={`font-semibold ${
-                                              existingInvoice.invoiceType ===
-                                              "Tax Invoice"
-                                                ? "text-green-600"
-                                                : "text-blue-600"
+                                              receivedAmount > 0 ? "text-green-600" : "text-gray-600"
                                             }`}
                                           >
-                                            {existingInvoice.invoiceType ===
-                                            "Proforma Invoice"
-                                              ? "Proforma"
-                                              : "Tax"}
-                                          </div>
-                                          {getApprovalStatusBadge(existingInvoice)}
-                                          {/* Invoice Number */}
-                                          <div className="text-xs text-gray-400 mt-0.5">
-                                            {existingInvoice.invoiceNumber ||
-                                              "N/A"}
-                                          </div>
-
-                                          {/* 🔹 Show original Proforma if Tax Invoice */}
-                                          {existingInvoice.convertedFromProforma &&
-                                            existingInvoice.originalProformaNumber && (
-                                              <div className="text-xs text-blue-600 mt-0.5">
-                                                Proforma:{" "}
-                                                {
-                                                  existingInvoice.originalProformaNumber
+                                            {formatCurrency(receivedAmount)}
+                                          </span>
+                                        </td>
+                                        <td className="px-4 py-2 text-sm">
+                                          <span
+                                            className={`font-semibold ${
+                                              dueAmount > 0 ? "text-red-600" : "text-green-600"
+                                            }`}
+                                          >
+                                            {dueAmount === 0 ? "0" : formatCurrency(dueAmount)}
+                                          </span>
+                                        </td>
+                                        <td className="px-4 py-2 text-sm">
+                                          <div className="flex gap-2">
+                                            <button
+                                              onClick={() => setSelectedInvoice(inv)}
+                                              className="bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded text-xs"
+                                            >
+                                              View
+                                            </button>
+                                            {isCancelled && !inv.regenerated && (
+                                              <button
+                                                onClick={() =>
+                                                  handleGenerateInvoice(invoice, installment, true, inv)
                                                 }
-                                              </div>
-                                            )}
-                                        </div>
-                                      ) : (
-                                        "-"
-                                      )}
-                                    </td>
-
-                                    <td className="px-4 py-2 text-sm">
-                                      <span
-                                        className={`font-semibold ${
-                                          receivedAmount > 0
-                                            ? "text-green-600"
-                                            : "text-gray-600"
-                                        }`}
-                                      >
-                                        {formatCurrency(receivedAmount)}
-                                      </span>
-                                    </td>
-                                    <td className="px-4 py-2 text-sm">
-                                      <span
-                                        className={`font-semibold ${
-                                          dueAmount > 0
-                                            ? "text-red-600"
-                                            : "text-green-600"
-                                        }`}
-                                      >
-                                        {dueAmount === 0
-                                          ? "0"
-                                          : formatCurrency(dueAmount)}
-                                      </span>
-                                    </td>
-                                    <td className="px-4 py-2 text-sm">
-                                      <div className="flex gap-2">
-                                        {!existingInvoice ? (
-                                          <>
-                                            <button
-                                              onClick={() =>
-                                                handleGenerateInvoice(
-                                                  invoice,
-                                                  installment
-                                                )
-                                              }
-                                              className="bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded text-xs"
-                                            >
-                                              Generate
-                                            </button>
-                                            
-                                            {/* Cancelled invoices ke liye regenerate option */}
-                                            {hasCancelledInvoices && (
-                                              <button
-                                                onClick={() => handleGenerateInvoice(
-                                                  invoice, 
-                                                  installment, 
-                                                  true, 
-                                                  cancelledInvoices[0]
-                                                )}
                                                 className="bg-orange-500 hover:bg-orange-700 text-white py-1 px-2 rounded text-xs"
                                                 title="Regenerate cancelled invoice"
                                               >
                                                 Regenerate
                                               </button>
                                             )}
-                                          </>
-                                        ) : existingInvoice.invoiceType ===
-                                          "Proforma Invoice" ? (
-                                          <>
-                                            <button
-                                              onClick={() =>
-                                                setSelectedInvoice(
-                                                  existingInvoice
-                                                )
-                                              }
-                                              className="bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded text-xs"
-                                            >
-                                              View
-                                            </button>
-                                            <button
-                                              onClick={() =>
-                                                handleConvertToTax(
-                                                  existingInvoice
-                                                )
-                                              }
-                                              className="bg-purple-500 hover:bg-purple-700 text-white py-1 px-2 rounded text-xs"
-                                            >
-                                              Generate TI
-                                            </button>
-                                          </>
-                                        ) : (
-                                          <>
-                                            <button
-                                              onClick={() =>
-                                                setSelectedInvoice(
-                                                  existingInvoice
-                                                )
-                                              }
-                                              className="bg-green-500 hover:bg-green-700 text-white py-1 px-2 rounded text-xs"
-                                            >
-                                              View
-                                            </button>
-                                            
-                                            {/* Active invoice ke saath bhi regenerate option agar cancelled hua ho */}
-                                            {hasCancelledInvoices && (
+                                            {!isCancelled && inv.invoiceType === "Proforma Invoice" && (
                                               <button
-                                                onClick={() => handleGenerateInvoice(
-                                                  invoice, 
-                                                  installment, 
-                                                  true, 
-                                                  cancelledInvoices[0]
-                                                )}
-                                                className="bg-orange-500 hover:bg-orange-700 text-white py-1 px-2 rounded text-xs"
-                                                title="Regenerate cancelled invoice"
+                                                onClick={() => handleConvertToTax(inv)}
+                                                className="bg-purple-500 hover:bg-purple-700 text-white py-1 px-2 rounded text-xs"
                                               >
-                                                Regenerate
+                                                Generate TI
                                               </button>
                                             )}
-                                          </>
-                                        )}
-                                      </div>
-                                    </td>
-                                  </tr>
-                                );
-                              }
-                            )}
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    );
+                                  });
+                                } else {
+                                  // No invoices for this installment
+                                  return (
+                                    <tr key={index} className="hover:bg-gray-50">
+                                      <td className="px-4 py-2 text-sm text-gray-900">{installment.name}</td>
+                                      <td className="px-4 py-2 text-sm text-gray-500">
+                                        {installment.percentage}%
+                                      </td>
+                                      <td className="px-4 py-2 text-sm text-gray-500 font-semibold">
+                                        {formatCurrency(installment.totalAmount)}
+                                      </td>
+                                      <td className="px-4 py-2 text-sm text-gray-500">-</td>
+                                      <td className="px-4 py-2 text-sm">₹0</td>
+                                      <td className="px-4 py-2 text-sm">
+                                        {formatCurrency(installment.totalAmount)}
+                                      </td>
+                                      <td className="px-4 py-2 text-sm">
+                                        <button
+                                          onClick={() => handleGenerateInvoice(invoice, installment)}
+                                          className="bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded text-xs"
+                                        >
+                                          Generate
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  );
+                                }
+                              });
+                            })()}
                           </tbody>
                         </table>
                       </div>
@@ -986,29 +859,55 @@ export default function ContractInvoiceTable() {
       </div>
 
       {/* Invoice Modal */}
-      <RaiseInvoiceModal
-        isOpen={showModal}
-        contract={selectedContract}
-        installment={selectedInstallment}
-        onClose={() => {
-          setShowModal(false);
-          setSelectedContract(null);
-          setSelectedInstallment(null);
-          setEditInvoice(null);
-        }}
-        onSubmit={(formData, contract, installment) =>
-          handleSubmit(
-            formData, 
-            contract, 
-            installment, 
-            !!editInvoice, 
-            editInvoice?.approvalStatus === 'cancelled'
-          )
-        }
-        isEdit={!!editInvoice}
-        isRegenerate={editInvoice?.approvalStatus === 'cancelled'}
-        editInvoice={editInvoice}
-      />
+      {isRegenerateModal ? (
+        <RegenerateInvoiceModal
+          isOpen={showModal}
+          contract={selectedContract}
+          installment={selectedInstallment}
+          onClose={() => {
+            setShowModal(false);
+            setSelectedContract(null);
+            setSelectedInstallment(null);
+            setEditInvoice(null);
+            setIsRegenerateModal(false);
+          }}
+          onSubmit={(formData, contract, installment) =>
+            handleSubmit(
+              formData, 
+              contract, 
+              installment, 
+              false, 
+              true
+            )
+          }
+          editInvoice={editInvoice}
+        />
+      ) : (
+        <RaiseInvoiceModal
+          isOpen={showModal}
+          contract={selectedContract}
+          installment={selectedInstallment}
+          onClose={() => {
+            setShowModal(false);
+            setSelectedContract(null);
+            setSelectedInstallment(null);
+            setEditInvoice(null);
+            setIsRegenerateModal(false);
+          }}
+          onSubmit={(formData, contract, installment) =>
+            handleSubmit(
+              formData, 
+              contract, 
+              installment, 
+              !!editInvoice, 
+              (editInvoice?.status === 'cancelled' || editInvoice?.approvalStatus === 'cancelled')
+            )
+          }
+          isEdit={!!editInvoice}
+          isRegenerate={editInvoice?.approvalStatus === 'cancelled'}
+          editInvoice={editInvoice}
+        />
+      )}
 
       {/* Invoice Detail Modal */}
       {selectedInvoice && (

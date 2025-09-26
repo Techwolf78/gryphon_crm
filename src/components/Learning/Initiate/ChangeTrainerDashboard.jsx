@@ -13,11 +13,11 @@ import {
   FiCalendar,
   FiUser,
   FiClock,
-  FiDollarSign,
   FiAlertTriangle,
   FiCheck,
   FiRefreshCw,
 } from "react-icons/fi";
+import { FaRupeeSign } from "react-icons/fa";
 
 const ChangeTrainerDashboard = ({
   isOpen,
@@ -919,7 +919,7 @@ const ChangeTrainerDashboard = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    <FiDollarSign className="inline w-4 h-4 mr-1" />
+                    <FaRupeeSign className="inline w-4 h-4 mr-1" />
                     New Trainer Cost (per hour)
                   </label>
                   <div className="space-y-1">
@@ -951,7 +951,7 @@ const ChangeTrainerDashboard = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    <FiDollarSign className="inline w-4 h-4 mr-1" />
+                    <FaRupeeSign className="inline w-4 h-4 mr-1" />
                     Conveyance Cost (one-time)
                   </label>
                   <input
@@ -965,7 +965,7 @@ const ChangeTrainerDashboard = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    <FiDollarSign className="inline w-4 h-4 mr-1" />
+                    <FaRupeeSign className="inline w-4 h-4 mr-1" />
                     Food Cost (per day)
                   </label>
                   <input
@@ -979,7 +979,7 @@ const ChangeTrainerDashboard = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    <FiDollarSign className="inline w-4 h-4 mr-1" />
+                    <FaRupeeSign className="inline w-4 h-4 mr-1" />
                     Lodging Cost (per day)
                   </label>
                   <input

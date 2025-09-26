@@ -23,6 +23,9 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
   // 🆕 Add department toggle state
   const [showDirectorLeads, setShowDirectorLeads] = useState(false);
 
+  // 🆕 Add enriched leads state
+  const [enrichedLeads, setEnrichedLeads] = useState({});
+
   // Modal states for table modals
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showMOUUploadModal, setShowMOUUploadModal] = useState(false);
@@ -82,9 +85,62 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
     setTargets(data);
   }, []);
 
+  // 🆕 Enrich leads with gstAmount from trainingForms
+  const enrichLeadsData = useCallback(async () => {
+    if (!leads || Object.keys(leads).length === 0) {
+      setEnrichedLeads({});
+      return;
+    }
+
+    const enriched = {};
+    await Promise.all(
+      Object.entries(leads).map(async ([id, lead]) => {
+        try {
+          const projectCode = lead.projectCode;
+          if (!projectCode) {
+            enriched[id] = lead;
+            return;
+          }
+
+          const docId = projectCode.replace(/\//g, "-");
+          const docRef = doc(db, "trainingForms", docId);
+          const docSnap = await getDoc(docRef);
+
+          if (docSnap.exists()) {
+            const trainingFormData = docSnap.data();
+            // Merge the training form data with the lead data
+            enriched[id] = {
+              ...lead,
+              studentCount: parseInt(trainingFormData.studentCount) || lead.studentCount,
+              perStudentCost: parseFloat(trainingFormData.perStudentCost) || lead.perStudentCost,
+              totalCost: parseFloat(trainingFormData.totalCost) || lead.totalCost,
+              gstAmount: parseFloat(trainingFormData.gstAmount) || 0,
+              netPayableAmount: parseFloat(trainingFormData.netPayableAmount) || lead.totalCost,
+            };
+          } else {
+            // For leads without training forms, set gstAmount to 0
+            enriched[id] = {
+              ...lead,
+              gstAmount: 0,
+            };
+          }
+        } catch (error) {
+          console.error("Error fetching training form data:", error);
+          enriched[id] = lead;
+        }
+      })
+    );
+
+    setEnrichedLeads(enriched);
+  }, [leads]);
+
   useEffect(() => {
     fetchTargets();
   }, [fetchTargets]);
+
+  useEffect(() => {
+    enrichLeadsData();
+  }, [enrichLeadsData]);
 
   const getFinancialYear = (date) => {
     const year = date.getFullYear();
@@ -152,7 +208,7 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
   const filteredLeads = useMemo(() => {
     if (!currentUser) return [];
 
-    return Object.entries(leads)
+    return Object.entries(enrichedLeads)
       .filter(([, lead]) => {
         if (viewMyLeadsOnly) {
           return lead.assignedTo?.uid === currentUser.uid;
@@ -215,7 +271,7 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
       })
       .sort(([, a], [, b]) => new Date(b.closedDate) - new Date(a.closedDate));
   }, [
-    leads,
+    enrichedLeads,
     currentUser,
     currentRole,
     filterType,
@@ -433,7 +489,7 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
         {/* Stats Dashboard */}
         <div className="mb-8">
           <ClosedLeadsStats
-            leads={leads}
+            leads={enrichedLeads}
             targets={targets}
             currentUser={currentUser}
             users={users}

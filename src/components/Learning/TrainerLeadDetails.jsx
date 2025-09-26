@@ -1,5 +1,6 @@
 import React from "react";
-import { FiX, FiCopy, FiPhone, FiMail, FiUser, FiDollarSign, FiCreditCard, FiHome, FiFileText } from "react-icons/fi";
+import { FiX, FiCopy, FiPhone, FiMail, FiUser, FiCreditCard, FiHome, FiFileText } from "react-icons/fi";
+import { FaRupeeSign } from "react-icons/fa";
 
 function TrainerLeadDetails({ trainer, onClose }) {
   if (!trainer) return null;
@@ -56,7 +57,7 @@ function TrainerLeadDetails({ trainer, onClose }) {
               value={trainer.domain}
             />
             <DetailCard 
-              icon={<FiDollarSign className="text-green-500" />}
+              icon={<FaRupeeSign className="text-green-500" />}
               title="Charges"
               value={`₹${trainer.charges ?? "-"} ${trainer.paymentType ? `(${trainer.paymentType})` : ""}`}
             />

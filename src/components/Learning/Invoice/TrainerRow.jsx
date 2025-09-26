@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import {
   FiUser,
   FiCalendar,
-  FiDollarSign,
   FiLayers,
   FiFileText,
   FiDownload,
@@ -10,7 +9,7 @@ import {
   FiClock,
   FiRefreshCw,
 } from "react-icons/fi";
-import { FaEye } from "react-icons/fa";
+import { FaEye, FaRupeeSign } from "react-icons/fa";
 import { collection, query, where, getDocs, doc, updateDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
 
@@ -169,7 +168,7 @@ function TrainerRow({
         </div>
 
         <div className="text-xs text-gray-500 mt-1 flex items-center">
-          <FiDollarSign className="text-gray-400 mr-1 flex-shrink-0" />
+          <FaRupeeSign className="text-gray-400 mr-1 flex-shrink-0" />
           <span>
             {item.totalCollegeHours} hrs •{" "}
             {item.perHourCost ? `₹${item.perHourCost}/hr` : "Rate not set"}

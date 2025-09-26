@@ -153,13 +153,14 @@ function groupByCollege(trainings) {
     const codeForDisplay = t.projectCode || t.collegeCode || '';
     const key = `${t.collegeName} (${codeForDisplay})`;
     if (!map[key]) {
-      map[key] = { phases: [], tcv: t.tcv || 0, totalCost: 0, totalNetPayable: 0, hasGST: false };
+      map[key] = { phases: [], tcv: t.tcv || 0, totalCost: 0, totalNetPayable: 0, hasGST: false, netPayableAdded: false };
     }
     map[key].phases.push(t);
     map[key].totalCost += t.totalCost || 0;
-    if (t.originalFormData?.gstType === "include") {
+    if (t.originalFormData?.gstType === "include" && !map[key].netPayableAdded) {
       map[key].totalNetPayable += t.originalFormData?.netPayableAmount || 0;
       map[key].hasGST = true;
+      map[key].netPayableAdded = true;
     }
   });
   // Calculate health: show cost% of TCV (higher % = higher cost utilization)
@@ -1508,11 +1509,11 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                           <p className="text-blue-100 text-sm mt-1">
                             {phases.length} phase
                             {phases.length !== 1 ? "s" : ""} configured • TCV: ₹
-                            {data.hasGST ? data.totalNetPayable.toLocaleString('en-IN') : "NA"} • Training Cost: ₹
+                            {data.tcv.toLocaleString('en-IN')} • Training Cost: ₹
                             {data.totalCost.toLocaleString('en-IN')} • Health: <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${health <= 20 ? "bg-green-500 text-white" : "bg-red-500 text-white"}`}>
                               {health <= 20 ? "✓" : "⚠"} {health.toFixed(1)}%
-                            </span> • Total Contract Amount (including GST): ₹
-                            {data.tcv.toLocaleString('en-IN')}
+                            </span> • Total Contract Amount ({data.hasGST ? 'GST applied' : 'GST not applied'}): ₹
+                            {data.hasGST ? data.totalNetPayable.toLocaleString('en-IN') : data.tcv.toLocaleString('en-IN')}
                           </p>
                         </div>
                         <div className="text-blue-100">
