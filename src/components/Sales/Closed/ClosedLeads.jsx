@@ -338,54 +338,54 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
-      <div className="w-full py-8">
+      <div className="w-full py-4">
         {/* Header Section */}
-        <div className="mb-4">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-3">
+        <div className="mb-3">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-2">
             <div className="space-y-1">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl shadow-lg">
-                  <FiTrendingUp className="w-6 h-6 text-white" />
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg shadow-md">
+                  <FiTrendingUp className="w-5 h-5 text-white" />
                 </div>
-                <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+                <h1 className="text-xl lg:text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
                   Closed Deals
                 </h1>
               </div>
-              <p className="text-lg text-gray-600 font-medium">
+              <p className="text-base text-gray-600 font-medium">
                 All your closed deals
               </p>
             </div>
 
             {/* Export Button and Filters Inline with Header */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               {/* Deals Count Capsule */}
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">
                 {filteredLeads.length} deals
               </span>
 
               {/* Export Button */}
               <button
                 onClick={() => exportClosedLeads(filteredLeads, db)}
-                className="inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/25"
+                className="inline-flex items-center justify-center px-2 py-1 bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-sm font-medium rounded-md shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/25"
               >
-                <FiDownload className="w-4 h-4 mr-2" />
+                <FiDownload className="w-3.5 h-3.5 mr-1" />
                 Export
               </button>
 
               {/* Filters */}
-              <div className="flex flex-wrap items-center gap-4">
+              <div className="flex flex-wrap items-center gap-3">
                 {/* Deal Type Filter */}
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-700">Type:</span>
-                  <div className="relative bg-gray-100 p-1 rounded-lg border border-gray-200">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-medium text-gray-700">Type:</span>
+                  <div className="relative bg-gray-100 p-0.5 rounded-md border border-gray-200">
                     {/* Sliding Background */}
                     <div
-                      className={`absolute top-1 bottom-1 bg-white border border-blue-200 rounded-md shadow-sm transition-all duration-300 ease-in-out ${
+                      className={`absolute top-0.5 bottom-0.5 bg-white border border-blue-200 rounded-sm shadow-sm transition-all duration-300 ease-in-out ${
                         filterType === "all"
-                          ? "left-1 w-[52px]"
+                          ? "left-0.5 w-[42px]"
                           : filterType === "new"
-                          ? "left-[61px] w-[48px]"
-                          : "left-[117px] w-[76px]"
+                          ? "left-[49px] w-[38px]"
+                          : "left-[93px] w-[61px]"
                       }`}
                     />
                     {/* Buttons */}
@@ -393,7 +393,7 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
                       <button
                         key={type}
                         onClick={() => setFilterType(type)}
-                        className={`relative px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 focus:outline-none z-10 ${
+                        className={`relative px-3 py-1.5 text-xs font-medium rounded-sm transition-all duration-200 focus:outline-none z-10 ${
                           filterType === type
                             ? "text-blue-700"
                             : "text-gray-600 hover:text-gray-800"
@@ -406,12 +406,12 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
                 </div>
 
                 {/* Quarter Filter */}
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-700">Quarter:</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-medium text-gray-700">Quarter:</span>
                   <select
                     value={quarterFilter}
                     onChange={(e) => setQuarterFilter(e.target.value)}
-                    className="px-3 py-1 border border-gray-300 rounded-lg text-xs text-gray-700 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500"
+                    className="px-2 py-0.5 border border-gray-300 rounded-md text-xs text-gray-700 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500"
                   >
                     <option value="current">Current</option>
                     <option value="Q1">Q1</option>
@@ -423,9 +423,9 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
                 </div>
 
                 {/* View Mode Display */}
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-700">View:</span>
-                  <span className="text-sm font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-lg border border-blue-200">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-medium text-gray-700">View:</span>
+                  <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
                     {viewMyLeadsOnly ? "Your Leads" : "Team Leads"}
                   </span>
                 </div>
@@ -438,36 +438,36 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
 
         {/* Department Toggle for Admin Directors */}
         {shouldShowDepartmentToggle && (
-          <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-6 mb-8 shadow-lg">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-3 mb-4 shadow-sm">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div className="space-y-1">
-                <h3 className="text-lg font-semibold text-gray-900">Department Filter</h3>
-                <p className="text-sm text-gray-600">Include Admin Directors in the view</p>
+                <h3 className="text-sm font-semibold text-gray-900">Department Filter</h3>
+                <p className="text-xs text-gray-600">Include Admin Directors in the view</p>
               </div>
 
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
                 <div className="flex items-center">
                   <button
                     onClick={() => setShowDirectorLeads(!showDirectorLeads)}
-                    className={`relative inline-flex h-8 w-16 items-center rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-4 focus:ring-amber-500/25 ${
+                    className={`relative inline-flex h-7 w-14 items-center rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-4 focus:ring-amber-500/25 ${
                       showDirectorLeads
                         ? "bg-gradient-to-r from-amber-400 to-orange-500"
                         : "bg-gray-300"
-                    } shadow-lg`}
+                    } shadow-md`}
                     role="switch"
                     aria-checked={showDirectorLeads}
                     aria-labelledby="department-toggle-label"
                   >
                     <span
-                      className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition-transform duration-300 ease-in-out ${
-                        showDirectorLeads ? "translate-x-9" : "translate-x-1"
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition-transform duration-300 ease-in-out ${
+                        showDirectorLeads ? "translate-x-8" : "translate-x-1"
                       }`}
                     />
                   </button>
 
                   <span
                     id="department-toggle-label"
-                    className={`ml-3 text-sm font-semibold transition-colors duration-300 ${
+                    className={`ml-2 text-xs font-semibold transition-colors duration-300 ${
                       showDirectorLeads ? "text-amber-700" : "text-gray-500"
                     }`}
                   >
@@ -475,7 +475,7 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
                   </span>
                 </div>
 
-                <div className="text-xs text-gray-500 bg-white/80 px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
+                <div className="text-xs text-gray-500 bg-white/80 px-2 py-1 rounded-md border border-gray-200 shadow-sm">
                   {showDirectorLeads
                     ? "📊 Sales + Admin Directors"
                     : "💼 Sales Only"

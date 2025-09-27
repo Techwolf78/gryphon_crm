@@ -286,7 +286,7 @@ function TrainingConfiguration({
         selectedPhases.includes("phase-3")) &&
         selectedPhases.length > 1 && (
         <div className="space-y-2 pt-2 border-t border-gray-200">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Phase 2 Dates */}
             {selectedPhases.includes("phase-2") &&
               getMainPhase() !== "phase-2" && (

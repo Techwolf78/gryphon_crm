@@ -163,6 +163,7 @@ function groupByCollege(trainings) {
       map[key].netPayableAdded = true;
     }
   });
+  
   // Calculate health: show cost% of TCV (higher % = higher cost utilization)
   Object.keys(map).forEach((key) => {
     const { tcv, totalCost } = map[key];
@@ -662,21 +663,6 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
   const grouped = groupByCollege(filteredByStatus);
 
   // Calculate overall health
-  const trainingsForHealth = filteredByStatus.filter(
-    (t) => t.computedStatus !== "Not Started"
-  );
-
-  const totalTrainingCost = trainingsForHealth.reduce(
-    (acc, t) => acc + (t.totalCost || 0),
-    0
-  );
-  const collegesForHealth = new Set(
-    trainingsForHealth.map((t) => `${t.collegeName} (${t.collegeCode})`)
-  );
-  const totalTcv = Object.entries(grouped)
-    .filter(([key]) => collegesForHealth.has(key))
-    .reduce((acc, [, data]) => acc + (data.tcv || 0), 0);
-  // const overallHealth = totalTcv > 0 ? ((totalTcv - totalTrainingCost) / totalTcv * 100) : 0;
   const overallHealth =
     Object.keys(grouped).length > 0
       ? Object.values(grouped).reduce((acc, data) => acc + data.health, 0) /
@@ -834,16 +820,14 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
         const branch = parts[2];
         const specialization = parts[3];
         const phaseBase = parts[4] + "-" + parts[5];
+        
         const phaseNumber = training.phaseId.split("-")[1]; // "1" for "phase-1"
         const phase = phaseBase + "-phase-" + phaseNumber;
+        
         const prefix = `${projectCode}-${year}-${branch}-${specialization}-${phase}`;
         
         const q = query(collection(db, "trainerAssignments"), where('__name__', '>=', prefix), where('__name__', '<', prefix + '\uf8ff'));
         const snap = await getDocs(q);
-        
-        snap.docs.forEach((doc) => {
-          const data = doc.data();
-        });
         
         const deletePromises = snap.docs.map(doc => deleteDoc(doc.ref));
         await Promise.all(deletePromises);
