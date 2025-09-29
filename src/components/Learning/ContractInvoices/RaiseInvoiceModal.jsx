@@ -27,16 +27,6 @@ const RaiseInvoiceModal = ({
     }
   }, [isEdit, editInvoice]);
 
-  const getPaymentTypeName = (type) => {
-    const paymentTypes = {
-      "AT": "Advanced Training (AT)",
-      "ATP": "Advanced Training Placement (ATP)", 
-      "ATTP": "Advanced Training Training Placement (ATTP)",
-      "ATTT": "Advanced Training Training Training (ATTT)",
-      "EMI": "Equated Monthly Installment (EMI)"
-    };
-    return paymentTypes[type] || type;
-  };
 
   const handleSubmit = () => {
     onSubmit(formData, contract, installment);

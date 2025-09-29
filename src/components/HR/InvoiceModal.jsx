@@ -19,24 +19,38 @@ const InvoiceModal = ({ invoice, onClose, onRegister, isViewOnly }) => {
     return invoice.invoiceNumber || "N/A";
   };
 
-  // ✅ Missing function add karo - Payment details se amounts nikalna
-  const getPaymentAmounts = () => {
-    if (!invoice.paymentDetails || invoice.paymentDetails.length === 0) {
-      return {
-        baseAmount: invoice.amount || invoice.netPayableAmount || invoice.amountRaised || 0,
-        gstAmount: invoice.gstAmount || 0,
-        totalAmount: invoice.amount || invoice.netPayableAmount || invoice.amountRaised || 0,
-      };
-    }
-
-    // Pehla payment detail use karna (Advance wala)
-    const payment = invoice.paymentDetails[0];
+// ✅ Missing function add karo - Payment details se amounts nikalna
+const getPaymentAmounts = () => {
+  // Pehle baseAmount check karo (merge invoices ke liye important)
+  if (invoice.baseAmount !== undefined) {
     return {
-      baseAmount: payment.baseAmount || payment.totalAmount || 0,
-      gstAmount: payment.gstAmount || invoice.gstAmount || 0,
-      totalAmount: payment.totalAmount || invoice.netPayableAmount || invoice.amountRaised || 0,
+      baseAmount: invoice.baseAmount,
+      gstAmount: invoice.gstAmount || 0,
+      totalAmount: invoice.netPayableAmount || invoice.amountRaised || 0,
     };
+  }
+  
+  if (!invoice.paymentDetails || invoice.paymentDetails.length === 0) {
+    // Agar baseAmount nahi hai toh calculate karo
+    const total = invoice.amount || invoice.netPayableAmount || invoice.amountRaised || 0;
+    const baseAmount = total / 1.18; // Assume 18% GST
+    const gstAmount = total - baseAmount;
+    
+    return {
+      baseAmount: Math.round(baseAmount),
+      gstAmount: Math.round(gstAmount),
+      totalAmount: total,
+    };
+  }
+
+  // Pehla payment detail use karna
+  const payment = invoice.paymentDetails[0];
+  return {
+    baseAmount: payment.baseAmount || (payment.totalAmount / 1.18),
+    gstAmount: payment.gstAmount || invoice.gstAmount || 0,
+    totalAmount: payment.totalAmount || invoice.netPayableAmount || invoice.amountRaised || 0,
   };
+};
 
   // ✅ Date format karne ka function
   const formatDate = (dateString) => {
