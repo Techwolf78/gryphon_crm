@@ -37,9 +37,12 @@ export default function ContractInvoiceTable() {
   const [existingProformas, setExistingProformas] = useState([]);
   const [isRegenerateModal, setIsRegenerateModal] = useState(false);
   const [showMergeModal, setShowMergeModal] = useState(false);
-  const [selectedContractsForMerge, setSelectedContractsForMerge] = useState([]);
-  const [selectedInstallmentForMerge, setSelectedInstallmentForMerge] = useState(null);
-  
+  const [selectedContractsForMerge, setSelectedContractsForMerge] = useState(
+    []
+  );
+  const [selectedInstallmentForMerge, setSelectedInstallmentForMerge] =
+    useState(null);
+
   // Tabs state instead of toggle view
   const [activeTab, setActiveTab] = useState("individual");
 
@@ -135,7 +138,9 @@ export default function ContractInvoiceTable() {
     });
 
     // Filter out contracts that have individual invoices
-    return invoices.filter((contract) => !contractsWithIndividualInvoices.has(contract.id));
+    return invoices.filter(
+      (contract) => !contractsWithIndividualInvoices.has(contract.id)
+    );
   };
 
   const formatCurrency = (amount) => {
@@ -188,32 +193,52 @@ export default function ContractInvoiceTable() {
   };
 
   // Generate unique sequential invoice number for financial year
+  // Generate unique sequential invoice number for financial year - IMPROVED VERSION
   const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
     const financialYear = getCurrentFinancialYear();
     const prefix = invoiceType === "Tax Invoice" ? "TI" : "PI";
 
     try {
-      const invoicesQuery = query(
-        collection(db, "ContractInvoices"),
-        where("financialYear", "==", financialYear.year),
-        firestoreOrderBy("raisedDate", "desc")
-      );
+      // Dono collections se check karo
+      const [invoicesSnapshot, proformaSnapshot] = await Promise.all([
+        getDocs(
+          query(
+            collection(db, "ContractInvoices"),
+            where("financialYear", "==", financialYear.year),
+            firestoreOrderBy("raisedDate", "desc")
+          )
+        ),
+        getDocs(
+          query(
+            collection(db, "ProformaInvoices"),
+            where("financialYear", "==", financialYear.year),
+            firestoreOrderBy("raisedDate", "desc")
+          )
+        ),
+      ]);
 
-      const invoicesSnapshot = await getDocs(invoicesQuery);
       let nextInvoiceNumber = 1;
 
-      if (!invoicesSnapshot.empty) {
-        const invoicesData = invoicesSnapshot.docs.map((doc) => doc.data());
-        const invoiceNumbers = invoicesData
+      // Combine both collections for invoice number tracking
+      const allInvoices = [
+        ...invoicesSnapshot.docs.map((doc) => doc.data()),
+        ...proformaSnapshot.docs.map((doc) => doc.data()),
+      ];
+
+      if (allInvoices.length > 0) {
+        const invoiceNumbers = allInvoices
           .filter(
             (inv) =>
               inv.invoiceNumber &&
-              inv.invoiceNumber.includes(financialYear.year)
+              inv.invoiceNumber.includes(financialYear.year) &&
+              inv.invoiceNumber.includes(prefix)
           )
           .map((inv) => {
             const parts = inv.invoiceNumber.split("/");
-            return parseInt(parts[parts.length - 1]) || 0;
-          });
+            const lastPart = parts[parts.length - 1];
+            return parseInt(lastPart) || 0;
+          })
+          .filter((num) => num > 0);
 
         if (invoiceNumbers.length > 0) {
           const maxInvoiceNumber = Math.max(...invoiceNumbers);
@@ -226,7 +251,7 @@ export default function ContractInvoiceTable() {
     } catch (error) {
       console.error("Error generating invoice number:", error);
       const timestamp = new Date().getTime();
-      return `GAPL/${financialYear.year}/${prefix}/F${timestamp}`;
+      return `GAPL/${financialYear.year}/${prefix}/E${timestamp}`;
     }
   };
 
@@ -349,35 +374,71 @@ export default function ContractInvoiceTable() {
       const financialYear = getCurrentFinancialYear();
       const currentDate = new Date();
 
+      // Determine collection name based on invoice type
+      const isProforma = formData.invoiceType === "Proforma Invoice";
+      const collectionName = isProforma
+        ? "ProformaInvoices"
+        : "ContractInvoices";
+
       if (isEdit && !isRegenerate && editInvoice) {
-        const updatedInvoiceNumber = editInvoice.invoiceNumber.replace(
-          "PI",
-          "TI"
-        );
+        // CASE 1: Proforma se Tax Invoice convert karna
+        if (editInvoice.invoiceType === "Proforma Invoice" && !isProforma) {
+          const updatedInvoiceNumber = await generateInvoiceNumber(
+            "Tax Invoice"
+          );
 
-        const updateData = {
-          invoiceType: "Tax Invoice",
-          invoiceNumber: updatedInvoiceNumber,
-          convertedFromProforma: true,
-          originalProformaNumber: editInvoice.invoiceNumber,
-          updatedDate: currentDate,
-        };
+          // 1. Naya Tax Invoice create karo
+          const taxInvoiceData = {
+            ...editInvoice,
+            invoiceType: "Tax Invoice",
+            invoiceNumber: updatedInvoiceNumber,
+            convertedFromProforma: true,
+            originalProformaNumber: editInvoice.invoiceNumber,
+            conversionDate: currentDate,
+            raisedDate: currentDate,
+            updatedDate: currentDate,
+            status: "registered",
+            approvalStatus: "pending",
+          };
 
-        await updateDoc(
-          doc(db, "ContractInvoices", editInvoice.id),
-          updateData
-        );
+          const { id: _, ...taxDataWithoutId } = taxInvoiceData;
+          const docRef = await addDoc(
+            collection(db, "ContractInvoices"),
+            taxDataWithoutId
+          );
 
-        setExistingInvoices((prev) =>
-          prev.map((inv) =>
-            inv.id === editInvoice.id ? { ...inv, ...updateData } : inv
-          )
-        );
+          // 2. Purane Proforma ko mark karo as converted
+          await updateDoc(doc(db, "ProformaInvoices", editInvoice.id), {
+            convertedToTax: true,
+            convertedTaxInvoiceNumber: updatedInvoiceNumber,
+            conversionDate: currentDate,
+          });
 
-        alert(
-          `Invoice converted to Tax Invoice successfully! Invoice Number: ${updatedInvoiceNumber}`
-        );
+          // 3. State update karo
+          const newInvoice = {
+            id: docRef.id,
+            ...taxInvoiceData,
+          };
+
+          setExistingInvoices((prev) => [...prev, newInvoice]);
+          setExistingProformas((prev) =>
+            prev.map((inv) =>
+              inv.id === editInvoice.id
+                ? {
+                    ...inv,
+                    convertedToTax: true,
+                    convertedTaxInvoiceNumber: updatedInvoiceNumber,
+                  }
+                : inv
+            )
+          );
+
+          alert(
+            `Invoice converted to Tax Invoice successfully! Invoice Number: ${updatedInvoiceNumber}`
+          );
+        }
       } else if (isRegenerate && editInvoice) {
+        // CASE 2: Regenerate invoice (same logic with collection selection)
         const newInvoiceNumber = await generateInvoiceNumber(
           formData.invoiceType
         );
@@ -389,7 +450,7 @@ export default function ContractInvoiceTable() {
           raisedDate: currentDate,
           updatedDate: currentDate,
           status: "registered",
-          approvalStatus: "pending",
+          approvalStatus: isProforma ? "not_required" : "pending", // Proforma ke liye approval status not required
           financialYear: financialYear.year,
           receivedAmount: 0,
           dueAmount: editInvoice.netPayableAmount || editInvoice.amountRaised,
@@ -402,11 +463,6 @@ export default function ContractInvoiceTable() {
 
         const { id: _, ...dataWithoutId } = regenerateData;
 
-        let collectionName = "ContractInvoices";
-        if (formData.invoiceType === "Proforma Invoice") {
-          collectionName = "ProformaInvoices";
-        }
-
         const docRef = await addDoc(
           collection(db, collectionName),
           dataWithoutId
@@ -417,16 +473,25 @@ export default function ContractInvoiceTable() {
           ...regenerateData,
         };
 
+        // State update based on collection
         if (collectionName === "ContractInvoices") {
           setExistingInvoices((prev) => [...prev, newInvoice]);
         } else {
           setExistingProformas((prev) => [...prev, newInvoice]);
         }
 
-        const cancelledDocRef = doc(db, collectionName, editInvoice.id);
-        await updateDoc(cancelledDocRef, { regenerated: true });
+        // Purane invoice ko mark karo as regenerated
+        const oldCollection =
+          editInvoice.invoiceType === "Proforma Invoice"
+            ? "ProformaInvoices"
+            : "ContractInvoices";
+        await updateDoc(doc(db, oldCollection, editInvoice.id), {
+          regenerated: true,
+          regeneratedTo: newInvoiceNumber,
+        });
 
-        if (collectionName === "ContractInvoices") {
+        // State update for old invoice
+        if (oldCollection === "ContractInvoices") {
           setExistingInvoices((prev) =>
             prev.map((inv) =>
               inv.id === editInvoice.id ? { ...inv, regenerated: true } : inv
@@ -444,6 +509,7 @@ export default function ContractInvoiceTable() {
           `Invoice regenerated successfully! New Invoice Number: ${newInvoiceNumber}`
         );
       } else {
+        // CASE 3: Naya invoice generate karna
         const invoiceNumber = await generateInvoiceNumber(formData.invoiceType);
         const selectedInstallment = contract.paymentDetails.find(
           (p) => p.name === installment.name
@@ -458,6 +524,8 @@ export default function ContractInvoiceTable() {
           invoiceNumber,
           raisedDate: currentDate,
           status: "registered",
+          // Proforma ke liye approval status not required
+          approvalStatus: isProforma ? "not_required" : "pending",
           originalInvoiceId: contract.id,
           projectCode: contract.projectCode,
           collegeName: contract.collegeName,
@@ -495,7 +563,7 @@ export default function ContractInvoiceTable() {
         };
 
         const docRef = await addDoc(
-          collection(db, "ContractInvoices"),
+          collection(db, collectionName),
           invoiceData
         );
 
@@ -504,7 +572,13 @@ export default function ContractInvoiceTable() {
           ...invoiceData,
         };
 
-        setExistingInvoices((prev) => [...prev, newInvoice]);
+        // State update based on collection
+        if (collectionName === "ContractInvoices") {
+          setExistingInvoices((prev) => [...prev, newInvoice]);
+        } else {
+          setExistingProformas((prev) => [...prev, newInvoice]);
+        }
+
         alert(`Invoice ${invoiceNumber} raised successfully!`);
       }
 
@@ -540,8 +614,18 @@ export default function ContractInvoiceTable() {
     }
   };
 
+  // Approval status badge function mein modification
   const getApprovalStatusBadge = (invoice) => {
     if (!invoice) return null;
+
+    // Proforma invoice ke liye approval status mat show karo
+    if (invoice.invoiceType === "Proforma Invoice") {
+      return (
+        <span className="ml-1 px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 border border-blue-300">
+          Proforma
+        </span>
+      );
+    }
 
     const status = invoice.approvalStatus || invoice.status;
 
@@ -567,17 +651,34 @@ export default function ContractInvoiceTable() {
   };
 
   // Group contracts by college for merged view
+  // Group contracts by college AND installment COUNT for merged view
   const getMergedContracts = () => {
     const mergableContracts = getMergableContracts();
     const merged = {};
 
     mergableContracts.forEach((contract) => {
-      const key = `${contract.collegeName}-${contract.collegeCode}`;
+      const collegeName = contract.collegeName;
+
+      // ✅ Check if contract has valid installment structure
+      if (
+        !contract.paymentDetails ||
+        !Array.isArray(contract.paymentDetails) ||
+        contract.paymentDetails.length === 0
+      ) {
+        return; // Skip contracts without proper installment structure
+      }
+
+      // ✅ Installment COUNT se group karo (names/percentages se koi lena-dena nahi)
+      const installmentCount = contract.paymentDetails.length;
+
+      // ✅ Final grouping key: collegeName + installmentCount
+      const key = `${collegeName}-${installmentCount}`;
 
       if (!merged[key]) {
         merged[key] = {
           collegeName: contract.collegeName,
           collegeCode: contract.collegeCode,
+          installmentCount: installmentCount,
           contracts: [contract],
           installments: {},
         };
@@ -585,12 +686,12 @@ export default function ContractInvoiceTable() {
         merged[key].contracts.push(contract);
       }
 
-      // Process installments for this college
+      // Process installments for this college+count group
       contract.paymentDetails?.forEach((installment) => {
-        const installmentKey = installment.name;
+        const installmentName = installment.name;
 
-        if (!merged[key].installments[installmentKey]) {
-          merged[key].installments[installmentKey] = {
+        if (!merged[key].installments[installmentName]) {
+          merged[key].installments[installmentName] = {
             name: installment.name,
             percentage: installment.percentage,
             contracts: [contract],
@@ -600,14 +701,14 @@ export default function ContractInvoiceTable() {
             studentCounts: [contract.studentCount],
           };
         } else {
-          merged[key].installments[installmentKey].contracts.push(contract);
-          merged[key].installments[installmentKey].totalAmount +=
+          merged[key].installments[installmentName].contracts.push(contract);
+          merged[key].installments[installmentName].totalAmount +=
             installment.totalAmount;
-          merged[key].installments[installmentKey].courses.push(
+          merged[key].installments[installmentName].courses.push(
             contract.course
           );
-          merged[key].installments[installmentKey].years.push(contract.year);
-          merged[key].installments[installmentKey].studentCounts.push(
+          merged[key].installments[installmentName].years.push(contract.year);
+          merged[key].installments[installmentName].studentCounts.push(
             contract.studentCount
           );
         }
@@ -616,7 +717,6 @@ export default function ContractInvoiceTable() {
 
     return Object.values(merged);
   };
-
   // Generate merged project code
   const generateMergedProjectCode = (mergedItem, installment) => {
     const contracts = mergedItem.contracts;
@@ -699,7 +799,8 @@ export default function ContractInvoiceTable() {
         );
         if (installmentDetail) {
           // Calculate base amount (without GST)
-          const installmentBaseAmount = installmentDetail.baseAmount || 
+          const installmentBaseAmount =
+            installmentDetail.baseAmount ||
             installmentDetail.totalAmount / 1.18; // If baseAmount not available, calculate it
           totalBaseAmount += installmentBaseAmount;
         }
@@ -789,6 +890,9 @@ export default function ContractInvoiceTable() {
           gstNumber: c.gstNumber,
           gstType: c.gstType,
         })),
+        individualProjectCodes: selectedContractsForMerge
+          .map((c) => c.projectCode)
+          .filter(Boolean),
       };
 
       const docRef = await addDoc(
@@ -832,7 +936,30 @@ export default function ContractInvoiceTable() {
 
   const individualContracts = getIndividualContracts();
   const mergedContracts = getMergedContracts();
+  // Helper functions for displaying useful info
+  const getUniquePaymentTypes = (contracts) => {
+    const types = [
+      ...new Set(contracts.map((c) => getPaymentTypeName(c.paymentType))),
+    ];
+    return types.join(", ");
+  };
 
+  const getTotalStudentCount = (contracts) => {
+    return contracts.reduce((total, contract) => {
+      return total + (parseInt(contract.studentCount) || 0);
+    }, 0);
+  };
+
+  const getTotalContractAmount = (contracts) => {
+    return contracts.reduce((total, contract) => {
+      return (
+        total +
+        (parseFloat(contract.netPayableAmount) ||
+          parseFloat(contract.totalCost) ||
+          0)
+      );
+    }, 0);
+  };
   return (
     <div className="min-h-screen bg-gray-50/50">
       <div className="w-full space-y-3">
@@ -909,8 +1036,8 @@ export default function ContractInvoiceTable() {
                     No individual contracts available
                   </h3>
                   <p className="text-gray-500 text-xs">
-                    All contracts are either merged or have individual invoices generated.
-                    Switch to Merged View to see available contracts.
+                    All contracts are either merged or have individual invoices
+                    generated. Switch to Merged View to see available contracts.
                   </p>
                 </div>
               </div>
@@ -1124,6 +1251,7 @@ export default function ContractInvoiceTable() {
                                               </td>
                                               <td className="px-4 py-2 text-sm text-gray-500">
                                                 <div className="text-center">
+                                                  {/* Invoice type (Tax / Proforma) */}
                                                   <div
                                                     className={`font-semibold ${
                                                       inv.invoiceType ===
@@ -1143,10 +1271,26 @@ export default function ContractInvoiceTable() {
                                                       inv.regeneratedFrom &&
                                                       ` (Regenerated from ${inv.regeneratedFrom})`}
                                                   </div>
-                                                  {getApprovalStatusBadge(inv)}
+
+                                                  {/* Approval status sirf Tax Invoice ke liye */}
+                                                  {inv.invoiceType !==
+                                                    "Proforma Invoice" &&
+                                                    getApprovalStatusBadge(inv)}
+
+                                                  {/* Invoice number */}
                                                   <div className="text-xs text-gray-400 mt-0.5">
                                                     {inv.invoiceNumber || "N/A"}
                                                   </div>
+
+                                                  {/* From: Proforma number niche dikhana hai */}
+                                                  {inv.convertedFromProforma && (
+                                                    <div className="text-xs text-purple-600 mt-0.5">
+                                                      From:{" "}
+                                                      {
+                                                        inv.originalProformaNumber
+                                                      }
+                                                    </div>
+                                                  )}
                                                 </div>
                                               </td>
 
@@ -1297,7 +1441,8 @@ export default function ContractInvoiceTable() {
                     No contracts available for merging
                   </h3>
                   <p className="text-gray-500 text-xs">
-                    All contracts have individual invoices generated. Switch to Individual View to see them.
+                    All contracts have individual invoices generated. Switch to
+                    Individual View to see them.
                   </p>
                 </div>
               </div>
@@ -1313,18 +1458,24 @@ export default function ContractInvoiceTable() {
                       <div>
                         <div className="flex items-center gap-2">
                           <h2 className="text-lg font-bold text-white">
-                            {mergedItem.collegeName} ({mergedItem.collegeCode})
+                            {mergedItem.collegeName}
                           </h2>
                           <span className="bg-purple-800 text-white text-xs font-semibold py-1 px-2 rounded-full">
                             {mergedItem.contracts.length} Contracts
                           </span>
-                          <FontAwesomeIcon
-                            icon={faObjectGroup}
-                            className="text-white"
-                          />
+                          <span className="bg-green-600 text-white text-xs font-semibold py-1 px-2 rounded-full">
+                            {mergedItem.installmentCount} Installments Each
+                          </span>
                         </div>
                         <p className="text-purple-100 text-sm mt-1">
-                          Merged View • {mergedItem.contracts.length} contracts available for merging
+                          {/* ✅ Useful information dikhao */}
+                          Payment Types:{" "}
+                          {getUniquePaymentTypes(mergedItem.contracts)} • Total
+                          Students: {getTotalStudentCount(mergedItem.contracts)}{" "}
+                          • Total Amount:{" "}
+                          {formatCurrency(
+                            getTotalContractAmount(mergedItem.contracts)
+                          )}
                         </p>
                       </div>
                       <div className="text-purple-100">
@@ -1517,14 +1668,18 @@ export default function ContractInvoiceTable() {
                                         {installment.percentage}%
                                       </td>
                                       <td className="px-4 py-2 text-sm text-gray-500 font-semibold">
-                                        {formatCurrency(installment.totalAmount)}
+                                        {formatCurrency(
+                                          installment.totalAmount
+                                        )}
                                       </td>
                                       <td className="px-4 py-2 text-sm text-gray-500">
                                         -
                                       </td>
                                       <td className="px-4 py-2 text-sm">₹0</td>
                                       <td className="px-4 py-2 text-sm">
-                                        {formatCurrency(installment.totalAmount)}
+                                        {formatCurrency(
+                                          installment.totalAmount
+                                        )}
                                       </td>
                                       <td className="px-4 py-2 text-sm">
                                         <button
