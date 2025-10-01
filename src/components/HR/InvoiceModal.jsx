@@ -1,7 +1,6 @@
 import React from "react";
 
 const InvoiceModal = ({ invoice, onClose }) => {
-  
   if (!invoice) return null;
 
   const getInvoiceTypeDisplay = () => {
@@ -157,8 +156,6 @@ const InvoiceModal = ({ invoice, onClose }) => {
 
   return (
     <>
-     
-
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-500 p-4 no-print">
         <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto invoice-modal-print">
           <div className="p-6">
@@ -222,8 +219,6 @@ const InvoiceModal = ({ invoice, onClose }) => {
                     Installment: {invoice.installment}
                   </p>
                 )}
-
-              
               </div>
             </div>
 
@@ -234,14 +229,15 @@ const InvoiceModal = ({ invoice, onClose }) => {
                   Gryphon Academy Pvt. Ltd
                 </h4>
                 <p className="text-sm">
-                  Survey Number 128, Office No 901, Olympia, Pune Bypass, Olympia
+                  Survey Number 128, Office No 901, Olympia, Pune Bypass,
+                  Olympia
                 </p>
                 <p className="text-sm">
                   Business House, Baner, Pune, Maharashtra 411045
                 </p>
                 <p className="text-sm mt-1">
-                  <strong>GSTIN:</strong> 27AAJCG8035D1ZM |<strong> PAN:</strong>{" "}
-                  AAJCG8035D
+                  <strong>GSTIN:</strong> 27AAJCG8035D1ZM |
+                  <strong> PAN:</strong> AAJCG8035D
                 </p>
               </div>
 
@@ -324,7 +320,8 @@ const InvoiceModal = ({ invoice, onClose }) => {
                               <div className="text-sm text-gray-700 mt-1">
                                 As per the MOU {percentage && `${percentage}% `}
                                 for {courses.join("/")} {years.join("/")} year
-                                {studentCount && ` for ${studentCount} students`}
+                                {studentCount &&
+                                  ` for ${studentCount} students`}
                                 {perStudentCost &&
                                   ` @${perStudentCost} per student`}
                                 {gstAmount > 0 && ` + 18% GST`}
@@ -351,7 +348,8 @@ const InvoiceModal = ({ invoice, onClose }) => {
                                 As per the MOU {percentage && `${percentage}% `}
                                 after completion of the training {course} {year}{" "}
                                 year
-                                {studentCount && ` for ${studentCount} students`}
+                                {studentCount &&
+                                  ` for ${studentCount} students`}
                                 {perStudentCost &&
                                   ` @${perStudentCost} per student`}
                                 {gstAmount > 0 && ` + 18% GST`}
@@ -360,7 +358,8 @@ const InvoiceModal = ({ invoice, onClose }) => {
                               {/* Project Code for individual invoices */}
                               {projectCodes.length > 0 && (
                                 <div className="text-xs text-blue-600 mt-2">
-                                  <strong>Project Code:</strong> {projectCodes[0]}
+                                  <strong>Project Code:</strong>{" "}
+                                  {projectCodes[0]}
                                 </div>
                               )}
                             </div>
@@ -417,26 +416,52 @@ const InvoiceModal = ({ invoice, onClose }) => {
                       })}
                     </td>
                   </tr>
-                  <tr>
-                    <td className="border border-gray-300 px-4 py-2 font-semibold">
-                      Add: CGST @ 9%
-                    </td>
-                    <td className="border border-gray-300 px-4 py-2 text-right">
-                      {(amounts.gstAmount / 2).toLocaleString("en-IN", {
-                        minimumFractionDigits: 2,
-                      })}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="border border-gray-300 px-4 py-2 font-semibold">
-                      Add: SGST @ 9%
-                    </td>
-                    <td className="border border-gray-300 px-4 py-2 text-right">
-                      {(amounts.gstAmount / 2).toLocaleString("en-IN", {
-                        minimumFractionDigits: 2,
-                      })}
-                    </td>
-                  </tr>
+
+                  {/* Cash Invoice ke liye GST zero dikhao */}
+                  {invoice.invoiceType === "Cash Invoice" ? (
+                    <>
+                      <tr>
+                        <td className="border border-gray-300 px-4 py-2 font-semibold">
+                          CGST @ 0%
+                        </td>
+                        <td className="border border-gray-300 px-4 py-2 text-right">
+                          0.00
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="border border-gray-300 px-4 py-2 font-semibold">
+                          SGST @ 0%
+                        </td>
+                        <td className="border border-gray-300 px-4 py-2 text-right">
+                          0.00
+                        </td>
+                      </tr>
+                    </>
+                  ) : (
+                    <>
+                      <tr>
+                        <td className="border border-gray-300 px-4 py-2 font-semibold">
+                          Add: CGST @ 9%
+                        </td>
+                        <td className="border border-gray-300 px-4 py-2 text-right">
+                          {(amounts.gstAmount / 2).toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                          })}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="border border-gray-300 px-4 py-2 font-semibold">
+                          Add: SGST @ 9%
+                        </td>
+                        <td className="border border-gray-300 px-4 py-2 text-right">
+                          {(amounts.gstAmount / 2).toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                          })}
+                        </td>
+                      </tr>
+                    </>
+                  )}
+
                   <tr>
                     <td className="border border-gray-300 px-4 py-2 font-semibold">
                       Grand Total
@@ -456,8 +481,8 @@ const InvoiceModal = ({ invoice, onClose }) => {
             <div className="mb-6 p-3 bg-blue-50 rounded">
               <p className="text-sm text-center">
                 If you have any questions concerning this invoice, use the
-                following contact information: Website: www.gryphonacademy.co.in | 
-                Email: shashli@gryphonacademy.co.in | Phone: +91 7875895160
+                following contact information: Website: www.gryphonacademy.co.in
+                | Email: shashli@gryphonacademy.co.in | Phone: +91 7875895160
               </p>
             </div>
 
@@ -494,7 +519,6 @@ const InvoiceModal = ({ invoice, onClose }) => {
             <div className="flex justify-end space-x-3 mt-6 pt-4 border-t no-print">
               <button
                 onClick={() => window.print()} // Yeh line add karo
-
                 className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 font-semibold"
               >
                 Print/Download

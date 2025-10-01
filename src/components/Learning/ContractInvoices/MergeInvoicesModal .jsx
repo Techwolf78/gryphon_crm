@@ -1,5 +1,5 @@
 // components/MergeInvoicesModal.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const MergeInvoicesModal = ({ 
   isOpen, 
@@ -11,17 +11,33 @@ const MergeInvoicesModal = ({
 }) => {
   const [invoiceType, setInvoiceType] = useState('Tax Invoice');
   const [terms, setTerms] = useState('');
+  const [totalAmount, setTotalAmount] = useState(0);
+  const [totalStudents, setTotalStudents] = useState(0);
+
+  useEffect(() => {
+    if (contracts && installment) {
+      // Safe amount calculation
+      const calculatedTotal = contracts.reduce((sum, contract) => {
+        if (!contract.paymentDetails || !Array.isArray(contract.paymentDetails)) return sum;
+        
+        const inst = contract.paymentDetails.find(p => p.name === installment.name);
+        if (!inst) return sum;
+        
+        const amount = parseFloat(inst.totalAmount) || 0;
+        return sum + amount;
+      }, 0);
+
+      const calculatedStudents = contracts.reduce((sum, contract) => {
+        const students = parseInt(contract.studentCount) || 0;
+        return sum + students;
+      }, 0);
+
+      setTotalAmount(calculatedTotal);
+      setTotalStudents(calculatedStudents);
+    }
+  }, [contracts, installment]);
 
   if (!isOpen) return null;
-
-  const totalAmount = contracts.reduce((sum, contract) => {
-    const inst = contract.paymentDetails?.find(p => p.name === installment?.name);
-    return sum + (inst?.totalAmount || 0);
-  }, 0);
-
-  const totalStudents = contracts.reduce((sum, contract) => 
-    sum + (parseInt(contract.studentCount) || 0), 0
-  );
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -29,6 +45,19 @@ const MergeInvoicesModal = ({
       invoiceType,
       terms: terms || 'Standard terms and conditions apply'
     });
+  };
+
+  // Safe currency formatting function
+  const formatCurrency = (amount) => {
+    if (!amount && amount !== 0) return "₹0";
+    const numAmount = Number(amount);
+    if (isNaN(numAmount)) return "₹0";
+    
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0
+    }).format(numAmount);
   };
 
   return (
@@ -48,20 +77,16 @@ const MergeInvoicesModal = ({
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-purple-600 font-medium">Contracts:</span>
-                <span className="ml-2">{contracts.length}</span>
+                <span className="ml-2">{contracts?.length || 0}</span>
               </div>
               <div>
                 <span className="text-purple-600 font-medium">Installment:</span>
-                <span className="ml-2">{installment?.name}</span>
+                <span className="ml-2">{installment?.name || 'N/A'}</span>
               </div>
               <div>
                 <span className="text-purple-600 font-medium">Total Amount:</span>
                 <span className="ml-2 font-semibold">
-                  {new Intl.NumberFormat('en-IN', {
-                    style: 'currency',
-                    currency: 'INR',
-                    maximumFractionDigits: 0
-                  }).format(totalAmount)}
+                  {formatCurrency(totalAmount)}
                 </span>
               </div>
               <div>
@@ -71,13 +96,13 @@ const MergeInvoicesModal = ({
             </div>
             <div className="mt-2">
               <span className="text-purple-600 font-medium">Project Code:</span>
-              <span className="ml-2 font-mono text-sm">{projectCode}</span>
+              <span className="ml-2 font-mono text-sm">{projectCode || 'N/A'}</span>
             </div>
           </div>
 
           {/* Contracts List */}
           <div>
-            <h3 className="font-semibold text-gray-700 mb-2">Included Contracts</h3>
+            <h3 className="font-semibold text-gray-700 mb-2">Included Contracts ({contracts?.length || 0})</h3>
             <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg">
               <table className="min-w-full text-sm">
                 <thead className="bg-gray-50">
@@ -90,20 +115,18 @@ const MergeInvoicesModal = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {contracts.map((contract, index) => {
+                  {contracts?.map((contract, index) => {
                     const inst = contract.paymentDetails?.find(p => p.name === installment?.name);
+                    const amount = parseFloat(inst?.totalAmount) || 0;
+                    
                     return (
                       <tr key={index}>
-                        <td className="px-3 py-2">{contract.projectCode}</td>
-                        <td className="px-3 py-2">{contract.course}</td>
-                        <td className="px-3 py-2">{contract.year}</td>
-                        <td className="px-3 py-2">{contract.studentCount}</td>
+                        <td className="px-3 py-2">{contract.projectCode || 'N/A'}</td>
+                        <td className="px-3 py-2">{contract.course || 'N/A'}</td>
+                        <td className="px-3 py-2">{contract.year || 'N/A'}</td>
+                        <td className="px-3 py-2">{contract.studentCount || '0'}</td>
                         <td className="px-3 py-2 font-semibold">
-                          {new Intl.NumberFormat('en-IN', {
-                            style: 'currency',
-                            currency: 'INR',
-                            maximumFractionDigits: 0
-                          }).format(inst?.totalAmount || 0)}
+                          {formatCurrency(amount)}
                         </td>
                       </tr>
                     );
@@ -113,7 +136,7 @@ const MergeInvoicesModal = ({
             </div>
           </div>
 
-          {/* Invoice Type */}
+          {/* Invoice Type - Cash Invoice bhi add karo */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Invoice Type
@@ -125,6 +148,7 @@ const MergeInvoicesModal = ({
               required
             >
               <option value="Tax Invoice">Tax Invoice</option>
+              <option value="Cash Invoice">Cash Invoice</option>
               <option value="Proforma Invoice">Proforma Invoice</option>
             </select>
           </div>
