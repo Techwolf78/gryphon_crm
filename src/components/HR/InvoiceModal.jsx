@@ -222,6 +222,8 @@ const InvoiceModal = ({ invoice, onClose }) => {
                     Installment: {invoice.installment}
                   </p>
                 )}
+
+              
               </div>
             </div>
 
