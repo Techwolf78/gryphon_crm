@@ -27,7 +27,6 @@ const RaiseInvoiceModal = ({
     }
   }, [isEdit, editInvoice]);
 
-
   const handleSubmit = () => {
     onSubmit(formData, contract, installment);
   };
@@ -45,14 +44,12 @@ const RaiseInvoiceModal = ({
             {isEdit ? "Convert to Tax Invoice" : "Generate Invoice"}
           </h3>
           <div className="mt-2 px-4 py-2">
-           
-            
             <div className="mb-3">
               <label className="block text-sm font-medium text-gray-700">
                 Invoice Type
               </label>
-              <div className="mt-1 flex gap-4 justify-center">
-                <label className="flex items-center gap-1">
+              <div className="mt-1 flex flex-col gap-2">
+                <label className="flex items-center gap-2 justify-center">
                   <input
                     type="radio"
                     name="invoiceType"
@@ -64,26 +61,29 @@ const RaiseInvoiceModal = ({
                         invoiceType: e.target.value,
                       }))
                     }
-                    disabled={isEdit} // Disable for conversion (always Tax)
+                    disabled={isEdit}
                   />
-                  Tax Invoice
+                  <span>Tax Invoice (TI) - With GST</span>
                 </label>
-<label className="flex items-center gap-1">
-  <input
-    type="radio"
-    name="invoiceType"
-    value="Cash Invoice"
-    checked={formData.invoiceType === "Cash Invoice"}
-    onChange={(e) =>
-      setFormData((prev) => ({
-        ...prev,
-        invoiceType: e.target.value,
-      }))
-    }
-  />
-  Cash Invoice
-</label>
-                <label className="flex items-center gap-1">
+                
+                <label className="flex items-center gap-2 justify-center">
+                  <input
+                    type="radio"
+                    name="invoiceType"
+                    value="Cash Invoice"
+                    checked={formData.invoiceType === "Cash Invoice"}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        invoiceType: e.target.value,
+                      }))
+                    }
+                    disabled={isEdit}
+                  />
+                  <span>Cash Invoice (CI) - Without GST</span>
+                </label>
+                
+                <label className="flex items-center gap-2 justify-center">
                   <input
                     type="radio"
                     name="invoiceType"
@@ -95,12 +95,18 @@ const RaiseInvoiceModal = ({
                         invoiceType: e.target.value,
                       }))
                     }
-                    disabled={isEdit} // Disable for conversion
+                    disabled={isEdit}
                   />
-                  Proforma Invoice
+                  <span>Proforma Invoice (PI)</span>
                 </label>
-
               </div>
+              
+              {formData.invoiceType === "Cash Invoice" && (
+                <p className="text-xs text-blue-600 mt-1">
+                  Cash Invoice: Base amount only, GST will be zero
+                </p>
+              )}
+              
               {isEdit && (
                 <p className="text-xs text-yellow-600 mt-1">
                   Converting Proforma invoice to Tax Invoice
