@@ -8,6 +8,7 @@ import Header from "./Invoice/Header";
 import FiltersSection from "./Invoice/FiltersSection";
 import LoadingState from "./Invoice/LoadingState";
 import EmptyState from "./Invoice/EmptyState";
+import TrainerInvoiceSkeleton from "./Invoice/TrainerInvoiceSkeleton";
 
 import TrainerTable from "./Invoice/TrainerTable";
 
@@ -627,68 +628,70 @@ function GenerateTrainerInvoice() {
 
   return (
     <div className="min-h-screen bg-gray-50 ">
-      <div className=" mx-auto bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
-        <Header />
-        
-        <FiltersSection
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          filtersBtnRef={filtersBtnRef}
-          isAnyFilterActive={isAnyFilterActive}
-          toggleFiltersDropdown={toggleFiltersDropdown}
-          filtersDropdownOpen={filtersDropdownOpen}
-          filtersDropdownRef={filtersDropdownRef}
-          dropdownPosition={dropdownPosition}
-          projectCodeFilter={projectCodeFilter}
-          setProjectCodeFilter={setProjectCodeFilter}
-          projectCodes={projectCodes}
-          businessNameFilter={businessNameFilter}
-          setBusinessNameFilter={setBusinessNameFilter}
-          businessNames={businessNames}
-          startDateFilter={startDateFilter}
-          setStartDateFilter={setStartDateFilter}
-          endDateFilter={endDateFilter}
-          setEndDateFilter={setEndDateFilter}
-          clearAllFilters={clearAllFilters}
-          applyFilters={applyFilters}
-          showOnlyActive={showOnlyActive}
-          setShowOnlyActive={setShowOnlyActive}
-          handleRefreshData={handleRefreshData}
-          exporting={exporting}
-          setExporting={setExporting}
-          filteredGroupedData={filteredGroupedData}
-        />
+      {loading ? (
+        <TrainerInvoiceSkeleton />
+      ) : (
+        <div className=" mx-auto bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+          <Header />
+          
+          <FiltersSection
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+            filtersBtnRef={filtersBtnRef}
+            isAnyFilterActive={isAnyFilterActive}
+            toggleFiltersDropdown={toggleFiltersDropdown}
+            filtersDropdownOpen={filtersDropdownOpen}
+            filtersDropdownRef={filtersDropdownRef}
+            dropdownPosition={dropdownPosition}
+            projectCodeFilter={projectCodeFilter}
+            setProjectCodeFilter={setProjectCodeFilter}
+            projectCodes={projectCodes}
+            businessNameFilter={businessNameFilter}
+            setBusinessNameFilter={setBusinessNameFilter}
+            businessNames={businessNames}
+            startDateFilter={startDateFilter}
+            setStartDateFilter={setStartDateFilter}
+            endDateFilter={endDateFilter}
+            setEndDateFilter={setEndDateFilter}
+            clearAllFilters={clearAllFilters}
+            applyFilters={applyFilters}
+            showOnlyActive={showOnlyActive}
+            setShowOnlyActive={setShowOnlyActive}
+            handleRefreshData={handleRefreshData}
+            exporting={exporting}
+            setExporting={setExporting}
+            filteredGroupedData={filteredGroupedData}
+          />
 
-        <div className="p-1 sm:p-2">
-          {loading ? (
-            <LoadingState />
-          ) : trainerData.length === 0 ? (
-            <EmptyState 
-              icon={FiUser}
-              title="No trainer data found"
-              message="Training data will appear here once available"
-            />
-          ) : Object.keys(filteredGroupedData).length === 0 ? (
-            <EmptyState 
-              icon={FiSearch}
-              title="No matching trainers"
-              message="Try adjusting your filters"
-            />
-          ) : (
-            <TrainerTable
-              filteredGroupedData={filteredGroupedData}
-              expandedPhases={expandedPhases}
-              togglePhase={togglePhase}
-              handleDownloadInvoice={handleDownloadInvoice}
-              handleEditInvoice={handleEditInvoice}
-              handleGenerateInvoice={handleGenerateInvoice}
-              downloadingInvoice={downloadingInvoice}
-              getDownloadStatus={getDownloadStatus}
-              formatDate={formatDate}
-            />
-          )}
+          <div className="p-1 sm:p-2">
+            {trainerData.length === 0 ? (
+              <EmptyState 
+                icon={FiUser}
+                title="No trainer data found"
+                message="Training data will appear here once available"
+              />
+            ) : Object.keys(filteredGroupedData).length === 0 ? (
+              <EmptyState 
+                icon={FiSearch}
+                title="No matching trainers"
+                message="Try adjusting your filters"
+              />
+            ) : (
+              <TrainerTable
+                filteredGroupedData={filteredGroupedData}
+                expandedPhases={expandedPhases}
+                togglePhase={togglePhase}
+                handleDownloadInvoice={handleDownloadInvoice}
+                handleEditInvoice={handleEditInvoice}
+                handleGenerateInvoice={handleGenerateInvoice}
+                downloadingInvoice={downloadingInvoice}
+                getDownloadStatus={getDownloadStatus}
+                formatDate={formatDate}
+              />
+            )}
+          </div>
         </div>
-      </div>
+      )}
       {showInvoiceModal && selectedTrainer && (
         <InvoiceModal
           trainer={selectedTrainer}

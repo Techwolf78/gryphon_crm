@@ -16,7 +16,7 @@ import * as XLSX from "xlsx";
 
 const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange }) => {
   const [filterType, setFilterType] = useState("all");
-  const [quarterFilter, setQuarterFilter] = useState("current");
+  const [quarterFilter, setQuarterFilter] = useState("all");
   const [targets, setTargets] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;

@@ -5,7 +5,7 @@ import { MdOutlineAttachMoney } from "react-icons/md";
 import ComingSoonModal from "./ComingSoonModal";
 
 
-function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouFile, onInitiate }) {
+function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouFile, onInitiate, onInitiateJD }) {
 
   const [menuOpenId, setMenuOpenId] = useState(null);
   const [showComingSoonModal, setShowComingSoonModal] = useState(false);
@@ -247,7 +247,7 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
                       </button>
                       <button
                         onClick={() => {
-                          setShowComingSoonModal(true);
+                          onInitiateJD();
                           setMenuOpenId(null);
                         }}
                         className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-indigo-50 focus:bg-indigo-50 text-gray-700 transition group"

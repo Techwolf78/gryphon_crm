@@ -19,8 +19,8 @@ import {
 import JDBatchTable from "./JDBatchTable";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import TrainingConfiguration from "./TrainingConfiguration";
-import SubmissionChecklist from "./SubmissionChecklist";
+import TrainingConfiguration from "../Initiate/TrainingConfiguration";
+import SubmissionChecklist from "../Initiate/SubmissionChecklist";
 
 const DOMAIN_OPTIONS = ["JD"];
 
