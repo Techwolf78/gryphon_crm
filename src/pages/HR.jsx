@@ -88,8 +88,8 @@ const HR = () => {
 
       setBills(billsData);
       setFilteredBills(billsData);
-    } catch (error) {
-      console.error("❌ Error fetching bills:", error);
+    } catch {
+      // Error fetching bills - handled silently
     } finally {
       setLoading(false);
     }
@@ -181,8 +181,8 @@ const HR = () => {
 
       setSelectedTrainer(trainer);
       setShowTrainerModal(true);
-    } catch (error) {
-      console.error("Error fetching trainer details:", error);
+    } catch {
+      // Error fetching trainer details - handled through alert
       alert("Failed to fetch trainer details.");
     }
   };
@@ -227,8 +227,8 @@ const HR = () => {
       setBills(updatedBills);
       setShowActionModal(false);
       setSelectedBill(null);
-    } catch (error) {
-      console.error("Error updating bill status:", error);
+    } catch {
+      // Error updating bill status - handled through alert
       alert("Failed to update bill status. Please try again.");
     }
   };

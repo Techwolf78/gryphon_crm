@@ -50,8 +50,8 @@ const Register = () => {
       } else {
         setInvoices([]);
       }
-    } catch (error) {
-      console.error("Error fetching invoices:", error);
+    } catch {
+      // Error fetching invoices - handled through UI error state
       setError(`Error: ${error.message}`);
     } finally {
       setLoading(false);
@@ -92,8 +92,8 @@ const Register = () => {
       );
 
       alert("✅ Invoice registered successfully!");
-    } catch (error) {
-      console.error("Error registering invoice:", error);
+    } catch {
+      // Error registering invoice - handled through alert
       alert("❌ Error registering invoice: " + error.message);
     }
   };

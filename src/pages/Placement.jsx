@@ -40,8 +40,8 @@ function Placement() {
         ...doc.data(),
       }));
       setLeads(leadsData);
-    } catch (err) {
-      console.error("Error fetching data:", err);
+    } catch {
+      // Error fetching data - handled silently
     }
   };
 
@@ -56,8 +56,8 @@ function Placement() {
       );
       const students = studentsSnapshot.docs.map((doc) => doc.data());
       setStudentModalData({ show: true, students });
-    } catch (err) {
-      console.error("Failed to fetch students:", err);
+    } catch {
+      // Failed to fetch students - handled through alert
       alert("Failed to load student data.");
     }
   };

@@ -20,6 +20,9 @@ const ClosedLeadsStats = ({
   handleTargetUpdate,
   selectedTeamUserId,
   setSelectedTeamUserId,
+  achievedValue: propAchievedValue, // ← rename incoming prop
+  showDirectorLeads,
+  shouldShowDepartmentToggle,
 }) => {
   const selectedFY = propSelectedFY || getCurrentFinancialYear();
 
@@ -34,12 +37,22 @@ const ClosedLeadsStats = ({
 
   const teamMembers = useMemo(() => {
     if (isAdminOrDirector) {
-      return Object.values(users).filter(
+      let members = Object.values(users).filter(
         (u) =>
           ["Head", "Manager", "Assistant Manager", "Executive"].includes(
             u.role
           ) && u.department === "Sales"
       );
+
+      // Include Admin Directors when department filter is ON
+      if (shouldShowDepartmentToggle && showDirectorLeads) {
+        const adminDirectors = Object.values(users).filter(
+          (u) => u.department === "Admin" && u.role === "Director"
+        );
+        members = [...members, ...adminDirectors];
+      }
+
+      return members;
     } else if (isHead) {
       return Object.values(users).filter(
         (u) => ["Manager"].includes(u.role) && u.department === "Sales"
@@ -53,7 +66,7 @@ const ClosedLeadsStats = ({
       );
     }
     return [];
-  }, [isAdminOrDirector, isHead, isManager, users, userObj.name]);
+  }, [isAdminOrDirector, isHead, isManager, users, userObj.name, shouldShowDepartmentToggle, showDirectorLeads]);
 
   let targetUser;
 
@@ -209,6 +222,14 @@ const ClosedLeadsStats = ({
             ) && u.department === "Sales"
         )
         .map((u) => u.uid);
+
+      // Include Admin Directors when department filter is ON
+      if (shouldShowDepartmentToggle && showDirectorLeads) {
+        const adminDirectorUids = Object.values(users)
+          .filter((u) => u.department === "Admin" && u.role === "Director")
+          .map((u) => u.uid);
+        allUids = [...allUids, ...adminDirectorUids];
+      }
     } else if (isHead) {
       let managers = teamMembers.filter(
         (u) => u.role === "Manager" && u.department === "Sales"
@@ -290,6 +311,8 @@ const ClosedLeadsStats = ({
     teamMembers,
     userObj.name,
     userObj.uid,
+    shouldShowDepartmentToggle,
+    showDirectorLeads,
   ]);
 
   // Display targets and achieved values
@@ -299,7 +322,9 @@ const ClosedLeadsStats = ({
     ? aggregateValues
     : getQuarterTargetWithCarryForward(targetUid);
 
-  const achievedValue = isHeadViewingManager
+  const achievedValue = shouldShowDepartmentToggle && showDirectorLeads
+    ? propAchievedValue
+    : isHeadViewingManager
     ? getTotalAchievedAmount(allUids, activeQuarter)
     : selectedTeamUserId === "all" && !effectiveViewMyLeadsOnly && aggregateValues
     ? aggregateValues.achieved
@@ -368,15 +393,15 @@ const ClosedLeadsStats = ({
             </div>
 
             {!effectiveViewMyLeadsOnly && teamMembers.length > 0 && (
-              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/20">
-                <label className="block text-xs font-semibold text-white/90 mb-1.5">
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                <label className="block text-xs font-semibold text-white/90 mb-1">
                   Team Member
                 </label>
                 <div className="relative">
                   <select
                     value={selectedTeamUserId}
                     onChange={(e) => setSelectedTeamUserId(e.target.value)}
-                    className="block w-full pl-3 pr-8 py-2 text-sm border border-white/30 rounded-md bg-white/95 text-gray-900 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 backdrop-blur-sm"
+                    className="block w-full pl-2 pr-6 py-1.5 text-xs border border-white/30 rounded-md bg-white/95 text-gray-900 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 backdrop-blur-sm"
                   >
                     <option value="all">All Team Members</option>
                     {teamMembers.map((u) => (
@@ -385,9 +410,9 @@ const ClosedLeadsStats = ({
                       </option>
                     ))}
                   </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-white/70">
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1.5 text-white/70">
                     <svg
-                      className="h-4 w-4"
+                      className="h-3 w-3"
                       fill="currentColor"
                       viewBox="0 0 20 20"
                     >
@@ -674,6 +699,9 @@ ClosedLeadsStats.propTypes = {
   handleTargetUpdate: PropTypes.func.isRequired,
   selectedTeamUserId: PropTypes.string.isRequired,
   setSelectedTeamUserId: PropTypes.func.isRequired,
+  achievedValue: PropTypes.number,
+  showDirectorLeads: PropTypes.bool,
+  shouldShowDepartmentToggle: PropTypes.bool,
 };
 
 export default ClosedLeadsStats;

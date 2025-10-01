@@ -161,7 +161,7 @@ export default function LoginPage() {
         localStorage.removeItem("rememberedPassword");
       }
     } catch (error) {
-      console.error("Login failed:", error);
+      // Login failed - error handled through UI feedback
 
       let errorMessage = "Login failed. Please try again.";
 
@@ -220,8 +220,8 @@ export default function LoginPage() {
       // Note: This would need to be implemented with Firebase Auth sendPasswordResetEmail
       // For now, showing the contact modal as fallback
       setShowPasswordReset(true);
-    } catch (error) {
-      console.error("Password reset failed:", error);
+    } catch {
+      // Password reset failed - error handled through UI feedback
       setSuccessMessage("Failed to send reset email. Please contact IT support.");
       setMessageType("error");
     } finally {

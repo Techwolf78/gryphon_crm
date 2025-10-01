@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { db } from "../../../firebase";
 import {
   doc,
@@ -209,38 +209,39 @@ function InitiationModal({ training, onClose, onConfirm }) {
     fetchTrainingDetails();
   }, [training]);
 
-  // Auto-generate table1Data for new domains
-  useEffect(() => {
-    if (courses.length === 0 || topics.length === 0) return;
-    setTable1DataByDomain((prev) => {
-      const updated = { ...prev };
-      selectedDomains.forEach((domain) => {
-        if (!updated[domain] || updated[domain].length === 0) {
-          const domainHours = getDomainHours(domain, getMainPhase());
-          updated[domain] = courses.map((course) => ({
-            batch: course.specialization,
-            stdCount: course.students,
-            hrs: domainHours,
-            assignedHours: 0,
-            batches: [
-              {
-                batchPerStdCount: "",
-                batchCode: `${course.specialization}1`,
-                assignedHours: 0,
-                trainers: [],
-              },
-            ],
-          }));
-        }
-      });
-
-      // Store original table data for undo functionality (only if not already set)
-      if (Object.keys(originalTable1DataByDomain.current).length === 0) {
-        originalTable1DataByDomain.current = JSON.parse(JSON.stringify(updated));
+  const table1DataByDomainMemo = useMemo(() => {
+    if (courses.length === 0 || topics.length === 0) return {};
+    const updated = {};
+    selectedDomains.forEach((domain) => {
+      if (!updated[domain] || updated[domain].length === 0) {
+        const domainHours = getDomainHours(domain, getMainPhase());
+        updated[domain] = courses.map((course) => ({
+          batch: course.specialization,
+          stdCount: course.students,
+          hrs: domainHours,
+          assignedHours: 0,
+          batches: [
+            {
+              batchPerStdCount: "",
+              batchCode: `${course.specialization}1`,
+              assignedHours: 0,
+              trainers: [],
+            },
+          ],
+        }));
       }
-
-      return updated;
     });
+
+    // Store original table data for undo functionality (only if not already set)
+    if (Object.keys(originalTable1DataByDomain.current).length === 0) {
+      originalTable1DataByDomain.current = JSON.parse(JSON.stringify(updated));
+    }
+
+    return updated;
+  }, [selectedDomains, courses, topics, getDomainHours, getMainPhase]);
+
+  useEffect(() => {
+    setTable1DataByDomain(table1DataByDomainMemo);
     
     // Store original custom phase hours for undo functionality (only if not already set)
     if (Object.keys(originalCustomPhaseHours.current).length === 0) {
@@ -251,8 +252,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
     if (originalSelectedDomains.current.length === 0) {
       originalSelectedDomains.current = [...selectedDomains];
     }
-    
-  }, [selectedDomains, courses, topics, getDomainHours, getMainPhase, customPhaseHours]);
+  }, [table1DataByDomainMemo, customPhaseHours, selectedDomains]);
 
   // Track changes for undo functionality
   useEffect(() => {
@@ -1634,7 +1634,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
 
 
-                <TrainingConfiguration commonFields={commonFields} setCommonFields={setCommonFields} selectedPhases={selectedPhases} phase2Dates={phase2Dates} phase3Dates={phase3Dates} getMainPhase={getMainPhase} />
+                <TrainingConfiguration commonFields={commonFields} setCommonFields={setCommonFields} selectedPhases={selectedPhases} phase2Dates={phase2Dates} phase3Dates={phase3Dates} setPhase2Dates={setPhase2Dates} setPhase3Dates={setPhase3Dates} getMainPhase={getMainPhase} />
 
                 {/* Training Domain + Batch Details */}
                 {getMainPhase() && (

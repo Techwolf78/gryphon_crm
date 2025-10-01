@@ -109,8 +109,8 @@ export default function UpdateProfile({ onClose }) {
           if (!usersSnapshot.empty) {
             setUserDetails(usersSnapshot.docs[0].data());
           }
-        } catch (error) {
-          console.error("Error:", error);
+        } catch {
+          // Error loading profile data - handled through toast
           toast.error("Failed to load profile data");
         } finally {
           setLoading(false);
@@ -137,8 +137,8 @@ export default function UpdateProfile({ onClose }) {
 
       setCurrentImage(imageUrl);
       setPhotoURL(imageUrl);
-    } catch (error) {
-      console.error("Error updating profile:", error);
+    } catch {
+      // Error updating profile - handled through toast
       toast.error("Failed to update profile picture");
     } finally {
       setUploading(false); // End upload

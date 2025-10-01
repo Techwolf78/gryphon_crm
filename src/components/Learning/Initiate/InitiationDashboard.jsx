@@ -120,6 +120,10 @@ function formatDate(input) {
   if (typeof input === "object" && input !== null && typeof input.toDate === "function") {
     date = input.toDate();
   } 
+  // Handle Firestore Timestamp as plain object (seconds/nanoseconds)
+  else if (typeof input === "object" && input !== null && input.seconds !== undefined && input.nanoseconds !== undefined) {
+    date = new Date(input.seconds * 1000 + input.nanoseconds / 1000000);
+  }
   // Handle timestamp (number)
   else if (typeof input === "number") {
     date = new Date(input);
@@ -133,11 +137,11 @@ function formatDate(input) {
   else if (input instanceof Date) {
     date = input;
   } else {
-    return String(input);
+    return "";
   }
   
   // Validate date
-  if (isNaN(date.getTime())) return String(input);
+  if (isNaN(date.getTime())) return "";
   
   const day = String(date.getDate()).padStart(2, "0");
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -510,6 +514,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
             totalCost: totalCost,
             table1Data: Array(totalBatches).fill({}), // For batch count display
             tcv: formData.totalCost || 0,
+            mergedColleges: phaseData.mergedColleges || null, // Add merged colleges info
             ...phaseData,
             // Include original form data for phase initiation
             originalFormData: formData,
@@ -1478,6 +1483,17 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
             {Object.keys(filteredGrouped).length > 0 ? (
               Object.entries(filteredGrouped).map(([college, data]) => {
                 const { phases, health } = data;
+                
+                // Check if this is a merged training (any phase has mergedColleges)
+                const mergedTraining = phases.find(p => p.mergedColleges);
+                let mergedCollegeNames = [];
+                if (mergedTraining && Array.isArray(mergedTraining.mergedColleges)) {
+                  mergedCollegeNames = mergedTraining.mergedColleges.map(c => c.name || c.collegeName).filter(Boolean);
+                }
+                const displayCollegeName = mergedTraining ? 
+                  `${college} (Merged: ${mergedCollegeNames.join(", ") || "Multiple Colleges"})` : 
+                  college;
+                
                 return (
                   <div
                     key={college}
@@ -1488,7 +1504,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                       <div className="flex items-center justify-between">
                         <div>
                           <h2 className="text-lg font-bold text-white">
-                            {college}
+                            {displayCollegeName}
                           </h2>
                           <p className="text-blue-100 text-sm mt-1">
                             {phases.length} phase
@@ -1550,6 +1566,9 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                               assignedUser?.uid ||
                               "Unassigned";
 
+                            // Check if this training is part of a merge
+                            const isMerged = training.mergedColleges && training.mergedColleges.length > 0;
+
                             return (
                               <tr
                                 key={training.id}
@@ -1573,6 +1592,11 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                                     <span className="text-sm font-medium text-gray-900">
                                       {PHASE_LABELS[training.phaseId] ||
                                         training.phaseId}
+                                      {isMerged && (
+                                        <span className="ml-2 text-xs text-blue-600 font-medium">
+                                          (Merged)
+                                        </span>
+                                      )}
                                     </span>
                                   </div>
                                 </td>
@@ -1932,6 +1956,9 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                           assignedUser?.uid ||
                           "Unassigned";
 
+                        // Check if this training is part of a merge
+                        const isMerged = training.mergedColleges && training.mergedColleges.length > 0;
+
                         return (
                           <div
                             key={training.id}
@@ -1956,6 +1983,11 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                                   <h3 className="text-xs font-semibold text-gray-900">
                                     {PHASE_LABELS[training.phaseId] ||
                                       training.phaseId}
+                                    {isMerged && (
+                                      <span className="ml-1 text-xs text-blue-600 font-medium">
+                                        (Merged)
+                                      </span>
+                                    )}
                                   </h3>
                                   <span
                                     className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-0.5 ${status.style}`}

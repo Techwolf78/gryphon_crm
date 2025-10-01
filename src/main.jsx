@@ -17,9 +17,8 @@ msalInstance.initialize().then(() => {
       </StrictMode>
     );
   });
-}).catch(error => {
-  console.error("MSAL initialization failed:", error);
-  // Fallback render without MSAL if initialization fails
+}).catch(() => {
+  // MSAL initialization failed - fallback render without MSAL
   createRoot(document.getElementById('root')).render(
     <StrictMode>
       <App />

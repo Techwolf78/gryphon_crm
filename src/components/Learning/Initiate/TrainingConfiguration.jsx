@@ -377,6 +377,66 @@ function TrainingConfiguration({
           </div>
         </div>
       )}
+
+      {/* Training Dates for JD */}
+      {selectedPhases.includes("JD") && getMainPhase() === "JD" && (
+        <div className="space-y-2 pt-2 border-t border-gray-200">
+          <h4 className="text-xs font-medium text-gray-900">Training Dates</h4>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                Training Start Date
+              </label>
+              <input
+                type="date"
+                value={(() => {
+                  if (!commonFields.trainingStartDate) return "";
+                  if (commonFields.trainingStartDate instanceof Date) {
+                    return commonFields.trainingStartDate.toISOString().split('T')[0];
+                  }
+                  if (typeof commonFields.trainingStartDate === 'string') {
+                    // If it's already a date string, return it
+                    return commonFields.trainingStartDate;
+                  }
+                  // Handle Firestore Timestamp
+                  if (commonFields.trainingStartDate && typeof commonFields.trainingStartDate.toDate === 'function') {
+                    return commonFields.trainingStartDate.toDate().toISOString().split('T')[0];
+                  }
+                  return "";
+                })()}
+                onChange={(e) => setCommonFields({ ...commonFields, trainingStartDate: e.target.value ? new Date(e.target.value) : null })}
+                className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                Training End Date
+              </label>
+              <input
+                type="date"
+                value={(() => {
+                  if (!commonFields.trainingEndDate) return "";
+                  if (commonFields.trainingEndDate instanceof Date) {
+                    return commonFields.trainingEndDate.toISOString().split('T')[0];
+                  }
+                  if (typeof commonFields.trainingEndDate === 'string') {
+                    // If it's already a date string, return it
+                    return commonFields.trainingEndDate;
+                  }
+                  // Handle Firestore Timestamp
+                  if (commonFields.trainingEndDate && typeof commonFields.trainingEndDate.toDate === 'function') {
+                    return commonFields.trainingEndDate.toDate().toISOString().split('T')[0];
+                  }
+                  return "";
+                })()}
+                onChange={(e) => setCommonFields({ ...commonFields, trainingEndDate: e.target.value ? new Date(e.target.value) : null })}
+                className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

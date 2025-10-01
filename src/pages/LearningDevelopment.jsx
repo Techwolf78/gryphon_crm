@@ -71,9 +71,14 @@ function LearningDevelopment() {
               collection(db, "trainingForms", doc.id, "trainings")
             );
             trainingData.isInitiated = !trainingsSnap.empty;
-          } catch (err) {
-            console.error("Error checking initiation status:", err);
+            
+            // Check if JD phase is initiated
+            const jdPhaseDoc = trainingsSnap.docs.find(doc => doc.id === "JD");
+            trainingData.isJDInitiated = !!jdPhaseDoc;
+          } catch {
+            // Error checking initiation status - handled silently
             trainingData.isInitiated = false;
+            trainingData.isJDInitiated = false;
           }
 
           return trainingData;
@@ -81,8 +86,8 @@ function LearningDevelopment() {
       );
 
       setTrainings(data);
-    } catch (err) {
-      console.error("Error fetching trainings:", err);
+    } catch {
+      // Error fetching trainings - handled through UI error state
       setError("Failed to load training data. Please try again.");
     }
   };
@@ -136,9 +141,15 @@ function LearningDevelopment() {
   };
 
   // NEW: Handle "Start Phase" button click from InitiationDashboard
-  const handleStartPhase = (training) => {
-    setSelectedTrainingForInitiation(training);
-    setShowInitiationModal(true);
+  const handleStartPhase = async (training) => {
+    // Check if this is a JD phase edit
+    if (training.selectedPhase === "JD") {
+      alert("JD Training feature is coming soon!");
+      return;
+    } else {
+      setSelectedTrainingForInitiation(training);
+      setShowInitiationModal(true);
+    }
   };
 
   // NEW: Handle closing InitiationModal and refresh dashboard

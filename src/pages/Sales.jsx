@@ -463,8 +463,8 @@ function Sales() {
   const updateLeadPhase = useCallback(async (id, newPhase) => {
     try {
       await updateDoc(doc(db, "leads", id), { phase: newPhase });
-    } catch (err) {
-      console.error("Phase update failed", err);
+    } catch {
+      // Phase update failed - handled silently
     }
   }, []);
 
@@ -496,8 +496,8 @@ function Sales() {
       await Promise.all(savePromises);
       setShowDetailsModal(false);
       setSelectedLead(null);
-    } catch (error) {
-      console.error("Error saving leads:", error);
+    } catch {
+      // Error saving leads - handled silently
     }
   }, []);
 
