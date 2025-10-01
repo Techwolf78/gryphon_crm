@@ -195,8 +195,6 @@ function TrainerCalendar({
   const previousActiveRef = useRef(null);
   const mainRef = useRef(null);
 
-
-
   useEffect(() => {
     let mounted = true;
     (async () => {
