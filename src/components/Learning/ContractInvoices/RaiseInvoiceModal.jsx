@@ -68,6 +68,21 @@ const RaiseInvoiceModal = ({
                   />
                   Tax Invoice
                 </label>
+<label className="flex items-center gap-1">
+  <input
+    type="radio"
+    name="invoiceType"
+    value="Cash Invoice"
+    checked={formData.invoiceType === "Cash Invoice"}
+    onChange={(e) =>
+      setFormData((prev) => ({
+        ...prev,
+        invoiceType: e.target.value,
+      }))
+    }
+  />
+  Cash Invoice
+</label>
                 <label className="flex items-center gap-1">
                   <input
                     type="radio"
@@ -84,6 +99,7 @@ const RaiseInvoiceModal = ({
                   />
                   Proforma Invoice
                 </label>
+
               </div>
               {isEdit && (
                 <p className="text-xs text-yellow-600 mt-1">
