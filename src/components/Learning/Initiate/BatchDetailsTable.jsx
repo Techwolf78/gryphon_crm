@@ -1509,7 +1509,7 @@ const filteredTrainers = useMemo(() => {
       });
       setTrainers(trainerList);
     } catch (error) {
-      console.error("Error fetching trainers:", error);
+
     }
   }, []);
 
@@ -2186,7 +2186,7 @@ const filteredTrainers = useMemo(() => {
           },
         });
       } catch (error) {
-        console.error("❌ [SWAP] Error during cross-batch swap:", error);
+
         alert("Error occurred during swap: " + error.message);
         return;
       }
@@ -2340,10 +2340,6 @@ const filteredTrainers = useMemo(() => {
     const updated = [...table1Data];
     const mergedRow = updated[mergedRowIndex];
     if (!mergedRow || !mergedRow.originalData) {
-      console.warn(
-        "[BatchDetailsTable] undoMerge: no originalData on merged row",
-        mergedRowIndex
-      );
       return;
     }
 
@@ -2429,10 +2425,6 @@ const filteredTrainers = useMemo(() => {
           mergeFirestoreConfig;
         // Implement revert logic here if needed. _collectionPath/_docIdField are preserved for future use.
       } catch (err) {
-        console.error(
-          "[BatchDetailsTable] Error while undoing persisted merge:",
-          err
-        );
       }
     }
   };
@@ -2513,17 +2505,6 @@ const filteredTrainers = useMemo(() => {
                 }`;
                 errors.push({ message });
                 // Debug log to help track false positives
-                console.debug(
-                  "[BatchDetailsTable] duplicate detected (local)",
-                  {
-                    trainerKey,
-                    existingKey,
-                    trainerId: trainer.trainerId,
-                    dateISO,
-                    trainerDayDuration: trainer.dayDuration,
-                    existingDayDuration: existing.dayDuration,
-                  }
-                );
               }
             } else {
               trainerMap.set(keyBase, {
@@ -2555,17 +2536,6 @@ const filteredTrainers = useMemo(() => {
                     trainer.trainerId
                   }) conflicts with an external assignment on ${dateISO}`;
                   errors.push({ message });
-                  console.debug(
-                    "[BatchDetailsTable] duplicate detected (global)",
-                    {
-                      trainerKey,
-                      trainerId: trainer.trainerId,
-                      dateISO,
-                      trainerDayDuration: trainer.dayDuration,
-                      assignmentDayDuration: assignment.dayDuration,
-                      assignmentSourceTrainingId: assignment.sourceTrainingId,
-                    }
-                  );
                 }
               }
             }
@@ -3206,3 +3176,4 @@ const filteredTrainers = useMemo(() => {
 };
 
 export default BatchDetailsTable;
+

@@ -180,7 +180,7 @@ function TrainerCalendar({
         if (typeof prefs.showAllPast === 'boolean') setShowAllPast(prefs.showAllPast);
       }
     } catch (e) {
-      console.warn('TrainerCalendar: load prefs failed', e);
+
     }
   }, []);
 
@@ -204,7 +204,7 @@ function TrainerCalendar({
         snap.forEach(d => list.push({ id: d.id, ...d.data() }));
         if (mounted) setTrainers(list);
       } catch (err) {
-        console.error('TrainerCalendar: failed to fetch trainers', err);
+
       }
     })();
     return () => { mounted = false; };
@@ -274,7 +274,6 @@ function TrainerCalendar({
     const endISO = formatDateISO(new Date(base.getFullYear(), base.getMonth() + monthOffset + 1, 0));
 
     const subscribe = async () => {
-      try {
         let q = fsQuery(colRef, where('date', '>=', startISO), where('date', '<=', endISO), orderBy('date'));
         if (selectedTrainer) q = fsQuery(q, where('trainerId', '==', selectedTrainer));
         if (selectedCollege) q = fsQuery(q, where('collegeName', '==', selectedCollege));
@@ -282,9 +281,8 @@ function TrainerCalendar({
           const out = [];
             snap.forEach(d => out.push({ id: d.id, ...d.data() }));
           setAssignments(out);
-        }, err => console.error('trainerAssignments query snapshot error', err));
-      } catch (err) {
-        console.warn('TrainerCalendar: query fallback - full collection', err);
+        });
+
         unsub = onSnapshot(colRef, snap => {
           const out = [];
           snap.forEach(d => out.push({ id: d.id, ...d.data() }));
@@ -297,11 +295,10 @@ function TrainerCalendar({
             return true;
           });
           setAssignments(filtered);
-        }, err => console.error('trainerAssignments fallback snapshot error', err));
-      }
-    };
+        });
+      };
     subscribe();
-    return () => { try { typeof unsub === 'function' && unsub(); } catch (err) { console.warn('unsubscribe failed', err); } };
+    return () => { typeof unsub === 'function' && unsub(); };
   }, [monthOffset, selectedTrainer, selectedCollege]);
 
   const colleges = useMemo(() => {

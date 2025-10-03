@@ -177,7 +177,7 @@ function groupByCollege(trainings) {
   return map;
 }
 
-const InitiationDashboard = ({ onRowClick, onStartPhase }) => {
+const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
   const [showTrainerCalendar, setShowTrainerCalendar] = useState(false);
   const [trainerCalendarTraining, setTrainerCalendarTraining] = useState(null);
   const [trainings, setTrainings] = useState([]);
@@ -603,11 +603,18 @@ const InitiationDashboard = ({ onRowClick, onStartPhase }) => {
   }, [selectedUserFilter]);
 
   // Refresh data handler
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchData(true); // Force refresh
     setRefreshing(false);
-  };
+  }, [fetchData]);
+
+  // Set the onRefresh callback when component mounts
+  useEffect(() => {
+    if (onRefresh) {
+      onRefresh(() => handleRefresh);
+    }
+  }, [onRefresh, handleRefresh]);
 
   // Filter trainings based on search, phase, and date
   const filteredTrainings = trainings.filter((training) => {
@@ -752,18 +759,37 @@ const InitiationDashboard = ({ onRowClick, onStartPhase }) => {
     }
   };
 
-  // Edit button handler - reopens initiation modal in edit mode for the specific phase
+  // Edit button handler - shows popup for JD training only
   const handleEditPhase = (e, training) => {
     e.stopPropagation();
+
+    // Only allow editing for JD training - show toast instead of opening form
+    if (training.phaseId === "JD") {
+      // Clear any existing toast timer
+      if (toast && toast.timer) {
+        clearTimeout(toast.timer);
+      }
+      const timer = setTimeout(() => setToast(null), 6000);
+      setToast({
+        type: "jd_edit_restricted",
+        message: "JD training edit functionality is not available from here. Please use the dedicated JD training interface.",
+        timer,
+      });
+      return;
+    }
+
+    // For other phases, open the initiation modal for editing
     const trainingForModal = {
       id: training.trainingId,
       selectedPhase: training.phaseId,
       collegeName: training.collegeName,
       projectCode: training.projectCode || training.collegeCode,
       ...training.originalFormData,
-      isEdit: true, // optional flag consumers can use to open modal in edit mode
     };
-    if (onStartPhase) onStartPhase(trainingForModal);
+
+    if (onStartPhase) {
+      onStartPhase(trainingForModal);
+    }
   };
 
   // Change trainer handler - opens change trainer modal for specific phase
@@ -821,7 +847,7 @@ const InitiationDashboard = ({ onRowClick, onStartPhase }) => {
         const deletePromises = snap.docs.map(doc => deleteDoc(doc.ref));
         await Promise.all(deletePromises);
       } else {
-        console.warn("❌ [DELETE] Could not parse training ID for assignment deletion:", training.trainingId);
+
       }
       
       // Commit all deletions
@@ -834,13 +860,13 @@ const InitiationDashboard = ({ onRowClick, onStartPhase }) => {
       try {
         localStorage.removeItem(`ld_initiation_trainings_${selectedUserFilter || user?.uid}`);
       } catch (cacheError) {
-        console.warn("Failed to clear cache:", cacheError);
+
       }
       
       setShowDeleteConfirm(false);
       setSelectedTrainingForDelete(null);
     } catch (error) {
-      console.error("Error deleting training:", error);
+
       // Optionally show error toast or alert
       alert("Failed to delete training. Please try again.");
       setShowDeleteConfirm(false);
@@ -904,6 +930,13 @@ const InitiationDashboard = ({ onRowClick, onStartPhase }) => {
 
   const handleUndo = async () => {
     if (!toast) return;
+    
+    // Only allow undo for certain toast types
+    if (toast.type === "jd_edit_restricted") {
+      setToast(null);
+      return;
+    }
+    
     const { trainingId, prevStatus, timer } = toast;
     if (timer) clearTimeout(timer);
 
@@ -1648,9 +1681,7 @@ const InitiationDashboard = ({ onRowClick, onStartPhase }) => {
                         <tbody className="bg-white divide-y divide-gray-100">
                           {phases.map((training) => {
                             const status = getPhaseStatus(training);
-                            const canEdit =
-                              training.domainsCount > 0 ||
-                              training.isEdit === true;
+                            const canEdit = true; // Allow editing for all phases
 
                             // Get assigned user details
                             const assignedUser =
@@ -2039,8 +2070,7 @@ const InitiationDashboard = ({ onRowClick, onStartPhase }) => {
                     <div className="lg:hidden divide-y divide-gray-100">
                       {phases.map((training) => {
                         const status = getPhaseStatus(training);
-                        const canEdit =
-                          training.domainsCount > 0 || training.isEdit === true;
+                        const canEdit = true; // Allow editing for all phases
 
                         // Get assigned user details
                         const assignedUser =
@@ -2292,24 +2322,32 @@ const InitiationDashboard = ({ onRowClick, onStartPhase }) => {
           <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-4 max-w-sm">
             <div className="flex items-start">
               <div className="flex-shrink-0">
-                <FiCheckCircle className="w-5 h-5 text-green-500" />
+                {toast.type === "jd_edit_restricted" ? (
+                  <FiX className="w-5 h-5 text-red-500" />
+                ) : (
+                  <FiCheckCircle className="w-5 h-5 text-green-500" />
+                )}
               </div>
               <div className="ml-3 flex-1">
                 <p className="text-sm font-medium text-gray-900">
                   {toast.message}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Status changed to {toast.status}
-                </p>
+                {toast.type !== "assignment" && toast.type !== "jd_edit_restricted" && toast.status && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Status changed to {toast.status}
+                  </p>
+                )}
               </div>
-              <div className="ml-3 flex-shrink-0">
-                <button
-                  onClick={handleUndo}
-                  className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                >
-                  Undo
-                </button>
-              </div>
+              {toast.type !== "jd_edit_restricted" && (
+                <div className="ml-3 flex-shrink-0">
+                  <button
+                    onClick={toast.type === "assignment" ? _handleUndoAssignment : handleUndo}
+                    className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    Undo
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

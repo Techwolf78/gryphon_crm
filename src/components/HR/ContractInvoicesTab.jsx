@@ -50,7 +50,7 @@ const ContractInvoicesTab = () => {
         setInvoices([]);
       }
     } catch (error) {
-      console.error("Error fetching invoices:", error);
+
       setError(`Error: ${error.message}`);
     } finally {
       setLoading(false);
@@ -78,7 +78,7 @@ const ContractInvoicesTab = () => {
 
       alert("✅ Invoice approved successfully!");
     } catch (error) {
-      console.error("Error approving invoice:", error);
+
       alert("❌ Error approving invoice: " + error.message);
     }
   };
@@ -109,7 +109,7 @@ const ContractInvoicesTab = () => {
 
       alert("❌ Invoice cancelled successfully!");
     } catch (error) {
-      console.error("Error cancelling invoice:", error);
+
       alert("❌ Error cancelling invoice: " + error.message);
     }
   };
@@ -162,7 +162,7 @@ const ContractInvoicesTab = () => {
       setPaymentModal({ isOpen: false, invoice: null });
       alert(`Payment of ₹${receivedAmount} recorded successfully!`);
     } catch (error) {
-      console.error("Error recording payment:", error);
+
       alert("Error recording payment: " + error.message);
     }
   };

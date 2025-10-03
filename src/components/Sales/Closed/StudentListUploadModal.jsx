@@ -50,7 +50,7 @@ const StudentListUploadModal = ({ isOpen, onClose, leadData, onUploadSuccess }) 
         created_at: result.created_at,
       };
     } catch (error) {
-      console.error("Cloudinary upload error:", error);
+
       throw new Error(`Student list upload failed: ${error.message}`);
     }
   };

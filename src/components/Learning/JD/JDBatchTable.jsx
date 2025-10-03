@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../../../firebase";
 import {
@@ -18,6 +18,8 @@ const JDBatchTable = ({
   commonFields,
   globalTrainerAssignments = [],
   excludeDays = "None",
+  onValidationChange,
+  selectedDomain,
 }) => {
   const [trainers, setTrainers] = useState([]);
 
@@ -31,7 +33,7 @@ const JDBatchTable = ({
       });
       setTrainers(trainerList);
     } catch (error) {
-      console.error("Error fetching trainers:", error);
+
     }
   }, []);
 
@@ -91,6 +93,177 @@ const JDBatchTable = ({
     }
     return dates;
   }, []);
+
+  // Memoize validation result to prevent unnecessary re-renders
+  const validationResult = useMemo(() => {
+    if (!table1Data || table1Data.length === 0) {
+      return {
+        hasErrors: false,
+        errors: [],
+        duplicates: [],
+      };
+    }
+
+    const duplicatesSet = new Set();
+    const errors = [];
+    const trainerScheduleMap = new Map(); // trainerId -> Map<dateISO, {dayDuration, trainerKey}>
+
+    // Helper function to get all dates for a trainer
+    const getTrainerDates = (trainer) => {
+      const dates = [];
+      if (!trainer.startDate || !trainer.endDate || !trainer.dayDuration) {
+        return dates; // Skip incomplete trainers
+      }
+
+      try {
+        const startDate = new Date(trainer.startDate);
+        const endDate = new Date(trainer.endDate);
+
+        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()) || startDate > endDate) {
+          return dates;
+        }
+
+        let current = new Date(startDate);
+        while (current <= endDate) {
+          const dayOfWeek = current.getDay();
+          let shouldInclude = true;
+
+          if (excludeDays === "Saturday" && dayOfWeek === 6) shouldInclude = false;
+          else if (excludeDays === "Sunday" && dayOfWeek === 0) shouldInclude = false;
+          else if (excludeDays === "Both" && (dayOfWeek === 0 || dayOfWeek === 6)) shouldInclude = false;
+
+          if (shouldInclude) {
+            dates.push(current.toISOString().slice(0, 10));
+          }
+          current.setDate(current.getDate() + 1);
+        }
+      } catch (error) {
+
+      }
+
+      return dates;
+    };
+
+    // First pass: collect all trainer schedules
+    table1Data.forEach((row, rowIndex) => {
+      row.batches?.forEach((batch, batchIndex) => {
+        batch.trainers?.forEach((trainer, trainerIdx) => {
+          if (!trainer.trainerId) return;
+
+          const trainerKey = `${rowIndex}-${batchIndex}-${trainerIdx}`;
+          const dates = getTrainerDates(trainer);
+
+          if (dates.length === 0) return; // Skip trainers with no valid dates
+
+          dates.forEach((dateISO) => {
+            if (!trainerScheduleMap.has(trainer.trainerId)) {
+              trainerScheduleMap.set(trainer.trainerId, new Map());
+            }
+
+            const trainerDates = trainerScheduleMap.get(trainer.trainerId);
+
+            if (trainerDates.has(dateISO)) {
+              const existing = trainerDates.get(dateISO);
+              // Check for time slot conflict
+              const hasConflict =
+                trainer.dayDuration === "AM & PM" ||
+                existing.dayDuration === "AM & PM" ||
+                (trainer.dayDuration === "AM" && existing.dayDuration === "AM") ||
+                (trainer.dayDuration === "PM" && existing.dayDuration === "PM");
+
+              if (hasConflict) {
+                duplicatesSet.add(existing.trainerKey);
+                duplicatesSet.add(trainerKey);
+
+                const message = `${trainer.trainerName || trainer.trainerId} (${trainer.trainerId}) has conflicting assignment on ${dateISO} (${trainer.dayDuration})`;
+                errors.push({ message });
+              }
+            } else {
+              trainerDates.set(dateISO, {
+                dayDuration: trainer.dayDuration,
+                trainerKey: trainerKey,
+              });
+            }
+          });
+        });
+      });
+    });
+
+    // Second pass: check against global assignments
+    table1Data.forEach((row, rowIndex) => {
+      row.batches?.forEach((batch, batchIndex) => {
+        batch.trainers?.forEach((trainer, trainerIdx) => {
+          if (!trainer.trainerId) return;
+
+          const trainerKey = `${rowIndex}-${batchIndex}-${trainerIdx}`;
+          const dates = getTrainerDates(trainer);
+
+          if (dates.length === 0) return;
+
+          dates.forEach((dateISO) => {
+            // Check global assignments
+            for (let assignment of globalTrainerAssignments) {
+              if (assignment.trainerId !== trainer.trainerId) continue;
+
+              let assignDates = [];
+              if (assignment.date) {
+                assignDates = [assignment.date];
+              } else if (assignment.startDate && assignment.endDate) {
+                try {
+                  const startDate = new Date(assignment.startDate);
+                  const endDate = new Date(assignment.endDate);
+
+                  if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+                    let current = new Date(startDate);
+                    while (current <= endDate) {
+                      assignDates.push(current.toISOString().slice(0, 10));
+                      current.setDate(current.getDate() + 1);
+                    }
+                  }
+                } catch (error) {
+
+                }
+              }
+
+              if (assignDates.includes(dateISO)) {
+                const hasConflict =
+                  assignment.dayDuration === "AM & PM" ||
+                  trainer.dayDuration === "AM & PM" ||
+                  (assignment.dayDuration === "AM" && trainer.dayDuration === "AM") ||
+                  (assignment.dayDuration === "PM" && trainer.dayDuration === "PM");
+
+                if (hasConflict) {
+                  duplicatesSet.add(trainerKey);
+                  const message = `${trainer.trainerName || trainer.trainerId} (${trainer.trainerId}) conflicts with existing assignment on ${dateISO} (${trainer.dayDuration})`;
+                  errors.push({ message });
+                }
+              }
+            }
+          });
+        });
+      });
+    });
+
+    const duplicates = Array.from(duplicatesSet);
+
+    // Remove duplicate error messages
+    const uniqueErrors = Array.from(
+      new Map(errors.map((e) => [e.message, e])).values()
+    );
+
+    return {
+      hasErrors: duplicates.length > 0,
+      errors: uniqueErrors,
+      duplicates: duplicates,
+    };
+  }, [table1Data, globalTrainerAssignments, excludeDays]);
+
+  // Update duplicate trainers and notify parent when validation result changes
+  useEffect(() => {
+    if (onValidationChange && selectedDomain) {
+      onValidationChange(selectedDomain, validationResult);
+    }
+  }, [validationResult, selectedDomain, onValidationChange]);
 
   // Check trainer availability
   const isTrainerAvailable = useCallback((
@@ -361,6 +534,45 @@ const JDBatchTable = ({
 
   return (
     <div className="space-y-4">
+      {/* Duplicate prompt banner inside the table component */}
+      {validationResult.duplicates && validationResult.duplicates.length > 0 && (
+        <div className="rounded bg-red-50 border border-red-200 p-3">
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-red-800">
+              Duplicate trainer assignments detected. Rows with conflicts are
+              highlighted in the table below.
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={() => {
+                  // Expand rows containing duplicates and scroll to first duplicate
+                  if (!validationResult.duplicates || validationResult.duplicates.length === 0)
+                    return;
+                  const first = validationResult.duplicates[0];
+                  const parts = first.split("-");
+                  const rowIdx = Number(parts[0]);
+                  if (!isNaN(rowIdx)) {
+                    // For JD table, we don't have expandable rows, so just scroll to the element
+                    setTimeout(() => {
+                      const el = document.getElementById(`trainer-${first}`);
+                      if (el && el.scrollIntoView)
+                        el.scrollIntoView({
+                          behavior: "smooth",
+                          block: "center",
+                        });
+                    }, 120);
+                  }
+                }}
+                className="px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700"
+              >
+                Show duplicates
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {table1Data.map((row, rowIndex) => (
         <div key={rowIndex} className="border rounded-lg p-4 bg-white shadow-sm">
           <div className="flex items-center justify-between mb-4">
@@ -434,8 +646,17 @@ const JDBatchTable = ({
                           ),
                         }));
 
+                        const duplicateKey = `${rowIndex}-${batchIndex}-${trainerIdx}`;
+                        const isDuplicate = validationResult.duplicates.includes(duplicateKey);
+
                         return (
-                          <div key={trainerIdx} className="border rounded p-3 bg-white">
+                          <div key={trainerIdx} className={`border rounded p-3 ${isDuplicate ? "bg-red-50 border-red-200" : "bg-white"}`} id={`trainer-${duplicateKey}`}>
+                            {isDuplicate && (
+                              <div className="mb-2 p-2 bg-red-100 border border-red-300 rounded text-xs text-red-800 flex items-center">
+                                <FiAlertCircle className="mr-1" size={12} />
+                                Duplicate assignment detected
+                              </div>
+                            )}
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
                               {/* Trainer Selection */}
                               <div>

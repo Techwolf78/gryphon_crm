@@ -234,7 +234,7 @@ const ImportData = ({ show, onClose, handleImportComplete }) => {
       await addDoc(collection(db, "companies"), companyData);
       return { success: true };
     } catch (error) {
-      console.error("Error uploading company data:", error);
+
       return { success: false, error: error.message };
     }
   };

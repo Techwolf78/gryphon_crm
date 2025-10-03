@@ -6,7 +6,7 @@ import { toast } from 'react-toastify';
 
 const SendRequestModal = ({ trainer, onClose, onRequestSent }) => {
   const { user } = useAuth();
-  console.log('SendRequestModal rendering for', trainer?.name);
+
 
   const handleSend = async () => {
     try {
@@ -20,7 +20,7 @@ const SendRequestModal = ({ trainer, onClose, onRequestSent }) => {
       });
       onRequestSent();
     } catch (err) {
-      console.error('Failed to send request:', err);
+
       toast.error('Failed to send request. Please try again.');
     }
   };

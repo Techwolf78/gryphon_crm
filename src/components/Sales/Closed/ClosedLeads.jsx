@@ -49,7 +49,7 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
       setActiveLeadData(leadData);
       setShowMOUUploadModal(true);
     } else {
-      console.error("Lead data not found for ID:", leadId);
+
     }
   };
 
@@ -72,7 +72,7 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
         alert("Training form data not found in Firestore!");
       }
     } catch (error) {
-      console.error("Error fetching training form data:", error);
+
       alert("Failed to fetch form data");
     }
   };
@@ -95,29 +95,29 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
     }
 
     const enriched = {};
-    console.log('Enriching leads data for', Object.keys(leads).length, 'leads');
+
 
     await Promise.all(
       Object.entries(leads).map(async ([id, lead]) => {
         try {
           const projectCode = lead.projectCode;
-          console.log('Processing lead:', id, 'projectCode:', projectCode);
+
 
           if (!projectCode) {
-            console.log('No projectCode for lead:', id);
+
             enriched[id] = lead;
             return;
           }
 
           const docId = projectCode.replace(/\//g, "-");
-          console.log('Looking for training form with docId:', docId);
+
 
           const docRef = doc(db, "trainingForms", docId);
           const docSnap = await getDoc(docRef);
 
           if (docSnap.exists()) {
             const trainingFormData = docSnap.data();
-            console.log('Found training form data:', trainingFormData);
+
 
             // Merge the training form data with the lead data
             enriched[id] = {
@@ -134,7 +134,7 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
             const perStudentCost = parseFloat(lead.perStudentCost) || 0;
             const calculatedTotalCost = studentCount * perStudentCost;
 
-            console.log('No training form found, calculating totalCost:', calculatedTotalCost, 'from', studentCount, '*', perStudentCost);
+
 
             enriched[id] = {
               ...lead,
@@ -143,15 +143,15 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
             };
           }
 
-          console.log('Final enriched lead:', id, enriched[id]);
+
         } catch (error) {
-          console.error("Error fetching training form data:", error);
+
           enriched[id] = lead;
         }
       })
     );
 
-    console.log('Setting enriched leads:', enriched);
+
     setEnrichedLeads(enriched);
   }, [leads]);
 
@@ -293,7 +293,7 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
       })
       .sort(([, a], [, b]) => new Date(b.closedDate) - new Date(a.closedDate));
 
-    console.log('Filtered leads for leaderboard:', result);
+
     return result;
   }, [
     enrichedLeads,

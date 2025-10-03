@@ -758,7 +758,7 @@ const SalesDashboard = ({ filters }) => {
       };
     } else {
       // Invalid input
-      console.error("Invalid input to processLeadsData:", input);
+
       return {
         revenue: 0,
         hotLeads: 0,
@@ -917,7 +917,7 @@ if (selectedUserId) {
             revenueByDate[dateKey].revenue += lead.totalCost;
             revenueByDate[dateKey].dealCount += 1;
           } catch (e) {
-            console.error("Error processing closed date:", e);
+
           }
         }
       }
@@ -1097,7 +1097,7 @@ if (lead.assignedTo && lead.assignedTo.uid) {
       const filteredUsers = usersData;
       setUsers(filteredUsers);
     } catch (error) {
-      console.error("Error fetching users:", error.message);
+
       setUsers([]);
     } finally {
       setIsLoading(false);
@@ -1130,7 +1130,7 @@ if (lead.assignedTo && lead.assignedTo.uid) {
       const currentData = processLeadsData(leads);
       setDashboardData(currentData);
     } catch (error) {
-      console.error("Error fetching dashboard data:", error);
+
       setDashboardData({
         revenue: 0,
         revenuePrevQuarter: 0,

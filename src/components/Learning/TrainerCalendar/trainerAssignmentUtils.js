@@ -4,7 +4,7 @@ import { db } from "../../../firebase";
 // Delete specific trainer assignment
 export const deleteTrainerAssignment = async (assignment, onSuccess, onError) => {
   if (!assignment || !assignment.id) {
-    console.error('Invalid assignment for deletion');
+
     if (onError) onError('Invalid assignment for deletion');
     return;
   }
@@ -18,7 +18,7 @@ export const deleteTrainerAssignment = async (assignment, onSuccess, onError) =>
       onSuccess(assignment);
     }
   } catch (error) {
-    console.error('Error deleting trainer assignment:', error);
+
     if (onError) {
       onError('Failed to delete trainer assignment. Please try again.');
     } else {

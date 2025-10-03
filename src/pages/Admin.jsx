@@ -151,7 +151,7 @@ const Admin = () => {
         u.name?.toLowerCase().includes(search.toLowerCase()) ||
         u.email?.toLowerCase().includes(search.toLowerCase())) &&
       (!roleFilter || u.role === roleFilter) &&
-      (!departmentFilter || u.department === departmentFilter)
+      (!departmentFilter || (Array.isArray(u.departments) ? u.departments.includes(departmentFilter) : u.department === departmentFilter))
     );
   });
 
@@ -304,7 +304,7 @@ const Admin = () => {
                   className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 >
                   <option value="">All Departments</option>
-                  {[...new Set(users.map((u) => u.department))].map((dep) => (
+                  {[...new Set(users.flatMap((u) => Array.isArray(u.departments) ? u.departments : (u.department ? [u.department] : [])))].map((dep) => (
                     <option key={dep} value={dep}>
                       {dep}
                     </option>
@@ -385,9 +385,11 @@ const Admin = () => {
                       <span className="px-2 py-1 text-xs rounded-full bg-indigo-50 text-indigo-700">
                         {user.role}
                       </span>
-                      <span className="px-2 py-1 text-xs rounded-full bg-gray-50 text-gray-700">
-                        {user.department}
-                      </span>
+                      {(Array.isArray(user.departments) ? user.departments : (user.department ? [user.department] : [])).map((dept) => (
+                        <span key={dept} className="px-2 py-1 text-xs rounded-full bg-gray-50 text-gray-700">
+                          {dept}
+                        </span>
+                      ))}
                     </div>
                   </div>
                 ))
@@ -439,7 +441,13 @@ const Admin = () => {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-gray-500">
-                          {user.department}
+                          <div className="flex flex-wrap gap-1">
+                            {(Array.isArray(user.departments) ? user.departments : (user.department ? [user.department] : [])).map((dept) => (
+                              <span key={dept} className="px-2 py-1 text-xs rounded-full bg-gray-50 text-gray-700">
+                                {dept}
+                              </span>
+                            ))}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right space-x-2" data-tour="user-actions">
                           <button

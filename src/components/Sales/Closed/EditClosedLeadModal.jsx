@@ -482,7 +482,7 @@ const numValue = (val) => (val === 0 || val === "0" ? "" : val);
       onSave();
       onClose();
     } catch (err) {
-      console.error("Error updating documents:", err);
+
       setError(err.message || "Failed to update lead. Please check your connection and try again.");
     } finally {
       setLoading(false);

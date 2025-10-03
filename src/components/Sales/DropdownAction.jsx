@@ -32,15 +32,7 @@ const DropdownActions = ({
   const [currentUserData, setCurrentUserData] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  // Debug logs
-  // useEffect(() => {
-  //   console.group("DropdownActions Debug");
-  //   console.log("Firebase Auth User:", currentUser);
-  //   console.log("Firestore Users Collection:", users);
-  //   console.log("Current User Data:", currentUserData);
-  //   console.log("Is Admin:", currentUserData?.department === "Admin");
-  //   console.groupEnd();
-  // }, [currentUser, users, currentUserData]);
+
 
   // Get complete user data from Firestore
   useEffect(() => {
@@ -52,9 +44,7 @@ const DropdownActions = ({
 
       if (userDoc) {
         setCurrentUserData(userDoc);
-        // console.log("Found user document:", userDoc);
       } else {
-        // console.warn("User document not found in Firestore");
         setCurrentUserData(null);
       }
     }
@@ -64,9 +54,8 @@ const DropdownActions = ({
     setIsDeleting(true);
     try {
       await deleteDoc(doc(db, "leads", leadId));
-      // console.log("Lead deleted successfully");
     } catch {
-      // console.error("Error deleting lead");
+      // Handle error silently
     } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);
@@ -82,8 +71,6 @@ const DropdownActions = ({
       (u) =>
         ["Sales", "Admin"].includes(u.department) && u.uid !== currentUser.uid
     );
-
-    // console.log("Current user role:", currentUserData.role);
 
     if (["Director", "Head"].includes(currentUserData.role)) {
       return allSalesUsers;
@@ -186,7 +173,7 @@ const DropdownActions = ({
                           },
                         });
                       } catch (error) {
-                        console.error("Error assigning lead:", error);
+                        // Handle error silently
                       }
                       setAssignHovered(false);
                       closeDropdown();

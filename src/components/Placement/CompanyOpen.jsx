@@ -316,7 +316,7 @@ function CompanyOpen() {
       }));
       setCompanies(data);
     } catch (err) {
-      console.error("Error fetching companies:", err);
+
       setError("Failed to load companies. Please try again.");
     } finally {
       setLoading(false);
@@ -332,13 +332,13 @@ function CompanyOpen() {
       }));
       setUsers(usersData);
     } catch (error) {
-      console.error("Error fetching users:", error);
+
     }
   };
 
 const fetchStudents = async () => {
   if (!selectedCompany || !selectedCompany.college) {
-    console.error("[ERROR] selectedCompany ya college missing hai.");
+
     return;
   }
 
@@ -374,10 +374,10 @@ const fetchStudents = async () => {
     setStudents(allStudents);
 
     if (allStudents.length === 0) {
-      console.warn("[DEBUG] No students found for this college!");
+
     }
   } catch (error) {
-    console.error("Error fetching students:", error);
+
     setStudentDataError("Failed to load student data. Please try again.");
   } finally {
     setLoadingStudents(false);
@@ -396,7 +396,7 @@ const fetchStudents = async () => {
       fetchCompanies();
       setDropdownOpen(null);
     } catch (error) {
-      console.error("Error updating company status:", error);
+
     }
   };
 

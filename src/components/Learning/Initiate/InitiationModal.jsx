@@ -792,7 +792,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
           // no assignments to write
         }
       } catch (assignmentErr) {
-        console.error("Error updating trainerAssignments:", assignmentErr);
         // don't block main save; surface a console warning
       }
       // --- end trainerAssignments update ---
@@ -816,7 +815,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
         if (onClose) onClose();
       }, 1500);
     } catch (err) {
-      console.error("Error saving phase data:", err);
       setError("Failed to save phase data. Please try again.");
       setLoading(false);
     }
@@ -1255,11 +1253,9 @@ function InitiationModal({ training, onClose, onConfirm }) {
           );
           if (!cancelled) setGlobalTrainerAssignments(filtered);
         } catch (err) {
-          console.error("Error processing trainerAssignments snapshot:", err);
         }
       },
       (err) => {
-        console.error("trainerAssignments onSnapshot error:", err);
       }
     );
 
@@ -1292,7 +1288,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
   const swapTrainers = (swapData) => {
 
     if (!swapData || !swapData.source || !swapData.target) {
-      console.error("❌ [INITIATION MODAL] Missing swap data:", { swapData });
       return;
     }
 
@@ -1302,10 +1297,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
     const currentDomain = domain || selectedDomains[0];
 
     if (!table1DataByDomain[currentDomain]) {
-      console.error(
-        "❌ [INITIATION MODAL] No table data found for domain:",
-        currentDomain
-      );
       return;
     }
 
@@ -1317,7 +1308,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
       !currentDomainData[source.rowIdx] ||
       !currentDomainData[source.rowIdx].batches[source.batchIdx]
     ) {
-      console.error("❌ [INITIATION MODAL] Invalid source batch path:", source);
       return;
     }
 
@@ -1325,7 +1315,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
       !currentDomainData[target.rowIdx] ||
       !currentDomainData[target.rowIdx].batches[target.batchIdx]
     ) {
-      console.error("❌ [INITIATION MODAL] Invalid target batch path:", target);
       return;
     }
 

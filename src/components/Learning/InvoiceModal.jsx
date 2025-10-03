@@ -23,9 +23,9 @@ const roundToNearestWhole = (num) => {
 
 function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
   const days = getTrainingDays(trainer?.earliestStartDate, trainer?.latestEndDate);
-  const [invoiceData, setInvoiceData] = useState({
+    const [invoiceData, setInvoiceData] = useState({
     billNumber: `INV-${Date.now()}`,
-    projectCode: trainer?.projectCode || "",
+    projectCode: Array.isArray(trainer?.allProjects) ? trainer.allProjects.join(", ") : trainer?.projectCode || "",
     domain: trainer?.domain || "",
     topics: Array.isArray(trainer?.topics) ? trainer.topics.join(", ") : "",
     startDate: trainer?.earliestStartDate || "",
@@ -41,6 +41,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
     food: (trainer?.food || 0) * days,
     lodging: (trainer?.lodging || 0) * days,
     businessName: trainer?.businessName || "",
+    collegeName: trainer?.collegeName || "",
   });
   const [existingInvoice, setExistingInvoice] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -67,23 +68,22 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
             trainerPhone: data.phone || "",
           }));
         } else {
-          console.warn("Trainer details not found");
+
         }
       } catch (error) {
-        console.error("Error fetching trainer details:", error);
+
       }
     };
 
     const checkExistingInvoice = async () => {
-      if (!trainer?.trainerId || !trainer?.businessName) return;
+      if (!trainer?.trainerId || !trainer?.collegeName) return;
 
       try {
         const q = query(
           collection(db, "invoices"),
           where("trainerId", "==", trainer.trainerId),
-          where("businessName", "==", trainer.businessName),
-          where("phase", "==", trainer.phase),
-          where("projectCode", "==", trainer.projectCode)
+          where("collegeName", "==", trainer.collegeName),
+          where("phase", "==", trainer.phase)
         );
 
         const querySnapshot = await getDocs(q);
@@ -105,13 +105,13 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
           }));
         }
       } catch (error) {
-        console.error("Error checking existing invoices:", error);
+
       }
     };
 
     checkExistingInvoice();
     fetchTrainerBankDetails();
-  }, [trainer?.trainerId, trainer?.businessName, trainer?.phase, trainer?.projectCode]);
+  }, [trainer?.trainerId, trainer?.collegeName, trainer?.phase]);
 
 const handleSubmit = async (e) => {
   e.preventDefault();
@@ -124,6 +124,7 @@ const handleSubmit = async (e) => {
       trainerId: trainer?.trainerId,
       trainerName: trainer?.trainerName,
       businessName: trainer?.businessName,
+      formId: trainer?.formId,
       phase: trainer?.phase,
       projectCode: trainer?.projectCode,
       totalAmount: calculateTotalAmount(),
@@ -136,17 +137,13 @@ const handleSubmit = async (e) => {
       invoice: false,
     };
 
-    let updatedInvoiceId = existingInvoice?.id;
-
     if (existingInvoice && editMode) {
       await updateDoc(doc(db, "invoices", existingInvoice.id), invoiceToSave);
       alert("Invoice updated successfully!");
-      updatedInvoiceId = existingInvoice.id;
     } else {
       invoiceToSave.createdAt = new Date();
       const docRef = await addDoc(collection(db, "invoices"), invoiceToSave);
       alert("Invoice generated successfully!");
-      updatedInvoiceId = docRef.id;
       setExistingInvoice({ id: docRef.id, ...invoiceToSave });
     }
 
@@ -156,7 +153,7 @@ const handleSubmit = async (e) => {
     onClose();
 
   } catch (error) {
-    console.error("Error saving invoice: ", error);
+
     alert("Error saving invoice. Please try again.");
   } finally {
     setIsGenerating(false);

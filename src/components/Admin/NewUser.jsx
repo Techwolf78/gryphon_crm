@@ -26,32 +26,33 @@ import {
 import emailjs from "@emailjs/browser";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-const departments = ["Sales", "Placement", "L & D", "DM", "Admin", "CA", "HR"];
+const departmentsList = ["Sales", "Placement", "L & D", "DM", "Admin", "CA", "HR"];
 const roles = ["Director", "Head", "Manager", "Assistant Manager", "Executive"];
  
 // Validation constants
 const MIN_PASSWORD_LENGTH = 8;
 const PASSWORD_COMPLEXITY_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/;
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_REGEX = /^[^\s@]+@gryphonacademy\.co\.in$/;
  
 const NewUser = ({ onUserAdded }) => {
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("Executive");
-  const [department, setDepartment] = useState("Sales");
+  const [departments, setDepartments] = useState([]);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [reportingManagers, setReportingManagers] = useState([]);
   const [selectedReportingManager, setSelectedReportingManager] = useState("");
+  const [departmentError, setDepartmentError] = useState(false);
  
   useEffect(() => {
     const fetchManagers = async () => {
       if (
         (role === "Assistant Manager" || role === "Executive") &&
-        department === "Sales"
+        departments.includes("Sales")
       ) {
         try {
           const q = query(
@@ -60,12 +61,12 @@ const NewUser = ({ onUserAdded }) => {
             where("department", "==", "Sales")
           );
           const querySnapshot = await getDocs(q);
- 
+
           const managers = querySnapshot.docs.map((doc) => ({
             id: doc.id,
             name: doc.data().name,
           }));
- 
+
           setReportingManagers(managers);
         } catch {
           // Error fetching managers - handled through toast
@@ -76,20 +77,19 @@ const NewUser = ({ onUserAdded }) => {
         setSelectedReportingManager("");
       }
     };
- 
+
     fetchManagers();
-  }, [role, department]);
- 
-  const resetForm = () => {
+  }, [role, departments]);  const resetForm = () => {
     setName("");
     setEmail("");
     setRole("Executive");
-    setDepartment("Sales");
+    setDepartments([]);
     setPassword("");
     setShowPassword(false);
     setError("");
     setSelectedReportingManager("");
     setReportingManagers([]);
+    setDepartmentError(false);
   };
  
   useEffect(() => {
@@ -124,7 +124,7 @@ const NewUser = ({ onUserAdded }) => {
     }
  
     if (!EMAIL_REGEX.test(email)) {
-      setError("Please enter a valid email address.");
+      setError("Please enter a valid email address ending with @gryphonacademy.co.in");
       setLoading(false);
       return;
     }
@@ -140,16 +140,21 @@ const NewUser = ({ onUserAdded }) => {
       setLoading(false);
       return;
     }
- 
-    if (!roles.includes(role) || !departments.includes(department)) {
-      setError("Invalid role or department selected.");
+
+    if (!roles.includes(role)) {
+      setError("Please select a valid role.");
       setLoading(false);
       return;
     }
- 
-    if (
+
+    if (departments.length === 0) {
+      setError("Please select at least one department.");
+      setDepartmentError(true);
+      setLoading(false);
+      return;
+    }    if (
       (role === "Assistant Manager" || role === "Executive") &&
-      department === "Sales" &&
+      departments.includes("Sales") &&
       !selectedReportingManager
     ) {
       setError("Please select a Reporting Manager.");
@@ -174,7 +179,7 @@ const NewUser = ({ onUserAdded }) => {
         name,
         email,
         role,
-        department,
+        departments, // Changed from department to departments array
         reportingManager:
           role === "Assistant Manager" || role === "Executive"
             ? selectedReportingManager
@@ -192,7 +197,7 @@ const NewUser = ({ onUserAdded }) => {
             email,
             password,
             role,
-            department,
+            department: departments.join(", "), // Join departments for email
             reportingManager:
               role === "Assistant Manager" || role === "Executive"
                 ? selectedReportingManager
@@ -212,7 +217,7 @@ const NewUser = ({ onUserAdded }) => {
       resetForm();
       setShowForm(false);
       if (onUserAdded) onUserAdded();
-      toast.success(`${name} (${role}, ${department}) added successfully!`);
+      toast.success(`${name} (${role}, ${departments.join(", ")}) added successfully!`);
     } catch (err) {
       // Error adding user - handled through error state and toast
       setError(err.message || "Failed to add user");
@@ -303,7 +308,7 @@ const NewUser = ({ onUserAdded }) => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="flex-grow focus:outline-none bg-transparent text-black placeholder-gray-400 text-sm"
-                placeholder="Enter email address"
+                placeholder="username@gryphonacademy.co.in"
                 required
                 autoComplete="email"
               />
@@ -363,25 +368,48 @@ const NewUser = ({ onUserAdded }) => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Department Field */}
             <div className="space-y-1.5">
-              <label htmlFor="departmentSelect" className="block text-sm font-medium text-gray-700">
-                Department <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-gray-700">
+                Departments <span className="text-red-500">*</span>
               </label>
-              <div className="flex items-center border-2 border-gray-300 bg-white/60 backdrop-blur rounded-lg px-3 py-2.5 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 focus-within:border-indigo-400 transition-all">
-                <FaBuilding className="text-gray-400 mr-2.5 flex-shrink-0" size={16} />
+              <div className="border-2 border-gray-300 bg-white/60 backdrop-blur rounded-lg px-3 py-2.5 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 focus-within:border-indigo-400 transition-all">
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {departments.map((dept, index) => (
+                    <span
+                      key={dept}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-800 text-xs rounded-full"
+                    >
+                      {dept}
+                      <button
+                        type="button"
+                        onClick={() => setDepartments(departments.filter((_, i) => i !== index))}
+                        className="text-indigo-600 hover:text-indigo-800 ml-1"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
                 <select
-                  id="departmentSelect"
-                  value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
-                  className="flex-grow bg-transparent focus:outline-none text-black text-sm"
-                  required
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value && !departments.includes(e.target.value)) {
+                      setDepartments([...departments, e.target.value]);
+                    }
+                    e.target.value = ""; // Reset select
+                  }}
+                  className="w-full bg-transparent focus:outline-none text-black text-sm"
                 >
-                  {departments.map((d) => (
-                    <option key={d} value={d}>
-                      {d}
+                  {departments.length === 0 && <option value="">Add department...</option>}
+                  {departmentsList.filter(dept => !departments.includes(dept)).map((dept) => (
+                    <option key={dept} value={dept}>
+                      {dept}
                     </option>
                   ))}
                 </select>
               </div>
+              {departmentError && departments.length === 0 && (
+                <p className="text-xs text-red-600 mt-1">Please select at least one department</p>
+              )}
             </div>
  
             {/* Role Field */}
@@ -409,7 +437,7 @@ const NewUser = ({ onUserAdded }) => {
           </div>
  
           {/* Compact Reporting Manager Field */}
-          {(role === "Assistant Manager" || role === "Executive") && department === "Sales" && (
+          {(role === "Assistant Manager" || role === "Executive") && departments.includes("Sales") && (
             <div className="space-y-1.5 bg-blue-50 p-3 rounded-lg border border-blue-200">
               <label htmlFor="managerSelect" className="block text-sm font-medium text-blue-800">
                 Reporting Manager <span className="text-red-500">*</span>

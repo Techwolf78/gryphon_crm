@@ -26,7 +26,7 @@ function TrainerCalendarPDF({ bookings, selectedTrainer, selectedCollege, disabl
             contactNumber = data.contactNumber || contactNumber;
           }
         } catch (err) {
-          console.warn('Failed to fetch training data for PDF:', err);
+
         }
       }
       const pdf = new jsPDF('portrait', 'mm', 'a4');
@@ -247,7 +247,7 @@ function TrainerCalendarPDF({ bookings, selectedTrainer, selectedCollege, disabl
       pdf.save(filename);
 
     } catch (error) {
-      console.error('PDF export failed:', error);
+
       alert(`Failed to generate PDF: ${error.message || 'Unknown error'}. Please try again.`);
     } finally {
       setLoading(false);

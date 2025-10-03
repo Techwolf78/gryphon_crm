@@ -188,7 +188,7 @@ function AddJD({ show, onClose }) {
       
       setStudentsData(prev => ({ ...prev, [college]: students }));
     } catch (error) {
-      console.error(`Error fetching students for ${college}:`, error);
+
       setStudentsData(prev => ({ ...prev, [college]: [] }));
     } finally {
       setIsLoadingStudents(false);
@@ -299,7 +299,7 @@ resumes in a zip folder by 10th July 2025 by 2:00 pm.*
             const tpoEmail = trainingFormSnapshot.docs[0].data().tpoEmail || null;
             return { college, tpoEmail };
           } catch (error) {
-            console.error(`Error fetching TPO email for ${college}:`, error);
+
             return { college, tpoEmail: null };
           }
         })
@@ -325,7 +325,7 @@ resumes in a zip folder by 10th July 2025 by 2:00 pm.*
       
       onClose();
     } catch (error) {
-      console.error("Error adding documents: ", error);
+
       alert("Error submitting JD. Please try again.");
     } finally {
       setIsSubmitting(false);
@@ -338,7 +338,7 @@ resumes in a zip folder by 10th July 2025 by 2:00 pm.*
         try {
           const passingYearNum = parseInt(formData.passingYear);
           if (isNaN(passingYearNum)) {
-            console.error('Invalid passing year:', formData.passingYear);
+
             return;
           }
           
@@ -388,7 +388,7 @@ resumes in a zip folder by 10th July 2025 by 2:00 pm.*
           setCollegeData(collegeInfo);
 
         } catch (error) {
-          console.error('[ERROR] Fetch failed:', error);
+
           setAvailableColleges(["Other"]); // Just show "Other" option if fetch fails
           setCollegeData([]);
         }

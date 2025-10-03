@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import TrainingTable from "../components/Learning/TrainingTables/TrainingTable";
 import TrainingDetailModal from "../components/Learning/TrainingTables/TrainingDetailModal";
@@ -48,6 +48,21 @@ function LearningDevelopment() {
   const [showOperationsConfigModal, setShowOperationsConfigModal] = useState(false);
   const [operationsConfig, setOperationsConfig] = useState(null);
   const [showJDInitiationModal, setShowJDInitiationModal] = useState(false);
+  const [onRefreshInitiationDashboard, setOnRefreshInitiationDashboard] = useState(null);
+
+  // Function to refresh the initiation dashboard
+  const refreshInitiationDashboard = () => {
+    if (onRefreshInitiationDashboard) {
+      onRefreshInitiationDashboard();
+    }
+  };
+
+  // Set the refresh callback when InitiationDashboard mounts
+  useEffect(() => {
+    if (onRefreshInitiationDashboard) {
+      setOnRefreshInitiationDashboard(onRefreshInitiationDashboard);
+    }
+  }, [onRefreshInitiationDashboard]);
 
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -174,6 +189,42 @@ function LearningDevelopment() {
     setShowJDInitiationModal(true);
   };
 
+  // Handle JD editing from dashboard
+  const handleEditJD = async (training) => {
+    try {
+      // Fetch existing JD phase data
+      const jdPhaseRef = doc(db, "trainingForms", training.trainingId, "trainings", "JD");
+      const jdPhaseSnap = await getDoc(jdPhaseRef);
+      
+      if (jdPhaseSnap.exists()) {
+        const jdData = jdPhaseSnap.data();
+        
+        // Extract merged colleges
+        const mergedColleges = jdData.mergedColleges || [];
+        
+        // Extract operations config
+        const operationsConfig = {
+          totalStudents: jdData.totalStudents || 0,
+          batches: jdData.batches || [],
+          collegeStudentCounts: jdData.collegeStudentCounts || {},
+          numBatches: jdData.numBatches || 1,
+        };
+        
+        // Set state for JD editing
+        setSelectedJDColleges(mergedColleges);
+        setOperationsConfig(operationsConfig);
+        
+        // Open JD initiation modal in edit mode
+        setShowJDInitiationModal(true);
+      } else {
+        alert("JD training data not found");
+      }
+    } catch (error) {
+
+      alert("Failed to load JD training data");
+    }
+  };
+
   // Handle JD initiation modal close
   const handleJDInitiationClose = () => {
     setShowJDInitiationModal(false);
@@ -183,6 +234,8 @@ function LearningDevelopment() {
     if (activeTab === "newContact") {
       fetchTrainings();
     }
+    // Also refresh initiation dashboard if needed
+    refreshInitiationDashboard();
   };
 
   // NEW: Handle "Start Phase" button click from InitiationDashboard
@@ -461,7 +514,9 @@ function LearningDevelopment() {
           ) : (
             <InitiationDashboard
               onRowClick={setSelectedInitiationTraining}
-              onStartPhase={handleStartPhase} // ADD this prop
+              onStartPhase={handleStartPhase}
+              onEditJD={handleEditJD}
+              onRefresh={onRefreshInitiationDashboard}
             />
           )
         ) : activeTab === "trainerInvoice" ? (
@@ -492,7 +547,7 @@ function LearningDevelopment() {
 
       {showJDInitiationModal && selectedJDColleges.length > 0 && operationsConfig && (
         <JDInitiationModal
-          training={{}} // Empty training object for JD initiation
+          training={{ id: selectedJDColleges[0]?.id || "", isEdit: true }} // Pass training with edit flag
           onClose={handleJDInitiationClose}
           onConfirm={handleJDInitiationClose}
           isMerged={true}

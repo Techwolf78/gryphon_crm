@@ -57,12 +57,18 @@ export const generateInvoicePDF = async (invoiceData) => {
     yPosition += 4.5;
 
     // Bill & Account details
+    const isJDDomain = invoiceData.domain === 'JD';
+    const projectLabel = isJDDomain ? 'Projects' : 'Project Code';
+    const projectValue = isJDDomain && invoiceData.projectCode.includes(',') 
+      ? invoiceData.projectCode.split(',').map(p => p.trim()).join('\n')
+      : invoiceData.projectCode;
+
     autoTable(doc, {
       startY: yPosition,
       body: [
         ['Bill Details', 'Account Details of Trainer'],
         [`Bill Number: ${invoiceData.billNumber}`, `Name in Bank: ${invoiceData.trainerName}`],
-        [`Project Code: ${invoiceData.projectCode}`, `Bank Name: ${invoiceData.bankName}`],
+        [`${projectLabel}: ${projectValue}`, `Bank Name: ${invoiceData.bankName}`],
         [`Domain: ${invoiceData.domain}`, `Bank Account No: ${invoiceData.accountNumber}`],
         [`Topic: ${invoiceData.topics}`, `IFSC Code: ${invoiceData.ifscCode}`],
         [`From: ${formatDate(invoiceData.startDate)}`, `PAN Card: ${invoiceData.panNumber}`],
@@ -178,7 +184,7 @@ export const generateInvoicePDF = async (invoiceData) => {
     doc.save(`Invoice_${invoiceData.billNumber || 'NA'}.pdf`);
     return true;
   } catch (error) {
-    console.error('PDF generation failed:', error);
+
     alert('Failed to generate PDF. Please try again.');
     return false;
   }
