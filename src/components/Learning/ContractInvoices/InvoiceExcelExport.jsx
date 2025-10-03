@@ -267,7 +267,6 @@ const calculateGSTBreakdown = (invoice) => {
         "Invoice Date": formatDateForExcel(invoice.raisedDate),
         "Party Name": invoice.collegeName || "N/A",
         "GSTIN Number": invoice.gstNumber || "N/A",
-        // ✅ NEW COLUMN ADDED HERE
         "Description": getDescription(invoice),
         "Total Value": formatCurrency(invoice.baseAmount || 0),
         "CGST": formatCurrency(gstBreakdown.cgst),
