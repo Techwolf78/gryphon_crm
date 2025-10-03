@@ -204,7 +204,8 @@ function FiltersSection({
             db={db} 
             exporting={exporting} 
             setExporting={setExporting} 
-            filteredData={filteredGroupedData} 
+            filteredData={filteredGroupedData}
+            clearAllFilters={clearAllFilters}
           />
 
           <button

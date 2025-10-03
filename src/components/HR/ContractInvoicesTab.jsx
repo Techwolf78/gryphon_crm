@@ -43,7 +43,7 @@ const ContractInvoicesTab = () => {
         }));
 
         const taxInvoices = data.filter(
-          (invoice) => invoice.invoiceType === "Tax Invoice"
+          (invoice) => invoice.invoiceType === "Tax Invoice" || invoice.invoiceType === "Cash Invoice"
         );
         setInvoices(taxInvoices);
       } else {
@@ -296,10 +296,10 @@ const ContractInvoicesTab = () => {
 
   return (
     <div className="p-6">
-      <h2 className="text-xl font-semibold mb-4">Tax Invoices - Approval & Payment Tracking</h2>
+      <h2 className="text-xl font-semibold mb-4">Invoices - Approval & Payment Tracking</h2>
 
       {invoices.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">No tax invoices found.</div>
+        <div className="text-center py-8 text-gray-500">No invoices found.</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full bg-white border">
@@ -325,7 +325,11 @@ const ContractInvoicesTab = () => {
                 const isApproved = invoice.approved;
 
                 return (
-                  <tr key={invoice.id}>
+                  <tr 
+                    key={invoice.id}
+                    className="hover:bg-gray-50 cursor-pointer"
+                    onClick={() => handleViewInvoice(invoice)}
+                  >
                     <td className="px-4 py-2 border font-semibold">
                       {invoice.invoiceNumber}
                     </td>
@@ -349,7 +353,10 @@ const ContractInvoicesTab = () => {
                         {/* ✅ APPROVE BUTTON - SIRF JAB APPROVED NA HO AUR CANCELLED NA HO */}
                         {!isApproved && invoice.approvalStatus !== "cancelled" && (
                           <button
-                            onClick={() => handleApproveInvoice(invoice)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleApproveInvoice(invoice);
+                            }}
                             className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs"
                           >
                             Approve
@@ -359,7 +366,10 @@ const ContractInvoicesTab = () => {
                         {/* ✅ CANCEL BUTTON - SIRF JAB CANCELLED NA HO */}
                         {invoice.approvalStatus !== "cancelled" && (
                           <button
-                            onClick={() => handleCancelInvoice(invoice)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCancelInvoice(invoice);
+                            }}
                             className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs"
                           >
                             Cancel
@@ -379,7 +389,10 @@ const ContractInvoicesTab = () => {
                       {/* ✅ PAYMENT ACTIONS - SIRF APPROVED INVOICES KE LIYE */}
                       {isApproved && !isFullyPaid ? (
                         <button
-                          onClick={() => setPaymentModal({ isOpen: true, invoice })}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPaymentModal({ isOpen: true, invoice });
+                          }}
                           className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs"
                         >
                           Receivable
@@ -392,7 +405,8 @@ const ContractInvoicesTab = () => {
 
                       {invoice.paymentHistory?.length > 0 && (
                         <button
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             const history = invoice.paymentHistory
                               .map((p) => `₹${p.amount} on ${new Date(p.date).toLocaleDateString()}`)
                               .join("\n");
@@ -406,7 +420,10 @@ const ContractInvoicesTab = () => {
                     </td>
                     <td className="px-4 py-2 border">
                       <button
-                        onClick={() => handleViewInvoice(invoice)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewInvoice(invoice);
+                        }}
                         className="px-3 py-1 bg-purple-500 text-white rounded hover:bg-purple-600 text-xs"
                       >
                         View

@@ -43,6 +43,7 @@ const Register = () => {
         const allTaxInvoices = data.filter(
           (invoice) => 
             invoice.invoiceType === "Tax Invoice" || 
+            invoice.invoiceType === "Cash Invoice" ||
             invoice.invoiceType === undefined
         );
         
@@ -143,7 +144,7 @@ const Register = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-4">
         <div>
-          <h2 className="text-xl font-semibold">All Tax Invoices</h2>
+          <h2 className="text-xl font-semibold">All Invoices</h2>
           <p className="text-sm text-gray-600 mt-1">
             Showing all invoices - Only approved invoices can be registered
           </p>

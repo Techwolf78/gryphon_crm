@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { db } from "../../../firebase";
 import {
   doc,
@@ -209,39 +209,34 @@ function InitiationModal({ training, onClose, onConfirm }) {
     fetchTrainingDetails();
   }, [training]);
 
-  const table1DataByDomainMemo = useMemo(() => {
-    if (courses.length === 0 || topics.length === 0) return {};
-    const updated = {};
-    selectedDomains.forEach((domain) => {
-      if (!updated[domain] || updated[domain].length === 0) {
-        const domainHours = getDomainHours(domain, getMainPhase());
-        updated[domain] = courses.map((course) => ({
-          batch: course.specialization,
-          stdCount: course.students,
-          hrs: domainHours,
-          assignedHours: 0,
-          batches: [
-            {
-              batchPerStdCount: "",
-              batchCode: `${course.specialization}1`,
-              assignedHours: 0,
-              trainers: [],
-            },
-          ],
-        }));
-      }
-    });
-
-    // Store original table data for undo functionality (only if not already set)
-    if (Object.keys(originalTable1DataByDomain.current).length === 0) {
-      originalTable1DataByDomain.current = JSON.parse(JSON.stringify(updated));
-    }
-
-    return updated;
-  }, [selectedDomains, courses, topics, getDomainHours, getMainPhase]);
-
   useEffect(() => {
-    setTable1DataByDomain(table1DataByDomainMemo);
+    setTable1DataByDomain((prev) => {
+      const updated = { ...prev };
+      selectedDomains.forEach((domain) => {
+        if (!updated[domain] || updated[domain].length === 0) {
+          const domainHours = getDomainHours(domain, getMainPhase());
+          updated[domain] = courses.map((course) => ({
+            batch: course.specialization,
+            stdCount: course.students,
+            hrs: domainHours,
+            assignedHours: 0,
+            batches: [
+              {
+                batchPerStdCount: "",
+                batchCode: `${course.specialization}1`,
+                assignedHours: 0,
+                trainers: [],
+              },
+            ],
+          }));
+        }
+      });
+      // Store original table data for undo functionality (only if not already set)
+      if (Object.keys(originalTable1DataByDomain.current).length === 0) {
+        originalTable1DataByDomain.current = JSON.parse(JSON.stringify(updated));
+      }
+      return updated;
+    });
     
     // Store original custom phase hours for undo functionality (only if not already set)
     if (Object.keys(originalCustomPhaseHours.current).length === 0) {
@@ -252,7 +247,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
     if (originalSelectedDomains.current.length === 0) {
       originalSelectedDomains.current = [...selectedDomains];
     }
-  }, [table1DataByDomainMemo, customPhaseHours, selectedDomains]);
+  }, [selectedDomains, courses, topics, getDomainHours, getMainPhase, customPhaseHours]);
 
   // Track changes for undo functionality
   useEffect(() => {
@@ -1032,10 +1027,31 @@ function InitiationModal({ training, onClose, onConfirm }) {
     fetchExistingPhases();
   }, [training?.id, training?.selectedPhase]);
 
+  // Load phase-specific data when currentPhase is set
+  useEffect(() => {
+    if (!training?.id || !currentPhase) return;
+    const fetchPhaseData = async () => {
+      const phaseDoc = await getDoc(doc(db, "trainingForms", training.id, "trainings", currentPhase));
+      if (phaseDoc.exists()) {
+        const phaseData = phaseDoc.data();
+        setCommonFields({
+          trainingStartDate: phaseData.trainingStartDate || "",
+          trainingEndDate: phaseData.trainingEndDate || "",
+          collegeStartTime: phaseData.collegeStartTime || "",
+          collegeEndTime: phaseData.collegeEndTime || "",
+          lunchStartTime: phaseData.lunchStartTime || "",
+          lunchEndTime: phaseData.lunchEndTime || "",
+        });
+        setSelectedDomains(phaseData.domains || []);
+        // excludeDays is not stored, so keep default "None"
+      }
+    };
+    fetchPhaseData();
+  }, [training?.id, currentPhase]);
+
   // Load all domains for the current phase
   useEffect(() => {
     if (!training?.id || !currentPhase) return;
-
     const fetchPhaseDomains = async () => {
       const domainsSnap = await getDocs(
         collection(
