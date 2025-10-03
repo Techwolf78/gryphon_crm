@@ -1001,24 +1001,33 @@ const handleChange = (e) => {
                         const emiCount = prompt("Enter number of EMI installments:", "3");
                         const emiMonths = parseInt(emiCount) || 3;
                         
-                        // Create equal installments
-                        const basePercentage = Math.floor((100 / emiMonths) * 100) / 100;
-                        newPaymentDetails = Array(emiMonths).fill().map((_, i) => {
-                          const isLast = i === emiMonths - 1;
-                          const percentage = isLast 
-                            ? (100 - basePercentage * (emiMonths - 1)).toFixed(2)
-                            : basePercentage.toFixed(2);
+                        const totalAmount = parseFloat(formData.netPayableAmount) || 0;
+                        const baseTotal = parseFloat(formData.totalCost) || 0;
+                        const gstTotal = parseFloat(formData.gstAmount) || 0;
+                        
+                        const baseInstallment = baseTotal / emiMonths;
+                        const gstInstallment = gstTotal / emiMonths;
+                        const totalInstallment = totalAmount / emiMonths;
+                        
+                        newPaymentDetails = Array.from({length: emiMonths}, (_, i) => {
+                          let percentage = 100 / emiMonths;
+                          let baseAmt = baseInstallment;
+                          let gstAmt = gstInstallment;
+                          let totalAmt = totalInstallment;
                           
-                          const baseAmount = totalCost * (parseFloat(percentage) / 100);
-                          const gstAmount = formData.gstType === "include" ? baseAmount * 0.18 : 0;
-                          const totalAmount = baseAmount + gstAmount;
-
+                          if (i === emiMonths - 1) {
+                            percentage = 100 - (100 / emiMonths) * (emiMonths - 1);
+                            baseAmt = baseTotal - baseInstallment * (emiMonths - 1);
+                            gstAmt = gstTotal - gstInstallment * (emiMonths - 1);
+                            totalAmt = totalAmount - totalInstallment * (emiMonths - 1);
+                          }
+                          
                           return {
                             name: `Installment ${i + 1}`,
-                            percentage: percentage,
-                            baseAmount: baseAmount.toFixed(2),
-                            gstAmount: gstAmount.toFixed(2),
-                            totalAmount: totalAmount.toFixed(2)
+                            percentage: percentage.toFixed(2),
+                            baseAmount: baseAmt.toFixed(2),
+                            gstAmount: gstAmt.toFixed(2),
+                            totalAmount: totalAmt.toFixed(2)
                           };
                         });
                       } else {

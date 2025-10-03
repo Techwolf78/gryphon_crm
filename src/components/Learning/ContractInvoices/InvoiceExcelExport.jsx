@@ -13,10 +13,11 @@ import { db } from "../../../firebase";
 export default function InvoiceExcelExport() {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [filters, setFilters] = useState({
     startDate: "",
     endDate: "",
-    invoiceType: "",
+    invoiceType: [], // Changed to array for multiple selections
     status: "",
     financialYear: "",
   });
@@ -66,7 +67,7 @@ export default function InvoiceExcelExport() {
         }
 
         // Invoice type filter
-        if (filters.invoiceType && invoice.invoiceType !== filters.invoiceType) {
+        if (filters.invoiceType.length > 0 && !filters.invoiceType.includes(invoice.invoiceType)) {
           return false;
         }
 
@@ -125,6 +126,18 @@ export default function InvoiceExcelExport() {
       fetchInvoices();
     }
   }, [filters.financialYear]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.invoice-type-dropdown')) {
+        setDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Generate financial year options
   const getFinancialYearOptions = () => {
@@ -328,15 +341,18 @@ const calculateGSTBreakdown = (invoice) => {
     setFilters({
       startDate: "",
       endDate: "",
-      invoiceType: "",
+      invoiceType: [], // Reset to empty array
       status: "",
       financialYear: getCurrentFinancialYear(),
     });
+    setInvoices([]); // Clear the results immediately
+    // Automatically fetch with default filters
+    setTimeout(() => fetchInvoices(), 100);
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-6">
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-2">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6 p-4">
         <div>
           <h2 className="text-lg font-bold text-gray-900">Export All Invoices to Excel</h2>
           <p className="text-gray-600 text-sm">
@@ -347,117 +363,175 @@ const calculateGSTBreakdown = (invoice) => {
         <button
           onClick={exportToExcel}
           disabled={loading || invoices.length === 0}
-          className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          className="bg-green-600 hover:bg-green-700 text-white py-1 px-2 rounded text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
-          Export to Excel
+          Export
         </button>
       </div>
 
       {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {/* Financial Year */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Financial Year
-          </label>
-          <select
-            value={filters.financialYear}
-            onChange={(e) => handleFilterChange("financialYear", e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {getFinancialYearOptions().map(year => (
-              <option key={year} value={year}>{year}</option>
-            ))}
-          </select>
-        </div>
+      <fieldset className="border border-gray-300 rounded-lg p-2">
+        <legend className="text-sm font-semibold text-gray-700 px-2">Filter Options</legend>
+        <div className="flex flex-wrap gap-2 items-end">
+          {/* Financial Year */}
+          <div className="min-w-0 flex-1 max-w-xs">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Financial Year
+            </label>
+            <select
+              value={filters.financialYear}
+              onChange={(e) => handleFilterChange("financialYear", e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {getFinancialYearOptions().map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </div>
 
-        {/* Invoice Type */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Invoice Type
-          </label>
-          <select
-            value={filters.invoiceType}
-            onChange={(e) => handleFilterChange("invoiceType", e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">All Types</option>
-            <option value="Tax Invoice">Tax Invoice</option>
-            <option value="Cash Invoice">Cash Invoice</option>
-            <option value="Proforma Invoice">Proforma Invoice</option>
-          </select>
-        </div>
+          {/* Invoice Type */}
+          <div className="min-w-0 flex-1 max-w-xs">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Invoice Type
+            </label>
+            <div className="relative invoice-type-dropdown">
+              <div
+                className="w-full border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer min-h-[32px] flex flex-wrap gap-1 items-center"
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+              >
+                {filters.invoiceType.length > 0 ? (
+                  filters.invoiceType.map((type) => (
+                    <span
+                      key={type}
+                      className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs flex items-center gap-1"
+                    >
+                      {type.replace(' Invoice', '')}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFilters(prev => ({
+                            ...prev,
+                            invoiceType: prev.invoiceType.filter(t => t !== type)
+                          }));
+                        }}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-gray-500 text-sm">All Types</span>
+                )}
+                <svg className={`w-4 h-4 ml-auto transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+              
+              {dropdownOpen && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
+                  {["Tax Invoice", "Cash Invoice", "Proforma Invoice"].map((type) => (
+                    <label
+                      key={type}
+                      className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={filters.invoiceType.includes(type)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFilters(prev => ({
+                              ...prev,
+                              invoiceType: [...prev.invoiceType, type]
+                            }));
+                          } else {
+                            setFilters(prev => ({
+                              ...prev,
+                              invoiceType: prev.invoiceType.filter(t => t !== type)
+                            }));
+                          }
+                        }}
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 mr-2"
+                      />
+                      <span className="text-sm text-gray-700">{type}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
 
-        {/* Status */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Status
-          </label>
-          <select
-            value={filters.status}
-            onChange={(e) => handleFilterChange("status", e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">All Status</option>
-            <option value="registered">Registered</option>
-            <option value="approved">Approved</option>
-            <option value="cancelled">Cancelled</option>
-            <option value="paid">Paid</option>
-            <option value="partially_paid">Partially Paid</option>
-          </select>
-        </div>
+          {/* Status */}
+          <div className="min-w-0 flex-1 max-w-xs">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Status
+            </label>
+            <select
+              value={filters.status}
+              onChange={(e) => handleFilterChange("status", e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All Status</option>
+              <option value="registered">Registered</option>
+              <option value="approved">Approved</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="paid">Paid</option>
+              <option value="partially_paid">Partially Paid</option>
+            </select>
+          </div>
 
-        {/* Date Range - Start Date */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Start Date
-          </label>
-          <input
-            type="date"
-            value={filters.startDate}
-            onChange={(e) => handleFilterChange("startDate", e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+          {/* Date Range - Start Date */}
+          <div className="min-w-0 flex-1 max-w-xs">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Start Date
+            </label>
+            <input
+              type="date"
+              value={filters.startDate}
+              onChange={(e) => handleFilterChange("startDate", e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
 
-        {/* Date Range - End Date */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            End Date
-          </label>
-          <input
-            type="date"
-            value={filters.endDate}
-            onChange={(e) => handleFilterChange("endDate", e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+          {/* Date Range - End Date */}
+          <div className="min-w-0 flex-1 max-w-xs">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              End Date
+            </label>
+            <input
+              type="date"
+              value={filters.endDate}
+              onChange={(e) => handleFilterChange("endDate", e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-end gap-2">
-          <button
-            onClick={fetchInvoices}
-            disabled={loading}
-            className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-medium disabled:opacity-50 flex-1"
-          >
-            {loading ? "Loading..." : "Apply Filters"}
-          </button>
-          
-          <button
-            onClick={clearFilters}
-            className="bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded-lg font-medium"
-          >
-            Clear
-          </button>
+          {/* Action Buttons */}
+          <div className="flex gap-1">
+            <button
+              onClick={fetchInvoices}
+              disabled={loading}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg font-medium text-sm disabled:opacity-50"
+            >
+              {loading ? "Loading..." : "Apply"}
+            </button>
+            
+            <button
+              onClick={clearFilters}
+              className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded-lg font-medium text-sm"
+            >
+              Clear
+            </button>
+          </div>
         </div>
-      </div>
+      </fieldset>
 
       {/* Results Summary */}
-      <div className="bg-gray-50 rounded-lg p-4">
-        <div className="flex items-center justify-between">
+      <div className="bg-gray-50 rounded-lg">
+        <div className="flex items-center justify-between p-2">
           <div>
             <p className="text-sm text-gray-600">
               Found <span className="font-semibold text-gray-900">{invoices.length}</span> invoices
@@ -512,9 +586,6 @@ const calculateGSTBreakdown = (invoice) => {
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                   Status
                 </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                  Collection
-                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -546,15 +617,6 @@ const calculateGSTBreakdown = (invoice) => {
                       "bg-yellow-100 text-yellow-800"
                     }`}>
                       {invoice.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2 text-sm">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      invoice.collection === "ContractInvoices" 
-                        ? "bg-blue-100 text-blue-800" 
-                        : "bg-purple-100 text-purple-800"
-                    }`}>
-                      {invoice.collection === "ContractInvoices" ? "Tax/Cash" : "Proforma"}
                     </span>
                   </td>
                 </tr>

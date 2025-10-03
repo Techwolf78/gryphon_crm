@@ -7,6 +7,7 @@ import {
   doc,
   updateDoc,
   addDoc,
+  deleteDoc,
   where,
 } from "firebase/firestore";
 import { db } from "../../../firebase";
@@ -19,6 +20,7 @@ import {
 import RaiseInvoiceModal from "./RaiseInvoiceModal";
 import RegenerateInvoiceModal from "./RegenerateInvoiceModal";
 import InvoiceModal from "../../../components/HR/InvoiceModal";
+import RowClickModal from "./RowClickModal";
 import MergeInvoicesModal from "./MergeInvoicesModal ";
 import InvoiceExcelExport from "./InvoiceExcelExport";
 
@@ -33,6 +35,12 @@ export default function ContractInvoiceTable() {
   const [existingInvoices, setExistingInvoices] = useState([]);
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [rowClickModal, setRowClickModal] = useState({
+    isOpen: false,
+    invoice: null,
+    installment: null,
+    contract: null,
+  });
   const [existingProformas, setExistingProformas] = useState([]);
   const [isRegenerateModal, setIsRegenerateModal] = useState(false);
   const [showMergeModal, setShowMergeModal] = useState(false);
@@ -430,6 +438,32 @@ const handleConvertToTax = async (invoice) => {
     alert("Failed to convert to tax invoice. Please try again.");
   }
 };
+
+  // Handle cancel invoice - only for fresh invoices, delete completely
+  const handleCancelInvoice = async (invoice) => {
+    // Only allow undo for fresh invoices (not regenerated ones)
+    if (invoice.regeneratedFrom) {
+      alert("Cannot undo regenerated invoices. Use Regenerate on the original cancelled invoice instead.");
+      return;
+    }
+
+    if (!confirm("Are you sure you want to undo this invoice generation? This will permanently delete the invoice.")) {
+      return;
+    }
+
+    try {
+      // Delete the invoice from database
+      await deleteDoc(doc(db, "ContractInvoices", invoice.id));
+
+      // Update local state by removing the invoice
+      setExistingInvoices(prev => prev.filter(inv => inv.id !== invoice.id));
+
+      alert("Invoice generation undone successfully!");
+    } catch (error) {
+      console.error("Error deleting invoice:", error);
+      alert("Error undoing invoice generation: " + error.message);
+    }
+  };
 
 const handleSubmit = async (
   formData,
@@ -1122,12 +1156,12 @@ const handleSubmit = async (
             {/* Export Toggle Button */}
             <button
               onClick={() => setShowExportView(!showExportView)}
-              className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg font-medium flex items-center gap-2"
+              className="bg-green-600 hover:bg-green-700 text-white py-1.5 px-3 rounded-lg font-medium flex items-center gap-1.5"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              {showExportView ? "Back to Table View" : "Export to Excel"}
+              {showExportView ? "Back to Table" : "Export"}
             </button>
           </div>
         </div>
@@ -1389,9 +1423,10 @@ const handleSubmit = async (
                                               return (
                                                 <tr
                                                   key={`${index}-${invIndex}`}
-                                                  className={`hover:bg-gray-50 ${
+                                                  className={`hover:bg-gray-50 cursor-pointer ${
                                                     isCancelled ? "bg-red-50" : ""
                                                   }`}
+                                                  onClick={() => setSelectedInvoice(inv)}
                                                 >
                                                   <td className="px-4 py-2 text-sm text-gray-900">
                                                     {installment.name}
@@ -1505,24 +1540,38 @@ const handleSubmit = async (
                                                   <td className="px-4 py-2 text-sm">
                                                     <div className="flex gap-2">
                                                       <button
-                                                        onClick={() =>
-                                                          setSelectedInvoice(inv)
-                                                        }
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          setSelectedInvoice(inv);
+                                                        }}
                                                         className="bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded text-xs"
                                                       >
                                                         View
                                                       </button>
+                                                      {!isCancelled && !inv.regeneratedFrom && (
+                                                        <button
+                                                          onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleCancelInvoice(inv);
+                                                          }}
+                                                          className="bg-red-500 hover:bg-red-700 text-white py-1 px-2 rounded text-xs"
+                                                          title="Cancel this invoice"
+                                                        >
+                                                          Undo
+                                                        </button>
+                                                      )}
                                                       {isCancelled &&
                                                         !inv.regenerated && (
                                                           <button
-                                                            onClick={() =>
+                                                            onClick={(e) => {
+                                                              e.stopPropagation();
                                                               handleGenerateInvoice(
                                                                 invoice,
                                                                 installment,
                                                                 true,
                                                                 inv
-                                                              )
-                                                            }
+                                                              );
+                                                            }}
                                                             className="bg-orange-500 hover:bg-orange-700 text-white py-1 px-2 rounded text-xs"
                                                             title="Regenerate cancelled invoice"
                                                           >
@@ -1533,11 +1582,12 @@ const handleSubmit = async (
                                                         inv.invoiceType ===
                                                           "Proforma Invoice" && (
                                                           <button
-                                                            onClick={() =>
+                                                            onClick={(e) => {
+                                                              e.stopPropagation();
                                                               handleConvertToTax(
                                                                 inv
-                                                              )
-                                                            }
+                                                              );
+                                                            }}
                                                             className="bg-purple-500 hover:bg-purple-700 text-white py-1 px-2 rounded text-xs"
                                                           >
                                                             Generate TI
@@ -1554,7 +1604,13 @@ const handleSubmit = async (
                                           return (
                                             <tr
                                               key={index}
-                                              className="hover:bg-gray-50"
+                                              className="hover:bg-gray-50 cursor-pointer"
+                                              onClick={() => setRowClickModal({
+                                                isOpen: true,
+                                                invoice: null,
+                                                installment: installment,
+                                                contract: invoice,
+                                              })}
                                             >
                                               <td className="px-4 py-2 text-sm text-gray-900">
                                                 {installment.name}
@@ -1580,12 +1636,13 @@ const handleSubmit = async (
                                               </td>
                                               <td className="px-4 py-2 text-sm">
                                                 <button
-                                                  onClick={() =>
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
                                                     handleGenerateInvoice(
                                                       invoice,
                                                       installment
-                                                    )
-                                                  }
+                                                    );
+                                                  }}
                                                   className="bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded text-xs"
                                                 >
                                                   Generate
@@ -1740,9 +1797,10 @@ const handleSubmit = async (
                                           return (
                                             <tr
                                               key={`${idx}-${invIndex}`}
-                                              className={`hover:bg-gray-50 ${
+                                              className={`hover:bg-gray-50 cursor-pointer ${
                                                 isCancelled ? "bg-red-50" : ""
                                               }`}
+                                              onClick={() => setSelectedInvoice(inv)}
                                             >
                                               <td className="px-4 py-2 text-sm text-gray-900">
                                                 {installment.name}
@@ -1814,17 +1872,31 @@ const handleSubmit = async (
                                               <td className="px-4 py-2 text-sm">
                                                 <div className="flex gap-2">
                                                   <button
-                                                    onClick={() =>
-                                                      setSelectedInvoice(inv)
-                                                    }
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      setSelectedInvoice(inv);
+                                                    }}
                                                     className="bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded text-xs"
                                                   >
                                                     View
                                                   </button>
+                                                  {!isCancelled && !inv.regeneratedFrom && (
+                                                    <button
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleCancelInvoice(inv);
+                                                      }}
+                                                      className="bg-red-500 hover:bg-red-700 text-white py-1 px-2 rounded text-xs"
+                                                      title="Cancel this invoice"
+                                                    >
+                                                      Undo
+                                                    </button>
+                                                  )}
                                                   {isCancelled &&
                                                     !inv.regenerated && (
                                                       <button
-                                                        onClick={() => {
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
                                                           /* Handle regenerate for merged invoice */
                                                         }}
                                                         className="bg-orange-500 hover:bg-orange-700 text-white py-1 px-2 rounded text-xs"
@@ -1842,7 +1914,14 @@ const handleSubmit = async (
                                     } else {
                                       // No invoice generated yet for this merged installment
                                       return (
-                                        <tr key={idx} className="hover:bg-gray-50">
+                                        <tr key={idx} className="hover:bg-gray-50 cursor-pointer"
+                                            onClick={() => setRowClickModal({
+                                              isOpen: true,
+                                              invoice: null,
+                                              installment: installment,
+                                              contract: mergedItem.contracts[0],
+                                            })}
+                                        >
                                           <td className="px-4 py-2 text-sm text-gray-900">
                                             {installment.name}
                                           </td>
@@ -1865,12 +1944,13 @@ const handleSubmit = async (
                                           </td>
                                           <td className="px-4 py-2 text-sm">
                                             <button
-                                              onClick={() =>
+                                              onClick={(e) => {
+                                                e.stopPropagation();
                                                 handleMergeGenerate(
                                                   mergedItem,
                                                   installment
-                                                )
-                                              }
+                                                );
+                                              }}
                                               className="bg-purple-500 hover:bg-purple-700 text-white py-1 px-2 rounded text-xs"
                                             >
                                               Generate Merged
@@ -1970,6 +2050,15 @@ const handleSubmit = async (
             onClose={() => setSelectedInvoice(null)}
             onRegister={(invoice) => handleRegisterInvoice(invoice)}
             isViewOnly={true}
+          />
+        )}
+
+        {rowClickModal.isOpen && (
+          <RowClickModal
+            installment={rowClickModal.installment}
+            invoice={rowClickModal.invoice}
+            contract={rowClickModal.contract}
+            onClose={() => setRowClickModal({ isOpen: false, invoice: null, installment: null, contract: null })}
           />
         )}
       </div>
