@@ -11,6 +11,9 @@ import InitiationModal from "../components/Learning/Initiate/InitiationModal";
 import GenerateTrainerInvoice from "../components/Learning/GenerateTrainerInvoice";
 import ContractInvoiceTable from "../components/Learning/ContractInvoices/ContractInvoiceTable";
 import LearningDevelopmentTour from "../components/tours/LearningDevelopmentTour";
+import JDMergeModal from "../components/Learning/JD/JDMergeModal";
+import OperationsConfigurationModal from "../components/Learning/JD/OperationsConfigurationModal";
+import JDInitiationModal from "../components/Learning/JD/JDInitiationModal";
 import { useAuth } from "../context/AuthContext";
 
 import { useNavigate } from "react-router-dom";
@@ -37,6 +40,15 @@ function LearningDevelopment() {
   const [selectedTrainingForInitiation, setSelectedTrainingForInitiation] =
     useState(null);
 
+  const [isLoading, setIsLoading] = useState(false);
+
+  // JD Training state
+  const [showJDMergeModal, setShowJDMergeModal] = useState(false);
+  const [selectedJDColleges, setSelectedJDColleges] = useState([]);
+  const [showOperationsConfigModal, setShowOperationsConfigModal] = useState(false);
+  const [operationsConfig, setOperationsConfig] = useState(null);
+  const [showJDInitiationModal, setShowJDInitiationModal] = useState(false);
+
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -53,6 +65,7 @@ function LearningDevelopment() {
 
   const fetchTrainings = async () => {
     try {
+      setIsLoading(true);
       setError(null);
 
       const q = query(
@@ -71,9 +84,14 @@ function LearningDevelopment() {
               collection(db, "trainingForms", doc.id, "trainings")
             );
             trainingData.isInitiated = !trainingsSnap.empty;
-          } catch (err) {
-            console.error("Error checking initiation status:", err);
+            
+            // Check if JD phase is initiated
+            const jdPhaseDoc = trainingsSnap.docs.find(doc => doc.id === "JD");
+            trainingData.isJDInitiated = !!jdPhaseDoc;
+          } catch {
+            // Error checking initiation status - handled silently
             trainingData.isInitiated = false;
+            trainingData.isJDInitiated = false;
           }
 
           return trainingData;
@@ -81,9 +99,11 @@ function LearningDevelopment() {
       );
 
       setTrainings(data);
-    } catch (err) {
-      console.error("Error fetching trainings:", err);
+    } catch {
+      // Error fetching trainings - handled through UI error state
       setError("Failed to load training data. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -135,8 +155,38 @@ function LearningDevelopment() {
     setShowInitiationModal(true);
   };
 
+  // Handle JD Training initiation
+  const handleInitiateJD = () => {
+    setShowJDMergeModal(true);
+  };
+
+  // Handle JD colleges selected
+  const handleJDCollegesSelected = (colleges) => {
+    setSelectedJDColleges(colleges);
+    setShowJDMergeModal(false);
+    setShowOperationsConfigModal(true);
+  };
+
+  // Handle operations configuration
+  const handleOperationsConfigured = (config) => {
+    setOperationsConfig(config);
+    setShowOperationsConfigModal(false);
+    setShowJDInitiationModal(true);
+  };
+
+  // Handle JD initiation modal close
+  const handleJDInitiationClose = () => {
+    setShowJDInitiationModal(false);
+    setSelectedJDColleges([]);
+    setOperationsConfig(null);
+    // Refresh trainings data
+    if (activeTab === "newContact") {
+      fetchTrainings();
+    }
+  };
+
   // NEW: Handle "Start Phase" button click from InitiationDashboard
-  const handleStartPhase = (training) => {
+  const handleStartPhase = async (training) => {
     setSelectedTrainingForInitiation(training);
     setShowInitiationModal(true);
   };
@@ -259,28 +309,147 @@ function LearningDevelopment() {
         {/* Tab Content */}
         {activeTab === "newContact" ? (
           <>
-            <TrainingTable
-              trainingData={trainings}
-              onRowClick={setSelectedTraining}
-              onViewStudentData={handleViewStudentData}
-              onViewMouFile={handleViewMouFile}
-              onInitiate={handleInitiateClick}
-            />
+            {isLoading ? (
+              <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm ring-1 ring-gray-200/60">
+                {/* Desktop Header Skeleton */}
+                <div className="hidden md:grid grid-cols-12 gap-2 px-5 py-3 text-[11px] font-semibold tracking-wide uppercase text-gray-600 bg-gradient-to-r from-gray-50 via-white to-gray-50 border-b border-gray-200">
+                  <div className="col-span-3 flex items-center gap-1.5">
+                    <div className="h-4 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-12"></div>
+                    <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-8"></div>
+                  </div>
+                  <div className="col-span-3 flex items-center gap-1.5">
+                    <div className="h-4 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-12"></div>
+                    <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-12"></div>
+                  </div>
+                  <div className="col-span-2 flex items-center gap-1.5">
+                    <div className="h-4 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-12"></div>
+                    <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-16"></div>
+                  </div>
+                  <div className="col-span-2 flex items-center gap-1.5">
+                    <div className="h-4 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-8"></div>
+                    <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-8"></div>
+                  </div>
+                  <div className="col-span-2 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <div className="h-4 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-10"></div>
+                      <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-10"></div>
+                    </div>
+                    <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-4 opacity-0"></div>
+                  </div>
+                </div>
 
-            {selectedTraining && (
-              <TrainingDetailModal
-                training={selectedTraining}
-                onClose={() => setSelectedTraining(null)}
-              />
-            )}
+                {/* Skeleton Rows */}
+                <div className="divide-y divide-gray-100/80">
+                  {[...Array(5)].map((_, index) => (
+                    <div
+                      key={index}
+                      className={`relative group ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'} hover:bg-gray-50 transition-colors`}
+                    >
+                      {/* Mobile Card Layout Skeleton */}
+                      <div className="md:hidden p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center mb-1">
+                              <div className="h-4 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-6 mr-2"></div>
+                              <div className="h-5 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-20"></div>
+                              {index % 3 === 0 && (
+                                <div className="h-4 w-4 bg-gradient-to-r from-green-200 via-green-100 to-green-200 rounded-full animate-pulse ml-2"></div>
+                              )}
+                            </div>
+                            <div className="flex items-center text-gray-600 text-sm">
+                              <div className="h-4 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-6 mr-2"></div>
+                              <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-32"></div>
+                            </div>
+                            <div className="h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-16 mt-1 ml-8"></div>
+                          </div>
+                          <div className="h-8 w-8 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-full animate-pulse mt-0.5"></div>
+                        </div>
 
-            {showFileModal && fileType === "mou" && (
-              <FilePreviewModal
-                fileUrl={fileUrl}
-                type={fileType}
-                trainingId={modalTrainingId}
-                onClose={() => setShowFileModal(false)}
-              />
+                        <div className="grid grid-cols-3 gap-3 text-[13px]">
+                          <div className="flex items-center">
+                            <div className="h-3 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-4 mr-1.5"></div>
+                            <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-8"></div>
+                          </div>
+                          <div className="flex items-center">
+                            <div className="h-3 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-4 mr-1.5"></div>
+                            <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-12"></div>
+                          </div>
+                          <div className="flex items-center">
+                            <div className="h-3 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-4 mr-1.5"></div>
+                            <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-6"></div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Desktop Grid Layout Skeleton */}
+                      <div className="hidden md:grid grid-cols-12 gap-2 px-5 py-3 text-[13px] items-center">
+                        <div className="col-span-3 truncate">
+                          <div className="flex items-center gap-2">
+                            <div className="h-4 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-16"></div>
+                            {index % 3 === 0 && (
+                              <div className="h-4 w-4 bg-gradient-to-r from-green-200 via-green-100 to-green-200 rounded-full animate-pulse"></div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="col-span-3 truncate">
+                          <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-24"></div>
+                          <div className="h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-12 mt-0.5"></div>
+                        </div>
+                        <div className="col-span-2 flex items-center gap-1.5">
+                          <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-6"></div>
+                          <div className="h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-12"></div>
+                        </div>
+                        <div className="col-span-2">
+                          <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-16"></div>
+                        </div>
+                        <div className="col-span-2 flex items-center justify-between">
+                          <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-8"></div>
+                          <div className="h-8 w-8 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-full animate-pulse"></div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Loading Text with Animation */}
+                <div className="text-center py-6">
+                  <div className="inline-flex items-center space-x-2">
+                    <div className="flex space-x-1">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    </div>
+                    <span className="text-gray-600 font-medium">Loading training data...</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <TrainingTable
+                  trainingData={trainings}
+                  onRowClick={setSelectedTraining}
+                  onViewStudentData={handleViewStudentData}
+                  onViewMouFile={handleViewMouFile}
+                  onInitiate={handleInitiateClick}
+                  onInitiateJD={handleInitiateJD}
+                />
+
+                {selectedTraining && (
+                  <TrainingDetailModal
+                    training={selectedTraining}
+                    onClose={() => setSelectedTraining(null)}
+                  />
+                )}
+
+                {showFileModal && fileType === "mou" && (
+                  <FilePreviewModal
+                    fileUrl={fileUrl}
+                    type={fileType}
+                    trainingId={modalTrainingId}
+                    onClose={() => setShowFileModal(false)}
+                  />
+                )}
+              </>
             )}
           </>
         ) : activeTab === "initiation" ? (
@@ -301,6 +470,36 @@ function LearningDevelopment() {
           <ContractInvoiceTable />
         ) : null}
       </div>
+
+      {/* JD Training Modals */}
+      {showJDMergeModal && (
+        <JDMergeModal
+          onClose={() => setShowJDMergeModal(false)}
+          onProceed={handleJDCollegesSelected}
+        />
+      )}
+
+      {showOperationsConfigModal && selectedJDColleges.length > 0 && (
+        <OperationsConfigurationModal
+          selectedColleges={selectedJDColleges}
+          onClose={() => {
+            setShowOperationsConfigModal(false);
+            setSelectedJDColleges([]);
+          }}
+          onProceed={handleOperationsConfigured}
+        />
+      )}
+
+      {showJDInitiationModal && selectedJDColleges.length > 0 && operationsConfig && (
+        <JDInitiationModal
+          training={{}} // Empty training object for JD initiation
+          onClose={handleJDInitiationClose}
+          onConfirm={handleJDInitiationClose}
+          isMerged={true}
+          selectedColleges={selectedJDColleges}
+          operationsConfig={operationsConfig}
+        />
+      )}
     </>
   );
 }

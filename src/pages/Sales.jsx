@@ -463,8 +463,8 @@ function Sales() {
   const updateLeadPhase = useCallback(async (id, newPhase) => {
     try {
       await updateDoc(doc(db, "leads", id), { phase: newPhase });
-    } catch (err) {
-      console.error("Phase update failed", err);
+    } catch {
+      // Phase update failed - handled silently
     }
   }, []);
 
@@ -496,8 +496,8 @@ function Sales() {
       await Promise.all(savePromises);
       setShowDetailsModal(false);
       setSelectedLead(null);
-    } catch (error) {
-      console.error("Error saving leads:", error);
+    } catch {
+      // Error saving leads - handled silently
     }
   }, []);
 
@@ -628,12 +628,12 @@ function Sales() {
           </div>
 
           {/* Phase Tabs */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2" data-tour="phase-tabs">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 mb-1.5" data-tour="phase-tabs">
             {Object.keys(tabLabels).map((key) => (
               <button
                 key={key}
                 onClick={() => handleTabChange(key)}
-                className={`py-3.5 rounded-xl text-sm font-semibold transition-all duration-300 ease-out transform hover:scale-[1.02] ${
+                className={`py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 ease-out transform hover:scale-[1.02] ${
                   activeTab === key
                     ? tabColorMap[key].active
                     : tabColorMap[key].inactive

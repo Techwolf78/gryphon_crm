@@ -25,7 +25,6 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { motion } from "framer-motion";
 import NewUser from "../components/Admin/NewUser";
 import AuditLogs from "../components/Admin/AuditLogs";
 import LoginAnalytics from "../components/Admin/LoginAnalytics";
@@ -96,11 +95,8 @@ const Admin = () => {
                 ? userProfile.data().profilePicUrl
                 : null,
             };
-          } catch (error) {
-            console.error(
-              `Error fetching profile for user ${userDoc.id}:`,
-              error
-            );
+          } catch {
+            // Error fetching profile - handled by returning user data without profile pic
             return {
               id: userDoc.id,
               ...userDoc.data(),
@@ -120,8 +116,8 @@ const Admin = () => {
 
       sessionStorage.setItem("userList", JSON.stringify(userData));
       sessionStorage.setItem("auditLogs", JSON.stringify(logData));
-    } catch (error) {
-      console.error("Refresh error:", error);
+    } catch {
+      // Refresh error - handled silently
     }
     setRefreshing(false);
   };
@@ -138,8 +134,8 @@ const Admin = () => {
       setUsers(updatedUsers);
       sessionStorage.setItem("userList", JSON.stringify(updatedUsers));
       setDeleteUser(null);
-    } catch (error) {
-      console.error("Error deleting user:", error);
+    } catch {
+      // Error deleting user - handled silently
     }
     setLoadingDelete(false);
   };
@@ -182,9 +178,7 @@ const Admin = () => {
   return (
     <div className="space-y-6 sm:space-y-8">
       {/* Header */}
-      <motion.header
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
+      <div
         className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
         data-tour="admin-header"
       >
@@ -199,12 +193,11 @@ const Admin = () => {
         <div className="w-full sm:w-auto" data-tour="add-user-button">
           <NewUser onUserAdded={handleRefresh} />
         </div>
-      </motion.header>
+      </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6" data-tour="stats-cards">
-        <motion.div
-          whileHover={{ y: -2 }}
+        <div
           className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6"
         >
           <div className="flex items-center justify-between">
@@ -220,10 +213,9 @@ const Admin = () => {
               <FiUsers className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
           </div>
-        </motion.div>
+        </div>
 
-        <motion.div
-          whileHover={{ y: -2 }}
+        <div
           className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6"
         >
           <div className="flex items-center justify-between">
@@ -239,10 +231,9 @@ const Admin = () => {
               <FiActivity className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
           </div>
-        </motion.div>
+        </div>
 
-        <motion.div
-          whileHover={{ y: -2 }}
+        <div
           className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 sm:col-span-2 lg:col-span-1"
         >
           <div className="flex items-center justify-between">
@@ -258,13 +249,11 @@ const Admin = () => {
               <FiClock className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
           </div>
-        </motion.div>
+        </div>
       </div>
 
       {/* User Management Section */}
-      <motion.section
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
+      <section
         className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
         data-tour="user-management-section"
       >
@@ -376,11 +365,8 @@ const Admin = () => {
                                 };
                                 setEditUser(fullUserData);
                               }
-                            } catch (err) {
-                              console.error(
-                                "Error fetching full user data:",
-                                err
-                              );
+                            } catch {
+                              // Error fetching full user data - handled silently
                             }
                           }}
                           className="text-blue-500 hover:text-blue-700 p-2 rounded-full hover:bg-blue-50"
@@ -468,11 +454,8 @@ const Admin = () => {
                                   };
                                   setEditUser(fullUserData);
                                 }
-                              } catch (err) {
-                                console.error(
-                                  "Error fetching full user data:",
-                                  err
-                                );
+                              } catch {
+                                // Error fetching full user data - handled silently
                               }
                             }}
                             className="text-blue-500 hover:text-blue-700 p-1 rounded-full hover:bg-blue-50"
@@ -562,7 +545,7 @@ const Admin = () => {
             </div>
           )}
         </div>
-      </motion.section>
+      </section>
 
       <div data-tour="login-analytics">
         <LoginAnalytics logs={logs} />
@@ -574,9 +557,7 @@ const Admin = () => {
       {/* Delete Confirmation Modal - Make responsive */}
       {deleteUser && (
         <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 p-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
+          <div
             className="bg-white rounded-xl shadow-lg max-w-md w-full p-4 sm:p-6 max-h-[90vh] overflow-y-auto"
           >
             <div className="flex items-center gap-4 mb-4">
@@ -622,16 +603,14 @@ const Admin = () => {
                 )}
               </button>
             </div>
-          </motion.div>
+          </div>
         </div>
       )}
 
       {/* Edit User Modal - Make responsive */}
       {editUser && (
         <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 p-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
+          <div
             className="bg-white rounded-xl shadow-lg max-w-md w-full p-4 sm:p-6 max-h-[90vh] overflow-y-auto"
           >
             <EditUser
@@ -639,7 +618,7 @@ const Admin = () => {
               onCancel={() => setEditUser(null)}
               onSuccess={handleUserUpdated}
             />
-          </motion.div>
+          </div>
         </div>
       )}
 

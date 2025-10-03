@@ -412,28 +412,28 @@ const ClosedLeadsTable = ({
           <table className={`min-w-full divide-y divide-gray-100/60 ${tableClassName}`}>
             <thead className="bg-gradient-to-r from-slate-50 to-gray-50/80">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
                   Project Code
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
                   College Name
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-[90px]">
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-[90px]">
                   No of stds.
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-[110px]">
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-[110px]">
                   Cost per std.
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-[12px]">
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-[12px]">
                   Actual TCV
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-[140px]">
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-[140px]">
                   Owner
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-[120px]">
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-[120px]">
                   Closed Date
                 </th>
-                <th className="px-2 py-4 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider w-[40px]">
+                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider w-[40px]">
                   Actions
                 </th>
               </tr>
@@ -443,10 +443,10 @@ const ClosedLeadsTable = ({
                 // Loading skeleton for desktop
                 Array.from({ length: 5 }).map((_, index) => (
                   <tr key={index} className="animate-pulse">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-3 whitespace-nowrap">
                       <div className="h-4 w-20 bg-slate-200 rounded"></div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-3 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="h-10 w-10 rounded-full bg-slate-200"></div>
                         <div className="ml-4 space-y-2">
@@ -455,16 +455,16 @@ const ClosedLeadsTable = ({
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-3 whitespace-nowrap">
                       <div className="h-4 w-8 bg-slate-200 rounded mx-auto"></div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-3 whitespace-nowrap">
                       <div className="h-4 w-16 bg-slate-200 rounded"></div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-3 whitespace-nowrap">
                       <div className="h-4 w-20 bg-slate-200 rounded"></div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-3 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="h-8 w-8 rounded-full bg-slate-200"></div>
                         <div className="ml-3">
@@ -472,7 +472,7 @@ const ClosedLeadsTable = ({
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-3 whitespace-nowrap">
                       <div className="h-4 w-16 bg-slate-200 rounded"></div>
                     </td>
                     <td className="px-2 py-3 whitespace-nowrap">
@@ -510,7 +510,7 @@ const ClosedLeadsTable = ({
                     }}
                   >
                     <td
-                      className="px-6 py-4 whitespace-nowrap text-sm text-slate-900 overflow-hidden truncate max-w-[120px] font-medium"
+                      className="px-6 py-3 whitespace-nowrap text-sm text-slate-900 overflow-hidden truncate max-w-[120px] font-medium"
                       title={`DocID: ${projectCodeToDocId(
                         lead.projectCode || ""
                       )}, ProjectCode: ${displayProjectCode(
@@ -519,7 +519,7 @@ const ClosedLeadsTable = ({
                     >
                       {displayProjectCode(lead.projectCode) || "-"}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap overflow-hidden truncate max-w-[180px]">
+                    <td className="px-6 py-3 whitespace-nowrap overflow-hidden truncate max-w-[180px]">
                       <div className="flex items-center">
                         <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center text-blue-700 font-semibold flex-shrink-0 shadow-sm border border-blue-100/50">
                           {lead.businessName?.charAt(0)?.toUpperCase() || "?"}
@@ -542,18 +542,18 @@ const ClosedLeadsTable = ({
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900 overflow-hidden truncate max-w-[90px] font-medium">
+                    <td className="px-6 py-3 whitespace-nowrap text-sm text-slate-900 overflow-hidden truncate max-w-[90px] font-medium">
                       <div className="text-center">
                         {lead.studentCount || "-"}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap font-semibold text-slate-900 overflow-hidden truncate max-w-[110px]">
+                    <td className="px-6 py-3 whitespace-nowrap font-semibold text-slate-900 overflow-hidden truncate max-w-[110px]">
                       {lead.perStudentCost ? formatCurrency(lead.perStudentCost) : "-"}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap font-semibold text-slate-900 overflow-hidden truncate max-w-[140px]">
+                    <td className="px-6 py-3 whitespace-nowrap font-semibold text-slate-900 overflow-hidden truncate max-w-[140px]">
                       {formatCurrency(lead.totalCost)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap overflow-hidden truncate max-w-[140px]">
+                    <td className="px-6 py-3 whitespace-nowrap overflow-hidden truncate max-w-[140px]">
                       <div className="flex items-center">
                         <div className="h-8 w-8 rounded-full bg-gradient-to-br from-slate-100 to-gray-200 flex items-center justify-center text-slate-700 text-xs font-semibold flex-shrink-0 shadow-sm border border-slate-200/50">
                           {lead.assignedTo?.name
@@ -567,7 +567,7 @@ const ClosedLeadsTable = ({
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900 overflow-hidden truncate max-w-[140px] font-medium">
+                    <td className="px-6 py-3 whitespace-nowrap text-sm text-slate-900 overflow-hidden truncate max-w-[140px] font-medium">
                       {formatDate(lead.closedDate)}
                     </td>
                     <td className="px-2 py-3 whitespace-nowrap w-[40px]">

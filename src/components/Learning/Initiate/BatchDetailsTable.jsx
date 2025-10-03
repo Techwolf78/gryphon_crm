@@ -1961,7 +1961,7 @@ const filteredTrainers = useMemo(() => {
     return result;
   };
 
-  const getDateList = (start, end) => {
+  const getDateList = useCallback((start, end) => {
     if (!start || !end) return [];
     const startDate = new Date(start);
     const endDate = new Date(end);
@@ -1991,7 +1991,7 @@ const filteredTrainers = useMemo(() => {
       current.setDate(current.getDate() + 1);
     }
     return dates;
-  };
+  }, [excludeDays]);
 
   const toggleBatchExpansion = (rowIndex) => {
     setExpandedBatch((prev) => ({
@@ -2437,18 +2437,14 @@ const filteredTrainers = useMemo(() => {
     }
   };
 
-  // Monitor for duplicate trainers whenever table1Data changes
-  useEffect(() => {
+  // Memoize validation result to prevent unnecessary re-renders
+  const validationResult = useMemo(() => {
     if (!table1Data || table1Data.length === 0) {
-      setDuplicateTrainers([]);
-      if (onValidationChange) {
-        onValidationChange(selectedDomain, {
-          hasErrors: false,
-          errors: [],
-          duplicates: [],
-        });
-      }
-      return;
+      return {
+        hasErrors: false,
+        errors: [],
+        duplicates: [],
+      };
     }
 
     // Improved duplicate detection with normalized dates and readable errors
@@ -2579,23 +2575,28 @@ const filteredTrainers = useMemo(() => {
     });
 
     const duplicates = Array.from(duplicatesSet);
-    setDuplicateTrainers(duplicates);
 
     // Remove duplicate error messages
     const uniqueErrors = Array.from(
       new Map(errors.map((e) => [e.message, e])).values()
     );
 
+    return {
+      hasErrors: duplicates.length > 0,
+      errors: uniqueErrors,
+      duplicates: duplicates,
+    };
+  }, [table1Data, globalTrainerAssignments, getDateList]);
+
+  // Update duplicate trainers and notify parent when validation result changes
+  useEffect(() => {
+    setDuplicateTrainers(validationResult.duplicates);
+
     // Notify parent component about validation status using the shape expected by InitiationModal
     if (onValidationChange) {
-      onValidationChange(selectedDomain, {
-        hasErrors: duplicates.length > 0,
-        errors: uniqueErrors,
-        duplicates: duplicates,
-      });
+      onValidationChange(selectedDomain, validationResult);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [table1Data, selectedDomain, globalTrainerAssignments]);
+  }, [validationResult, selectedDomain, onValidationChange]);
 
 
 

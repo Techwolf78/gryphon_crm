@@ -67,8 +67,8 @@ const NewUser = ({ onUserAdded }) => {
           }));
  
           setReportingManagers(managers);
-        } catch (err) {
-          console.error("Error fetching managers:", err);
+        } catch {
+          // Error fetching managers - handled through toast
           toast.error("Failed to load reporting managers");
         }
       } else {
@@ -200,8 +200,8 @@ const NewUser = ({ onUserAdded }) => {
           },
           "CXYkFqg_8EWTsrN8M"
         );
-      } catch (emailErr) {
-        console.error("EmailJS Error:", emailErr);
+      } catch {
+        // EmailJS Error - handled through toast warning
         toast.warning("User added, but email not sent.");
       }
  
@@ -214,7 +214,7 @@ const NewUser = ({ onUserAdded }) => {
       if (onUserAdded) onUserAdded();
       toast.success(`${name} (${role}, ${department}) added successfully!`);
     } catch (err) {
-      console.error("Error adding user:", err);
+      // Error adding user - handled through error state and toast
       setError(err.message || "Failed to add user");
       toast.error(err.message || "Failed to add user");
     } finally {

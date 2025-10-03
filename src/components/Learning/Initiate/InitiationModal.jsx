@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { db } from "../../../firebase";
 import {
   doc,
@@ -151,6 +151,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
         return Number(customPhaseHours[phase]);
       }
       if (!domain) return 0;
+
       // Support for Tools subdomains:
       // - If domain is "Tools (Excel - Power BI)" or "Tools (Looker Studio)"
       //   -> return hours for the specific topic only.
@@ -208,38 +209,39 @@ function InitiationModal({ training, onClose, onConfirm }) {
     fetchTrainingDetails();
   }, [training]);
 
-  // Auto-generate table1Data for new domains
-  useEffect(() => {
-    if (courses.length === 0 || topics.length === 0) return;
-    setTable1DataByDomain((prev) => {
-      const updated = { ...prev };
-      selectedDomains.forEach((domain) => {
-        if (!updated[domain] || updated[domain].length === 0) {
-          const domainHours = getDomainHours(domain, getMainPhase());
-          updated[domain] = courses.map((course) => ({
-            batch: course.specialization,
-            stdCount: course.students,
-            hrs: domainHours,
-            assignedHours: 0,
-            batches: [
-              {
-                batchPerStdCount: "",
-                batchCode: `${course.specialization}1`,
-                assignedHours: 0,
-                trainers: [],
-              },
-            ],
-          }));
-        }
-      });
-
-      // Store original table data for undo functionality (only if not already set)
-      if (Object.keys(originalTable1DataByDomain.current).length === 0) {
-        originalTable1DataByDomain.current = JSON.parse(JSON.stringify(updated));
+  const table1DataByDomainMemo = useMemo(() => {
+    if (courses.length === 0 || topics.length === 0) return {};
+    const updated = {};
+    selectedDomains.forEach((domain) => {
+      if (!updated[domain] || updated[domain].length === 0) {
+        const domainHours = getDomainHours(domain, getMainPhase());
+        updated[domain] = courses.map((course) => ({
+          batch: course.specialization,
+          stdCount: course.students,
+          hrs: domainHours,
+          assignedHours: 0,
+          batches: [
+            {
+              batchPerStdCount: "",
+              batchCode: `${course.specialization}1`,
+              assignedHours: 0,
+              trainers: [],
+            },
+          ],
+        }));
       }
-
-      return updated;
     });
+
+    // Store original table data for undo functionality (only if not already set)
+    if (Object.keys(originalTable1DataByDomain.current).length === 0) {
+      originalTable1DataByDomain.current = JSON.parse(JSON.stringify(updated));
+    }
+
+    return updated;
+  }, [selectedDomains, courses, topics, getDomainHours, getMainPhase]);
+
+  useEffect(() => {
+    setTable1DataByDomain(table1DataByDomainMemo);
     
     // Store original custom phase hours for undo functionality (only if not already set)
     if (Object.keys(originalCustomPhaseHours.current).length === 0) {
@@ -250,8 +252,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
     if (originalSelectedDomains.current.length === 0) {
       originalSelectedDomains.current = [...selectedDomains];
     }
-    
-  }, [selectedDomains, courses, topics, getDomainHours, getMainPhase, customPhaseHours]);
+  }, [table1DataByDomainMemo, customPhaseHours, selectedDomains]);
 
   // Track changes for undo functionality
   useEffect(() => {
@@ -282,6 +283,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
       const newPhases = prev.includes(phase)
         ? prev.filter((p) => p !== phase)
         : [...prev, phase];
+
       if (prev.includes(phase) && !newPhases.includes(phase)) {
         setCustomPhaseHours((prevHours) => ({
           ...prevHours,
@@ -326,33 +328,41 @@ function InitiationModal({ training, onClose, onConfirm }) {
   }, [selectedDomains]);
 
   const validateForm = () => {
+    // Require at least one phase
     if (selectedPhases.length === 0) {
-      setError("Please select at least one phase");
+      setError("Please select at least one training phase");
       return false;
     }
+
+    // Require domains
     if (selectedDomains.length === 0) {
       setError("Please select at least one domain");
       return false;
     }
+
+    // Date validation
     if (!commonFields.trainingStartDate || !commonFields.trainingEndDate) {
       setError("Please select training start and end dates");
       return false;
     }
+
     if (!commonFields.collegeStartTime || !commonFields.collegeEndTime) {
       setError("Please enter college start and end times");
       return false;
     }
 
-    // Detect selected domains that have zero configured hours
-    const mainPhase = getMainPhase();
-    const zeroDomains = selectedDomains.filter(
-      (d) => Number(getDomainHours(d, mainPhase) || 0) === 0
-    );
-    if (zeroDomains.length > 0) {
-      setZeroHourDomains(zeroDomains);
-      setShowZeroHourWarning(true);
-      setError(`Selected domain(s) with 0 hours: ${zeroDomains.join(", ")}.`);
-      return false;
+    // Detect selected domains that have zero configured hours (only if domains are selected)
+    if (selectedDomains.length > 0) {
+      const mainPhase = getMainPhase();
+      const zeroDomains = selectedDomains.filter(
+        (d) => Number(getDomainHours(d, mainPhase) || 0) === 0
+      );
+      if (zeroDomains.length > 0) {
+        setZeroHourDomains(zeroDomains);
+        setShowZeroHourWarning(true);
+        setError(`Selected domain(s) with 0 hours: ${zeroDomains.join(", ")}.`);
+        return false;
+      }
     }
 
     return true;
@@ -562,7 +572,19 @@ function InitiationModal({ training, onClose, onConfirm }) {
         }
 
         if (phase === "phase-2") phaseDocData.phase2Dates = phase2Dates;
+        if (phase === "phase-2") {
+          phaseDocData.trainingStartDate = phase2Dates.startDate;
+        }
+        if (phase === "phase-2") {
+          phaseDocData.trainingEndDate = phase2Dates.endDate;
+        }
         if (phase === "phase-3") phaseDocData.phase3Dates = phase3Dates;
+        if (phase === "phase-3") {
+          phaseDocData.trainingStartDate = phase3Dates.startDate;
+        }
+        if (phase === "phase-3") {
+          phaseDocData.trainingEndDate = phase3Dates.endDate;
+        }
         if (phase2Dates?.startDate && phase === "phase-2") {
           phaseDocData.trainingStartDate = phase2Dates.startDate;
         }
@@ -996,6 +1018,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
       if (training?.selectedPhase) {
         setSelectedPhases([training.selectedPhase]);
       } else {
+        // Restore all existing phases from Firestore
         setSelectedPhases(phases);
       }
 
@@ -1467,26 +1490,28 @@ function InitiationModal({ training, onClose, onConfirm }) {
                   </div>
                   <div className="flex flex-wrap gap-6 items-start">
                     <div className="flex flex-wrap gap-3 min-w-[300px]">
-                      {PHASE_OPTIONS.map((phase) => (
-                        <label
-                          key={phase}
-                          className={`flex items-center px-3 py-2 rounded-lg border cursor-pointer text-sm font-medium transition-all min-w-[80px] ${
-                            selectedPhases.includes(phase)
-                              ? "border-blue-500 bg-blue-50 text-blue-700"
-                              : "border-gray-200 bg-white hover:border-gray-300"
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            className="mr-2 accent-blue-600"
-                            checked={selectedPhases.includes(phase)}
-                            onChange={() => handlePhaseChange(phase)}
-                          />
-                          <span className="capitalize">
-                            {phase.replace("-", " ")}
-                          </span>
-                        </label>
-                      ))}
+                      {PHASE_OPTIONS.map((phase) => {
+                        return (
+                          <label
+                            key={phase}
+                            className={`flex items-center px-3 py-2 rounded-lg border text-sm font-medium transition-all min-w-[80px] ${
+                              selectedPhases.includes(phase)
+                                ? "border-blue-500 bg-blue-50 text-blue-700"
+                                : "border-gray-200 bg-white hover:border-gray-300"
+                            } cursor-pointer`}
+                          >
+                            <input
+                              type="checkbox"
+                              className="mr-2 accent-blue-600"
+                              checked={selectedPhases.includes(phase)}
+                              onChange={() => handlePhaseChange(phase)}
+                            />
+                            <span className="capitalize">
+                              {phase.replace("-", " ")}
+                            </span>
+                          </label>
+                        );
+                      })}
                     </div>
  {/* Start/End Date */}
                     <div className="flex gap-4 min-w-[200px]">
@@ -1496,16 +1521,15 @@ function InitiationModal({ training, onClose, onConfirm }) {
                         </label>
                         <DatePicker
                           selected={
-                            commonFields.trainingStartDate
-                              ? new Date(commonFields.trainingStartDate + "T00:00:00")
-                              : null
+                            commonFields.trainingStartDate ? new Date(commonFields.trainingStartDate + "T00:00:00") : null
                           }
                           onChange={(date) => {
+                            const dateStr = date
+                              ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+                              : "";
                             setCommonFields({
                               ...commonFields,
-                              trainingStartDate: date
-                                ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
-                                : "",
+                              trainingStartDate: dateStr,
                             });
                           }}
                           dateFormat="yyyy-MM-dd"
@@ -1521,16 +1545,15 @@ function InitiationModal({ training, onClose, onConfirm }) {
                         </label>
                         <DatePicker
                           selected={
-                            commonFields.trainingEndDate
-                              ? new Date(commonFields.trainingEndDate + "T00:00:00")
-                              : null
+                            commonFields.trainingEndDate ? new Date(commonFields.trainingEndDate + "T00:00:00") : null
                           }
                           onChange={(date) => {
+                            const dateStr = date
+                              ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+                              : "";
                             setCommonFields({
                               ...commonFields,
-                              trainingEndDate: date
-                                ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
-                                : "",
+                              trainingEndDate: dateStr,
                             });
                           }}
                           dateFormat="yyyy-MM-dd"
@@ -1608,6 +1631,8 @@ function InitiationModal({ training, onClose, onConfirm }) {
                     </div>
                   </div>
                 </div>
+
+
 
                 <TrainingConfiguration commonFields={commonFields} setCommonFields={setCommonFields} selectedPhases={selectedPhases} phase2Dates={phase2Dates} phase3Dates={phase3Dates} setPhase2Dates={setPhase2Dates} setPhase3Dates={setPhase3Dates} getMainPhase={getMainPhase} />
 

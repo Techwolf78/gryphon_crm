@@ -120,6 +120,10 @@ function formatDate(input) {
   if (typeof input === "object" && input !== null && typeof input.toDate === "function") {
     date = input.toDate();
   } 
+  // Handle Firestore Timestamp as plain object (seconds/nanoseconds)
+  else if (typeof input === "object" && input !== null && input.seconds !== undefined && input.nanoseconds !== undefined) {
+    date = new Date(input.seconds * 1000 + input.nanoseconds / 1000000);
+  }
   // Handle timestamp (number)
   else if (typeof input === "number") {
     date = new Date(input);
@@ -133,11 +137,11 @@ function formatDate(input) {
   else if (input instanceof Date) {
     date = input;
   } else {
-    return String(input);
+    return "";
   }
   
   // Validate date
-  if (isNaN(date.getTime())) return String(input);
+  if (isNaN(date.getTime())) return "";
   
   const day = String(date.getDate()).padStart(2, "0");
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -163,6 +167,7 @@ function groupByCollege(trainings) {
       map[key].netPayableAdded = true;
     }
   });
+  
   // Calculate health: show cost% of TCV (higher % = higher cost utilization)
   Object.keys(map).forEach((key) => {
     const { tcv, totalCost } = map[key];
@@ -172,7 +177,7 @@ function groupByCollege(trainings) {
   return map;
 }
 
-const Dashboard = ({ onRowClick, onStartPhase }) => {
+const InitiationDashboard = ({ onRowClick, onStartPhase }) => {
   const [showTrainerCalendar, setShowTrainerCalendar] = useState(false);
   const [trainerCalendarTraining, setTrainerCalendarTraining] = useState(null);
   const [trainings, setTrainings] = useState([]);
@@ -509,6 +514,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
             totalCost: totalCost,
             table1Data: Array(totalBatches).fill({}), // For batch count display
             tcv: formData.totalCost || 0,
+            mergedColleges: phaseData.mergedColleges || null, // Add merged colleges info
             ...phaseData,
             // Include original form data for phase initiation
             originalFormData: formData,
@@ -662,42 +668,11 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
   const grouped = groupByCollege(filteredByStatus);
 
   // Calculate overall health
-  const trainingsForHealth = filteredByStatus.filter(
-    (t) => t.computedStatus !== "Not Started"
-  );
-
-  const totalTrainingCost = trainingsForHealth.reduce(
-    (acc, t) => acc + (t.totalCost || 0),
-    0
-  );
-  const collegesForHealth = new Set(
-    trainingsForHealth.map((t) => `${t.collegeName} (${t.collegeCode})`)
-  );
-  const totalTcv = Object.entries(grouped)
-    .filter(([key]) => collegesForHealth.has(key))
-    .reduce((acc, [, data]) => acc + (data.tcv || 0), 0);
-  // const overallHealth = totalTcv > 0 ? ((totalTcv - totalTrainingCost) / totalTcv * 100) : 0;
   const overallHealth =
     Object.keys(grouped).length > 0
       ? Object.values(grouped).reduce((acc, data) => acc + data.health, 0) /
         Object.keys(grouped).length
       : 0;
-  // Health counts
-  const healthCounts = useMemo(() => {
-    const counts = {
-      all: Object.keys(grouped).length,
-      low: 0,
-      medium: 0,
-      high: 0,
-    };
-    Object.values(grouped).forEach((data) => {
-      if (data.health < 20) counts.low++;
-      else if (data.health <= 50) counts.medium++;
-      else counts.high++;
-    });
-    return counts;
-  }, [grouped]);
-
   // Filter grouped by health tab
   const filteredGrouped = useMemo(() => {
     if (activeHealthTab === "all") return grouped;
@@ -834,16 +809,14 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
         const branch = parts[2];
         const specialization = parts[3];
         const phaseBase = parts[4] + "-" + parts[5];
+        
         const phaseNumber = training.phaseId.split("-")[1]; // "1" for "phase-1"
         const phase = phaseBase + "-phase-" + phaseNumber;
+        
         const prefix = `${projectCode}-${year}-${branch}-${specialization}-${phase}`;
         
         const q = query(collection(db, "trainerAssignments"), where('__name__', '>=', prefix), where('__name__', '<', prefix + '\uf8ff'));
         const snap = await getDocs(q);
-        
-        snap.docs.forEach((doc) => {
-          const data = doc.data();
-        });
         
         const deletePromises = snap.docs.map(doc => deleteDoc(doc.ref));
         await Promise.all(deletePromises);
@@ -969,7 +942,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
     setToast(null);
   };
 
-  const handleUndoAssignment = async () => {
+  const _handleUndoAssignment = async () => {
     if (!toast) return;
     const { trainingId, prevAssignedUser, timer } = toast;
     if (timer) clearTimeout(timer);
@@ -1148,272 +1121,383 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
   return (
     <div className="min-h-screen bg-gray-50/50">
       <div className="w-full space-y-3">
-        {/* Header Section */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-3">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
-            <div>
-              <h1 className="text-xl font-bold text-gray-900 tracking-tight">
-                Training Status
-              </h1>
-              <p className="text-gray-600 text-xs mt-0.5">
-                Manage and monitor training phases across all colleges
-              </p>
-            </div>
+        {loading ? (
+          <div className="space-y-3">
+            {/* Header Skeleton */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-3">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
+                <div>
+                  <div className="h-6 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-48 mb-1"></div>
+                  <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-64"></div>
+                </div>
 
-            {/* Controls */}
-            <div className="flex flex-col sm:flex-row gap-2">
-              {/* Search */}
-              <div className="relative">
-                <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input
-                  type="text"
-                  placeholder="Search colleges or domains..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-3 py-1.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all w-full sm:w-52"
-                />
+                {/* Controls Skeleton */}
+                <div className="flex flex-col sm:flex-row gap-2">
+                  {/* Search Skeleton */}
+                  <div className="relative">
+                    <div className="h-9 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-xl animate-pulse w-full sm:w-52"></div>
+                  </div>
+
+                  {/* Filters Button Skeleton */}
+                  <div className="h-9 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-xl animate-pulse w-20"></div>
+
+                  {/* Refresh Button Skeleton */}
+                  <div className="h-9 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-xl animate-pulse w-20"></div>
+                </div>
+
+                <div className="mt-2 lg:mt-0 flex items-center gap-3">
+                  <div className="h-9 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-24"></div>
+                  <div className="w-px h-6 bg-gray-300"></div>
+                  <div className="h-9 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded-lg animate-pulse w-32"></div>
+                </div>
               </div>
 
-              {/* Combined Filters Button */}
-              <div className="relative">
-                <button
-                  ref={filtersBtnRef}
-                  onClick={toggleFiltersDropdown}
-                  className={`inline-flex items-center px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${
-                    isAnyFilterActive ? "ring-2 ring-blue-500/20" : ""
-                  }`}
-                  aria-label="Open filters"
-                >
-                  <FiFilter className="w-4 h-4 mr-1" />
-                  Filters
-                  {isAnyFilterActive && (
-                    <span className="ml-1 w-2 h-2 bg-blue-500 rounded-full"></span>
-                  )}
-                </button>
-                {filtersDropdownOpen &&
-                  createPortal(
-                    <div
-                      ref={filtersDropdownRef}
-                      className="z-54 w-full max-w-xs md:max-w-sm bg-white border border-gray-200 rounded-lg shadow-xl py-2 px-3 flex flex-col space-y-2 animate-fade-in transition-opacity duration-200"
-                      style={{
-                        position: "absolute",
-                        top: dropdownPosition.top,
-                        left: dropdownPosition.left,
-                        maxHeight: "80vh", // Prevent vertical overflow
-                        overflowY: "auto", // Scroll if needed
-                      }}
-                    >
-                      {/* Phase Filter */}
-                      <div>
-                        <label className="text-xs font-medium text-gray-700 mb-1 flex items-center">
-                          <FiFilter className="w-3 h-3 mr-1" />
-                          Phase
-                        </label>
-                        <select
-                          value={filterPhase}
-                          onChange={(e) => setFilterPhase(e.target.value)}
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all"
-                        >
-                          <option value="all">All Phases</option>
-                          <option value="phase-1">Phase 1</option>
-                          <option value="phase-2">Phase 2</option>
-                          <option value="phase-3">Phase 3</option>
-                        </select>
-                      </div>
-
-                      {/* Date Filter */}
-                      <div>
-                        <label className="text-xs font-medium text-gray-700 mb-1 flex items-center">
-                          <FiCalendar className="w-3 h-3 mr-1" />
-                          Date Range
-                        </label>
-                        <div className="space-y-1">
-                          <div className="flex gap-1">
-                            <div className="flex-1">
-                              <div className="text-gray-900 text-[10px] font-medium mb-0.5">
-                                Start Date
-                              </div>
-                              <input
-                                type="date"
-                                value={dateFilterStart}
-                                onChange={(e) =>
-                                  setDateFilterStart(e.target.value)
-                                }
-                                className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all"
-                                placeholder="Start Date"
-                              />
-                            </div>
-                            <div className="flex-1">
-                              <div className="text-gray-900 text-[10px] font-medium mb-0.5">
-                                End Date
-                              </div>
-                              <input
-                                type="date"
-                                value={dateFilterEnd}
-                                onChange={(e) =>
-                                  setDateFilterEnd(e.target.value)
-                                }
-                                className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all"
-                                placeholder="End Date"
-                              />
-                            </div>
-                          </div>
-                          <div className="text-blue-600 text-[10px] mt-1 leading-tight font-medium bg-blue-50 px-2 py-1 rounded border-l-2 border-blue-400">
-                            🎯 Filter trainings by their start dates within the
-                            selected range
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* User Filter */}
-                      {(user?.role === "Director" || user?.role === "Head") &&
-                        availableUsers.length > 1 && (
-                          <div>
-                            <label className="text-xs font-medium text-gray-700 mb-1 flex items-center">
-                              <FiUser className="w-3 h-3 mr-1" />
-                              User
-                            </label>
-                            <select
-                              value={selectedUserFilter}
-                              onChange={(e) =>
-                                setSelectedUserFilter(e.target.value)
-                              }
-                              className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all"
-                            >
-                              <option value="all">All Users</option>
-                              {availableUsers.map((userOption) => (
-                                <option
-                                  key={userOption.uid}
-                                  value={userOption.uid}
-                                >
-                                  {userOption.name ||
-                                    userOption.email ||
-                                    userOption.uid}{" "}
-                                  {userOption.department
-                                    ? `(${userOption.department.toLowerCase()})`
-                                    : ""}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-
-                      {/* Health Filter */}
-                      <div>
-                        <label className="text-xs font-medium text-gray-700 mb-1 flex items-center">
-                          <FiTrendingUp className="w-3 h-3 mr-1" />
-                          Health
-                        </label>
-                        <select
-                          value={activeHealthTab}
-                          onChange={(e) => setActiveHealthTab(e.target.value)}
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all"
-                        >
-                          <option value="all">
-                            All Health ({healthCounts.all || 0})
-                          </option>
-                          <option value="low">
-                            Good (≤20%) ({healthCounts.low || 0})
-                          </option>
-                          <option value="medium">
-                            Concerning (20-50%) ({healthCounts.medium || 0})
-                          </option>
-                          <option value="high">
-                            Bad (&gt;50%) ({healthCounts.high || 0})
-                          </option>
-                        </select>
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex flex-col sm:flex-row justify-between gap-1 pt-1 border-t border-gray-100">
-                        <button
-                          onClick={clearAllFilters}
-                          className="flex-1 inline-flex items-center justify-center px-2 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200 transition-all"
-                        >
-                          <FiTrash2 className="w-3 h-3 mr-1" />
-                          Clear All
-                        </button>
-                        <button
-                          onClick={applyFilters}
-                          className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-all"
-                        >
-                          Apply
-                        </button>
-                      </div>
-                    </div>,
-                    document.body
-                  )}
+              {/* Status Tabs Skeleton */}
+              <div className="mt-3">
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-3">
+                  {[...Array(6)].map((_, index) => (
+                    <div key={index} className="h-10 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-xl animate-pulse"></div>
+                  ))}
+                </div>
               </div>
-
-              {/* Refresh Button */}
-              <button
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="inline-flex items-center px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <FiRefreshCw
-                  className={`w-4 h-4 mr-1 ${refreshing ? "animate-spin" : ""}`}
-                />
-                Refresh
-              </button>
             </div>
-            <div className="mt-2 lg:mt-0 flex items-center gap-3">
-              <div className="flex items-center">
-                <InitiationDashboardExportButton trainings={trainings} />
-              </div>
-              <div className="w-px h-6 bg-gray-300"></div>
-              <button
-                type="button"
-                onClick={() => {
-                  setTrainerCalendarTraining(null);
-                  setShowTrainerCalendar(true);
-                }}
-                className="inline-flex items-center px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-all shadow-sm hover:shadow-md"
-              >
-                <FiCalendar className="mr-2 w-4 h-4" /> Trainer Calendar
-              </button>
-            </div>
-          </div>
 
-          {/* Status Tabs (Not Started, Initiated, Hold, In Progress, Done) */}
-          <div className="mt-3">
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-3">
-              {Object.keys(STATUS_LABELS).map((key) => (
-                <button
-                  key={key}
-                  onClick={() => setActiveStatusTab(key)}
-                  className={`py-2 rounded-xl text-sm font-semibold transition-all ${
-                    activeStatusTab === key
-                      ? key !== "all" && STATUS_UI[key]
-                        ? STATUS_UI[key].tabActive
-                        : "bg-blue-600 text-white shadow-md"
-                      : key !== "all" &&
-                        STATUS_UI[key] &&
-                        STATUS_UI[key].tabInactive
-                      ? STATUS_UI[key].tabInactive
-                      : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
-                  }`}
-                >
-                  {STATUS_LABELS[key]}{" "}
-                  <span className="ml-1 text-xs font-bold">
-                    ({statusCounts[key] || 0})
-                  </span>
-                </button>
+            {/* Statistics Cards Skeleton */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              {[...Array(4)].map((_, index) => (
+                <div key={index} className="bg-white rounded-xl shadow-sm border border-gray-200/50 p-4 h-full">
+                  <div className="flex items-center justify-between h-full">
+                    <div className="flex-1 min-w-0">
+                      <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-20 mb-2"></div>
+                      <div className="h-7 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-12"></div>
+                    </div>
+                    <div className="w-10 h-10 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-lg animate-pulse flex-shrink-0 ml-3"></div>
+                  </div>
+                </div>
               ))}
             </div>
-          </div>
-        </div>
 
-        {/* Loading State */}
-        {loading ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-6">
-            <div className="flex flex-col items-center justify-center space-y-2">
-              <div className="w-7 h-7 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-              <p className="text-gray-500 text-xs">Loading training data...</p>
+            {/* Training Tables Skeleton */}
+            {[...Array(3)].map((_, collegeIndex) => (
+              <div key={collegeIndex} className="bg-white rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden">
+                {/* College Header Skeleton */}
+                <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3 min-h-[3rem]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="h-5 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-48 mb-1"></div>
+                      <div className="h-4 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-full max-w-md"></div>
+                    </div>
+                    <div className="w-6 h-6 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse flex-shrink-0 ml-3"></div>
+                  </div>
+                </div>
+
+                {/* Desktop Table Skeleton */}
+                <div className="hidden lg:block overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50/50">
+                      <tr>
+                        {[...Array(7)].map((_, headerIndex) => (
+                          <th key={headerIndex} className="px-4 py-3 text-left">
+                            <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-16"></div>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-100">
+                      {[...Array(2)].map((_, rowIndex) => (
+                        <tr key={rowIndex} className="hover:bg-blue-50/30">
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="w-8 h-8 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded-lg animate-pulse mr-3 flex-shrink-0"></div>
+                              <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-16"></div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-24"></div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-20"></div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="w-4 h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse mr-2 flex-shrink-0"></div>
+                              <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-8"></div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="h-6 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded-full animate-pulse w-20"></div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="w-4 h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse mr-2 flex-shrink-0"></div>
+                              <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-16"></div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-right">
+                            <div className="h-8 w-8 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-full animate-pulse ml-auto"></div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile Card Skeleton */}
+                <div className="lg:hidden divide-y divide-gray-100">
+                  {[...Array(2)].map((_, cardIndex) => (
+                    <div key={cardIndex} className="p-4 hover:bg-blue-50/30">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center flex-1 min-w-0">
+                          <div className="w-8 h-8 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded-xl animate-pulse mr-2 flex-shrink-0"></div>
+                          <div className="flex-1 min-w-0">
+                            <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-16 mb-1"></div>
+                            <div className="h-5 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded-full animate-pulse w-20"></div>
+                          </div>
+                        </div>
+                        <div className="w-4 h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse flex-shrink-0 ml-2"></div>
+                      </div>
+
+                      <div className="space-y-2">
+                        {[...Array(4)].map((_, fieldIndex) => (
+                          <div key={fieldIndex}>
+                            <div className="h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-12 mb-1"></div>
+                            <div className={`h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse ${fieldIndex === 0 ? 'w-24' : fieldIndex === 1 ? 'w-32' : fieldIndex === 2 ? 'w-16' : 'w-20'}`}></div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+                        <div className="flex-1 h-8 bg-gradient-to-r from-green-200 via-green-100 to-green-200 rounded-lg animate-pulse"></div>
+                        <div className="flex-1 h-8 bg-gradient-to-r from-amber-200 via-amber-100 to-amber-200 rounded-lg animate-pulse"></div>
+                        <div className="flex-1 h-8 bg-gradient-to-r from-red-200 via-red-100 to-red-200 rounded-lg animate-pulse"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {/* Loading Text with Animation */}
+            <div className="text-center py-6">
+              <div className="inline-flex items-center space-x-2">
+                <div className="flex space-x-1">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                </div>
+                <span className="text-gray-600 font-medium">Loading training data...</span>
+              </div>
             </div>
           </div>
         ) : (
           <div className="space-y-3">
+            {/* Header Section */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-3">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900 tracking-tight">
+                    Training Status
+                  </h1>
+                  <p className="text-gray-600 text-xs mt-0.5">
+                    Manage and monitor training phases across all colleges
+                  </p>
+                </div>
+
+                {/* Controls */}
+                <div className="flex flex-col sm:flex-row gap-2">
+                  {/* Search */}
+                  <div className="relative">
+                    <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <input
+                      type="text"
+                      placeholder="Search colleges or domains..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 pr-3 py-1.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all w-full sm:w-52"
+                    />
+                  </div>
+
+                  {/* Combined Filters Button */}
+                  <div className="relative">
+                    <button
+                      ref={filtersBtnRef}
+                      onClick={toggleFiltersDropdown}
+                      className={`inline-flex items-center px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${
+                        isAnyFilterActive ? "ring-2 ring-blue-500/20" : ""
+                      }`}
+                      aria-label="Open filters"
+                    >
+                      <FiFilter className="w-4 h-4 mr-1" />
+                      Filters
+                      {isAnyFilterActive && (
+                        <span className="ml-1 w-2 h-2 bg-blue-500 rounded-full"></span>
+                      )}
+                    </button>
+
+                    {/* Filters Dropdown */}
+                    {filtersDropdownOpen && (
+                      <div
+                        ref={filtersDropdownRef}
+                        className="absolute right-0 top-full mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-50"
+                      >
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Phase
+                            </label>
+                            <select
+                              value={filterPhase}
+                              onChange={(e) => setFilterPhase(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                            >
+                              <option value="all">All Phases</option>
+                              <option value="phase-1">Phase 1</option>
+                              <option value="phase-2">Phase 2</option>
+                              <option value="phase-3">Phase 3</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Assigned To
+                            </label>
+                            <select
+                              value={selectedUserFilter}
+                              onChange={(e) => setSelectedUserFilter(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                            >
+                              <option value={defaultSelectedUserFilter}>
+                                {defaultSelectedUserFilter === "all" ? "All Users" : "Me"}
+                              </option>
+                              {availableUsers
+                                .filter((u) => u.uid !== user?.uid)
+                                .map((u) => (
+                                  <option key={u.uid} value={u.uid}>
+                                    {u.name || u.email || u.uid}
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Health Filter
+                            </label>
+                            <select
+                              value={activeHealthTab}
+                              onChange={(e) => setActiveHealthTab(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                            >
+                              <option value="all">All Health</option>
+                              <option value="low">Low (&lt; 20%)</option>
+                              <option value="medium">Medium (20-50%)</option>
+                              <option value="high">High (&gt; 50%)</option>
+                            </select>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Start Date
+                              </label>
+                              <input
+                                type="date"
+                                value={dateFilterStart}
+                                onChange={(e) => setDateFilterStart(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                End Date
+                              </label>
+                              <input
+                                type="date"
+                                value={dateFilterEnd}
+                                onChange={(e) => setDateFilterEnd(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex justify-between pt-2">
+                            <button
+                              onClick={clearAllFilters}
+                              className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+                            >
+                              Clear All
+                            </button>
+                            <button
+                              onClick={applyFilters}
+                              className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                              Apply Filters
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Refresh Button */}
+                  <button
+                    onClick={handleRefresh}
+                    disabled={refreshing}
+                    className="inline-flex items-center px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <FiRefreshCw
+                      className={`w-4 h-4 mr-1 ${refreshing ? "animate-spin" : ""}`}
+                    />
+                    Refresh
+                  </button>
+                </div>
+                <div className="mt-2 lg:mt-0 flex items-center gap-3">
+                  <div className="flex items-center">
+                    <InitiationDashboardExportButton trainings={trainings} />
+                  </div>
+                  <div className="w-px h-6 bg-gray-300"></div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTrainerCalendarTraining(null);
+                      setShowTrainerCalendar(true);
+                    }}
+                    className="inline-flex items-center px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-all shadow-sm hover:shadow-md"
+                  >
+                    <FiCalendar className="mr-2 w-4 h-4" /> Trainer Calendar
+                  </button>
+                </div>
+              </div>
+
+              {/* Status Tabs (Not Started, Initiated, Hold, In Progress, Done) */}
+              <div className="mt-3">
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-3">
+                  {Object.keys(STATUS_LABELS).map((key) => (
+                    <button
+                      key={key}
+                      onClick={() => setActiveStatusTab(key)}
+                      className={`py-2 rounded-xl text-sm font-semibold transition-all ${
+                        activeStatusTab === key
+                          ? key !== "all" && STATUS_UI[key]
+                            ? STATUS_UI[key].tabActive
+                            : "bg-blue-600 text-white shadow-md"
+                          : key !== "all" &&
+                            STATUS_UI[key] &&
+                            STATUS_UI[key].tabInactive
+                          ? STATUS_UI[key].tabInactive
+                          : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
+                      }`}
+                    >
+                      {STATUS_LABELS[key]}{" "}
+                      <span className="ml-1 text-xs font-bold">
+                        ({statusCounts[key] || 0})
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
             {/* Statistics Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
               <div className="bg-white rounded-xl shadow-sm border border-gray-200/50 p-3">
@@ -1494,6 +1578,17 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
             {Object.keys(filteredGrouped).length > 0 ? (
               Object.entries(filteredGrouped).map(([college, data]) => {
                 const { phases, health } = data;
+                
+                // Check if this is a merged training (any phase has mergedColleges)
+                const mergedTraining = phases.find(p => p.mergedColleges);
+                let mergedCollegeNames = [];
+                if (mergedTraining && Array.isArray(mergedTraining.mergedColleges)) {
+                  mergedCollegeNames = mergedTraining.mergedColleges.map(c => c.name || c.collegeName).filter(Boolean);
+                }
+                const displayCollegeName = mergedTraining ? 
+                  `${college} (Merged: ${mergedCollegeNames.join(", ") || "Multiple Colleges"})` : 
+                  college;
+                
                 return (
                   <div
                     key={college}
@@ -1504,7 +1599,7 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                       <div className="flex items-center justify-between">
                         <div>
                           <h2 className="text-lg font-bold text-white">
-                            {college}
+                            {displayCollegeName}
                           </h2>
                           <p className="text-blue-100 text-sm mt-1">
                             {phases.length} phase
@@ -1566,6 +1661,9 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                               assignedUser?.uid ||
                               "Unassigned";
 
+                            // Check if this training is part of a merge
+                            const isMerged = training.mergedColleges && training.mergedColleges.length > 0;
+
                             return (
                               <tr
                                 key={training.id}
@@ -1589,6 +1687,11 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                                     <span className="text-sm font-medium text-gray-900">
                                       {PHASE_LABELS[training.phaseId] ||
                                         training.phaseId}
+                                      {isMerged && (
+                                        <span className="ml-2 text-xs text-blue-600 font-medium">
+                                          (Merged)
+                                        </span>
+                                      )}
                                     </span>
                                   </div>
                                 </td>
@@ -1948,6 +2051,9 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                           assignedUser?.uid ||
                           "Unassigned";
 
+                        // Check if this training is part of a merge
+                        const isMerged = training.mergedColleges && training.mergedColleges.length > 0;
+
                         return (
                           <div
                             key={training.id}
@@ -1972,6 +2078,11 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
                                   <h3 className="text-xs font-semibold text-gray-900">
                                     {PHASE_LABELS[training.phaseId] ||
                                       training.phaseId}
+                                    {isMerged && (
+                                      <span className="ml-1 text-xs text-blue-600 font-medium">
+                                        (Merged)
+                                      </span>
+                                    )}
                                   </h3>
                                   <span
                                     className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-0.5 ${status.style}`}
@@ -2140,33 +2251,33 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
           setSelectedTrainingForChange(null);
         }}
         selectedTraining={selectedTrainingForChange}
-        includeSundays={false}
       />
 
       {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && selectedTrainingForDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
             <div className="flex items-center mb-4">
               <FiTrash2 className="w-6 h-6 text-red-500 mr-3" />
-              <h3 className="text-lg font-semibold text-gray-900">Delete Training</h3>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Delete Training
+              </h3>
             </div>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to delete this training phase? This will remove all associated trainer assignments and cannot be undone.
+              Are you sure you want to delete this training phase? This action
+              cannot be undone and will remove all associated data including
+              domains, batches, and trainer assignments.
             </p>
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => {
-                  setShowDeleteConfirm(false);
-                  setSelectedTrainingForDelete(null);
-                }}
-                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleDeleteTraining(selectedTrainingForDelete)}
-                className="px-4 py-2 text-white bg-red-600 rounded-lg hover:bg-red-700"
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
               >
                 Delete
               </button>
@@ -2175,63 +2286,36 @@ const Dashboard = ({ onRowClick, onStartPhase }) => {
         </div>
       )}
 
-      {/* Undo toast */}
+      {/* Toast Notification */}
       {toast && (
-        <div className="fixed right-4 bottom-6 z-50">
-          {toast.type === "assignment" ? (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg shadow-lg px-4 py-3 flex items-center gap-3 animate-fade-in">
-              <FiUser className="w-4 h-4 text-blue-600" />
-              <span className="text-sm text-blue-800 font-medium">
-                {toast.message}
-              </span>
-              <button
-                onClick={handleUndoAssignment}
-                className="text-sm text-blue-600 hover:text-blue-800 font-semibold underline hover:no-underline transition-colors"
-              >
-                Undo
-              </button>
-              <button
-                onClick={() => {
-                  if (toast.timer) clearTimeout(toast.timer);
-                  setToast(null);
-                }}
-                className="text-sm text-blue-400 hover:text-blue-600 ml-1"
-              >
-                ✕
-              </button>
+        <div className="fixed bottom-4 right-4 z-50">
+          <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-4 max-w-sm">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <FiCheckCircle className="w-5 h-5 text-green-500" />
+              </div>
+              <div className="ml-3 flex-1">
+                <p className="text-sm font-medium text-gray-900">
+                  {toast.message}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Status changed to {toast.status}
+                </p>
+              </div>
+              <div className="ml-3 flex-shrink-0">
+                <button
+                  onClick={handleUndo}
+                  className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  Undo
+                </button>
+              </div>
             </div>
-          ) : (
-            <div className="bg-white border border-gray-200 rounded-lg shadow-lg px-4 py-2 flex items-center gap-3">
-              <span className="text-sm text-gray-700">Moved to</span>
-              <span
-                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                  (STATUS_UI[toast.status] && STATUS_UI[toast.status].pill) ||
-                  "bg-gray-100 text-gray-700"
-                }`}
-              >
-                {toast.status}
-              </span>
-              <button
-                onClick={handleUndo}
-                className="text-sm text-blue-600 font-semibold"
-              >
-                Undo
-              </button>
-              <button
-                onClick={() => {
-                  if (toast.timer) clearTimeout(toast.timer);
-                  setToast(null);
-                }}
-                className="text-sm text-gray-400"
-              >
-                ✕
-              </button>
-            </div>
-          )}
+          </div>
         </div>
       )}
     </div>
   );
 };
 
-export default Dashboard;
+export default InitiationDashboard;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, where, deleteDoc, doc } from "firebase/firestore";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { db } from "../../firebase";
@@ -7,9 +7,10 @@ import AddTrainer from "./AddTrainer.jsx";
 import EditTrainer from "./EditTrainer.jsx";
 import DeleteTrainer from "./DeleteTrainer.jsx";
 import TrainerLeadDetails from "./TrainerLeadDetails.jsx";
-import { FiPlusCircle, FiEdit, FiTrash2, FiChevronLeft } from "react-icons/fi";
+import { FiPlusCircle, FiEdit, FiTrash2, FiChevronLeft, FiCheck, FiX, FiBell, FiFilter, FiChevronDown, FiChevronUp } from "react-icons/fi";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import TrainersDashboardTour from "../tours/TrainersDashboardTour";
+import SendRequestModal from './SendRequestModal';
 import { useAuth } from "../../context/AuthContext";
 
 const DOMAIN_COLORS = {
@@ -33,13 +34,26 @@ function TrainersDashboard() {
   const [showTrainerDetails, setShowTrainerDetails] = useState(false);
   const [trainerDetailsData, setTrainerDetailsData] = useState(null);
 
+  const [showSendRequest, setShowSendRequest] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [deleteRequests, setDeleteRequests] = useState([]);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOrder, setSortOrder] = useState("asc");
+  const [selectedDomain, setSelectedDomain] = useState("All");
+  const [selectedPaymentType, setSelectedPaymentType] = useState("All");
+  const [showFilters, setShowFilters] = useState(false);
+  const [showDomainSection, setShowDomainSection] = useState(false);
+  const [showPaymentSection, setShowPaymentSection] = useState(false);
 
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const didInitRef = useRef(false);
+  const dropdownRef = useRef(null);
+  const buttonRef = useRef(null);
+  const filterDropdownRef = useRef(null);
   const { user } = useAuth();
+  const isPrivileged = ["director", "head"].includes(user?.role?.toLowerCase());
   useEffect(() => {
     const loadAll = async () => {
       try {
@@ -82,15 +96,70 @@ function TrainersDashboard() {
   }, [searchTerm, searchParams, setSearchParams]);
   // No remote searching; purely client-side filter now.
 
+  useEffect(() => {
+    if (isPrivileged) {
+      console.log('Fetching requests for privileged user');
+      const fetchRequests = async () => {
+        try {
+          const q = query(collection(db, "trainer_delete_requests"), where("status", "==", "pending"));
+          const snapshot = await getDocs(q);
+          const reqs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+          console.log('Fetched requests:', reqs);
+          setDeleteRequests(reqs);
+        } catch (err) {
+          console.error("Failed to fetch requests:", err);
+        }
+      };
+      fetchRequests();
+    }
+  }, [isPrivileged]);
+
+  useEffect(() => {
+    if (showNotifications) {
+      const handleClickOutside = (event) => {
+        if (dropdownRef.current && !dropdownRef.current.contains(event.target) && buttonRef.current && !buttonRef.current.contains(event.target)) {
+          setShowNotifications(false);
+        }
+      };
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showNotifications]);
+
+  useEffect(() => {
+    if (showFilters) {
+      const handleClickOutside = (event) => {
+        if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target)) {
+          setShowFilters(false);
+        }
+      };
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showFilters]);
+
   const toggleSortOrder = () => {
     setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
   };
 
-  const filteredTrainers = trainers.filter((trainer) =>
-    [trainer.name, trainer.trainerId, trainer.domain]
-      .map((f) => (f || "").toLowerCase())
-      .some((f) => f.includes(searchTerm.toLowerCase()))
-  );
+  const uniqueDomains = React.useMemo(() => {
+    const domains = new Set();
+    trainers.forEach(trainer => {
+      const doms = Array.isArray(trainer.domain) ? trainer.domain : trainer.domain ? trainer.domain.split(',').map(d => d.trim()) : [];
+      doms.forEach(d => domains.add(d));
+    });
+    return Array.from(domains).sort();
+  }, [trainers]);
+
+  const filteredTrainers = trainers.filter((trainer) => {
+    const matchesSearch = [trainer.name, trainer.trainerId, trainer.domain]
+      .map((f) => (f || "").trim())
+      .some((f) => f.includes(searchTerm.trim()));
+    const trainerDomains = Array.isArray(trainer.domain) ? trainer.domain : trainer.domain ? trainer.domain.split(',').map(d => d.trim()) : [];
+    const matchesDomain = selectedDomain === "All" || trainerDomains.some(d => d.trim() === selectedDomain.trim());
+    const matchesPayment = selectedPaymentType === "All" || trainer.paymentType === selectedPaymentType;
+    return matchesSearch && matchesDomain && matchesPayment;
+  });
 
   const sortedTrainers = [...filteredTrainers].sort((a, b) => {
     const numA = parseInt((a.trainerId || "").replace("GA-T", ""), 10);
@@ -133,6 +202,28 @@ function TrainersDashboard() {
     toast.success("Trainer deleted");
     }
     setShowDeleteTrainer(false);
+  };
+
+  const handleApprove = async (request) => {
+    try {
+      await deleteDoc(doc(db, 'trainers', request.trainerId));
+      await deleteDoc(doc(db, 'trainer_delete_requests', request.id));
+      setTrainers(prev => prev.filter(t => t.id !== request.trainerId));
+      setDeleteRequests(prev => prev.filter(r => r.id !== request.id));
+      toast.success('Trainer deleted');
+    } catch {
+      toast.error('Failed to delete trainer');
+    }
+  };
+
+  const handleReject = async (request) => {
+    try {
+      await deleteDoc(doc(db, 'trainer_delete_requests', request.id));
+      setDeleteRequests(prev => prev.filter(r => r.id !== request.id));
+      toast.success('Request rejected');
+    } catch {
+      toast.error('Failed to reject request');
+    }
   };
 
   const renderSpecializations = (trainer) => {
@@ -220,39 +311,286 @@ function TrainersDashboard() {
       <div className="bg-white rounded-lg shadow-md p-3 sm:p-4 overflow-hidden">
         {/* Search + Add */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
-          {/* Search Input */}
-          <div className="relative w-full sm:w-48">
-            <input
-              type="text"
-              placeholder="Search trainers..."
-              className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              data-tour="trainers-search"
-            />
-            <svg
-              className="absolute left-2 top-2 h-4 w-4 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+          <div className="flex items-center gap-2">
+            {/* Search Input */}
+            <div className="relative w-full sm:w-48">
+              <input
+                type="text"
+                placeholder="Search trainers..."
+                className="w-full pl-8 pr-8 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                data-tour="trainers-search"
               />
-            </svg>
+              <svg
+                className="absolute left-2 top-2 h-4 w-4 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-2 top-2 h-4 w-4 text-gray-400 hover:text-gray-600 focus:outline-none"
+                  aria-label="Clear search"
+                >
+                  <svg
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {/* Filter Button */}
+            <div className="relative">
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className="bg-green-200 hover:bg-green-300 text-gray-800 px-3 py-1.5 rounded-lg transition-colors duration-150 focus:outline-none flex items-center gap-2 text-sm"
+                aria-label="Filter trainers"
+                title="Filter trainers"
+              >
+                <FiFilter className="w-4 h-4" />
+                {(selectedDomain !== "All" || selectedPaymentType !== "All") && (
+                  <span className="hidden sm:inline">
+                    {selectedDomain !== "All" ? selectedDomain : ""}
+                    {selectedDomain !== "All" && selectedPaymentType !== "All" ? ", " : ""}
+                    {selectedPaymentType !== "All" ? selectedPaymentType.replace("Per ", "") : ""}
+                  </span>
+                )}
+              </button>
+              {showFilters && (
+                <div
+                  ref={filterDropdownRef}
+                  className="absolute top-full mt-2 w-fit min-w-40 max-w-56 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 max-h-60 overflow-y-auto transition-all duration-150 ease-out"
+                  role="menu"
+                  aria-labelledby="filter-button"
+                >
+                  <div className="relative">
+                    {/* Arrow pointer */}
+                    <div className="absolute -top-2 left-4 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-white shadow-sm"></div>
+                    
+                    {/* Header */}
+                    <div className="flex items-center justify-between p-2 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white rounded-t-xl">
+                      <h3 className="text-xs font-semibold text-gray-900" id="filter-heading">Filters</h3>
+                      <button
+                        onClick={() => setShowFilters(false)}
+                        className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-0.5 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+                        aria-label="Close filter"
+                      >
+                        <FiX className="w-3 h-3" />
+                      </button>
+                    </div>
+                    
+                    {/* Content */}
+                    <div className="p-1">
+                      <div className="mb-2">
+                        <button
+                          onClick={() => setShowDomainSection(!showDomainSection)}
+                          className="w-full text-left flex items-center justify-between px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 rounded"
+                        >
+                          Domain
+                          {showDomainSection ? <FiChevronUp className="w-3 h-3" /> : <FiChevronDown className="w-3 h-3" />}
+                        </button>
+                        {showDomainSection && (
+                          <div className="mt-1">
+                            <button
+                              onClick={() => { setSelectedDomain("All"); setShowFilters(false); }}
+                              className={`w-full text-left px-2 py-1 rounded text-xs font-medium transition-colors duration-150 ${selectedDomain === "All" ? "bg-blue-50 text-blue-700 border border-blue-200" : "text-gray-700 hover:bg-gray-50"}`}
+                              role="menuitem"
+                            >
+                              All Domains
+                            </button>
+                            {uniqueDomains.map(domain => (
+                              <button
+                                key={domain}
+                                onClick={() => { setSelectedDomain(domain); setShowFilters(false); }}
+                                className={`w-full text-left px-2 py-1 rounded text-xs font-medium transition-colors duration-150 ${selectedDomain === domain ? "bg-blue-50 text-blue-700 border border-blue-200" : "text-gray-700 hover:bg-gray-50"}`}
+                                role="menuitem"
+                              >
+                                {domain}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <button
+                          onClick={() => setShowPaymentSection(!showPaymentSection)}
+                          className="w-full text-left flex items-center justify-between px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 rounded"
+                        >
+                          Payment Type
+                          {showPaymentSection ? <FiChevronUp className="w-3 h-3" /> : <FiChevronDown className="w-3 h-3" />}
+                        </button>
+                        {showPaymentSection && (
+                          <div className="mt-1">
+                            <button
+                              onClick={() => { setSelectedPaymentType("All"); setShowFilters(false); }}
+                              className={`w-full text-left px-2 py-1 rounded text-xs font-medium transition-colors duration-150 ${selectedPaymentType === "All" ? "bg-blue-50 text-blue-700 border border-blue-200" : "text-gray-700 hover:bg-gray-50"}`}
+                              role="menuitem"
+                            >
+                              All Types
+                            </button>
+                            <button
+                              onClick={() => { setSelectedPaymentType("Per Hour"); setShowFilters(false); }}
+                              className={`w-full text-left px-2 py-1 rounded text-xs font-medium transition-colors duration-150 ${selectedPaymentType === "Per Hour" ? "bg-blue-50 text-blue-700 border border-blue-200" : "text-gray-700 hover:bg-gray-50"}`}
+                              role="menuitem"
+                            >
+                              Per Hour
+                            </button>
+                            <button
+                              onClick={() => { setSelectedPaymentType("Per Day"); setShowFilters(false); }}
+                              className={`w-full text-left px-2 py-1 rounded text-xs font-medium transition-colors duration-150 ${selectedPaymentType === "Per Day" ? "bg-blue-50 text-blue-700 border border-blue-200" : "text-gray-700 hover:bg-gray-50"}`}
+                              role="menuitem"
+                            >
+                              Per Day
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Clear Filter Button */}
+            {(selectedDomain !== "All" || selectedPaymentType !== "All") && (
+              <button
+                onClick={() => { setSelectedDomain("All"); setSelectedPaymentType("All"); }}
+                className="bg-red-100 hover:bg-red-200 text-red-700 px-2 py-1 rounded transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 flex items-center gap-1 text-xs"
+                aria-label="Clear all filters"
+              >
+                <FiX className="w-3 h-3" />
+                Clear
+              </button>
+            )}
           </div>
 
-          <button
-            onClick={() => setShowAddTrainer(true)}
-            className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-3 py-1.5 rounded-xl font-semibold hover:opacity-90 transition-all shadow-sm flex items-center text-sm"
-            data-tour="add-trainer-button"
-          >
-            <FiPlusCircle className="h-4 w-4 mr-2" />
-            Add Trainer
-          </button>
+          <div className="flex items-center gap-2">
+            {isPrivileged && (
+              <div className="relative">
+                <button
+                  ref={buttonRef}
+                  id="notifications-button"
+                  onClick={() => {
+                    console.log('Notifications clicked');
+                    setShowNotifications(!showNotifications);
+                  }}
+                  className="relative bg-blue-200 hover:bg-blue-300 text-gray-800 p-2 rounded-lg transition-colors duration-150 focus:outline-none"
+                  aria-label={`Notifications (${deleteRequests.length} pending)`}
+                  title="Notifications"
+                >
+                  <FiBell className="w-5 h-5" />
+                  {deleteRequests.length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium">
+                      {deleteRequests.length > 9 ? '9+' : deleteRequests.length}
+                    </span>
+                  )}
+                </button>
+                {showNotifications && (
+                  <div
+                    ref={dropdownRef}
+                    className="absolute top-full mt-2 w-80 sm:w-80 sm:right-0 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 max-h-80 overflow-y-auto transition-all duration-150 ease-out"
+                    role="menu"
+                    aria-labelledby="notifications-button"
+                  >
+                    {console.log('Rendering dropdown, requests:', deleteRequests)}
+                    <div className="relative">
+                      {/* Arrow pointer */}
+                      <div className="absolute -top-2 right-6 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-white shadow-sm"></div>
+                      
+                      {/* Header */}
+                      <div className="flex items-center justify-between p-2 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white rounded-t-xl">
+                        <h3 className="text-sm font-medium text-gray-900" id="notifications-heading">Delete Requests</h3>
+                        <button
+                          onClick={() => setShowNotifications(false)}
+                          className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-0.5 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+                          aria-label="Close notifications"
+                        >
+                          <FiX className="w-3 h-3" />
+                        </button>
+                      </div>
+                      
+                      {/* Content */}
+                      <div className="p-2">
+                        {deleteRequests.length === 0 ? (
+                          <div className="text-center py-6">
+                            <div className="text-gray-400 mb-2">
+                              <FiCheck className="w-6 h-6 mx-auto" />
+                            </div>
+                            <p className="text-gray-500 text-xs">No pending requests.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {deleteRequests.map(req => (
+                              <div
+                                key={req.id}
+                                className="bg-white border border-gray-200 rounded-lg p-2 shadow-sm hover:shadow-md transition-shadow duration-150"
+                                role="menuitem"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs text-gray-600 truncate">
+                                      <span className="font-medium text-gray-900">From:</span> {req.requesterName}
+                                    </p>
+                                    <p className="text-xs text-gray-600 truncate">
+                                      <span className="font-medium text-gray-900">Delete:</span> {req.trainerName} ({req.trainerId})
+                                    </p>
+                                  </div>
+                                  <div className="flex gap-1 ml-1">
+                                    <button
+                                      onClick={() => handleApprove(req)}
+                                      className="inline-flex items-center gap-1 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-2 py-1 rounded text-xs font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 shadow-sm hover:shadow-md"
+                                      aria-label={`Approve delete request for ${req.trainerName}`}
+                                    >
+                                      <FiCheck className="w-3 h-3" />
+                                      OK
+                                    </button>
+                                    <button
+                                      onClick={() => handleReject(req)}
+                                      className="inline-flex items-center gap-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-2 py-1 rounded text-xs font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 shadow-sm hover:shadow-md"
+                                      aria-label={`Reject delete request for ${req.trainerName}`}
+                                    >
+                                      <FiX className="w-3 h-3" />
+                                      No
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            <button
+              onClick={() => setShowAddTrainer(true)}
+              className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-3 py-1.5 rounded-xl font-semibold hover:opacity-90 transition-all shadow-sm flex items-center text-sm"
+              data-tour="add-trainer-button"
+            >
+              <FiPlusCircle className="h-4 w-4 mr-2" />
+              Add Trainer
+            </button>
+          </div>
         </div>
 
         {/* Error */}
@@ -271,7 +609,7 @@ function TrainersDashboard() {
           <div className="relative">
             <>
             {/* Table with horizontal scroll */}
-            <div className="overflow-x-auto mb-3" style={{ maxWidth: "100%" }} data-tour="trainers-table">
+            <div className="overflow-x-auto min-h-screen" style={{ maxWidth: "100%" }} data-tour="trainers-table">
               <table className="min-w-full text-xs divide-y divide-gray-200">
                 <thead className="bg-gray-50 text-[10px] uppercase font-medium text-gray-500">
                   <tr>
@@ -333,8 +671,15 @@ function TrainersDashboard() {
                         <button
                           className="text-red-600 hover:text-red-900 text-sm p-1"
                           onClick={() => {
-                            setTrainerToDelete(trainer);
-                            setShowDeleteTrainer(true);
+                            if (isPrivileged) {
+                              console.log('Privileged delete for', trainer.name);
+                              setTrainerToDelete(trainer);
+                              setShowDeleteTrainer(true);
+                            } else {
+                              console.log('Send request for', trainer.name);
+                              setTrainerToDelete(trainer);
+                              setShowSendRequest(true);
+                            }
                           }}
                         >
                           <FiTrash2 />
@@ -375,6 +720,13 @@ function TrainersDashboard() {
               <TrainerLeadDetails
                 trainer={trainerDetailsData}
                 onClose={() => setShowTrainerDetails(false)}
+              />
+            )}
+            {showSendRequest && trainerToDelete && (
+              <SendRequestModal
+                trainer={trainerToDelete}
+                onClose={() => setShowSendRequest(false)}
+                onRequestSent={() => { setShowSendRequest(false); toast.success("Request sent"); }}
               />
             )}
             </>

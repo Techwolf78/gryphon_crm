@@ -33,15 +33,22 @@ const SubmissionChecklist = ({
       id: 'dates',
       label: 'Training Dates',
       description: 'Set start and end dates',
-      isComplete: trainingStartDate && trainingEndDate && trainingStartDate.trim() !== '' && trainingEndDate.trim() !== ''
+      isComplete: (() => {
+        const startDateStr = trainingStartDate ? 
+          (trainingStartDate instanceof Date ? trainingStartDate.toISOString().split('T')[0] : String(trainingStartDate).trim()) : '';
+        const endDateStr = trainingEndDate ? 
+          (trainingEndDate instanceof Date ? trainingEndDate.toISOString().split('T')[0] : String(trainingEndDate).trim()) : '';
+        
+        return startDateStr !== '' && endDateStr !== '' && new Date(startDateStr) <= new Date(endDateStr);
+      })()
     },
     {
       id: 'schedule',
       label: 'Daily Schedule',
       description: 'Configure college timings',
       isComplete: collegeStartTime && collegeEndTime && lunchStartTime && lunchEndTime &&
-                  collegeStartTime.trim() !== '' && collegeEndTime.trim() !== '' &&
-                  lunchStartTime.trim() !== '' && lunchEndTime.trim() !== ''
+                  String(collegeStartTime).trim() !== '' && String(collegeEndTime).trim() !== '' &&
+                  String(lunchStartTime).trim() !== '' && String(lunchEndTime).trim() !== ''
     },
     {
       id: 'batchCreation',

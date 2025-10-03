@@ -20,6 +20,9 @@ const ClosedLeadsStats = ({
   handleTargetUpdate,
   selectedTeamUserId,
   setSelectedTeamUserId,
+  achievedValue: propAchievedValue, // ← rename incoming prop
+  showDirectorLeads,
+  shouldShowDepartmentToggle,
 }) => {
   const selectedFY = propSelectedFY || getCurrentFinancialYear();
 
@@ -34,12 +37,22 @@ const ClosedLeadsStats = ({
 
   const teamMembers = useMemo(() => {
     if (isAdminOrDirector) {
-      return Object.values(users).filter(
+      let members = Object.values(users).filter(
         (u) =>
           ["Head", "Manager", "Assistant Manager", "Executive"].includes(
             u.role
           ) && u.department === "Sales"
       );
+
+      // Include Admin Directors when department filter is ON
+      if (shouldShowDepartmentToggle && showDirectorLeads) {
+        const adminDirectors = Object.values(users).filter(
+          (u) => u.department === "Admin" && u.role === "Director"
+        );
+        members = [...members, ...adminDirectors];
+      }
+
+      return members;
     } else if (isHead) {
       return Object.values(users).filter(
         (u) => ["Manager"].includes(u.role) && u.department === "Sales"
@@ -53,7 +66,7 @@ const ClosedLeadsStats = ({
       );
     }
     return [];
-  }, [isAdminOrDirector, isHead, isManager, users, userObj.name]);
+  }, [isAdminOrDirector, isHead, isManager, users, userObj.name, shouldShowDepartmentToggle, showDirectorLeads]);
 
   let targetUser;
 
@@ -209,6 +222,14 @@ const ClosedLeadsStats = ({
             ) && u.department === "Sales"
         )
         .map((u) => u.uid);
+
+      // Include Admin Directors when department filter is ON
+      if (shouldShowDepartmentToggle && showDirectorLeads) {
+        const adminDirectorUids = Object.values(users)
+          .filter((u) => u.department === "Admin" && u.role === "Director")
+          .map((u) => u.uid);
+        allUids = [...allUids, ...adminDirectorUids];
+      }
     } else if (isHead) {
       let managers = teamMembers.filter(
         (u) => u.role === "Manager" && u.department === "Sales"
@@ -290,6 +311,8 @@ const ClosedLeadsStats = ({
     teamMembers,
     userObj.name,
     userObj.uid,
+    shouldShowDepartmentToggle,
+    showDirectorLeads,
   ]);
 
   // Display targets and achieved values
@@ -299,7 +322,9 @@ const ClosedLeadsStats = ({
     ? aggregateValues
     : getQuarterTargetWithCarryForward(targetUid);
 
-  const achievedValue = isHeadViewingManager
+  const achievedValue = shouldShowDepartmentToggle && showDirectorLeads
+    ? propAchievedValue
+    : isHeadViewingManager
     ? getTotalAchievedAmount(allUids, activeQuarter)
     : selectedTeamUserId === "all" && !effectiveViewMyLeadsOnly && aggregateValues
     ? aggregateValues.achieved
@@ -334,28 +359,28 @@ const ClosedLeadsStats = ({
   const annualLabel = (selectedTeamUserId === "all" && !effectiveViewMyLeadsOnly) ? "Annual Total Target" : "Annual Target";
 
   return (
-    <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 overflow-hidden">
+    <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-white/20 overflow-hidden">
       {/* Header Section */}
-      <div className="relative bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-6 text-white">
+      <div className="relative bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-4 text-white">
         <div className="absolute inset-0 bg-black/10"></div>
         <div className="relative">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold bg-white/20 backdrop-blur-sm border border-white/30">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-white/20 backdrop-blur-sm border border-white/30">
                   📅 {selectedFY}
                 </span>
-                <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold bg-white/20 backdrop-blur-sm border border-white/30">
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-white/20 backdrop-blur-sm border border-white/30">
                   🎯 {activeQuarter}
                 </span>
-                <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold bg-white/20 backdrop-blur-sm border border-white/30">
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-white/20 backdrop-blur-sm border border-white/30">
                   👤{" "}
                   {selectedTeamUserId === "all" && !effectiveViewMyLeadsOnly
                     ? "All Team Members"
                     : targetUser?.name}
                 </span>
                 <span
-                  className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold ${
+                  className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${
                     achievementPercentage >= 100
                       ? "bg-emerald-500/20 border border-emerald-400/30"
                       : "bg-amber-500/20 border border-amber-400/30"
@@ -368,15 +393,15 @@ const ClosedLeadsStats = ({
             </div>
 
             {!effectiveViewMyLeadsOnly && teamMembers.length > 0 && (
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-                <label className="block text-sm font-semibold text-white/90 mb-2">
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                <label className="block text-xs font-semibold text-white/90 mb-1">
                   Team Member
                 </label>
                 <div className="relative">
                   <select
                     value={selectedTeamUserId}
                     onChange={(e) => setSelectedTeamUserId(e.target.value)}
-                    className="block w-full pl-4 pr-10 py-2.5 text-base border border-white/30 rounded-lg bg-white/95 text-gray-900 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 sm:text-sm backdrop-blur-sm"
+                    className="block w-full pl-2 pr-6 py-1.5 text-xs border border-white/30 rounded-md bg-white/95 text-gray-900 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 backdrop-blur-sm"
                   >
                     <option value="all">All Team Members</option>
                     {teamMembers.map((u) => (
@@ -385,9 +410,9 @@ const ClosedLeadsStats = ({
                       </option>
                     ))}
                   </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-white/70">
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1.5 text-white/70">
                     <svg
-                      className="h-5 w-5"
+                      className="h-3 w-3"
                       fill="currentColor"
                       viewBox="0 0 20 20"
                     >
@@ -406,15 +431,15 @@ const ClosedLeadsStats = ({
       </div>
 
       {/* Stats Cards Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 p-3">
         {/* Achieved Card */}
-        <div className="group bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl p-4 border border-emerald-100/50 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-r from-emerald-500 to-green-600 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
+        <div className="group bg-gradient-to-br from-emerald-50 to-green-50 rounded-lg p-3 border border-emerald-100/50 hover:shadow-md transition-all duration-300 hover:-translate-y-0.5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-gradient-to-r from-emerald-500 to-green-600 rounded-md shadow-md group-hover:scale-110 transition-transform duration-300">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4 text-white"
+                  className="h-3 w-3 text-white"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -428,7 +453,7 @@ const ClosedLeadsStats = ({
                 </svg>
               </div>
               <div>
-                <p className="text-sm font-semibold text-emerald-700">
+                <p className="text-xs font-semibold text-emerald-700">
                   Achieved
                 </p>
                 <p className="text-xs text-emerald-600">This Quarter</p>
@@ -436,19 +461,19 @@ const ClosedLeadsStats = ({
             </div>
           </div>
           {/* Centered big achieved amount */}
-          <div className="text-center mb-4">
-            <p className="text-3xl font-bold text-gray-900 mb-2">
+          <div className="text-center mb-3">
+            <p className="text-2xl font-bold text-gray-900 mb-1.5">
               {formatCurrency(achievedValue)}
             </p>
             {displayQuarterTarget.adjustedTarget > 0 && (
               <div className="flex items-center justify-center gap-2">
-                <div className="w-20 bg-gray-200 rounded-full h-3 overflow-hidden">
+                <div className="w-16 bg-gray-200 rounded-full h-2 overflow-hidden">
                   <div
-                    className="bg-gradient-to-r from-emerald-400 to-green-600 h-3 rounded-full transition-all duration-700 ease-out shadow-sm"
+                    className="bg-gradient-to-r from-emerald-400 to-green-600 h-2 rounded-full transition-all duration-700 ease-out shadow-sm"
                     style={{ width: `${achievementPercentage}%` }}
                   />
                 </div>
-                <span className="text-sm font-semibold text-emerald-700">
+                <span className="text-xs font-semibold text-emerald-700">
                   {achievementPercentage}%
                 </span>
               </div>
@@ -457,13 +482,13 @@ const ClosedLeadsStats = ({
         </div>
 
         {/* Target Card */}
-        <div className="group bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100/50 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+        <div className="group bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-3 border border-blue-100/50 hover:shadow-md transition-all duration-300 hover:-translate-y-0.5">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-md shadow-md group-hover:scale-110 transition-transform duration-300">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4 text-white"
+                  className="h-3 w-3 text-white"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -477,7 +502,7 @@ const ClosedLeadsStats = ({
                 </svg>
               </div>
               <div>
-                <p className="text-sm font-semibold text-blue-700">
+                <p className="text-xs font-semibold text-blue-700">
                   {annualLabel}
                 </p>
                 <p className="text-xs text-blue-600">Full Year Goal</p>
@@ -485,18 +510,18 @@ const ClosedLeadsStats = ({
             </div>
             <div className="text-right">
               {annualTarget > 0 ? (
-                <p className="text-xl font-bold text-gray-900">
+                <p className="text-lg font-bold text-gray-900">
                   {formatCurrency(annualTarget)}
                 </p>
               ) : (
-                <p className="text-lg font-bold text-gray-500">Not Assigned</p>
+                <p className="text-base font-bold text-gray-500">Not Assigned</p>
               )}
             </div>
           </div>
 
           {/* Show edit button only for individual users, not for "All Team Members" */}
           {selectedTeamUserId !== "all" || effectiveViewMyLeadsOnly ? (
-            <div className="mt-3 flex justify-end">
+            <div className="mt-2 flex justify-end">
               <TargetWithEdit
                 value={annualTarget}
                 fy={selectedFY}
@@ -513,8 +538,8 @@ const ClosedLeadsStats = ({
             </div>
           ) : null}
 
-          <div className="mt-3 bg-white/60 rounded-lg p-3 border border-blue-100/50">
-            <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="mt-2 bg-white/60 rounded-md p-2 border border-blue-100/50">
+            <div className="grid grid-cols-2 gap-1.5 text-xs">
               <div>
                 <span className="text-gray-600">{quarterLabel}</span>
                 <p className="font-semibold text-blue-700">
@@ -533,16 +558,16 @@ const ClosedLeadsStats = ({
 
         {/* Deficit/Surplus Card */}
         <div
-          className={`group rounded-xl p-4 border hover:shadow-lg transition-all duration-300 hover:-translate-y-1 ${
+          className={`group rounded-lg p-3 border hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 ${
             displayDeficit > 0
               ? "bg-gradient-to-br from-red-50 to-rose-50 border-red-100/50"
               : "bg-gradient-to-br from-emerald-50 to-green-50 border-emerald-100/50"
           }`}
         >
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <div
-                className={`p-2 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300 ${
+                className={`p-1.5 rounded-md shadow-md group-hover:scale-110 transition-transform duration-300 ${
                   displayDeficit > 0
                     ? "bg-gradient-to-r from-red-500 to-rose-600"
                     : "bg-gradient-to-r from-emerald-500 to-green-600"
@@ -551,7 +576,7 @@ const ClosedLeadsStats = ({
                 {displayDeficit > 0 ? (
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4 text-white"
+                    className="h-3 w-3 text-white"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -566,7 +591,7 @@ const ClosedLeadsStats = ({
                 ) : (
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4 text-white"
+                    className="h-3 w-3 text-white"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -582,7 +607,7 @@ const ClosedLeadsStats = ({
               </div>
               <div>
                 <p
-                  className={`text-sm font-semibold ${
+                  className={`text-xs font-semibold ${
                     displayDeficit > 0 ? "text-red-700" : "text-emerald-700"
                   }`}
                 >
@@ -599,14 +624,14 @@ const ClosedLeadsStats = ({
             </div>
             <div className="text-right">
               <p
-                className={`text-xl font-bold ${
+                className={`text-lg font-bold ${
                   displayDeficit > 0 ? "text-red-600" : "text-emerald-600"
                 }`}
               >
                 {formatCurrency(Math.abs(displayDeficit))}
               </p>
               <div
-                className={`text-xs mt-1 ${
+                className={`text-xs mt-0.5 ${
                   displayDeficit > 0 ? "text-red-500" : "text-emerald-500"
                 }`}
               >
@@ -617,7 +642,7 @@ const ClosedLeadsStats = ({
 
           {displayQuarterTarget.adjustedTarget > 0 && (
             <div
-              className={`mt-3 bg-white/60 rounded-lg p-3 border ${
+              className={`mt-2 bg-white/60 rounded-md p-2 border ${
                 displayDeficit > 0
                   ? "border-red-100/50"
                   : "border-emerald-100/50"
@@ -674,6 +699,9 @@ ClosedLeadsStats.propTypes = {
   handleTargetUpdate: PropTypes.func.isRequired,
   selectedTeamUserId: PropTypes.string.isRequired,
   setSelectedTeamUserId: PropTypes.func.isRequired,
+  achievedValue: PropTypes.number,
+  showDirectorLeads: PropTypes.bool,
+  shouldShowDepartmentToggle: PropTypes.bool,
 };
 
 export default ClosedLeadsStats;
