@@ -1,4 +1,6 @@
 import React from "react";
+import gryphonLogo from "../../assets/gryphon_logo.png";
+import signature from "../../assets/sign.png";
 
 const InvoiceModal = ({ invoice, onClose }) => {
   if (!invoice) return null;
@@ -48,21 +50,17 @@ const InvoiceModal = ({ invoice, onClose }) => {
     };
   };
 
-  // ✅ IMPROVED: Get all project codes for merged invoices
   const getAllProjectCodes = () => {
-    // Agar merged invoice hai toh merged contracts se project codes lo
     if (invoice.isMergedInvoice && invoice.mergedContracts) {
       return invoice.mergedContracts
         .map((contract) => contract.projectCode)
         .filter(Boolean);
     }
 
-    // Agar individual project code hai toh woh return karo
     if (invoice.projectCode) {
       return [invoice.projectCode];
     }
 
-    // Agar individualProjectCodes array mein hai (merged invoice ke liye backup)
     if (
       invoice.individualProjectCodes &&
       invoice.individualProjectCodes.length > 0
@@ -149,6 +147,139 @@ const InvoiceModal = ({ invoice, onClose }) => {
 
     return "Rupees " + convert(num).trim() + " Only";
   };
+  // ✅ PDF Download Function - Fixed layout
+  const downloadPDF = () => {
+    const downloadBtn = document.querySelector("#download-btn");
+    const originalText = downloadBtn.textContent;
+    downloadBtn.textContent = "Downloading...";
+    downloadBtn.disabled = true;
+
+    const printWindow = window.open("", "_blank");
+
+    // Get the invoice content
+    const invoiceContent = document.querySelector(
+      ".invoice-modal-print"
+    ).innerHTML;
+
+    const invoiceHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Invoice ${getInvoiceNumberDisplay()}</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    @media print {
+      body { 
+        margin: 0;
+        padding: 0;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        font-size: 12px;
+      }
+      .no-print { 
+        display: none !important; 
+      }
+      .invoice-container {
+        box-shadow: none !important;
+        border: 1px solid #1f2937 !important;
+        margin: 0 auto;
+        width: 100%;
+        transform: none !important;
+      }
+      .compact-table {
+        margin-bottom: 8px !important;
+      }
+      .compact-section {
+      }
+      .bank-signature-container {
+        position: relative;
+        margin-top: 20px;
+      }
+      .signature-section {
+        position: absolute;
+        bottom: 10px;
+        right: 20px;
+        text-align: center;
+      }
+    }
+    
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      background: white;
+    }
+    .Detail {
+    flex-direction: col;
+    justify-content: center;
+    }
+    /* Compact styles */
+    .compact-table table {
+      font-size: 11px;
+    }
+    .compact-table th, 
+    .compact-table td {
+      padding: 4px 6px !important;
+    }
+    
+    /* Ensure all colors print correctly */
+    .bg-gray-300 { background-color: #d1d5db !important; }
+    .bg-blue-50 { background-color: #eff6ff !important; }
+    .bg-gray-50 { background-color: #f9fafb !important; }
+    .bg-gray-100 { background-color: #f3f4f6 !important; }
+    .bg-blue-600 { background-color: #2563eb !important; }
+    .text-blue-800 { color: #1e40af !important; }
+    .text-red-600 { color: #dc2626 !important; }
+    .text-gray-800 { color: #1f2937 !important; }
+    .text-gray-600 { color: #4b5563 !important; }
+    .text-gray-700 { color: #374151 !important; }
+    .border-gray-300 { border-color: #d1d5db !important; }
+    .border-gray-800 { border-color: #1f2937 !important; }
+    .border-blue-800 { border-color: #1e40af !important; }
+    
+    /* Clear floats */
+    .clearfix::after {
+      content: "";
+      clear: both;
+      display: table;
+    }
+  </style>
+</head>
+<body class="bg-white">
+  <div class="invoice-container p-4 max-w-4xl mx-auto border border-gray-800 clearfix" style="font-size: 12px;">
+    ${invoiceContent}
+  </div>
+  <script>
+    window.onload = function() {
+      const noPrintElements = document.querySelectorAll('.no-print');
+      noPrintElements.forEach(el => el.remove());
+      
+      // Force logo positioning before print
+      const logoContainer = document.querySelector('.logo-container');
+      const companyDetails = document.querySelector('.company-details');
+      if (logoContainer && companyDetails) {
+        logoContainer.style.float = 'right';
+        logoContainer.style.textAlign = 'right';
+        companyDetails.style.float = 'left';
+        companyDetails.style.width = '65%';
+      }
+      
+      window.print();
+      setTimeout(() => {
+        window.close();
+      }, 500);
+    };
+  </script>
+</body>
+</html>
+`;
+    printWindow.document.write(invoiceHtml);
+    printWindow.document.close();
+
+    setTimeout(() => {
+      downloadBtn.textContent = originalText;
+      downloadBtn.disabled = false;
+    }, 3000);
+  };
 
   const amounts = getPaymentAmounts();
   const amountInWords = convertAmountToWords(amounts.totalAmount);
@@ -157,104 +288,89 @@ const InvoiceModal = ({ invoice, onClose }) => {
   return (
     <>
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-500 p-4 no-print">
-        <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto invoice-modal-print">
-          <div className="p-6">
-            {/* Header */}
-            <div className="flex justify-between items-start mb-6 border-b pb-4">
-              <div>
-                <h3 className="text-2xl font-bold text-gray-800">Invoice</h3>
-                <p className="text-gray-600 mt-1">
-                  College: {invoice.collegeName || "N/A"}
-                </p>
-
-                {/* ✅ IMPROVED: Project Codes Display */}
-                <div className="mt-2">
-                  <span className="text-sm font-semibold text-gray-700">
-                    Project {projectCodes.length > 1 ? "Codes" : "Code"}:
-                  </span>
-                  {projectCodes.length > 0 ? (
-                    projectCodes.map((projectCode, index) => (
-                      <span key={index} className="text-sm text-gray-600 ml-2">
-                        {projectCode}
-                        {index < projectCodes.length - 1 ? ", " : ""}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-sm text-gray-600 ml-2">N/A</span>
-                  )}
-                </div>
-
-                {/* Invoice Date Display */}
-                <div className="mt-2">
-                  <span className="text-sm font-semibold text-gray-700">
-                    Invoice Date:
-                  </span>
-                  <span className="text-sm text-gray-600 ml-2">
-                    {formatDate(invoice.raisedDate || invoice.createdAt)}
-                  </span>
-
-                  {invoice.dueDate && (
-                    <>
-                      <span className="text-sm font-semibold text-gray-700 ml-4">
-                        Due Date:
-                      </span>
-                      <span className="text-sm text-red-600 ml-2">
-                        {formatDate(invoice.dueDate)}
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
+        <div
+          className="bg-white border-2 border-gray-800 shadow-2xl p-4 w-full max-w-4xl max-h-[90vh] overflow-y-auto invoice-modal-print"
+          style={{ fontSize: "14px" }}
+        >
+          <div className="border border-gray-300 p-2">
+            {/* Header - More Compact */}
+            <div className="flex justify-between items-start mb-4 border-b p-3 bg-gray-300 compact-section">
+              <div></div>
               <div className="text-center">
-                <div className="bg-blue-100  py-2 rounded-lg">
-                  <p className="font-bold text-blue-800 text-lg">
-                    {getInvoiceTypeDisplay()}
+                <h1 className="text-2xl font-bold text-gray-800">
+                  {getInvoiceTypeDisplay()}
+                </h1>
+                {invoice.installment && (
+                  <p className="text-xs text-gray-600 mt-1">
+                    {invoice.installment}
                   </p>
-                  <p className="text-sm text-blue-600 font-semibold">
-                    {getInvoiceNumberDisplay()}
+                )}
+              </div>
+              <div className="text-left">
+                <div className="mb-1">
+                  <p className="text-sm text-blue-800 font-bold">
+                    Invoice No. : {getInvoiceNumberDisplay()}
                   </p>
                 </div>
-                {invoice.installment && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Installment: {invoice.installment}
+                <p className="text-xs text-gray-800">
+                  Invoice Date :{" "}
+                  {formatDate(invoice.raisedDate || invoice.createdAt)}
+                </p>
+                {invoice.dueDate && (
+                  <p className="text-xs text-red-600">
+                    Due Date : {formatDate(invoice.dueDate)}
                   </p>
                 )}
               </div>
             </div>
 
-            {/* Company Details */}
-            <div className="mb-6">
-              <div className="bg-blue-50 p-4 rounded-lg mb-4">
-                <h4 className="font-bold text-lg mb-2">
-                  Gryphon Academy Pvt. Ltd
-                </h4>
-                <p className="text-sm">
-                  Survey Number 128, Office No 901, Olympia, Pune Bypass,
-                  Olympia
-                </p>
-                <p className="text-sm">
-                  Business House, Baner, Pune, Maharashtra 411045
-                </p>
-                <p className="text-sm mt-1">
-                  <strong>GSTIN:</strong> 27AAJCG8035D1ZM |
-                  <strong> PAN:</strong> AAJCG8035D
-                </p>
+            {/* Company Details - More Compact */}
+            <div className="mb-4 compact-section">
+              <div className="bg-blue-50 p-3 rounded mb-3">
+                <div className="flex justify-between items-center gap-3">
+                  {/* Company Details - Left Side */}
+                  <div className="flex-1">
+                    <h4 className="font-bold text-md mb-1">
+                      Gryphon Academy Pvt. Ltd
+                    </h4>
+                    <p className="text-xs">
+                      Survey Number 128, Office No 901, Olympia, Pune Bypass,
+                      Olympia
+                    </p>
+                    <p className="text-xs">
+                      Business House, Baner, Pune, Maharashtra 411045
+                    </p>
+                    <p className="text-xs mt-1">
+                      <strong>GSTIN:</strong> 27AAJCG8035D1ZM |{" "}
+                      <strong>PAN:</strong> AAJCG8035D
+                    </p>
+                  </div>
+
+                  {/* Logo - Right Side */}
+                  <div className="flex-shrink-0">
+                    <img
+                      src={gryphonLogo}
+                      alt="Gryphon Academy Logo"
+                      className="h-20 w-auto object-contain"
+                    />
+                  </div>
+                </div>
               </div>
 
-              {/* College Details */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-bold text-lg mb-2">
-                  PARTY'S NAME: -{" "}
+              <div className="bg-gray-50 p-3 rounded">
+                <h4 className="font-bold text-md mb-1">
+                  Party Name :{" "}
                   {invoice.collegeName || "College Name Not Available"}
                 </h4>
-
-                {/* ✅ IMPROVED: Multiple Project Codes Detailed View */}
-
-                <p className="text-sm">
+                <p className="text-md">
+                  <spam className="font-bold text-md ">
+                  Address : 
+                   </spam>
                   {invoice.address || "College Address Not Available"}
+                  
                 </p>
-                <p className="text-sm mt-1">
-                  <strong>GSTIN:</strong>{" "}
+                <p className="text-xs mt-1">
+                  <strong>GSTIN :</strong>{" "}
                   {invoice.gstNumber || "GSTIN Not Available"} |
                   <strong> PLACE OF SUPPLY:</strong>{" "}
                   {invoice.state || "State Not Available"}
@@ -262,120 +378,57 @@ const InvoiceModal = ({ invoice, onClose }) => {
               </div>
             </div>
 
-            {/* Invoice Table */}
-            <div className="mb-6">
-              <table className="w-full border-collapse border border-gray-300">
+            {/* Invoice Table - More Compact */}
+            <div className="mb-4 compact-table">
+              <table className="w-full border-collapse border border-gray-300 text-sm">
                 <thead>
                   <tr className="bg-gray-100">
-                    <th className="border border-gray-300 px-4 py-2 text-left">
+                    <th className="border border-gray-300 px-3 py-1 text-left">
                       Description
                     </th>
-                    <th className="border border-gray-300 px-4 py-2 text-left">
+                    <th className="border border-gray-300 px-3 py-1 text-left">
                       HSN Code
                     </th>
-                    <th className="border border-gray-300 px-4 py-2 text-right">
+                    <th className="border border-gray-300 px-3 py-1 text-right">
                       Amount (₹)
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    <td className="border border-gray-300 px-4 py-2">
-                      {/* ✅ DYNAMIC DESCRIPTION GENERATION */}
-                      {(() => {
-                        // Common parts
-                        const installment = invoice.installment || "";
-                        const percentage =
-                          invoice.paymentDetails?.[0]?.percentage || "";
-                        const course = invoice.course || "";
-                        const year = invoice.year || "";
-                        const studentCount = invoice.studentCount || "";
-                        const perStudentCost = invoice.perStudentCost
-                          ? new Intl.NumberFormat("en-IN", {
-                              style: "currency",
-                              currency: "INR",
-                              maximumFractionDigits: 0,
-                            }).format(Number(invoice.perStudentCost))
-                          : "";
-
-                        // Calculate base amount and GST
-                        const gstAmount = amounts.gstAmount;
-
-                        // Generate description based on invoice type
-                        if (invoice.isMergedInvoice) {
-                          // MERGED INVOICE DESCRIPTION
-                          const courses = invoice.course
-                            ? invoice.course.split(", ")
-                            : [course];
-                          const years = invoice.year
-                            ? invoice.year.split(", ")
-                            : [year];
-
-                          return (
-                            <div>
-                              <div className="font-semibold">
-                                Training Services - {installment}{" "}
-                                {percentage && `(${percentage}%)`}
-                              </div>
-                              <div className="text-sm text-gray-700 mt-1">
-                                As per the MOU {percentage && `${percentage}% `}
-                                for {courses.join("/")} {years.join("/")} year
-                                {studentCount &&
-                                  ` for ${studentCount} students`}
-                                {perStudentCost &&
-                                  ` @${perStudentCost} per student`}
-                                {gstAmount > 0 && ` + 18% GST`}
-                              </div>
-
-                              {/* Project Codes for merged invoices */}
-                              {projectCodes.length > 0 && (
-                                <div className="text-xs text-blue-600 mt-2">
-                                  <strong>Project Codes:</strong>{" "}
-                                  {projectCodes.join(", ")}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        } else {
-                          // INDIVIDUAL INVOICE DESCRIPTION
-                          return (
-                            <div>
-                              <div className="font-semibold">
-                                Training Services - {installment}{" "}
-                                {percentage && `(${percentage}%)`}
-                              </div>
-                              <div className="text-sm text-gray-700 mt-1">
-                                As per the MOU {percentage && `${percentage}% `}
-                                after completion of the training {course} {year}{" "}
-                                year
-                                {studentCount &&
-                                  ` for ${studentCount} students`}
-                                {perStudentCost &&
-                                  ` @${perStudentCost} per student`}
-                                {gstAmount > 0 && ` + 18% GST`}
-                              </div>
-
-                              {/* Project Code for individual invoices */}
-                              {projectCodes.length > 0 && (
-                                <div className="text-xs text-blue-600 mt-2">
-                                  <strong>Project Code:</strong>{" "}
-                                  {projectCodes[0]}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        }
-                      })()}
-
-                      {/* Additional details if any */}
-                      {invoice.additionalDetails && (
-                        <div className="text-xs text-gray-600 mt-2">
-                          {invoice.additionalDetails}
+                    <td className="border border-gray-300 px-3 py-1">
+                      <div>
+                        <div className="font-semibold text-sm">
+                          Training Services - {invoice.installment || ""}
+                          {invoice.paymentDetails?.[0]?.percentage &&
+                            ` (${invoice.paymentDetails[0].percentage}%)`}
                         </div>
-                      )}
+                        <div className="text-xs text-gray-700 mt-1">
+                          {invoice.isMergedInvoice
+                            ? `for ${invoice.course || ""} ${
+                                invoice.year || ""
+                              } year`
+                            : `after completion of the training ${
+                                invoice.course || ""
+                              } ${invoice.year || ""} year`}
+                          {invoice.studentCount &&
+                            ` for ${invoice.studentCount} students`}
+                          {amounts.gstAmount > 0 && ` + 18% GST`}
+                        </div>
+
+                        {projectCodes.length > 0 && (
+                          <div className="text-xs text-blue-600 mt-1">
+                            <strong>
+                              Project{" "}
+                              {projectCodes.length > 1 ? "Codes" : "Code"}:
+                            </strong>{" "}
+                            {projectCodes.join(", ")}
+                          </div>
+                        )}
+                      </div>
                     </td>
-                    <td className="border border-gray-300 px-4 py-2">999293</td>
-                    <td className="border border-gray-300 px-4 py-2 text-right">
+                    <td className="border border-gray-300 px-3 py-1">999293</td>
+                    <td className="border border-gray-300 px-3 py-1 text-right">
                       {amounts.baseAmount.toLocaleString("en-IN", {
                         minimumFractionDigits: 2,
                       })}
@@ -385,54 +438,43 @@ const InvoiceModal = ({ invoice, onClose }) => {
               </table>
             </div>
 
-            {/* Amount in Words */}
-            <div className="mb-6 p-3 bg-gray-50 rounded">
-              <p className="text-sm">
+            {/* Amount in Words - Compact */}
+            <div className="mb-4 p-2 bg-gray-50 rounded compact-section">
+              <p className="text-xs">
                 <strong>Amount in Words:</strong> {amountInWords}
               </p>
-
-              {/* ✅ IMPROVED: Project codes yahan bhi dikhao */}
-              {projectCodes.length > 0 && (
-                <p className="text-sm mt-1">
-                  <strong>
-                    Project {projectCodes.length > 1 ? "Codes" : "Code"}:
-                  </strong>{" "}
-                  {projectCodes.join(", ")}
-                </p>
-              )}
             </div>
 
-            {/* GST Calculation */}
-            <div className="mb-6">
-              <table className="w-full border-collapse border border-gray-300">
+            {/* GST Calculation - Compact */}
+            <div className="mb-4 compact-table">
+              <table className="w-full border-collapse border border-gray-300 text-sm">
                 <tbody>
                   <tr>
-                    <td className="border border-gray-300 px-4 py-2 font-semibold">
+                    <td className="border border-gray-300 px-3 py-1 font-semibold">
                       Total (Base Amount)
                     </td>
-                    <td className="border border-gray-300 px-4 py-2 text-right">
+                    <td className="border border-gray-300 px-3 py-1 text-right">
                       {amounts.baseAmount.toLocaleString("en-IN", {
                         minimumFractionDigits: 2,
                       })}
                     </td>
                   </tr>
 
-                  {/* Cash Invoice ke liye GST zero dikhao */}
                   {invoice.invoiceType === "Cash Invoice" ? (
                     <>
                       <tr>
-                        <td className="border border-gray-300 px-4 py-2 font-semibold">
+                        <td className="border border-gray-300 px-3 py-1 font-semibold">
                           CGST @ 0%
                         </td>
-                        <td className="border border-gray-300 px-4 py-2 text-right">
+                        <td className="border border-gray-300 px-3 py-1 text-right">
                           0.00
                         </td>
                       </tr>
                       <tr>
-                        <td className="border border-gray-300 px-4 py-2 font-semibold">
+                        <td className="border border-gray-300 px-3 py-1 font-semibold">
                           SGST @ 0%
                         </td>
-                        <td className="border border-gray-300 px-4 py-2 text-right">
+                        <td className="border border-gray-300 px-3 py-1 text-right">
                           0.00
                         </td>
                       </tr>
@@ -440,20 +482,20 @@ const InvoiceModal = ({ invoice, onClose }) => {
                   ) : (
                     <>
                       <tr>
-                        <td className="border border-gray-300 px-4 py-2 font-semibold">
+                        <td className="border border-gray-300 px-3 py-1 font-semibold">
                           Add: CGST @ 9%
                         </td>
-                        <td className="border border-gray-300 px-4 py-2 text-right">
+                        <td className="border border-gray-300 px-3 py-1 text-right">
                           {(amounts.gstAmount / 2).toLocaleString("en-IN", {
                             minimumFractionDigits: 2,
                           })}
                         </td>
                       </tr>
                       <tr>
-                        <td className="border border-gray-300 px-4 py-2 font-semibold">
+                        <td className="border border-gray-300 px-3 py-1 font-semibold">
                           Add: SGST @ 9%
                         </td>
-                        <td className="border border-gray-300 px-4 py-2 text-right">
+                        <td className="border border-gray-300 px-3 py-1 text-right">
                           {(amounts.gstAmount / 2).toLocaleString("en-IN", {
                             minimumFractionDigits: 2,
                           })}
@@ -463,10 +505,10 @@ const InvoiceModal = ({ invoice, onClose }) => {
                   )}
 
                   <tr>
-                    <td className="border border-gray-300 px-4 py-2 font-semibold">
+                    <td className="border border-gray-300 px-3 py-1 font-semibold">
                       Grand Total
                     </td>
-                    <td className="border border-gray-300 px-4 py-2 text-right font-bold">
+                    <td className="border border-gray-300 px-3 py-1 text-right font-bold">
                       ₹
                       {amounts.totalAmount.toLocaleString("en-IN", {
                         minimumFractionDigits: 2,
@@ -477,55 +519,74 @@ const InvoiceModal = ({ invoice, onClose }) => {
               </table>
             </div>
 
-            {/* Contact Information */}
-            <div className="mb-6 p-3 bg-blue-50 rounded">
-              <p className="text-sm text-center">
+            {/* Contact Information - Compact */}
+            <div className="mb-4 p-2 bg-blue-50 rounded compact-section">
+              <p className="text-xs text-center">
                 If you have any questions concerning this invoice, use the
                 following contact information: Website: www.gryphonacademy.co.in
-                | Email: shashli@gryphonacademy.co.in | Phone: +91 7875895160
+                | Email: shashi@gryphonacademy.co.in | Phone: +91 7875895160
               </p>
             </div>
 
-            {/* Bank Details */}
-            <div className="mb-6 p-4 border border-gray-300 rounded">
-              <h5 className="font-bold mb-2">Bank Details:</h5>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <strong>Name of Account:</strong> Gryphon Academy Private
-                  Limited
+            {/* Bank Details & Signature Section - Fixed Positioning */}
+            <div className="mb-4 p-3 border border-gray-300 rounded bank-signature-container">
+              <div className="flex flex-col md:flex-row justify-between gap-4">
+                {/* Bank Details - Left Side */}
+                <div className="flex-1">
+                  <h5 className="font-bold mb-1 text-sm">Bank Details:</h5>
+                  <div className="grid grid-cols-1 gap-1 text-xs">
+                    <div>
+                      <strong>Name of Account:</strong> Gryphon Academy Private
+                      Limited
+                    </div>
+                    <div>
+                      <strong>Account Number:</strong> 50200080602438
+                    </div>
+                    <div>
+                      <strong>IFSC Code:</strong> HDFC0000052
+                    </div>
+                    <div>
+                      <strong>Bank:</strong> HDFC Bank
+                    </div>
+                    <div>
+                      <strong>Account Type:</strong> Current Account
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <strong>Account Number:</strong> 50200080602438
-                </div>
-                <div>
-                  <strong>IFSC Code:</strong> HDFC0000062
-                </div>
-                <div>
-                  <strong>Bank:</strong> HDFC Bank
-                </div>
-                <div>
-                  <strong>Account Type:</strong> Current Account
+
+                {/* Signature - Right Side with Fixed Positioning */}
+                <div className="flex-1 flex flex-col items-center signature-section">
+                  <p className="font-semibold mb-2 text-sm">
+                    For Gryphon Academy Pvt. Ltd
+                  </p>
+                  <div className="text-center">
+                    <img
+                      src={signature}
+                      alt="Authorised Signature"
+                      className="h-10 w-auto mx-auto mb-1"
+                    />
+                    <div className="border-t border-gray-400 w-24 mx-auto mb-1"></div>
+                    <p className="text-xs text-gray-600">Digital Signature</p>
+                    <p className="mt-1 font-semibold text-xs">
+                      Authorised Signatory
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Signature */}
-            <div className="text-right mt-8">
-              <p className="font-semibold">For Gryphon Academy Pvt. Ltd</p>
-              <p className="mt-4">Authorised Signatory</p>
-            </div>
-
             {/* Action Buttons */}
-            <div className="flex justify-end space-x-3 mt-6 pt-4 border-t no-print">
+            <div className="flex justify-end space-x-3 mt-4 pt-3 border-t no-print">
               <button
-                onClick={() => window.print()} // Yeh line add karo
-                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 font-semibold"
+                id="download-btn"
+                onClick={downloadPDF}
+                className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-700 font-semibold transition-colors text-sm"
               >
-                Print/Download
+                Download PDF
               </button>
               <button
                 onClick={onClose}
-                className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 font-semibold"
+                className="bg-gray-500 text-white px-4 py-1 rounded hover:bg-gray-600 font-semibold transition-colors text-sm"
               >
                 Close
               </button>
