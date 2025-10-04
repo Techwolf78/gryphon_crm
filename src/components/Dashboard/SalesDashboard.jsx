@@ -181,7 +181,7 @@ const RecentActivity = ({ recentActivity, isLoading }) => {
                 </p>
                 {activity.amount && (
                   <p className="text-sm font-medium text-gray-900 mt-1">
-                    ₹{activity.amount.toLocaleString()}
+                    ₹{activity.amount.toLocaleString('en-IN')}
                   </p>
                 )}
               </div>
@@ -453,7 +453,7 @@ const CustomTooltip = ({ active, payload, label, timePeriod }) => {
       <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
         <p className="font-medium text-gray-900">{timeLabel}</p>
         <p className="text-sm" style={{ color: payload[0].color }}>
-          Revenue: ₹{payload[0].value.toLocaleString()}
+          Revenue: {formatCurrency(payload[0].value)}
         </p>
         <p className="text-xs text-gray-500 mt-1">
           {dataPoint.dealCount} closed deal(s)
@@ -519,6 +519,57 @@ const SalesDashboard = ({ filters }) => {
   const [modalLeads, setModalLeads] = useState([]);
   const [modalMember, setModalMember] = useState(null);
   const [isYearDropdownOpen, setIsYearDropdownOpen] = useState(false);
+
+  const formatCurrency = (amount) => {
+    const numAmount = Number(amount);
+    if (numAmount > 10000000) {
+      const crores = numAmount / 10000000;
+      let str = crores.toFixed(4);
+      str = str.replace(/\.?0+$/, '');
+      return `₹${str} cr`;
+    } else {
+      return `₹${numAmount.toLocaleString('en-IN')}`;
+    }
+  };
+
+  const CustomTooltip = ({ active, payload, label, timePeriod }) => {
+    if (active && payload && payload.length) {
+      const dataPoint = payload[0].payload;
+      let timeLabel = "";
+
+      switch (timePeriod) {
+        case "week":
+          timeLabel = `Day: ${label}`;
+          break;
+        case "month":
+          timeLabel = `Week: ${label}`;
+          break;
+        case "quarter":
+          // Show month and year for clarity
+          timeLabel = `Month: ${label} ${new Date().getFullYear()}`;
+          break;
+        case "year":
+          // Show month and year for clarity
+          timeLabel = `Month: ${label} ${new Date().getFullYear()}`;
+          break;
+        default:
+          timeLabel = `Period: ${label}`;
+      }
+
+      return (
+        <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
+          <p className="font-medium text-gray-900">{timeLabel}</p>
+          <p className="text-sm" style={{ color: payload[0].color }}>
+            Revenue: {formatCurrency(payload[0].value)}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            {dataPoint.dealCount} closed deal(s)
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
 
   const getCurrentQuarter = () => {
     const now = new Date();
@@ -1469,7 +1520,7 @@ if (lead.assignedTo && lead.assignedTo.uid) {
             {[
               {
                 title: selectedUserId ? "Your Revenue" : "Team Revenue",
-                value: `₹${dashboardData.revenue.toLocaleString()}`,
+                value: formatCurrency(dashboardData.revenue),
                 change: dashboardData.growth,
                 icon: <FaRupeeSign className="text-white" size={16} />, // changed size
                 color: "bg-indigo-600",
@@ -1499,7 +1550,7 @@ if (lead.assignedTo && lead.assignedTo.uid) {
                 title: selectedUserId
                   ? "Your Projected TCV"
                   : "Team Projected TCV",
-                value: `₹${dashboardData.projectedTCV.toLocaleString()}`,
+                value: formatCurrency(dashboardData.projectedTCV),
                 change:
                   ((dashboardData.projectedTCV -
                     dashboardData.projectedTCVPrevQuarter) /

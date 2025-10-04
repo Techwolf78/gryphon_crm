@@ -182,8 +182,32 @@ const Roadmap = () => {
                     label: "Learning & Development",
                     start: 1,
                     span: 3,
+                    color: "bg-green-500",
+                    status: "Completed (15 Jul-30 Sep)",
+                    icon: (
+                      <svg
+                        className="w-4 h-4 mr-2"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    ),
+                    text: "text-white",
+                    desc: "Training Scheduler, trainer management, and invoice generation.",
+                  },
+                  {
+                    label: "Comprehensive Testing (L&D)",
+                    start: 3,
+                    span: 2,
                     color: "bg-amber-400",
-                    status: "In Progress (15 Jul-30 Sep)",
+                    status: "In Progress (1 Sep-15 Oct)",
                     icon: (
                       <svg
                         className="w-4 h-4 mr-2 animate-spin"
@@ -202,35 +226,14 @@ const Roadmap = () => {
                       </svg>
                     ),
                     text: "text-white",
-                    desc: "Training Scheduler, trainer management, and invoice generation.",
-                  },
-                  {
-                    label: "Comprehensive Testing (L&D)",
-                    start: 2,
-                    span: 2,
-                    color: "bg-gray-400",
-                    status: "Pending (1 Sep-30 Sep)",
-                    icon: (
-                      <svg
-                        className="w-4 h-4 mr-2"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle cx="12" cy="12" r="10" />
-                        <path d="M12 8v4l2 2" />
-                      </svg>
-                    ),
-                    text: "text-white",
                     desc: "Comprehensive QA, fine-tuning processes, and optimization/scalability.",
                   },
                   {
                     label: "Placement Phase",
-                    start: 3,
-                    span: 2,
+                    start: 4,
+                    span: 1,
                     color: "bg-gray-200",
-                    status: "Pending (20 Sep-25 Oct)",
+                    status: "Pending (15 Oct-25 Oct)",
                     icon: (
                       <svg
                         className="w-4 h-4 mr-2"

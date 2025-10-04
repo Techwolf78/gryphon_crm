@@ -385,8 +385,8 @@ const Admin = () => {
                       <span className="px-2 py-1 text-xs rounded-full bg-indigo-50 text-indigo-700">
                         {user.role}
                       </span>
-                      {(Array.isArray(user.departments) ? user.departments : (user.department ? [user.department] : [])).map((dept) => (
-                        <span key={dept} className="px-2 py-1 text-xs rounded-full bg-gray-50 text-gray-700">
+                      {(Array.isArray(user.departments) ? user.departments : (user.department ? [user.department] : [])).map((dept, index) => (
+                        <span key={`${dept}-${index}`} className="px-2 py-1 text-xs rounded-full bg-gray-50 text-gray-700">
                           {dept}
                         </span>
                       ))}
@@ -442,8 +442,8 @@ const Admin = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-gray-500">
                           <div className="flex flex-wrap gap-1">
-                            {(Array.isArray(user.departments) ? user.departments : (user.department ? [user.department] : [])).map((dept) => (
-                              <span key={dept} className="px-2 py-1 text-xs rounded-full bg-gray-50 text-gray-700">
+                            {(Array.isArray(user.departments) ? user.departments : (user.department ? [user.department] : [])).map((dept, index) => (
+                              <span key={`${dept}-${index}`} className="px-2 py-1 text-xs rounded-full bg-gray-50 text-gray-700">
                                 {dept}
                               </span>
                             ))}

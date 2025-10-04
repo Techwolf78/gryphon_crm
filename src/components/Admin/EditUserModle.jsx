@@ -128,11 +128,11 @@ const EditUser = ({ user, onCancel, onSuccess }) => {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Departments
           </label>
-          <div className="border border-gray-200 rounded-lg p-3">
+          <div className="border-2 border-gray-300 bg-white/60 backdrop-blur rounded-lg px-3 py-2.5 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 focus-within:border-indigo-400 transition-all">
             <div className="flex flex-wrap gap-2 mb-2">
               {formData.departments.map((dept, index) => (
                 <span
-                  key={dept}
+                  key={`${dept}-${index}`}
                   className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-800 text-xs rounded-full"
                 >
                   {dept}
@@ -149,26 +149,31 @@ const EditUser = ({ user, onCancel, onSuccess }) => {
                 </span>
               ))}
             </div>
-            <select
-              value=""
-              onChange={(e) => {
-                if (e.target.value && !formData.departments.includes(e.target.value)) {
-                  setFormData(prev => ({
-                    ...prev,
-                    departments: [...prev.departments, e.target.value]
-                  }));
-                }
-                e.target.value = ""; // Reset select
-              }}
-              className="w-full bg-transparent focus:outline-none text-black text-sm"
-            >
-              <option value="">Add department...</option>
+            <div className="grid grid-cols-2 gap-2">
               {departments.filter(dept => !formData.departments.includes(dept)).map((dept) => (
-                <option key={dept} value={dept}>
-                  {dept}
-                </option>
+                <label key={dept} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                  <input
+                    type="checkbox"
+                    checked={formData.departments.includes(dept)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setFormData(prev => ({
+                          ...prev,
+                          departments: [...prev.departments, dept]
+                        }));
+                      } else {
+                        setFormData(prev => ({
+                          ...prev,
+                          departments: prev.departments.filter(d => d !== dept)
+                        }));
+                      }
+                    }}
+                    className="w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500 focus:ring-2"
+                  />
+                  <span className="text-sm text-gray-700">{dept}</span>
+                </label>
               ))}
-            </select>
+            </div>
           </div>
           {formData.departments.length === 0 && (
             <p className="text-xs text-red-600 mt-1">Please select at least one department</p>

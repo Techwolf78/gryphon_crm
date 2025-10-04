@@ -133,7 +133,7 @@ function LeadFilters({
   }
 
   return (
-    <div className="flex items-center gap-3 px-4 relative">
+    <div className="flex items-center gap-3 relative">
       {/* Export & Import */}
       <ExportLead filteredLeads={filteredLeads} allLeads={allLeads} />
       <ImportLead 
@@ -145,7 +145,7 @@ function LeadFilters({
       <div className="relative">
         <button
           onClick={() => !isFilterOpen && setIsFilterOpen(true)}
-          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-all ${
+          className={`flex items-center gap-2 px-2 py-1 text-xs font-medium rounded-lg border transition-all ${
             isFilterOpen || hasActiveFilters
               ? "bg-blue-50 border-blue-200 text-blue-700 shadow-sm"
               : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50 shadow-sm"
@@ -154,7 +154,7 @@ function LeadFilters({
           <FiFilter className="w-4 h-4" />
           <span>Filters</span>
           {hasActiveFilters && (
-            <span className="bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
+            <span className="bg-blue-600 text-white text-[8px] rounded-full w-4 h-4 flex items-center justify-center font-medium">
               {Object.values(filters).filter(Boolean).length}
             </span>
           )}

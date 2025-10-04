@@ -230,7 +230,10 @@ const NewUser = ({ onUserAdded }) => {
   return (
     <div>
       <button
-        onClick={() => setShowForm(true)}
+        onClick={() => {
+          setShowForm(true);
+          resetForm(); // Reset form when opening modal
+        }}
         className="w-full py-3 px-4 rounded-full font-semibold shadow transition-all duration-300 text-[#4F39F6] bg-[#DBEAFE] flex items-center justify-center gap-2 hover:bg-[#E0E7FF]"
       >
         <AiOutlineUserAdd className="text-2xl" />
@@ -399,7 +402,7 @@ const NewUser = ({ onUserAdded }) => {
                   }}
                   className="w-full bg-transparent focus:outline-none text-black text-sm"
                 >
-                  {departments.length === 0 && <option value="">Add department...</option>}
+                  <option key="placeholder" value="">Add department...</option>
                   {departmentsList.filter(dept => !departments.includes(dept)).map((dept) => (
                     <option key={dept} value={dept}>
                       {dept}

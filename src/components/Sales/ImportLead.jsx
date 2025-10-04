@@ -924,7 +924,7 @@ const processExcel = (file) => {
       {/* Import Button */}
       <button
         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-        className={`flex items-center gap-2 px-4 py-2 text-sm font-medium shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-md border transition-colors ${
+        className={`flex items-center gap-2 px-2 py-1 text-xs font-medium shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-md border transition-colors ${
           importStatus.loading
             ? "bg-blue-50 border-blue-200 text-blue-700"
             : importStatus.success
