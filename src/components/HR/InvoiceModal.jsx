@@ -1,9 +1,103 @@
-import React from "react";
+import React, { useState, useEffect } from "react"; // ✅ useEffect import karo
 import gryphonLogo from "../../assets/gryphon_logo.png";
 import signature from "../../assets/sign.png";
-import QRCodeGenerator from "../../components/Learning/ContractInvoices/QRCodeGenerator"; // Correct import path
+import QRCodeGenerator from "../../components/Learning/ContractInvoices/QRCodeGenerator";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "../../firebase";
 
-const InvoiceModal = ({ invoice, onClose }) => {
+const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
+  const [editableInvoice, setEditableInvoice] = useState(invoice);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // ✅ Yeh IMPORTANT fix hai - jab invoice prop change ho toh state update ho
+  useEffect(() => {
+    setEditableInvoice(invoice);
+  }, [invoice]);
+
+  const handleEditToggle = () => {
+    setIsEditing(!isEditing);
+  };
+
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      
+      // ✅ Validation karo
+      if (!editableInvoice.invoiceNumber?.trim()) {
+        alert("Invoice number is required!");
+        return;
+      }
+
+      if (!editableInvoice.raisedDate) {
+        alert("Invoice date is required!");
+        return;
+      }
+
+      const collectionName = invoice.invoiceType === "Proforma Invoice" 
+        ? "ProformaInvoices" 
+        : "ContractInvoices";
+      
+      const invoiceRef = doc(db, collectionName, invoice.id);
+      
+      // ✅ Proper date handling karo
+      const updateData = {
+        invoiceNumber: editableInvoice.invoiceNumber.trim(),
+        raisedDate: new Date(editableInvoice.raisedDate)
+      };
+      
+      console.log("Updating invoice with:", updateData);
+      
+      await updateDoc(invoiceRef, updateData);
+      
+      setIsEditing(false);
+      
+      // ✅ Parent component ko updated data bhejo
+      if (onInvoiceUpdate) {
+        const updatedInvoice = {
+          ...invoice,
+          ...updateData
+        };
+        onInvoiceUpdate(updatedInvoice);
+      }
+      
+      alert("Invoice details updated successfully!");
+      
+    } catch (error) {
+      console.error("Error updating invoice:", error);
+      alert("Failed to update invoice details: " + error.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
+  const handleInputChange = (field, value) => {
+    setEditableInvoice(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  // Date formatting helper
+  const formatDateForInput = (dateString) => {
+    if (!dateString) return '';
+    
+    try {
+      const date = dateString.toDate ? dateString.toDate() : new Date(dateString);
+      return date.toISOString().split('T')[0];
+    } catch (error) {
+      console.error("Date parsing error:", error);
+      return '';
+    }
+  };
+
+  // ✅ Reset function add karo
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditableInvoice(invoice); // Original data par reset karo
+  };
+
+
   if (!invoice) return null;
 
   const getInvoiceTypeDisplay = () => {
@@ -305,30 +399,61 @@ const InvoiceModal = ({ invoice, onClose }) => {
                 <h1 className="text-2xl font-bold text-gray-800">
                   {getInvoiceTypeDisplay()}
                 </h1>
+              </div>
+              <div className="text-left">
+                {/* Invoice Number - Editable */}
+                <div className="mb-1">
+                  {isEditing ? (
+                    <div>
+                      <input
+                        type="text"
+                        value={editableInvoice.invoiceNumber || ''}
+                        onChange={(e) => handleInputChange('invoiceNumber', e.target.value)}
+                        className="text-sm text-blue-800 font-bold border border-blue-300 px-2 py-1 rounded w-48 mb-1"
+                        placeholder="Enter invoice number"
+                      />
+                      <p className="text-xs text-gray-600">Current: {invoice.invoiceNumber}</p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-blue-800 font-bold">
+                      Invoice No. : {editableInvoice.invoiceNumber || "N/A"}
+                    </p>
+                  )}
+                </div>
+                
+                {/* Invoice Date - Editable */}
+                <div>
+                  {isEditing ? (
+                    <div>
+                      <input
+                        type="date"
+                        value={formatDateForInput(editableInvoice.raisedDate || editableInvoice.createdAt)}
+                        onChange={(e) => handleInputChange('raisedDate', e.target.value)}
+                        className="text-xs border border-gray-300 px-2 py-1 rounded w-32 mb-1"
+                      />
+                      <p className="text-xs text-gray-600">
+                        Current: {formatDate(invoice.raisedDate || invoice.createdAt)}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-800">
+                      Invoice Date : {formatDate(editableInvoice.raisedDate || editableInvoice.createdAt)}
+                    </p>
+                  )}
+                </div>
+                
+                {invoice.dueDate && (
+                  <p className="text-xs text-red-600">
+                    Due Date : {formatDate(invoice.dueDate)}
+                  </p>
+                )}
                 {invoice.installment && (
                   <p className="text-xs text-gray-600 mt-1">
                     {invoice.installment}
                   </p>
                 )}
               </div>
-              <div className="text-left">
-                <div className="mb-1">
-                  <p className="text-sm text-blue-800 font-bold">
-                    Invoice No. : {invoiceNumber}
-                  </p>
-                </div>
-                <p className="text-xs text-gray-800">
-                  Invoice Date :{" "}
-                  {formatDate(invoice.raisedDate || invoice.createdAt)}
-                </p>
-                {invoice.dueDate && (
-                  <p className="text-xs text-red-600">
-                    Due Date : {formatDate(invoice.dueDate)}
-                  </p>
-                )}
-              </div>
             </div>
-
             {/* Company Details - More Compact */}
             <div className="mb-4 compact-section">
               <div className="bg-blue-50 p-3 rounded mb-3">
@@ -588,21 +713,51 @@ const InvoiceModal = ({ invoice, onClose }) => {
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex justify-end space-x-3 mt-4 pt-3 border-t no-print">
-              <button
-                id="download-btn"
-                onClick={downloadPDF}
-                className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-700 font-semibold transition-colors text-sm"
-              >
-                Download PDF
-              </button>
-              <button
-                onClick={onClose}
-                className="bg-gray-500 text-white px-4 py-1 rounded hover:bg-gray-600 font-semibold transition-colors text-sm"
-              >
-                Close
-              </button>
+              {/* Action Buttons - IMPROVED */}
+            <div className="flex justify-between items-center mt-4 pt-3 border-t no-print">
+              <div>
+                {isEditing ? (
+                  <>
+                    <button
+                      onClick={handleSave}
+                      disabled={isSaving}
+                      className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-700 font-semibold transition-colors text-sm mr-2 disabled:bg-green-400"
+                    >
+                      {isSaving ? "Saving..." : "Save Changes"}
+                    </button>
+                    <button
+                      onClick={handleCancelEdit}
+                      disabled={isSaving}
+                      className="bg-gray-500 text-white px-4 py-1 rounded hover:bg-gray-600 font-semibold transition-colors text-sm disabled:bg-gray-400"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={handleEditToggle}
+                    className="bg-blue-600 text-white px-4 py-1 rounded hover:bg-blue-700 font-semibold transition-colors text-sm"
+                  >
+                    Edit Invoice
+                  </button>
+                )}
+              </div>
+              
+              <div className="flex space-x-3">
+                <button
+                  id="download-btn"
+                  onClick={downloadPDF}
+                  className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-700 font-semibold transition-colors text-sm"
+                >
+                  Download PDF
+                </button>
+                <button
+                  onClick={onClose}
+                  className="bg-gray-500 text-white px-4 py-1 rounded hover:bg-gray-600 font-semibold transition-colors text-sm"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
