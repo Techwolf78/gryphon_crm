@@ -1,6 +1,7 @@
 import React from "react";
 import gryphonLogo from "../../assets/gryphon_logo.png";
 import signature from "../../assets/sign.png";
+import QRCodeGenerator from "../../components/Learning/ContractInvoices/QRCodeGenerator"; // Correct import path
 
 const InvoiceModal = ({ invoice, onClose }) => {
   if (!invoice) return null;
@@ -147,6 +148,7 @@ const InvoiceModal = ({ invoice, onClose }) => {
 
     return "Rupees " + convert(num).trim() + " Only";
   };
+
   // ✅ PDF Download Function - Fixed layout
   const downloadPDF = () => {
     const downloadBtn = document.querySelector("#download-btn");
@@ -201,6 +203,11 @@ const InvoiceModal = ({ invoice, onClose }) => {
         right: 20px;
         text-align: center;
       }
+      .qr-code-print {
+        display: block !important;
+        width: 100px !important;
+        height: 100px !important;
+      }
     }
     
     body {
@@ -242,6 +249,13 @@ const InvoiceModal = ({ invoice, onClose }) => {
       clear: both;
       display: table;
     }
+    
+    /* QR Code styles for print */
+    .qr-code-container {
+      display: flex !important;
+      flex-direction: column;
+      align-items: center;
+    }
   </style>
 </head>
 <body class="bg-white">
@@ -252,16 +266,6 @@ const InvoiceModal = ({ invoice, onClose }) => {
     window.onload = function() {
       const noPrintElements = document.querySelectorAll('.no-print');
       noPrintElements.forEach(el => el.remove());
-      
-      // Force logo positioning before print
-      const logoContainer = document.querySelector('.logo-container');
-      const companyDetails = document.querySelector('.company-details');
-      if (logoContainer && companyDetails) {
-        logoContainer.style.float = 'right';
-        logoContainer.style.textAlign = 'right';
-        companyDetails.style.float = 'left';
-        companyDetails.style.width = '65%';
-      }
       
       window.print();
       setTimeout(() => {
@@ -284,6 +288,7 @@ const InvoiceModal = ({ invoice, onClose }) => {
   const amounts = getPaymentAmounts();
   const amountInWords = convertAmountToWords(amounts.totalAmount);
   const projectCodes = getAllProjectCodes();
+  const invoiceNumber = getInvoiceNumberDisplay();
 
   return (
     <>
@@ -309,7 +314,7 @@ const InvoiceModal = ({ invoice, onClose }) => {
               <div className="text-left">
                 <div className="mb-1">
                   <p className="text-sm text-blue-800 font-bold">
-                    Invoice No. : {getInvoiceNumberDisplay()}
+                    Invoice No. : {invoiceNumber}
                   </p>
                 </div>
                 <p className="text-xs text-gray-800">
@@ -357,24 +362,32 @@ const InvoiceModal = ({ invoice, onClose }) => {
                 </div>
               </div>
 
+              {/* Party Details with QR Code - YEH SECTION FIX HAI */}
               <div className="bg-gray-50 p-3 rounded">
-                <h4 className="font-bold text-md mb-1">
-                  Party Name :{" "}
-                  {invoice.collegeName || "College Name Not Available"}
-                </h4>
-                <p className="text-md">
-                  <spam className="font-bold text-md ">
-                  Address : 
-                   </spam>
-                  {invoice.address || "College Address Not Available"}
-                  
-                </p>
-                <p className="text-xs mt-1">
-                  <strong>GSTIN :</strong>{" "}
-                  {invoice.gstNumber || "GSTIN Not Available"} |
-                  <strong> PLACE OF SUPPLY:</strong>{" "}
-                  {invoice.state || "State Not Available"}
-                </p>
+                <div className="flex justify-between items-start">
+                  {/* Party Details - Left Side */}
+                  <div className="flex-1">
+                    <h4 className="font-bold text-md mb-1">
+                      Party Name :{" "}
+                      {invoice.collegeName || "College Name Not Available"}
+                    </h4>
+                    <p className="text-md">
+                      <span className="font-bold text-md">Address : </span>
+                      {invoice.address || "College Address Not Available"}
+                    </p>
+                    <p className="text-xs mt-1">
+                      <strong>GSTIN :</strong>{" "}
+                      {invoice.gstNumber || "GSTIN Not Available"} |
+                      <strong> PLACE OF SUPPLY:</strong>{" "}
+                      {invoice.state || "State Not Available"}
+                    </p>
+                  </div>
+
+                  {/* QR Code - Right Side - YEH IMPORTANT HAI */}
+                  <div className="ml-4 flex-shrink-0">
+                    <QRCodeGenerator invoiceNumber={invoiceNumber} />
+                  </div>
+                </div>
               </div>
             </div>
 
