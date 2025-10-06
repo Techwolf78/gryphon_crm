@@ -19,6 +19,7 @@ import TrainerCalendarExcel from './TrainerCalendarExcel';
 import BookingDetail from './BookingDetail';
 import DeleteConfirmationModal from './TrainerAssignmentDelete';
 import { deleteTrainerAssignment } from './trainerAssignmentUtils';
+import { useAuth } from '../../../context/AuthContext';
 
 // TrainerCalendar
 // Purpose: dashboard to view trainer bookings (booked dates, details).
@@ -167,6 +168,17 @@ function TrainerCalendar({
   const [deleteConfirmation, setDeleteConfirmation] = useState(null); // { assignment, isOpen }
   // Persistence key
   const PERSIST_KEY = 'trainerCalendarPrefs_v1';
+  
+  // Authentication and authorization
+  const { user } = useAuth();
+  
+  // Check if user can delete assignments
+  // Allow delete for: L&D department, Admin department, or senior roles (Director/Head/Manager)
+  const canDeleteAssignments = user && (
+    user.department === 'L & D' || 
+    user.department === 'Admin' ||
+    ['Director', 'Head', 'Manager'].includes(user.role)
+  );
 
   // Load persisted preferences once
   useEffect(() => {
@@ -834,7 +846,7 @@ function TrainerCalendar({
                                     {b.trainerName || b.trainerId} • {b.collegeName || '—'} {b._conflict && <span className="ml-1 text-red-600 font-semibold">(Conflict)</span>}
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                                <div className="flex items-center gap-1 transition-opacity duration-200">
                                   <button 
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -845,16 +857,18 @@ function TrainerCalendar({
                                   >
                                     Info
                                   </button>
-                                  <button 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setDeleteConfirmation(b);
-                                    }} 
-                                    aria-label="Delete trainer assignment" 
-                                    className="p-2 rounded-md bg-red-600 text-white hover:bg-red-700 text-xs font-medium shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-                                  >
-                                    <FiTrash2 className="w-3 h-3" />
-                                  </button>
+                                  {canDeleteAssignments && (
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDeleteConfirmation(b);
+                                      }} 
+                                      aria-label="Delete trainer assignment" 
+                                      className="p-2 rounded-md bg-red-600 text-white hover:bg-red-700 text-xs font-medium shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                                    >
+                                      <FiTrash2 className="w-3 h-3" />
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -966,7 +980,7 @@ function TrainerCalendar({
                               {b.trainerName || b.trainerId} • {b.collegeName || '—'} {b._conflict && <span className="ml-1 text-red-600 font-semibold">(Conflict)</span>}
                             </div>
                           </div>
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                          <div className="flex items-center gap-1 transition-opacity duration-200">
                             <button 
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -977,16 +991,18 @@ function TrainerCalendar({
                             >
                               Info
                             </button>
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDeleteConfirmation(b);
-                              }} 
-                              aria-label="Delete trainer assignment" 
-                              className="p-2 rounded-md bg-red-600 text-white hover:bg-red-700 text-xs font-medium shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-                            >
-                              <FiTrash2 className="w-3 h-3" />
-                            </button>
+                            {canDeleteAssignments && (
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteConfirmation(b);
+                                }} 
+                                aria-label="Delete trainer assignment" 
+                                className="p-2 rounded-md bg-red-600 text-white hover:bg-red-700 text-xs font-medium shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                              >
+                                <FiTrash2 className="w-3 h-3" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>

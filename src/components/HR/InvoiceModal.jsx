@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react"; // ✅ useEffect import karo
 import gryphonLogo from "../../assets/gryphon_logo.png";
 import signature from "../../assets/sign.png";
-import QRCodeGenerator from "../../components/Learning/ContractInvoices/QRCodeGenerator";
+
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 
@@ -243,7 +243,7 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
     return "Rupees " + convert(num).trim() + " Only";
   };
 
-  // ✅ PDF Download Function - Fixed layout
+  // ✅ PDF Download Function - Print modal approach
   const downloadPDF = () => {
     const downloadBtn = document.querySelector("#download-btn");
     const originalText = downloadBtn.textContent;
@@ -297,11 +297,6 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
         right: 20px;
         text-align: center;
       }
-      .qr-code-print {
-        display: block !important;
-        width: 100px !important;
-        height: 100px !important;
-      }
     }
     
     body {
@@ -310,8 +305,8 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
       background: white;
     }
     .Detail {
-    flex-direction: col;
-    justify-content: center;
+      flex-direction: col;
+      justify-content: center;
     }
     /* Compact styles */
     .compact-table table {
@@ -342,13 +337,6 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
       content: "";
       clear: both;
       display: table;
-    }
-    
-    /* QR Code styles for print */
-    .qr-code-container {
-      display: flex !important;
-      flex-direction: column;
-      align-items: center;
     }
   </style>
 </head>
@@ -382,7 +370,6 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
   const amounts = getPaymentAmounts();
   const amountInWords = convertAmountToWords(amounts.totalAmount);
   const projectCodes = getAllProjectCodes();
-  const invoiceNumber = getInvoiceNumberDisplay();
 
   return (
     <>
@@ -487,11 +474,11 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
                 </div>
               </div>
 
-              {/* Party Details with QR Code - YEH SECTION FIX HAI */}
+              {/* Party Details */}
               <div className="bg-gray-50 p-3 rounded">
-                <div className="flex justify-between items-start">
-                  {/* Party Details - Left Side */}
-                  <div className="flex-1">
+                <div>
+                  {/* Party Details */}
+                  <div>
                     <h4 className="font-bold text-md mb-1">
                       Party Name :{" "}
                       {invoice.collegeName || "College Name Not Available"}
@@ -506,11 +493,6 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
                       <strong> PLACE OF SUPPLY:</strong>{" "}
                       {invoice.state || "State Not Available"}
                     </p>
-                  </div>
-
-                  {/* QR Code - Right Side - YEH IMPORTANT HAI */}
-                  <div className="ml-4 flex-shrink-0">
-                    <QRCodeGenerator invoiceNumber={invoiceNumber} />
                   </div>
                 </div>
               </div>

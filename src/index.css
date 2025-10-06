@@ -10,7 +10,7 @@
   }
 }
 
-/* Custom animations for the QR code feature */
+/* Custom animations */
 @keyframes fadeIn {
   from {
     opacity: 0;

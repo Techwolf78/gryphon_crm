@@ -147,7 +147,7 @@ const handleSubmit = async (e) => {
       setExistingInvoice({ id: docRef.id, ...invoiceToSave });
     }
 
-    onInvoiceGenerated();
+    await onInvoiceGenerated(); // Wait for data refresh to complete
     setEditMode(false);
     setViewMode(true);
     onClose();
