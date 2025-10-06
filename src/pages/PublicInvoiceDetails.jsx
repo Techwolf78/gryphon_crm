@@ -280,7 +280,7 @@ const PublicInvoiceDetails = () => {
             </svg>
           </div>
           <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-4">Invoice Verified Successfully</h2>
-          <p className="text-sm md:text-base text-gray-600 mb-2">You have scanned a QR code of verified invoice.</p>
+          <p className="text-sm md:text-base text-gray-600 mb-2">You are viewing a verified invoice.</p>
           <p className="text-sm md:text-base text-gray-600 mb-6">
             <strong>Invoice Number:</strong> {invoiceNumber}
           </p>
