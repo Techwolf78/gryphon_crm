@@ -214,7 +214,7 @@ function InitiationTrainingDetails({ training, onBack }) {
       
       setLoading(false);
     } catch (err) {
-      console.error("Error deleting batch:", err);
+
       setError("Failed to delete batch. Please try again.");
       setLoading(false);
     }
@@ -297,7 +297,7 @@ function InitiationTrainingDetails({ training, onBack }) {
         setLoading(false);
 
       } catch (err) {
-        console.error("Error fetching training data:", err);
+
         setError(err.message);
         setLoading(false);
       }
@@ -690,7 +690,7 @@ function InitiationTrainingDetails({ training, onBack }) {
                                                             current.setDate(current.getDate() + 1);
                                                           }
                                                         } catch (e) {
-                                                          console.error("Error generating dates:", e);
+
                                                           return (
                                                             <tr>
                                                               <td colSpan="6" className="px-0.5 py-0 text-center text-red-500">

@@ -199,7 +199,7 @@ const InitiationDashboardExportButton = ({ trainings }) => {
       ws['!tables'] = [{ name: 'TrainingsTable', ref: tableRef, headerRow: true }];
     } catch (e) {
       // Non-critical: if table creation fails, continue without blocking export
-      console.warn('Could not create table object for worksheet:', e);
+
     }
 
     // Create workbook
@@ -211,7 +211,7 @@ const InitiationDashboardExportButton = ({ trainings }) => {
       XLSX.writeFile(wb, `trainings_export_${new Date().toISOString().split('T')[0]}.xlsx`);
       setIsDropdownOpen(false);
     } catch (error) {
-      console.error('Export failed:', error);
+
       alert('Failed to export data. Please try again.');
     }
   };

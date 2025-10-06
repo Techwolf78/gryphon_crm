@@ -71,6 +71,23 @@ const courseYears = {
 const contactMethodOptions = ["Visit", "Call", "Other"];
 
 function EditDetailsModal({ show, onClose, lead, onSave }) {
+  // Helper for Indian number formatting
+  const formatIndianNumber = (num, decimals = 2) => {
+    if (num === 0 || num === "0" || !num) return "0.00";
+    const number = parseFloat(num);
+    if (isNaN(number)) return num;
+    
+    const [integerPart, decimalPart] = number.toFixed(decimals).split('.');
+    const lastThree = integerPart.substring(integerPart.length - 3);
+    const otherNumbers = integerPart.substring(0, integerPart.length - 3);
+    
+    let formattedInteger = lastThree;
+    if (otherNumbers !== '') {
+      formattedInteger = otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + "," + lastThree;
+    }
+    
+    return decimalPart ? `${formattedInteger}.${decimalPart}` : formattedInteger;
+  };
   const defaultLeadFields = useMemo(
     () => ({
       businessName: "",
@@ -808,8 +825,8 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
                         type="text"
                         value={
                           course.courseTCV
-                            ? course.courseTCV.toLocaleString()
-                            : "0"
+                            ? formatIndianNumber(course.courseTCV, 2)
+                            : "0.00"
                         }
                         readOnly
                         className="w-full px-3 py-2 border rounded-md bg-gray-50"

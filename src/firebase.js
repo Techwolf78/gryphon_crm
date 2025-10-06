@@ -35,12 +35,12 @@ export const setAuthPersistence = async (rememberMe) => {
       rememberMe ? browserLocalPersistence : browserSessionPersistence
     );
   } catch (error) {
-    console.error("Failed to set auth persistence:", error);
+
   }
 };
 
 // Default: session persistence
-setPersistence(auth, browserSessionPersistence).catch(console.error);
+setPersistence(auth, browserSessionPersistence).catch(() => {});
 
 // Firestore with built-in persistence (recommended way)
 const db = initializeFirestore(app, {
@@ -51,12 +51,8 @@ const db = initializeFirestore(app, {
 let secondaryApp;
 let secondaryAuth;
 
-try {
-  secondaryApp = initializeApp(firebaseConfig, "Secondary");
-  secondaryAuth = getAuth(secondaryApp);
-  setPersistence(secondaryAuth, browserSessionPersistence).catch(console.error);
-} catch (error) {
-  console.error("Secondary app initialization failed:", error);
-}
+secondaryApp = initializeApp(firebaseConfig, "Secondary");
+secondaryAuth = getAuth(secondaryApp);
+setPersistence(secondaryAuth, browserSessionPersistence).catch(() => {});
 
 export { app, auth, db, secondaryApp, secondaryAuth };

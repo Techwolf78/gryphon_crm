@@ -74,7 +74,7 @@ function AddTrainer({ onClose, onTrainerAdded }) {
         const nextId = `GA-T${(maxNumber + 1).toString().padStart(3, "0")}`;
         setTrainerData((prev) => ({ ...prev, trainerId: nextId }));
       } catch (err) {
-        console.error("Error generating ID:", err);
+
         setTrainerData((prev) => ({ ...prev, trainerId: "GA-T001" }));
       }
     };
@@ -128,7 +128,7 @@ function AddTrainer({ onClose, onTrainerAdded }) {
   onTrainerAdded({ id: trainerData.trainerId, ...trainerToSave });
       onClose();
     } catch (err) {
-      console.error("Error adding trainer:", err);
+
       setError(`Failed to add trainer: ${err.message}`);
     } finally {
       setLoading(false);
@@ -247,7 +247,7 @@ function AddTrainer({ onClose, onTrainerAdded }) {
           setImportProgress(0);
         }, 3000);
       } catch (error) {
-        console.error("Import error:", error);
+
         setError(`Import failed: ${error.message}`);
         setImportStatus("Import failed");
         setImportProgress(0);

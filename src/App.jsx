@@ -26,6 +26,7 @@ import HR from "./pages/HR";
 import CA from "./pages/CA";
 import NotFound from "./pages/NotFound"; // Import the new component
 import Roadmap from "./pages/Roadmap";
+import PublicInvoiceDetails from "./pages/PublicInvoiceDetails";
  
 const AppContent = () => {
   const location = useLocation();
@@ -37,6 +38,7 @@ const AppContent = () => {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/*" element={<PublicInvoiceDetails />} />
  
         <Route
           path="/dashboard"

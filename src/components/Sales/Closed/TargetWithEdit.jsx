@@ -175,7 +175,7 @@ if (viewMyLeadsOnly) {
       onUpdate();
       setIsEditing(false);
     } catch (err) {
-      console.error("Error updating target:", err);
+
       setError("Failed to update target. Please try again.");
     } finally {
       setIsUpdating(false);

@@ -47,7 +47,7 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
       }
       setStudentData(students);
     } catch (err) {
-      console.error("Error fetching student subcollection data:", err);
+
     } finally {
       setLoading(false);
     }
@@ -80,7 +80,7 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
       await saveToFirestore(updatedData);
       setEditRowIndex(null);
     } catch (error) {
-      console.error("Error saving changes:", error);
+
     } finally {
       setIsSaving(false);
     }
@@ -100,7 +100,7 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
 
       await Promise.all(batchUpdates);
     } catch (err) {
-      console.error("Failed to save student data:", err);
+
       throw err;
     }
   };

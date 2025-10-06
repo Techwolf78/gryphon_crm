@@ -49,7 +49,7 @@ const MOUUploadModal = ({ isOpen, onClose, leadData, onUploadSuccess }) => {
         created_at: result.created_at,
       };
     } catch (error) {
-      console.error("Cloudinary upload error:", error);
+
       throw new Error(`MOU upload failed: ${error.message}`);
     }
   };
@@ -188,7 +188,7 @@ const MOUUploadModal = ({ isOpen, onClose, leadData, onUploadSuccess }) => {
         onUploadSuccess();
       }
     } catch (error) {
-      console.error("MOU upload error:", error);
+
       setUploadError("Error uploading MOU document: " + error.message);
     } finally {
       setUploading(false);

@@ -92,7 +92,7 @@ const ClosedLeadsTable = ({
               return [id, lead];
             }
           } catch (error) {
-            console.error("Error fetching training form data:", error);
+
             return [id, lead];
           }
         })
@@ -209,7 +209,7 @@ const ClosedLeadsTable = ({
                 try {
                   const projectCode = lead.projectCode;
                   if (!projectCode) {
-                    console.error("No project code found for this lead");
+
                     return;
                   }
 
@@ -220,11 +220,11 @@ const ClosedLeadsTable = ({
                   if (docSnap.exists()) {
                     onViewDetails({ id: docSnap.id, ...docSnap.data() });
                   } else {
-                    console.error("No training form found for this lead");
+
                     onViewDetails(lead);
                   }
                 } catch (error) {
-                  console.error("Error fetching training form:", error);
+
                   onViewDetails(lead);
                 }
               }}
@@ -489,7 +489,7 @@ const ClosedLeadsTable = ({
                       try {
                         const projectCode = lead.projectCode;
                         if (!projectCode) {
-                          console.error("No project code found for this lead");
+
                           return;
                         }
 
@@ -500,11 +500,11 @@ const ClosedLeadsTable = ({
                         if (docSnap.exists()) {
                           onViewDetails({ id: docSnap.id, ...docSnap.data() });
                         } else {
-                          console.error("No training form found for this lead");
+
                           onViewDetails(lead);
                         }
                       } catch (error) {
-                        console.error("Error fetching training form:", error);
+
                         onViewDetails(lead);
                       }
                     }}

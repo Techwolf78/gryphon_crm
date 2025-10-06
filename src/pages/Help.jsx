@@ -136,7 +136,7 @@ const Help = () => {
           "Ticket submitted successfully! Our team will contact you soon."
         );
       } catch (emailError) {
-        console.error("Email sending failed:", emailError);
+
         let errorMessage = "Ticket submitted but email notification failed";
 
         if (emailError.status === 422) {
@@ -158,7 +158,7 @@ const Help = () => {
       setShowTicketForm(false);
       fetchTickets();
     } catch (error) {
-      console.error("Error submitting ticket:", error);
+
       toast.error("Failed to submit ticket. Please try again.");
     } finally {
       setIsSubmitting(false);
@@ -194,7 +194,7 @@ const Help = () => {
       }));
       setTickets(ticketsData);
     } catch (error) {
-      console.error("Error fetching tickets:", error);
+
       // Only show toast for actual errors, not empty collections
       if (error.code !== "permission-denied") {
         // You might want to handle permission errors differently
@@ -231,7 +231,7 @@ const Help = () => {
       setActiveTicket(null);
       setRemark("");
     } catch (error) {
-      console.error("Error updating ticket status:", error);
+
       toast.error("Failed to update ticket status");
     }
   };

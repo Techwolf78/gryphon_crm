@@ -116,7 +116,7 @@ const InvoiceExcelExporter = ({ db, filteredData, exporting, setExporting }) => 
             amount,
           ]);
         } catch (error) {
-          console.error("Error processing invoice:", error);
+
         }
       }
 
@@ -222,7 +222,7 @@ const InvoiceExcelExporter = ({ db, filteredData, exporting, setExporting }) => 
 
       XLSX.writeFile(wb, fileName);
     } catch (error) {
-      console.error("Error exporting to Excel:", error);
+
       alert("Failed to export data. Please try again.");
     } finally {
       setExporting(false);

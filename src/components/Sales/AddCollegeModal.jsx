@@ -336,7 +336,7 @@ if (isDuplicate) {
 }
 
 } catch (error) {
-  console.error("Error checking duplicate:", error);
+
   alert("Something went wrong while checking duplicate.");
   setLoading(false);
   return;
@@ -432,7 +432,7 @@ if (isDuplicate) {
       setLoading(false);
       handleClose();
     } catch (error) {
-      console.error("Error adding leads:", error);
+
       alert("Failed to add some leads. Please try again.");
       setLoading(false);
     }

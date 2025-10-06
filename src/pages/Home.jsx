@@ -2,7 +2,7 @@ import React, { useContext, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { motion } from "framer-motion";
-import bgImage from "../../public/home/bg.avif";
+const bgImage = '/home/bg.avif';
 import { FaArrowRight } from "react-icons/fa";
 import logo from "../../src/assets/SYNC-logo-2.png"; // Updated logo path
 import emgageLogo from "../../src/assets/emgage.png";

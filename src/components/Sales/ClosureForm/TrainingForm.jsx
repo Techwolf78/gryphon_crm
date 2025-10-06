@@ -321,7 +321,7 @@ const TrainingForm = ({
 
       await batch.commit();
     } catch (error) {
-      console.error("Error uploading students:", error);
+
       throw error;
     }
   };
@@ -350,7 +350,7 @@ const TrainingForm = ({
       const existingDoc = await getDoc(formRef);
       return existingDoc.exists();
     } catch (error) {
-      console.error("Error checking duplicate project code:", error);
+
       return false;
     }
   };
@@ -461,7 +461,7 @@ const TrainingForm = ({
               await setDoc(doc(db, "trainingForms", sanitizedProjectCode), formDocData);
               await setDoc(doc(db, "placementData", sanitizedProjectCode), formDocData);
             } catch (error) {
-              console.error("Error while saving to placementData: ", error);
+
             }
  
             // Upload students (if student list exists)
@@ -472,7 +472,7 @@ const TrainingForm = ({
             setHasUnsavedChanges(false);
             setTimeout(onClose, 1000);
         } catch (err) {
-            console.error("Error submitting form: ", err);
+
         } finally {
             setIsSubmitting(false);
         }

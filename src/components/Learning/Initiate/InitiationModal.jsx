@@ -792,7 +792,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
           // no assignments to write
         }
       } catch (assignmentErr) {
-        console.error("Error updating trainerAssignments:", assignmentErr);
         // don't block main save; surface a console warning
       }
       // --- end trainerAssignments update ---
@@ -816,7 +815,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
         if (onClose) onClose();
       }, 1500);
     } catch (err) {
-      console.error("Error saving phase data:", err);
       setError("Failed to save phase data. Please try again.");
       setLoading(false);
     }
@@ -1066,19 +1064,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
       const loadedDomains = [];
       const loadedTable1Data = {};
 
-      // helper to sum assigned hours in a saved row
-      const sumAssignedInRow = (row) => {
-        let sum = 0;
-        if (row.assignedHours) sum += Number(row.assignedHours || 0);
-        if (row.batches && row.batches.length > 0) {
-          row.batches.forEach((b) => {
-            sum += Number(b.assignedHours || 0);
-            // trainers' assignedHours are usually part of batch-level allocation, skip to avoid double-counting
-          });
-        }
-        return sum;
-      };
-
       // For each domain in the current phase, also load other phases to compute already-used hours
       domainsSnap.forEach((docSnap) => {
         loadedDomains.push(docSnap.id);
@@ -1112,50 +1097,15 @@ function InitiationModal({ training, onClose, onConfirm }) {
         );
         const currentData = currentDoc.exists() ? currentDoc.data() : null;
 
-        // compute used hours across other phases for each specialization
-        const usedBySpec = {}; // specialization -> usedHours
-        for (const phase of PHASE_OPTIONS) {
-          if (phase === currentPhase) continue; // we only want prior/other phases' usage
-          const otherDoc = await getDoc(
-            doc(
-              db,
-              "trainingForms",
-              training.id,
-              "trainings",
-              phase,
-              "domains",
-              domain
-            )
-          );
-          if (!otherDoc.exists()) continue;
-          const otherData = otherDoc.data();
-          const rows = otherData.table1Data || [];
-          rows.forEach((r) => {
-            const spec = r.batch || r.specialization || "";
-            const used = sumAssignedInRow(r);
-            usedBySpec[spec] = (usedBySpec[spec] || 0) + Number(used || 0);
-          });
-        }
-
         // Build the table data for this domain taking into account used hours
         const rowsForDomain = (currentData?.table1Data || []).map((row) => {
-          const spec = row.batch || row.specialization || "";
           const totalDomainHours = getDomainHours(domain) || 0; // domain-level total
-          const used = Number(usedBySpec[spec] || 0);
-          const remaining = Math.max(0, totalDomainHours - used);
-
-          // Adjust row.hrs and batches assignedHours to not exceed remaining
-          const adjustedBatches = (row.batches || []).map((b) => ({
-            ...b,
-            assignedHours: Math.min(Number(b.assignedHours || 0), remaining),
-          }));
 
           // Restore merge state from persisted data
           const restoredRow = {
             ...row,
-            hrs: remaining,
-            assignedHours: Math.min(Number(row.assignedHours || 0), remaining),
-            batches: adjustedBatches,
+            hrs: totalDomainHours,
+            batches: row.batches || [],
           };
 
           // Preserve merge metadata if it exists in the persisted data
@@ -1181,10 +1131,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
           loadedTable1Data[domain] = courses.map((course) => ({
             batch: course.specialization,
             stdCount: course.students,
-            hrs: Math.max(
-              0,
-              domainHours - (usedBySpec[course.specialization] || 0)
-            ),
+            hrs: domainHours,
             assignedHours: 0,
             batches: [
               {
@@ -1255,11 +1202,9 @@ function InitiationModal({ training, onClose, onConfirm }) {
           );
           if (!cancelled) setGlobalTrainerAssignments(filtered);
         } catch (err) {
-          console.error("Error processing trainerAssignments snapshot:", err);
         }
       },
       (err) => {
-        console.error("trainerAssignments onSnapshot error:", err);
       }
     );
 
@@ -1292,7 +1237,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
   const swapTrainers = (swapData) => {
 
     if (!swapData || !swapData.source || !swapData.target) {
-      console.error("❌ [INITIATION MODAL] Missing swap data:", { swapData });
       return;
     }
 
@@ -1302,10 +1246,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
     const currentDomain = domain || selectedDomains[0];
 
     if (!table1DataByDomain[currentDomain]) {
-      console.error(
-        "❌ [INITIATION MODAL] No table data found for domain:",
-        currentDomain
-      );
       return;
     }
 
@@ -1317,7 +1257,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
       !currentDomainData[source.rowIdx] ||
       !currentDomainData[source.rowIdx].batches[source.batchIdx]
     ) {
-      console.error("❌ [INITIATION MODAL] Invalid source batch path:", source);
       return;
     }
 
@@ -1325,7 +1264,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
       !currentDomainData[target.rowIdx] ||
       !currentDomainData[target.rowIdx].batches[target.batchIdx]
     ) {
-      console.error("❌ [INITIATION MODAL] Invalid target batch path:", target);
       return;
     }
 

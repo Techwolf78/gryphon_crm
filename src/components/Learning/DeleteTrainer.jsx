@@ -16,7 +16,7 @@ function DeleteTrainer({ trainerId, trainerName, onClose, onTrainerDeleted }) {
   onTrainerDeleted(trainerId);
       onClose();
     } catch (err) {
-      console.error("Error deleting trainer:", err);
+
       setError("Failed to delete trainer. Please try again.");
     } finally {
       setLoading(false);

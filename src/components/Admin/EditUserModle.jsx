@@ -10,7 +10,7 @@ const EditUser = ({ user, onCancel, onSuccess }) => {
     name: "",
     email: "",
     role: "",
-    department: "",
+    departments: [], // Changed from department to departments array
   });
  
   const [loading, setLoading] = useState(false);
@@ -22,7 +22,7 @@ const EditUser = ({ user, onCancel, onSuccess }) => {
         name: user.name || "",
         email: user.email || "",
         role: user.role || "",
-        department: user.department || "",
+        departments: Array.isArray(user.departments) ? user.departments : (user.department ? [user.department] : []), // Handle both old single department and new array format
       });
     }
   }, [user]);
@@ -43,14 +43,14 @@ const EditUser = ({ user, onCancel, onSuccess }) => {
         name: formData.name,
         email: formData.email,
         role: formData.role,
-        department: formData.department,
+        departments: formData.departments, // Changed from department to departments array
         updatedAt: new Date(),
       });
  
       onSuccess();
     } catch (err) {
       setError("Failed to update user: " + err.message);
-      console.error("Update error:", err);
+
     } finally {
       setLoading(false);
     }
@@ -126,22 +126,58 @@ const EditUser = ({ user, onCancel, onSuccess }) => {
  
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Department
+            Departments
           </label>
-          <select
-            name="department"
-            value={formData.department}
-            onChange={handleChange}
-            className="w-full p-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            required
-          >
-            <option value="">Select Department</option>
-            {departments.map((dept) => (
-              <option key={dept} value={dept}>
-                {dept}
-              </option>
-            ))}
-          </select>
+          <div className="border-2 border-gray-300 bg-white/60 backdrop-blur rounded-lg px-3 py-2.5 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 focus-within:border-indigo-400 transition-all">
+            <div className="flex flex-wrap gap-2 mb-2">
+              {formData.departments.map((dept, index) => (
+                <span
+                  key={`${dept}-${index}`}
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-800 text-xs rounded-full"
+                >
+                  {dept}
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({
+                      ...prev,
+                      departments: prev.departments.filter((_, i) => i !== index)
+                    }))}
+                    className="text-indigo-600 hover:text-indigo-800 ml-1"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {departments.filter(dept => !formData.departments.includes(dept)).map((dept) => (
+                <label key={dept} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                  <input
+                    type="checkbox"
+                    checked={formData.departments.includes(dept)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setFormData(prev => ({
+                          ...prev,
+                          departments: [...prev.departments, dept]
+                        }));
+                      } else {
+                        setFormData(prev => ({
+                          ...prev,
+                          departments: prev.departments.filter(d => d !== dept)
+                        }));
+                      }
+                    }}
+                    className="w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500 focus:ring-2"
+                  />
+                  <span className="text-sm text-gray-700">{dept}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          {formData.departments.length === 0 && (
+            <p className="text-xs text-red-600 mt-1">Please select at least one department</p>
+          )}
         </div>
  
         <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">

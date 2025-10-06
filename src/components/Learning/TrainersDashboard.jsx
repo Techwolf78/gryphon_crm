@@ -63,7 +63,7 @@ function TrainersDashboard() {
         const all = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
         setTrainers(all);
       } catch (err) {
-        console.error("Fetch trainers failed:", err);
+
         setError("Failed to fetch trainers. Try again.");
       } finally {
         setInitialLoading(false);
@@ -98,16 +98,16 @@ function TrainersDashboard() {
 
   useEffect(() => {
     if (isPrivileged) {
-      console.log('Fetching requests for privileged user');
+
       const fetchRequests = async () => {
         try {
           const q = query(collection(db, "trainer_delete_requests"), where("status", "==", "pending"));
           const snapshot = await getDocs(q);
           const reqs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-          console.log('Fetched requests:', reqs);
+
           setDeleteRequests(reqs);
         } catch (err) {
-          console.error("Failed to fetch requests:", err);
+
         }
       };
       fetchRequests();
@@ -489,7 +489,7 @@ function TrainersDashboard() {
                   ref={buttonRef}
                   id="notifications-button"
                   onClick={() => {
-                    console.log('Notifications clicked');
+
                     setShowNotifications(!showNotifications);
                   }}
                   className="relative bg-blue-200 hover:bg-blue-300 text-gray-800 p-2 rounded-lg transition-colors duration-150 focus:outline-none"
@@ -510,7 +510,7 @@ function TrainersDashboard() {
                     role="menu"
                     aria-labelledby="notifications-button"
                   >
-                    {console.log('Rendering dropdown, requests:', deleteRequests)}
+
                     <div className="relative">
                       {/* Arrow pointer */}
                       <div className="absolute -top-2 right-6 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-white shadow-sm"></div>
@@ -672,11 +672,11 @@ function TrainersDashboard() {
                           className="text-red-600 hover:text-red-900 text-sm p-1"
                           onClick={() => {
                             if (isPrivileged) {
-                              console.log('Privileged delete for', trainer.name);
+
                               setTrainerToDelete(trainer);
                               setShowDeleteTrainer(true);
                             } else {
-                              console.log('Send request for', trainer.name);
+
                               setTrainerToDelete(trainer);
                               setShowSendRequest(true);
                             }

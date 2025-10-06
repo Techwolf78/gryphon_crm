@@ -50,20 +50,7 @@ const FollowUp = ({ lead, onClose }) => {
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const graphScopes = ["User.Read", "Calendars.ReadWrite"];
 
-  // Environment-based logging
-  // const logInfo = (message, data = null) => {
-  //   if (!import.meta.env.PROD) {
-  //     console.log(message, data);
-  //   }
-  // };
 
-  // const logError = (message, error = null) => {
-  //   console.error(message, error);
-  //   // In production, you might want to send this to error tracking service
-  //   if (import.meta.env.PROD && error) {
-  //     // Example: Sentry.captureException(error);
-  //   }
-  // };
 
   // Replace all logInfo and logError calls with no-ops
   const logInfo = () => {};

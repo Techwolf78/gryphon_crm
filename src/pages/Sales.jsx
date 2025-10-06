@@ -194,6 +194,154 @@ function Sales() {
 
   const phaseCounts = useMemo(() => computePhaseCounts(), [computePhaseCounts]);
 
+  const userData = Object.values(users).find((u) => u.uid === currentUser?.uid);
+
+  const allVisibleLeads = useMemo(() => {
+    return Object.entries(leads).filter(([, lead]) => {
+      const user = Object.values(users).find((u) => u.uid === currentUser?.uid);
+      if (!user) return false;
+
+      const matchesFilters =
+        (!filters.city || lead.city?.includes(filters.city)) &&
+        (!filters.assignedTo || lead.assignedTo?.uid === filters.assignedTo) &&
+        (!filters.dateRange?.start ||
+          lead.createdAt >= new Date(filters.dateRange.start).getTime()) &&
+        (!filters.dateRange?.end ||
+          lead.createdAt <= new Date(filters.dateRange.end).getTime()) &&
+        (!filters.pocName ||
+          lead.pocName
+            ?.toLowerCase()
+            .includes(filters.pocName.toLowerCase())) &&
+        (!filters.phoneNo || lead.phoneNo?.includes(filters.phoneNo)) &&
+        (!filters.email ||
+          lead.email?.toLowerCase().includes(filters.email.toLowerCase())) &&
+        (!filters.contactMethod ||
+          lead.contactMethod?.toLowerCase() ===
+            filters.contactMethod.toLowerCase());
+      const isSalesDept = user.department === "Sales";
+      const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
+
+      if (user.role === "Director") {
+        if (viewMyLeadsOnly) {
+          return (
+            matchesFilters &&
+            lead.assignedTo?.uid === currentUser?.uid
+          );
+        } else {
+          return matchesFilters;
+        }
+      }
+
+      if (isSalesDept && isHigherRole) {
+        if (viewMyLeadsOnly) {
+          return (
+            matchesFilters &&
+            lead.assignedTo?.uid === currentUser?.uid
+          );
+        } else {
+          if (user.role === "Manager") {
+            const subordinates = Object.values(users).filter(
+              (u) =>
+                u.reportingManager === user.name &&
+                ["Assistant Manager", "Executive"].includes(u.role)
+            );
+            const teamUids = subordinates.map((u) => u.uid);
+            return (
+              matchesFilters &&
+              teamUids.includes(lead.assignedTo?.uid)
+            );
+          }
+
+          if (user.role === "Head") {
+            const leadUser = Object.values(users).find(
+              (u) => u.uid === lead.assignedTo?.uid
+            );
+            if (!leadUser) return false;
+
+            if (leadUser.role === "Manager")
+              return matchesFilters;
+
+            if (
+              ["Assistant Manager", "Executive"].includes(leadUser.role) &&
+              leadUser.reportingManager &&
+              Object.values(users).some(
+                (mgr) =>
+                  mgr.role === "Manager" &&
+                  mgr.name === leadUser.reportingManager
+              )
+            ) {
+              return matchesFilters;
+            }
+          }
+
+          return matchesFilters;
+        }
+      }
+
+      if (
+        isSalesDept &&
+        ["Assistant Manager", "Executive"].includes(user.role)
+      ) {
+        return (
+          matchesFilters &&
+          lead.assignedTo?.uid === currentUser?.uid
+        );
+      }
+
+      return false;
+    });
+  }, [leads, users, currentUser, viewMyLeadsOnly, filters]);
+
+  const totalTCV = useMemo(() => {
+    const sum = allVisibleLeads.reduce((sum, [, lead]) => sum + (lead.tcv || 0), 0);
+    console.log('Total TCV calculated:', sum);
+    return sum;
+  }, [allVisibleLeads]);
+
+  const hotTCV = useMemo(() => {
+    const hotLeads = allVisibleLeads.filter(([, lead]) => (lead.phase || "hot") === "hot");
+    const sum = hotLeads.reduce((sum, [, lead]) => sum + (lead.tcv || 0), 0);
+    return sum;
+  }, [allVisibleLeads]);
+
+  const warmTCV = useMemo(() => {
+    const warmLeads = allVisibleLeads.filter(([, lead]) => lead.phase === "warm");
+    const sum = warmLeads.reduce((sum, [, lead]) => sum + (lead.tcv || 0), 0);
+    return sum;
+  }, [allVisibleLeads]);
+
+  const coldTCV = useMemo(() => {
+    const coldLeads = allVisibleLeads.filter(([, lead]) => lead.phase === "cold");
+    const sum = coldLeads.reduce((sum, [, lead]) => sum + (lead.tcv || 0), 0);
+    return sum;
+  }, [allVisibleLeads]);
+
+  const formatCurrency = (amount) => {
+    const numAmount = Number(amount);
+    console.log('Formatting currency for amount:', amount, 'numAmount:', numAmount);
+    if (numAmount > 10000000) {
+      const crores = numAmount / 10000000;
+      let str = crores.toFixed(4);
+      str = str.replace(/\.?0+$/, '');
+      console.log('Formatted as crores:', str);
+      return `₹${str} cr`;
+    } else {
+      const formatted = `₹${numAmount.toLocaleString('en-IN')}`;
+      console.log('Formatted normally:', formatted);
+      return formatted;
+    }
+  };
+
+  useEffect(() => {
+    console.log('Current user dept:', userData?.department, 'role:', userData?.role);
+    if (userData?.department === "Admin" && userData?.role === "Director") {
+      console.log('Displaying TCV for Admin Director:', totalTCV, formatCurrency(totalTCV));
+    }
+  }, [userData, totalTCV]);
+
+  const showTCV = userData?.department === "Admin" && userData?.role === "Director";
+  console.log('TCV shown:', showTCV);
+
   const filteredLeads = useMemo(() => {
     return Object.entries(leads).filter(([, lead]) => {
       const phaseMatch = (lead.phase || "hot") === activeTab;
@@ -515,7 +663,7 @@ function Sales() {
       <div className="flex gap-2">
         <button
           onClick={() => setViewMyLeadsOnly(true)}
-          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${
+          className={`text-[10px] font-medium px-2 py-0.5 rounded-full border transition ${
             viewMyLeadsOnly
               ? "bg-blue-600 text-white border-blue-600 shadow-md"
               : "bg-white text-blue-600 border-blue-300 hover:bg-blue-50"
@@ -526,7 +674,7 @@ function Sales() {
         </button>
         <button
           onClick={() => setViewMyLeadsOnly(false)}
-          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${
+          className={`text-[10px] font-medium px-2 py-0.5 rounded-full border transition ${
             !viewMyLeadsOnly
               ? "bg-blue-600 text-white border-blue-600 shadow-md"
               : "bg-white text-blue-600 border-blue-300 hover:bg-blue-50"
@@ -545,7 +693,7 @@ function Sales() {
         {/* Sticky Header Section */}
         <div className="sticky top-0 z-20 bg-gradient-to-br from-gray-50 to-gray-100 pb-2 border-b border-gray-200">
           {/* Dashboard Title and Description */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4" data-tour="sales-header">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-2 " data-tour="sales-header">
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
                 Sales Dashboard
@@ -578,7 +726,7 @@ function Sales() {
 
           {/* View Mode and Filters */}
           <div className="flex items-center justify-between mb-2">
-            <div data-tour="view-mode-toggle">
+            <div data-tour="view-mode-toggle" className="flex items-center gap-2">
               {currentUser &&
                 (() => {
                   const role = Object.values(users).find(
@@ -593,13 +741,12 @@ function Sales() {
                   ) : (
                     <div className="flex items-center gap-2">
                       <p
-                        className={`text-xs font-medium px-3 py-1 rounded-full ${
+                        className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
                           isHigherRole
                             ? "bg-green-100 text-green-700"
                             : "bg-blue-100 text-blue-700"
                         }`}
                       >
-                        Viewing:{" "}
                         {isHigherRole
                           ? viewMyLeadsOnly
                             ? "My Leads Only"
@@ -612,19 +759,34 @@ function Sales() {
                 })()}
             </div>
 
-            <div data-tour="lead-filters">
-              <LeadFilters
-                filteredLeads={filteredLeads}
-                handleImportComplete={handleImportComplete}
-                filters={rawFilters}
-                setFilters={setRawFilters}
-                isFilterOpen={isFilterOpen}
-                setIsFilterOpen={setIsFilterOpen}
-                users={users}
-                leads={leads}
-                activeTab={activeTab}
-              />
-            </div>
+            {showTCV && (
+              <div className="flex gap-2 flex-wrap">
+                <div className="text-xs font-medium text-red-700 bg-red-50 px-2 py-1 rounded-lg border border-red-200">
+                  Hot TCV: {formatCurrency(hotTCV)}
+                </div>
+                <div className="text-xs font-medium text-amber-700 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200">
+                  Warm TCV: {formatCurrency(warmTCV)}
+                </div>
+                <div className="text-xs font-medium text-cyan-700 bg-cyan-50 px-2 py-1 rounded-lg border border-cyan-200">
+                  Cold TCV: {formatCurrency(coldTCV)}
+                </div>
+                <div className="text-xs font-medium text-gray-700 bg-white px-2 py-1 rounded-lg border border-gray-200">
+                  Total TCV: {formatCurrency(totalTCV)}
+                </div>
+              </div>
+            )}
+
+            <LeadFilters
+              filteredLeads={filteredLeads}
+              handleImportComplete={handleImportComplete}
+              filters={rawFilters}
+              setFilters={setRawFilters}
+              isFilterOpen={isFilterOpen}
+              setIsFilterOpen={setIsFilterOpen}
+              users={users}
+              leads={leads}
+              activeTab={activeTab}
+            />
           </div>
 
           {/* Phase Tabs */}

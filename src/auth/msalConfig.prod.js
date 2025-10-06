@@ -17,7 +17,7 @@ export const msalConfig = {
         if (containsPii) return;
         // Only log errors in production
         if (level === LogLevel.Error) {
-          console.error(message);
+
         }
       }
     }

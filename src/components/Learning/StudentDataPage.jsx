@@ -78,7 +78,7 @@ function StudentDataPage({ trainingId, onBack }) {
       setHeaders(expectedHeaders);
 
     } catch (err) {
-      console.error("Fetch error:", err);
+
       setError(`Failed to load data: ${err.message}`);
     } finally {
       setLoading(false);
@@ -333,7 +333,7 @@ function StudentDataPage({ trainingId, onBack }) {
           fetchStudentData(); // Refresh the displayed data
         }
       } catch (err) {
-        console.error("Import failed:", err);
+
         setError(`Import error: ${err.message}`);
       } finally {
         setLoading(false);

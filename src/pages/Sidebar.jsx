@@ -87,12 +87,36 @@ const Sidebar = ({ collapsed, onToggle }) => {
  
   if (!user) return null;
  
-  const normalizedRole = normalizeRole(user.department) || normalizeRole(user.role);
+  // Get all departments for the user (handle both single department and array format)
+  const userDepartments = Array.isArray(user.departments) ? user.departments : (user.department ? [user.department] : []);
+  const normalizedRole = normalizeRole(user.role);
+  const isAdmin = normalizedRole === "admin";
+ 
+  // If admin, show all links. Otherwise, show links for each department the user belongs to
+  let departmentLinks = [];
+  if (isAdmin) {
+    departmentLinks = roleLinks.admin;
+  } else {
+    // Collect unique links for all user's departments
+    const uniqueLinks = new Map();
+    userDepartments.forEach(dept => {
+      const deptRole = normalizeRole(dept);
+      if (roleLinks[deptRole]) {
+        roleLinks[deptRole].forEach(link => {
+          if (!uniqueLinks.has(link.path)) {
+            uniqueLinks.set(link.path, link);
+          }
+        });
+      }
+    });
+    departmentLinks = Array.from(uniqueLinks.values());
+  }
+ 
   const isActive = (path) => path === "/dashboard" ? location.pathname === "/dashboard" : location.pathname.startsWith(path);
  
   const links = [
     { label: "Dashboard", path: "/dashboard", icon: <FiHome />, skipRedirect: true },
-    ...(roleLinks[normalizedRole] || []),
+    ...departmentLinks,
     { label: "Help", path: "/dashboard/help", icon: <FiHelpCircle />, skipRedirect: true },
   ];
  

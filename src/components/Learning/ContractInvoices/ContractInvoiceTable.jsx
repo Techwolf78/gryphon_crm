@@ -54,7 +54,7 @@ export default function ContractInvoiceTable() {
       try {
         setLoading(true);
         setError(null);
-        console.log("Fetching contract invoices...");
+
 
         // 1️⃣ Fetch training forms
         const trainingFormsSnapshot = await getDocs(
@@ -95,7 +95,7 @@ export default function ContractInvoiceTable() {
 
         setInvoices(trainingFormsData);
       } catch (err) {
-        console.error("Error fetching data:", err);
+
         setError("Failed to load data. Please try again.");
       } finally {
         setLoading(false);
@@ -229,10 +229,8 @@ export default function ContractInvoiceTable() {
         ...proformaSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
       ];
 
-      console.log(
-        `Total ALL invoices found for FY ${financialYear.year}:`,
-        allInvoices.length
-      );
+
+
 
       // Filter sirf CURRENT financial year ke invoices
       const currentFYInvoices = allInvoices.filter((inv) => {
@@ -240,7 +238,7 @@ export default function ContractInvoiceTable() {
         return inv.invoiceNumber.includes(financialYear.year);
       });
 
-      console.log(`Current FY invoices:`, currentFYInvoices.length);
+
 
       // Extract sequential numbers from ALL invoice types
       const invoiceNumbers = currentFYInvoices
@@ -260,25 +258,22 @@ export default function ContractInvoiceTable() {
         })
         .filter((num) => num > 0);
 
-      console.log("Extracted ALL invoice numbers:", invoiceNumbers);
+
 
       let nextInvoiceNumber = 1;
 
       if (invoiceNumbers.length > 0) {
         const maxInvoiceNumber = Math.max(...invoiceNumbers);
         nextInvoiceNumber = maxInvoiceNumber + 1;
-        console.log(
-          `Max invoice number found: ${maxInvoiceNumber}, next: ${nextInvoiceNumber}`
-        );
       } else {
-        console.log("No invoices found, starting from 1");
+
       }
 
       // YEH LINE CHANGE KARDI - 3 digit ki jagah 2 digit
       const invoiceNumber = nextInvoiceNumber.toString().padStart(2, "0");
       const finalInvoiceNumber = `GAPL/${financialYear.year}/${prefix}/${invoiceNumber}`;
 
-      console.log("Final invoice number:", finalInvoiceNumber);
+
       return finalInvoiceNumber;
     } catch (error) {
       const fallbackNumber = `GAPL/${financialYear.year}/${prefix}/01`;
@@ -354,7 +349,7 @@ export default function ContractInvoiceTable() {
   };
 
 const handleConvertToTax = async (invoice) => {
-  console.log("Converting invoice:", invoice);
+
 
   if (!invoice.id) {
     alert("Error: Invoice ID not found. Cannot convert to tax invoice.");
@@ -395,7 +390,7 @@ const handleConvertToTax = async (invoice) => {
     
     // DIRECTLY Tax Invoice add karo ContractInvoices mein
     const docRef = await addDoc(collection(db, "ContractInvoices"), taxDataWithoutId);
-    console.log("Tax Invoice created directly from Proforma");
+
 
     // Purane Proforma ko mark karo as converted
     await updateDoc(doc(db, "ProformaInvoices", invoice.id), {
@@ -434,7 +429,7 @@ const handleConvertToTax = async (invoice) => {
     setEditInvoice(null);
 
   } catch (error) {
-    console.error("Error converting to tax invoice:", error);
+
     alert("Failed to convert to tax invoice. Please try again.");
   }
 };
@@ -460,7 +455,7 @@ const handleConvertToTax = async (invoice) => {
 
       alert("Invoice generation undone successfully!");
     } catch (error) {
-      console.error("Error deleting invoice:", error);
+
       alert("Error undoing invoice generation: " + error.message);
     }
   };
@@ -716,7 +711,7 @@ const handleSubmit = async (
     setSelectedInstallment(null);
     setEditInvoice(null);
   } catch (err) {
-    console.error("Error processing invoice:", err);
+
     alert(
       `Failed to ${isEdit ? "convert" : "raise"} invoice. Error: ${
         err.message
@@ -738,7 +733,7 @@ const handleSubmit = async (
 
       alert("Invoice registered successfully!");
     } catch (err) {
-      console.error("Error registering invoice:", err);
+
       alert("Failed to register invoice");
     }
   };
@@ -1088,7 +1083,7 @@ const handleSubmit = async (
       setSelectedContractsForMerge([]);
       setSelectedInstallmentForMerge(null);
     } catch (err) {
-      console.error("Error creating merged invoice:", err);
+
       alert(`Failed to create merged invoice. Error: ${err.message}`);
     }
   };
@@ -2044,7 +2039,6 @@ const handleSubmit = async (
           onSubmit={handleMergeSubmit}
         />
 
-       // InvoiceModal call karte time onInvoiceUpdate prop pass karo
 {selectedInvoice && (
   <InvoiceModal
     invoice={selectedInvoice}

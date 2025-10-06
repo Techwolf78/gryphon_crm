@@ -80,7 +80,7 @@ const AdminTour = ({ userId }) => {
 
       return false;
     } catch (error) {
-      console.error('Error checking tour status:', error);
+
       return false;
     }
   }, [userId]);
@@ -102,7 +102,7 @@ const AdminTour = ({ userId }) => {
         lastUpdated: new Date(),
       });
     } catch (error) {
-      console.error('Error setting tour status:', error);
+
     }
   };
 

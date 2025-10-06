@@ -76,6 +76,24 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
 // Helper for number display
 const numValue = (val) => (val === 0 || val === "0" ? "" : val);
 
+// Helper for Indian number formatting
+const formatIndianNumber = (num, decimals = 2) => {
+  if (num === 0 || num === "0" || !num) return "0.00";
+  const number = parseFloat(num);
+  if (isNaN(number)) return num;
+  
+  const [integerPart, decimalPart] = number.toFixed(decimals).split('.');
+  const lastThree = integerPart.substring(integerPart.length - 3);
+  const otherNumbers = integerPart.substring(0, integerPart.length - 3);
+  
+  let formattedInteger = lastThree;
+  if (otherNumbers !== '') {
+    formattedInteger = otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + "," + lastThree;
+  }
+  
+  return decimalPart ? `${formattedInteger}.${decimalPart}` : formattedInteger;
+};
+
   const courseSpecializations = useMemo(() => ({
     Engineering: [
       "CS",
@@ -482,7 +500,7 @@ const numValue = (val) => (val === 0 || val === "0" ? "" : val);
       onSave();
       onClose();
     } catch (err) {
-      console.error("Error updating documents:", err);
+
       setError(err.message || "Failed to update lead. Please check your connection and try again.");
     } finally {
       setLoading(false);
@@ -773,8 +791,8 @@ const handleChange = (e) => {
                     </label>
                     <div className="relative">
                       <input
-                        type="number"
-                        value={numValue(formData.studentCount)}
+                        type="text"
+                        value={formatIndianNumber(formData.studentCount, 0)}
                         className="block w-full pl-10 pr-3 py-2 border border-blue-300 rounded-lg shadow-sm bg-blue-100"
                         readOnly
                       />
@@ -899,77 +917,96 @@ const handleChange = (e) => {
                     </p>
                   </div>
 
-                  {/* GST Amount (auto-calculated) */}
-                  <div className="bg-red-50 p-4 rounded-lg">
-                    <label className="block text-sm font-medium text-red-700 mb-1">
-                      GST Amount (18%)
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        value={
-                          (parseFloat(formData.gstAmount) || 0).toFixed(2)
-                        }
-                        readOnly
-                        className="block w-full pl-10 pr-3 py-2 border border-red-300 rounded-lg shadow-sm bg-red-100"
-                      />
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <FiDollarSign className="h-5 w-5 text-red-400" />
-                      </div>
-                    </div>
-                    <p className="text-xs text-red-600 mt-1">
-                      Stored in gstAmount
-                    </p>
-                  </div>
+                  <div className="md:col-span-3">
+                    <div className="flex items-center gap-4">
+                      {/* Base Amount and GST Amount Group */}
+                      <div className="border border-gray-300 rounded-lg p-4 flex-1">
+                        <div className="flex items-center gap-2">
+                          {/* Base Amount (excl. GST) */}
+                          <div className="bg-orange-50 p-4 rounded-lg flex-1">
+                            <label className="block text-sm font-medium text-orange-700 mb-1">
+                              Base Amount (excl. GST)
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                value={
+                                  formatIndianNumber(formData.totalCost, 2)
+                                }
+                                readOnly
+                                className="block w-full pl-10 pr-3 py-2 border border-orange-300 rounded-lg shadow-sm bg-orange-100"
+                              />
+                              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <FiDollarSign className="h-5 w-5 text-orange-400" />
+                              </div>
+                            </div>
+                            <p className="text-xs text-orange-600 mt-1">
+                              Stored in totalCost
+                            </p>
+                          </div>
 
-                  {/* Base Amount (auto-calculated) */}
-                  <div className="bg-orange-50 p-4 rounded-lg">
-                    <label className="block text-sm font-medium text-orange-700 mb-1">
-                      Base Amount (excl. GST)
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        value={
-                          (parseFloat(formData.totalCost) || 0).toFixed(2)
-                        }
-                        readOnly
-                        className="block w-full pl-10 pr-3 py-2 border border-orange-300 rounded-lg shadow-sm bg-orange-100"
-                      />
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <FiDollarSign className="h-5 w-5 text-orange-400" />
-                      </div>
-                    </div>
-                    <p className="text-xs text-orange-600 mt-1">
-                      Stored in totalCost
-                    </p>
-                  </div>
+                          {/* Plus Icon */}
+                          <div className="flex items-center justify-center px-1">
+                            <FiPlus className="h-4 w-4 text-gray-500" />
+                          </div>
 
-                  {/* Total Amount (auto-calculated) */}
-                  <div className="bg-green-50 p-4 rounded-lg">
-                    <label className="block text-sm font-medium text-green-700 mb-1">
-                      Total Amount (
-                      {formData.gstType === "include"
-                        ? "incl. GST"
-                        : "excl. GST"}
-                      )
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        value={
-                          (parseFloat(formData.netPayableAmount) || 0).toFixed(2)
-                        }
-                        readOnly
-                        className="block w-full pl-10 pr-3 py-2 border border-green-300 rounded-lg shadow-sm bg-green-100"
-                      />
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <FiDollarSign className="h-5 w-5 text-green-400" />
+                          {/* GST Amount (18%) */}
+                          <div className="bg-red-50 p-4 rounded-lg flex-1">
+                            <label className="block text-sm font-medium text-red-700 mb-1">
+                              GST Amount (18%)
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                value={
+                                  formatIndianNumber(formData.gstAmount, 2)
+                                }
+                                readOnly
+                                className="block w-full pl-10 pr-3 py-2 border border-red-300 rounded-lg shadow-sm bg-red-100"
+                              />
+                              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <FiDollarSign className="h-5 w-5 text-red-400" />
+                              </div>
+                            </div>
+                            <p className="text-xs text-red-600 mt-1">
+                              Stored in gstAmount
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Equals Icon */}
+                      <div className="flex items-center justify-center px-1">
+                        <span className="text-2xl font-bold text-gray-500">=</span>
+                      </div>
+
+                      {/* Total Amount (auto-calculated) */}
+                      <div className="bg-green-50 p-4 rounded-lg">
+                        <label className="block text-sm font-medium text-green-700 mb-1">
+                          Total Amount (
+                          {formData.gstType === "include"
+                            ? "incl. GST"
+                            : "excl. GST"}
+                          )
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={
+                              formatIndianNumber(formData.netPayableAmount, 2)
+                            }
+                            readOnly
+                            className="block w-full pl-10 pr-3 py-2 border border-green-300 rounded-lg shadow-sm bg-green-100"
+                          />
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <FiDollarSign className="h-5 w-5 text-green-400" />
+                          </div>
+                        </div>
+                        <p className="text-xs text-green-600 mt-1">
+                          Stored in netPayableAmount
+                        </p>
                       </div>
                     </div>
-                    <p className="text-xs text-green-600 mt-1">
-                      Stored in netPayableAmount
-                    </p>
                   </div>
                 </div>
 
@@ -1226,15 +1263,13 @@ const handleChange = (e) => {
                               </label>
                               <input
                                 type="text"
-                                value={`₹${totalAmount.toFixed(2)}`}
+                                value={`₹${formatIndianNumber(totalAmount, 2)}`}
                                 readOnly
                                 className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100"
                               />
                               <p className="text-xs text-gray-500 mt-1">
                                 {formData.gstType === "include"
-                                  ? `(Base: ₹${baseAmount.toFixed(
-                                      2
-                                    )} + GST: ₹${gstAmount.toFixed(2)})`
+                                  ? `(Base: ₹${formatIndianNumber(baseAmount, 2)} + GST: ₹${formatIndianNumber(gstAmount, 2)})`
                                   : "No GST applied"}
                               </p>
                             </div>
@@ -1539,8 +1574,8 @@ const handleChange = (e) => {
                     </label>
                     <div className="relative">
                       <input
-                        type="number"
-                        value={numValue(formData.studentCount)}
+                        type="text"
+                        value={formatIndianNumber(formData.studentCount, 0)}
                         className="block w-full pl-10 pr-3 py-2 border border-blue-300 rounded-lg shadow-sm bg-blue-100 focus:ring-blue-500 focus:border-blue-500"
                         readOnly
                       />

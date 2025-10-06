@@ -38,7 +38,7 @@ function TrainerRow({
         const q = query(
           collection(db, "invoices"),
           where("trainerId", "==", item.trainerId),
-          where("businessName", "==", item.businessName),
+          where("collegeName", "==", item.collegeName),
           where("phase", "==", item.phase)
         );
 
@@ -52,7 +52,7 @@ function TrainerRow({
           });
         }
       } catch (error) {
-        console.error("Error fetching invoice data:", error);
+
       } finally {
         setLoading(false);
       }
@@ -77,7 +77,7 @@ function TrainerRow({
         query(
           collection(db, "invoices"),
           where("trainerId", "==", item.trainerId),
-          where("businessName", "==", item.businessName),
+          where("collegeName", "==", item.collegeName),
           where("phase", "==", item.phase)
         )
       );
@@ -90,7 +90,7 @@ function TrainerRow({
         });
       }
     } catch (error) {
-      console.error("Error updating invoice status:", error);
+
       alert("Failed to update invoice status. Please try again.");
     } finally {
       setUpdatingStatus(false);
@@ -148,7 +148,7 @@ function TrainerRow({
       </td>
       <td className="px-2 sm:px-4 py-2">
         <div className="text-sm text-gray-900 font-medium max-w-xs truncate">
-          {item.businessName}
+          {item.collegeName || item.businessName.split('/')[0].trim() || item.businessName}
         </div>
         <div className="text-sm text-gray-500">
           {item.allProjects.join(", ")}
@@ -256,7 +256,7 @@ function TrainerRow({
                 )}
               </div>
 
-              {getDownloadStatus(item.trainerId, item.businessName, item.phase, item.projectCode)}
+              {getDownloadStatus(item)}
             </>
           ) : invoiceAvailable ? (
             <button

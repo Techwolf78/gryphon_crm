@@ -92,7 +92,7 @@ function CompanyLeads() {
         }));
         setLeads(leadsData);
       } catch (error) {
-        console.error("Error fetching leads: ", error);
+
       } finally {
         setLoading(false);
       }
@@ -153,7 +153,7 @@ function CompanyLeads() {
       ));
       setShowActionMenu(null);
     } catch (error) {
-      console.error("Error updating status:", error);
+
     }
   };
 
@@ -198,7 +198,7 @@ function CompanyLeads() {
       setShowAddContactForm(false);
 
     } catch (error) {
-      console.error("Error adding contact:", error);
+
     }
   };
 

@@ -44,7 +44,7 @@ function JDMergeModal({ onClose, onProceed }) {
 
         setAvailableColleges(uniqueColleges);
       } catch (err) {
-        console.error("Error fetching colleges:", err);
+
         setError("Failed to load available colleges");
       } finally {
         setLoading(false);

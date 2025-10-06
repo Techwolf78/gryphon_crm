@@ -86,7 +86,7 @@ const Navbar = ({ onImageClick = () => {} }) => {
             }
           });
         } catch (error) {
-          console.error("Error setting up profile picture listeners:", error);
+
           toast.error("Failed to load profile picture");
         } finally {
           setLoadingProfilePic(false);

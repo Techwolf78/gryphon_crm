@@ -319,7 +319,7 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
       const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
       saveAs(new Blob([wbout], { type: "application/octet-stream" }), fileName);
     } catch (error) {
-      console.error("Export error:", error);
+
       alert("Export failed. Please try again or contact support.");
     }
 
@@ -330,7 +330,7 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
     <div className="relative inline-block text-left" ref={dropdownRef}>
       <button
         onClick={() => setMenuOpen((prev) => !prev)}
-        className="flex items-center justify-center px-2 py-2 bg-white border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50  focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 ease-in-out hover:shadow-md"
+        className="flex items-center justify-center px-2 py-1 bg-white border border-gray-300 rounded-lg shadow-sm text-xs font-medium text-gray-700 hover:bg-gray-50  focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 ease-in-out hover:shadow-md"
       >
         <FiDownload className="w-4 h-4 mr-2" />
         Export Data

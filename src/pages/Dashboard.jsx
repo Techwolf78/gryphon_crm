@@ -18,9 +18,10 @@ const Dashboard = () => {
 
   // Set initial department based on user's department
   useEffect(() => {
-    if (user?.department) {
-      const userDept = user.department.toLowerCase();
-      
+    if (user?.departments || user?.department) {
+      // Handle both array and single department formats
+      const userDepts = Array.isArray(user.departments) ? user.departments : (user.department ? [user.department] : []);
+
       // Map user department to dashboard IDs
       const departmentMapping = {
         'sales': 'sales',
@@ -32,8 +33,12 @@ const Dashboard = () => {
         'marketing': 'marketing',
         'admin': 'sales'
       };
-      
-      const mappedDepartment = departmentMapping[userDept] || 'sales';
+
+      // Use the first department that maps to a valid dashboard, or default to sales
+      const mappedDepartment = userDepts
+        .map(dept => departmentMapping[dept.toLowerCase()])
+        .find(mapped => mapped) || 'sales';
+
       setActiveDepartment(mappedDepartment);
     }
   }, [user]);
@@ -44,15 +49,16 @@ const Dashboard = () => {
 
   // Helper function to check if department belongs to user
   const isUserDepartment = (deptId) => {
-    if (!user?.department) return false;
-    
-    const userDept = user.department.toLowerCase();
-    
+    if (!user?.departments && !user?.department) return false;
+
+    // Handle both array and single department formats
+    const userDepts = Array.isArray(user.departments) ? user.departments : (user.department ? [user.department] : []);
+
     // Don't show "Your Dept" badge for Admin users
-    if (userDept === 'admin') {
+    if (userDepts.some(dept => dept.toLowerCase() === 'admin')) {
       return false;
     }
-    
+
     // Direct mapping check for non-admin users
     const departmentMapping = {
       'sales': 'sales',
@@ -63,9 +69,11 @@ const Dashboard = () => {
       'placement': 'placement',
       'marketing': 'marketing'
     };
-    
-    const mappedUserDept = departmentMapping[userDept];
-    return deptId === mappedUserDept;
+
+    return userDepts.some(userDept => {
+      const mappedUserDept = departmentMapping[userDept.toLowerCase()];
+      return deptId === mappedUserDept;
+    });
   };
 
   return (

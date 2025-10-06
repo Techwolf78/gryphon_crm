@@ -30,7 +30,7 @@ const getTourStatus = async (userId, tourKey) => {
         return firestoreStatus || null;
       }
     } catch (error) {
-      console.error("Error fetching tour status from Firestore:", error);
+
     }
   }
 
@@ -47,7 +47,7 @@ const setTourStatus = async (userId, tourKey, status) => {
       const docRef = doc(db, "hrtour", userId);
       await setDoc(docRef, { [tourKey]: status }, { merge: true });
     } catch (error) {
-      console.error("Error saving tour status to Firestore:", error);
+
     }
   }
 };
@@ -66,7 +66,7 @@ export default function TrainersDashboardTour({ userId, enabled = true }) {
         setCompleted(isCompleted);
         setRun(enabled && !isCompleted);
       } catch (error) {
-        console.error("Error checking tour status:", error);
+
         setRun(enabled); // Default to showing tour if error
       } finally {
         setLoading(false);
@@ -134,7 +134,7 @@ export default function TrainersDashboardTour({ userId, enabled = true }) {
         setCompleted(true);
         setRun(false);
       } catch (error) {
-        console.error("Error saving tour completion:", error);
+
       }
     }
 

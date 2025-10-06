@@ -69,7 +69,7 @@ const RowClickModal = ({ installment, invoice, contract, onClose }) => {
         year: "numeric",
       });
     } catch (error) {
-      console.error("Date formatting error:", error);
+
       return "Invalid Date";
     }
   };

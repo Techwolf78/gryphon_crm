@@ -213,7 +213,7 @@ const LoginAnalytics = ({ logs, className = "" }) => {
         setChartData(result);
         setError(null);
       } catch (err) {
-        console.error("Error processing login data:", err);
+
         setError("Failed to process login data");
       } finally {
         setIsLoading(false);

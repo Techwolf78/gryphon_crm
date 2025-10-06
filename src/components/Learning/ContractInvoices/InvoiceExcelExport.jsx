@@ -105,7 +105,7 @@ export default function InvoiceExcelExport() {
 
       setInvoices(allInvoices);
     } catch (error) {
-      console.error("Error fetching invoices:", error);
+
       alert("Failed to fetch invoices. Please check console for details.");
     } finally {
       setLoading(false);

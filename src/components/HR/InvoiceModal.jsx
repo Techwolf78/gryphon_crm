@@ -179,7 +179,7 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
         year: "numeric",
       });
     } catch (error) {
-      console.error("Date formatting error:", error);
+
       return "Invalid Date";
     }
   };

@@ -95,6 +95,8 @@ function GenerateTrainerInvoice() {
                     domain: domainData.domain || domainDoc.id,
                     businessName: formData.businessName || "",
                     projectCode: formData.projectCode || "",
+                    formId: formId,
+                    collegeName: ((formData.businessName || "").split('/')[0].trim() || (formData.projectCode || "").split('/')[0].trim()),
                     startDate,
                     endDate,
                     topics: Array.from(allTopics), // All aggregated topics
@@ -110,6 +112,11 @@ function GenerateTrainerInvoice() {
                     conveyance: parseFloat(trainer.conveyance) || 0,
                     food: parseFloat(trainer.food) || 0,
                     lodging: parseFloat(trainer.lodging) || 0,
+                    // Add phase-level merged training data
+                    isMergedTraining: _phaseData.isMergedTraining || false,
+                    mergedColleges: _phaseData.mergedColleges || [],
+                    operationsConfig: _phaseData.operationsConfig || null,
+                    totalCost: _phaseData.totalCost || 0,
                   };
 
                   trainersList.push(trainerObj);
@@ -124,11 +131,27 @@ function GenerateTrainerInvoice() {
       const collegePhaseBasedGrouping = {};
 
       trainersList.forEach((trainer) => {
-        // Create a unique key for each trainer-college-phase-project combination
-        const collegePhaseKey = `${trainer.businessName}_${trainer.trainerId}_${trainer.phase}_${trainer.projectCode}`;
+        // For merged JD trainings, group by the merged colleges instead of individual college
+        let groupingKey;
+        if (trainer.isMergedTraining && trainer.domain === "JD") {
+          // Sort merged colleges to ensure consistent key regardless of order
+          const sortedColleges = trainer.mergedColleges
+            .map(c => c.collegeName || c)
+            .sort()
+            .join('_');
+          groupingKey = `merged_jd_${sortedColleges}_${trainer.trainerId.trim()}_${trainer.phase.trim().toLowerCase()}`;
+        } else {
+          // Original logic for non-merged trainings
+          const isJDDomain = trainer.domain === "JD";
+          groupingKey = isJDDomain
+            ? `${trainer.collegeName.trim().toLowerCase()}_${trainer.trainerId.trim()}_${trainer.phase.trim().toLowerCase()}`
+            : `${trainer.collegeName.trim().toLowerCase()}_${trainer.trainerId.trim()}_${trainer.phase.trim().toLowerCase()}_${trainer.projectCode.trim()}`;
+        }
 
-        if (!collegePhaseBasedGrouping[collegePhaseKey]) {
-          collegePhaseBasedGrouping[collegePhaseKey] = {
+
+
+        if (!collegePhaseBasedGrouping[groupingKey]) {
+          collegePhaseBasedGrouping[groupingKey] = {
             ...trainer,
             totalCollegeHours: trainer.assignedHours,
             allBatches: [trainer],
@@ -138,113 +161,167 @@ function GenerateTrainerInvoice() {
             allProjects: [trainer.projectCode],
             // Keep track of all domains for this trainer at this college and phase
             allDomains: [trainer.domain],
+            // For merged trainings, track all colleges involved
+            allColleges: trainer.isMergedTraining ? trainer.mergedColleges.map(c => c.collegeName || c) : [trainer.collegeName],
             // Aggregate all topics from all batches
             allTopics: new Set(trainer.topics || []),
+            // Store merged training info
+            isMerged: trainer.isMergedTraining,
+            mergedColleges: trainer.mergedColleges || [],
+            operationsConfig: trainer.operationsConfig,
           };
         } else {
           // Add hours from this batch to total
-          collegePhaseBasedGrouping[collegePhaseKey].totalCollegeHours +=
-            trainer.assignedHours;
-          collegePhaseBasedGrouping[collegePhaseKey].allBatches.push(trainer);
+          // For JD domain, don't sum hours since it's merged across projects
+          if (!trainer.isMergedTraining || trainer.domain !== "JD") {
+            collegePhaseBasedGrouping[groupingKey].totalCollegeHours +=
+              trainer.assignedHours;
+          }
+          collegePhaseBasedGrouping[groupingKey].allBatches.push(trainer);
 
           // Update dates to show the full range
           if (
             new Date(trainer.startDate) <
             new Date(
-              collegePhaseBasedGrouping[collegePhaseKey].earliestStartDate
+              collegePhaseBasedGrouping[groupingKey].earliestStartDate
             )
           ) {
-            collegePhaseBasedGrouping[collegePhaseKey].earliestStartDate =
+            collegePhaseBasedGrouping[groupingKey].earliestStartDate =
               trainer.startDate;
           }
           if (
             new Date(trainer.endDate) >
-            new Date(collegePhaseBasedGrouping[collegePhaseKey].latestEndDate)
+            new Date(collegePhaseBasedGrouping[groupingKey].latestEndDate)
           ) {
-            collegePhaseBasedGrouping[collegePhaseKey].latestEndDate =
+            collegePhaseBasedGrouping[groupingKey].latestEndDate =
               trainer.endDate;
           }
 
           // Add unique projects and domains
           if (
-            !collegePhaseBasedGrouping[collegePhaseKey].allProjects.includes(
+            !collegePhaseBasedGrouping[groupingKey].allProjects.includes(
               trainer.projectCode
             )
           ) {
-            collegePhaseBasedGrouping[collegePhaseKey].allProjects.push(
+            collegePhaseBasedGrouping[groupingKey].allProjects.push(
               trainer.projectCode
             );
           }
 
           if (
-            !collegePhaseBasedGrouping[collegePhaseKey].allDomains.includes(
+            !collegePhaseBasedGrouping[groupingKey].allDomains.includes(
               trainer.domain
             )
           ) {
-            collegePhaseBasedGrouping[collegePhaseKey].allDomains.push(
+            collegePhaseBasedGrouping[groupingKey].allDomains.push(
               trainer.domain
             );
+          }
+
+          // For merged trainings, add college if not already present
+          if (trainer.isMergedTraining) {
+            const collegeName = trainer.mergedColleges.map(c => c.collegeName || c).find(c => !collegePhaseBasedGrouping[groupingKey].allColleges.includes(c));
+            if (collegeName && !collegePhaseBasedGrouping[groupingKey].allColleges.includes(collegeName)) {
+              collegePhaseBasedGrouping[groupingKey].allColleges.push(collegeName);
+            }
           }
 
           // Aggregate topics from this batch
           if (trainer.topics && Array.isArray(trainer.topics)) {
             trainer.topics.forEach(topic => {
-              collegePhaseBasedGrouping[collegePhaseKey].allTopics.add(topic);
+              collegePhaseBasedGrouping[groupingKey].allTopics.add(topic);
             });
           }
         }
       });
 
+
+      Object.keys(collegePhaseBasedGrouping).forEach(key => {
+        const trainer = collegePhaseBasedGrouping[key];
+
+      });
+
       const collegePhaseBasedTrainers = Object.values(
         collegePhaseBasedGrouping
-      ).map(trainer => ({
-        ...trainer,
-        topics: Array.from(trainer.allTopics), // Convert Set to Array for topics
-      }));
+      ).map(trainer => {
+        const finalTrainer = {
+          ...trainer,
+          topics: Array.from(trainer.allTopics), // Convert Set to Array for topics
+        };
+
+        // For merged trainings, update display fields
+        if (trainer.isMerged) {
+          finalTrainer.businessName = trainer.allColleges.join(", ");
+          finalTrainer.collegeName = trainer.allColleges.join(", ");
+          finalTrainer.projectCode = trainer.allProjects.join(", ");
+        }
+
+        return finalTrainer;
+      });
 
       // Check invoices for each trainer-college-phase combination
       const updatedTrainersList = await Promise.all(
         collegePhaseBasedTrainers.map(async (trainer) => {
           try {
-            const q = query(
-              collection(db, "invoices"),
-              where("trainerId", "==", trainer.trainerId),
-              where("businessName", "==", trainer.businessName),
-              where("phase", "==", trainer.phase),
-              where("projectCode", "==", trainer.projectCode)
-            );
-
-            const querySnapshot = await getDocs(q);
-            const invoiceCount = querySnapshot.size;
-            
-            // Get the latest invoice status
-            let invoiceStatus = null;
+            let totalInvoiceCount = 0;
             let latestInvoice = null;
-            
-            if (invoiceCount > 0) {
-              // Find the most recent invoice
-              querySnapshot.forEach(doc => {
-                const invoiceData = doc.data();
-                if (!latestInvoice || invoiceData.createdAt > latestInvoice.createdAt) {
-                  latestInvoice = invoiceData;
-                }
-              });
-              
+            let invoiceStatus = null;
+
+            if (trainer.isMerged) {
+              // For merged trainings, check for the merged invoice
+              const q = query(
+                collection(db, "invoices"),
+                where("trainerId", "==", trainer.trainerId),
+                where("collegeName", "==", trainer.collegeName),
+                where("phase", "==", trainer.phase)
+              );
+
+              const querySnapshot = await getDocs(q);
+              totalInvoiceCount = querySnapshot.size;
+
+              if (totalInvoiceCount > 0) {
+                // Find the most recent invoice
+                querySnapshot.forEach(doc => {
+                  const invoiceData = doc.data();
+                  if (!latestInvoice || invoiceData.createdAt > latestInvoice.createdAt) {
+                    latestInvoice = invoiceData;
+                  }
+                });
+              }
+            } else {
+              // Original logic for non-merged trainings
+              const q = query(
+                collection(db, "invoices"),
+                where("trainerId", "==", trainer.trainerId),
+                where("collegeName", "==", trainer.collegeName),
+                where("phase", "==", trainer.phase)
+              );
+
+              const querySnapshot = await getDocs(q);
+              totalInvoiceCount = querySnapshot.size;
+
+              if (totalInvoiceCount > 0) {
+                // Find the most recent invoice
+                querySnapshot.forEach(doc => {
+                  const invoiceData = doc.data();
+                  if (!latestInvoice || invoiceData.createdAt > latestInvoice.createdAt) {
+                    latestInvoice = invoiceData;
+                  }
+                });
+              }
+            }
+
+            if (latestInvoice) {
               invoiceStatus = latestInvoice.status || "generated";
             }
 
             return {
               ...trainer,
-              hasExistingInvoice: invoiceCount > 0,
-              invoiceCount: invoiceCount,
+              hasExistingInvoice: totalInvoiceCount > 0,
+              invoiceCount: totalInvoiceCount,
               invoiceStatus: invoiceStatus,
             };
           } catch (error) {
-            console.error(
-              "Error checking invoice for trainer:",
-              trainer.trainerId,
-              error
-            );
             return {
               ...trainer,
               hasExistingInvoice: false,
@@ -273,7 +350,7 @@ function GenerateTrainerInvoice() {
       });
       setExpandedPhases(initialExpandedState);
     } catch (error) {
-      console.error("Error fetching trainer data:", error);
+
     } finally {
       setLoading(false);
     }
@@ -371,8 +448,11 @@ function GenerateTrainerInvoice() {
   ].filter(Boolean);
 
   // Get status icon and text for download button
-  const getDownloadStatus = (trainerId, businessName, phase, projectCode) => {
-    const status = pdfStatus[`${trainerId}_${businessName}_${phase}_${projectCode}`];
+  const getDownloadStatus = (trainer) => {
+    const statusKey = trainer.isMerged 
+      ? `${trainer.trainerId}_merged_jd_${trainer.phase}_${trainer.allProjects.join('_')}`
+      : `${trainer.trainerId}_${trainer.businessName}_${trainer.phase}_${trainer.projectCode}`;
+    const status = pdfStatus[statusKey];
     if (!status) return null;
 
     switch (status) {
@@ -475,137 +555,157 @@ function GenerateTrainerInvoice() {
   }, [filtersDropdownOpen]);
 
   const handleDownloadInvoice = async (trainer) => {
-    setDownloadingInvoice(
-      `${trainer.trainerId}_${trainer.businessName}_${trainer.phase}_${trainer.projectCode}`
-    );
+    const statusKey = trainer.isMerged 
+      ? `${trainer.trainerId}_merged_jd_${trainer.phase}_${trainer.allProjects.join('_')}`
+      : `${trainer.trainerId}_${trainer.businessName}_${trainer.phase}_${trainer.projectCode}`;
+    
+    setDownloadingInvoice(statusKey);
     setPdfStatus((prev) => ({
       ...prev,
-      [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}_${trainer.projectCode}`]:
-        "downloading",
+      [statusKey]: "downloading",
     }));
 
     try {
-      // Find invoices for this trainer, college, phase, and project combination
-      const q = query(
-        collection(db, "invoices"),
-        where("trainerId", "==", trainer.trainerId),
-        where("businessName", "==", trainer.businessName),
-        where("phase", "==", trainer.phase),
-        where("projectCode", "==", trainer.projectCode)
-      );
+      let allInvoices = [];
 
-      const querySnapshot = await getDocs(q);
+      if (trainer.isMerged) {
+        // For merged trainings, get the merged invoice
+        const q = query(
+          collection(db, "invoices"),
+          where("trainerId", "==", trainer.trainerId),
+          where("collegeName", "==", trainer.collegeName),
+          where("phase", "==", trainer.phase)
+        );
 
-      if (!querySnapshot.empty) {
-        // If multiple invoices, show selection dialog
-        if (querySnapshot.size > 1) {
-          const invoiceNumbers = querySnapshot.docs.map(
-            (doc) => doc.data().billNumber
+        const querySnapshot = await getDocs(q);
+        querySnapshot.forEach(doc => {
+          allInvoices.push({ id: doc.id, ...doc.data() });
+        });
+      } else {
+        // Original logic for non-merged trainings
+        const q = query(
+          collection(db, "invoices"),
+          where("trainerId", "==", trainer.trainerId),
+          where("collegeName", "==", trainer.collegeName),
+          where("phase", "==", trainer.phase)
+        );
+
+        const querySnapshot = await getDocs(q);
+        querySnapshot.forEach(doc => {
+          allInvoices.push({ id: doc.id, ...doc.data() });
+        });
+      }
+
+      if (allInvoices.length > 0) {
+        if (allInvoices.length > 1) {
+          // For multiple invoices, show selection dialog
+          const invoiceOptions = allInvoices.map(invoice => 
+            `${invoice.billNumber} (${trainer.collegeName})`
           );
           const selectedInvoice = prompt(
-            `Multiple invoices found for ${trainer.trainerName} at ${
-              trainer.businessName
-            } (${
-              trainer.phase
-            }). Please enter the invoice number you want to download:\n${invoiceNumbers.join(
+            `Multiple invoices found for ${trainer.trainerName}. Please enter the invoice number you want to download:\n${invoiceOptions.join(
               "\n"
             )}`
           );
 
           if (selectedInvoice) {
-            const selectedDoc = querySnapshot.docs.find(
-              (doc) => doc.data().billNumber === selectedInvoice
+            const selectedInvoiceData = allInvoices.find(
+              inv => inv.billNumber === selectedInvoice.split(' ')[0]
             );
-            if (selectedDoc) {
-              const invoiceData = selectedDoc.data();
-              const success = await generateInvoicePDF(invoiceData);
+            if (selectedInvoiceData) {
+              const success = await generateInvoicePDF(selectedInvoiceData);
               setPdfStatus((prev) => ({
                 ...prev,
-                [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}_${trainer.projectCode}`]:
-                  success ? "success" : "error",
+                [statusKey]: success ? "success" : "error",
               }));
             } else {
               alert("Invalid invoice number selected");
               setPdfStatus((prev) => ({
                 ...prev,
-                [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}_${trainer.projectCode}`]:
-                  "error",
+                [statusKey]: "error",
               }));
             }
           } else {
             setPdfStatus((prev) => ({
               ...prev,
-              [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}_${trainer.projectCode}`]:
-                "cancelled",
+              [statusKey]: "cancelled",
             }));
           }
         } else {
           // Single invoice - download it directly
-          const success = await generateInvoicePDF(
-            querySnapshot.docs[0].data()
-          );
+          const success = await generateInvoicePDF(allInvoices[0]);
           setPdfStatus((prev) => ({
             ...prev,
-            [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}_${trainer.projectCode}`]:
-              success ? "success" : "error",
+            [statusKey]: success ? "success" : "error",
           }));
         }
       } else {
-        alert("No invoice found for this trainer at this college and phase");
+        alert("No invoice found for this trainer");
         setPdfStatus((prev) => ({
           ...prev,
-          [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}_${trainer.projectCode}`]:
-            "not_found",
+          [statusKey]: "not_found",
         }));
       }
     } catch (error) {
-      console.error("Error downloading invoice:", error);
+
       alert("Failed to download invoice. Please try again.");
       setPdfStatus((prev) => ({
         ...prev,
-        [`${trainer.trainerId}_${trainer.businessName}_${trainer.phase}_${trainer.projectCode}`]:
-          "error",
+        [statusKey]: "error",
       }));
     } finally {
       setDownloadingInvoice(null);
     }
-  };
-
-  // Function to handle editing an invoice
+  };  // Function to handle editing an invoice
   const handleEditInvoice = async (trainer) => {
     try {
-      // Find the invoice for this trainer
-      const q = query(
-        collection(db, "invoices"),
-        where("trainerId", "==", trainer.trainerId),
-        where("businessName", "==", trainer.businessName),
-        where("phase", "==", trainer.phase),
-        where("projectCode", "==", trainer.projectCode)
-      );
+      let allInvoices = [];
 
-      const querySnapshot = await getDocs(q);
+      if (trainer.isMerged) {
+        // For merged trainings, get the merged invoice
+        const q = query(
+          collection(db, "invoices"),
+          where("trainerId", "==", trainer.trainerId),
+          where("collegeName", "==", trainer.collegeName),
+          where("phase", "==", trainer.phase)
+        );
 
-      if (!querySnapshot.empty) {
-        // If multiple invoices, show selection dialog
-        if (querySnapshot.size > 1) {
-          const invoiceNumbers = querySnapshot.docs.map(
-            (doc) => doc.data().billNumber
+        const querySnapshot = await getDocs(q);
+        querySnapshot.forEach(doc => {
+          allInvoices.push({ id: doc.id, ...doc.data() });
+        });
+      } else {
+        // Original logic for non-merged trainings
+        const q = query(
+          collection(db, "invoices"),
+          where("trainerId", "==", trainer.trainerId),
+          where("collegeName", "==", trainer.collegeName),
+          where("phase", "==", trainer.phase)
+        );
+
+        const querySnapshot = await getDocs(q);
+        querySnapshot.forEach(doc => {
+          allInvoices.push({ id: doc.id, ...doc.data() });
+        });
+      }
+
+      if (allInvoices.length > 0) {
+        if (allInvoices.length > 1) {
+          // For multiple invoices, show selection dialog
+          const invoiceOptions = allInvoices.map(invoice => 
+            `${invoice.billNumber} (${trainer.collegeName})`
           );
           const selectedInvoice = prompt(
-            `Multiple invoices found for ${trainer.trainerName} at ${
-              trainer.businessName
-            } (${
-              trainer.phase
-            }). Please enter the invoice number you want to edit:\n${invoiceNumbers.join(
+            `Multiple invoices found for ${trainer.trainerName}. Please enter the invoice number you want to edit:\n${invoiceOptions.join(
               "\n"
             )}`
           );
 
           if (selectedInvoice) {
-            const selectedDoc = querySnapshot.docs.find(
-              (doc) => doc.data().billNumber === selectedInvoice
+            const selectedInvoiceData = allInvoices.find(
+              inv => inv.billNumber === selectedInvoice.split(' ')[0]
             );
-            if (selectedDoc) {
+            if (selectedInvoiceData) {
               setSelectedTrainer(trainer);
               setShowInvoiceModal(true);
             } else {
@@ -618,10 +718,10 @@ function GenerateTrainerInvoice() {
           setShowInvoiceModal(true);
         }
       } else {
-        alert("No invoice found for this trainer at this college and phase");
+        alert("No invoice found for this trainer");
       }
     } catch (error) {
-      console.error("Error finding invoice for editing:", error);
+
       alert("Failed to find invoice. Please try again.");
     }
   };
@@ -707,3 +807,4 @@ function GenerateTrainerInvoice() {
 }
 
 export default GenerateTrainerInvoice;
+
