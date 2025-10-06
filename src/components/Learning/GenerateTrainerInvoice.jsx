@@ -6,10 +6,8 @@ import { generateInvoicePDF } from "./invoiceUtils";
 import { FiSearch, FiFilter, FiRefreshCw, FiTrash2, FiUser, FiCheckCircle, FiAlertCircle, FiXCircle, FiInfo } from "react-icons/fi";
 import Header from "./Invoice/Header";
 import FiltersSection from "./Invoice/FiltersSection";
-import LoadingState from "./Invoice/LoadingState";
 import EmptyState from "./Invoice/EmptyState";
 import TrainerInvoiceSkeleton from "./Invoice/TrainerInvoiceSkeleton";
-
 import TrainerTable from "./Invoice/TrainerTable";
 
 function GenerateTrainerInvoice() {
@@ -96,7 +94,7 @@ function GenerateTrainerInvoice() {
                     businessName: formData.businessName || "",
                     projectCode: formData.projectCode || "",
                     formId: formId,
-                    collegeName: ((formData.businessName || "").split('/')[0].trim() || (formData.projectCode || "").split('/')[0].trim()),
+  collegeName: (formData.businessName || "").split('/')[0]?.trim() || "Unknown College",
                     startDate,
                     endDate,
                     topics: Array.from(allTopics), // All aggregated topics
@@ -131,22 +129,23 @@ function GenerateTrainerInvoice() {
       const collegePhaseBasedGrouping = {};
 
       trainersList.forEach((trainer) => {
+          const collegeName = trainer.collegeName;
         // For merged JD trainings, group by the merged colleges instead of individual college
-        let groupingKey;
-        if (trainer.isMergedTraining && trainer.domain === "JD") {
-          // Sort merged colleges to ensure consistent key regardless of order
-          const sortedColleges = trainer.mergedColleges
-            .map(c => c.collegeName || c)
-            .sort()
-            .join('_');
-          groupingKey = `merged_jd_${sortedColleges}_${trainer.trainerId.trim()}_${trainer.phase.trim().toLowerCase()}`;
-        } else {
-          // Original logic for non-merged trainings
-          const isJDDomain = trainer.domain === "JD";
-          groupingKey = isJDDomain
-            ? `${trainer.collegeName.trim().toLowerCase()}_${trainer.trainerId.trim()}_${trainer.phase.trim().toLowerCase()}`
-            : `${trainer.collegeName.trim().toLowerCase()}_${trainer.trainerId.trim()}_${trainer.phase.trim().toLowerCase()}_${trainer.projectCode.trim()}`;
-        }
+       let groupingKey;
+  if (trainer.isMergedTraining && trainer.domain === "JD") {
+    // Sort merged colleges to ensure consistent key regardless of order
+    const sortedColleges = trainer.mergedColleges
+      .map(c => c.collegeName || c)
+      .sort()
+      .join('_');
+    groupingKey = `merged_jd_${sortedColleges}_${trainer.trainerId.trim()}_${trainer.phase.trim().toLowerCase()}`;
+  } else {
+    // Original logic for non-merged trainings
+    const isJDDomain = trainer.domain === "JD";
+    groupingKey = isJDDomain
+      ? `${collegeName.trim().toLowerCase()}_${trainer.trainerId.trim()}_${trainer.phase.trim().toLowerCase()}`
+      : `${collegeName.trim().toLowerCase()}_${trainer.trainerId.trim()}_${trainer.phase.trim().toLowerCase()}_${trainer.projectCode.trim()}`;
+  }
 
 
 
@@ -349,9 +348,7 @@ function GenerateTrainerInvoice() {
         initialExpandedState[phase] = true;
       });
       setExpandedPhases(initialExpandedState);
-    } catch (error) {
-
-    } finally {
+    }  finally {
       setLoading(false);
     }
   }, []);

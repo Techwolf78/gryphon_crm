@@ -51,9 +51,7 @@ function TrainerRow({
             ...invoiceDoc.data(),
           });
         }
-      } catch (error) {
-
-      } finally {
+      }  finally {
         setLoading(false);
       }
     };
