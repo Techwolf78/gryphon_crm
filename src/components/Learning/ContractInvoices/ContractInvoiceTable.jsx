@@ -44,8 +44,11 @@ export default function ContractInvoiceTable() {
   const [existingProformas, setExistingProformas] = useState([]);
   const [isRegenerateModal, setIsRegenerateModal] = useState(false);
   const [showMergeModal, setShowMergeModal] = useState(false);
-  const [selectedContractsForMerge, setSelectedContractsForMerge] = useState([]);
-  const [selectedInstallmentForMerge, setSelectedInstallmentForMerge] = useState(null);
+  const [selectedContractsForMerge, setSelectedContractsForMerge] = useState(
+    []
+  );
+  const [selectedInstallmentForMerge, setSelectedInstallmentForMerge] =
+    useState(null);
   const [showExportView, setShowExportView] = useState(false);
   const [activeTab, setActiveTab] = useState("individual");
 
@@ -54,7 +57,6 @@ export default function ContractInvoiceTable() {
       try {
         setLoading(true);
         setError(null);
-
 
         // 1️⃣ Fetch training forms
         const trainingFormsSnapshot = await getDocs(
@@ -95,7 +97,6 @@ export default function ContractInvoiceTable() {
 
         setInvoices(trainingFormsData);
       } catch (err) {
-
         setError("Failed to load data. Please try again.");
       } finally {
         setLoading(false);
@@ -229,16 +230,11 @@ export default function ContractInvoiceTable() {
         ...proformaSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
       ];
 
-
-
-
       // Filter sirf CURRENT financial year ke invoices
       const currentFYInvoices = allInvoices.filter((inv) => {
         if (!inv.invoiceNumber) return false;
         return inv.invoiceNumber.includes(financialYear.year);
       });
-
-
 
       // Extract sequential numbers from ALL invoice types
       const invoiceNumbers = currentFYInvoices
@@ -258,21 +254,17 @@ export default function ContractInvoiceTable() {
         })
         .filter((num) => num > 0);
 
-
-
       let nextInvoiceNumber = 1;
 
       if (invoiceNumbers.length > 0) {
         const maxInvoiceNumber = Math.max(...invoiceNumbers);
         nextInvoiceNumber = maxInvoiceNumber + 1;
       } else {
-
       }
 
       // YEH LINE CHANGE KARDI - 3 digit ki jagah 2 digit
       const invoiceNumber = nextInvoiceNumber.toString().padStart(2, "0");
       const finalInvoiceNumber = `GAPL/${financialYear.year}/${prefix}/${invoiceNumber}`;
-
 
       return finalInvoiceNumber;
     } catch (error) {
@@ -348,101 +340,105 @@ export default function ContractInvoiceTable() {
     setShowModal(true);
   };
 
-const handleConvertToTax = async (invoice) => {
+  const handleConvertToTax = async (invoice) => {
+    if (!invoice.id) {
+      alert("Error: Invoice ID not found. Cannot convert to tax invoice.");
+      return;
+    }
 
+    try {
+      // DIRECT Tax Invoice generate karo - Proforma store mat karo
+      const financialYear = getCurrentFinancialYear();
+      const currentDate = new Date();
 
-  if (!invoice.id) {
-    alert("Error: Invoice ID not found. Cannot convert to tax invoice.");
-    return;
-  }
+      // Tax Invoice ke liye number generate karo
+      const taxInvoiceNumber = await generateInvoiceNumber("Tax Invoice");
 
-  try {
-    // DIRECT Tax Invoice generate karo - Proforma store mat karo
-    const financialYear = getCurrentFinancialYear();
-    const currentDate = new Date();
-    
-    // Tax Invoice ke liye number generate karo
-    const taxInvoiceNumber = await generateInvoiceNumber("Tax Invoice");
+      // Tax Invoice data prepare karo
+      const taxInvoiceData = {
+        ...invoice,
+        invoiceType: "Tax Invoice",
+        invoiceNumber: taxInvoiceNumber,
+        convertedFromProforma: true,
+        originalProformaNumber: invoice.invoiceNumber,
+        conversionDate: currentDate,
+        raisedDate: currentDate,
+        updatedDate: currentDate,
+        status: "registered",
+        approvalStatus: "pending",
+        financialYear: financialYear.year,
+        // Payment details reset karo (fresh invoice)
+        receivedAmount: 0,
+        dueAmount: invoice.netPayableAmount || invoice.amountRaised,
+        paymentHistory: [],
+        cancelled: false,
+        cancellationDate: null,
+        cancellationReason: null,
+      };
 
-    // Tax Invoice data prepare karo
-    const taxInvoiceData = {
-      ...invoice,
-      invoiceType: "Tax Invoice",
-      invoiceNumber: taxInvoiceNumber,
-      convertedFromProforma: true,
-      originalProformaNumber: invoice.invoiceNumber,
-      conversionDate: currentDate,
-      raisedDate: currentDate,
-      updatedDate: currentDate,
-      status: "registered",
-      approvalStatus: "pending",
-      financialYear: financialYear.year,
-      // Payment details reset karo (fresh invoice)
-      receivedAmount: 0,
-      dueAmount: invoice.netPayableAmount || invoice.amountRaised,
-      paymentHistory: [],
-      cancelled: false,
-      cancellationDate: null,
-      cancellationReason: null,
-    };
+      const { id: _, ...taxDataWithoutId } = taxInvoiceData;
 
-    const { id: _, ...taxDataWithoutId } = taxInvoiceData;
-    
-    // DIRECTLY Tax Invoice add karo ContractInvoices mein
-    const docRef = await addDoc(collection(db, "ContractInvoices"), taxDataWithoutId);
+      // DIRECTLY Tax Invoice add karo ContractInvoices mein
+      const docRef = await addDoc(
+        collection(db, "ContractInvoices"),
+        taxDataWithoutId
+      );
 
+      // Purane Proforma ko mark karo as converted
+      await updateDoc(doc(db, "ProformaInvoices", invoice.id), {
+        convertedToTax: true,
+        convertedTaxInvoiceNumber: taxInvoiceNumber,
+        conversionDate: currentDate,
+      });
 
-    // Purane Proforma ko mark karo as converted
-    await updateDoc(doc(db, "ProformaInvoices", invoice.id), {
-      convertedToTax: true,
-      convertedTaxInvoiceNumber: taxInvoiceNumber,
-      conversionDate: currentDate,
-    });
+      // State update karo
+      const newInvoice = {
+        id: docRef.id,
+        ...taxInvoiceData,
+      };
 
-    // State update karo
-    const newInvoice = {
-      id: docRef.id,
-      ...taxInvoiceData,
-    };
+      setExistingInvoices((prev) => [...prev, newInvoice]);
+      setExistingProformas((prev) =>
+        prev.map((inv) =>
+          inv.id === invoice.id
+            ? {
+                ...inv,
+                convertedToTax: true,
+                convertedTaxInvoiceNumber: taxInvoiceNumber,
+              }
+            : inv
+        )
+      );
 
-    setExistingInvoices((prev) => [...prev, newInvoice]);
-    setExistingProformas((prev) =>
-      prev.map((inv) =>
-        inv.id === invoice.id
-          ? {
-              ...inv,
-              convertedToTax: true,
-              convertedTaxInvoiceNumber: taxInvoiceNumber,
-            }
-          : inv
-      )
-    );
+      alert(
+        `Invoice converted to Tax Invoice successfully! Invoice Number: ${taxInvoiceNumber}`
+      );
 
-    alert(
-      `Invoice converted to Tax Invoice successfully! Invoice Number: ${taxInvoiceNumber}`
-    );
-
-    // Modal close karo - koi modal open mat karo
-    setShowModal(false);
-    setSelectedContract(null);
-    setSelectedInstallment(null);
-    setEditInvoice(null);
-
-  } catch (error) {
-
-    alert("Failed to convert to tax invoice. Please try again.");
-  }
-};
+      // Modal close karo - koi modal open mat karo
+      setShowModal(false);
+      setSelectedContract(null);
+      setSelectedInstallment(null);
+      setEditInvoice(null);
+    } catch (error) {
+      alert("Failed to convert to tax invoice. Please try again.");
+    }
+  };
 
   // Handle cancel invoice - only for fresh invoices, delete completely
   const handleCancelInvoice = async (invoice) => {
     // Only allow undo for fresh invoices (not regenerated ones)
     if (invoice.regeneratedFrom) {
-      alert("Cannot undo regenerated invoices. Use Regenerate on the original cancelled invoice instead.");
+      alert(
+        "Cannot undo regenerated invoices. Use Regenerate on the original cancelled invoice instead."
+      );
       return;
     }
 
-    if (!confirm("Are you sure you want to undo this invoice generation? This will permanently delete the invoice.")) {
+    if (
+      !confirm(
+        "Are you sure you want to undo this invoice generation? This will permanently delete the invoice."
+      )
+    ) {
       return;
     }
 
@@ -451,275 +447,275 @@ const handleConvertToTax = async (invoice) => {
       await deleteDoc(doc(db, "ContractInvoices", invoice.id));
 
       // Update local state by removing the invoice
-      setExistingInvoices(prev => prev.filter(inv => inv.id !== invoice.id));
+      setExistingInvoices((prev) =>
+        prev.filter((inv) => inv.id !== invoice.id)
+      );
 
       alert("Invoice generation undone successfully!");
     } catch (error) {
-
       alert("Error undoing invoice generation: " + error.message);
     }
   };
 
-const handleSubmit = async (
-  formData,
-  contract,
-  installment,
-  isEdit = false,
-  isRegenerate = false
-) => {
-  if (!contract || !installment) {
-    alert("Error: Contract or installment data missing.");
-    return;
-  }
+  const handleSubmit = async (
+    formData,
+    contract,
+    installment,
+    isEdit = false,
+    isRegenerate = false
+  ) => {
+    if (!contract || !installment) {
+      alert("Error: Contract or installment data missing.");
+      return;
+    }
 
-  try {
-    const financialYear = getCurrentFinancialYear();
-    const currentDate = new Date();
+    try {
+      const financialYear = getCurrentFinancialYear();
+      const currentDate = new Date();
 
-    // Determine collection name based on invoice type
-    const isProforma = formData.invoiceType === "Proforma Invoice";
-    const isCashInvoice = formData.invoiceType === "Cash Invoice";
-    const collectionName = isProforma
-      ? "ProformaInvoices"
-      : "ContractInvoices";
+      // Determine collection name based on invoice type
+      const isProforma = formData.invoiceType === "Proforma Invoice";
+      const isCashInvoice = formData.invoiceType === "Cash Invoice";
+      const collectionName = isProforma
+        ? "ProformaInvoices"
+        : "ContractInvoices";
 
-    if (isEdit && !isRegenerate && editInvoice) {
-      // CASE 1: Proforma se Tax Invoice convert karna
-      if (editInvoice.invoiceType === "Proforma Invoice" && !isProforma) {
-        const updatedInvoiceNumber = await generateInvoiceNumber(
-          "Tax Invoice"
+      if (isEdit && !isRegenerate && editInvoice) {
+        // CASE 1: Proforma se Tax Invoice convert karna
+        if (editInvoice.invoiceType === "Proforma Invoice" && !isProforma) {
+          const updatedInvoiceNumber = await generateInvoiceNumber(
+            "Tax Invoice"
+          );
+
+          // 1. Naya Tax Invoice create karo
+          const taxInvoiceData = {
+            ...editInvoice,
+            invoiceType: "Tax Invoice",
+            invoiceNumber: updatedInvoiceNumber,
+            convertedFromProforma: true,
+            originalProformaNumber: editInvoice.invoiceNumber,
+            conversionDate: currentDate,
+            raisedDate: currentDate,
+            updatedDate: currentDate,
+            status: "registered",
+            approvalStatus: "pending",
+          };
+
+          const { id: _, ...taxDataWithoutId } = taxInvoiceData;
+          const docRef = await addDoc(
+            collection(db, "ContractInvoices"),
+            taxDataWithoutId
+          );
+
+          // 2. Purane Proforma ko mark karo as converted
+          await updateDoc(doc(db, "ProformaInvoices", editInvoice.id), {
+            convertedToTax: true,
+            convertedTaxInvoiceNumber: updatedInvoiceNumber,
+            conversionDate: currentDate,
+          });
+
+          // 3. State update karo
+          const newInvoice = {
+            id: docRef.id,
+            ...taxInvoiceData,
+          };
+
+          setExistingInvoices((prev) => [...prev, newInvoice]);
+          setExistingProformas((prev) =>
+            prev.map((inv) =>
+              inv.id === editInvoice.id
+                ? {
+                    ...inv,
+                    convertedToTax: true,
+                    convertedTaxInvoiceNumber: updatedInvoiceNumber,
+                  }
+                : inv
+            )
+          );
+
+          alert(
+            `Invoice converted to Tax Invoice successfully! Invoice Number: ${updatedInvoiceNumber}`
+          );
+        }
+        // YEH LINE ADD KARO - pehle if ka closing
+      } else if (isRegenerate && editInvoice) {
+        // CASE 2: Regenerate invoice (same logic with collection selection)
+        const newInvoiceNumber = await generateInvoiceNumber(
+          formData.invoiceType
         );
 
-        // 1. Naya Tax Invoice create karo
-        const taxInvoiceData = {
+        const regenerateData = {
           ...editInvoice,
-          invoiceType: "Tax Invoice",
-          invoiceNumber: updatedInvoiceNumber,
-          convertedFromProforma: true,
-          originalProformaNumber: editInvoice.invoiceNumber,
-          conversionDate: currentDate,
+          invoiceNumber: newInvoiceNumber,
+          invoiceType: formData.invoiceType,
           raisedDate: currentDate,
           updatedDate: currentDate,
           status: "registered",
-          approvalStatus: "pending",
+          approvalStatus: isProforma ? "not_required" : "pending",
+          financialYear: financialYear.year,
+          receivedAmount: 0,
+          dueAmount: editInvoice.netPayableAmount || editInvoice.amountRaised,
+          paymentHistory: [],
+          cancelled: false,
+          cancellationDate: null,
+          cancellationReason: null,
+          regeneratedFrom: editInvoice.invoiceNumber,
         };
 
-        const { id: _, ...taxDataWithoutId } = taxInvoiceData;
+        // Cash Invoice ke liye GST zero karo
+        if (formData.invoiceType === "Cash Invoice") {
+          regenerateData.gstAmount = 0;
+          regenerateData.netPayableAmount =
+            regenerateData.baseAmount || regenerateData.netPayableAmount / 1.18;
+          regenerateData.amountRaised = regenerateData.netPayableAmount;
+          regenerateData.dueAmount = regenerateData.netPayableAmount;
+        }
+
+        const { id: _, ...dataWithoutId } = regenerateData;
+
         const docRef = await addDoc(
-          collection(db, "ContractInvoices"),
-          taxDataWithoutId
+          collection(db, collectionName),
+          dataWithoutId
         );
 
-        // 2. Purane Proforma ko mark karo as converted
-        await updateDoc(doc(db, "ProformaInvoices", editInvoice.id), {
-          convertedToTax: true,
-          convertedTaxInvoiceNumber: updatedInvoiceNumber,
-          conversionDate: currentDate,
-        });
-
-        // 3. State update karo
         const newInvoice = {
           id: docRef.id,
-          ...taxInvoiceData,
+          ...regenerateData,
         };
 
-        setExistingInvoices((prev) => [...prev, newInvoice]);
-        setExistingProformas((prev) =>
-          prev.map((inv) =>
-            inv.id === editInvoice.id
-              ? {
-                  ...inv,
-                  convertedToTax: true,
-                  convertedTaxInvoiceNumber: updatedInvoiceNumber,
-                }
-              : inv
-          )
-        );
+        // State update based on collection
+        if (collectionName === "ContractInvoices") {
+          setExistingInvoices((prev) => [...prev, newInvoice]);
+        } else {
+          setExistingProformas((prev) => [...prev, newInvoice]);
+        }
+
+        // Purane invoice ko mark karo as regenerated
+        const oldCollection =
+          editInvoice.invoiceType === "Proforma Invoice"
+            ? "ProformaInvoices"
+            : "ContractInvoices";
+        await updateDoc(doc(db, oldCollection, editInvoice.id), {
+          regenerated: true,
+          regeneratedTo: newInvoiceNumber,
+        });
+
+        // State update for old invoice
+        if (oldCollection === "ContractInvoices") {
+          setExistingInvoices((prev) =>
+            prev.map((inv) =>
+              inv.id === editInvoice.id ? { ...inv, regenerated: true } : inv
+            )
+          );
+        } else {
+          setExistingProformas((prev) =>
+            prev.map((inv) =>
+              inv.id === editInvoice.id ? { ...inv, regenerated: true } : inv
+            )
+          );
+        }
 
         alert(
-          `Invoice converted to Tax Invoice successfully! Invoice Number: ${updatedInvoiceNumber}`
-        );
-      }
-      // YEH LINE ADD KARO - pehle if ka closing
-    } else if (isRegenerate && editInvoice) {
-      // CASE 2: Regenerate invoice (same logic with collection selection)
-      const newInvoiceNumber = await generateInvoiceNumber(
-        formData.invoiceType
-      );
-
-      const regenerateData = {
-        ...editInvoice,
-        invoiceNumber: newInvoiceNumber,
-        invoiceType: formData.invoiceType,
-        raisedDate: currentDate,
-        updatedDate: currentDate,
-        status: "registered",
-        approvalStatus: isProforma ? "not_required" : "pending",
-        financialYear: financialYear.year,
-        receivedAmount: 0,
-        dueAmount: editInvoice.netPayableAmount || editInvoice.amountRaised,
-        paymentHistory: [],
-        cancelled: false,
-        cancellationDate: null,
-        cancellationReason: null,
-        regeneratedFrom: editInvoice.invoiceNumber,
-      };
-
-      // Cash Invoice ke liye GST zero karo
-      if (formData.invoiceType === "Cash Invoice") {
-        regenerateData.gstAmount = 0;
-        regenerateData.netPayableAmount =
-          regenerateData.baseAmount || regenerateData.netPayableAmount / 1.18;
-        regenerateData.amountRaised = regenerateData.netPayableAmount;
-        regenerateData.dueAmount = regenerateData.netPayableAmount;
-      }
-
-      const { id: _, ...dataWithoutId } = regenerateData;
-
-      const docRef = await addDoc(
-        collection(db, collectionName),
-        dataWithoutId
-      );
-
-      const newInvoice = {
-        id: docRef.id,
-        ...regenerateData,
-      };
-
-      // State update based on collection
-      if (collectionName === "ContractInvoices") {
-        setExistingInvoices((prev) => [...prev, newInvoice]);
-      } else {
-        setExistingProformas((prev) => [...prev, newInvoice]);
-      }
-
-      // Purane invoice ko mark karo as regenerated
-      const oldCollection =
-        editInvoice.invoiceType === "Proforma Invoice"
-          ? "ProformaInvoices"
-          : "ContractInvoices";
-      await updateDoc(doc(db, oldCollection, editInvoice.id), {
-        regenerated: true,
-        regeneratedTo: newInvoiceNumber,
-      });
-
-      // State update for old invoice
-      if (oldCollection === "ContractInvoices") {
-        setExistingInvoices((prev) =>
-          prev.map((inv) =>
-            inv.id === editInvoice.id ? { ...inv, regenerated: true } : inv
-          )
+          `Invoice regenerated successfully! New Invoice Number: ${newInvoiceNumber}`
         );
       } else {
-        setExistingProformas((prev) =>
-          prev.map((inv) =>
-            inv.id === editInvoice.id ? { ...inv, regenerated: true } : inv
-          )
+        // CASE 3: Naya invoice generate karna
+        const invoiceNumber = await generateInvoiceNumber(formData.invoiceType);
+        const selectedInstallment = contract.paymentDetails.find(
+          (p) => p.name === installment.name
         );
+
+        let totalAmount = selectedInstallment
+          ? selectedInstallment.totalAmount
+          : contract.netPayableAmount;
+
+        let baseAmount, gstAmount;
+
+        // Cash Invoice ke liye different calculation
+        if (formData.invoiceType === "Cash Invoice") {
+          baseAmount = totalAmount;
+          gstAmount = 0;
+          totalAmount = baseAmount;
+        } else {
+          // Tax/Proforma invoice ke liye normal calculation
+          baseAmount = totalAmount / 1.18;
+          gstAmount = totalAmount - baseAmount;
+        }
+
+        const invoiceData = {
+          ...formData,
+          invoiceNumber,
+          raisedDate: currentDate,
+          status: "registered",
+          approvalStatus: isProforma ? "not_required" : "pending",
+          originalInvoiceId: contract.id,
+          projectCode: contract.projectCode,
+          collegeName: contract.collegeName,
+          collegeCode: contract.collegeCode,
+          course: contract.course,
+          year: contract.year,
+          deliveryType: contract.deliveryType,
+          passingYear: contract.passingYear,
+          studentCount: contract.studentCount,
+          perStudentCost: contract.perStudentCost,
+          totalCost: contract.totalCost,
+          installment: installment.name,
+          baseAmount: baseAmount,
+          gstAmount: gstAmount,
+          netPayableAmount: totalAmount,
+          amountRaised: totalAmount,
+          receivedAmount: 0,
+          dueAmount: totalAmount,
+          paymentHistory: [],
+          gstNumber: contract.gstNumber,
+          gstType: contract.gstType,
+          tpoName: contract.tpoName,
+          tpoEmail: contract.tpoEmail,
+          tpoPhone: contract.tpoPhone,
+          address: contract.address,
+          city: contract.city,
+          state: contract.state,
+          pincode: contract.pincode,
+          paymentDetails: contract.paymentDetails,
+          contractStartDate: contract.contractStartDate,
+          contractEndDate: contract.contractEndDate,
+          financialYear: financialYear.year,
+          academicYear: financialYear.year,
+        };
+
+        const docRef = await addDoc(
+          collection(db, collectionName),
+          invoiceData
+        );
+
+        const newInvoice = {
+          id: docRef.id,
+          ...invoiceData,
+        };
+
+        // State update based on collection
+        if (collectionName === "ContractInvoices") {
+          setExistingInvoices((prev) => [...prev, newInvoice]);
+        } else {
+          setExistingProformas((prev) => [...prev, newInvoice]);
+        }
+
+        alert(`Invoice ${invoiceNumber} raised successfully!`);
       }
 
+      setShowModal(false);
+      setSelectedContract(null);
+      setSelectedInstallment(null);
+      setEditInvoice(null);
+    } catch (err) {
       alert(
-        `Invoice regenerated successfully! New Invoice Number: ${newInvoiceNumber}`
+        `Failed to ${isEdit ? "convert" : "raise"} invoice. Error: ${
+          err.message
+        }`
       );
-    } else {
-      // CASE 3: Naya invoice generate karna
-      const invoiceNumber = await generateInvoiceNumber(formData.invoiceType);
-      const selectedInstallment = contract.paymentDetails.find(
-        (p) => p.name === installment.name
-      );
-
-      let totalAmount = selectedInstallment
-        ? selectedInstallment.totalAmount
-        : contract.netPayableAmount;
-
-      let baseAmount, gstAmount;
-
-      // Cash Invoice ke liye different calculation
-      if (formData.invoiceType === "Cash Invoice") {
-        baseAmount = totalAmount;
-        gstAmount = 0;
-        totalAmount = baseAmount;
-      } else {
-        // Tax/Proforma invoice ke liye normal calculation
-        baseAmount = totalAmount / 1.18;
-        gstAmount = totalAmount - baseAmount;
-      }
-
-      const invoiceData = {
-        ...formData,
-        invoiceNumber,
-        raisedDate: currentDate,
-        status: "registered",
-        approvalStatus: isProforma ? "not_required" : "pending",
-        originalInvoiceId: contract.id,
-        projectCode: contract.projectCode,
-        collegeName: contract.collegeName,
-        collegeCode: contract.collegeCode,
-        course: contract.course,
-        year: contract.year,
-        deliveryType: contract.deliveryType,
-        passingYear: contract.passingYear,
-        studentCount: contract.studentCount,
-        perStudentCost: contract.perStudentCost,
-        totalCost: contract.totalCost,
-        installment: installment.name,
-        baseAmount: baseAmount,
-        gstAmount: gstAmount,
-        netPayableAmount: totalAmount,
-        amountRaised: totalAmount,
-        receivedAmount: 0,
-        dueAmount: totalAmount,
-        paymentHistory: [],
-        gstNumber: contract.gstNumber,
-        gstType: contract.gstType,
-        tpoName: contract.tpoName,
-        tpoEmail: contract.tpoEmail,
-        tpoPhone: contract.tpoPhone,
-        address: contract.address,
-        city: contract.city,
-        state: contract.state,
-        pincode: contract.pincode,
-        paymentDetails: contract.paymentDetails,
-        contractStartDate: contract.contractStartDate,
-        contractEndDate: contract.contractEndDate,
-        financialYear: financialYear.year,
-        academicYear: financialYear.year,
-      };
-
-      const docRef = await addDoc(
-        collection(db, collectionName),
-        invoiceData
-      );
-
-      const newInvoice = {
-        id: docRef.id,
-        ...invoiceData,
-      };
-
-      // State update based on collection
-      if (collectionName === "ContractInvoices") {
-        setExistingInvoices((prev) => [...prev, newInvoice]);
-      } else {
-        setExistingProformas((prev) => [...prev, newInvoice]);
-      }
-
-      alert(`Invoice ${invoiceNumber} raised successfully!`);
     }
-
-    setShowModal(false);
-    setSelectedContract(null);
-    setSelectedInstallment(null);
-    setEditInvoice(null);
-  } catch (err) {
-
-    alert(
-      `Failed to ${isEdit ? "convert" : "raise"} invoice. Error: ${
-        err.message
-      }`
-    );
-  }
-};
-// "Generate TI" button ke handler ko update karo
+  };
+  // "Generate TI" button ke handler ko update karo
   const handleRegisterInvoice = async (invoice) => {
     try {
       const invoiceRef = doc(db, "ContractInvoices", invoice.id);
@@ -733,7 +729,6 @@ const handleSubmit = async (
 
       alert("Invoice registered successfully!");
     } catch (err) {
-
       alert("Failed to register invoice");
     }
   };
@@ -1083,7 +1078,6 @@ const handleSubmit = async (
       setSelectedContractsForMerge([]);
       setSelectedInstallmentForMerge(null);
     } catch (err) {
-
       alert(`Failed to create merged invoice. Error: ${err.message}`);
     }
   };
@@ -1106,7 +1100,7 @@ const handleSubmit = async (
 
   const individualContracts = getIndividualContracts();
   const mergedContracts = getMergedContracts();
-  
+
   // Helper functions for displaying useful info
   const getUniquePaymentTypes = (contracts) => {
     const types = [
@@ -1147,14 +1141,24 @@ const handleSubmit = async (
                 {getCurrentFinancialYear().year}
               </p>
             </div>
-            
+
             {/* Export Toggle Button */}
             <button
               onClick={() => setShowExportView(!showExportView)}
               className="bg-green-600 hover:bg-green-700 text-white py-1.5 px-3 rounded-lg font-medium flex items-center gap-1.5"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
               </svg>
               {showExportView ? "Back to Table" : "Export"}
             </button>
@@ -1225,8 +1229,9 @@ const handleSubmit = async (
                         No individual contracts available
                       </h3>
                       <p className="text-gray-500 text-xs">
-                        All contracts are either merged or have individual invoices
-                        generated. Switch to Merged View to see available contracts.
+                        All contracts are either merged or have individual
+                        invoices generated. Switch to Merged View to see
+                        available contracts.
                       </p>
                     </div>
                   </div>
@@ -1262,11 +1267,11 @@ const handleSubmit = async (
                                 </span>
                               </div>
                               <p className="text-blue-100 text-sm mt-1">
-                                Project Code: {invoice.projectCode || invoice.id} •
-                                Payment Type:{" "}
-                                {getPaymentTypeName(invoice.paymentType)} •
-                                Students: {invoice.studentCount || "N/A"} • Total
-                                Amount:{" "}
+                                Project Code:{" "}
+                                {invoice.projectCode || invoice.id} • Payment
+                                Type: {getPaymentTypeName(invoice.paymentType)}{" "}
+                                • Students: {invoice.studentCount || "N/A"} •
+                                Total Amount:{" "}
                                 {formatCurrency(
                                   invoice.netPayableAmount || invoice.totalCost
                                 )}
@@ -1363,25 +1368,28 @@ const handleSubmit = async (
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
                                   {(() => {
-                                    const allInvoicesForContract = existingInvoices
-                                      .filter(
-                                        (inv) =>
-                                          inv.originalInvoiceId === invoice.id
-                                      )
-                                      .concat(
-                                        existingProformas.filter(
+                                    const allInvoicesForContract =
+                                      existingInvoices
+                                        .filter(
                                           (inv) =>
-                                            inv.originalInvoiceId === invoice.id &&
-                                            !inv.convertedToTax
+                                            inv.originalInvoiceId === invoice.id
                                         )
-                                      );
+                                        .concat(
+                                          existingProformas.filter(
+                                            (inv) =>
+                                              inv.originalInvoiceId ===
+                                                invoice.id &&
+                                              !inv.convertedToTax
+                                          )
+                                        );
 
                                     return invoice.paymentDetails?.map(
                                       (installment, index) => {
                                         const invoicesForInstallment =
                                           allInvoicesForContract.filter(
                                             (inv) =>
-                                              inv.installment === installment.name
+                                              inv.installment ===
+                                              installment.name
                                           );
 
                                         // Sort: active first, then cancelled, by raisedDate desc
@@ -1392,8 +1400,10 @@ const handleSubmit = async (
                                           const bCancelled =
                                             b.status === "cancelled" ||
                                             b.approvalStatus === "cancelled";
-                                          if (aCancelled && !bCancelled) return 1;
-                                          if (bCancelled && !aCancelled) return -1;
+                                          if (aCancelled && !bCancelled)
+                                            return 1;
+                                          if (bCancelled && !aCancelled)
+                                            return -1;
                                           return (
                                             new Date(b.raisedDate || 0) -
                                             new Date(a.raisedDate || 0)
@@ -1405,7 +1415,8 @@ const handleSubmit = async (
                                             (inv, invIndex) => {
                                               const isCancelled =
                                                 inv.status === "cancelled" ||
-                                                inv.approvalStatus === "cancelled";
+                                                inv.approvalStatus ===
+                                                  "cancelled";
                                               const totalAmount =
                                                 inv.amountRaised ||
                                                 inv.netPayableAmount ||
@@ -1419,9 +1430,13 @@ const handleSubmit = async (
                                                 <tr
                                                   key={`${index}-${invIndex}`}
                                                   className={`hover:bg-gray-50 cursor-pointer ${
-                                                    isCancelled ? "bg-red-50" : ""
+                                                    isCancelled
+                                                      ? "bg-red-50"
+                                                      : ""
                                                   }`}
-                                                  onClick={() => setSelectedInvoice(inv)}
+                                                  onClick={() =>
+                                                    setSelectedInvoice(inv)
+                                                  }
                                                 >
                                                   <td className="px-4 py-2 text-sm text-gray-900">
                                                     {installment.name}
@@ -1471,7 +1486,9 @@ const handleSubmit = async (
                                                       {/* Approval status sirf Tax Invoice ke liye, Cash aur Proforma ke liye nahi */}
                                                       {inv.invoiceType ===
                                                         "Tax Invoice" &&
-                                                        getApprovalStatusBadge(inv)}
+                                                        getApprovalStatusBadge(
+                                                          inv
+                                                        )}
 
                                                       {/* Cash Invoice ke liye special badge */}
                                                       {inv.invoiceType ===
@@ -1491,7 +1508,8 @@ const handleSubmit = async (
 
                                                       {/* Invoice number */}
                                                       <div className="text-xs text-gray-400 mt-0.5">
-                                                        {inv.invoiceNumber || "N/A"}
+                                                        {inv.invoiceNumber ||
+                                                          "N/A"}
                                                       </div>
 
                                                       {/* From: Proforma number niche dikhana hai */}
@@ -1529,7 +1547,9 @@ const handleSubmit = async (
                                                     >
                                                       {dueAmount === 0
                                                         ? "0"
-                                                        : formatCurrency(dueAmount)}
+                                                        : formatCurrency(
+                                                            dueAmount
+                                                          )}
                                                     </span>
                                                   </td>
                                                   <td className="px-4 py-2 text-sm">
@@ -1537,24 +1557,29 @@ const handleSubmit = async (
                                                       <button
                                                         onClick={(e) => {
                                                           e.stopPropagation();
-                                                          setSelectedInvoice(inv);
+                                                          setSelectedInvoice(
+                                                            inv
+                                                          );
                                                         }}
                                                         className="bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded text-xs"
                                                       >
                                                         View
                                                       </button>
-                                                      {!isCancelled && !inv.regeneratedFrom && (
-                                                        <button
-                                                          onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleCancelInvoice(inv);
-                                                          }}
-                                                          className="bg-red-500 hover:bg-red-700 text-white py-1 px-2 rounded text-xs"
-                                                          title="Cancel this invoice"
-                                                        >
-                                                          Undo
-                                                        </button>
-                                                      )}
+                                                      {!isCancelled &&
+                                                        !inv.regeneratedFrom && (
+                                                          <button
+                                                            onClick={(e) => {
+                                                              e.stopPropagation();
+                                                              handleCancelInvoice(
+                                                                inv
+                                                              );
+                                                            }}
+                                                            className="bg-red-500 hover:bg-red-700 text-white py-1 px-2 rounded text-xs"
+                                                            title="Cancel this invoice"
+                                                          >
+                                                            Undo
+                                                          </button>
+                                                        )}
                                                       {isCancelled &&
                                                         !inv.regenerated && (
                                                           <button
@@ -1600,12 +1625,14 @@ const handleSubmit = async (
                                             <tr
                                               key={index}
                                               className="hover:bg-gray-50 cursor-pointer"
-                                              onClick={() => setRowClickModal({
-                                                isOpen: true,
-                                                invoice: null,
-                                                installment: installment,
-                                                contract: invoice,
-                                              })}
+                                              onClick={() =>
+                                                setRowClickModal({
+                                                  isOpen: true,
+                                                  invoice: null,
+                                                  installment: installment,
+                                                  contract: invoice,
+                                                })
+                                              }
                                             >
                                               <td className="px-4 py-2 text-sm text-gray-900">
                                                 {installment.name}
@@ -1675,8 +1702,8 @@ const handleSubmit = async (
                         No contracts available for merging
                       </h3>
                       <p className="text-gray-500 text-xs">
-                        All contracts have individual invoices generated. Switch to
-                        Individual View to see them.
+                        All contracts have individual invoices generated. Switch
+                        to Individual View to see them.
                       </p>
                     </div>
                   </div>
@@ -1704,9 +1731,10 @@ const handleSubmit = async (
                             <p className="text-purple-100 text-sm mt-1">
                               {/* ✅ Useful information dikhao */}
                               Payment Types:{" "}
-                              {getUniquePaymentTypes(mergedItem.contracts)} • Total
-                              Students: {getTotalStudentCount(mergedItem.contracts)}{" "}
-                              • Total Amount:{" "}
+                              {getUniquePaymentTypes(mergedItem.contracts)} •
+                              Total Students:{" "}
+                              {getTotalStudentCount(mergedItem.contracts)} •
+                              Total Amount:{" "}
                               {formatCurrency(
                                 getTotalContractAmount(mergedItem.contracts)
                               )}
@@ -1795,7 +1823,9 @@ const handleSubmit = async (
                                               className={`hover:bg-gray-50 cursor-pointer ${
                                                 isCancelled ? "bg-red-50" : ""
                                               }`}
-                                              onClick={() => setSelectedInvoice(inv)}
+                                              onClick={() =>
+                                                setSelectedInvoice(inv)
+                                              }
                                             >
                                               <td className="px-4 py-2 text-sm text-gray-900">
                                                 {installment.name}
@@ -1848,7 +1878,9 @@ const handleSubmit = async (
                                                       : "text-gray-600"
                                                   }`}
                                                 >
-                                                  {formatCurrency(receivedAmount)}
+                                                  {formatCurrency(
+                                                    receivedAmount
+                                                  )}
                                                 </span>
                                               </td>
                                               <td className="px-4 py-2 text-sm">
@@ -1875,18 +1907,21 @@ const handleSubmit = async (
                                                   >
                                                     View
                                                   </button>
-                                                  {!isCancelled && !inv.regeneratedFrom && (
-                                                    <button
-                                                      onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleCancelInvoice(inv);
-                                                      }}
-                                                      className="bg-red-500 hover:bg-red-700 text-white py-1 px-2 rounded text-xs"
-                                                      title="Cancel this invoice"
-                                                    >
-                                                      Undo
-                                                    </button>
-                                                  )}
+                                                  {!isCancelled &&
+                                                    !inv.regeneratedFrom && (
+                                                      <button
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          handleCancelInvoice(
+                                                            inv
+                                                          );
+                                                        }}
+                                                        className="bg-red-500 hover:bg-red-700 text-white py-1 px-2 rounded text-xs"
+                                                        title="Cancel this invoice"
+                                                      >
+                                                        Undo
+                                                      </button>
+                                                    )}
                                                   {isCancelled &&
                                                     !inv.regenerated && (
                                                       <button
@@ -1909,13 +1944,17 @@ const handleSubmit = async (
                                     } else {
                                       // No invoice generated yet for this merged installment
                                       return (
-                                        <tr key={idx} className="hover:bg-gray-50 cursor-pointer"
-                                            onClick={() => setRowClickModal({
+                                        <tr
+                                          key={idx}
+                                          className="hover:bg-gray-50 cursor-pointer"
+                                          onClick={() =>
+                                            setRowClickModal({
                                               isOpen: true,
                                               invoice: null,
                                               installment: installment,
                                               contract: mergedItem.contracts[0],
-                                            })}
+                                            })
+                                          }
                                         >
                                           <td className="px-4 py-2 text-sm text-gray-900">
                                             {installment.name}
@@ -1931,7 +1970,9 @@ const handleSubmit = async (
                                           <td className="px-4 py-2 text-sm text-gray-500">
                                             -
                                           </td>
-                                          <td className="px-4 py-2 text-sm">₹0</td>
+                                          <td className="px-4 py-2 text-sm">
+                                            ₹0
+                                          </td>
                                           <td className="px-4 py-2 text-sm">
                                             {formatCurrency(
                                               installment.totalAmount
@@ -2039,30 +2080,37 @@ const handleSubmit = async (
           onSubmit={handleMergeSubmit}
         />
 
-{selectedInvoice && (
-  <InvoiceModal
-    invoice={selectedInvoice}
-    onClose={() => setSelectedInvoice(null)}
-    onRegister={(invoice) => handleRegisterInvoice(invoice)}
-    onInvoiceUpdate={(updatedInvoice) => {
-      // ✅ State update karo parent mein bhi
-      setExistingInvoices(prev => 
-        prev.map(inv => 
-          inv.id === updatedInvoice.id ? updatedInvoice : inv
-        )
-      );
-      setSelectedInvoice(updatedInvoice); // Modal mein bhi update ho
-    }}
-    isViewOnly={true}
-  />
-)}
+        {selectedInvoice && (
+          <InvoiceModal
+            invoice={selectedInvoice}
+            onClose={() => setSelectedInvoice(null)}
+            onRegister={(invoice) => handleRegisterInvoice(invoice)}
+            onInvoiceUpdate={(updatedInvoice) => {
+              // ✅ State update karo parent mein bhi
+              setExistingInvoices((prev) =>
+                prev.map((inv) =>
+                  inv.id === updatedInvoice.id ? updatedInvoice : inv
+                )
+              );
+              setSelectedInvoice(updatedInvoice); // Modal mein bhi update ho
+            }}
+            isViewOnly={true}
+          />
+        )}
 
         {rowClickModal.isOpen && (
           <RowClickModal
             installment={rowClickModal.installment}
             invoice={rowClickModal.invoice}
             contract={rowClickModal.contract}
-            onClose={() => setRowClickModal({ isOpen: false, invoice: null, installment: null, contract: null })}
+            onClose={() =>
+              setRowClickModal({
+                isOpen: false,
+                invoice: null,
+                installment: null,
+                contract: null,
+              })
+            }
           />
         )}
       </div>
