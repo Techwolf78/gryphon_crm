@@ -5,7 +5,7 @@ import { db } from "../firebase";
 
 const PublicInvoiceDetails = () => {
   const location = useLocation();
-  const invoiceNumber = location.pathname.replace(/^\//, '');
+  const invoiceNumber = location.pathname.replace('/invoice/', '');
   const [invoice, setInvoice] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

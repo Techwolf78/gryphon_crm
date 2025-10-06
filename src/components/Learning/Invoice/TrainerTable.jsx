@@ -34,35 +34,45 @@ function TrainerTable({
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {Object.keys(phaseCollegeGroupedData).map((phase) => (
-        <div key={phase} className="border border-gray-200 rounded-lg overflow-hidden">
-          {/* Phase Header */}
+        <div key={phase} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200">
+          {/* Enhanced Phase Header */}
           <div
-            className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 flex justify-between items-center cursor-pointer hover:bg-blue-100 transition-colors"
+            className="bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50 px-6 py-3 flex justify-between items-center cursor-pointer hover:from-blue-100 hover:to-indigo-100 transition-all duration-200 border-l-4 border-blue-500"
             onClick={() => togglePhase(phase)}
           >
             <div className="flex items-center gap-3">
-              {expandedPhases[phase] ? (
-                <FiChevronUp className="text-blue-600 text-lg" />
-              ) : (
-                <FiChevronDown className="text-blue-600 text-lg" />
-              )}
-              <div>
-                <h3 className="font-bold text-gray-800 text-lg">
-                  {phase.toUpperCase()} PHASE
-                </h3>
-                <p className="text-sm text-gray-600 flex items-center gap-2 mt-1">
-                  <FiHome className="text-blue-500" />
-                  {Object.keys(phaseCollegeGroupedData[phase]).length} colleges • 
-                  <FiUsers className="text-green-500 ml-1" />
-                  {filteredGroupedData[phase].length} trainers total
-                </p>
+              <div className="p-1 rounded-full bg-blue-100 hover:bg-blue-200 transition-colors">
+                {expandedPhases[phase] ? (
+                  <FiChevronUp className="text-blue-600 text-lg" />
+                ) : (
+                  <FiChevronDown className="text-blue-600 text-lg" />
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="bg-yellow-100 text-yellow-700 text-sm font-semibold px-3 py-1 rounded-lg border border-yellow-200 shadow-sm">
+                  📚 {phase.toUpperCase()}
+                </span>
+                <div className="hidden sm:flex items-center gap-4 text-sm text-gray-600">
+                  <span className="flex items-center gap-1 bg-white px-3 py-1 rounded-lg border shadow-sm">
+                    <FiHome className="text-blue-500" />
+                    <span className="font-medium">{Object.keys(phaseCollegeGroupedData[phase]).length}</span>
+                    <span className="text-gray-500">colleges</span>
+                  </span>
+                  <span className="flex items-center gap-1 bg-white px-3 py-1 rounded-lg border shadow-sm">
+                    <FiUsers className="text-green-500" />
+                    <span className="font-medium">{filteredGroupedData[phase].length}</span>
+                    <span className="text-gray-500">trainers</span>
+                  </span>
+                </div>
               </div>
             </div>
-            <span className="text-sm text-blue-600 font-medium bg-blue-100 px-3 py-1 rounded-full">
-              {expandedPhases[phase] ? "Collapse" : "Expand"} Phase
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-blue-600 font-medium bg-white px-3 py-1 rounded-lg border shadow-sm">
+                {expandedPhases[phase] ? "🔽 Collapse" : "▶️ Expand"}
+              </span>
+            </div>
           </div>
 
           {/* Colleges and Trainers */}
@@ -70,47 +80,48 @@ function TrainerTable({
             <div className="bg-white">
               {Object.keys(phaseCollegeGroupedData[phase]).map((collegeName) => (
                 <div key={collegeName} className="border-b border-gray-100 last:border-b-0">
-                  {/* College Header */}
-                  <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-                    <div className="flex items-center justify-between">
+                  {/* Enhanced College Header */}
+                  <div className="bg-gradient-to-r from-blue-50/30 to-indigo-50/30 px-6 py-4 border-b border-blue-100">
+                    <div className="flex items-center">
                       <div className="flex items-center gap-3">
-                        <FiHome className="text-gray-600 text-xl" />
+                        <div className="p-2 bg-blue-100 rounded-lg">
+                          <FiHome className="text-blue-600 text-lg" />
+                        </div>
                         <div>
-                          <h4 className="font-semibold text-gray-800 text-lg">
-                            {collegeName}
+                          <h4 className="font-semibold text-gray-900 text-lg">
+                            🏛️ {collegeName}
                           </h4>
-                          <p className="text-sm text-gray-600 flex items-center gap-2 mt-1">
-                            <FiUsers className="text-gray-500" />
-                            {phaseCollegeGroupedData[phase][collegeName].length} 
-                            {phaseCollegeGroupedData[phase][collegeName].length === 1 ? " trainer" : " trainers"} in {phase} phase
-                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="inline-flex items-center text-sm text-gray-600 bg-white px-3 py-1 rounded-lg border shadow-sm">
+                              <FiUsers className="text-green-500 text-sm mr-2" />
+                              <span className="font-medium">{phaseCollegeGroupedData[phase][collegeName].length}</span>
+                              <span className="ml-1">{phaseCollegeGroupedData[phase][collegeName].length === 1 ? "trainer" : "trainers"}</span>
+                            </span>
+                          </div>
                         </div>
                       </div>
-                      <span className="text-xs text-gray-500 bg-white px-3 py-2 rounded-lg border font-medium">
-                        College
-                      </span>
                     </div>
                   </div>
 
-                  {/* Trainers Table for this College */}
+                  {/* Responsive Trainers Table */}
                   <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-50">
+                    <table className="w-full min-w-[800px]">
+                      <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
                         <tr>
-                          <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Trainer Details
+                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                            👤 Trainer Details
                           </th>
-                          <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Project & Domain
+                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                            🏛️ College & Project
                           </th>
-                          <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Timeline & Hours
+                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                            📚 Domain
                           </th>
-                          <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Invoice Status
+                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                            📅 Timeline & Hours
                           </th>
-                          <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Actions
+                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                            💼 Invoice Status
                           </th>
                         </tr>
                       </thead>
