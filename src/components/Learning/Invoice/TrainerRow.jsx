@@ -87,10 +87,7 @@ function TrainerRow({
           ...updatedData,
         });
       }
-    } catch (error) {
-
-      alert("Failed to update invoice status. Please try again.");
-    } finally {
+    }  finally {
       setUpdatingStatus(false);
     }
   };
