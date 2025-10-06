@@ -2039,14 +2039,23 @@ const handleSubmit = async (
           onSubmit={handleMergeSubmit}
         />
 
-        {selectedInvoice && (
-          <InvoiceModal
-            invoice={selectedInvoice}
-            onClose={() => setSelectedInvoice(null)}
-            onRegister={(invoice) => handleRegisterInvoice(invoice)}
-            isViewOnly={true}
-          />
-        )}
+{selectedInvoice && (
+  <InvoiceModal
+    invoice={selectedInvoice}
+    onClose={() => setSelectedInvoice(null)}
+    onRegister={(invoice) => handleRegisterInvoice(invoice)}
+    onInvoiceUpdate={(updatedInvoice) => {
+      // ✅ State update karo parent mein bhi
+      setExistingInvoices(prev => 
+        prev.map(inv => 
+          inv.id === updatedInvoice.id ? updatedInvoice : inv
+        )
+      );
+      setSelectedInvoice(updatedInvoice); // Modal mein bhi update ho
+    }}
+    isViewOnly={true}
+  />
+)}
 
         {rowClickModal.isOpen && (
           <RowClickModal

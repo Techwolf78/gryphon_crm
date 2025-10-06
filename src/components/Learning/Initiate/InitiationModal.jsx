@@ -1064,19 +1064,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
       const loadedDomains = [];
       const loadedTable1Data = {};
 
-      // helper to sum assigned hours in a saved row
-      const sumAssignedInRow = (row) => {
-        let sum = 0;
-        if (row.assignedHours) sum += Number(row.assignedHours || 0);
-        if (row.batches && row.batches.length > 0) {
-          row.batches.forEach((b) => {
-            sum += Number(b.assignedHours || 0);
-            // trainers' assignedHours are usually part of batch-level allocation, skip to avoid double-counting
-          });
-        }
-        return sum;
-      };
-
       // For each domain in the current phase, also load other phases to compute already-used hours
       domainsSnap.forEach((docSnap) => {
         loadedDomains.push(docSnap.id);
@@ -1110,50 +1097,15 @@ function InitiationModal({ training, onClose, onConfirm }) {
         );
         const currentData = currentDoc.exists() ? currentDoc.data() : null;
 
-        // compute used hours across other phases for each specialization
-        const usedBySpec = {}; // specialization -> usedHours
-        for (const phase of PHASE_OPTIONS) {
-          if (phase === currentPhase) continue; // we only want prior/other phases' usage
-          const otherDoc = await getDoc(
-            doc(
-              db,
-              "trainingForms",
-              training.id,
-              "trainings",
-              phase,
-              "domains",
-              domain
-            )
-          );
-          if (!otherDoc.exists()) continue;
-          const otherData = otherDoc.data();
-          const rows = otherData.table1Data || [];
-          rows.forEach((r) => {
-            const spec = r.batch || r.specialization || "";
-            const used = sumAssignedInRow(r);
-            usedBySpec[spec] = (usedBySpec[spec] || 0) + Number(used || 0);
-          });
-        }
-
         // Build the table data for this domain taking into account used hours
         const rowsForDomain = (currentData?.table1Data || []).map((row) => {
-          const spec = row.batch || row.specialization || "";
           const totalDomainHours = getDomainHours(domain) || 0; // domain-level total
-          const used = Number(usedBySpec[spec] || 0);
-          const remaining = Math.max(0, totalDomainHours - used);
-
-          // Adjust row.hrs and batches assignedHours to not exceed remaining
-          const adjustedBatches = (row.batches || []).map((b) => ({
-            ...b,
-            assignedHours: Math.min(Number(b.assignedHours || 0), remaining),
-          }));
 
           // Restore merge state from persisted data
           const restoredRow = {
             ...row,
-            hrs: remaining,
-            assignedHours: Math.min(Number(row.assignedHours || 0), remaining),
-            batches: adjustedBatches,
+            hrs: totalDomainHours,
+            batches: row.batches || [],
           };
 
           // Preserve merge metadata if it exists in the persisted data
@@ -1179,10 +1131,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
           loadedTable1Data[domain] = courses.map((course) => ({
             batch: course.specialization,
             stdCount: course.students,
-            hrs: Math.max(
-              0,
-              domainHours - (usedBySpec[course.specialization] || 0)
-            ),
+            hrs: domainHours,
             assignedHours: 0,
             batches: [
               {
