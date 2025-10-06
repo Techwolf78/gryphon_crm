@@ -294,7 +294,6 @@ function Sales() {
 
   const totalTCV = useMemo(() => {
     const sum = allVisibleLeads.reduce((sum, [, lead]) => sum + (lead.tcv || 0), 0);
-    console.log('Total TCV calculated:', sum);
     return sum;
   }, [allVisibleLeads]);
 
@@ -318,29 +317,22 @@ function Sales() {
 
   const formatCurrency = (amount) => {
     const numAmount = Number(amount);
-    console.log('Formatting currency for amount:', amount, 'numAmount:', numAmount);
     if (numAmount > 10000000) {
       const crores = numAmount / 10000000;
       let str = crores.toFixed(4);
       str = str.replace(/\.?0+$/, '');
-      console.log('Formatted as crores:', str);
       return `₹${str} cr`;
     } else {
       const formatted = `₹${numAmount.toLocaleString('en-IN')}`;
-      console.log('Formatted normally:', formatted);
       return formatted;
     }
   };
 
   useEffect(() => {
-    console.log('Current user dept:', userData?.department, 'role:', userData?.role);
-    if (userData?.department === "Admin" && userData?.role === "Director") {
-      console.log('Displaying TCV for Admin Director:', totalTCV, formatCurrency(totalTCV));
-    }
+    // TCV display logic for Admin Director users
   }, [userData, totalTCV]);
 
   const showTCV = userData?.department === "Admin" && userData?.role === "Director";
-  console.log('TCV shown:', showTCV);
 
   const filteredLeads = useMemo(() => {
     return Object.entries(leads).filter(([, lead]) => {

@@ -553,6 +553,25 @@ function GenerateTrainerInvoice() {
     }));
   };
 
+  const toggleAllColleges = () => {
+    const colleges = Object.keys(filteredGroupedData);
+    const allExpanded = colleges.every(college => expandedPhases[college]);
+    
+    const newExpandedState = {};
+    colleges.forEach(college => {
+      newExpandedState[college] = !allExpanded;
+      // Also toggle all phases within each college
+      Object.keys(filteredGroupedData[college]).forEach(phase => {
+        newExpandedState[`${college}_${phase}`] = !allExpanded;
+      });
+    });
+    
+    setExpandedPhases(prev => ({
+      ...prev,
+      ...newExpandedState
+    }));
+  };
+
   const handleGenerateInvoice = (trainer) => {
     setSelectedTrainer(trainer);
     setShowInvoiceModal(true);
@@ -1079,10 +1098,11 @@ function GenerateTrainerInvoice() {
             applyFilters={applyFilters}
             showOnlyActive={showOnlyActive}
             setShowOnlyActive={setShowOnlyActive}
-            handleRefreshData={handleRefreshData}
             exporting={exporting}
             setExporting={setExporting}
             filteredGroupedData={filteredGroupedData}
+            expandedPhases={expandedPhases}
+            toggleAllColleges={toggleAllColleges}
           />
 
           <div className="p-1 sm:p-2">

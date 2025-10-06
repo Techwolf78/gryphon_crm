@@ -451,6 +451,12 @@ const formatIndianNumber = (num, decimals = 2) => {
         const newDocRef = doc(db, "trainingForms", newDocId);
         await setDoc(newDocRef, mergedData);
 
+        // 🔄 DUPLICATE ALL SUBCOLLECTIONS from old document to new document
+        await duplicateSubcollections(oldDocRef, newDocRef);
+
+        // 🔄 UPDATE TRAINER ASSIGNMENTS - Replace old project code with new project code
+        await updateTrainerAssignments(originalProjectCode, newProjectCode);
+
         // Handle placementData: Fetch old, delete, and create new with merged data
         const oldPlacementRef = doc(db, "placementData", oldDocId);
         const oldPlacementSnap = await getDoc(oldPlacementRef);
@@ -508,6 +514,185 @@ const formatIndianNumber = (num, decimals = 2) => {
   };
   const projectCodeToDocId = (projectCode) => projectCode.replace(/\//g, "-");
 
+  // Function to update trainerAssignments collection when project code changes
+  const updateTrainerAssignments = async (oldProjectCode, newProjectCode) => {
+    try {
+      console.log(`🔄 Updating trainer assignments: ${oldProjectCode} → ${newProjectCode}`);
+      
+      // Convert project codes to the format used in document IDs (replace / with -)
+      const oldProjectCodeFormatted = oldProjectCode.replace(/\//g, "-");
+      const newProjectCodeFormatted = newProjectCode.replace(/\//g, "-");
+      
+      console.log(`📝 Formatted codes: ${oldProjectCodeFormatted} → ${newProjectCodeFormatted}`);
+      
+      // The trainer assignment document ID pattern is:
+      // {projectCode}-{year}-{branch}-{specialization}-{phaseBase}-phase-{phaseNumber}-{trainerId}-{date}
+      // Example: RC-MBA-1st-OT-26-27-phase-1-GA-T015-2025-10-03
+      
+      // Query all trainer assignments with the old project code in sourceTrainingId
+      const trainerAssignmentsQuery = query(
+        collection(db, "trainerAssignments"), 
+        where("sourceTrainingId", "==", oldProjectCode)
+      );
+      const assignmentsSnapshot = await getDocs(trainerAssignmentsQuery);
+      
+      if (!assignmentsSnapshot.empty) {
+        console.log(`📋 Found ${assignmentsSnapshot.size} trainer assignments to update`);
+        
+        // Update each assignment with the new project code and new document ID
+        for (const assignmentDoc of assignmentsSnapshot.docs) {
+          const oldDocId = assignmentDoc.id;
+          const assignmentData = assignmentDoc.data();
+          
+          console.log(`🔍 Processing document: ${oldDocId}`);
+          
+          // The document ID structure: {projectCode}-{year}-{branch}-{specialization}-{phaseBase}-phase-{phaseNumber}-{trainerId}-{date}
+          // We need to replace the {projectCode} part at the beginning
+          // Parse the document ID to extract parts
+          const docParts = oldDocId.split('-');
+          if (docParts.length >= 8) {
+            // Replace the first part (project code) with the new project code
+            // For RC-MBA-1st-OT-26-27-phase-1-GA-T015-2025-10-03:
+            // docParts[0] = 'RC' (old project code)
+            // Replace 'RC' with new project code parts
+            
+            const oldPCParts = oldProjectCodeFormatted.split('-');
+            const newPCParts = newProjectCodeFormatted.split('-');
+            
+            // Replace the project code parts at the beginning
+            const newDocParts = [...docParts];
+            for (let i = 0; i < oldPCParts.length && i < newPCParts.length; i++) {
+              newDocParts[i] = newPCParts[i];
+            }
+            
+            const newDocId = newDocParts.join('-');
+            
+            console.log(`🆔 Document ID change: ${oldDocId} → ${newDocId}`);
+            
+            // Updated data with new sourceTrainingId
+            const updatedData = {
+              ...assignmentData,
+              sourceTrainingId: newProjectCode,
+              updatedAt: new Date()
+            };
+            
+            // Create new document with new ID
+            const newDocRef = doc(db, "trainerAssignments", newDocId);
+            await setDoc(newDocRef, updatedData);
+            console.log(`✅ Created new trainer assignment: ${newDocId}`);
+            
+            // Delete old document
+            await deleteDoc(assignmentDoc.ref);
+            console.log(`🗑️ Deleted old trainer assignment: ${oldDocId}`);
+          } else {
+            console.log(`⚠️ Unexpected document ID format: ${oldDocId}`);
+          }
+        }
+        
+        console.log(`✅ All trainer assignments migrated to new project code: ${newProjectCode}`);
+      } else {
+        console.log(`ℹ️ No trainer assignments found for project code: ${oldProjectCode}`);
+        
+        // Also try querying with formatted project code in case it's stored differently
+        const alternativeQuery = query(
+          collection(db, "trainerAssignments"), 
+          where("sourceTrainingId", "==", oldProjectCodeFormatted)
+        );
+        const alternativeSnapshot = await getDocs(alternativeQuery);
+        
+        if (!alternativeSnapshot.empty) {
+          console.log(`📋 Found ${alternativeSnapshot.size} trainer assignments with formatted project code`);
+          
+          for (const assignmentDoc of alternativeSnapshot.docs) {
+            const oldDocId = assignmentDoc.id;
+            const assignmentData = assignmentDoc.data();
+            
+            console.log(`🔍 Processing document: ${oldDocId}`);
+            
+            const docParts = oldDocId.split('-');
+            if (docParts.length >= 8) {
+              const oldPCParts = oldProjectCodeFormatted.split('-');
+              const newPCParts = newProjectCodeFormatted.split('-');
+              
+              const newDocParts = [...docParts];
+              for (let i = 0; i < oldPCParts.length && i < newPCParts.length; i++) {
+                newDocParts[i] = newPCParts[i];
+              }
+              
+              const newDocId = newDocParts.join('-');
+              
+              console.log(`🆔 Document ID change: ${oldDocId} → ${newDocId}`);
+              
+              const updatedData = {
+                ...assignmentData,
+                sourceTrainingId: newProjectCode,
+                updatedAt: new Date()
+              };
+              
+              const newDocRef = doc(db, "trainerAssignments", newDocId);
+              await setDoc(newDocRef, updatedData);
+              console.log(`✅ Created new trainer assignment: ${newDocId}`);
+              
+              await deleteDoc(assignmentDoc.ref);
+              console.log(`🗑️ Deleted old trainer assignment: ${oldDocId}`);
+            } else {
+              console.log(`⚠️ Unexpected document ID format: ${oldDocId}`);
+            }
+          }
+        } else {
+          console.log(`ℹ️ No trainer assignments found with either format for: ${oldProjectCode} or ${oldProjectCodeFormatted}`);
+        }
+      }
+    } catch (error) {
+      console.error("Error updating trainer assignments:", error);
+      // Don't throw error, just log it so main operation can continue
+    }
+  };
+
+  // Function to recursively duplicate all subcollections from old document to new document
+  const duplicateSubcollections = async (oldDocRef, newDocRef) => {
+    try {
+      // Known subcollections in trainingForms documents (add more as needed)
+      const knownSubcollections = ['trainings', 'assignments', 'evaluations', 'reports', 'students', 'modules', 'sessions', 'domains', 'phases'];
+      
+      for (const subcollectionName of knownSubcollections) {
+        try {
+          // Get all documents from the subcollection in old document
+          const oldSubcollectionRef = collection(oldDocRef, subcollectionName);
+          const subcollectionSnapshot = await getDocs(oldSubcollectionRef);
+          
+          if (!subcollectionSnapshot.empty) {
+            console.log(`🔄 Starting subcollection: ${subcollectionName} (${subcollectionSnapshot.size} documents)`);
+            
+            // Process each document in the subcollection sequentially to ensure proper copying
+            for (const subDoc of subcollectionSnapshot.docs) {
+              console.log(`  📄 Copying document: ${subcollectionName}/${subDoc.id}`);
+              
+              // Create the corresponding document in the new location
+              const newSubDocRef = doc(newDocRef, subcollectionName, subDoc.id);
+              
+              // Copy the document data first
+              await setDoc(newSubDocRef, subDoc.data());
+              console.log(`  ✅ Document data copied: ${subcollectionName}/${subDoc.id}`);
+              
+              // 🔄 RECURSIVELY copy any nested subcollections within this document
+              const oldNestedDocRef = doc(oldDocRef, subcollectionName, subDoc.id);
+              await duplicateSubcollections(oldNestedDocRef, newSubDocRef);
+              console.log(`  🔄 Nested subcollections processed for: ${subcollectionName}/${subDoc.id}`);
+            }
+            
+            console.log(`✅ Completed subcollection: ${subcollectionName}`);
+          }
+        } catch (error) {
+          console.log(`⚠️ Subcollection '${subcollectionName}' not found or error: ${error.message}`);
+        }
+      }
+    } catch (error) {
+      console.error("Error duplicating subcollections:", error);
+      // Don't throw error, just log it so main operation can continue
+    }
+  };
+
   const goToNextSection = () => {
     const currentIndex = sections.indexOf(activeSection);
     if (currentIndex < sections.length - 1) {
@@ -522,16 +707,43 @@ const formatIndianNumber = (num, decimals = 2) => {
     }
   };
 
+  // Validation function to check if form can be submitted
+  const canSubmit = () => {
+    // College code is required
+    if (!formData.collegeCode || formData.collegeCode.trim() === '') {
+      return false;
+    }
+    // Topics validation (existing)
+    if (activeSection === "topics" && topicErrors.some(e => !!e)) {
+      return false;
+    }
+    return true;
+  };
+
 // Update handleChange to auto-update projectCode when collegeCode changes
 const handleChange = (e) => {
   const { name, value } = e.target;
   let updatedFormData = { ...formData, [name]: value };
 
-  // Auto-update projectCode if collegeCode changes
+  // Special handling for college code - only alphabets and auto-uppercase
   if (name === "collegeCode") {
-    const parts = lead.projectCode.split('/');
-    parts[0] = value; // Replace only the collegeCode part
-    updatedFormData.projectCode = parts.join('/');
+    // Remove non-alphabetic characters and convert to uppercase
+    const cleanValue = value.replace(/[^A-Za-z]/g, '').toUpperCase();
+    updatedFormData.collegeCode = cleanValue;
+    
+    // Extract the existing project code parts
+    const currentProjectCode = formData.projectCode || lead.projectCode || "";
+    const parts = currentProjectCode.split("/");
+    
+    // If we have a valid project code structure, update only the college code part
+    if (parts.length >= 4) {
+      // Structure: COLLEGE_CODE/COURSE/YEAR/TYPE/YEAR_RANGE
+      parts[0] = cleanValue; // Update college code (already uppercase)
+      updatedFormData.projectCode = parts.join("/");
+    } else {
+      // If no valid structure exists, create a basic one with college code
+      updatedFormData.projectCode = `${cleanValue}/${formData.course || "MBA"}/${formData.year || "1st"}/${formData.deliveryType || "OT"}/${formData.passingYear || "26-27"}`;
+    }
   }
 
   setFormData(updatedFormData);
@@ -660,23 +872,41 @@ const handleChange = (e) => {
                       type="text"
                       name="projectCode"
                       value={formData.projectCode}
-                      onChange={handleChange}
-                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm bg-gray-100 cursor-not-allowed"
+                      readOnly
+                      disabled
+                      title="Project code cannot be modified"
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Project code is system-generated and cannot be edited
+                    </p>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      College Code
+                      College Code *
                     </label>
                     <input
                       type="text"
                       name="collegeCode"
                       value={formData.collegeCode}
                       onChange={handleChange}
-                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="TST"
+                      className={`block w-full px-3 py-2 border rounded-lg shadow-sm uppercase ${
+                        formData.collegeCode && formData.collegeCode.trim() !== ''
+                          ? "border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                          : "border-red-300 focus:ring-red-500 focus:border-red-500"
+                      }`}
+                      placeholder="RC"
+                      pattern="[A-Za-z]*"
+                      maxLength="10"
+                      title="Only alphabets allowed, automatically converted to uppercase"
+                      required
                     />
+                    {(!formData.collegeCode || formData.collegeCode.trim() === '') && (
+                      <p className="text-xs text-red-600 mt-1">
+                        College Code is required
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -1896,7 +2126,7 @@ const handleChange = (e) => {
                 </button>
               )}
 
-              {activeSection !== sections[sections.length - 1] ? (
+              {activeSection !== sections[sections.length - 1] && (
                 <button
                   type="button"
                   onClick={goToNextSection}
@@ -1908,38 +2138,44 @@ const handleChange = (e) => {
                 >
                   Next <FiArrowRight className="ml-2" />
                 </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmation(true)}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center"
-                  disabled={loading}
-                >
-                  Submit Changes
-                  {loading && (
-                    <svg
-                      className="animate-spin h-5 w-5 ml-2 -mr-1 text-white"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4.93 4.93a10 10 0 0114.14 14.14M2.05 12a9.95 9.95 0 001.88 5.66M12 22c-5.52 0-10-4.48-10-10S6.48 2 12 2s10 4.48 10 10 10z"
-                      />
-                    </svg>
-                  )}
-                </button>
               )}
+
+              {/* Submit button available on all sections */}
+              <button
+                type="button"
+                onClick={() => setShowConfirmation(true)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 flex items-center ${
+                  canSubmit() && !loading
+                    ? "bg-green-600 text-white hover:bg-green-700 focus:ring-green-500"
+                    : "bg-gray-400 text-gray-200 cursor-not-allowed"
+                }`}
+                disabled={loading || !canSubmit()}
+                title={!canSubmit() ? "Please fill in the required College Code field" : "Submit changes"}
+              >
+                Submit Changes
+                {loading && (
+                  <svg
+                    className="animate-spin h-5 w-5 ml-2 -mr-1 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4.93 4.93a10 10 0 0114.14 14.14M2.05 12a9.95 9.95 0 001.88 5.66M12 22c-5.52 0-10-4.48-10-10S6.48 2 12 2s10 4.48 10 10 10z"
+                    />
+                  </svg>
+                )}
+              </button>
             </div>
           </div>
         </form>

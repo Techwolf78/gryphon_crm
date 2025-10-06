@@ -149,7 +149,7 @@ function TrainerRow({
 
   return (
     <tr className="hover:bg-gray-50/50 transition-colors">
-      <td className="px-3 py-3 w-[180px]">
+      <td className="px-3 py-3">
         <div className="flex items-center min-w-0">
           <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg flex items-center justify-center">
             <FiUser className="text-blue-600" />
@@ -167,21 +167,21 @@ function TrainerRow({
           </div>
         </div>
       </td>
-      <td className="px-3 py-3 w-[160px]">
-        <div className="space-y-1 min-w-0">
-          <div className="text-sm font-semibold text-gray-900 truncate" title={item.collegeName || item.businessName.split('/')[0].trim() || item.businessName}>
+      <td className="px-3 py-3 max-w-0">
+        <div className="space-y-1 min-w-0 max-w-full">
+          <div className="text-sm font-semibold text-gray-900 truncate max-w-full" title={item.collegeName || item.businessName.split('/')[0].trim() || item.businessName}>
             {item.collegeName || item.businessName.split('/')[0].trim() || item.businessName}
           </div>
-          <div className="text-xs text-gray-600 truncate" title={item.allProjects.join(", ")}>
+          <div className="text-xs text-gray-600 truncate max-w-full" title={item.allProjects.join(", ")}>
             {item.allProjects.join(", ")}
           </div>
         </div>
       </td>
-      <td className="px-3 py-3 w-[120px]">
+      <td className="px-3 py-3">
         <div className="text-sm font-medium text-gray-800 truncate" title={item.allDomains.join(", ")}>{item.allDomains.join(", ")}</div>
       </td>
 
-      <td className="px-3 py-3 w-[140px]">
+      <td className="px-3 py-3">
         <div className="space-y-1 min-w-0">
           <div className="flex items-center gap-1 text-xs text-gray-700">
             <FiCalendar className="text-blue-500 flex-shrink-0 text-xs" />
@@ -208,8 +208,8 @@ function TrainerRow({
           )}
         </div>
       </td>
-      <td className="px-3 py-3 w-[300px]">
-        <div className="space-y-2 min-w-0 max-w-[280px]">
+      <td className="px-3 py-3">
+        <div className="space-y-2 min-w-0">
           {(() => {
             // 🐛 DEBUG: Log button rendering logic
             console.log(`🎛️ Button logic for ${item.trainerName}:`, {
@@ -225,26 +225,6 @@ function TrainerRow({
           {item.hasExistingInvoice ? (
             <>
               {console.log(`✅ Rendering EXISTING invoice buttons for ${item.trainerName}`)}
-              {/* Compact Status Badge */}
-              <div className="flex justify-center">
-                <div
-                  className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
-                    uiStatus === "done"
-                      ? "bg-green-100 text-green-800"
-                      : uiStatus === "pending"
-                      ? "bg-amber-100 text-amber-800"
-                      : "bg-blue-100 text-blue-800"
-                  }`}
-                >
-                  {uiStatus === "done" && <FiCheckCircle className="mr-1 w-3 h-3" />}
-                  {uiStatus === "approve"
-                    ? "✋ Needs Approval"
-                    : uiStatus === "pending"
-                    ? "⏳ Pending"
-                    : "✅ Complete"}
-                </div>
-              </div>
-
               {/* Compact Action Buttons - Single Row */}
               <div className="flex gap-1 w-full">
                 <button
@@ -311,7 +291,7 @@ function TrainerRow({
                   className="w-full inline-flex items-center justify-center px-4 py-3 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all shadow-sm hover:shadow-md border border-blue-600"
                 >
                   <FiFileText className="w-5 h-5 mr-2" />
-                  🚀 Generate Invoice
+                  Generate Invoice
                 </button>
               </div>
             </>
@@ -340,7 +320,7 @@ function TrainerRow({
                   className="w-full inline-flex items-center justify-center px-4 py-3 text-sm font-medium text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed border border-gray-200"
                 >
                   <FiFileText className="w-4 h-4 mr-2" />
-                  🔒 Generate Invoice
+                  Generate Invoice
                 </button>
               </div>
             </>
