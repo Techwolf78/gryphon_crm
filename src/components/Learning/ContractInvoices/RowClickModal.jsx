@@ -469,7 +469,7 @@ const RowClickModal = ({ installment, invoice, contract, onClose }) => {
                         href="mailto:shashli@gryphonacademy.co.in"
                         className="text-blue-600 hover:text-blue-800 transition-colors"
                       >
-                        shashli@gryphonacademy.co.in
+                        shashi@gryphonacademy.co.in
                       </a>
                     </div>
 
@@ -512,7 +512,7 @@ const RowClickModal = ({ installment, invoice, contract, onClose }) => {
 
                       <div className="flex justify-between items-center py-1 border-b border-slate-100">
                         <span className="text-xs font-medium text-slate-600">IFSC Code</span>
-                        <span className="text-xs text-slate-800 font-mono">HDFC0000062</span>
+                        <span className="text-xs text-slate-800 font-mono">HDFC0000052</span>
                       </div>
 
                       <div className="flex justify-between items-center py-1 border-b border-slate-100">

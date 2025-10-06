@@ -1,13 +1,19 @@
 import React from "react";
 
-function EmptyState({ icon: Icon, title, message }) {
+function EmptyState({ icon: IconComponent, title, message }) {
   return (
-    <div className="text-center py-12 bg-gray-50 rounded-lg">
-      <Icon className="mx-auto text-4xl text-gray-300 mb-4" />
-      <h3 className="text-lg font-medium text-gray-700 mb-1">
+    <div className="text-center py-16 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200">
+      <div className="bg-white rounded-full p-4 w-20 h-20 mx-auto mb-6 shadow-sm border">
+        <IconComponent className="w-full h-full text-gray-400" />
+      </div>
+      <h3 className="text-xl font-semibold text-gray-800 mb-3">
         {title}
       </h3>
-      {message && <p className="text-gray-500">{message}</p>}
+      {message && (
+        <p className="text-gray-600 max-w-sm mx-auto leading-relaxed">
+          {message}
+        </p>
+      )}
     </div>
   );
 }

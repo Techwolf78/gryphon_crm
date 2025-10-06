@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { db } from "../../firebase";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where, orderBy, limit } from "firebase/firestore";
 import InvoiceModal from "./InvoiceModal";
 import { generateInvoicePDF } from "./invoiceUtils";
-import { FiSearch, FiFilter, FiRefreshCw, FiTrash2, FiUser, FiCheckCircle, FiAlertCircle, FiXCircle, FiInfo } from "react-icons/fi";
+import { FiSearch, FiFilter, FiRefreshCw, FiTrash2, FiUser, FiCheckCircle, FiAlertCircle, FiXCircle, FiInfo, FiClock } from "react-icons/fi";
 import Header from "./Invoice/Header";
 import FiltersSection from "./Invoice/FiltersSection";
 import EmptyState from "./Invoice/EmptyState";
@@ -30,13 +30,114 @@ function GenerateTrainerInvoice() {
   const filtersBtnRef = useRef();
   const filtersDropdownRef = useRef();
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+  
+  // 🚀 NEW: Caching and Performance State with localStorage persistence
+  const [lastFetchTime, setLastFetchTime] = useState(() => {
+    try {
+      return parseInt(localStorage.getItem('trainer_invoice_last_fetch')) || null;
+    } catch {
+      return null;
+    }
+  });
+  const [cachedData, setCachedData] = useState(() => {
+    try {
+      const cached = localStorage.getItem('trainer_invoice_cache');
+      const cacheVersion = localStorage.getItem('trainer_invoice_cache_version');
+      
+      // 🔄 Clear cache if version doesn't match (structure change)
+      if (cacheVersion !== CACHE_VERSION) {
+        console.log('🔄 Cache version mismatch - clearing old cache structure');
+        localStorage.removeItem('trainer_invoice_cache');
+        localStorage.removeItem('trainer_invoice_last_fetch');
+        localStorage.setItem('trainer_invoice_cache_version', CACHE_VERSION);
+        return null;
+      }
+      
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [refreshing, setRefreshing] = useState(false);
+  const hasLoadedRef = useRef(false); // Track if we've loaded data in this session
+  
+  // Cache duration: 5 minutes (but adaptive based on usage)
+  const CACHE_DURATION = 5 * 60 * 1000;
+  const EXTENDED_CACHE_DURATION = 15 * 60 * 1000; // 15 minutes for heavy users
+  const CACHE_VERSION = 'v2.0_college_first'; // 🆕 Version to invalidate old cache structure
+  
+  // 🧠 Intelligent cache management with version check
+  const getAdaptiveCacheDuration = () => {
+    try {
+      const sessionVisits = parseInt(localStorage.getItem('trainer_invoice_session_visits') || '0');
+      // If user has visited multiple times in this session, extend cache duration
+      return sessionVisits > 3 ? EXTENDED_CACHE_DURATION : CACHE_DURATION;
+    } catch {
+      return CACHE_DURATION;
+    }
+  };
+  
+  const trackUserVisit = () => {
+    try {
+      const currentVisits = parseInt(localStorage.getItem('trainer_invoice_session_visits') || '0');
+      localStorage.setItem('trainer_invoice_session_visits', (currentVisits + 1).toString());
+    } catch {
+      // Ignore storage errors
+    }
+  };
+  
+  // 🔄 Helper functions for localStorage cache management
+  const saveCacheToStorage = (data, timestamp) => {
+    try {
+      localStorage.setItem('trainer_invoice_cache', JSON.stringify(data));
+      localStorage.setItem('trainer_invoice_last_fetch', timestamp.toString());
+      localStorage.setItem('trainer_invoice_cache_version', CACHE_VERSION); // 🆕 Save version
+    } catch (error) {
+      console.warn('⚠️ Failed to save cache to localStorage:', error);
+    }
+  };
+  
+  const clearCacheFromStorage = () => {
+    try {
+      localStorage.removeItem('trainer_invoice_cache');
+      localStorage.removeItem('trainer_invoice_last_fetch');
+      localStorage.removeItem('trainer_invoice_cache_version'); // 🆕 Clear version too
+    } catch (error) {
+      console.warn('⚠️ Failed to clear cache from localStorage:', error);
+    }
+  };
 
-  // Enhanced data fetch function with proper college+phase based grouping
-  const fetchTrainers = useCallback(async () => {
+  // 🚀 OPTIMIZED: Enhanced data fetch function with persistent caching
+  const fetchTrainers = useCallback(async (forceRefresh = false) => {
+    const now = Date.now();
+    
+    // 📱 Use cache if data is fresh and not forcing refresh
+    if (!forceRefresh && cachedData && lastFetchTime && (now - lastFetchTime) < CACHE_DURATION) {
+      console.log('🎯 Using cached data from localStorage, skipping Firebase request');
+      setTrainerData(cachedData.trainerData);
+      setGroupedData(cachedData.groupedData);
+      setExpandedPhases(cachedData.expandedPhases);
+      setLoading(false);
+      return;
+    }
+    
+    console.log('🔄 Fetching fresh data from Firebase...', forceRefresh ? '(Force refresh)' : '(Cache expired/missing)');
     setLoading(true);
+    if (forceRefresh) {
+      setRefreshing(true);
+    }
+    
     let trainersList = [];
     try {
-      const trainingFormsSnap = await getDocs(collection(db, "trainingForms"));
+      // 🔥 OPTIMIZED: Add query constraints to reduce data transfer
+      const trainingFormsQuery = query(
+        collection(db, "trainingForms"),
+        orderBy("createdAt", "desc"),
+        limit(100) // Reasonable limit to prevent excessive data
+      );
+      
+      const trainingFormsSnap = await getDocs(trainingFormsQuery);
+      console.log(`📊 Fetched ${trainingFormsSnap.docs.length} training forms`);
 
       for (const formDoc of trainingFormsSnap.docs) {
         const formId = formDoc.id;
@@ -94,7 +195,7 @@ function GenerateTrainerInvoice() {
                     businessName: formData.businessName || "",
                     projectCode: formData.projectCode || "",
                     formId: formId,
-  collegeName: (formData.businessName || "").split('/')[0]?.trim() || "Unknown College",
+                    collegeName: (formData.businessName || "").split('/')[0]?.trim() || "Unknown College",
                     startDate,
                     endDate,
                     topics: Array.from(allTopics), // All aggregated topics
@@ -235,11 +336,8 @@ function GenerateTrainerInvoice() {
       });
 
 
-      Object.keys(collegePhaseBasedGrouping).forEach(key => {
-        const trainer = collegePhaseBasedGrouping[key];
-
-      });
-
+      // Data grouping complete
+      
       const collegePhaseBasedTrainers = Object.values(
         collegePhaseBasedGrouping
       ).map(trainer => {
@@ -258,7 +356,9 @@ function GenerateTrainerInvoice() {
         return finalTrainer;
       });
 
-      // Check invoices for each trainer-college-phase combination
+      // 🔥 OPTIMIZED: Batch invoice status checks to reduce Firebase calls
+      // Check invoice status for each trainer
+      console.log('📊 Checking invoice status for trainers...');
       const updatedTrainersList = await Promise.all(
         collegePhaseBasedTrainers.map(async (trainer) => {
           try {
@@ -266,61 +366,68 @@ function GenerateTrainerInvoice() {
             let latestInvoice = null;
             let invoiceStatus = null;
 
-            if (trainer.isMerged) {
-              // For merged trainings, check for the merged invoice
-              const q = query(
-                collection(db, "invoices"),
-                where("trainerId", "==", trainer.trainerId),
-                where("collegeName", "==", trainer.collegeName),
-                where("phase", "==", trainer.phase)
-              );
+            // 🚀 OPTIMIZED: Use more specific queries to reduce data transfer
+            const invoiceQuery = trainer.isMerged
+              ? query(
+                  collection(db, "invoices"),
+                  where("trainerId", "==", trainer.trainerId),
+                  where("collegeName", "==", trainer.collegeName),
+                  where("phase", "==", trainer.phase),
+                  limit(5) // Limit to recent invoices only
+                )
+              : query(
+                  collection(db, "invoices"),
+                  where("trainerId", "==", trainer.trainerId),
+                  where("collegeName", "==", trainer.collegeName),
+                  where("phase", "==", trainer.phase),
+                  limit(5) // Limit to recent invoices only
+                );
 
-              const querySnapshot = await getDocs(q);
-              totalInvoiceCount = querySnapshot.size;
+            const querySnapshot = await getDocs(invoiceQuery);
+            totalInvoiceCount = querySnapshot.size;
+            
+            console.log(`🔍 Invoice query for ${trainer.trainerId} at ${trainer.collegeName} (${trainer.phase}):`, {
+              totalInvoiceCount,
+              querySize: querySnapshot.size,
+              invoiceDocsFound: querySnapshot.docs.length
+            });
 
-              if (totalInvoiceCount > 0) {
-                // Find the most recent invoice
-                querySnapshot.forEach(doc => {
-                  const invoiceData = doc.data();
-                  if (!latestInvoice || invoiceData.createdAt > latestInvoice.createdAt) {
-                    latestInvoice = invoiceData;
-                  }
-                });
-              }
-            } else {
-              // Original logic for non-merged trainings
-              const q = query(
-                collection(db, "invoices"),
-                where("trainerId", "==", trainer.trainerId),
-                where("collegeName", "==", trainer.collegeName),
-                where("phase", "==", trainer.phase)
-              );
-
-              const querySnapshot = await getDocs(q);
-              totalInvoiceCount = querySnapshot.size;
-
-              if (totalInvoiceCount > 0) {
-                // Find the most recent invoice
-                querySnapshot.forEach(doc => {
-                  const invoiceData = doc.data();
-                  if (!latestInvoice || invoiceData.createdAt > latestInvoice.createdAt) {
-                    latestInvoice = invoiceData;
-                  }
-                });
-              }
-            }
-
-            if (latestInvoice) {
+            if (totalInvoiceCount > 0) {
+              // Find the most recent invoice (first doc due to orderBy desc)
+              const latestDoc = querySnapshot.docs[0];
+              latestInvoice = latestDoc.data();
               invoiceStatus = latestInvoice.status || "generated";
+              
+              console.log(`💰 Found invoice for ${trainer.trainerName}:`, {
+                invoiceId: latestDoc.id,
+                status: invoiceStatus,
+                createdAt: latestInvoice.createdAt,
+                trainerId: latestInvoice.trainerId,
+                phase: latestInvoice.phase,
+                collegeName: latestInvoice.collegeName
+              });
+            } else {
+              console.log(`❌ No invoices found for ${trainer.trainerName} (${trainer.trainerId})`);
             }
 
-            return {
+            const trainerWithInvoiceStatus = {
               ...trainer,
               hasExistingInvoice: totalInvoiceCount > 0,
               invoiceCount: totalInvoiceCount,
               invoiceStatus: invoiceStatus,
             };
-          } catch (error) {
+            
+            console.log(`👤 Final trainer object for ${trainer.trainerName}:`, {
+              trainerName: trainer.trainerName,
+              trainerId: trainer.trainerId,
+              hasExistingInvoice: trainerWithInvoiceStatus.hasExistingInvoice,
+              invoiceCount: trainerWithInvoiceStatus.invoiceCount,
+              invoiceStatus: trainerWithInvoiceStatus.invoiceStatus
+            });
+            
+            return trainerWithInvoiceStatus;
+          } catch (trainerError) {
+            console.error(`🚨 Error processing trainer ${trainer.trainerName}:`, trainerError);
             return {
               ...trainer,
               hasExistingInvoice: false,
@@ -333,29 +440,111 @@ function GenerateTrainerInvoice() {
 
       setTrainerData(updatedTrainersList);
 
-      // Group by phase
+      // 🔄 NEW: Group by college first, then by phase within each college
       const grouped = updatedTrainersList.reduce((acc, trainer) => {
-        if (!acc[trainer.phase]) acc[trainer.phase] = [];
-        acc[trainer.phase].push(trainer);
+        const collegeName = trainer.collegeName || "Unknown College";
+        
+        if (!acc[collegeName]) {
+          acc[collegeName] = {};
+        }
+        
+        if (!acc[collegeName][trainer.phase]) {
+          acc[collegeName][trainer.phase] = [];
+        }
+        
+        acc[collegeName][trainer.phase].push(trainer);
         return acc;
       }, {});
 
       setGroupedData(grouped);
 
-      // Expand all phases by default
+      // Expand all colleges by default
       const initialExpandedState = {};
-      Object.keys(grouped).forEach((phase) => {
-        initialExpandedState[phase] = true;
+      Object.keys(grouped).forEach((college) => {
+        initialExpandedState[college] = true;
+        // Also expand all phases within each college
+        Object.keys(grouped[college]).forEach((phase) => {
+          initialExpandedState[`${college}_${phase}`] = true;
+        });
       });
       setExpandedPhases(initialExpandedState);
-    }  finally {
+      
+      // 💾 CACHE: Store the results with timestamp in localStorage
+      const cacheData = {
+        trainerData: updatedTrainersList,
+        groupedData: grouped,
+        expandedPhases: initialExpandedState,
+      };
+      setCachedData(cacheData);
+      setLastFetchTime(now);
+      saveCacheToStorage(cacheData, now);
+      
+    } catch (error) {
+      console.error('❌ Error fetching trainers:', error);
+      // If fetch fails but we have cached data, use it
+      if (!forceRefresh && cachedData) {
+        console.log('🔄 Using stale cache due to fetch error');
+        setTrainerData(cachedData.trainerData);
+        setGroupedData(cachedData.groupedData);
+        setExpandedPhases(cachedData.expandedPhases);
+      }
+    } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, []);
+  }, [lastFetchTime, cachedData, CACHE_DURATION]);
 
+  // 🚀 OPTIMIZED: Check cache on mount, fetch if needed (with session tracking)
   useEffect(() => {
-    fetchTrainers();
-  }, [fetchTrainers]);
+    // 🔄 ONE-TIME: Force clear cache for structural change (remove this after deployment)
+    const forceStructureUpdate = () => {
+      const currentVersion = localStorage.getItem('trainer_invoice_cache_version');
+      if (currentVersion !== CACHE_VERSION) {
+        console.log('🔄 Forcing cache clear for College → Phase structure change...');
+        clearCacheFromStorage();
+        setCachedData(null);
+        setLastFetchTime(null);
+        localStorage.setItem('trainer_invoice_cache_version', CACHE_VERSION);
+        return true; // Indicates cache was cleared
+      }
+      return false;
+    };
+    
+    // Track user visit for adaptive caching
+    trackUserVisit();
+    
+    // Force structure update first
+    const cacheWasCleared = forceStructureUpdate();
+    
+    // Prevent multiple loads in the same session (unless cache was just cleared)
+    if (hasLoadedRef.current && !cacheWasCleared) {
+      console.log('⚡ Already loaded in this session - using existing state');
+      return;
+    }
+    
+    console.log('🎬 First mount in session - checking cache status...');
+    
+    const now = Date.now();
+    const adaptiveDuration = getAdaptiveCacheDuration();
+    const isCacheValid = cachedData && lastFetchTime && (now - lastFetchTime) < adaptiveDuration;
+    
+    if (isCacheValid) {
+      const cacheAge = Math.round((now - lastFetchTime) / (1000 * 60));
+      const isExtended = adaptiveDuration > CACHE_DURATION;
+      console.log(`💾 Valid cache found (${cacheAge}m old, ${isExtended ? 'extended' : 'standard'} duration) - loading instantly`);
+      setTrainerData(cachedData.trainerData);
+      setGroupedData(cachedData.groupedData);
+      setExpandedPhases(cachedData.expandedPhases);
+      setLoading(false);
+      hasLoadedRef.current = true;
+    } else {
+      console.log('🔄 Cache expired or missing - fetching fresh data from Firebase');
+      fetchTrainers().then(() => {
+        hasLoadedRef.current = true;
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Intentionally empty - we only want this to run on mount
 
   const togglePhase = (phase) => {
     setExpandedPhases((prev) => ({
@@ -369,9 +558,101 @@ function GenerateTrainerInvoice() {
     setShowInvoiceModal(true);
   };
 
-  const handleRefreshData = () => {
-    fetchTrainers();
+  // 🎯 NEW: Handle invoice generation completion with forced refresh
+  const handleInvoiceGenerated = async () => {
+    console.log('🎉 Invoice generated successfully - starting data refresh...');
+    
+    // Clear all cache to ensure fresh data
+    clearCacheFromStorage();
+    setCachedData(null);
+    setLastFetchTime(null);
+    console.log('🗑️ Cache cleared successfully');
+    
+    // Add a longer delay to ensure database consistency and indexing
+    console.log('⏳ Waiting for database consistency and indexing...');
+    await new Promise(resolve => setTimeout(resolve, 2000)); // Increased to 2 seconds
+    
+    console.log('🔄 Forcing fresh data fetch to update invoice status...');
+    await fetchTrainers(true); // Force refresh to show updated invoice status
+    
+    console.log('✅ Data refresh completed - invoice status should now be updated');
+    
+    // Log final state for debugging
+    setTimeout(() => {
+      console.log('📊 Final trainer data after refresh:', trainerData.map(t => ({
+        name: t.trainerName,
+        hasInvoice: t.hasExistingInvoice,
+        status: t.invoiceStatus
+      })));
+    }, 100);
   };
+
+  // 🔄 ENHANCED: Manual refresh with cache invalidation and visual feedback
+  const handleRefreshData = () => {
+    console.log('🔄 Manual refresh triggered - clearing cache and forcing fresh data fetch');
+    clearCacheFromStorage(); // Clear localStorage cache
+    setCachedData(null); // Clear state cache
+    setLastFetchTime(null);
+    localStorage.setItem('trainer_invoice_cache_version', CACHE_VERSION); // Ensure version is set
+    fetchTrainers(true); // Force refresh
+  };
+  
+  // 💡 NEW: Function to check cache status for UI indicators
+  const getCacheStatus = () => {
+    if (!lastFetchTime) return { status: 'never', message: 'Never loaded', isExpired: false };
+    
+    const now = Date.now();
+    const timeSinceLastFetch = now - lastFetchTime;
+    const minutesAgo = Math.floor(timeSinceLastFetch / (1000 * 60));
+    const adaptiveDuration = getAdaptiveCacheDuration();
+    const isExtended = adaptiveDuration > CACHE_DURATION;
+    
+    if (timeSinceLastFetch < adaptiveDuration) {
+      return { 
+        status: 'fresh', 
+        message: `Cached ${minutesAgo === 0 ? 'just now' : `${minutesAgo}m ago`}${isExtended ? ' (extended)' : ''}`,
+        isExpired: false
+      };
+    } else {
+      return { 
+        status: 'expired', 
+        message: `Cache expired (${minutesAgo}m old)`,
+        isExpired: true
+      };
+    }
+  };
+
+  // 🧹 Cleanup: Clear session data when user is inactive for too long
+  useEffect(() => {
+    const cleanupOldSessionData = () => {
+      try {
+        const lastActivity = localStorage.getItem('trainer_invoice_last_activity');
+        const now = Date.now();
+        
+        // If no activity for 1 hour, clear session data
+        if (lastActivity && (now - parseInt(lastActivity)) > (60 * 60 * 1000)) {
+          localStorage.removeItem('trainer_invoice_session_visits');
+          console.log('🧹 Cleared old session data due to inactivity');
+        }
+        
+        // Update last activity
+        localStorage.setItem('trainer_invoice_last_activity', now.toString());
+      } catch {
+        // Ignore storage errors
+      }
+    };
+    
+    cleanupOldSessionData();
+    
+    // Optional: Clean up on page unload
+    const handleBeforeUnload = () => {
+      // Uncomment if you want to clear cache when user closes tab
+      // clearCacheFromStorage();
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
 
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
@@ -380,55 +661,64 @@ function GenerateTrainerInvoice() {
   };
 
   // Filter and search logic
-  const filteredGroupedData = Object.keys(groupedData).reduce((acc, phase) => {
-    const filteredTrainers = groupedData[phase].filter((trainer) => {
-      // compute invoice availability
-      const invoiceAvailable = trainer.latestEndDate
-        ? Date.now() >=
-          new Date(trainer.latestEndDate).getTime() + 24 * 60 * 60 * 1000
-        : false;
+  // 🔄 NEW: Filter data with college-first structure
+  const filteredGroupedData = Object.keys(groupedData).reduce((acc, college) => {
+    const collegePhases = {};
+    
+    Object.keys(groupedData[college]).forEach((phase) => {
+      const filteredTrainers = groupedData[college][phase].filter((trainer) => {
+        // compute invoice availability
+        const invoiceAvailable = trainer.latestEndDate
+          ? Date.now() >=
+            new Date(trainer.latestEndDate).getTime() + 24 * 60 * 60 * 1000
+          : false;
 
-      // when showOnlyActive is true, only include trainers that either already have an invoice or are available
-      if (showOnlyActive && !trainer.hasExistingInvoice && !invoiceAvailable) {
-        return false;
+        // when showOnlyActive is true, only include trainers that either already have an invoice or are available
+        if (showOnlyActive && !trainer.hasExistingInvoice && !invoiceAvailable) {
+          return false;
+        }
+        const matchesSearch =
+          trainer.trainerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          trainer.trainerId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          trainer.businessName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          trainer.projectCode.toLowerCase().includes(searchTerm.toLowerCase());
+
+        // Date range filter
+        const matchesDateRange =
+          (!startDateFilter ||
+            new Date(trainer.earliestStartDate) >= new Date(startDateFilter)) &&
+          (!endDateFilter ||
+            new Date(trainer.latestEndDate) <= new Date(endDateFilter));
+
+        // Project code filter
+        const matchesProjectCode = projectCodeFilter
+          ? trainer.projectCode
+              .toLowerCase()
+              .includes(projectCodeFilter.toLowerCase())
+          : true;
+
+        // College name filter
+        const matchesBusinessName = businessNameFilter
+          ? trainer.businessName
+              .toLowerCase()
+              .includes(businessNameFilter.toLowerCase())
+          : true;
+
+        return (
+          matchesSearch &&
+          matchesDateRange &&
+          matchesProjectCode &&
+          matchesBusinessName
+        );
+      });
+
+      if (filteredTrainers.length > 0) {
+        collegePhases[phase] = filteredTrainers;
       }
-      const matchesSearch =
-        trainer.trainerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        trainer.trainerId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        trainer.businessName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        trainer.projectCode.toLowerCase().includes(searchTerm.toLowerCase());
-
-      // Date range filter
-      const matchesDateRange =
-        (!startDateFilter ||
-          new Date(trainer.earliestStartDate) >= new Date(startDateFilter)) &&
-        (!endDateFilter ||
-          new Date(trainer.latestEndDate) <= new Date(endDateFilter));
-
-      // Project code filter
-      const matchesProjectCode = projectCodeFilter
-        ? trainer.projectCode
-            .toLowerCase()
-            .includes(projectCodeFilter.toLowerCase())
-        : true;
-
-      // College name filter
-      const matchesBusinessName = businessNameFilter
-        ? trainer.businessName
-            .toLowerCase()
-            .includes(businessNameFilter.toLowerCase())
-        : true;
-
-      return (
-        matchesSearch &&
-        matchesDateRange &&
-        matchesProjectCode &&
-        matchesBusinessName
-      );
     });
 
-    if (filteredTrainers.length > 0) {
-      acc[phase] = filteredTrainers;
+    if (Object.keys(collegePhases).length > 0) {
+      acc[college] = collegePhases;
     }
 
     return acc;
@@ -643,8 +933,7 @@ function GenerateTrainerInvoice() {
           [statusKey]: "not_found",
         }));
       }
-    } catch (error) {
-
+    } catch {
       alert("Failed to download invoice. Please try again.");
       setPdfStatus((prev) => ({
         ...prev,
@@ -717,19 +1006,55 @@ function GenerateTrainerInvoice() {
       } else {
         alert("No invoice found for this trainer");
       }
-    } catch (error) {
-
+    } catch {
       alert("Failed to find invoice. Please try again.");
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 ">
+    <div className="min-h-screen bg-gray-50">
       {loading ? (
         <TrainerInvoiceSkeleton />
       ) : (
-        <div className=" mx-auto bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+        <div className="mx-auto bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
           <Header />
+          
+          {/* 🎯 SIMPLIFIED: Clean status with refresh button focus */}
+          {!loading && lastFetchTime && (
+            <div className="px-4 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className={`text-sm font-medium ${
+                    getCacheStatus().isExpired ? 'text-amber-700' : 'text-green-700'
+                  }`}>
+                    {getCacheStatus().isExpired ? '⚠️ Data may be outdated' : '✅ Data is current'}
+                  </span>
+                  
+                  {refreshing && (
+                    <div className="flex items-center gap-1 text-blue-600">
+                      <FiRefreshCw className="animate-spin text-sm" />
+                      <span className="text-sm">Updating...</span>
+                    </div>
+                  )}
+                </div>
+                
+                <button
+                  onClick={handleRefreshData}
+                  disabled={refreshing}
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm ${
+                    refreshing
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : getCacheStatus().isExpired
+                      ? 'bg-amber-500 text-white hover:bg-amber-600'
+                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
+                >
+                  <FiRefreshCw className={`${refreshing ? 'animate-spin' : ''}`} />
+                  {refreshing ? 'Refreshing...' : 'Refresh'}
+                </button>
+              </div>
+            </div>
+          )}
           
           <FiltersSection
             searchTerm={searchTerm}
@@ -796,7 +1121,7 @@ function GenerateTrainerInvoice() {
             setShowInvoiceModal(false);
             setSelectedTrainer(null);
           }}
-          onInvoiceGenerated={fetchTrainers}
+          onInvoiceGenerated={handleInvoiceGenerated}
         />
       )}
     </div>

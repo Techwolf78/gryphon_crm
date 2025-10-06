@@ -15,121 +15,132 @@ function TrainerTable({
   getDownloadStatus,
   formatDate
 }) {
-  // Naya grouping: Phase -> College -> Trainers (with proper college names)
-  const phaseCollegeGroupedData = {};
+  // 🔄 NEW: Structure is now College → Phase → Trainers
   
-  Object.keys(filteredGroupedData).forEach(phase => {
-    phaseCollegeGroupedData[phase] = {};
-    
-    filteredGroupedData[phase].forEach(trainer => {
-      // College name properly use karo
-      const collegeName = trainer.collegeName || "Unknown College";
-      
-      if (!phaseCollegeGroupedData[phase][collegeName]) {
-        phaseCollegeGroupedData[phase][collegeName] = [];
-      }
-      
-      phaseCollegeGroupedData[phase][collegeName].push(trainer);
-    });
-  });
-
   return (
-    <div className="space-y-4">
-      {Object.keys(phaseCollegeGroupedData).map((phase) => (
-        <div key={phase} className="border border-gray-200 rounded-lg overflow-hidden">
-          {/* Phase Header */}
+    <div className="space-y-6">
+      {Object.keys(filteredGroupedData).map((collegeName) => (
+        <div key={collegeName} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200">
+          {/* Enhanced College Header */}
           <div
-            className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 flex justify-between items-center cursor-pointer hover:bg-blue-100 transition-colors"
-            onClick={() => togglePhase(phase)}
+            className="bg-gradient-to-r from-green-50 via-emerald-50 to-green-50 px-6 py-3 flex justify-between items-center cursor-pointer hover:from-green-100 hover:to-emerald-100 transition-all duration-200 border-l-4 border-green-500"
+            onClick={() => togglePhase(collegeName)}
           >
             <div className="flex items-center gap-3">
-              {expandedPhases[phase] ? (
-                <FiChevronUp className="text-blue-600 text-lg" />
-              ) : (
-                <FiChevronDown className="text-blue-600 text-lg" />
-              )}
-              <div>
-                <h3 className="font-bold text-gray-800 text-lg">
-                  {phase.toUpperCase()} PHASE
-                </h3>
-                <p className="text-sm text-gray-600 flex items-center gap-2 mt-1">
-                  <FiHome className="text-blue-500" />
-                  {Object.keys(phaseCollegeGroupedData[phase]).length} colleges • 
-                  <FiUsers className="text-green-500 ml-1" />
-                  {filteredGroupedData[phase].length} trainers total
-                </p>
+              <div className="p-1 rounded-full bg-green-100 hover:bg-green-200 transition-colors">
+                {expandedPhases[collegeName] ? (
+                  <FiChevronUp className="text-green-600 text-lg" />
+                ) : (
+                  <FiChevronDown className="text-green-600 text-lg" />
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="bg-green-100 text-green-700 text-sm font-semibold px-3 py-1 rounded-lg border border-green-200 shadow-sm">
+                  🏛️ {collegeName}
+                </span>
+                <div className="hidden sm:flex items-center gap-4 text-sm text-gray-600">
+                  <span className="flex items-center gap-1 bg-white px-3 py-1 rounded-lg border shadow-sm">
+                    <FiUsers className="text-blue-500" />
+                    <span className="font-medium">{Object.keys(filteredGroupedData[collegeName]).length}</span>
+                    <span className="text-gray-500">phases</span>
+                  </span>
+                  <span className="flex items-center gap-1 bg-white px-3 py-1 rounded-lg border shadow-sm">
+                    <FiHome className="text-green-500" />
+                    <span className="font-medium">
+                      {Object.values(filteredGroupedData[collegeName]).reduce((total, phaseTrainers) => total + phaseTrainers.length, 0)}
+                    </span>
+                    <span className="text-gray-500">trainers</span>
+                  </span>
+                </div>
               </div>
             </div>
-            <span className="text-sm text-blue-600 font-medium bg-blue-100 px-3 py-1 rounded-full">
-              {expandedPhases[phase] ? "Collapse" : "Expand"} Phase
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-green-600 font-medium bg-white px-3 py-1 rounded-lg border shadow-sm">
+                {expandedPhases[collegeName] ? "🔽 Collapse" : "▶️ Expand"}
+              </span>
+            </div>
           </div>
 
-          {/* Colleges and Trainers */}
-          {expandedPhases[phase] && (
+          {/* Phases and Trainers */}
+          {expandedPhases[collegeName] && (
             <div className="bg-white">
-              {Object.keys(phaseCollegeGroupedData[phase]).map((collegeName) => (
-                <div key={collegeName} className="border-b border-gray-100 last:border-b-0">
-                  {/* College Header */}
-                  <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+              {Object.keys(filteredGroupedData[collegeName]).map((phase) => (
+                <div key={`${collegeName}_${phase}`} className="border-b border-gray-100 last:border-b-0">
+                  {/* Enhanced Phase Header within College */}
+                  <div 
+                    className="bg-gradient-to-r from-blue-50/30 to-indigo-50/30 px-6 py-4 border-b border-blue-100 cursor-pointer hover:from-blue-100/50 hover:to-indigo-100/50 transition-all duration-200"
+                    onClick={() => togglePhase(`${collegeName}_${phase}`)}
+                  >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <FiHome className="text-gray-600 text-xl" />
+                        <div className="p-1 rounded-full bg-blue-100 hover:bg-blue-200 transition-colors">
+                          {expandedPhases[`${collegeName}_${phase}`] ? (
+                            <FiChevronUp className="text-blue-600" />
+                          ) : (
+                            <FiChevronDown className="text-blue-600" />
+                          )}
+                        </div>
                         <div>
-                          <h4 className="font-semibold text-gray-800 text-lg">
-                            {collegeName}
+                          <h4 className="font-semibold text-gray-900 text-lg">
+                            📚 {phase}
                           </h4>
-                          <p className="text-sm text-gray-600 flex items-center gap-2 mt-1">
-                            <FiUsers className="text-gray-500" />
-                            {phaseCollegeGroupedData[phase][collegeName].length} 
-                            {phaseCollegeGroupedData[phase][collegeName].length === 1 ? " trainer" : " trainers"} in {phase} phase
-                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="inline-flex items-center text-sm text-gray-600 bg-white px-3 py-1 rounded-lg border shadow-sm">
+                              <FiUsers className="text-blue-500 text-sm mr-2" />
+                              <span className="font-medium">{filteredGroupedData[collegeName][phase].length}</span>
+                              <span className="ml-1">{filteredGroupedData[collegeName][phase].length === 1 ? "trainer" : "trainers"}</span>
+                            </span>
+                          </div>
                         </div>
                       </div>
-                      <span className="text-xs text-gray-500 bg-white px-3 py-2 rounded-lg border font-medium">
-                        College
-                      </span>
+                      <div className="text-xs text-blue-600 font-medium bg-white px-2 py-1 rounded-lg border shadow-sm">
+                        {expandedPhases[`${collegeName}_${phase}`] ? "🔽 Collapse" : "▶️ Expand"}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Trainers Table for this College */}
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Trainer Details
-                          </th>
-                          <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Project & Domain
-                          </th>
-                          <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Timeline & Hours
-                          </th>
-                          <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Invoice Status
-                          </th>
-                          <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200 bg-white">
-                        {phaseCollegeGroupedData[phase][collegeName].map((item, idx) => (
-                          <TrainerRow
-                            key={`${collegeName}-${idx}`}
-                            item={item}
-                            handleDownloadInvoice={handleDownloadInvoice}
-                            handleEditInvoice={handleEditInvoice}
-                            handleGenerateInvoice={handleGenerateInvoice}
-                            downloadingInvoice={downloadingInvoice}
-                            getDownloadStatus={getDownloadStatus}
-                            formatDate={formatDate}
-                          />
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  {/* Responsive Trainers Table */}
+                  {expandedPhases[`${collegeName}_${phase}`] && (
+                    <div className="overflow-x-auto overflow-y-hidden">
+                      <div className="min-w-0">
+                        <table className="w-full min-w-[900px] table-fixed">
+                          <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+                            <tr>
+                              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-[180px]">
+                                👤 Trainer Details
+                              </th>
+                              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-[160px]">
+                                🏛️ College & Project
+                              </th>
+                              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-[120px]">
+                                📚 Domain
+                              </th>
+                              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-[140px]">
+                                📅 Timeline & Hours
+                              </th>
+                              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-[300px]">
+                                💼 Invoice Status
+                              </th>
+                            </tr>
+                          </thead>
+                        <tbody className="divide-y divide-gray-200 bg-white">
+                          {filteredGroupedData[collegeName][phase].map((item, idx) => (
+                            <TrainerRow
+                              key={`${collegeName}-${phase}-${idx}`}
+                              item={item}
+                              handleDownloadInvoice={handleDownloadInvoice}
+                              handleEditInvoice={handleEditInvoice}
+                              handleGenerateInvoice={handleGenerateInvoice}
+                              downloadingInvoice={downloadingInvoice}
+                              getDownloadStatus={getDownloadStatus}
+                              formatDate={formatDate}
+                            />
+                          ))}
+                        </tbody>
+                      </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
