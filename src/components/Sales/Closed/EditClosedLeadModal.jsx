@@ -18,6 +18,7 @@ import {
   FiCheck,
   FiPlus,
   FiTrash2,
+  FiHash,
 } from "react-icons/fi";
 
 const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
@@ -70,7 +71,6 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [topicErrors, setTopicErrors] = useState([]);
   const [paymentErrors, setPaymentErrors] = useState([]);
-  const [isCustomDeliveryType, setIsCustomDeliveryType] = useState(false);
   const sections = ["basic", "contacts", "course", "topics", "financial"];
 
 // Helper for number display
@@ -95,7 +95,7 @@ const formatIndianNumber = (num, decimals = 2) => {
 };
 
   const courseSpecializations = useMemo(() => ({
-    Engineering: [
+    ENGINEERING: [
       "CS",
       "IT",
       "ENTC",
@@ -112,7 +112,7 @@ const formatIndianNumber = (num, decimals = 2) => {
     BBA: ["International Business", "General", "Finance", "Other"],
     BCA: ["Computer Applications", "Other"],
     MCA: ["Computer Science", "Other"],
-    Diploma: ["Mechanical", "Civil", "Electrical", "Computer", "Other"],
+    DIPLOMA: ["Mechanical", "Civil", "Electrical", "Computer", "Other"],
     BSC: ["Physics", "Chemistry", "Mathematics", "CS", "Other"],
     MSC: ["Physics", "Chemistry", "Mathematics", "CS", "Other"],
     Others: ["Other"],
@@ -126,11 +126,21 @@ const formatIndianNumber = (num, decimals = 2) => {
     "Looker Studio",
   ];
 
+  const deliveryTypes = useMemo(() => [
+    { value: "TP", label: "TP - Training Placement" },
+    { value: "OT", label: "OT - Only Training" },
+    { value: "IP", label: "IP - Induction Program" },
+    { value: "DM", label: "DM - Digital Marketing" },
+    { value: "SNS", label: "SNS - SNS" }
+  ], []);
+
+  const passingYearOptions = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    return Array.from({ length: 16 }, (_, i) => `${currentYear - 5 + i}-${currentYear - 4 + i}`);
+  }, []);
+
   useEffect(() => {
     if (lead) {
-      const deliveryTypes = ["TP", "OT", "IP", "DM", "SNS"];
-      setIsCustomDeliveryType(lead.deliveryType && !deliveryTypes.includes(lead.deliveryType));
-
       // Normalize courses: if the stored specialization is not one of the predefined
       // options for the course, treat it as "Other" and populate othersSpecText with the stored value
       const normalizedCourses = (lead.courses || [
@@ -217,7 +227,7 @@ const formatIndianNumber = (num, decimals = 2) => {
         isCustomCourse: !Object.prototype.hasOwnProperty.call(courseSpecializations, lead.course || ""), // Determine if it's a custom course
       });
     }
-  }, [lead, courseSpecializations]);
+  }, [lead, courseSpecializations, deliveryTypes]);
 
 
 
@@ -415,11 +425,14 @@ const formatIndianNumber = (num, decimals = 2) => {
         return { ...c, specialization: spec, students: parseInt(c.students) || 0 };
       });
 
+      // Trim trailing spaces and apply sentence case to college name before saving
+      const trimmedCollegeName = formData.collegeName.replace(/\s+$/, '').replace(/\b\w/g, (char) => char.toUpperCase());
+
       const updatedData = {
         ...formData,
         courses: coursesForSave,
-        collegeName: formData.collegeName,
-        businessName: formData.collegeName, // Sync both fields
+        collegeName: trimmedCollegeName,
+        businessName: trimmedCollegeName, // Sync both fields
         updatedAt: new Date(),
       };
 
@@ -439,8 +452,8 @@ const formatIndianNumber = (num, decimals = 2) => {
           ...originalData,
           ...updatedData,
           projectCode: newProjectCode,
-          collegeName: formData.collegeName,
-          businessName: formData.collegeName, // Sync both fields
+          collegeName: trimmedCollegeName,
+          businessName: trimmedCollegeName, // Sync both fields
         };
 
         // Delete old document in trainingForms
@@ -470,7 +483,7 @@ const formatIndianNumber = (num, decimals = 2) => {
         const leadsQuery = query(collection(db, "leads"), where("projectCode", "==", originalProjectCode));
         const leadsSnapshot = await getDocs(leadsQuery);
         leadsSnapshot.forEach(async (docSnap) => {
-          await updateDoc(docSnap.ref, { projectCode: newProjectCode, collegeName: formData.collegeName, businessName: formData.collegeName, totalCost: formData.totalCost, updatedAt: new Date() });
+          await updateDoc(docSnap.ref, { projectCode: newProjectCode, collegeName: trimmedCollegeName, businessName: trimmedCollegeName, totalCost: formData.totalCost, updatedAt: new Date() });
         });
       } else {
         // Normal update if Project Code didn't change
@@ -499,7 +512,7 @@ const formatIndianNumber = (num, decimals = 2) => {
         const leadsQuery = query(collection(db, "leads"), where("projectCode", "==", newProjectCode));
         const leadsSnapshot = await getDocs(leadsQuery);
         leadsSnapshot.forEach(async (docSnap) => {
-          await updateDoc(docSnap.ref, { collegeName: formData.collegeName, businessName: formData.collegeName, totalCost: formData.totalCost, updatedAt: new Date() });
+          await updateDoc(docSnap.ref, { collegeName: trimmedCollegeName, businessName: trimmedCollegeName, totalCost: formData.totalCost, updatedAt: new Date() });
         });
       }
 
@@ -742,7 +755,61 @@ const handleChange = (e) => {
       updatedFormData.projectCode = parts.join("/");
     } else {
       // If no valid structure exists, create a basic one with college code
-      updatedFormData.projectCode = `${cleanValue}/${formData.course || "MBA"}/${formData.year || "1st"}/${formData.deliveryType || "OT"}/${formData.passingYear || "26-27"}`;
+      const coursePart = (formData.course === "ENGINEERING" ? "ENGG" : formData.course || "MBA");
+      updatedFormData.projectCode = `${cleanValue}/${coursePart}/${formData.year || "1st"}/${formData.deliveryType || "OT"}/${formData.passingYear || "26-27"}`;
+    }
+  }
+
+  // Convert college name to sentence case (capitalize first letter of each word)
+  if (name === "collegeName") {
+    // Trim leading and trailing spaces, prevent multiple consecutive spaces, and convert to sentence case
+    const cleanValue = value.replace(/^\s+/, '').replace(/\s+/g, ' ');
+    updatedFormData.collegeName = cleanValue.replace(/\b\w/g, (char) => char.toUpperCase());
+  }
+
+  // Convert course to uppercase
+  if (name === "course") {
+    updatedFormData.course = value.toUpperCase();
+    // Update project code if it's a custom course
+    if (formData.isCustomCourse) {
+      const currentProjectCode = formData.projectCode || "";
+      const parts = currentProjectCode.split("/");
+      if (parts.length >= 5) {
+        parts[1] = value.toUpperCase();
+        updatedFormData.projectCode = parts.join("/");
+      }
+    }
+  }
+
+  // Update project code when year changes
+  if (name === "year") {
+    const currentProjectCode = formData.projectCode || lead.projectCode || "";
+    const parts = currentProjectCode.split("/");
+    if (parts.length >= 5) {
+      parts[2] = value;
+      updatedFormData.projectCode = parts.join("/");
+    }
+  }
+
+  // Update project code when delivery type changes
+  if (name === "deliveryType") {
+    const currentProjectCode = formData.projectCode || lead.projectCode || "";
+    const parts = currentProjectCode.split("/");
+    if (parts.length >= 5) {
+      parts[3] = value;
+      updatedFormData.projectCode = parts.join("/");
+    }
+  }
+
+  // Update project code when passing year changes
+  if (name === "passingYear") {
+    const currentProjectCode = formData.projectCode || lead.projectCode || "";
+    const parts = currentProjectCode.split("/");
+    if (parts.length >= 5) {
+      const passYear = value.split("-");
+      const shortPassYear = `${passYear[0].slice(-2)}-${passYear[1].slice(-2)}`;
+      parts[4] = shortPassYear;
+      updatedFormData.projectCode = parts.join("/");
     }
   }
 
@@ -808,6 +875,20 @@ const handleChange = (e) => {
             >
               <FiX className="h-6 w-6" />
             </button>
+          </div>
+
+          {/* Always visible project code display */}
+          <div className="mt-4 bg-blue-700 bg-opacity-50 rounded-lg p-3 border border-blue-500">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <FiHash className="h-4 w-4 text-blue-200" />
+                <span className="text-sm font-medium text-blue-100">Current Project Code:</span>
+              </div>
+              <div className="bg-blue-900 bg-opacity-80 px-3 py-1 rounded-md border border-blue-400">
+                <span className="text-white font-mono text-sm font-semibold">{formData.projectCode}</span>
+              </div>
+            </div>
+            <p className="text-xs text-blue-200 mt-1">Updates automatically when you change course, year, or passing year</p>
           </div>
 
           {/* Navigation Tabs */}
@@ -1561,21 +1642,52 @@ const handleChange = (e) => {
                           name="course"
                           value={formData.course || ""}
                           onChange={(e) => {
-                            const value = e.target.value;
-                            if (value === "Others") {
-                              setFormData(prev => ({
-                                ...prev,
-                                course: "",
-                                isCustomCourse: true,
-                                courses: [{ specialization: "", students: 0, othersSpecText: "" }]
-                              }));
+                            const value = e.target.value.toUpperCase();
+                            if (value === "OTHERS") {
+                              setFormData(prev => {
+                                const currentProjectCode = prev.projectCode || "";
+                                const parts = currentProjectCode.split("/");
+                                if (parts.length >= 5) {
+                                  parts[1] = "OTHERS";
+                                  return {
+                                    ...prev,
+                                    course: "",
+                                    isCustomCourse: true,
+                                    courses: [{ specialization: "", students: 0, othersSpecText: "" }],
+                                    projectCode: parts.join("/")
+                                  };
+                                } else {
+                                  return {
+                                    ...prev,
+                                    course: "",
+                                    isCustomCourse: true,
+                                    courses: [{ specialization: "", students: 0, othersSpecText: "" }]
+                                  };
+                                }
+                              });
                             } else {
-                              setFormData(prev => ({
-                                ...prev,
-                                course: value,
-                                isCustomCourse: false,
-                                courses: [{ specialization: "", students: 0, othersSpecText: "" }]
-                              }));
+                              setFormData(prev => {
+                                const currentProjectCode = prev.projectCode || "";
+                                const parts = currentProjectCode.split("/");
+                                const coursePart = value === "ENGINEERING" ? "ENGG" : value;
+                                if (parts.length >= 5) {
+                                  parts[1] = coursePart;
+                                  return {
+                                    ...prev,
+                                    course: value,
+                                    isCustomCourse: false,
+                                    courses: [{ specialization: "", students: 0, othersSpecText: "" }],
+                                    projectCode: parts.join("/")
+                                  };
+                                } else {
+                                  return {
+                                    ...prev,
+                                    course: value,
+                                    isCustomCourse: false,
+                                    courses: [{ specialization: "", students: 0, othersSpecText: "" }]
+                                  };
+                                }
+                              });
                             }
                           }}
                           className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
@@ -1598,16 +1710,35 @@ const handleChange = (e) => {
                       <button
                         type="button"
                         onClick={() => {
-                          setFormData(prev => ({
-                            ...prev,
-                            isCustomCourse: false,
-                            course: "",
-                            courses: prev.courses.map(course => ({
-                              ...course,
-                              specialization: "",
-                              othersSpecText: ""
-                            }))
-                          }));
+                          setFormData(prev => {
+                            const currentProjectCode = prev.projectCode || "";
+                            const parts = currentProjectCode.split("/");
+                            if (parts.length >= 5) {
+                              parts[1] = "";
+                              return {
+                                ...prev,
+                                isCustomCourse: false,
+                                course: "",
+                                courses: prev.courses.map(course => ({
+                                  ...course,
+                                  specialization: "",
+                                  othersSpecText: ""
+                                })),
+                                projectCode: parts.join("/")
+                              };
+                            } else {
+                              return {
+                                ...prev,
+                                isCustomCourse: false,
+                                course: "",
+                                courses: prev.courses.map(course => ({
+                                  ...course,
+                                  specialization: "",
+                                  othersSpecText: ""
+                                }))
+                              };
+                            }
+                          });
                         }}
                         className="mt-1 text-xs text-blue-600 hover:text-blue-800"
                       >
@@ -1645,17 +1776,24 @@ const handleChange = (e) => {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Delivery Type
                     </label>
-                    <input
-                      type="text"
-                      value={
-                        formData.deliveryType
-                          ? formData.deliveryType
-                          : ""
-                      }
-                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm bg-gray-100 cursor-not-allowed"
-                      readOnly
-                      disabled
-                    />
+                    <div className="relative">
+                      <select
+                        name="deliveryType"
+                        value={formData.deliveryType || ""}
+                        onChange={handleChange}
+                        className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="">Select Delivery Type</option>
+                        {deliveryTypes.map((type) => (
+                          <option key={type.value} value={type.value}>
+                            {type.label}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                        <FiChevronDown className="h-5 w-5 text-gray-400" />
+                      </div>
+                    </div>
                   </div>
 
                   {/* Passing Year dropdown */}
@@ -1663,13 +1801,24 @@ const handleChange = (e) => {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Passing Year
                     </label>
-                    <input
-                      type="text"
-                      value={formData.passingYear || ""}
-                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm bg-gray-100 cursor-not-allowed"
-                      readOnly
-                      disabled
-                    />
+                    <div className="relative">
+                      <select
+                        name="passingYear"
+                        value={formData.passingYear || ""}
+                        onChange={handleChange}
+                        className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="">Select Passing Year</option>
+                        {passingYearOptions.map((year) => (
+                          <option key={year} value={year}>
+                            {year}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                        <FiChevronDown className="h-5 w-5 text-gray-400" />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -2171,7 +2320,7 @@ const handleChange = (e) => {
                     <path
                       className="opacity-75"
                       fill="currentColor"
-                      d="M4.93 4.93a10 10 0 0114.14 14.14M2.05 12a9.95 9.95 0 001.88 5.66M12 22c-5.52 0-10-4.48-10-10S6.48 2 12 2s10 4.48 10 10 10z"
+                      d="M12 6V4a8 8 0 018 8h-2a6 6 0 01-6-6z"
                     />
                   </svg>
                 )}

@@ -1328,6 +1328,8 @@ const BatchDetailsTable = ({
   courses,
   onValidationChange,
   globalTrainerAssignments = [], // <-- pass this from parent (InitiationModal)
+  training,
+  currentTrainingAssignments = [], // <-- assignments from other domains in current training
   excludeDays = "None",
 }) => {
   const [mergeModal, setMergeModal] = useState({
@@ -2516,6 +2518,11 @@ const filteredTrainers = useMemo(() => {
 
             // Check global assignments (normalize their date too)
             for (let assignment of globalTrainerAssignments) {
+              // Skip assignments from the current training project
+              if (assignment.sourceTrainingId === training?.projectCode) {
+                continue;
+              }
+              
               const assignDate = normalizeDate(assignment.date);
               if (!assignDate) continue;
               if (
@@ -2563,6 +2570,54 @@ const filteredTrainers = useMemo(() => {
                 }
               }
             }
+
+            // Check current training assignments from other domains
+            for (let assignment of currentTrainingAssignments) {
+              const assignDate = normalizeDate(assignment.date || assignment.startDate);
+              if (!assignDate) continue;
+              if (
+                assignment.trainerId === trainer.trainerId &&
+                assignDate === dateISO
+              ) {
+                const currentTrainingConflict =
+                  assignment.dayDuration === "AM & PM" ||
+                  trainer.dayDuration === "AM & PM" ||
+                  (assignment.dayDuration === "AM" &&
+                    trainer.dayDuration === "AM") ||
+                  (assignment.dayDuration === "PM" &&
+                    trainer.dayDuration === "PM");
+                if (currentTrainingConflict) {
+                  duplicatesSet.add(trainerKey);
+
+                  // Conflict message for current training cross-domain conflicts
+                  const conflictDetails = [];
+
+                  conflictDetails.push(`🔄 Conflicting Assignment in Current Training`);
+                  conflictDetails.push(`👥 Batch: ${assignment.batchCode || 'Not specified'}`);
+                  conflictDetails.push(`🎯 Domain: ${assignment.domain || 'Not specified'}`);
+                  conflictDetails.push(`⏰ Duration: ${assignment.dayDuration || 'Not specified'}`);
+                  conflictDetails.push(`📅 Date: ${assignDate}`);
+
+                  // Add trainer name if available
+                  if (assignment.trainerName) {
+                    conflictDetails.push(`👤 Trainer: ${assignment.trainerName}`);
+                  }
+
+                  // Add new assignment attempt details
+                  conflictDetails.push(`\n🆕 Trying to Assign to Current Domain:`);
+                  conflictDetails.push(`⏰ Duration: ${trainer.dayDuration}`);
+                  conflictDetails.push(`📅 Date: ${dateISO}`);
+
+                  const message = `${
+                    trainer.trainerName || trainer.trainerId
+                  } (${
+                    trainer.trainerId
+                  }) conflicts with assignment in another domain of this training:\n\n${conflictDetails.join('\n')}`;
+
+                  errors.push({ message });
+                }
+              }
+            }
           });
         });
       });
@@ -2580,7 +2635,7 @@ const filteredTrainers = useMemo(() => {
       errors: uniqueErrors,
       duplicates: duplicates,
     };
-  }, [table1Data, globalTrainerAssignments, getDateList]);
+  }, [table1Data, globalTrainerAssignments, currentTrainingAssignments, getDateList, training]);
 
   // Update duplicate trainers and notify parent when validation result changes
   useEffect(() => {

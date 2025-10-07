@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { db } from "../../../firebase";
 import {
   doc,
@@ -111,7 +111,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
   const [hasChanges, setHasChanges] = useState(false);
 
   // Helper to generate date list, respecting excludeDays
-  const getDateList = (start, end) => {
+  const getDateList = useCallback((start, end) => {
     if (!start || !end) return [];
     const s = new Date(start);
     const e = new Date(end);
@@ -137,11 +137,24 @@ function InitiationModal({ training, onClose, onConfirm }) {
       cur.setDate(cur.getDate() + 1);
     }
     return out;
-  };
+  }, [excludeDays]);
 
   // Helper to calculate training days
   const getTrainingDays = (startDate, endDate) => {
     return getDateList(startDate, endDate).length;
+  };
+
+  const normalizeDate = (d) => {
+    if (!d) return null;
+    if (typeof d === "string") return d;
+    if (d?.toDate) return d.toDate().toISOString().slice(0, 10);
+    try {
+      const dt = new Date(d);
+      if (isNaN(dt.getTime())) return null;
+      return dt.toISOString().slice(0, 10);
+    } catch {
+      return null;
+    }
   };
 
   // Get domain hours - use custom hours if set, otherwise default from database
@@ -1220,6 +1233,46 @@ function InitiationModal({ training, onClose, onConfirm }) {
     };
   }, [training?.collegeName]);
 
+  // Compute current training assignments by domain for cross-domain duplicate detection
+  const currentTrainingAssignmentsByDomain = useMemo(() => {
+    const result = {};
+    selectedDomains.forEach((currentDomain) => {
+      const assignments = [];
+      Object.entries(table1DataByDomain).forEach(([dom, tableData]) => {
+        if (dom === currentDomain) return;
+        tableData.forEach((row) => {
+          row.batches.forEach((batch) => {
+            batch.trainers.forEach((trainer) => {
+              let dateStrings = [];
+              if (trainer.activeDates && trainer.activeDates.length > 0) {
+                dateStrings = trainer.activeDates.map(normalizeDate).filter(Boolean);
+              } else if (trainer.startDate && trainer.endDate) {
+                dateStrings = getDateList(trainer.startDate, trainer.endDate);
+              } else if (trainer.startDate) {
+                const d = normalizeDate(trainer.startDate);
+                if (d) dateStrings = [d];
+              }
+              dateStrings.forEach((dateStr) => {
+                assignments.push({
+                  trainerId: trainer.trainerId,
+                  trainerName: trainer.trainerName || trainer.trainer || "",
+                  date: dateStr,
+                  dayDuration: trainer.dayDuration || "",
+                  sourceTrainingId: training.id,
+                  domain: dom,
+                  collegeName: trainer.collegeName || training.collegeName || "",
+                  batchCode: batch.batchCode || "",
+                });
+              });
+            });
+          });
+        });
+      });
+      result[currentDomain] = assignments;
+    });
+    return result;
+  }, [selectedDomains, table1DataByDomain, training.id, training.collegeName, getDateList]);
+
   const swapTrainers = (swapData) => {
 
     if (!swapData || !swapData.source || !swapData.target) {
@@ -1758,6 +1811,8 @@ function InitiationModal({ training, onClose, onConfirm }) {
                               }
                               excludeDays={excludeDays}
                               showPersistentWarnings={submitDisabled}
+                              training={training}
+                              currentTrainingAssignments={currentTrainingAssignmentsByDomain[domain]}
                             />
                           )}
                         </div>
