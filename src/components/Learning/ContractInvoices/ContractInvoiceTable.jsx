@@ -769,73 +769,74 @@ export default function ContractInvoiceTable() {
     );
   };
 
-  const getMergedContracts = () => {
-    const mergableContracts = getMergableContracts();
-    const merged = {};
+const getMergedContracts = () => {
+  const mergableContracts = getMergableContracts();
+  const merged = {};
 
-    mergableContracts.forEach((contract) => {
-      const collegeName = contract.collegeName;
+  mergableContracts.forEach((contract) => {
+    const collegeName = contract.collegeName;
 
-      // ✅ Check if contract has valid installment structure
-      if (
-        !contract.paymentDetails ||
-        !Array.isArray(contract.paymentDetails) ||
-        contract.paymentDetails.length === 0
-      ) {
-        return; // Skip contracts without proper installment structure
-      }
+    // ✅ Check if contract has valid installment structure
+    if (
+      !contract.paymentDetails ||
+      !Array.isArray(contract.paymentDetails) ||
+      contract.paymentDetails.length === 0
+    ) {
+      return; // Skip contracts without proper installment structure
+    }
 
-      // ✅ Installment COUNT se group karo (names/percentages se koi lena-dena nahi)
-      const installmentCount = contract.paymentDetails.length;
+    // ✅ Installment COUNT se group karo (names/percentages se koi lena-dena nahi)
+    const installmentCount = contract.paymentDetails.length;
 
-      // ✅ Final grouping key: collegeName + installmentCount
-      const key = `${collegeName}-${installmentCount}`;
+    // ✅ Final grouping key: collegeName + installmentCount
+    const key = `${collegeName}-${installmentCount}`;
 
-      if (!merged[key]) {
-        merged[key] = {
-          collegeName: contract.collegeName,
-          collegeCode: contract.collegeCode,
-          installmentCount: installmentCount,
+    if (!merged[key]) {
+      merged[key] = {
+        collegeName: contract.collegeName,
+        collegeCode: contract.collegeCode,
+        installmentCount: installmentCount,
+        contracts: [contract],
+        installments: {},
+      };
+    } else {
+      merged[key].contracts.push(contract);
+    }
+
+    // Process installments for this college+count group - EMI FIX
+    contract.paymentDetails?.forEach((installment) => {
+      const installmentName = installment.name;
+      const installmentAmount = calculateEMIAmount(contract, installmentName);
+
+      if (!merged[key].installments[installmentName]) {
+        merged[key].installments[installmentName] = {
+          name: installment.name,
+          percentage: installment.percentage,
           contracts: [contract],
-          installments: {},
+          totalAmount: installmentAmount, // ✅ EMI amount use karo
+          courses: [contract.course],
+          years: [contract.year],
+          studentCounts: [contract.studentCount],
         };
       } else {
-        merged[key].contracts.push(contract);
+        merged[key].installments[installmentName].contracts.push(contract);
+        // 🔥 YEH LINE CHANGE KARO - PROPER ROUNDING ADD KARO
+        merged[key].installments[installmentName].totalAmount = Math.round(
+          merged[key].installments[installmentName].totalAmount + installmentAmount
+        );
+        merged[key].installments[installmentName].courses.push(
+          contract.course
+        );
+        merged[key].installments[installmentName].years.push(contract.year);
+        merged[key].installments[installmentName].studentCounts.push(
+          contract.studentCount
+        );
       }
-
-      // Process installments for this college+count group - EMI FIX
-      contract.paymentDetails?.forEach((installment) => {
-        const installmentName = installment.name;
-        const installmentAmount = calculateEMIAmount(contract, installmentName);
-
-        if (!merged[key].installments[installmentName]) {
-          merged[key].installments[installmentName] = {
-            name: installment.name,
-            percentage: installment.percentage,
-            contracts: [contract],
-            totalAmount: installmentAmount, // ✅ EMI amount use karo
-            courses: [contract.course],
-            years: [contract.year],
-            studentCounts: [contract.studentCount],
-          };
-        } else {
-          merged[key].installments[installmentName].contracts.push(contract);
-          merged[key].installments[installmentName].totalAmount +=
-            installmentAmount; // ✅ EMI amount add karo
-          merged[key].installments[installmentName].courses.push(
-            contract.course
-          );
-          merged[key].installments[installmentName].years.push(contract.year);
-          merged[key].installments[installmentName].studentCounts.push(
-            contract.studentCount
-          );
-        }
-      });
     });
+  });
 
-    return Object.values(merged);
-  };
-
+  return Object.values(merged);
+};
   // Generate merged project code
   const generateMergedProjectCode = (mergedItem, installment) => {
     const contracts = mergedItem.contracts;
@@ -894,193 +895,205 @@ export default function ContractInvoiceTable() {
   };
 
   // Temporary EMI fix - agar data mein amounts nahi hain toh
-  const calculateEMIAmount = (contract, installmentName) => {
-    if (!contract.paymentDetails || !Array.isArray(contract.paymentDetails)) {
-      return 0;
-    }
-
-    const installmentDetail = contract.paymentDetails.find(
-      (p) => p.name === installmentName
-    );
-
-    // Pehle check karo ki installment detail mein amount hai ya nahi
-    if (installmentDetail && installmentDetail.totalAmount) {
-      const amount = parseFloat(installmentDetail.totalAmount);
-      return isNaN(amount) ? 0 : amount;
-    }
-
-    // EMI ke liye total amount se calculate karo
-    if (contract.paymentType === "EMI") {
-      const totalAmount =
-        parseFloat(contract.netPayableAmount) ||
-        parseFloat(contract.totalCost) ||
-        0;
-
-      if (totalAmount > 0 && contract.paymentDetails.length > 0) {
-        // Equal installments mein divide karo
-        return totalAmount / contract.paymentDetails.length;
-      }
-    }
-
-    // Percentage se calculate karo
-    if (installmentDetail && installmentDetail.percentage) {
-      const totalAmount =
-        parseFloat(contract.netPayableAmount) ||
-        parseFloat(contract.totalCost) ||
-        0;
-      const percentage = parseFloat(installmentDetail.percentage) || 0;
-
-      if (totalAmount > 0 && percentage > 0) {
-        return (totalAmount * percentage) / 100;
-      }
-    }
-
-    // Last resort: 0 return karo
+// Fixed EMI calculation with proper rounding
+const calculateEMIAmount = (contract, installmentName) => {
+  if (!contract.paymentDetails || !Array.isArray(contract.paymentDetails)) {
     return 0;
-  };
+  }
+
+  const installmentDetail = contract.paymentDetails.find(
+    (p) => p.name === installmentName
+  );
+
+  // Pehle check karo ki installment detail mein amount hai ya nahi
+  if (installmentDetail && installmentDetail.totalAmount) {
+    const amount = parseFloat(installmentDetail.totalAmount);
+    return isNaN(amount) ? 0 : Math.round(amount); // 🔥 ROUND ADD KARO
+  }
+
+  // EMI ke liye total amount se calculate karo
+  if (contract.paymentType === "EMI") {
+    const totalAmount =
+      parseFloat(contract.netPayableAmount) ||
+      parseFloat(contract.totalCost) ||
+      0;
+
+    if (totalAmount > 0 && contract.paymentDetails.length > 0) {
+      // Equal installments mein divide karo aur ROUND KARO
+      const emiAmount = totalAmount / contract.paymentDetails.length;
+      return Math.round(emiAmount); // 🔥 ROUND ADD KARO
+    }
+  }
+
+  // Percentage se calculate karo
+  if (installmentDetail && installmentDetail.percentage) {
+    const totalAmount =
+      parseFloat(contract.netPayableAmount) ||
+      parseFloat(contract.totalCost) ||
+      0;
+    const percentage = parseFloat(installmentDetail.percentage) || 0;
+
+    if (totalAmount > 0 && percentage > 0) {
+      // Percentage calculate karo aur ROUND KARO
+      const percentageAmount = (totalAmount * percentage) / 100;
+      return Math.round(percentageAmount); // 🔥 ROUND ADD KARO
+    }
+  }
+
+  // Last resort: 0 return karo
+  return 0;
+};
 
   // Submit merged invoice - CORRECTED VERSION
-  const handleMergeSubmit = async (formData) => {
-    if (!selectedContractsForMerge.length || !selectedInstallmentForMerge) {
-      alert("Error: No contracts selected for merge.");
-      return;
-    }
+// Submit merged invoice - CORRECTED VERSION with proper rounding
+const handleMergeSubmit = async (formData) => {
+  if (!selectedContractsForMerge.length || !selectedInstallmentForMerge) {
+    alert("Error: No contracts selected for merge.");
+    return;
+  }
 
-    try {
-      const financialYear = getCurrentFinancialYear();
-      const currentDate = new Date();
-      const invoiceNumber = await generateInvoiceNumber(formData.invoiceType);
+  try {
+    const financialYear = getCurrentFinancialYear();
+    const currentDate = new Date();
+    const invoiceNumber = await generateInvoiceNumber(formData.invoiceType);
 
-      // Calculate totals from all selected contracts
-      let totalBaseAmount = 0;
-      let totalStudentCount = 0;
-      const courses = [];
-      const years = [];
-      let perStudentCost = 0;
+    // Calculate totals from all selected contracts with PROPER ROUNDING
+    let totalBaseAmount = 0;
+    let totalStudentCount = 0;
+    const courses = [];
+    const years = [];
+    let perStudentCost = 0;
 
-      selectedContractsForMerge.forEach((contract) => {
-        // Use the calculateEMIAmount function to get installment amount
-        const installmentAmount = calculateEMIAmount(
-          contract,
-          selectedInstallmentForMerge.name
-        );
-
-        // Calculate base amount (without GST)
-        const installmentBaseAmount = installmentAmount / 1.18; // Assuming 18% GST
-        totalBaseAmount += installmentBaseAmount;
-
-        if (contract.studentCount) {
-          totalStudentCount += parseInt(contract.studentCount);
-        }
-        if (contract.course) {
-          courses.push(contract.course);
-        }
-        if (contract.year) {
-          years.push(contract.year);
-        }
-        if (contract.perStudentCost) {
-          perStudentCost += parseFloat(contract.perStudentCost);
-        }
-      });
-
-      perStudentCost = perStudentCost / selectedContractsForMerge.length;
-
-      // Use first contract for common details
-      const firstContract = selectedContractsForMerge[0];
-
-      // Calculate GST properly (18%)
-      const gstRate = 0.18;
-      const gstAmount = totalBaseAmount * gstRate;
-      const netPayableAmount = totalBaseAmount + gstAmount;
-
-      const mergedInvoiceData = {
-        ...formData,
-        invoiceNumber,
-        raisedDate: currentDate,
-        status: "registered",
-        originalInvoiceId: `merged-${Date.now()}`,
-        projectCode: generateMergedProjectCode(
-          {
-            contracts: selectedContractsForMerge,
-            collegeName: firstContract.collegeName,
-            collegeCode: firstContract.collegeCode,
-          },
-          selectedInstallmentForMerge
-        ),
-        collegeName: firstContract.collegeName,
-        collegeCode: firstContract.collegeCode,
-        course: [...new Set(courses)].join(", "),
-        year: [...new Set(years)].join(", "),
-        deliveryType: firstContract.deliveryType,
-        passingYear: firstContract.passingYear,
-        studentCount: totalStudentCount,
-        perStudentCost: perStudentCost,
-        totalCost: totalBaseAmount,
-        installment: selectedInstallmentForMerge.name,
-        baseAmount: totalBaseAmount,
-        gstAmount: gstAmount,
-        netPayableAmount: netPayableAmount,
-        amountRaised: netPayableAmount,
-        receivedAmount: 0,
-        dueAmount: netPayableAmount,
-        paymentHistory: [],
-        gstNumber: formData.gstNumber || firstContract.gstNumber,
-        gstType: formData.gstType || firstContract.gstType || "IGST",
-        tpoName: firstContract.tpoName,
-        tpoEmail: firstContract.tpoEmail,
-        tpoPhone: firstContract.tpoPhone,
-        address: firstContract.address,
-        city: firstContract.city,
-        state: firstContract.state,
-        pincode: firstContract.pincode,
-        paymentDetails: [
-          {
-            ...selectedInstallmentForMerge,
-            baseAmount: totalBaseAmount,
-            gstAmount: gstAmount,
-            totalAmount: netPayableAmount,
-          },
-        ],
-        contractStartDate: firstContract.contractStartDate,
-        contractEndDate: firstContract.contractEndDate,
-        financialYear: financialYear.year,
-        academicYear: financialYear.year,
-        isMergedInvoice: true,
-        mergedContracts: selectedContractsForMerge.map((c) => ({
-          id: c.id,
-          projectCode: c.projectCode,
-          course: c.course,
-          year: c.year,
-          studentCount: c.studentCount,
-          gstNumber: c.gstNumber,
-          gstType: c.gstType,
-        })),
-        individualProjectCodes: selectedContractsForMerge
-          .map((c) => c.projectCode)
-          .filter(Boolean),
-      };
-
-      const docRef = await addDoc(
-        collection(db, "ContractInvoices"),
-        mergedInvoiceData
+    // Pehle sab contracts ke amounts ko properly calculate karo with rounding
+    selectedContractsForMerge.forEach((contract) => {
+      // Use the calculateEMIAmount function to get installment amount
+      const installmentAmount = calculateEMIAmount(
+        contract,
+        selectedInstallmentForMerge.name
       );
 
-      const newInvoice = {
-        id: docRef.id,
-        ...mergedInvoiceData,
-      };
+      // Amount ko properly round karo
+      const roundedInstallmentAmount = Math.round(installmentAmount);
+      
+      // Calculate base amount (without GST) with rounding
+      const installmentBaseAmount = Math.round(roundedInstallmentAmount / 1.18);
+      totalBaseAmount += installmentBaseAmount;
 
-      setExistingInvoices((prev) => [...prev, newInvoice]);
-      alert(`Merged Invoice ${invoiceNumber} raised successfully!`);
+      if (contract.studentCount) {
+        totalStudentCount += parseInt(contract.studentCount);
+      }
+      if (contract.course) {
+        courses.push(contract.course);
+      }
+      if (contract.year) {
+        years.push(contract.year);
+      }
+      if (contract.perStudentCost) {
+        perStudentCost += parseFloat(contract.perStudentCost);
+      }
+    });
 
-      // Reset modal
-      setShowMergeModal(false);
-      setSelectedContractsForMerge([]);
-      setSelectedInstallmentForMerge(null);
-    } catch (err) {
-      alert(`Failed to create merged invoice. Error: ${err.message}`);
-    }
-  };
+    perStudentCost = perStudentCost / selectedContractsForMerge.length;
+
+    // Use first contract for common details
+    const firstContract = selectedContractsForMerge[0];
+
+    // Calculate GST properly (18%) with rounding
+    const gstRate = 0.18;
+    const gstAmount = Math.round(totalBaseAmount * gstRate);
+    const netPayableAmount = totalBaseAmount + gstAmount;
+
+    // Final amount ko bhi round karo
+    const finalNetPayableAmount = Math.round(netPayableAmount);
+
+    const mergedInvoiceData = {
+      ...formData,
+      invoiceNumber,
+      raisedDate: currentDate,
+      status: "registered",
+      originalInvoiceId: `merged-${Date.now()}`,
+      projectCode: generateMergedProjectCode(
+        {
+          contracts: selectedContractsForMerge,
+          collegeName: firstContract.collegeName,
+          collegeCode: firstContract.collegeCode,
+        },
+        selectedInstallmentForMerge
+      ),
+      collegeName: firstContract.collegeName,
+      collegeCode: firstContract.collegeCode,
+      course: [...new Set(courses)].join(", "),
+      year: [...new Set(years)].join(", "),
+      deliveryType: firstContract.deliveryType,
+      passingYear: firstContract.passingYear,
+      studentCount: totalStudentCount,
+      perStudentCost: perStudentCost,
+      totalCost: totalBaseAmount,
+      installment: selectedInstallmentForMerge.name,
+      baseAmount: totalBaseAmount,
+      gstAmount: gstAmount,
+      netPayableAmount: finalNetPayableAmount,
+      amountRaised: finalNetPayableAmount,
+      receivedAmount: 0,
+      dueAmount: finalNetPayableAmount,
+      paymentHistory: [],
+      gstNumber: formData.gstNumber || firstContract.gstNumber,
+      gstType: formData.gstType || firstContract.gstType || "IGST",
+      tpoName: firstContract.tpoName,
+      tpoEmail: firstContract.tpoEmail,
+      tpoPhone: firstContract.tpoPhone,
+      address: firstContract.address,
+      city: firstContract.city,
+      state: firstContract.state,
+      pincode: firstContract.pincode,
+      paymentDetails: [
+        {
+          ...selectedInstallmentForMerge,
+          baseAmount: totalBaseAmount,
+          gstAmount: gstAmount,
+          totalAmount: finalNetPayableAmount,
+        },
+      ],
+      contractStartDate: firstContract.contractStartDate,
+      contractEndDate: firstContract.contractEndDate,
+      financialYear: financialYear.year,
+      academicYear: financialYear.year,
+      isMergedInvoice: true,
+      mergedContracts: selectedContractsForMerge.map((c) => ({
+        id: c.id,
+        projectCode: c.projectCode,
+        course: c.course,
+        year: c.year,
+        studentCount: c.studentCount,
+        gstNumber: c.gstNumber,
+        gstType: c.gstType,
+      })),
+      individualProjectCodes: selectedContractsForMerge
+        .map((c) => c.projectCode)
+        .filter(Boolean),
+    };
+
+    const docRef = await addDoc(
+      collection(db, "ContractInvoices"),
+      mergedInvoiceData
+    );
+
+    const newInvoice = {
+      id: docRef.id,
+      ...mergedInvoiceData,
+    };
+
+    setExistingInvoices((prev) => [...prev, newInvoice]);
+    alert(`Merged Invoice ${invoiceNumber} raised successfully!`);
+
+    // Reset modal
+    setShowMergeModal(false);
+    setSelectedContractsForMerge([]);
+    setSelectedInstallmentForMerge(null);
+  } catch (err) {
+    alert(`Failed to create merged invoice. Error: ${err.message}`);
+  }
+};
 
   if (loading) {
     return (
