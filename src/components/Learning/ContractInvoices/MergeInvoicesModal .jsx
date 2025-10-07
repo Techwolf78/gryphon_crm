@@ -14,28 +14,30 @@ const MergeInvoicesModal = ({
   const [totalAmount, setTotalAmount] = useState(0);
   const [totalStudents, setTotalStudents] = useState(0);
 
-  useEffect(() => {
-    if (contracts && installment) {
-      // Safe amount calculation
-      const calculatedTotal = contracts.reduce((sum, contract) => {
-        if (!contract.paymentDetails || !Array.isArray(contract.paymentDetails)) return sum;
-        
-        const inst = contract.paymentDetails.find(p => p.name === installment.name);
-        if (!inst) return sum;
-        
-        const amount = parseFloat(inst.totalAmount) || 0;
-        return sum + amount;
-      }, 0);
+// MergeInvoicesModal.js - Amount calculation update
+useEffect(() => {
+  if (contracts && installment) {
+    // Safe amount calculation WITH ROUNDING
+    const calculatedTotal = contracts.reduce((sum, contract) => {
+      if (!contract.paymentDetails || !Array.isArray(contract.paymentDetails)) return sum;
+      
+      const inst = contract.paymentDetails.find(p => p.name === installment.name);
+      if (!inst) return sum;
+      
+      const amount = parseFloat(inst.totalAmount) || 0;
+      // Amount ko round karo
+      return sum + Math.round(amount);
+    }, 0);
 
-      const calculatedStudents = contracts.reduce((sum, contract) => {
-        const students = parseInt(contract.studentCount) || 0;
-        return sum + students;
-      }, 0);
+    const calculatedStudents = contracts.reduce((sum, contract) => {
+      const students = parseInt(contract.studentCount) || 0;
+      return sum + students;
+    }, 0);
 
-      setTotalAmount(calculatedTotal);
-      setTotalStudents(calculatedStudents);
-    }
-  }, [contracts, installment]);
+    setTotalAmount(calculatedTotal);
+    setTotalStudents(calculatedStudents);
+  }
+}, [contracts, installment]);
 
   if (!isOpen) return null;
 
