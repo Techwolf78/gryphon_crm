@@ -1194,11 +1194,14 @@ function InitiationModal({ training, onClose, onConfirm }) {
               dayDuration: data.dayDuration || "",
               sourceTrainingId: data.sourceTrainingId || "",
               domain: data.domain || "",
+              collegeName: data.collegeName || "",
+              batchCode: data.batchCode || "",
+              trainerName: data.trainerName || "",
             });
           });
-          // Filter out assignments that belong to the current training to avoid self-conflict
+          // Filter out assignments that belong to the current college to avoid self-conflict
           const filtered = assignments.filter(
-            (a) => a.sourceTrainingId !== (training?.id || "")
+            (a) => a.collegeName !== (training?.collegeName || "")
           );
           if (!cancelled) setGlobalTrainerAssignments(filtered);
         } catch (err) {
@@ -1215,24 +1218,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
       cancelled = true;
       if (unsubscribe) unsubscribe();
     };
-  }, [training?.id]);
-
-  // Click outside to close exclude days dropdown
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setExcludeDropdownOpen(false);
-      }
-    };
-
-    if (excludeDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [excludeDropdownOpen]);
+  }, [training?.collegeName]);
 
   const swapTrainers = (swapData) => {
 
@@ -1876,18 +1862,22 @@ function InitiationModal({ training, onClose, onConfirm }) {
                             ([domain, validation]) => {
                               if (!validation?.hasErrors) return null;
                               return (
-                                <div key={domain} className="mb-2">
-                                  <strong>{domain} domain:</strong>
-                                  <ul className="list-disc ml-4 mt-1">
+                                <div key={domain} className="mb-4">
+                                  <strong className="text-red-800">{domain} domain:</strong>
+                                  <div className="mt-2 space-y-3">
                                     {validation.errors.map((error, index) => (
-                                      <li key={index}>{error.message}</li>
+                                      <div key={index} className="bg-red-100 border border-red-200 rounded p-2">
+                                        <pre className="whitespace-pre-wrap text-xs text-red-800 font-mono">
+                                          {error.message}
+                                        </pre>
+                                      </div>
                                     ))}
-                                  </ul>
+                                  </div>
                                 </div>
                               );
                             }
                           )}
-                          <p className="mt-2 font-medium">
+                          <p className="mt-3 font-medium text-red-800 bg-red-100 border border-red-200 rounded p-2">
                             Please remove duplicate assignments or modify
                             trainer details (dates, duration) before proceeding.
                           </p>

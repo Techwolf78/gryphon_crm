@@ -2485,6 +2485,7 @@ const filteredTrainers = useMemo(() => {
               const existingKey = existing.trainerKey;
               // If the existing entry is the same trainer instance (same key), skip
               if (existingKey === trainerKey) return;
+              
               // Check time slot overlap
               const conflict =
                 trainer.dayDuration === "AM & PM" ||
@@ -2530,11 +2531,34 @@ const filteredTrainers = useMemo(() => {
                     trainer.dayDuration === "PM");
                 if (globalConflict) {
                   duplicatesSet.add(trainerKey);
+
+                  // Enhanced conflict message with detailed information
+                  const conflictDetails = [];
+
+                  // Add current assignment details with clear project code label
+                  conflictDetails.push(`🔄 Conflicting Project Code: ${assignment.sourceTrainingId || 'Unknown Project'}`);
+                  conflictDetails.push(`📚 College: ${assignment.collegeName || 'Not specified'}`);
+                  conflictDetails.push(`👥 Batch: ${assignment.batchCode || 'Not specified'}`);
+                  conflictDetails.push(`🎯 Domain: ${assignment.domain || 'Not specified'}`);
+                  conflictDetails.push(`⏰ Duration: ${assignment.dayDuration || 'Not specified'}`);
+                  conflictDetails.push(`📅 Date: ${assignDate}`);
+
+                  // Add trainer name if available
+                  if (assignment.trainerName) {
+                    conflictDetails.push(`👤 Trainer: ${assignment.trainerName}`);
+                  }
+
+                  // Add new assignment attempt details
+                  conflictDetails.push(`\n🆕 Trying to Assign to Current Project:`);
+                  conflictDetails.push(`⏰ Duration: ${trainer.dayDuration}`);
+                  conflictDetails.push(`📅 Date: ${dateISO}`);
+
                   const message = `${
                     trainer.trainerName || trainer.trainerId
                   } (${
                     trainer.trainerId
-                  }) conflicts with an external assignment on ${dateISO}`;
+                  }) conflicts with existing assignment:\n\n${conflictDetails.join('\n')}`;
+
                   errors.push({ message });
                 }
               }
