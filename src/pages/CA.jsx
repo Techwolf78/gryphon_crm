@@ -176,140 +176,187 @@ const Register = () => {
     setFilteredInvoices(invoices);
   };
 
-  // Export to Excel
-  const exportToExcel = async () => {
-    try {
-      setExportLoading(true);
+// Export to Excel - UPDATED WITH SAME COLUMNS AS InvoiceExcelExport + BOOKED DATE
+const exportToExcel = async () => {
+  try {
+    setExportLoading(true);
 
-      // Use filtered invoices for export
-      const dataToExport =
-        filteredInvoices.length > 0 ? filteredInvoices : invoices;
+    // Use filtered invoices for export
+    const dataToExport = filteredInvoices.length > 0 ? filteredInvoices : invoices;
 
-      // Prepare data for Excel
-      const excelData = dataToExport.map((invoice) => {
-        const totalAmount = invoice.amountRaised || 0;
-        const receivedAmount = invoice.receivedAmount || 0;
-        const dueAmount = invoice.dueAmount || totalAmount - receivedAmount;
 
-        return {
-          "Invoice Number": invoice.invoiceNumber || "N/A",
-          "Invoice Type": getInvoiceTypeText(invoice.invoiceType),
-          "Invoice Date": formatDateForExcel(invoice.raisedDate),
-          "College Name": invoice.collegeName || "N/A",
-          "College Code": invoice.collegeCode || "N/A",
-          "College GSTIN": invoice.collegeGSTIN || "N/A",
-          "College State": invoice.collegeState || "N/A",
-          "College Address": invoice.collegeAddress || "N/A",
-          "Project Code": invoice.projectCode || "N/A",
-          Course: invoice.course || "N/A",
-          Year: invoice.year || "N/A",
-          "Student Count": invoice.studentCount || 0,
-          "Total Amount": formatCurrency(totalAmount),
-          "Received Amount": formatCurrency(receivedAmount),
-          "Due Amount": formatCurrency(dueAmount),
-          "Registration Status": invoice.registered
-            ? "Registered"
-            : "Not Registered",
-          "Approval Status": getApprovalStatusText(invoice),
-          "Payment Status": getPaymentStatusText(invoice),
-          "GST Number": invoice.gstNumber || "N/A",
-          "GST Type": invoice.gstType || "N/A",
-          Installment: invoice.installment || "N/A",
-          "Base Amount": formatCurrency(invoice.baseAmount || 0),
-          "SGST Amount": formatCurrency(invoice.sgstAmount || 0),
-          "CGST Amount": formatCurrency(invoice.cgstAmount || 0),
-          "IGST Amount": formatCurrency(invoice.igstAmount || 0),
-          "Total GST": formatCurrency(
-            (invoice.sgstAmount || 0) +
-              (invoice.cgstAmount || 0) +
-              (invoice.igstAmount || 0)
-          ),
-          "Net Payable": formatCurrency(invoice.netPayableAmount || 0),
-          "TPO Name": invoice.tpoName || "N/A",
-          "TPO Email": invoice.tpoEmail || "N/A",
-          "TPO Phone": invoice.tpoPhone || "N/A",
-          Description: invoice.description || "N/A",
-          "Additional Details": invoice.additionalDetails || "N/A",
-          "Registered At": invoice.registeredAt
-            ? formatDateForExcel(invoice.registeredAt)
-            : "N/A",
-          "Approved At": invoice.approvedAt
-            ? formatDateForExcel(invoice.approvedAt)
-            : "N/A",
-        };
-      });
 
-      // Create workbook
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(excelData);
+    // ✅ ADD ROUNDED AMOUNT CALCULATION
 
-      // Set column widths
-      const colWidths = [
-        { wch: 20 }, // Invoice Number
-        { wch: 15 }, // Invoice Type
-        { wch: 12 }, // Invoice Date
-        { wch: 25 }, // College Name
-        { wch: 15 }, // College Code
-        { wch: 20 }, // College GSTIN
-        { wch: 15 }, // College State
-        { wch: 30 }, // College Address
-        { wch: 20 }, // Project Code
-        { wch: 20 }, // Course
-        { wch: 10 }, // Year
-        { wch: 12 }, // Student Count
-        { wch: 12 }, // Total Amount
-        { wch: 12 }, // Received Amount
-        { wch: 12 }, // Due Amount
-        { wch: 15 }, // Registration Status
-        { wch: 15 }, // Approval Status
-        { wch: 15 }, // Payment Status
-        { wch: 20 }, // GST Number
-        { wch: 10 }, // GST Type
-        { wch: 15 }, // Installment
-        { wch: 12 }, // Base Amount
-        { wch: 12 }, // SGST Amount
-        { wch: 12 }, // CGST Amount
-        { wch: 12 }, // IGST Amount
-        { wch: 12 }, // Total GST
-        { wch: 12 }, // Net Payable
-        { wch: 20 }, // TPO Name
-        { wch: 25 }, // TPO Email
-        { wch: 15 }, // TPO Phone
-        { wch: 30 }, // Description
-        { wch: 30 }, // Additional Details
-        { wch: 15 }, // Registered At
-        { wch: 15 }, // Approved At
-      ];
-      ws["!cols"] = colWidths;
 
-      // Add worksheet to workbook
-      XLSX.utils.book_append_sheet(wb, ws, "Registration Invoices");
+    // ✅ ADD DESCRIPTION FUNCTION
 
-      // Generate Excel file
-      const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-      const blob = new Blob([wbout], { type: "application/octet-stream" });
 
-      // Create filename with timestamp and filter info
-      const timestamp = new Date().toISOString().slice(0, 10);
-      let filename = `invoice_registration_${timestamp}`;
+    // ✅ ADD INVOICE MONTH FUNCTION
+const getInvoiceMonth = (date) => {
+  if (!date) return "";
+  try {
+    const d = date?.toDate ? date.toDate() : new Date(date);
+    return d.toLocaleDateString("en-IN", { 
+      year: "numeric", 
+      month: "long" 
+    });
+  } catch {
+    return "Invalid Date";
+  }
+};
+const calculateGSTBreakdown = (invoice) => {
+  let gstAmount = invoice.gstAmount || 0;
+  
+  if (typeof gstAmount === 'string') {
+    gstAmount = parseFloat(gstAmount) || 0;
+  }
 
-      // Add filter info to filename if any filter is active
-      if (
-        filters.financialYear ||
-        filters.invoiceType !== "all" ||
-        filters.status !== "all"
-      ) {
-        filename += "_filtered";
+  const gstType = invoice.gstType?.toLowerCase();
+  
+  if (gstType === "igst") {
+    return {
+      cgst: 0,
+      sgst: 0,
+      igst: gstAmount
+    };
+  } else {
+    return {
+      cgst: gstAmount / 2,
+      sgst: gstAmount / 2,
+      igst: 0
+    };
+  }
+};
+
+// Calculate rounded amount
+const calculateRoundedAmount = (amount) => {
+  if (!amount && amount !== 0) return 0;
+  
+  let numAmount = amount;
+  if (typeof amount === 'string') {
+    numAmount = parseFloat(amount) || 0;
+  }
+  
+  return Math.round(numAmount);
+};
+
+// Get HSN code
+const getHSNCode = (invoice) => {
+  return "9984";
+};
+
+// Get description from delivery type
+const getDescription = (invoice) => {
+  const deliveryType = invoice.deliveryType || "";
+  
+  switch(deliveryType.toUpperCase()) {
+    case "TP":
+      return "Training and Placement";
+    case "OT":
+      return "Only Training";
+    case "IP":
+      return "Induction Program";
+    case "DM":
+      return "Digital Marketing Services";
+    default:
+      return deliveryType || "N/A";
+  }
+};
+    // Prepare data for Excel - SAME COLUMNS AS InvoiceExcelExport + Booked Date
+    const excelData = dataToExport.map((invoice) => {
+      const gstBreakdown = calculateGSTBreakdown(invoice);
+      let netPayableAmount = invoice.netPayableAmount || invoice.amountRaised || 0;
+      if (typeof netPayableAmount === 'string') {
+        netPayableAmount = parseFloat(netPayableAmount) || 0;
       }
-      filename += ".xlsx";
+      
+      const roundedAmount = calculateRoundedAmount(netPayableAmount);
+      const baseAmount = invoice.baseAmount || invoice.amountRaised || 0;
 
-      saveAs(blob, filename);
-    } catch (error) {
-      alert("Error exporting to Excel: " + error.message);
-    } finally {
-      setExportLoading(false);
+      return {
+        // ✅ SAME COLUMNS AS InvoiceExcelExport.jsx
+        "Invoice Month": getInvoiceMonth(invoice.raisedDate),
+        "Invoice Number": invoice.invoiceNumber || "N/A",
+        "Invoice Date": formatDateForExcel(invoice.raisedDate),
+        "Party Name": invoice.collegeName || "N/A",
+        "GSTIN Number": invoice.gstNumber || "N/A",
+        "Description": getDescription(invoice),
+        "Total Value": formatCurrency(baseAmount),
+        "CGST": formatCurrency(gstBreakdown.cgst),
+        "SGST": formatCurrency(gstBreakdown.sgst),
+        "IGST": formatCurrency(gstBreakdown.igst),
+        "Rounded Off": formatCurrency(roundedAmount - netPayableAmount),
+        "Total Invoice Value": formatCurrency(roundedAmount),
+        "HSN Code": getHSNCode(invoice),
+        "Invoice Type": getInvoiceTypeText(invoice.invoiceType),
+        
+        // ✅ EXTRA COLUMN: Booked Date (Yahi tumhara naya column hai)
+        "Booked Date": invoice.registeredAt 
+          ? formatDateForExcel(invoice.registeredAt)
+          : "Not Booked",
+        
+        // Additional status columns for Register.jsx
+        "Registration Status": invoice.registered ? "Booked" : "Not Booked",
+        "Approval Status": invoice.approvalStatus === "cancelled" 
+          ? "Cancelled" 
+          : (invoice.approved || invoice.receivedAmount > 0) 
+            ? "Approved" 
+            : "Pending Approval",
+      };
+    });
+
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(excelData);
+
+    // Set column widths - UPDATED FOR NEW STRUCTURE
+    const colWidths = [
+      { wch: 15 }, // Invoice Month
+      { wch: 20 }, // Invoice Number
+      { wch: 12 }, // Invoice Date
+      { wch: 25 }, // Party Name
+      { wch: 20 }, // GSTIN Number
+      { wch: 25 }, // Description
+      { wch: 12 }, // Total Value
+      { wch: 10 }, // CGST
+      { wch: 10 }, // SGST
+      { wch: 10 }, // IGST
+      { wch: 12 }, // Rounded Off
+      { wch: 15 }, // Total Invoice Value
+      { wch: 10 }, // HSN Code
+      { wch: 15 }, // Invoice Type
+      { wch: 12 }, // ✅ NEW: Booked Date
+      { wch: 15 }, // Registration Status
+      { wch: 15 }, // Approval Status
+    ];
+    ws["!cols"] = colWidths;
+
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(wb, ws, "Registration Invoices");
+
+    // Generate Excel file
+    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([wbout], { type: "application/octet-stream" });
+
+    // Create filename
+    const timestamp = new Date().toISOString().slice(0, 10);
+    let filename = `invoice_registration_${timestamp}`;
+    
+    if (filters.financialYear || filters.invoiceType !== "all" || filters.status !== "all") {
+      filename += "_filtered";
     }
-  };
+    filename += ".xlsx";
+
+    saveAs(blob, filename);
+  } catch (error) {
+    alert("Error exporting to Excel: " + error.message);
+  } finally {
+    setExportLoading(false);
+  }
+};
+// ✅ ADD THESE HELPER FUNCTIONS TO Register.jsx
+
 
   // Helper functions for export and filters
   const formatDateForExcel = (date) => {
@@ -333,20 +380,7 @@ const Register = () => {
     }).format(numAmount);
   };
 
-  const getPaymentStatusText = (invoice) => {
-    const status = invoice.status;
-    if (status === "received") return "Fully Paid";
-    if (status === "partially_received") return "Partially Paid";
-    if (status === "registered") return "Registered";
-    return "Pending";
-  };
-
-  const getApprovalStatusText = (invoice) => {
-    if (invoice.approvalStatus === "cancelled") return "Cancelled";
-    if (invoice.approved) return "Approved";
-    if (invoice.approvalStatus === "pending") return "Pending Approval";
-    return "Pending";
-  };
+  
 
   const getInvoiceTypeText = (invoiceType) => {
     if (invoiceType === "Tax Invoice") return "Tax Invoice";
@@ -362,46 +396,58 @@ const Register = () => {
     { value: "2027-28", label: "2027-28" },
   ];
 
-  const handleRegister = async (invoice) => {
-    try {
-      if (!invoice.id) {
-        throw new Error("Invoice ID is missing");
-      }
-
-      // ✅ SIRF CANCELLED INVOICES KO CHECK KARO
-      if (invoice.approvalStatus === "cancelled") {
-        alert("❌ Cannot register a cancelled invoice!");
-        return;
-      }
-
-      const invoiceRef = doc(db, "ContractInvoices", invoice.id);
-      await updateDoc(invoiceRef, {
-        registered: true,
-        registeredAt: new Date().toISOString(),
-        status: "Booked", // ✅ DIRECT "Booked" SET KARO
-      });
-
-      setInvoices((prev) =>
-        prev.map((inv) =>
-          inv.id === invoice.id
-            ? { ...inv, registered: true, status: "Booked" }
-            : inv
-        )
-      );
-
-      setFilteredInvoices((prev) =>
-        prev.map((inv) =>
-          inv.id === invoice.id
-            ? { ...inv, registered: true, status: "Booked" }
-            : inv
-        )
-      );
-
-      alert("✅ Invoice Booked successfully!");
-    } catch (error) {
-      alert("❌ Error registering invoice: " + error.message);
+ const handleRegister = async (invoice) => {
+  try {
+    if (!invoice.id) {
+      throw new Error("Invoice ID is missing");
     }
-  };
+
+    // ✅ SIRF CANCELLED INVOICES KO CHECK KARO
+    if (invoice.approvalStatus === "cancelled") {
+      alert("❌ Cannot register a cancelled invoice!");
+      return;
+    }
+
+    const invoiceRef = doc(db, "ContractInvoices", invoice.id);
+    const bookedDate = new Date().toISOString(); // ✅ CURRENT DATE CAPTURE KARO
+    
+    await updateDoc(invoiceRef, {
+      registered: true,
+      registeredAt: bookedDate, // ✅ DATE STORE KARO
+      status: "Booked",
+    });
+
+    setInvoices((prev) =>
+      prev.map((inv) =>
+        inv.id === invoice.id
+          ? { 
+              ...inv, 
+              registered: true, 
+              status: "Booked",
+              registeredAt: bookedDate // ✅ FRONTEND MEIN BHI UPDATE KARO
+            }
+          : inv
+      )
+    );
+
+    setFilteredInvoices((prev) =>
+      prev.map((inv) =>
+        inv.id === invoice.id
+          ? { 
+              ...inv, 
+              registered: true, 
+              status: "Booked",
+              registeredAt: bookedDate // ✅ FRONTEND MEIN BHI UPDATE KARO
+            }
+          : inv
+      )
+    );
+
+    alert("✅ Invoice Booked successfully!");
+  } catch (error) {
+    alert("❌ Error registering invoice: " + error.message);
+  }
+};
 
   const handleView = (invoice) => {
     setSelectedInvoice(invoice);
