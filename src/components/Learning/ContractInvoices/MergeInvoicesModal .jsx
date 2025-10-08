@@ -37,6 +37,7 @@ useEffect(() => {
     setTotalAmount(calculatedTotal);
     setTotalStudents(calculatedStudents);
   }
+  
 }, [contracts, installment]);
 
   if (!isOpen) return null;
