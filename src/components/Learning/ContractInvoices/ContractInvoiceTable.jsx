@@ -200,78 +200,75 @@ export default function ContractInvoiceTable() {
   };
 
   // Generate unique sequential invoice number for ALL invoice types - COMBINED COUNTING
-  const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
-    const financialYear = getCurrentFinancialYear();
+// Add this state to your component
+const [locallyGeneratedNumbers, setLocallyGeneratedNumbers] = useState(new Set());
 
-    // Prefix set karo based on invoice type
-    let prefix = "TI";
-    if (invoiceType === "Proforma Invoice") prefix = "PI";
-    if (invoiceType === "Cash Invoice") prefix = "CI";
+const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
+  const financialYear = getCurrentFinancialYear();
+  let prefix = "TI";
+  if (invoiceType === "Proforma Invoice") prefix = "PI";
+  if (invoiceType === "Cash Invoice") prefix = "CI";
 
-    try {
-      const [invoicesSnapshot, proformaSnapshot] = await Promise.all([
-        getDocs(
-          query(
-            collection(db, "ContractInvoices"),
-            where("financialYear", "==", financialYear.year)
-          )
-        ),
-        getDocs(
-          query(
-            collection(db, "ProformaInvoices"),
-            where("financialYear", "==", financialYear.year)
-          )
-        ),
-      ]);
+  try {
+    const [invoicesSnapshot, proformaSnapshot] = await Promise.all([
+      getDocs(query(collection(db, "ContractInvoices"), 
+        where("financialYear", "==", financialYear.year))),
+      getDocs(query(collection(db, "ProformaInvoices"), 
+        where("financialYear", "==", financialYear.year))),
+    ]);
 
-      // Combine ALL invoices from both collections
-      const allInvoices = [
-        ...invoicesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-        ...proformaSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-      ];
+    // Combine existing invoices from database
+    const allInvoices = [
+      ...invoicesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+      ...proformaSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+    ];
 
-      // Filter sirf CURRENT financial year ke invoices
-      const currentFYInvoices = allInvoices.filter((inv) => {
-        if (!inv.invoiceNumber) return false;
-        return inv.invoiceNumber.includes(financialYear.year);
-      });
+    // Filter current financial year invoices
+    const currentFYInvoices = allInvoices.filter((inv) => {
+      if (!inv.invoiceNumber) return false;
+      return inv.invoiceNumber.includes(financialYear.year);
+    });
 
-      // Extract sequential numbers from ALL invoice types
-      const invoiceNumbers = currentFYInvoices
-        .map((inv) => {
-          const parts = inv.invoiceNumber.split("/");
-          if (parts.length !== 4) return 0;
+    // Extract sequential numbers from ALL invoice types
+    const invoiceNumbers = currentFYInvoices
+      .map((inv) => {
+        const parts = inv.invoiceNumber.split("/");
+        if (parts.length !== 4) return 0;
+        const sequentialPart = parts[3];
+        if (/^\d+$/.test(sequentialPart)) {
+          const num = parseInt(sequentialPart, 10);
+          return isNaN(num) ? 0 : num;
+        }
+        return 0;
+      })
+      .filter((num) => num > 0);
 
-          const sequentialPart = parts[3];
+    // Also consider locally generated numbers in this session
+    const localNumbers = Array.from(locallyGeneratedNumbers)
+      .map(num => parseInt(num))
+      .filter(num => !isNaN(num) && num > 0);
 
-          // Check if it's a proper sequential number (01, 02, etc.)
-          if (/^\d+$/.test(sequentialPart)) {
-            const num = parseInt(sequentialPart, 10);
-            return isNaN(num) ? 0 : num;
-          }
-
-          return 0;
-        })
-        .filter((num) => num > 0);
-
-      let nextInvoiceNumber = 1;
-
-      if (invoiceNumbers.length > 0) {
-        const maxInvoiceNumber = Math.max(...invoiceNumbers);
-        nextInvoiceNumber = maxInvoiceNumber + 1;
-      } else {
-      }
-
-      // YEH LINE CHANGE KARDI - 3 digit ki jagah 2 digit
-      const invoiceNumber = nextInvoiceNumber.toString().padStart(2, "0");
-      const finalInvoiceNumber = `GAPL/${financialYear.year}/${prefix}/${invoiceNumber}`;
-
-      return finalInvoiceNumber;
-    } catch (error) {
-      const fallbackNumber = `GAPL/${financialYear.year}/${prefix}/01`;
-      return fallbackNumber;
+    const allNumbers = [...invoiceNumbers, ...localNumbers];
+    
+    let nextInvoiceNumber = 1;
+    if (allNumbers.length > 0) {
+      const maxInvoiceNumber = Math.max(...allNumbers);
+      nextInvoiceNumber = maxInvoiceNumber + 1;
     }
-  };
+
+    // Update local tracking
+    setLocallyGeneratedNumbers(prev => new Set([...prev, nextInvoiceNumber]));
+
+    const invoiceNumber = nextInvoiceNumber.toString().padStart(2, "0");
+    const finalInvoiceNumber = `GAPL/${financialYear.year}/${prefix}/${invoiceNumber}`;
+
+    return finalInvoiceNumber;
+  } catch (error) {
+    // Fallback with timestamp to ensure uniqueness
+    const fallbackNumber = `GAPL/${financialYear.year}/${prefix}/F${Date.now().toString().slice(-2)}`;
+    return fallbackNumber;
+  }
+};
 
   const getPaymentTypeName = (type) => {
     switch (type) {
@@ -794,7 +791,6 @@ const getMergedContracts = () => {
     if (!merged[key]) {
       merged[key] = {
         collegeName: contract.collegeName,
-        collegeCode: contract.collegeCode,
         installmentCount: installmentCount,
         contracts: [contract],
         installments: {},
@@ -838,7 +834,7 @@ const getMergedContracts = () => {
   return Object.values(merged);
 };
   // Generate merged project code
-  const generateMergedProjectCode = (mergedItem, installment) => {
+  const generateMergedProjectCode = (mergedItem) => {
     const contracts = mergedItem.contracts;
     if (contracts.length === 0) return "N/A";
 
@@ -1017,8 +1013,7 @@ const handleMergeSubmit = async (formData) => {
           contracts: selectedContractsForMerge,
           collegeName: firstContract.collegeName,
           collegeCode: firstContract.collegeCode,
-        },
-        selectedInstallmentForMerge
+        }
       ),
       collegeName: firstContract.collegeName,
       collegeCode: firstContract.collegeCode,
@@ -1808,9 +1803,13 @@ const handleMergeSubmit = async (formData) => {
                                       existingInvoices.filter(
                                         (inv) =>
                                           inv.isMergedInvoice &&
-                                          inv.collegeCode ===
-                                            mergedItem.collegeCode &&
-                                          inv.installment === installment.name
+                                          inv.installment === installment.name &&
+                                          // Check if this invoice belongs to the same group of contracts
+                                          inv.mergedContracts &&
+                                          inv.mergedContracts.length === mergedItem.contracts.length &&
+                                          inv.mergedContracts.every(mc =>
+                                            mergedItem.contracts.some(c => c.id === mc.id)
+                                          )
                                       );
 
                                     // For merged view, show each installment with its status
