@@ -1525,17 +1525,19 @@ const handleMergeSubmit = async (formData) => {
                             <p className="text-xs font-medium text-gray-500 mb-0.5">
                               Generated Invoices
                             </p>
-                            <p className="text-sm text-gray-900">
-                              {contractInvoices.length > 0 ? (
-                                <span className="bg-blue-100 text-blue-800 text-xs font-semibold py-1 px-2 rounded">
-                                  {generatedCount}/{totalInstallments}
-                                </span>
-                              ) : (
-                                <span className="text-gray-400">
-                                  0/{totalInstallments}
-                                </span>
-                              )}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 bg-gray-100 rounded-full h-3 shadow-inner border border-gray-200">
+                                <div
+                                  className="bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 h-3 rounded-full transition-all duration-500 ease-out shadow-sm relative overflow-hidden"
+                                  style={{ width: `${(generatedCount / totalInstallments) * 100}%` }}
+                                >
+                                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse"></div>
+                                </div>
+                              </div>
+                              <span className="text-xs text-gray-600 font-medium bg-gray-50 px-2 py-1 rounded-md border">
+                                {generatedCount}/{totalInstallments}
+                              </span>
+                            </div>
                           </div>
                         </div>
                         {/* Expanded Content */}
@@ -1998,7 +2000,7 @@ const handleMergeSubmit = async (formData) => {
                           <p className="text-xs font-medium text-gray-500 mb-0.5">
                             Generated Merged Invoices
                           </p>
-                          <p className="text-sm text-gray-900">
+                          <div className="flex items-center gap-2">
                             {(() => {
                               // Count total merged invoices for this group
                               const mergedInvoicesCount = existingInvoices.filter(inv => 
@@ -2009,18 +2011,25 @@ const handleMergeSubmit = async (formData) => {
                               ).length;
 
                               const totalPossible = mergedItem.installmentCount;
+                              const percentage = (mergedInvoicesCount / totalPossible) * 100;
 
-                              return mergedInvoicesCount > 0 ? (
-                                <span className="bg-purple-100 text-purple-800 text-xs font-semibold py-1 px-2 rounded">
-                                  {mergedInvoicesCount}/{totalPossible}
-                                </span>
-                              ) : (
-                                <span className="text-gray-400">
-                                  0/{totalPossible}
-                                </span>
+                              return (
+                                <>
+                                  <div className="flex-1 bg-gray-100 rounded-full h-3 shadow-inner border border-gray-200">
+                                    <div
+                                      className="bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 h-3 rounded-full transition-all duration-500 ease-out shadow-sm relative overflow-hidden"
+                                      style={{ width: `${percentage}%` }}
+                                    >
+                                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse"></div>
+                                    </div>
+                                  </div>
+                                  <span className="text-xs text-gray-600 font-medium bg-gray-50 px-2 py-1 rounded-md border">
+                                    {mergedInvoicesCount}/{totalPossible}
+                                  </span>
+                                </>
                               );
                             })()}
-                          </p>
+                          </div>
                         </div>
                       </div>
 

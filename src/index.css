@@ -40,6 +40,8 @@
   }
 }
 
+
+
 .animate-fadeIn {
   animation: fadeIn 0.3s ease-out;
 }
@@ -51,5 +53,7 @@
 .animate-spin-slow {
   animation: spin-slow 3s linear infinite;
 }
+
+
 
 
