@@ -82,64 +82,65 @@ const ContractInvoicesTab = () => {
     }
   };
 
-// Calculate statistics - FIXED VERSION
-const calculateStats = (invoiceData) => {
-  const newStats = {
-    totalInvoices: invoiceData.length,
-    cancelledInvoices: 0,
-    totalAmount: 0,
-    receivedAmount: 0,
-    dueAmount: 0,
-    bookedInvoices: 0,
-    cashInvoices: 0,
-    taxInvoices: 0,
-    approvedInvoices: 0,
-    pendingInvoices: 0
+  // Calculate statistics - FIXED VERSION
+  const calculateStats = (invoiceData) => {
+    const newStats = {
+      totalInvoices: invoiceData.length,
+      cancelledInvoices: 0,
+      totalAmount: 0,
+      receivedAmount: 0,
+      dueAmount: 0,
+      bookedInvoices: 0,
+      cashInvoices: 0,
+      taxInvoices: 0,
+      approvedInvoices: 0,
+      pendingInvoices: 0
+    };
+
+    invoiceData.forEach(invoice => {
+      // Safely parse amounts to numbers
+      const totalAmount = parseFloat(invoice.amountRaised) || 0;
+      const receivedAmount = parseFloat(invoice.receivedAmount) || 0;
+      const dueAmount = parseFloat(invoice.dueAmount) || (totalAmount - receivedAmount);
+
+      // Count cancelled invoices
+      if (invoice.approvalStatus === "cancelled") {
+        newStats.cancelledInvoices++;
+      }
+
+      // Count booked invoices
+      if (invoice.status === "Booked" || invoice.registered) {
+        newStats.bookedInvoices++;
+      }
+
+      // Count by invoice type
+      if (invoice.invoiceType === "Cash Invoice") {
+        newStats.cashInvoices++;
+      } else if (invoice.invoiceType === "Tax Invoice") {
+        newStats.taxInvoices++;
+      } 
+
+      // Count approval status
+      if (invoice.approved) {
+        newStats.approvedInvoices++;
+      } else {
+        newStats.pendingInvoices++;
+      }
+
+      // Amount calculations - ADD numbers, don't concatenate
+      newStats.totalAmount += totalAmount;
+      newStats.receivedAmount += receivedAmount;
+      newStats.dueAmount += dueAmount;
+    });
+
+    // Ensure numbers are properly formatted
+    newStats.totalAmount = Number(newStats.totalAmount.toFixed(2));
+    newStats.receivedAmount = Number(newStats.receivedAmount.toFixed(2));
+    newStats.dueAmount = Number(newStats.dueAmount.toFixed(2));
+
+    setStats(newStats);
   };
 
-  invoiceData.forEach(invoice => {
-    // Safely parse amounts to numbers
-    const totalAmount = parseFloat(invoice.amountRaised) || 0;
-    const receivedAmount = parseFloat(invoice.receivedAmount) || 0;
-    const dueAmount = parseFloat(invoice.dueAmount) || (totalAmount - receivedAmount);
-
-    // Count cancelled invoices
-    if (invoice.approvalStatus === "cancelled") {
-      newStats.cancelledInvoices++;
-    }
-
-    // Count booked invoices
-    if (invoice.status === "Booked" || invoice.registered) {
-      newStats.bookedInvoices++;
-    }
-
-    // Count by invoice type
-    if (invoice.invoiceType === "Cash Invoice") {
-      newStats.cashInvoices++;
-    } else if (invoice.invoiceType === "Tax Invoice") {
-      newStats.taxInvoices++;
-    } 
-
-    // Count approval status
-    if (invoice.approved) {
-      newStats.approvedInvoices++;
-    } else {
-      newStats.pendingInvoices++;
-    }
-
-    // Amount calculations - ADD numbers, don't concatenate
-    newStats.totalAmount += totalAmount;
-    newStats.receivedAmount += receivedAmount;
-    newStats.dueAmount += dueAmount;
-  });
-
-  // Ensure numbers are properly formatted
-  newStats.totalAmount = Number(newStats.totalAmount.toFixed(2));
-  newStats.receivedAmount = Number(newStats.receivedAmount.toFixed(2));
-  newStats.dueAmount = Number(newStats.dueAmount.toFixed(2));
-
-  setStats(newStats);
-};
   // Apply filters
   const applyFilters = () => {
     let filtered = [...invoices];
@@ -250,198 +251,199 @@ const calculateStats = (invoiceData) => {
     calculateStats(invoices);
   };
 
-// Export to Excel with same columns as InvoiceExcelExport + Payment History
-const exportToExcel = async () => {
-  try {
-    setExportLoading(true);
-    const dataToExport = filteredInvoices.length > 0 ? filteredInvoices : invoices;
+  // Export to Excel with same columns as InvoiceExcelExport + Payment History
+  const exportToExcel = async () => {
+    try {
+      setExportLoading(true);
+      const dataToExport = filteredInvoices.length > 0 ? filteredInvoices : invoices;
 
-    // Calculate GST breakdown function - SAME AS InvoiceExcelExport
-    const calculateGSTBreakdown = (invoice) => {
-      let gstAmount = invoice.gstAmount || 0;
-      
-      if (typeof gstAmount === 'string') {
-        gstAmount = parseFloat(gstAmount) || 0;
-      }
-      
-      const gstType = invoice.gstType?.toLowerCase();
-      
-      if (gstType === "igst") {
-        return {
-          cgst: 0,
-          sgst: 0,
-          igst: gstAmount
-        };
-      } else {
-        return {
-          cgst: gstAmount / 2,
-          sgst: gstAmount / 2,
-          igst: 0
-        };
-      }
-    };
-
-    // Get invoice month - SAME AS InvoiceExcelExport
-    const getInvoiceMonth = (date) => {
-      if (!date) return "";
-      try {
-        const d = date?.toDate ? date.toDate() : new Date(date);
-        return d.toLocaleDateString("en-IN", { 
-          year: "numeric", 
-          month: "long" 
-        });
-      } catch {
-        return "Invalid Date";
-      }
-    };
-
-    // Get Description from deliveryType - SAME AS InvoiceExcelExport
-    const getDescription = (invoice) => {
-      const deliveryType = invoice.deliveryType || "";
-      
-      switch(deliveryType.toUpperCase()) {
-        case "TP":
-          return "Training and Placement";
-        case "OT":
-          return "Only Training";
-        case "IP":
-          return "Induction Program";
-        case "DM":
-          return "Digital Marketing Services";
-        default:
-          return deliveryType || "N/A";
-      }
-    };
-
-    // Calculate rounded amount - SAME AS InvoiceExcelExport
-    const calculateRoundedAmount = (amount) => {
-      if (!amount && amount !== 0) return 0;
-      
-      let numAmount = amount;
-      if (typeof amount === 'string') {
-        numAmount = parseFloat(amount) || 0;
-      }
-      
-      return Math.round(numAmount);
-    };
-
-    // Get HSN code - SAME AS InvoiceExcelExport
-    const getHSNCode = (invoice) => {
-      return "9984";
-    };
-
-    // Format payment history with dates and amounts - NEW FUNCTION
-    const getPaymentHistoryText = (invoice) => {
-      if (!invoice.paymentHistory || invoice.paymentHistory.length === 0) {
-        return "No Payments";
-      }
-      
-      // Sort payment history by date ascending (oldest first)
-      const sortedPayments = [...invoice.paymentHistory].sort((a, b) => {
-        const dateA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.date);
-        const dateB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.date);
-        return dateA - dateB;
-      });
-      
-      // Format each payment: "₹Amount on Date"
-      return sortedPayments.map(payment => {
-        const paymentDate = payment.timestamp?.toDate ? 
-          payment.timestamp.toDate() : new Date(payment.date);
-        const formattedDate = paymentDate.toLocaleDateString("en-IN");
-        const amount = payment.amount || 0;
+      // Calculate GST breakdown function - SAME AS InvoiceExcelExport
+      const calculateGSTBreakdown = (invoice) => {
+        let gstAmount = invoice.gstAmount || 0;
         
-        return `₹${formatCurrency(amount)} on ${formattedDate}`;
-      }).join('\n');
-    };
-
-    // Get total received amount - helper function
-    const getTotalReceived = (invoice) => {
-      if (!invoice.paymentHistory || invoice.paymentHistory.length === 0) {
-        return 0;
-      }
-      
-      return invoice.paymentHistory.reduce((total, payment) => {
-        return total + (payment.amount || 0);
-      }, 0);
-    };
-
-    const excelData = dataToExport.map((invoice) => {
-      const gstBreakdown = calculateGSTBreakdown(invoice);
-      
-      let netPayableAmount = invoice.netPayableAmount || 0;
-      if (typeof netPayableAmount === 'string') {
-        netPayableAmount = parseFloat(netPayableAmount) || 0;
-      }
-      
-      const roundedAmount = calculateRoundedAmount(netPayableAmount);
-      const baseAmount = invoice.baseAmount || 0;
-      const totalReceived = getTotalReceived(invoice);
-
-      return {
-        "Invoice Month": getInvoiceMonth(invoice.raisedDate),
-        "Invoice Number": invoice.invoiceNumber || "N/A",
-        "Invoice Date": formatDateForExcel(invoice.raisedDate),
-        "Party Name": invoice.collegeName || "N/A",
-        "GSTIN Number": invoice.gstNumber || "N/A",
-        "Description": getDescription(invoice),
-        "Total Value": formatCurrency(baseAmount),
-        "CGST": formatCurrency(gstBreakdown.cgst),
-        "SGST": formatCurrency(gstBreakdown.sgst),
-        "IGST": formatCurrency(gstBreakdown.igst),
-        "Rounded Off": formatCurrency(roundedAmount - netPayableAmount),
-        "Total Invoice Value": formatCurrency(roundedAmount),
-        "Total Received": formatCurrency(totalReceived), // NEW: Total received amount
-        "Due Amount": formatCurrency(roundedAmount - totalReceived), // NEW: Due amount
-        "HSN Code": getHSNCode(invoice),
-        "Invoice Type": invoice.invoiceType || "N/A",
-        "Payment History": getPaymentHistoryText(invoice), // NEW: All payment dates with amounts
+        if (typeof gstAmount === 'string') {
+          gstAmount = parseFloat(gstAmount) || 0;
+        }
+        
+        const gstType = invoice.gstType?.toLowerCase();
+        
+        if (gstType === "igst") {
+          return {
+            cgst: 0,
+            sgst: 0,
+            igst: gstAmount
+          };
+        } else {
+          return {
+            cgst: gstAmount / 2,
+            sgst: gstAmount / 2,
+            igst: 0
+          };
+        }
       };
-    });
 
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(excelData);
+      // Get invoice month - SAME AS InvoiceExcelExport
+      const getInvoiceMonth = (date) => {
+        if (!date) return "";
+        try {
+          const d = date?.toDate ? date.toDate() : new Date(date);
+          return d.toLocaleDateString("en-IN", { 
+            year: "numeric", 
+            month: "long" 
+          });
+        } catch {
+          return "Invalid Date";
+        }
+      };
 
-    // Set column widths - SAME AS InvoiceExcelExport + NEW COLUMNS
-    const colWidths = [
-      { wch: 15 }, // Invoice Month
-      { wch: 20 }, // Invoice Number
-      { wch: 12 }, // Invoice Date
-      { wch: 25 }, // Party Name
-      { wch: 20 }, // GSTIN Number
-      { wch: 25 }, // Description
-      { wch: 12 }, // Total Value
-      { wch: 10 }, // CGST
-      { wch: 10 }, // SGST
-      { wch: 10 }, // IGST
-      { wch: 12 }, // Rounded Off
-      { wch: 15 }, // Total Invoice Value
-      { wch: 12 }, // NEW: Total Received
-      { wch: 12 }, // NEW: Due Amount
-      { wch: 10 }, // HSN Code
-      { wch: 15 }, // Invoice Type
-      { wch: 30 }, // NEW: Payment History (wider for multiple lines)
-    ];
-    ws['!cols'] = colWidths;
+      // Get Description from deliveryType - SAME AS InvoiceExcelExport
+      const getDescription = (invoice) => {
+        const deliveryType = invoice.deliveryType || "";
+        
+        switch(deliveryType.toUpperCase()) {
+          case "TP":
+            return "Training and Placement";
+          case "OT":
+            return "Only Training";
+          case "IP":
+            return "Induction Program";
+          case "DM":
+            return "Digital Marketing Services";
+          default:
+            return deliveryType || "N/A";
+        }
+      };
 
-    XLSX.utils.book_append_sheet(wb, ws, "All Invoices");
-    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    const blob = new Blob([wbout], { type: "application/octet-stream" });
+      // Calculate rounded amount - SAME AS InvoiceExcelExport
+      const calculateRoundedAmount = (amount) => {
+        if (!amount && amount !== 0) return 0;
+        
+        let numAmount = amount;
+        if (typeof amount === 'string') {
+          numAmount = parseFloat(amount) || 0;
+        }
+        
+        return Math.round(numAmount);
+      };
 
-    const timestamp = new Date().toISOString().slice(0, 10);
-    let filename = `all_invoices_${timestamp}`;
+      // Get HSN code - SAME AS InvoiceExcelExport
+      const getHSNCode = (invoice) => {
+        return "9984";
+      };
 
-    if (filters.financialYear || filters.invoiceType !== "all" || filters.status !== "all") {
-      filename += "_filtered";
+      // Format payment history with dates and amounts - NEW FUNCTION
+      const getPaymentHistoryText = (invoice) => {
+        if (!invoice.paymentHistory || invoice.paymentHistory.length === 0) {
+          return "No Payments";
+        }
+        
+        // Sort payment history by date ascending (oldest first)
+        const sortedPayments = [...invoice.paymentHistory].sort((a, b) => {
+          const dateA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.date);
+          const dateB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.date);
+          return dateA - dateB;
+        });
+        
+        // Format each payment: "₹Amount on Date"
+        return sortedPayments.map(payment => {
+          const paymentDate = payment.timestamp?.toDate ? 
+            payment.timestamp.toDate() : new Date(payment.date);
+          const formattedDate = paymentDate.toLocaleDateString("en-IN");
+          const amount = payment.amount || 0;
+          
+          return `₹${formatCurrency(amount)} on ${formattedDate}`;
+        }).join('\n');
+      };
+
+      // Get total received amount - helper function
+      const getTotalReceived = (invoice) => {
+        if (!invoice.paymentHistory || invoice.paymentHistory.length === 0) {
+          return 0;
+        }
+        
+        return invoice.paymentHistory.reduce((total, payment) => {
+          return total + (payment.amount || 0);
+        }, 0);
+      };
+
+      const excelData = dataToExport.map((invoice) => {
+        const gstBreakdown = calculateGSTBreakdown(invoice);
+        
+        let netPayableAmount = invoice.netPayableAmount || 0;
+        if (typeof netPayableAmount === 'string') {
+          netPayableAmount = parseFloat(netPayableAmount) || 0;
+        }
+        
+        const roundedAmount = calculateRoundedAmount(netPayableAmount);
+        const baseAmount = invoice.baseAmount || 0;
+        const totalReceived = getTotalReceived(invoice);
+
+        return {
+          "Invoice Month": getInvoiceMonth(invoice.raisedDate),
+          "Invoice Number": invoice.invoiceNumber || "N/A",
+          "Invoice Date": formatDateForExcel(invoice.raisedDate),
+          "Party Name": invoice.collegeName || "N/A",
+          "GSTIN Number": invoice.gstNumber || "N/A",
+          "Description": getDescription(invoice),
+          "Total Value": formatCurrency(baseAmount),
+          "CGST": formatCurrency(gstBreakdown.cgst),
+          "SGST": formatCurrency(gstBreakdown.sgst),
+          "IGST": formatCurrency(gstBreakdown.igst),
+          "Rounded Off": formatCurrency(roundedAmount - netPayableAmount),
+          "Total Invoice Value": formatCurrency(roundedAmount),
+          "Total Received": formatCurrency(totalReceived), // NEW: Total received amount
+          "Due Amount": formatCurrency(roundedAmount - totalReceived), // NEW: Due amount
+          "HSN Code": getHSNCode(invoice),
+          "Invoice Type": invoice.invoiceType || "N/A",
+          "Payment History": getPaymentHistoryText(invoice), // NEW: All payment dates with amounts
+        };
+      });
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(excelData);
+
+      // Set column widths - SAME AS InvoiceExcelExport + NEW COLUMNS
+      const colWidths = [
+        { wch: 15 }, // Invoice Month
+        { wch: 20 }, // Invoice Number
+        { wch: 12 }, // Invoice Date
+        { wch: 25 }, // Party Name
+        { wch: 20 }, // GSTIN Number
+        { wch: 25 }, // Description
+        { wch: 12 }, // Total Value
+        { wch: 10 }, // CGST
+        { wch: 10 }, // SGST
+        { wch: 10 }, // IGST
+        { wch: 12 }, // Rounded Off
+        { wch: 15 }, // Total Invoice Value
+        { wch: 12 }, // NEW: Total Received
+        { wch: 12 }, // NEW: Due Amount
+        { wch: 10 }, // HSN Code
+        { wch: 15 }, // Invoice Type
+        { wch: 30 }, // NEW: Payment History (wider for multiple lines)
+      ];
+      ws['!cols'] = colWidths;
+
+      XLSX.utils.book_append_sheet(wb, ws, "All Invoices");
+      const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      const blob = new Blob([wbout], { type: "application/octet-stream" });
+
+      const timestamp = new Date().toISOString().slice(0, 10);
+      let filename = `all_invoices_${timestamp}`;
+
+      if (filters.financialYear || filters.invoiceType !== "all" || filters.status !== "all") {
+        filename += "_filtered";
+      }
+      filename += ".xlsx";
+
+      saveAs(blob, filename);
+    } catch (error) {
+      alert("Error exporting to Excel: " + error.message);
+    } finally {
+      setExportLoading(false);
     }
-    filename += ".xlsx";
+  };
 
-    saveAs(blob, filename);
-  } catch (error) {
-    alert("Error exporting to Excel: " + error.message);
-  } finally {
-    setExportLoading(false);
-  }
-};
   // Helper functions
   const formatDateForExcel = (date) => {
     if (!date) return "";
@@ -464,12 +466,76 @@ const exportToExcel = async () => {
     }).format(numAmount);
   };
 
-  
   const getInvoiceTypeText = (invoiceType) => {
     if (invoiceType === "Tax Invoice") return "Tax Invoice";
     if (invoiceType === "Cash Invoice") return "Cash Invoice";
     return invoiceType || "N/A";
   };
+
+  // NEW: Get Status Badge (Only Pending/Booked)
+  const getStatusBadge = (invoice) => {
+    if (invoice.status === "Booked" || invoice.registered) {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+          <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1"></span>
+          Booked
+        </span>
+      );
+    } else {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
+          <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full mr-1"></span>
+          Pending
+        </span>
+      );
+    }
+  };
+
+  // NEW: Get Payment Status Badge
+// NEW: Get Payment Status Badge - FIXED VERSION
+const getPaymentStatusBadge = (invoice) => {
+  if (invoice.approvalStatus === "cancelled") {
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">
+        <span className="w-1.5 h-1.5 bg-red-500 rounded-full mr-1"></span>
+        Cancelled
+      </span>
+    );
+  }
+
+  const totalAmount = parseFloat(invoice.amountRaised) || 0;
+  const receivedAmount = parseFloat(invoice.receivedAmount) || 0;
+  
+  // FIXED: Use proper floating point comparison with tolerance
+  const isFullyPaid = Math.abs(totalAmount - receivedAmount) < 0.01; // 0.01 tolerance for floating point errors
+  
+  // FIXED: Also check if dueAmount is zero in database
+  const dbDueAmount = parseFloat(invoice.dueAmount) || 0;
+  const isDueAmountZero = Math.abs(dbDueAmount) < 0.01;
+
+  if (isFullyPaid || isDueAmountZero) {
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1"></span>
+        Fully Paid
+      </span>
+    );
+  } else if (receivedAmount > 0) {
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+        <span className="w-1.5 h-1.5 bg-purple-500 rounded-full mr-1"></span>
+        Partially Paid
+      </span>
+    );
+  } else {
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
+        <span className="w-1.5 h-1.5 bg-orange-500 rounded-full mr-1"></span>
+        Unpaid
+      </span>
+    );
+  }
+};
 
   // Financial year options
   const financialYearOptions = [
@@ -604,51 +670,6 @@ const exportToExcel = async () => {
       invoice: invoice,
       isViewOnly: true,
     });
-  };
-
-  // Status Badges
-  const getStatusBadge = (invoice) => {
-    const status = invoice.status;
-    const approvalStatus = invoice.approvalStatus;
-
-    if (approvalStatus === "cancelled") {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">
-          <span className="w-1.5 h-1.5 bg-red-500 rounded-full mr-1"></span>
-          Cancelled
-        </span>
-      );
-    }
-
-    if (status === "Booked" || invoice.registered) {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
-          <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1"></span>
-          Booked
-        </span>
-      );
-    } else if (status === "received") {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
-          <span className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1"></span>
-          Received
-        </span>
-      );
-    } else if (status === "partially_received") {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
-          <span className="w-1.5 h-1.5 bg-purple-500 rounded-full mr-1"></span>
-          Partially Received
-        </span>
-      );
-    } else {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
-          <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full mr-1"></span>
-          Pending
-        </span>
-      );
-    }
   };
 
   const shouldDisableCancel = (invoice) => {
@@ -866,8 +887,6 @@ const exportToExcel = async () => {
           </div>
         </div>
       </div>
-
-      
     </div>
   );
 
@@ -1119,20 +1138,16 @@ const exportToExcel = async () => {
             {/* Mobile Cards View */}
             <div className="lg:hidden">
               {filteredInvoices.map((invoice) => {
-                // FIXED PAYMENT CALCULATION
                 const totalAmount = parseFloat(invoice.amountRaised) || 0;
                 const receivedAmount = parseFloat(invoice.receivedAmount) || 0;
                 const dbDueAmount = parseFloat(invoice.dueAmount) || 0;
                 
-                // Multiple ways to check if fully paid
                 const calculatedDue = totalAmount - receivedAmount;
                 const isFullyPaidByCalc = Math.abs(calculatedDue) < 0.01;
                 const isFullyPaidByDB = Math.abs(dbDueAmount) < 0.01;
                 const isFullyPaid = isFullyPaidByCalc || isFullyPaidByDB;
                 
-                // Final due amount for display
                 const dueAmount = isFullyPaid ? 0 : (dbDueAmount || calculatedDue);
-
                 const canCancel = !shouldDisableCancel(invoice);
 
                 return (
@@ -1142,7 +1157,10 @@ const exportToExcel = async () => {
                         <h3 className="font-semibold text-gray-900">{invoice.invoiceNumber}</h3>
                         <p className="text-sm text-gray-600">{invoice.collegeName}</p>
                       </div>
-                      {getStatusBadge(invoice)}
+                      <div className="flex flex-col gap-1 items-end">
+                        {getStatusBadge(invoice)}
+                        {getPaymentStatusBadge(invoice)}
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 text-sm mb-4">
@@ -1172,7 +1190,6 @@ const exportToExcel = async () => {
                         View
                       </button>
 
-                      {/* FIXED RECEIVE BUTTON LOGIC */}
                       {!isFullyPaid && invoice.approvalStatus !== "cancelled" ? (
                         <button
                           onClick={(e) => {
@@ -1185,7 +1202,7 @@ const exportToExcel = async () => {
                         </button>
                       ) : isFullyPaid ? (
                         <span className="flex-1 bg-green-100 text-green-700 px-3 py-2 rounded-lg text-sm font-medium text-center">
-                          ✓ Received
+                         Received
                         </span>
                       ) : null}
 
@@ -1229,26 +1246,25 @@ const exportToExcel = async () => {
                       Status
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Payment Status
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredInvoices.map((invoice) => {
-                    // FIXED PAYMENT CALCULATION
                     const totalAmount = parseFloat(invoice.amountRaised) || 0;
                     const receivedAmount = parseFloat(invoice.receivedAmount) || 0;
                     const dbDueAmount = parseFloat(invoice.dueAmount) || 0;
                     
-                    // Multiple ways to check if fully paid
                     const calculatedDue = totalAmount - receivedAmount;
                     const isFullyPaidByCalc = Math.abs(calculatedDue) < 0.01;
                     const isFullyPaidByDB = Math.abs(dbDueAmount) < 0.01;
                     const isFullyPaid = isFullyPaidByCalc || isFullyPaidByDB;
                     
-                    // Final due amount for display
                     const dueAmount = isFullyPaid ? 0 : (dbDueAmount || calculatedDue);
-
                     const canCancel = !shouldDisableCancel(invoice);
 
                     return (
@@ -1291,6 +1307,9 @@ const exportToExcel = async () => {
                           {getStatusBadge(invoice)}
                         </td>
                         <td className="px-6 py-4">
+                          {getPaymentStatusBadge(invoice)}
+                        </td>
+                        <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
                             <button
                               onClick={(e) => {
@@ -1302,7 +1321,6 @@ const exportToExcel = async () => {
                               View
                             </button>
 
-                            {/* FIXED RECEIVE BUTTON LOGIC */}
                             {!isFullyPaid && invoice.approvalStatus !== "cancelled" ? (
                               <button
                                 onClick={(e) => {
@@ -1315,7 +1333,7 @@ const exportToExcel = async () => {
                               </button>
                             ) : isFullyPaid ? (
                               <span className="inline-flex items-center px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-sm font-medium">
-                                ✓ Received
+                                Received
                               </span>
                             ) : null}
 
