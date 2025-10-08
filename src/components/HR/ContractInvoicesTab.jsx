@@ -82,59 +82,64 @@ const ContractInvoicesTab = () => {
     }
   };
 
-  // Calculate statistics
-  const calculateStats = (invoiceData) => {
-    const newStats = {
-      totalInvoices: invoiceData.length,
-      cancelledInvoices: 0,
-      totalAmount: 0,
-      receivedAmount: 0,
-      dueAmount: 0,
-      bookedInvoices: 0,
-      cashInvoices: 0,
-      taxInvoices: 0,
-      approvedInvoices: 0,
-      pendingInvoices: 0
-    };
-
-    invoiceData.forEach(invoice => {
-      const totalAmount = invoice.amountRaised || 0;
-      const receivedAmount = invoice.receivedAmount || 0;
-      const dueAmount = invoice.dueAmount || totalAmount - receivedAmount;
-
-      // Count cancelled invoices
-      if (invoice.approvalStatus === "cancelled") {
-        newStats.cancelledInvoices++;
-      }
-
-      // Count booked invoices
-      if (invoice.status === "Booked" || invoice.registered) {
-        newStats.bookedInvoices++;
-      }
-
-      // Count by invoice type
-      if (invoice.invoiceType === "Cash Invoice") {
-        newStats.cashInvoices++;
-      } else if (invoice.invoiceType === "Tax Invoice") {
-        newStats.taxInvoices++;
-      } 
-
-      // Count approval status
-      if (invoice.approved) {
-        newStats.approvedInvoices++;
-      } else {
-        newStats.pendingInvoices++;
-      }
-
-      // Amount calculations
-      newStats.totalAmount += totalAmount;
-      newStats.receivedAmount += receivedAmount;
-      newStats.dueAmount += dueAmount;
-    });
-
-    setStats(newStats);
+// Calculate statistics - FIXED VERSION
+const calculateStats = (invoiceData) => {
+  const newStats = {
+    totalInvoices: invoiceData.length,
+    cancelledInvoices: 0,
+    totalAmount: 0,
+    receivedAmount: 0,
+    dueAmount: 0,
+    bookedInvoices: 0,
+    cashInvoices: 0,
+    taxInvoices: 0,
+    approvedInvoices: 0,
+    pendingInvoices: 0
   };
 
+  invoiceData.forEach(invoice => {
+    // Safely parse amounts to numbers
+    const totalAmount = parseFloat(invoice.amountRaised) || 0;
+    const receivedAmount = parseFloat(invoice.receivedAmount) || 0;
+    const dueAmount = parseFloat(invoice.dueAmount) || (totalAmount - receivedAmount);
+
+    // Count cancelled invoices
+    if (invoice.approvalStatus === "cancelled") {
+      newStats.cancelledInvoices++;
+    }
+
+    // Count booked invoices
+    if (invoice.status === "Booked" || invoice.registered) {
+      newStats.bookedInvoices++;
+    }
+
+    // Count by invoice type
+    if (invoice.invoiceType === "Cash Invoice") {
+      newStats.cashInvoices++;
+    } else if (invoice.invoiceType === "Tax Invoice") {
+      newStats.taxInvoices++;
+    } 
+
+    // Count approval status
+    if (invoice.approved) {
+      newStats.approvedInvoices++;
+    } else {
+      newStats.pendingInvoices++;
+    }
+
+    // Amount calculations - ADD numbers, don't concatenate
+    newStats.totalAmount += totalAmount;
+    newStats.receivedAmount += receivedAmount;
+    newStats.dueAmount += dueAmount;
+  });
+
+  // Ensure numbers are properly formatted
+  newStats.totalAmount = Number(newStats.totalAmount.toFixed(2));
+  newStats.receivedAmount = Number(newStats.receivedAmount.toFixed(2));
+  newStats.dueAmount = Number(newStats.dueAmount.toFixed(2));
+
+  setStats(newStats);
+};
   // Apply filters
   const applyFilters = () => {
     let filtered = [...invoices];
@@ -245,85 +250,198 @@ const ContractInvoicesTab = () => {
     calculateStats(invoices);
   };
 
-  // Export to Excel with filters
-  const exportToExcel = async () => {
-    try {
-      setExportLoading(true);
-      const dataToExport = filteredInvoices.length > 0 ? filteredInvoices : invoices;
+// Export to Excel with same columns as InvoiceExcelExport + Payment History
+const exportToExcel = async () => {
+  try {
+    setExportLoading(true);
+    const dataToExport = filteredInvoices.length > 0 ? filteredInvoices : invoices;
 
-      const excelData = dataToExport.map((invoice) => {
-        const totalAmount = invoice.amountRaised || 0;
-        const receivedAmount = invoice.receivedAmount || 0;
-        const dueAmount = invoice.dueAmount || totalAmount - receivedAmount;
-
-        return {
-          "Invoice Number": invoice.invoiceNumber || "N/A",
-          "Invoice Type": getInvoiceTypeText(invoice.invoiceType),
-          "Invoice Date": formatDateForExcel(invoice.raisedDate),
-          "College Name": invoice.collegeName || "N/A",
-          "College Code": invoice.collegeCode || "N/A",
-          "Project Code": invoice.projectCode || "N/A",
-          Course: invoice.course || "N/A",
-          Year: invoice.year || "N/A",
-          "Student Count": invoice.studentCount || 0,
-          "Total Amount": formatCurrency(totalAmount),
-          "Received Amount": formatCurrency(receivedAmount),
-          "Due Amount": formatCurrency(dueAmount),
-          "Payment Status": getPaymentStatusText(invoice),
-          "Approval Status": getApprovalStatusText(invoice),
-          "GST Number": invoice.gstNumber || "N/A",
-          "GST Type": invoice.gstType || "N/A",
-          Installment: invoice.installment || "N/A",
-          "Base Amount": formatCurrency(invoice.baseAmount || 0),
-          "SGST Amount": formatCurrency(invoice.sgstAmount || 0),
-          "CGST Amount": formatCurrency(invoice.cgstAmount || 0),
-          "IGST Amount": formatCurrency(invoice.igstAmount || 0),
-          "Total GST": formatCurrency(
-            (invoice.sgstAmount || 0) +
-              (invoice.cgstAmount || 0) +
-              (invoice.igstAmount || 0)
-          ),
-          "Net Payable": formatCurrency(invoice.netPayableAmount || 0),
-          "TPO Name": invoice.tpoName || "N/A",
-          "TPO Email": invoice.tpoEmail || "N/A",
-          "TPO Phone": invoice.tpoPhone || "N/A",
-          Remarks: invoice.remarks || "N/A",
-        };
-      });
-
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(excelData);
-
-      const colWidths = [
-        { wch: 20 }, { wch: 15 }, { wch: 12 }, { wch: 25 }, { wch: 15 },
-        { wch: 20 }, { wch: 20 }, { wch: 10 }, { wch: 12 }, { wch: 12 },
-        { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 20 },
-        { wch: 10 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 },
-        { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 25 },
-        { wch: 15 }, { wch: 30 },
-      ];
-      ws["!cols"] = colWidths;
-
-      XLSX.utils.book_append_sheet(wb, ws, "All Invoices");
-      const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-      const blob = new Blob([wbout], { type: "application/octet-stream" });
-
-      const timestamp = new Date().toISOString().slice(0, 10);
-      let filename = `all_invoices_${timestamp}`;
-
-      if (filters.financialYear || filters.invoiceType !== "all" || filters.status !== "all") {
-        filename += "_filtered";
+    // Calculate GST breakdown function - SAME AS InvoiceExcelExport
+    const calculateGSTBreakdown = (invoice) => {
+      let gstAmount = invoice.gstAmount || 0;
+      
+      if (typeof gstAmount === 'string') {
+        gstAmount = parseFloat(gstAmount) || 0;
       }
-      filename += ".xlsx";
+      
+      const gstType = invoice.gstType?.toLowerCase();
+      
+      if (gstType === "igst") {
+        return {
+          cgst: 0,
+          sgst: 0,
+          igst: gstAmount
+        };
+      } else {
+        return {
+          cgst: gstAmount / 2,
+          sgst: gstAmount / 2,
+          igst: 0
+        };
+      }
+    };
 
-      saveAs(blob, filename);
-    } catch (error) {
-      alert("Error exporting to Excel: " + error.message);
-    } finally {
-      setExportLoading(false);
+    // Get invoice month - SAME AS InvoiceExcelExport
+    const getInvoiceMonth = (date) => {
+      if (!date) return "";
+      try {
+        const d = date?.toDate ? date.toDate() : new Date(date);
+        return d.toLocaleDateString("en-IN", { 
+          year: "numeric", 
+          month: "long" 
+        });
+      } catch {
+        return "Invalid Date";
+      }
+    };
+
+    // Get Description from deliveryType - SAME AS InvoiceExcelExport
+    const getDescription = (invoice) => {
+      const deliveryType = invoice.deliveryType || "";
+      
+      switch(deliveryType.toUpperCase()) {
+        case "TP":
+          return "Training and Placement";
+        case "OT":
+          return "Only Training";
+        case "IP":
+          return "Induction Program";
+        case "DM":
+          return "Digital Marketing Services";
+        default:
+          return deliveryType || "N/A";
+      }
+    };
+
+    // Calculate rounded amount - SAME AS InvoiceExcelExport
+    const calculateRoundedAmount = (amount) => {
+      if (!amount && amount !== 0) return 0;
+      
+      let numAmount = amount;
+      if (typeof amount === 'string') {
+        numAmount = parseFloat(amount) || 0;
+      }
+      
+      return Math.round(numAmount);
+    };
+
+    // Get HSN code - SAME AS InvoiceExcelExport
+    const getHSNCode = (invoice) => {
+      return "9984";
+    };
+
+    // Format payment history with dates and amounts - NEW FUNCTION
+    const getPaymentHistoryText = (invoice) => {
+      if (!invoice.paymentHistory || invoice.paymentHistory.length === 0) {
+        return "No Payments";
+      }
+      
+      // Sort payment history by date ascending (oldest first)
+      const sortedPayments = [...invoice.paymentHistory].sort((a, b) => {
+        const dateA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.date);
+        const dateB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.date);
+        return dateA - dateB;
+      });
+      
+      // Format each payment: "₹Amount on Date"
+      return sortedPayments.map(payment => {
+        const paymentDate = payment.timestamp?.toDate ? 
+          payment.timestamp.toDate() : new Date(payment.date);
+        const formattedDate = paymentDate.toLocaleDateString("en-IN");
+        const amount = payment.amount || 0;
+        
+        return `₹${formatCurrency(amount)} on ${formattedDate}`;
+      }).join('\n');
+    };
+
+    // Get total received amount - helper function
+    const getTotalReceived = (invoice) => {
+      if (!invoice.paymentHistory || invoice.paymentHistory.length === 0) {
+        return 0;
+      }
+      
+      return invoice.paymentHistory.reduce((total, payment) => {
+        return total + (payment.amount || 0);
+      }, 0);
+    };
+
+    const excelData = dataToExport.map((invoice) => {
+      const gstBreakdown = calculateGSTBreakdown(invoice);
+      
+      let netPayableAmount = invoice.netPayableAmount || 0;
+      if (typeof netPayableAmount === 'string') {
+        netPayableAmount = parseFloat(netPayableAmount) || 0;
+      }
+      
+      const roundedAmount = calculateRoundedAmount(netPayableAmount);
+      const baseAmount = invoice.baseAmount || 0;
+      const totalReceived = getTotalReceived(invoice);
+
+      return {
+        "Invoice Month": getInvoiceMonth(invoice.raisedDate),
+        "Invoice Number": invoice.invoiceNumber || "N/A",
+        "Invoice Date": formatDateForExcel(invoice.raisedDate),
+        "Party Name": invoice.collegeName || "N/A",
+        "GSTIN Number": invoice.gstNumber || "N/A",
+        "Description": getDescription(invoice),
+        "Total Value": formatCurrency(baseAmount),
+        "CGST": formatCurrency(gstBreakdown.cgst),
+        "SGST": formatCurrency(gstBreakdown.sgst),
+        "IGST": formatCurrency(gstBreakdown.igst),
+        "Rounded Off": formatCurrency(roundedAmount - netPayableAmount),
+        "Total Invoice Value": formatCurrency(roundedAmount),
+        "Total Received": formatCurrency(totalReceived), // NEW: Total received amount
+        "Due Amount": formatCurrency(roundedAmount - totalReceived), // NEW: Due amount
+        "HSN Code": getHSNCode(invoice),
+        "Invoice Type": invoice.invoiceType || "N/A",
+        "Payment History": getPaymentHistoryText(invoice), // NEW: All payment dates with amounts
+      };
+    });
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(excelData);
+
+    // Set column widths - SAME AS InvoiceExcelExport + NEW COLUMNS
+    const colWidths = [
+      { wch: 15 }, // Invoice Month
+      { wch: 20 }, // Invoice Number
+      { wch: 12 }, // Invoice Date
+      { wch: 25 }, // Party Name
+      { wch: 20 }, // GSTIN Number
+      { wch: 25 }, // Description
+      { wch: 12 }, // Total Value
+      { wch: 10 }, // CGST
+      { wch: 10 }, // SGST
+      { wch: 10 }, // IGST
+      { wch: 12 }, // Rounded Off
+      { wch: 15 }, // Total Invoice Value
+      { wch: 12 }, // NEW: Total Received
+      { wch: 12 }, // NEW: Due Amount
+      { wch: 10 }, // HSN Code
+      { wch: 15 }, // Invoice Type
+      { wch: 30 }, // NEW: Payment History (wider for multiple lines)
+    ];
+    ws['!cols'] = colWidths;
+
+    XLSX.utils.book_append_sheet(wb, ws, "All Invoices");
+    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([wbout], { type: "application/octet-stream" });
+
+    const timestamp = new Date().toISOString().slice(0, 10);
+    let filename = `all_invoices_${timestamp}`;
+
+    if (filters.financialYear || filters.invoiceType !== "all" || filters.status !== "all") {
+      filename += "_filtered";
     }
-  };
+    filename += ".xlsx";
 
+    saveAs(blob, filename);
+  } catch (error) {
+    alert("Error exporting to Excel: " + error.message);
+  } finally {
+    setExportLoading(false);
+  }
+};
   // Helper functions
   const formatDateForExcel = (date) => {
     if (!date) return "";
@@ -346,21 +464,7 @@ const ContractInvoicesTab = () => {
     }).format(numAmount);
   };
 
-  const getPaymentStatusText = (invoice) => {
-    const status = invoice.status;
-    if (status === "received") return "Fully Paid";
-    if (status === "partially_received") return "Partially Paid";
-    if (status === "registered") return "Registered";
-    return "Pending";
-  };
-
-  const getApprovalStatusText = (invoice) => {
-    if (invoice.approvalStatus === "cancelled") return "Cancelled";
-    if (invoice.approved) return "Approved";
-    if (invoice.approvalStatus === "pending") return "Pending Approval";
-    return "Pending";
-  };
-
+  
   const getInvoiceTypeText = (invoiceType) => {
     if (invoiceType === "Tax Invoice") return "Tax Invoice";
     if (invoiceType === "Cash Invoice") return "Cash Invoice";
