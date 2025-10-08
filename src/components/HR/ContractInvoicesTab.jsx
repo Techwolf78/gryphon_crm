@@ -1119,10 +1119,20 @@ const exportToExcel = async () => {
             {/* Mobile Cards View */}
             <div className="lg:hidden">
               {filteredInvoices.map((invoice) => {
-                const totalAmount = invoice.amountRaised || 0;
-                const receivedAmount = invoice.receivedAmount || 0;
-                const dueAmount = invoice.dueAmount || totalAmount - receivedAmount;
-                const isFullyPaid = dueAmount === 0;
+                // FIXED PAYMENT CALCULATION
+                const totalAmount = parseFloat(invoice.amountRaised) || 0;
+                const receivedAmount = parseFloat(invoice.receivedAmount) || 0;
+                const dbDueAmount = parseFloat(invoice.dueAmount) || 0;
+                
+                // Multiple ways to check if fully paid
+                const calculatedDue = totalAmount - receivedAmount;
+                const isFullyPaidByCalc = Math.abs(calculatedDue) < 0.01;
+                const isFullyPaidByDB = Math.abs(dbDueAmount) < 0.01;
+                const isFullyPaid = isFullyPaidByCalc || isFullyPaidByDB;
+                
+                // Final due amount for display
+                const dueAmount = isFullyPaid ? 0 : (dbDueAmount || calculatedDue);
+
                 const canCancel = !shouldDisableCancel(invoice);
 
                 return (
@@ -1162,7 +1172,8 @@ const exportToExcel = async () => {
                         View
                       </button>
 
-                      {!isFullyPaid && invoice.approvalStatus !== "cancelled" && (
+                      {/* FIXED RECEIVE BUTTON LOGIC */}
+                      {!isFullyPaid && invoice.approvalStatus !== "cancelled" ? (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -1172,7 +1183,11 @@ const exportToExcel = async () => {
                         >
                           Receive
                         </button>
-                      )}
+                      ) : isFullyPaid ? (
+                        <span className="flex-1 bg-green-100 text-green-700 px-3 py-2 rounded-lg text-sm font-medium text-center">
+                          ✓ Received
+                        </span>
+                      ) : null}
 
                       {canCancel ? (
                         <button
@@ -1220,10 +1235,20 @@ const exportToExcel = async () => {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredInvoices.map((invoice) => {
-                    const totalAmount = invoice.amountRaised || 0;
-                    const receivedAmount = invoice.receivedAmount || 0;
-                    const dueAmount = invoice.dueAmount || totalAmount - receivedAmount;
-                    const isFullyPaid = dueAmount === 0;
+                    // FIXED PAYMENT CALCULATION
+                    const totalAmount = parseFloat(invoice.amountRaised) || 0;
+                    const receivedAmount = parseFloat(invoice.receivedAmount) || 0;
+                    const dbDueAmount = parseFloat(invoice.dueAmount) || 0;
+                    
+                    // Multiple ways to check if fully paid
+                    const calculatedDue = totalAmount - receivedAmount;
+                    const isFullyPaidByCalc = Math.abs(calculatedDue) < 0.01;
+                    const isFullyPaidByDB = Math.abs(dbDueAmount) < 0.01;
+                    const isFullyPaid = isFullyPaidByCalc || isFullyPaidByDB;
+                    
+                    // Final due amount for display
+                    const dueAmount = isFullyPaid ? 0 : (dbDueAmount || calculatedDue);
+
                     const canCancel = !shouldDisableCancel(invoice);
 
                     return (
@@ -1277,7 +1302,8 @@ const exportToExcel = async () => {
                               View
                             </button>
 
-                            {!isFullyPaid && invoice.approvalStatus !== "cancelled" && (
+                            {/* FIXED RECEIVE BUTTON LOGIC */}
+                            {!isFullyPaid && invoice.approvalStatus !== "cancelled" ? (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1287,7 +1313,11 @@ const exportToExcel = async () => {
                               >
                                 Receive
                               </button>
-                            )}
+                            ) : isFullyPaid ? (
+                              <span className="inline-flex items-center px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-sm font-medium">
+                                ✓ Received
+                              </span>
+                            ) : null}
 
                             {canCancel ? (
                               <button
