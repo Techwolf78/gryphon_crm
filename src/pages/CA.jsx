@@ -13,6 +13,9 @@ const Register = () => {
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false); // ✅ NEW: Date picker modal state
+  const [selectedDate, setSelectedDate] = useState(""); // ✅ NEW: Selected date state
+  const [invoiceToRegister, setInvoiceToRegister] = useState(null); // ✅ NEW: Invoice to register
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -50,6 +53,8 @@ const Register = () => {
           receivedAmount: doc.data().receivedAmount || 0,
           dueAmount: doc.data().dueAmount || 0,
           paymentHistory: doc.data().paymentHistory || [],
+          // ✅ Ensure registeredAt field is included
+          registeredAt: doc.data().registeredAt || null,
         }));
 
         const allTaxInvoices = data.filter(
@@ -176,23 +181,95 @@ const Register = () => {
     setFilteredInvoices(invoices);
   };
 
+  // ✅ NEW: Open date picker modal
+  const openDatePicker = (invoice) => {
+    setInvoiceToRegister(invoice);
+    setSelectedDate(new Date().toISOString().split('T')[0]); // Set today's date as default
+    setShowDatePicker(true);
+  };
+
+  // ✅ NEW: Close date picker modal
+  const closeDatePicker = () => {
+    setShowDatePicker(false);
+    setInvoiceToRegister(null);
+    setSelectedDate("");
+  };
+
+  // ✅ UPDATED: Handle register with manual date
+  const handleRegister = async (invoice, manualDate = null) => {
+    try {
+      if (!invoice.id) {
+        throw new Error("Invoice ID is missing");
+      }
+
+      // ✅ SIRF CANCELLED INVOICES KO CHECK KARO
+      if (invoice.approvalStatus === "cancelled") {
+        alert("❌ Cannot register a cancelled invoice!");
+        return;
+      }
+
+      const invoiceRef = doc(db, "ContractInvoices", invoice.id);
+      
+      // ✅ MANUAL DATE YA CURRENT DATE USE KARO
+      let bookedDate;
+      if (manualDate) {
+        // Manual date from picker
+        bookedDate = new Date(manualDate).toISOString();
+      } else {
+        // Current date (for backward compatibility)
+        bookedDate = new Date().toISOString();
+      }
+      
+      await updateDoc(invoiceRef, {
+        registered: true,
+        registeredAt: bookedDate, // ✅ SELECTED DATE STORE KARO
+        status: "Booked",
+      });
+
+      setInvoices((prev) =>
+        prev.map((inv) =>
+          inv.id === invoice.id
+            ? { 
+                ...inv, 
+                registered: true, 
+                status: "Booked",
+                registeredAt: bookedDate // ✅ FRONTEND MEIN BHI UPDATE KARO
+              }
+            : inv
+        )
+      );
+
+      setFilteredInvoices((prev) =>
+        prev.map((inv) =>
+          inv.id === invoice.id
+            ? { 
+                ...inv, 
+                registered: true, 
+                status: "Booked",
+                registeredAt: bookedDate // ✅ FRONTEND MEIN BHI UPDATE KARO
+              }
+            : inv
+        )
+      );
+
+      alert("✅ Invoice Booked successfully!");
+    } catch (error) {
+      alert("❌ Error registering invoice: " + error.message);
+    }
+  };
+
+  // ✅ NEW: Confirm registration with selected date
+  const confirmRegistration = () => {
+    if (invoiceToRegister && selectedDate) {
+      handleRegister(invoiceToRegister, selectedDate);
+      closeDatePicker();
+    }
+  };
 // Export to Excel - UPDATED WITH SAME COLUMNS AS InvoiceExcelExport + BOOKED DATE
 const exportToExcel = async () => {
   try {
     setExportLoading(true);
-
-    // Use filtered invoices for export
-    const dataToExport = filteredInvoices.length > 0 ? filteredInvoices : invoices;
-
-
-
-    // ✅ ADD ROUNDED AMOUNT CALCULATION
-
-
-    // ✅ ADD DESCRIPTION FUNCTION
-
-
-    // ✅ ADD INVOICE MONTH FUNCTION
+const dataToExport = filteredInvoices.length > 0 ? filteredInvoices : invoices;
 const getInvoiceMonth = (date) => {
   if (!date) return "";
   try {
@@ -388,66 +465,12 @@ const getDescription = (invoice) => {
     return invoiceType || "N/A";
   };
 
-  // Financial year options
   const financialYearOptions = [
     { value: "2024-25", label: "2024-25" },
     { value: "2025-26", label: "2025-26" },
     { value: "2026-27", label: "2026-27" },
     { value: "2027-28", label: "2027-28" },
   ];
-
- const handleRegister = async (invoice) => {
-  try {
-    if (!invoice.id) {
-      throw new Error("Invoice ID is missing");
-    }
-
-    // ✅ SIRF CANCELLED INVOICES KO CHECK KARO
-    if (invoice.approvalStatus === "cancelled") {
-      alert("❌ Cannot register a cancelled invoice!");
-      return;
-    }
-
-    const invoiceRef = doc(db, "ContractInvoices", invoice.id);
-    const bookedDate = new Date().toISOString(); // ✅ CURRENT DATE CAPTURE KARO
-    
-    await updateDoc(invoiceRef, {
-      registered: true,
-      registeredAt: bookedDate, // ✅ DATE STORE KARO
-      status: "Booked",
-    });
-
-    setInvoices((prev) =>
-      prev.map((inv) =>
-        inv.id === invoice.id
-          ? { 
-              ...inv, 
-              registered: true, 
-              status: "Booked",
-              registeredAt: bookedDate // ✅ FRONTEND MEIN BHI UPDATE KARO
-            }
-          : inv
-      )
-    );
-
-    setFilteredInvoices((prev) =>
-      prev.map((inv) =>
-        inv.id === invoice.id
-          ? { 
-              ...inv, 
-              registered: true, 
-              status: "Booked",
-              registeredAt: bookedDate // ✅ FRONTEND MEIN BHI UPDATE KARO
-            }
-          : inv
-      )
-    );
-
-    alert("✅ Invoice Booked successfully!");
-  } catch (error) {
-    alert("❌ Error registering invoice: " + error.message);
-  }
-};
 
   const handleView = (invoice) => {
     setSelectedInvoice(invoice);
@@ -467,6 +490,17 @@ const getDescription = (invoice) => {
       return "bg-green-50 border-l-4 border-l-green-400";
     }
     return "";
+  };
+
+  // ✅ NEW: Format date for display
+  const formatDisplayDate = (date) => {
+    if (!date) return "Not Booked";
+    try {
+      const d = date?.toDate ? date.toDate() : new Date(date);
+      return d.toLocaleDateString("en-IN");
+    } catch {
+      return "Invalid Date";
+    }
   };
 
   useEffect(() => {
@@ -723,6 +757,9 @@ const getDescription = (invoice) => {
                   Registration Status
                 </th>
                 <th className="px-4 py-3 border border-gray-200 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                  ✅ Booking Date
+                </th>
+                <th className="px-4 py-3 border border-gray-200 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   Approval Status
                 </th>
                 <th className="px-4 py-3 border border-gray-200 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
@@ -764,12 +801,22 @@ const getDescription = (invoice) => {
                     )}
                   </td>
                   <td className="px-4 py-3 border border-gray-200">
+                    {/* ✅ BOOKING DATE COLUMN */}
+                    {invoice.registeredAt ? (
+                      <span className="text-sm text-gray-700">
+                        {formatDisplayDate(invoice.registeredAt)}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-gray-400">Not Booked</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 border border-gray-200">
                     {/* ✅ UPDATED APPROVAL STATUS BADGE */}
                     {invoice.approvalStatus === "cancelled" ? (
                       <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">
                         Cancelled
                       </span>
-                    ) : invoice.approved || invoice.receivedAmount > 0 ? ( // ✅ PAYMENT RECEIVE = AUTO APPROVE
+                    ) : invoice.approved || invoice.receivedAmount > 0 ? (
                       <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
                         ✓ Approved
                       </span>
@@ -792,7 +839,7 @@ const getDescription = (invoice) => {
                       {invoice.approvalStatus !== "cancelled" &&
                         !invoice.registered && (
                           <button
-                            onClick={() => handleRegister(invoice)}
+                            onClick={() => openDatePicker(invoice)}
                             className="bg-purple-500 text-white px-3 py-1 rounded text-sm hover:bg-purple-600"
                           >
                             Book
@@ -813,6 +860,44 @@ const getDescription = (invoice) => {
           onClose={closeModal}
           onRegister={handleRegister}
         />
+      )}
+
+      {/* ✅ DATE PICKER MODAL */}
+      {showDatePicker && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg w-96">
+            <h3 className="text-lg font-semibold mb-4">Select Booking Date</h3>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Booking Date
+              </label>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                max={new Date().toISOString().split('T')[0]} // Can't select future dates
+              />
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={closeDatePicker}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmRegistration}
+                disabled={!selectedDate}
+                className="bg-purple-600 text-white px-4 py-2 rounded font-medium hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Confirm Booking
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
