@@ -51,6 +51,8 @@ export default function ContractInvoiceTable() {
     useState(null);
   const [showExportView, setShowExportView] = useState(false);
   const [activeTab, setActiveTab] = useState("individual");
+  const [selectedCollegeFilter, setSelectedCollegeFilter] = useState("");
+  const [isAllExpanded, setIsAllExpanded] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -105,6 +107,13 @@ export default function ContractInvoiceTable() {
 
     fetchData();
   }, []);
+
+  // Update isAllExpanded when tab or filter changes
+  useEffect(() => {
+    // This will be called when activeTab or selectedCollegeFilter changes
+    // The actual check will happen in the toggleExpand function and toggleExpandAll function
+    setIsAllExpanded(false);
+  }, [activeTab, selectedCollegeFilter]);
 
   // Get contracts for individual view (not part of any merged invoice)
   const getIndividualContracts = () => {
@@ -171,8 +180,47 @@ export default function ContractInvoiceTable() {
       } else {
         newSet.add(id);
       }
+      
+      // Check if all items are now expanded or collapsed
+      const currentContracts = activeTab === "individual" 
+        ? getFilteredContracts(individualContracts) 
+        : getFilteredContracts(mergedContracts, true);
+      
+      const allIds = currentContracts.map((contract, index) => 
+        activeTab === "individual" ? contract.id : `merged-${index}`
+      );
+      
+      const allExpanded = allIds.every(id => newSet.has(id));
+      const allCollapsed = allIds.every(id => !newSet.has(id));
+      
+      if (allExpanded) {
+        setIsAllExpanded(true);
+      } else if (allCollapsed) {
+        setIsAllExpanded(false);
+      }
+      
       return newSet;
     });
+  };
+
+  // Toggle expand/collapse all items
+  const toggleExpandAll = () => {
+    const currentContracts = activeTab === "individual" 
+      ? getFilteredContracts(individualContracts) 
+      : getFilteredContracts(mergedContracts, true);
+    
+    if (isAllExpanded) {
+      // Collapse all
+      setExpandedRows(new Set());
+      setIsAllExpanded(false);
+    } else {
+      // Expand all
+      const allIds = currentContracts.map((contract, index) => 
+        activeTab === "individual" ? contract.id : `merged-${index}`
+      );
+      setExpandedRows(new Set(allIds));
+      setIsAllExpanded(true);
+    }
   };
 
   // Get current financial year (April to March)
@@ -1092,8 +1140,61 @@ const handleMergeSubmit = async (formData) => {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      <div className="min-h-screen bg-gray-50/50">
+        <div className="w-full space-y-3">
+          {/* Header Skeleton */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-3">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <div className="h-6 bg-gray-200 rounded w-64 mb-1 animate-pulse"></div>
+                <div className="h-4 bg-gray-200 rounded w-48 animate-pulse"></div>
+              </div>
+              <div className="flex items-center gap-3 mt-3 lg:mt-0">
+                <div className="h-8 bg-gray-200 rounded w-24 animate-pulse"></div>
+                <div className="h-8 bg-gray-200 rounded w-32 animate-pulse"></div>
+                <div className="h-8 bg-gray-200 rounded w-20 animate-pulse"></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tabs Skeleton */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-1">
+            <div className="flex border-b border-gray-200">
+              <div className="flex-1 py-3 px-4">
+                <div className="h-4 bg-gray-200 rounded w-32 animate-pulse"></div>
+              </div>
+              <div className="flex-1 py-3 px-4">
+                <div className="h-4 bg-gray-200 rounded w-28 animate-pulse"></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Card Skeletons */}
+          {[...Array(3)].map((_, index) => (
+            <div key={index} className="bg-white rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden">
+              {/* Header Skeleton */}
+              <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="h-5 bg-blue-500 rounded w-48 mb-2 animate-pulse"></div>
+                    <div className="h-4 bg-blue-400 rounded w-96 animate-pulse"></div>
+                  </div>
+                  <div className="h-6 w-6 bg-blue-500 rounded animate-pulse"></div>
+                </div>
+              </div>
+
+              {/* Content Skeleton */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 p-4">
+                {[...Array(4)].map((_, idx) => (
+                  <div key={idx}>
+                    <div className="h-3 bg-gray-200 rounded w-16 mb-1 animate-pulse"></div>
+                    <div className="h-4 bg-gray-200 rounded w-20 animate-pulse"></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -1108,6 +1209,43 @@ const handleMergeSubmit = async (formData) => {
 
   const individualContracts = getIndividualContracts();
   const mergedContracts = getMergedContracts();
+
+  // Get unique college names for filter
+  const getUniqueColleges = () => {
+    const colleges = new Set();
+    
+    // Add colleges from individual contracts
+    individualContracts.forEach(contract => {
+      if (contract.collegeName) {
+        colleges.add(contract.collegeName);
+      }
+    });
+    
+    // Add colleges from merged contracts
+    mergedContracts.forEach(mergedItem => {
+      if (mergedItem.collegeName) {
+        colleges.add(mergedItem.collegeName);
+      }
+    });
+    
+    return Array.from(colleges).sort();
+  };
+
+  // Filter contracts based on selected college and search term
+  const getFilteredContracts = (contracts, isMerged = false) => {
+    let filtered = contracts;
+
+    // College filter
+    if (selectedCollegeFilter) {
+      if (isMerged) {
+        filtered = filtered.filter(mergedItem => mergedItem.collegeName === selectedCollegeFilter);
+      } else {
+        filtered = filtered.filter(contract => contract.collegeName === selectedCollegeFilter);
+      }
+    }
+
+    return filtered;
+  };
 
   // Helper functions for displaying useful info
   const getUniquePaymentTypes = (contracts) => {
@@ -1139,7 +1277,8 @@ const handleMergeSubmit = async (formData) => {
       <div className="w-full space-y-3">
         {/* Header Section */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-3">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
+          <div className="flex items-center justify-between">
+            {/* Title and Subtitle */}
             <div>
               <h1 className="text-xl font-bold text-gray-900 tracking-tight">
                 Contract Invoices - Payment Tracking
@@ -1150,26 +1289,76 @@ const handleMergeSubmit = async (formData) => {
               </p>
             </div>
 
-            {/* Export Toggle Button */}
-            <button
-              onClick={() => setShowExportView(!showExportView)}
-              className="bg-green-600 hover:bg-green-700 text-white py-1.5 px-3 rounded-lg font-medium flex items-center gap-1.5"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            {/* Controls */}
+            <div className="flex items-center gap-3">
+              {/* Expand/Collapse All Button */}
+              <button
+                onClick={toggleExpandAll}
+                className={`${isAllExpanded ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} text-white py-1 px-2 rounded text-xs font-medium flex items-center gap-1 whitespace-nowrap`}
+                title={isAllExpanded ? "Collapse all contract details" : "Expand all contract details"}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-              {showExportView ? "Back to Table" : "Export"}
-            </button>
+                <svg
+                  className="w-3 h-3"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  {isAllExpanded ? (
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 15l7-7 7 7"
+                    />
+                  ) : (
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  )}
+                </svg>
+                {isAllExpanded ? "Collapse All" : "Expand All"}
+              </button>
+
+              {/* College Filter */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700">College:</label>
+                <select
+                  value={selectedCollegeFilter}
+                  onChange={(e) => setSelectedCollegeFilter(e.target.value)}
+                  className="w-40 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">All Colleges</option>
+                  {getUniqueColleges().map(college => (
+                    <option key={college} value={college}>{college}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Export Toggle Button */}
+              <button
+                onClick={() => setShowExportView(!showExportView)}
+                className="bg-green-600 hover:bg-green-700 text-white py-1.5 px-3 rounded-lg font-medium flex items-center gap-1.5 whitespace-nowrap"
+                title={showExportView ? "Return to table view" : "Switch to export view for bulk operations"}
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+                {showExportView ? "Back to Table" : "Export"}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1184,7 +1373,7 @@ const handleMergeSubmit = async (formData) => {
               <div className="flex border-b border-gray-200">
                 <button
                   onClick={() => setActiveTab("individual")}
-                  className={`flex-1 py-3 px-4 text-center font-medium text-sm rounded-lg transition-colors ${
+                  className={`flex-1 py-3 px-4 text-center font-medium text-sm rounded-lg transition-colors whitespace-nowrap ${
                     activeTab === "individual"
                       ? "bg-blue-50 text-blue-700 border-b-2 border-blue-500"
                       : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
@@ -1192,7 +1381,7 @@ const handleMergeSubmit = async (formData) => {
                 >
                   Individual Invoices
                   <span className="ml-2 bg-blue-100 text-blue-800 text-xs font-semibold py-0.5 px-2 rounded-full">
-                    {individualContracts.length}
+                    {getFilteredContracts(individualContracts).length}
                   </span>
                 </button>
                 <button
@@ -1205,7 +1394,7 @@ const handleMergeSubmit = async (formData) => {
                 >
                   Merged Invoices
                   <span className="ml-2 bg-purple-100 text-purple-800 text-xs font-semibold py-0.5 px-2 rounded-full">
-                    {mergedContracts.length}
+                    {getFilteredContracts(mergedContracts, true).length}
                   </span>
                 </button>
               </div>
@@ -1215,7 +1404,7 @@ const handleMergeSubmit = async (formData) => {
             {activeTab === "individual" ? (
               /* INDIVIDUAL VIEW TAB */
               <div className="space-y-3 mt-3">
-                {individualContracts.length === 0 ? (
+                {getFilteredContracts(individualContracts).length === 0 ? (
                   <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-6">
                     <div className="text-center max-w-md mx-auto">
                       <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-2">
@@ -1236,15 +1425,21 @@ const handleMergeSubmit = async (formData) => {
                       <h3 className="text-base font-semibold text-gray-900 mb-1">
                         No individual contracts available
                       </h3>
-                      <p className="text-gray-500 text-xs">
+                      <p className="text-gray-500 text-xs mb-4">
                         All contracts are either merged or have individual
                         invoices generated. Switch to Merged View to see
                         available contracts.
                       </p>
+                      <button
+                        onClick={() => setActiveTab("merged")}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                      >
+                        Switch to Merged View
+                      </button>
                     </div>
                   </div>
                 ) : (
-                  individualContracts.map((invoice) => {
+                  getFilteredContracts(individualContracts).map((invoice) => {
                     const contractInvoices = existingInvoices.filter(
                       (inv) => inv.originalInvoiceId === invoice.id
                     );
@@ -1345,7 +1540,7 @@ const handleMergeSubmit = async (formData) => {
                         </div>
                         {/* Expanded Content */}
                         {expandedRows.has(invoice.id) && (
-                          <div className="p-4">
+                          <div className="p-4 transition-all duration-300 ease-in-out">
                             {/* Installments Table */}
                             <div className="overflow-x-auto">
                               <table className="min-w-full divide-y divide-gray-200">
@@ -1569,7 +1764,7 @@ const handleMergeSubmit = async (formData) => {
                                                             inv
                                                           );
                                                         }}
-                                                        className="bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded text-xs"
+                                                        className="bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded text-xs whitespace-nowrap"
                                                       >
                                                         View
                                                       </button>
@@ -1582,7 +1777,7 @@ const handleMergeSubmit = async (formData) => {
                                                                 inv
                                                               );
                                                             }}
-                                                            className="bg-red-500 hover:bg-red-700 text-white py-1 px-2 rounded text-xs"
+                                                            className="bg-red-500 hover:bg-red-700 text-white py-1 px-2 rounded text-xs whitespace-nowrap"
                                                             title="Cancel this invoice"
                                                           >
                                                             Undo
@@ -1600,7 +1795,7 @@ const handleMergeSubmit = async (formData) => {
                                                                 inv
                                                               );
                                                             }}
-                                                            className="bg-orange-500 hover:bg-orange-700 text-white py-1 px-2 rounded text-xs"
+                                                            className="bg-orange-500 hover:bg-orange-700 text-white py-1 px-2 rounded text-xs whitespace-nowrap"
                                                             title="Regenerate cancelled invoice"
                                                           >
                                                             Regenerate
@@ -1616,7 +1811,7 @@ const handleMergeSubmit = async (formData) => {
                                                                 inv
                                                               );
                                                             }}
-                                                            className="bg-purple-500 hover:bg-purple-700 text-white py-1 px-2 rounded text-xs"
+                                                            className="bg-purple-500 hover:bg-purple-700 text-white py-1 px-2 rounded text-xs whitespace-nowrap"
                                                           >
                                                             Generate TI
                                                           </button>
@@ -1673,7 +1868,7 @@ const handleMergeSubmit = async (formData) => {
                                                       installment
                                                     );
                                                   }}
-                                                  className="bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded text-xs"
+                                                  className="bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded text-xs whitespace-nowrap"
                                                 >
                                                   Generate
                                                 </button>
@@ -1697,7 +1892,7 @@ const handleMergeSubmit = async (formData) => {
             ) : (
               /* MERGED VIEW TAB */
               <div className="space-y-3 mt-3">
-                {mergedContracts.length === 0 ? (
+                {getFilteredContracts(mergedContracts, true).length === 0 ? (
                   <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-6">
                     <div className="text-center max-w-md mx-auto">
                       <div className="w-12 h-12 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-2">
@@ -1709,14 +1904,20 @@ const handleMergeSubmit = async (formData) => {
                       <h3 className="text-base font-semibold text-gray-900 mb-1">
                         No contracts available for merging
                       </h3>
-                      <p className="text-gray-500 text-xs">
+                      <p className="text-gray-500 text-xs mb-4">
                         All contracts have individual invoices generated. Switch
                         to Individual View to see them.
                       </p>
+                      <button
+                        onClick={() => setActiveTab("individual")}
+                        className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                      >
+                        Switch to Individual View
+                      </button>
                     </div>
                   </div>
                 ) : (
-                  mergedContracts.map((mergedItem, index) => (
+                  getFilteredContracts(mergedContracts, true).map((mergedItem, index) => (
                     <div
                       key={index}
                       className="bg-white rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden"
@@ -1737,7 +1938,7 @@ const handleMergeSubmit = async (formData) => {
                               </span>
                             </div>
                             <p className="text-purple-100 text-sm mt-1">
-                              {/* ✅ Useful information dikhao */}
+                              Project Code: {generateMergedProjectCode(mergedItem)} •
                               Payment Types:{" "}
                               {getUniquePaymentTypes(mergedItem.contracts)} •
                               Total Students:{" "}
@@ -1765,9 +1966,67 @@ const handleMergeSubmit = async (formData) => {
                         </div>
                       </div>
 
+                      {/* Contract Details - Similar to Individual View */}
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 p-4">
+                        <div>
+                          <p className="text-xs font-bold text-gray-500 mb-0.5">
+                            Course
+                          </p>
+                          <p className="text-sm text-gray-900">
+                            {[...new Set(mergedItem.contracts.map(c => c.course))].join(", ") || "N/A"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-gray-500 mb-0.5">
+                            Year
+                          </p>
+                          <p className="text-sm text-gray-900">
+                            {[...new Set(mergedItem.contracts.map(c => c.year))].join(", ") || "N/A"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-gray-500 mb-0.5">
+                            Per Student Cost
+                          </p>
+                          <p className="text-sm text-gray-900">
+                            {formatCurrency(
+                              mergedItem.contracts.reduce((total, c) => total + (parseFloat(c.perStudentCost) || 0), 0) / mergedItem.contracts.length
+                            )}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 mb-0.5">
+                            Generated Merged Invoices
+                          </p>
+                          <p className="text-sm text-gray-900">
+                            {(() => {
+                              // Count total merged invoices for this group
+                              const mergedInvoicesCount = existingInvoices.filter(inv => 
+                                inv.isMergedInvoice && 
+                                inv.mergedContracts &&
+                                inv.mergedContracts.length === mergedItem.contracts.length &&
+                                inv.mergedContracts.every(mc => mergedItem.contracts.some(c => c.id === mc.id))
+                              ).length;
+
+                              const totalPossible = mergedItem.installmentCount;
+
+                              return mergedInvoicesCount > 0 ? (
+                                <span className="bg-purple-100 text-purple-800 text-xs font-semibold py-1 px-2 rounded">
+                                  {mergedInvoicesCount}/{totalPossible}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400">
+                                  0/{totalPossible}
+                                </span>
+                              );
+                            })()}
+                          </p>
+                        </div>
+                      </div>
+
                       {/* Expanded Content */}
                       {expandedRows.has(`merged-${index}`) && (
-                        <div className="p-4">
+                        <div className="p-4 transition-all duration-300 ease-in-out">
                           <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200">
                               <thead className="bg-gray-50">
@@ -1915,7 +2174,7 @@ const handleMergeSubmit = async (formData) => {
                                                       e.stopPropagation();
                                                       setSelectedInvoice(inv);
                                                     }}
-                                                    className="bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded text-xs"
+                                                    className="bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded text-xs whitespace-nowrap"
                                                   >
                                                     View
                                                   </button>
@@ -1928,7 +2187,7 @@ const handleMergeSubmit = async (formData) => {
                                                             inv
                                                           );
                                                         }}
-                                                        className="bg-red-500 hover:bg-red-700 text-white py-1 px-2 rounded text-xs"
+                                                        className="bg-red-500 hover:bg-red-700 text-white py-1 px-2 rounded text-xs whitespace-nowrap"
                                                         title="Cancel this invoice"
                                                       >
                                                         Undo
@@ -1941,7 +2200,7 @@ const handleMergeSubmit = async (formData) => {
                                                           e.stopPropagation();
                                                           /* Handle regenerate for merged invoice */
                                                         }}
-                                                        className="bg-orange-500 hover:bg-orange-700 text-white py-1 px-2 rounded text-xs"
+                                                        className="bg-orange-500 hover:bg-orange-700 text-white py-1 px-2 rounded text-xs whitespace-nowrap"
                                                         title="Regenerate cancelled invoice"
                                                       >
                                                         Regenerate
@@ -1999,7 +2258,7 @@ const handleMergeSubmit = async (formData) => {
                                                   installment
                                                 );
                                               }}
-                                              className="bg-purple-500 hover:bg-purple-700 text-white py-1 px-2 rounded text-xs"
+                                              className="bg-purple-500 hover:bg-purple-700 text-white py-1 px-2 rounded text-xs whitespace-nowrap"
                                             >
                                               Generate Merged
                                             </button>
