@@ -11,6 +11,7 @@ import {
   where,
   deleteDoc,
   writeBatch,
+  onSnapshot,
 } from "firebase/firestore";
 import { useAuth } from "../../../context/AuthContext";
 import {
@@ -55,7 +56,7 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
   const [customPhaseHours, setCustomPhaseHours] = useState({});
 
   // Add missing state variables that BatchDetailsTable expects
-  const [globalTrainerAssignments] = useState([]);
+  const [globalTrainerAssignments, setGlobalTrainerAssignments] = useState([]);
   const [excludeDays] = useState("None");
 
   const getDomainHours = useCallback(
@@ -127,6 +128,67 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
       // For merged training, domains are fixed to ["JD"]
     }
   }, [isMerged]);
+
+  // Fetch global trainer assignments for conflict detection
+  useEffect(() => {
+    if (!db) return;
+    let cancelled = false;
+    const normalizeDate = (d) => {
+      if (!d) return null;
+      if (typeof d === "string") return d;
+      if (d?.toDate) return d.toDate().toISOString().slice(0, 10);
+      try {
+        const dt = new Date(d);
+        if (isNaN(dt.getTime())) return null;
+        return dt.toISOString().slice(0, 10);
+      } catch {
+        return null;
+      }
+    };
+
+    // Listen to trainerAssignments collection for real-time updates
+    const assignmentsCol = collection(db, "trainerAssignments");
+    const unsubscribe = onSnapshot(
+      assignmentsCol,
+      (snap) => {
+        try {
+          const assignments = [];
+          snap.forEach((docSnap) => {
+            const data = docSnap.data();
+            if (!data) return;
+            const dateStr = normalizeDate(data.date);
+            if (!dateStr) return;
+            assignments.push({
+              trainerId: data.trainerId,
+              date: dateStr,
+              dayDuration: data.dayDuration || "",
+              sourceTrainingId: data.sourceTrainingId || "",
+              domain: data.domain || "",
+              collegeName: data.collegeName || "",
+              batchCode: data.batchCode || "",
+              trainerName: data.trainerName || "",
+            });
+          });
+          // Filter out assignments that belong to the current training to avoid self-conflict
+          const filtered = assignments.filter(
+            (a) => a.sourceTrainingId !== (training?.id || "")
+          );
+          if (!cancelled) setGlobalTrainerAssignments(filtered);
+        } catch (err) {
+          // Silent error handling
+        }
+      },
+      (err) => {
+        // Silent error handling
+      }
+    );
+
+    // Cleanup
+    return () => {
+      cancelled = true;
+      if (unsubscribe) unsubscribe();
+    };
+  }, [training?.id]);
 
   const validateForm = () => {
     if (!commonFields.trainingStartDate || !commonFields.trainingEndDate) {
@@ -664,18 +726,22 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                             ([domain, validation]) => {
                               if (!validation?.hasErrors) return null;
                               return (
-                                <div key={domain} className="mb-2">
-                                  <strong>{domain} domain:</strong>
-                                  <ul className="list-disc ml-4 mt-1">
+                                <div key={domain} className="mb-4">
+                                  <strong className="text-red-800">{domain} domain:</strong>
+                                  <div className="mt-2 space-y-3">
                                     {validation.errors.map((error, index) => (
-                                      <li key={index}>{error.message}</li>
+                                      <div key={index} className="bg-red-100 border border-red-200 rounded p-2">
+                                        <pre className="whitespace-pre-wrap text-xs text-red-800 font-mono">
+                                          {error.message}
+                                        </pre>
+                                      </div>
                                     ))}
-                                  </ul>
+                                  </div>
                                 </div>
                               );
                             }
                           )}
-                          <p className="mt-2 font-medium">
+                          <p className="mt-3 font-medium text-red-800 bg-red-100 border border-red-200 rounded p-2">
                             Please remove duplicate assignments or modify
                             trainer details (dates, duration) before proceeding.
                           </p>

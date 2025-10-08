@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { db } from "../firebase";
 import { collection, getDocs } from "firebase/firestore";
-import StudentListModal from "../components/Placement/StudentListModal";
-import AddJD from "../components/Placement/AddJD";
-import CompanyOpen from "../components/Placement/CompanyOpen";
-import CompanyLeads from "../components/Placement/CompanyLeads";
-import MouPreviewModal from "../components/Placement/MouPreviewModal";
-import PlacementDetailsModal from "../components/Placement//PlacementDetailsModal";
+import StudentListModal from "../components/PlacementOld/StudentListModal";
+import AddJD from "../components/PlacementOld/AddJD";
+import CompanyOpen from "../components/PlacementOld/CompanyOpen";
+import CompanyLeads from "../components/PlacementOld/CompanyLeads";
+import MouPreviewModal from "../components/PlacementOld/MouPreviewModal";
+import PlacementDetailsModal from "../components/PlacementOld/PlacementDetailsModal";
 
 function Placement() {
   const [trainingData, setTrainingData] = useState([]);

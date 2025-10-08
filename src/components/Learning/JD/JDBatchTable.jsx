@@ -234,7 +234,34 @@ const JDBatchTable = ({
 
                 if (hasConflict) {
                   duplicatesSet.add(trainerKey);
-                  const message = `${trainer.trainerName || trainer.trainerId} (${trainer.trainerId}) conflicts with existing assignment on ${dateISO} (${trainer.dayDuration})`;
+                  
+                  // Enhanced conflict message with detailed information
+                  const conflictDetails = [];
+                  
+                  // Add current assignment details with clear project code label
+                  conflictDetails.push(`🔄 Conflicting Project Code: ${assignment.sourceTrainingId || 'Unknown Project'}`);
+                  conflictDetails.push(`📚 College: ${assignment.collegeName || 'Not specified'}`);
+                  conflictDetails.push(`👥 Batch: ${assignment.batchCode || 'Not specified'}`);
+                  conflictDetails.push(`🎯 Domain: ${assignment.domain || 'Not specified'}`);
+                  conflictDetails.push(`⏰ Duration: ${assignment.dayDuration || 'Not specified'}`);
+                  conflictDetails.push(`📅 Date: ${dateISO}`);
+                  
+                  // Add trainer name if available
+                  if (assignment.trainerName) {
+                    conflictDetails.push(`👤 Trainer: ${assignment.trainerName}`);
+                  }
+                  
+                  // Add new assignment attempt details
+                  conflictDetails.push(`\n🆕 Trying to Assign to Current Project:`);
+                  conflictDetails.push(`⏰ Duration: ${trainer.dayDuration}`);
+                  conflictDetails.push(`📅 Date: ${dateISO}`);
+                  
+                  const message = `${
+                    trainer.trainerName || trainer.trainerId
+                  } (${
+                    trainer.trainerId
+                  }) conflicts with existing assignment:\n\n${conflictDetails.join('\n')}`;
+                  
                   errors.push({ message });
                 }
               }

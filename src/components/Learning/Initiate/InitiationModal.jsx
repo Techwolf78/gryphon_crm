@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { db } from "../../../firebase";
 import {
   doc,
@@ -111,7 +111,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
   const [hasChanges, setHasChanges] = useState(false);
 
   // Helper to generate date list, respecting excludeDays
-  const getDateList = (start, end) => {
+  const getDateList = useCallback((start, end) => {
     if (!start || !end) return [];
     const s = new Date(start);
     const e = new Date(end);
@@ -137,11 +137,24 @@ function InitiationModal({ training, onClose, onConfirm }) {
       cur.setDate(cur.getDate() + 1);
     }
     return out;
-  };
+  }, [excludeDays]);
 
   // Helper to calculate training days
   const getTrainingDays = (startDate, endDate) => {
     return getDateList(startDate, endDate).length;
+  };
+
+  const normalizeDate = (d) => {
+    if (!d) return null;
+    if (typeof d === "string") return d;
+    if (d?.toDate) return d.toDate().toISOString().slice(0, 10);
+    try {
+      const dt = new Date(d);
+      if (isNaN(dt.getTime())) return null;
+      return dt.toISOString().slice(0, 10);
+    } catch {
+      return null;
+    }
   };
 
   // Get domain hours - use custom hours if set, otherwise default from database
@@ -1194,11 +1207,14 @@ function InitiationModal({ training, onClose, onConfirm }) {
               dayDuration: data.dayDuration || "",
               sourceTrainingId: data.sourceTrainingId || "",
               domain: data.domain || "",
+              collegeName: data.collegeName || "",
+              batchCode: data.batchCode || "",
+              trainerName: data.trainerName || "",
             });
           });
-          // Filter out assignments that belong to the current training to avoid self-conflict
+          // Filter out assignments that belong to the current college to avoid self-conflict
           const filtered = assignments.filter(
-            (a) => a.sourceTrainingId !== (training?.id || "")
+            (a) => a.collegeName !== (training?.collegeName || "")
           );
           if (!cancelled) setGlobalTrainerAssignments(filtered);
         } catch (err) {
@@ -1215,24 +1231,47 @@ function InitiationModal({ training, onClose, onConfirm }) {
       cancelled = true;
       if (unsubscribe) unsubscribe();
     };
-  }, [training?.id]);
+  }, [training?.collegeName]);
 
-  // Click outside to close exclude days dropdown
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setExcludeDropdownOpen(false);
-      }
-    };
-
-    if (excludeDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [excludeDropdownOpen]);
+  // Compute current training assignments by domain for cross-domain duplicate detection
+  const currentTrainingAssignmentsByDomain = useMemo(() => {
+    const result = {};
+    selectedDomains.forEach((currentDomain) => {
+      const assignments = [];
+      Object.entries(table1DataByDomain).forEach(([dom, tableData]) => {
+        if (dom === currentDomain) return;
+        tableData.forEach((row) => {
+          row.batches.forEach((batch) => {
+            batch.trainers.forEach((trainer) => {
+              let dateStrings = [];
+              if (trainer.activeDates && trainer.activeDates.length > 0) {
+                dateStrings = trainer.activeDates.map(normalizeDate).filter(Boolean);
+              } else if (trainer.startDate && trainer.endDate) {
+                dateStrings = getDateList(trainer.startDate, trainer.endDate);
+              } else if (trainer.startDate) {
+                const d = normalizeDate(trainer.startDate);
+                if (d) dateStrings = [d];
+              }
+              dateStrings.forEach((dateStr) => {
+                assignments.push({
+                  trainerId: trainer.trainerId,
+                  trainerName: trainer.trainerName || trainer.trainer || "",
+                  date: dateStr,
+                  dayDuration: trainer.dayDuration || "",
+                  sourceTrainingId: training.id,
+                  domain: dom,
+                  collegeName: trainer.collegeName || training.collegeName || "",
+                  batchCode: batch.batchCode || "",
+                });
+              });
+            });
+          });
+        });
+      });
+      result[currentDomain] = assignments;
+    });
+    return result;
+  }, [selectedDomains, table1DataByDomain, training.id, training.collegeName, getDateList]);
 
   const swapTrainers = (swapData) => {
 
@@ -1772,6 +1811,8 @@ function InitiationModal({ training, onClose, onConfirm }) {
                               }
                               excludeDays={excludeDays}
                               showPersistentWarnings={submitDisabled}
+                              training={training}
+                              currentTrainingAssignments={currentTrainingAssignmentsByDomain[domain]}
                             />
                           )}
                         </div>
@@ -1876,18 +1917,22 @@ function InitiationModal({ training, onClose, onConfirm }) {
                             ([domain, validation]) => {
                               if (!validation?.hasErrors) return null;
                               return (
-                                <div key={domain} className="mb-2">
-                                  <strong>{domain} domain:</strong>
-                                  <ul className="list-disc ml-4 mt-1">
+                                <div key={domain} className="mb-4">
+                                  <strong className="text-red-800">{domain} domain:</strong>
+                                  <div className="mt-2 space-y-3">
                                     {validation.errors.map((error, index) => (
-                                      <li key={index}>{error.message}</li>
+                                      <div key={index} className="bg-red-100 border border-red-200 rounded p-2">
+                                        <pre className="whitespace-pre-wrap text-xs text-red-800 font-mono">
+                                          {error.message}
+                                        </pre>
+                                      </div>
                                     ))}
-                                  </ul>
+                                  </div>
                                 </div>
                               );
                             }
                           )}
-                          <p className="mt-2 font-medium">
+                          <p className="mt-3 font-medium text-red-800 bg-red-100 border border-red-200 rounded p-2">
                             Please remove duplicate assignments or modify
                             trainer details (dates, duration) before proceeding.
                           </p>
