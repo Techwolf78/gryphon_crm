@@ -791,7 +791,6 @@ const getMergedContracts = () => {
     if (!merged[key]) {
       merged[key] = {
         collegeName: contract.collegeName,
-        collegeCode: contract.collegeCode,
         installmentCount: installmentCount,
         contracts: [contract],
         installments: {},
