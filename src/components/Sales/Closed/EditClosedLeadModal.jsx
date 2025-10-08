@@ -2337,23 +2337,23 @@ const handleChange = (e) => {
             )}
           </div>
           {/* Footer - Modify the submit button to show confirmation */}
-          <div className="bg-gray-50 px-4 py-3 border-t flex justify-between items-center">
-            <div className="text-sm text-gray-500">
+          <div className="bg-gray-50 px-3 py-2 border-t flex justify-between items-center">
+            <div className="text-xs text-gray-500">
               {loading
                 ? "Saving changes..."
                 : `Section ${sections.indexOf(activeSection) + 1} of ${
                     sections.length
                   }`}
             </div>
-            <div className="flex space-x-3">
+            <div className="flex space-x-2">
               {activeSection !== sections[0] && (
                 <button
                   type="button"
                   onClick={goToPrevSection}
-                  className="px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center"
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg shadow-sm text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center"
                   disabled={loading}
                 >
-                  <FiArrowLeft className="mr-2" /> Back
+                  <FiArrowLeft className="mr-1.5 h-3 w-3" /> Back
                 </button>
               )}
 
@@ -2361,13 +2361,13 @@ const handleChange = (e) => {
                 <button
                   type="button"
                   onClick={goToNextSection}
-                  className="px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center"
+                  className="px-3 py-1.5 border border-transparent rounded-lg shadow-sm text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center"
                   disabled={
                     loading ||
                     (activeSection === "topics" && topicErrors.some(e => !!e))
                   }
                 >
-                  Next <FiArrowRight className="ml-2" />
+                  Next <FiArrowRight className="ml-1.5 h-3 w-3" />
                 </button>
               )}
 
@@ -2375,7 +2375,7 @@ const handleChange = (e) => {
               <button
                 type="button"
                 onClick={() => setShowConfirmation(true)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 flex items-center ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 flex items-center ${
                   canSubmit() && !loading
                     ? "bg-green-600 text-white hover:bg-green-700 focus:ring-green-500"
                     : "bg-gray-400 text-gray-200 cursor-not-allowed"
@@ -2386,7 +2386,7 @@ const handleChange = (e) => {
                 Submit Changes
                 {loading && (
                   <svg
-                    className="animate-spin h-5 w-5 ml-2 -mr-1 text-white"
+                    className="animate-spin h-4 w-4 ml-1.5 -mr-1 text-white"
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"
                     viewBox="0 0 24 24"
