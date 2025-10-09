@@ -2127,16 +2127,20 @@ const handleMergeSubmit = async (formData) => {
                                                 <div className="text-center">
                                                   <div
                                                     className={`font-semibold ${
-                                                      inv.invoiceType ===
-                                                      "Tax Invoice"
+                                                      inv.invoiceType === "Tax Invoice"
                                                         ? "text-green-600"
+                                                        : inv.invoiceType === "Cash Invoice"
+                                                        ? "text-purple-600"
                                                         : "text-blue-600"
                                                     }`}
                                                   >
-                                                    {inv.invoiceType ===
-                                                    "Proforma Invoice"
+                                                    {inv.invoiceType === "Tax Invoice"
+                                                      ? "Tax"
+                                                      : inv.invoiceType === "Cash Invoice"
+                                                      ? "Cash"
+                                                      : inv.invoiceType === "Proforma Invoice"
                                                       ? "Proforma"
-                                                      : "Tax"}
+                                                      : inv.invoiceType}
                                                     {isCancelled &&
                                                       inv.regenerated &&
                                                       " (Cancelled - Regenerated)"}

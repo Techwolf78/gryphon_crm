@@ -19,6 +19,7 @@ import {
   FiCheck,
   FiAlertCircle,
   FiX,
+  FiClock,
 } from "react-icons/fi";
 import JDBatchTable from "./JDBatchTable";
 import DatePicker from "react-datepicker";
@@ -170,8 +171,11 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
             });
           });
           // Filter out assignments that belong to the current training to avoid self-conflict
+          // For JD training (merged across colleges), filter by both the merged training ID and selected colleges
+          const jdTrainingId = selectedColleges?.length > 0 ? `${selectedColleges[0].id}-JD-merged` : `${training?.id}-JD-merged`;
+          const selectedCollegeNames = selectedColleges?.map(c => c.collegeName) || [];
           const filtered = assignments.filter(
-            (a) => a.sourceTrainingId !== (training?.id || "")
+            (a) => a.sourceTrainingId !== jdTrainingId && !selectedCollegeNames.some(collegeName => a.collegeName.includes(collegeName))
           );
           if (!cancelled) setGlobalTrainerAssignments(filtered);
         } catch (err) {
@@ -188,7 +192,7 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
       cancelled = true;
       if (unsubscribe) unsubscribe();
     };
-  }, [training?.id]);
+  }, [training?.id, selectedColleges]);
 
   const validateForm = () => {
     if (!commonFields.trainingStartDate || !commonFields.trainingEndDate) {
@@ -485,7 +489,9 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div className="relative top-4 mx-auto p-4 w-full max-w-6xl max-h-[95vh] overflow-y-auto">
+          <div className="bg-white rounded-lg shadow-xl">
         {/* Page Header */}
         <div className="bg-white shadow-sm border-b border-gray-200">
           <div className="mx-auto p-3">
@@ -528,9 +534,15 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                   JD Training Initiation
                 </p>
               </div>
-              {/* Right: Placeholder for spacing / future actions */}
-              <div className="flex-1 text-right hidden sm:block">
-                {/* Reserved for future quick actions */}
+              {/* Right: Close button */}
+              <div className="flex-1 text-right">
+                <button
+                  onClick={onClose}
+                  className="text-gray-400 hover:text-gray-600"
+                  disabled={loading}
+                >
+                  <FiX className="w-5 h-5" />
+                </button>
               </div>
             </div>
           </div>
@@ -580,7 +592,7 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                     ))}
                   </div>
                   <div className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded p-2">
-                    ?? Trainer costs will be divided equally among these {selectedColleges.length} colleges
+                    💰 Trainer costs will be divided equally among these {selectedColleges.length} colleges
                   </div>
                 </div>
 
@@ -811,6 +823,8 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                   onChecklistComplete={setIsChecklistComplete}
                 />
               </div>
+            </div>
+          </div>
             </div>
           </div>
         </div>

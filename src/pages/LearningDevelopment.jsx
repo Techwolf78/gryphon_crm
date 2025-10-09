@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import { collection, getDocs, query, orderBy, doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import TrainingTable from "../components/Learning/TrainingTables/TrainingTable";
@@ -14,9 +16,8 @@ import LearningDevelopmentTour from "../components/tours/LearningDevelopmentTour
 import JDMergeModal from "../components/Learning/JD/JDMergeModal";
 import OperationsConfigurationModal from "../components/Learning/JD/OperationsConfigurationModal";
 import JDInitiationModal from "../components/Learning/JD/JDInitiationModal";
-import { useAuth } from "../context/AuthContext";
-
-import { useNavigate } from "react-router-dom";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 function LearningDevelopment() {
   const [trainings, setTrainings] = useState([]);
@@ -172,6 +173,17 @@ function LearningDevelopment() {
 
   // Handle JD Training initiation
   const handleInitiateJD = () => {
+    // TODO: Remove this toast notification and uncomment the line below when JD training is ready for production
+    // toast.info("JD Training feature is still under development and not available for use yet", {
+    //   position: "top-right",
+    //   autoClose: 5000,
+    //   hideProgressBar: false,
+    //   closeOnClick: true,
+    //   pauseOnHover: true,
+    //   draggable: true,
+    // });
+
+    // Uncomment the line below when ready to enable JD training functionality:
     setShowJDMergeModal(true);
   };
 
@@ -219,7 +231,7 @@ function LearningDevelopment() {
       } else {
         alert("JD training data not found");
       }
-    } catch (error) {
+    } catch {
 
       alert("Failed to load JD training data");
     }
@@ -275,6 +287,18 @@ function LearningDevelopment() {
   return (
     <>
       <LearningDevelopmentTour userId={user?.uid} />
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
       <div className="bg-gray-50 min-h-screen">
         <div className="flex justify-between items-center mb-3" data-tour="ld-header">
           <h1 className="text-3xl font-bold text-blue-800">
@@ -547,12 +571,24 @@ function LearningDevelopment() {
 
       {showJDInitiationModal && selectedJDColleges.length > 0 && operationsConfig && (
         <JDInitiationModal
-          training={{ id: selectedJDColleges[0]?.id || "", isEdit: true }} // Pass training with edit flag
+          training={{ 
+            id: selectedJDColleges[0]?.id || "", 
+            isEdit: false, // This is a new training, not editing
+            createdBy: {
+              uid: user?.uid,
+              email: user?.email,
+              name: user?.displayName || user?.name || "Unknown"
+            }
+          }}
           onClose={handleJDInitiationClose}
           onConfirm={handleJDInitiationClose}
           isMerged={true}
           selectedColleges={selectedJDColleges}
           operationsConfig={operationsConfig}
+          onBack={() => {
+            setShowJDInitiationModal(false);
+            setShowOperationsConfigModal(true);
+          }}
         />
       )}
     </>
