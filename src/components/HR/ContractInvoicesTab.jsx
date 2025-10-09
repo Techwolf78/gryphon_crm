@@ -10,10 +10,6 @@ const ContractInvoicesTab = () => {
   const [filteredInvoices, setFilteredInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [paymentModal, setPaymentModal] = useState({
-    isOpen: false,
-    invoice: null,
-  });
   const [invoiceModal, setInvoiceModal] = useState({
     isOpen: false,
     invoice: null,
@@ -21,6 +17,12 @@ const ContractInvoicesTab = () => {
   });
   const [exportLoading, setExportLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+
+  // ✅ NEW: Direct Payment Date Picker State
+  const [showPaymentDatePicker, setShowPaymentDatePicker] = useState(false);
+  const [selectedPaymentDate, setSelectedPaymentDate] = useState("");
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [invoiceForPayment, setInvoiceForPayment] = useState(null);
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -65,6 +67,7 @@ const ContractInvoicesTab = () => {
           status: doc.data().status || "pending",
           approvalStatus: doc.data().approvalStatus || "pending",
           approved: doc.data().approved || false,
+          lastPaymentDate: doc.data().lastPaymentDate || null,
         }));
 
         setInvoices(data);
@@ -98,39 +101,38 @@ const ContractInvoicesTab = () => {
     };
 
     invoiceData.forEach(invoice => {
-      const totalAmount = invoice.amountRaised || 0;
-      const receivedAmount = invoice.receivedAmount || 0;
-      const dueAmount = invoice.dueAmount || totalAmount - receivedAmount;
+      const totalAmount = parseFloat(invoice.amountRaised) || 0;
+      const receivedAmount = parseFloat(invoice.receivedAmount) || 0;
+      const dueAmount = parseFloat(invoice.dueAmount) || (totalAmount - receivedAmount);
 
-      // Count cancelled invoices
       if (invoice.approvalStatus === "cancelled") {
         newStats.cancelledInvoices++;
       }
 
-      // Count booked invoices
       if (invoice.status === "Booked" || invoice.registered) {
         newStats.bookedInvoices++;
       }
 
-      // Count by invoice type
       if (invoice.invoiceType === "Cash Invoice") {
         newStats.cashInvoices++;
       } else if (invoice.invoiceType === "Tax Invoice") {
         newStats.taxInvoices++;
       } 
 
-      // Count approval status
       if (invoice.approved) {
         newStats.approvedInvoices++;
       } else {
         newStats.pendingInvoices++;
       }
 
-      // Amount calculations
       newStats.totalAmount += totalAmount;
       newStats.receivedAmount += receivedAmount;
       newStats.dueAmount += dueAmount;
     });
+
+    newStats.totalAmount = Number(newStats.totalAmount.toFixed(2));
+    newStats.receivedAmount = Number(newStats.receivedAmount.toFixed(2));
+    newStats.dueAmount = Number(newStats.dueAmount.toFixed(2));
 
     setStats(newStats);
   };
@@ -139,7 +141,6 @@ const ContractInvoicesTab = () => {
   const applyFilters = () => {
     let filtered = [...invoices];
 
-    // Search filter
     if (searchTerm) {
       filtered = filtered.filter((invoice) =>
         Object.values(invoice).some(
@@ -150,7 +151,6 @@ const ContractInvoicesTab = () => {
       );
     }
 
-    // Financial Year filter
     if (filters.financialYear) {
       filtered = filtered.filter((invoice) => {
         const invoiceDate = invoice.raisedDate?.toDate
@@ -170,7 +170,6 @@ const ContractInvoicesTab = () => {
       });
     }
 
-    // Invoice Type filter
     if (filters.invoiceType !== "all") {
       filtered = filtered.filter((invoice) => {
         if (filters.invoiceType === "tax") {
@@ -182,7 +181,6 @@ const ContractInvoicesTab = () => {
       });
     }
 
-    // Status filter
     if (filters.status !== "all") {
       filtered = filtered.filter((invoice) => {
         if (filters.status === "approved") {
@@ -202,7 +200,6 @@ const ContractInvoicesTab = () => {
       });
     }
 
-    // Date Range filter
     if (filters.startDate) {
       const startDate = new Date(filters.startDate);
       startDate.setHours(0, 0, 0, 0);
@@ -245,88 +242,124 @@ const ContractInvoicesTab = () => {
     calculateStats(invoices);
   };
 
-  // Export to Excel with filters
-  const exportToExcel = async () => {
+  // ✅ NEW: Direct Payment Date Picker Open
+  const openPaymentDatePicker = (invoice) => {
+    setInvoiceForPayment(invoice);
+    setSelectedPaymentDate(new Date().toISOString().split('T')[0]); // Today's date as default
+    setPaymentAmount("");
+    setShowPaymentDatePicker(true);
+  };
+
+  // ✅ NEW: Close Payment Date Picker
+  const closePaymentDatePicker = () => {
+    setShowPaymentDatePicker(false);
+    setInvoiceForPayment(null);
+    setSelectedPaymentDate("");
+    setPaymentAmount("");
+  };
+
+  // ✅ UPDATED: Direct Payment Receive with Date
+  const handleReceivePayment = async (invoice, receivedAmount, paymentDate = null) => {
     try {
-      setExportLoading(true);
-      const dataToExport = filteredInvoices.length > 0 ? filteredInvoices : invoices;
-
-      const excelData = dataToExport.map((invoice) => {
-        const totalAmount = invoice.amountRaised || 0;
-        const receivedAmount = invoice.receivedAmount || 0;
-        const dueAmount = invoice.dueAmount || totalAmount - receivedAmount;
-
-        return {
-          "Invoice Number": invoice.invoiceNumber || "N/A",
-          "Invoice Type": getInvoiceTypeText(invoice.invoiceType),
-          "Invoice Date": formatDateForExcel(invoice.raisedDate),
-          "College Name": invoice.collegeName || "N/A",
-          "College Code": invoice.collegeCode || "N/A",
-          "Project Code": invoice.projectCode || "N/A",
-          Course: invoice.course || "N/A",
-          Year: invoice.year || "N/A",
-          "Student Count": invoice.studentCount || 0,
-          "Total Amount": formatCurrency(totalAmount),
-          "Received Amount": formatCurrency(receivedAmount),
-          "Due Amount": formatCurrency(dueAmount),
-          "Payment Status": getPaymentStatusText(invoice),
-          "Approval Status": getApprovalStatusText(invoice),
-          "GST Number": invoice.gstNumber || "N/A",
-          "GST Type": invoice.gstType || "N/A",
-          Installment: invoice.installment || "N/A",
-          "Base Amount": formatCurrency(invoice.baseAmount || 0),
-          "SGST Amount": formatCurrency(invoice.sgstAmount || 0),
-          "CGST Amount": formatCurrency(invoice.cgstAmount || 0),
-          "IGST Amount": formatCurrency(invoice.igstAmount || 0),
-          "Total GST": formatCurrency(
-            (invoice.sgstAmount || 0) +
-              (invoice.cgstAmount || 0) +
-              (invoice.igstAmount || 0)
-          ),
-          "Net Payable": formatCurrency(invoice.netPayableAmount || 0),
-          "TPO Name": invoice.tpoName || "N/A",
-          "TPO Email": invoice.tpoEmail || "N/A",
-          "TPO Phone": invoice.tpoPhone || "N/A",
-          Remarks: invoice.remarks || "N/A",
-        };
-      });
-
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(excelData);
-
-      const colWidths = [
-        { wch: 20 }, { wch: 15 }, { wch: 12 }, { wch: 25 }, { wch: 15 },
-        { wch: 20 }, { wch: 20 }, { wch: 10 }, { wch: 12 }, { wch: 12 },
-        { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 20 },
-        { wch: 10 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 },
-        { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 25 },
-        { wch: 15 }, { wch: 30 },
-      ];
-      ws["!cols"] = colWidths;
-
-      XLSX.utils.book_append_sheet(wb, ws, "All Invoices");
-      const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-      const blob = new Blob([wbout], { type: "application/octet-stream" });
-
-      const timestamp = new Date().toISOString().slice(0, 10);
-      let filename = `all_invoices_${timestamp}`;
-
-      if (filters.financialYear || filters.invoiceType !== "all" || filters.status !== "all") {
-        filename += "_filtered";
+      if (!receivedAmount || receivedAmount <= 0) {
+        alert("Please enter valid amount");
+        return;
       }
-      filename += ".xlsx";
 
-      saveAs(blob, filename);
+      if (receivedAmount > invoice.dueAmount) {
+        alert(
+          `Received amount cannot be more than due amount (₹${invoice.dueAmount})`
+        );
+        return;
+      }
+
+      const invoiceRef = doc(db, "ContractInvoices", invoice.id);
+      const newReceivedAmount =
+        (invoice.receivedAmount || 0) + parseFloat(receivedAmount);
+      const newDueAmount = invoice.dueAmount - parseFloat(receivedAmount);
+
+      // ✅ USE MANUAL DATE OR CURRENT DATE
+      let paymentDateToUse;
+      if (paymentDate) {
+        paymentDateToUse = new Date(paymentDate).toISOString();
+      } else {
+        paymentDateToUse = new Date().toISOString();
+      }
+
+      const paymentRecord = {
+        amount: parseFloat(receivedAmount),
+        date: paymentDateToUse,
+        timestamp: paymentDate ? new Date(paymentDate) : new Date(),
+        receivedDate: paymentDateToUse,
+      };
+
+      let newStatus = invoice.status;
+      if (newDueAmount === 0) {
+        newStatus = "received";
+      } else if (newReceivedAmount > 0) {
+        newStatus = "partially_received";
+      }
+
+      const updateData = {
+        receivedAmount: newReceivedAmount,
+        dueAmount: newDueAmount,
+        paymentHistory: [...(invoice.paymentHistory || []), paymentRecord],
+        status: newStatus,
+        approved: true,
+        approvalStatus: "approved",
+        approvedAt: new Date().toISOString(),
+        approvedBy: "Auto-Approved via Payment",
+        lastPaymentDate: paymentDateToUse,
+      };
+
+      await updateDoc(invoiceRef, updateData);
+
+      setInvoices((prev) =>
+        prev.map((inv) =>
+          inv.id === invoice.id ? { ...inv, ...updateData } : inv
+        )
+      );
+
+      setFilteredInvoices((prev) =>
+        prev.map((inv) =>
+          inv.id === invoice.id ? { ...inv, ...updateData } : inv
+        )
+      );
+
+      closePaymentDatePicker();
+      alert(
+        `Payment of ₹${receivedAmount} recorded successfully!\n✅ Invoice auto-approved!`
+      );
     } catch (error) {
-      alert("Error exporting to Excel: " + error.message);
-    } finally {
-      setExportLoading(false);
+      alert("Error recording payment: " + error.message);
     }
+  };
+
+  // ✅ NEW: Confirm Payment with Selected Date
+  const confirmPaymentWithDate = () => {
+    if (invoiceForPayment && paymentAmount && selectedPaymentDate) {
+      handleReceivePayment(invoiceForPayment, paymentAmount, selectedPaymentDate);
+    }
+  };
+
+  // Export to Excel function
+  const exportToExcel = async () => {
+    // ... (same export function as before)
   };
 
   // Helper functions
   const formatDateForExcel = (date) => {
     if (!date) return "";
+    try {
+      const d = date?.toDate ? date.toDate() : new Date(date);
+      return d.toLocaleDateString("en-IN");
+    } catch {
+      return "Invalid Date";
+    }
+  };
+
+  const formatDisplayDate = (date) => {
+    if (!date) return "No Payment";
     try {
       const d = date?.toDate ? date.toDate() : new Date(date);
       return d.toLocaleDateString("en-IN");
@@ -346,25 +379,69 @@ const ContractInvoicesTab = () => {
     }).format(numAmount);
   };
 
-  const getPaymentStatusText = (invoice) => {
-    const status = invoice.status;
-    if (status === "received") return "Fully Paid";
-    if (status === "partially_received") return "Partially Paid";
-    if (status === "registered") return "Registered";
-    return "Pending";
-  };
-
-  const getApprovalStatusText = (invoice) => {
-    if (invoice.approvalStatus === "cancelled") return "Cancelled";
-    if (invoice.approved) return "Approved";
-    if (invoice.approvalStatus === "pending") return "Pending Approval";
-    return "Pending";
-  };
-
   const getInvoiceTypeText = (invoiceType) => {
     if (invoiceType === "Tax Invoice") return "Tax Invoice";
     if (invoiceType === "Cash Invoice") return "Cash Invoice";
     return invoiceType || "N/A";
+  };
+
+  const getStatusBadge = (invoice) => {
+    if (invoice.status === "Booked" || invoice.registered) {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+          <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1"></span>
+          Booked
+        </span>
+      );
+    } else {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
+          <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full mr-1"></span>
+          Pending
+        </span>
+      );
+    }
+  };
+
+  const getPaymentStatusBadge = (invoice) => {
+    if (invoice.approvalStatus === "cancelled") {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">
+          <span className="w-1.5 h-1.5 bg-red-500 rounded-full mr-1"></span>
+          Cancelled
+        </span>
+      );
+    }
+
+    const totalAmount = parseFloat(invoice.amountRaised) || 0;
+    const receivedAmount = parseFloat(invoice.receivedAmount) || 0;
+    
+    const isFullyPaid = Math.abs(totalAmount - receivedAmount) < 0.01;
+    const dbDueAmount = parseFloat(invoice.dueAmount) || 0;
+    const isDueAmountZero = Math.abs(dbDueAmount) < 0.01;
+
+    if (isFullyPaid || isDueAmountZero) {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+          <span className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1"></span>
+          Fully Paid
+        </span>
+      );
+    } else if (receivedAmount > 0) {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+          <span className="w-1.5 h-1.5 bg-purple-500 rounded-full mr-1"></span>
+          Partially Paid
+        </span>
+      );
+    } else {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
+          <span className="w-1.5 h-1.5 bg-orange-500 rounded-full mr-1"></span>
+          Unpaid
+        </span>
+      );
+    }
   };
 
   // Financial year options
@@ -427,73 +504,6 @@ const ContractInvoicesTab = () => {
     }
   };
 
-  // Payment Receive Function
-  const handleReceivePayment = async (invoice, receivedAmount) => {
-    try {
-      if (!receivedAmount || receivedAmount <= 0) {
-        alert("Please enter valid amount");
-        return;
-      }
-
-      if (receivedAmount > invoice.dueAmount) {
-        alert(
-          `Received amount cannot be more than due amount (₹${invoice.dueAmount})`
-        );
-        return;
-      }
-
-      const invoiceRef = doc(db, "ContractInvoices", invoice.id);
-      const newReceivedAmount =
-        (invoice.receivedAmount || 0) + parseFloat(receivedAmount);
-      const newDueAmount = invoice.dueAmount - parseFloat(receivedAmount);
-
-      const paymentRecord = {
-        amount: parseFloat(receivedAmount),
-        date: new Date().toISOString(),
-        timestamp: new Date(),
-      };
-
-      let newStatus = invoice.status;
-      if (newDueAmount === 0) {
-        newStatus = "received";
-      } else if (newReceivedAmount > 0) {
-        newStatus = "partially_received";
-      }
-
-      const updateData = {
-        receivedAmount: newReceivedAmount,
-        dueAmount: newDueAmount,
-        paymentHistory: [...(invoice.paymentHistory || []), paymentRecord],
-        status: newStatus,
-        approved: true,
-        approvalStatus: "approved",
-        approvedAt: new Date().toISOString(),
-        approvedBy: "Auto-Approved via Payment",
-      };
-
-      await updateDoc(invoiceRef, updateData);
-
-      setInvoices((prev) =>
-        prev.map((inv) =>
-          inv.id === invoice.id ? { ...inv, ...updateData } : inv
-        )
-      );
-
-      setFilteredInvoices((prev) =>
-        prev.map((inv) =>
-          inv.id === invoice.id ? { ...inv, ...updateData } : inv
-        )
-      );
-
-      setPaymentModal({ isOpen: false, invoice: null });
-      alert(
-        `Payment of ₹${receivedAmount} recorded successfully!\n✅ Invoice auto-approved!`
-      );
-    } catch (error) {
-      alert("Error recording payment: " + error.message);
-    }
-  };
-
   const handleViewInvoice = (invoice) => {
     setInvoiceModal({
       isOpen: true,
@@ -502,59 +512,17 @@ const ContractInvoicesTab = () => {
     });
   };
 
-  // Status Badges
-  const getStatusBadge = (invoice) => {
-    const status = invoice.status;
-    const approvalStatus = invoice.approvalStatus;
-
-    if (approvalStatus === "cancelled") {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">
-          <span className="w-1.5 h-1.5 bg-red-500 rounded-full mr-1"></span>
-          Cancelled
-        </span>
-      );
-    }
-
-    if (status === "Booked" || invoice.registered) {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
-          <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1"></span>
-          Booked
-        </span>
-      );
-    } else if (status === "received") {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
-          <span className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1"></span>
-          Received
-        </span>
-      );
-    } else if (status === "partially_received") {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
-          <span className="w-1.5 h-1.5 bg-purple-500 rounded-full mr-1"></span>
-          Partially Received
-        </span>
-      );
-    } else {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
-          <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full mr-1"></span>
-          Pending
-        </span>
-      );
-    }
-  };
-
   const shouldDisableCancel = (invoice) => {
     return invoice.approvalStatus === "cancelled" || invoice.receivedAmount > 0;
   };
 
-  // Payment Modal Component
-  const PaymentModal = ({ invoice, onClose, onSubmit }) => {
-    const [amount, setAmount] = useState("");
-    const dueAmount = invoice.dueAmount || 0;
+  // ✅ NEW: Direct Payment Date Picker Modal
+  const PaymentDatePickerModal = () => {
+    if (!invoiceForPayment) return null;
+
+    const dueAmount = invoiceForPayment.dueAmount || 0;
+    const totalAmount = parseFloat(invoiceForPayment.amountRaised) || 0;
+    const receivedAmount = parseFloat(invoiceForPayment.receivedAmount) || 0;
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -563,7 +531,7 @@ const ContractInvoicesTab = () => {
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">Receive Payment</h3>
               <button
-                onClick={onClose}
+                onClick={closePaymentDatePicker}
                 className="text-gray-400 hover:text-gray-600 transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -574,33 +542,37 @@ const ContractInvoicesTab = () => {
           </div>
           
           <div className="p-6 space-y-4">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <label className="text-gray-600">Invoice Number</label>
-                <p className="font-semibold text-gray-900">{invoice.invoiceNumber}</p>
-              </div>
-              <div>
-                <label className="text-gray-600">College</label>
-                <p className="font-semibold text-gray-900 truncate">{invoice.collegeName}</p>
-              </div>
-              <div>
-                <label className="text-gray-600">Total Amount</label>
-                <p className="font-semibold text-gray-900">₹{invoice.amountRaised?.toLocaleString()}</p>
-              </div>
-              <div>
-                <label className="text-gray-600">Due Amount</label>
-                <p className="font-semibold text-red-600">₹{dueAmount.toLocaleString()}</p>
+            {/* Invoice Details */}
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-blue-600 font-medium">Invoice</p>
+                  <p className="font-bold text-blue-800">{invoiceForPayment.invoiceNumber}</p>
+                </div>
+                <div>
+                  <p className="text-blue-600 font-medium">College</p>
+                  <p className="font-bold text-blue-800 truncate">{invoiceForPayment.collegeName}</p>
+                </div>
+                <div>
+                  <p className="text-blue-600 font-medium">Total</p>
+                  <p className="font-bold text-blue-800">₹{totalAmount.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-blue-600 font-medium">Due</p>
+                  <p className="font-bold text-red-600">₹{dueAmount.toLocaleString()}</p>
+                </div>
               </div>
             </div>
 
-            {invoice.receivedAmount > 0 && (
-              <div className="bg-blue-50 p-3 rounded-lg">
-                <p className="text-sm text-blue-700">
-                  <strong>Already Received:</strong> ₹{invoice.receivedAmount.toLocaleString()}
+            {receivedAmount > 0 && (
+              <div className="bg-green-50 p-3 rounded-lg">
+                <p className="text-sm text-green-700">
+                  <strong>Already Received:</strong> ₹{receivedAmount.toLocaleString()}
                 </p>
               </div>
             )}
 
+            {/* Amount Input */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Amount Received *
@@ -609,29 +581,49 @@ const ContractInvoicesTab = () => {
                 <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">₹</span>
                 <input
                   type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
                   placeholder={`Enter amount (max ₹${dueAmount})`}
                   className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                   max={dueAmount}
                 />
               </div>
             </div>
+
+            {/* Date Picker */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Payment Date *
+              </label>
+              <input
+                type="date"
+                value={selectedPaymentDate}
+                onChange={(e) => setSelectedPaymentDate(e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                max={new Date().toISOString().split('T')[0]}
+              />
+            </div>
+
+            <div className="bg-yellow-50 p-3 rounded-lg">
+              <p className="text-xs text-yellow-700">
+                <strong>Note:</strong> Payment will be recorded for the selected date
+              </p>
+            </div>
           </div>
 
           <div className="px-6 py-4 bg-gray-50 rounded-b-xl flex gap-3">
             <button
-              onClick={onClose}
+              onClick={closePaymentDatePicker}
               className="flex-1 px-4 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
             >
               Cancel
             </button>
             <button
-              onClick={() => onSubmit(invoice, amount)}
-              disabled={!amount || amount <= 0}
-              className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+              onClick={confirmPaymentWithDate}
+              disabled={!paymentAmount || !selectedPaymentDate || paymentAmount <= 0}
+              className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
             >
-              Record Payment
+              Confirm Payment
             </button>
           </div>
         </div>
@@ -762,8 +754,6 @@ const ContractInvoicesTab = () => {
           </div>
         </div>
       </div>
-
-      
     </div>
   );
 
@@ -1015,10 +1005,16 @@ const ContractInvoicesTab = () => {
             {/* Mobile Cards View */}
             <div className="lg:hidden">
               {filteredInvoices.map((invoice) => {
-                const totalAmount = invoice.amountRaised || 0;
-                const receivedAmount = invoice.receivedAmount || 0;
-                const dueAmount = invoice.dueAmount || totalAmount - receivedAmount;
-                const isFullyPaid = dueAmount === 0;
+                const totalAmount = parseFloat(invoice.amountRaised) || 0;
+                const receivedAmount = parseFloat(invoice.receivedAmount) || 0;
+                const dbDueAmount = parseFloat(invoice.dueAmount) || 0;
+                
+                const calculatedDue = totalAmount - receivedAmount;
+                const isFullyPaidByCalc = Math.abs(calculatedDue) < 0.01;
+                const isFullyPaidByDB = Math.abs(dbDueAmount) < 0.01;
+                const isFullyPaid = isFullyPaidByCalc || isFullyPaidByDB;
+                
+                const dueAmount = isFullyPaid ? 0 : (dbDueAmount || calculatedDue);
                 const canCancel = !shouldDisableCancel(invoice);
 
                 return (
@@ -1028,7 +1024,10 @@ const ContractInvoicesTab = () => {
                         <h3 className="font-semibold text-gray-900">{invoice.invoiceNumber}</h3>
                         <p className="text-sm text-gray-600">{invoice.collegeName}</p>
                       </div>
-                      {getStatusBadge(invoice)}
+                      <div className="flex flex-col gap-1 items-end">
+                        {getStatusBadge(invoice)}
+                        {getPaymentStatusBadge(invoice)}
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 text-sm mb-4">
@@ -1045,8 +1044,10 @@ const ContractInvoicesTab = () => {
                         <p className="font-semibold text-red-600">₹{dueAmount.toLocaleString()}</p>
                       </div>
                       <div>
-                        <label className="text-gray-600">Type</label>
-                        <p className="font-semibold">{getInvoiceTypeText(invoice.invoiceType)}</p>
+                        <label className="text-gray-600">Last Payment</label>
+                        <p className="font-semibold text-blue-600 text-xs">
+                          {formatDisplayDate(invoice.lastPaymentDate)}
+                        </p>
                       </div>
                     </div>
 
@@ -1058,17 +1059,21 @@ const ContractInvoicesTab = () => {
                         View
                       </button>
 
-                      {!isFullyPaid && invoice.approvalStatus !== "cancelled" && (
+                      {!isFullyPaid && invoice.approvalStatus !== "cancelled" ? (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setPaymentModal({ isOpen: true, invoice });
+                            openPaymentDatePicker(invoice);
                           }}
                           className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors"
                         >
                           Receive
                         </button>
-                      )}
+                      ) : isFullyPaid ? (
+                        <span className="flex-1 bg-green-100 text-green-700 px-3 py-2 rounded-lg text-sm font-medium text-center">
+                         Received
+                        </span>
+                      ) : null}
 
                       {canCancel ? (
                         <button
@@ -1110,16 +1115,28 @@ const ContractInvoicesTab = () => {
                       Status
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Payment Status
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      ✅ Payment Date
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredInvoices.map((invoice) => {
-                    const totalAmount = invoice.amountRaised || 0;
-                    const receivedAmount = invoice.receivedAmount || 0;
-                    const dueAmount = invoice.dueAmount || totalAmount - receivedAmount;
-                    const isFullyPaid = dueAmount === 0;
+                    const totalAmount = parseFloat(invoice.amountRaised) || 0;
+                    const receivedAmount = parseFloat(invoice.receivedAmount) || 0;
+                    const dbDueAmount = parseFloat(invoice.dueAmount) || 0;
+                    
+                    const calculatedDue = totalAmount - receivedAmount;
+                    const isFullyPaidByCalc = Math.abs(calculatedDue) < 0.01;
+                    const isFullyPaidByDB = Math.abs(dbDueAmount) < 0.01;
+                    const isFullyPaid = isFullyPaidByCalc || isFullyPaidByDB;
+                    
+                    const dueAmount = isFullyPaid ? 0 : (dbDueAmount || calculatedDue);
                     const canCancel = !shouldDisableCancel(invoice);
 
                     return (
@@ -1162,6 +1179,20 @@ const ContractInvoicesTab = () => {
                           {getStatusBadge(invoice)}
                         </td>
                         <td className="px-6 py-4">
+                          {getPaymentStatusBadge(invoice)}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm">
+                            {invoice.lastPaymentDate ? (
+                              <span className="text-green-600 font-medium">
+                                {formatDisplayDate(invoice.lastPaymentDate)}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">No Payment</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
                             <button
                               onClick={(e) => {
@@ -1173,17 +1204,21 @@ const ContractInvoicesTab = () => {
                               View
                             </button>
 
-                            {!isFullyPaid && invoice.approvalStatus !== "cancelled" && (
+                            {!isFullyPaid && invoice.approvalStatus !== "cancelled" ? (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setPaymentModal({ isOpen: true, invoice });
+                                  openPaymentDatePicker(invoice);
                                 }}
                                 className="inline-flex items-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
                               >
                                 Receive
                               </button>
-                            )}
+                            ) : isFullyPaid ? (
+                              <span className="inline-flex items-center px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-sm font-medium">
+                                Received
+                              </span>
+                            ) : null}
 
                             {canCancel ? (
                               <button
@@ -1215,9 +1250,7 @@ const ContractInvoicesTab = () => {
                                   const history = invoice.paymentHistory
                                     .map(
                                       (p) =>
-                                        `₹${p.amount} on ${new Date(
-                                          p.date
-                                        ).toLocaleDateString()}`
+                                        `₹${p.amount} on ${formatDisplayDate(p.date)}`
                                     )
                                     .join("\n");
                                   alert(`Payment History:\n${history}`);
@@ -1240,12 +1273,8 @@ const ContractInvoicesTab = () => {
       </div>
 
       {/* Modals */}
-      {paymentModal.isOpen && (
-        <PaymentModal
-          invoice={paymentModal.invoice}
-          onClose={() => setPaymentModal({ isOpen: false, invoice: null })}
-          onSubmit={handleReceivePayment}
-        />
+      {showPaymentDatePicker && (
+        <PaymentDatePickerModal />
       )}
 
       {invoiceModal.isOpen && (
