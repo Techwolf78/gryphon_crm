@@ -10,6 +10,10 @@ const ContractInvoicesTab = () => {
   const [filteredInvoices, setFilteredInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [paymentModal, setPaymentModal] = useState({
+    isOpen: false,
+    invoice: null,
+  });
   const [invoiceModal, setInvoiceModal] = useState({
     isOpen: false,
     invoice: null,
@@ -17,12 +21,6 @@ const ContractInvoicesTab = () => {
   });
   const [exportLoading, setExportLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-
-  // ✅ NEW: Direct Payment Date Picker State
-  const [showPaymentDatePicker, setShowPaymentDatePicker] = useState(false);
-  const [selectedPaymentDate, setSelectedPaymentDate] = useState("");
-  const [paymentAmount, setPaymentAmount] = useState("");
-  const [invoiceForPayment, setInvoiceForPayment] = useState(null);
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -67,7 +65,6 @@ const ContractInvoicesTab = () => {
           status: doc.data().status || "pending",
           approvalStatus: doc.data().approvalStatus || "pending",
           approved: doc.data().approved || false,
-          lastPaymentDate: doc.data().lastPaymentDate || null,
         }));
 
         setInvoices(data);
@@ -85,7 +82,7 @@ const ContractInvoicesTab = () => {
     }
   };
 
-  // Calculate statistics
+  // Calculate statistics - FIXED VERSION
   const calculateStats = (invoiceData) => {
     const newStats = {
       totalInvoices: invoiceData.length,
@@ -101,35 +98,42 @@ const ContractInvoicesTab = () => {
     };
 
     invoiceData.forEach(invoice => {
+      // Safely parse amounts to numbers
       const totalAmount = parseFloat(invoice.amountRaised) || 0;
       const receivedAmount = parseFloat(invoice.receivedAmount) || 0;
       const dueAmount = parseFloat(invoice.dueAmount) || (totalAmount - receivedAmount);
 
+      // Count cancelled invoices
       if (invoice.approvalStatus === "cancelled") {
         newStats.cancelledInvoices++;
       }
 
+      // Count booked invoices
       if (invoice.status === "Booked" || invoice.registered) {
         newStats.bookedInvoices++;
       }
 
+      // Count by invoice type
       if (invoice.invoiceType === "Cash Invoice") {
         newStats.cashInvoices++;
       } else if (invoice.invoiceType === "Tax Invoice") {
         newStats.taxInvoices++;
       } 
 
+      // Count approval status
       if (invoice.approved) {
         newStats.approvedInvoices++;
       } else {
         newStats.pendingInvoices++;
       }
 
+      // Amount calculations - ADD numbers, don't concatenate
       newStats.totalAmount += totalAmount;
       newStats.receivedAmount += receivedAmount;
       newStats.dueAmount += dueAmount;
     });
 
+    // Ensure numbers are properly formatted
     newStats.totalAmount = Number(newStats.totalAmount.toFixed(2));
     newStats.receivedAmount = Number(newStats.receivedAmount.toFixed(2));
     newStats.dueAmount = Number(newStats.dueAmount.toFixed(2));
@@ -141,6 +145,7 @@ const ContractInvoicesTab = () => {
   const applyFilters = () => {
     let filtered = [...invoices];
 
+    // Search filter
     if (searchTerm) {
       filtered = filtered.filter((invoice) =>
         Object.values(invoice).some(
@@ -151,6 +156,7 @@ const ContractInvoicesTab = () => {
       );
     }
 
+    // Financial Year filter
     if (filters.financialYear) {
       filtered = filtered.filter((invoice) => {
         const invoiceDate = invoice.raisedDate?.toDate
@@ -170,6 +176,7 @@ const ContractInvoicesTab = () => {
       });
     }
 
+    // Invoice Type filter
     if (filters.invoiceType !== "all") {
       filtered = filtered.filter((invoice) => {
         if (filters.invoiceType === "tax") {
@@ -181,6 +188,7 @@ const ContractInvoicesTab = () => {
       });
     }
 
+    // Status filter
     if (filters.status !== "all") {
       filtered = filtered.filter((invoice) => {
         if (filters.status === "approved") {
@@ -200,6 +208,7 @@ const ContractInvoicesTab = () => {
       });
     }
 
+    // Date Range filter
     if (filters.startDate) {
       const startDate = new Date(filters.startDate);
       startDate.setHours(0, 0, 0, 0);
@@ -242,124 +251,201 @@ const ContractInvoicesTab = () => {
     calculateStats(invoices);
   };
 
-  // ✅ NEW: Direct Payment Date Picker Open
-  const openPaymentDatePicker = (invoice) => {
-    setInvoiceForPayment(invoice);
-    setSelectedPaymentDate(new Date().toISOString().split('T')[0]); // Today's date as default
-    setPaymentAmount("");
-    setShowPaymentDatePicker(true);
-  };
-
-  // ✅ NEW: Close Payment Date Picker
-  const closePaymentDatePicker = () => {
-    setShowPaymentDatePicker(false);
-    setInvoiceForPayment(null);
-    setSelectedPaymentDate("");
-    setPaymentAmount("");
-  };
-
-  // ✅ UPDATED: Direct Payment Receive with Date
-  const handleReceivePayment = async (invoice, receivedAmount, paymentDate = null) => {
-    try {
-      if (!receivedAmount || receivedAmount <= 0) {
-        alert("Please enter valid amount");
-        return;
-      }
-
-      if (receivedAmount > invoice.dueAmount) {
-        alert(
-          `Received amount cannot be more than due amount (₹${invoice.dueAmount})`
-        );
-        return;
-      }
-
-      const invoiceRef = doc(db, "ContractInvoices", invoice.id);
-      const newReceivedAmount =
-        (invoice.receivedAmount || 0) + parseFloat(receivedAmount);
-      const newDueAmount = invoice.dueAmount - parseFloat(receivedAmount);
-
-      // ✅ USE MANUAL DATE OR CURRENT DATE
-      let paymentDateToUse;
-      if (paymentDate) {
-        paymentDateToUse = new Date(paymentDate).toISOString();
-      } else {
-        paymentDateToUse = new Date().toISOString();
-      }
-
-      const paymentRecord = {
-        amount: parseFloat(receivedAmount),
-        date: paymentDateToUse,
-        timestamp: paymentDate ? new Date(paymentDate) : new Date(),
-        receivedDate: paymentDateToUse,
-      };
-
-      let newStatus = invoice.status;
-      if (newDueAmount === 0) {
-        newStatus = "received";
-      } else if (newReceivedAmount > 0) {
-        newStatus = "partially_received";
-      }
-
-      const updateData = {
-        receivedAmount: newReceivedAmount,
-        dueAmount: newDueAmount,
-        paymentHistory: [...(invoice.paymentHistory || []), paymentRecord],
-        status: newStatus,
-        approved: true,
-        approvalStatus: "approved",
-        approvedAt: new Date().toISOString(),
-        approvedBy: "Auto-Approved via Payment",
-        lastPaymentDate: paymentDateToUse,
-      };
-
-      await updateDoc(invoiceRef, updateData);
-
-      setInvoices((prev) =>
-        prev.map((inv) =>
-          inv.id === invoice.id ? { ...inv, ...updateData } : inv
-        )
-      );
-
-      setFilteredInvoices((prev) =>
-        prev.map((inv) =>
-          inv.id === invoice.id ? { ...inv, ...updateData } : inv
-        )
-      );
-
-      closePaymentDatePicker();
-      alert(
-        `Payment of ₹${receivedAmount} recorded successfully!\n✅ Invoice auto-approved!`
-      );
-    } catch (error) {
-      alert("Error recording payment: " + error.message);
-    }
-  };
-
-  // ✅ NEW: Confirm Payment with Selected Date
-  const confirmPaymentWithDate = () => {
-    if (invoiceForPayment && paymentAmount && selectedPaymentDate) {
-      handleReceivePayment(invoiceForPayment, paymentAmount, selectedPaymentDate);
-    }
-  };
-
-  // Export to Excel function
+  // Export to Excel with same columns as InvoiceExcelExport + Payment History
   const exportToExcel = async () => {
-    // ... (same export function as before)
+    try {
+      setExportLoading(true);
+      const dataToExport = filteredInvoices.length > 0 ? filteredInvoices : invoices;
+
+      // Calculate GST breakdown function - SAME AS InvoiceExcelExport
+      const calculateGSTBreakdown = (invoice) => {
+        let gstAmount = invoice.gstAmount || 0;
+        
+        if (typeof gstAmount === 'string') {
+          gstAmount = parseFloat(gstAmount) || 0;
+        }
+        
+        const gstType = invoice.gstType?.toLowerCase();
+        
+        if (gstType === "igst") {
+          return {
+            cgst: 0,
+            sgst: 0,
+            igst: gstAmount
+          };
+        } else {
+          return {
+            cgst: gstAmount / 2,
+            sgst: gstAmount / 2,
+            igst: 0
+          };
+        }
+      };
+
+      // Get invoice month - SAME AS InvoiceExcelExport
+      const getInvoiceMonth = (date) => {
+        if (!date) return "";
+        try {
+          const d = date?.toDate ? date.toDate() : new Date(date);
+          return d.toLocaleDateString("en-IN", { 
+            year: "numeric", 
+            month: "long" 
+          });
+        } catch {
+          return "Invalid Date";
+        }
+      };
+
+      // Get Description from deliveryType - SAME AS InvoiceExcelExport
+      const getDescription = (invoice) => {
+        const deliveryType = invoice.deliveryType || "";
+        
+        switch(deliveryType.toUpperCase()) {
+          case "TP":
+            return "Training and Placement";
+          case "OT":
+            return "Only Training";
+          case "IP":
+            return "Induction Program";
+          case "DM":
+            return "Digital Marketing Services";
+          default:
+            return deliveryType || "N/A";
+        }
+      };
+
+      // Calculate rounded amount - SAME AS InvoiceExcelExport
+      const calculateRoundedAmount = (amount) => {
+        if (!amount && amount !== 0) return 0;
+        
+        let numAmount = amount;
+        if (typeof amount === 'string') {
+          numAmount = parseFloat(amount) || 0;
+        }
+        
+        return Math.round(numAmount);
+      };
+
+      // Get HSN code - SAME AS InvoiceExcelExport
+      const getHSNCode = (invoice) => {
+        return "9984";
+      };
+
+// Format payment history with dates and amounts - UPDATED FUNCTION
+const getPaymentHistoryText = (invoice) => {
+  if (!invoice.paymentHistory || invoice.paymentHistory.length === 0) {
+    return "No Payments";
+  }
+  
+  // Sort payment history by date ascending (oldest first)
+  const sortedPayments = [...invoice.paymentHistory].sort((a, b) => {
+    const dateA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.date);
+    const dateB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.date);
+    return dateA - dateB;
+  });
+  
+  // Format each payment: "₹Amount on Date" - USING THE STORED DATE
+  return sortedPayments.map(payment => {
+    const paymentDate = payment.date; // Use the stored date directly
+    const formattedDate = new Date(paymentDate).toLocaleDateString("en-IN");
+    const amount = payment.amount || 0;
+    
+    return `₹${formatCurrency(amount)} on ${formattedDate}`;
+  }).join('\n');
+};
+
+// Get total received amount - helper function
+const getTotalReceived = (invoice) => {
+  if (!invoice.paymentHistory || invoice.paymentHistory.length === 0) {
+    return 0;
+  }
+  
+  return invoice.paymentHistory.reduce((total, payment) => {
+    return total + (payment.amount || 0);
+  }, 0);
+};
+
+      const excelData = dataToExport.map((invoice) => {
+        const gstBreakdown = calculateGSTBreakdown(invoice);
+        
+        let netPayableAmount = invoice.netPayableAmount || 0;
+        if (typeof netPayableAmount === 'string') {
+          netPayableAmount = parseFloat(netPayableAmount) || 0;
+        }
+        
+        const roundedAmount = calculateRoundedAmount(netPayableAmount);
+        const baseAmount = invoice.baseAmount || 0;
+        const totalReceived = getTotalReceived(invoice);
+
+        return {
+          "Invoice Month": getInvoiceMonth(invoice.raisedDate),
+          "Invoice Number": invoice.invoiceNumber || "N/A",
+          "Invoice Date": formatDateForExcel(invoice.raisedDate),
+          "Party Name": invoice.collegeName || "N/A",
+          "GSTIN Number": invoice.gstNumber || "N/A",
+          "Description": getDescription(invoice),
+          "Total Value": formatCurrency(baseAmount),
+          "CGST": formatCurrency(gstBreakdown.cgst),
+          "SGST": formatCurrency(gstBreakdown.sgst),
+          "IGST": formatCurrency(gstBreakdown.igst),
+          "Rounded Off": formatCurrency(roundedAmount - netPayableAmount),
+          "Total Invoice Value": formatCurrency(roundedAmount),
+          "Total Received": formatCurrency(totalReceived), // NEW: Total received amount
+          "Due Amount": formatCurrency(roundedAmount - totalReceived), // NEW: Due amount
+          "HSN Code": getHSNCode(invoice),
+          "Invoice Type": invoice.invoiceType || "N/A",
+          "Payment History": getPaymentHistoryText(invoice), // NEW: All payment dates with amounts
+        };
+      });
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(excelData);
+
+      // Set column widths - SAME AS InvoiceExcelExport + NEW COLUMNS
+      const colWidths = [
+        { wch: 15 }, // Invoice Month
+        { wch: 20 }, // Invoice Number
+        { wch: 12 }, // Invoice Date
+        { wch: 25 }, // Party Name
+        { wch: 20 }, // GSTIN Number
+        { wch: 25 }, // Description
+        { wch: 12 }, // Total Value
+        { wch: 10 }, // CGST
+        { wch: 10 }, // SGST
+        { wch: 10 }, // IGST
+        { wch: 12 }, // Rounded Off
+        { wch: 15 }, // Total Invoice Value
+        { wch: 12 }, // NEW: Total Received
+        { wch: 12 }, // NEW: Due Amount
+        { wch: 10 }, // HSN Code
+        { wch: 15 }, // Invoice Type
+        { wch: 30 }, // NEW: Payment History (wider for multiple lines)
+      ];
+      ws['!cols'] = colWidths;
+
+      XLSX.utils.book_append_sheet(wb, ws, "All Invoices");
+      const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      const blob = new Blob([wbout], { type: "application/octet-stream" });
+
+      const timestamp = new Date().toISOString().slice(0, 10);
+      let filename = `all_invoices_${timestamp}`;
+
+      if (filters.financialYear || filters.invoiceType !== "all" || filters.status !== "all") {
+        filename += "_filtered";
+      }
+      filename += ".xlsx";
+
+      saveAs(blob, filename);
+    } catch (error) {
+      alert("Error exporting to Excel: " + error.message);
+    } finally {
+      setExportLoading(false);
+    }
   };
 
   // Helper functions
   const formatDateForExcel = (date) => {
     if (!date) return "";
-    try {
-      const d = date?.toDate ? date.toDate() : new Date(date);
-      return d.toLocaleDateString("en-IN");
-    } catch {
-      return "Invalid Date";
-    }
-  };
-
-  const formatDisplayDate = (date) => {
-    if (!date) return "No Payment";
     try {
       const d = date?.toDate ? date.toDate() : new Date(date);
       return d.toLocaleDateString("en-IN");
@@ -385,6 +471,7 @@ const ContractInvoicesTab = () => {
     return invoiceType || "N/A";
   };
 
+  // NEW: Get Status Badge (Only Pending/Booked)
   const getStatusBadge = (invoice) => {
     if (invoice.status === "Booked" || invoice.registered) {
       return (
@@ -403,46 +490,51 @@ const ContractInvoicesTab = () => {
     }
   };
 
-  const getPaymentStatusBadge = (invoice) => {
-    if (invoice.approvalStatus === "cancelled") {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">
-          <span className="w-1.5 h-1.5 bg-red-500 rounded-full mr-1"></span>
-          Cancelled
-        </span>
-      );
-    }
+  // NEW: Get Payment Status Badge
+// NEW: Get Payment Status Badge - FIXED VERSION
+const getPaymentStatusBadge = (invoice) => {
+  if (invoice.approvalStatus === "cancelled") {
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">
+        <span className="w-1.5 h-1.5 bg-red-500 rounded-full mr-1"></span>
+        Cancelled
+      </span>
+    );
+  }
 
-    const totalAmount = parseFloat(invoice.amountRaised) || 0;
-    const receivedAmount = parseFloat(invoice.receivedAmount) || 0;
-    
-    const isFullyPaid = Math.abs(totalAmount - receivedAmount) < 0.01;
-    const dbDueAmount = parseFloat(invoice.dueAmount) || 0;
-    const isDueAmountZero = Math.abs(dbDueAmount) < 0.01;
+  const totalAmount = parseFloat(invoice.amountRaised) || 0;
+  const receivedAmount = parseFloat(invoice.receivedAmount) || 0;
+  
+  // FIXED: Use proper floating point comparison with tolerance
+  const isFullyPaid = Math.abs(totalAmount - receivedAmount) < 0.01; // 0.01 tolerance for floating point errors
+  
+  // FIXED: Also check if dueAmount is zero in database
+  const dbDueAmount = parseFloat(invoice.dueAmount) || 0;
+  const isDueAmountZero = Math.abs(dbDueAmount) < 0.01;
 
-    if (isFullyPaid || isDueAmountZero) {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
-          <span className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1"></span>
-          Fully Paid
-        </span>
-      );
-    } else if (receivedAmount > 0) {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
-          <span className="w-1.5 h-1.5 bg-purple-500 rounded-full mr-1"></span>
-          Partially Paid
-        </span>
-      );
-    } else {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
-          <span className="w-1.5 h-1.5 bg-orange-500 rounded-full mr-1"></span>
-          Unpaid
-        </span>
-      );
-    }
-  };
+  if (isFullyPaid || isDueAmountZero) {
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1"></span>
+        Fully Paid
+      </span>
+    );
+  } else if (receivedAmount > 0) {
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+        <span className="w-1.5 h-1.5 bg-purple-500 rounded-full mr-1"></span>
+        Partially Paid
+      </span>
+    );
+  } else {
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
+        <span className="w-1.5 h-1.5 bg-orange-500 rounded-full mr-1"></span>
+        Unpaid
+      </span>
+    );
+  }
+};
 
   // Financial year options
   const financialYearOptions = [
@@ -504,6 +596,75 @@ const ContractInvoicesTab = () => {
     }
   };
 
+// Payment Receive Function - UPDATED WITH DATE
+const handleReceivePayment = async (invoice, receivedAmount, paymentDate) => {
+  try {
+    if (!receivedAmount || receivedAmount <= 0) {
+      alert("Please enter valid amount");
+      return;
+    }
+
+    if (!paymentDate) {
+      alert("Please select payment date");
+      return;
+    }
+
+    if (receivedAmount > invoice.dueAmount) {
+      alert(`Received amount cannot be more than due amount (₹${invoice.dueAmount})`);
+      return;
+    }
+
+    const invoiceRef = doc(db, "ContractInvoices", invoice.id);
+    const newReceivedAmount = (invoice.receivedAmount || 0) + parseFloat(receivedAmount);
+    const newDueAmount = invoice.dueAmount - parseFloat(receivedAmount);
+
+    // Create payment record with selected date
+    const paymentRecord = {
+      amount: parseFloat(receivedAmount),
+      date: paymentDate, // Use selected date instead of current date
+      timestamp: new Date(paymentDate), // Use selected date for timestamp
+      recordedAt: new Date().toISOString(), // Keep when it was actually recorded in system
+    };
+
+    let newStatus = invoice.status;
+    if (newDueAmount === 0) {
+      newStatus = "received";
+    } else if (newReceivedAmount > 0) {
+      newStatus = "partially_received";
+    }
+
+    const updateData = {
+      receivedAmount: newReceivedAmount,
+      dueAmount: newDueAmount,
+      paymentHistory: [...(invoice.paymentHistory || []), paymentRecord],
+      status: newStatus,
+      approved: true,
+      approvalStatus: "approved",
+      approvedAt: new Date().toISOString(),
+      approvedBy: "Auto-Approved via Payment",
+    };
+
+    await updateDoc(invoiceRef, updateData);
+
+    setInvoices((prev) =>
+      prev.map((inv) =>
+        inv.id === invoice.id ? { ...inv, ...updateData } : inv
+      )
+    );
+
+    setFilteredInvoices((prev) =>
+      prev.map((inv) =>
+        inv.id === invoice.id ? { ...inv, ...updateData } : inv
+      )
+    );
+
+    setPaymentModal({ isOpen: false, invoice: null });
+    alert(`Payment of ₹${receivedAmount} recorded successfully for date ${paymentDate}!\n✅ Invoice auto-approved!`);
+  } catch (error) {
+    alert("Error recording payment: " + error.message);
+  }
+};
+
   const handleViewInvoice = (invoice) => {
     setInvoiceModal({
       isOpen: true,
@@ -516,121 +677,127 @@ const ContractInvoicesTab = () => {
     return invoice.approvalStatus === "cancelled" || invoice.receivedAmount > 0;
   };
 
-  // ✅ NEW: Direct Payment Date Picker Modal
-  const PaymentDatePickerModal = () => {
-    if (!invoiceForPayment) return null;
+// Payment Modal Component - UPDATED WITH DATE SELECTION
+const PaymentModal = ({ invoice, onClose, onSubmit }) => {
+  const [amount, setAmount] = useState("");
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]); // Default to today
+  const dueAmount = invoice.dueAmount || 0;
 
-    const dueAmount = invoiceForPayment.dueAmount || 0;
-    const totalAmount = parseFloat(invoiceForPayment.amountRaised) || 0;
-    const receivedAmount = parseFloat(invoiceForPayment.receivedAmount) || 0;
+  const handleSubmit = () => {
+    if (!amount || amount <= 0) {
+      alert("Please enter valid amount");
+      return;
+    }
 
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all">
-          <div className="p-6 border-b border-gray-100">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">Receive Payment</h3>
-              <button
-                onClick={closePaymentDatePicker}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-          
-          <div className="p-6 space-y-4">
-            {/* Invoice Details */}
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <p className="text-blue-600 font-medium">Invoice</p>
-                  <p className="font-bold text-blue-800">{invoiceForPayment.invoiceNumber}</p>
-                </div>
-                <div>
-                  <p className="text-blue-600 font-medium">College</p>
-                  <p className="font-bold text-blue-800 truncate">{invoiceForPayment.collegeName}</p>
-                </div>
-                <div>
-                  <p className="text-blue-600 font-medium">Total</p>
-                  <p className="font-bold text-blue-800">₹{totalAmount.toLocaleString()}</p>
-                </div>
-                <div>
-                  <p className="text-blue-600 font-medium">Due</p>
-                  <p className="font-bold text-red-600">₹{dueAmount.toLocaleString()}</p>
-                </div>
-              </div>
-            </div>
+    if (!paymentDate) {
+      alert("Please select payment date");
+      return;
+    }
 
-            {receivedAmount > 0 && (
-              <div className="bg-green-50 p-3 rounded-lg">
-                <p className="text-sm text-green-700">
-                  <strong>Already Received:</strong> ₹{receivedAmount.toLocaleString()}
-                </p>
-              </div>
-            )}
+    if (amount > dueAmount) {
+      alert(`Received amount cannot be more than due amount (₹${dueAmount})`);
+      return;
+    }
 
-            {/* Amount Input */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Amount Received *
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">₹</span>
-                <input
-                  type="number"
-                  value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(e.target.value)}
-                  placeholder={`Enter amount (max ₹${dueAmount})`}
-                  className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  max={dueAmount}
-                />
-              </div>
-            </div>
+    onSubmit(invoice, amount, paymentDate);
+  };
 
-            {/* Date Picker */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Payment Date *
-              </label>
-              <input
-                type="date"
-                value={selectedPaymentDate}
-                onChange={(e) => setSelectedPaymentDate(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                max={new Date().toISOString().split('T')[0]}
-              />
-            </div>
-
-            <div className="bg-yellow-50 p-3 rounded-lg">
-              <p className="text-xs text-yellow-700">
-                <strong>Note:</strong> Payment will be recorded for the selected date
-              </p>
-            </div>
-          </div>
-
-          <div className="px-6 py-4 bg-gray-50 rounded-b-xl flex gap-3">
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all">
+        <div className="p-6 border-b border-gray-100">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-900">Receive Payment</h3>
             <button
-              onClick={closePaymentDatePicker}
-              className="flex-1 px-4 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
             >
-              Cancel
-            </button>
-            <button
-              onClick={confirmPaymentWithDate}
-              disabled={!paymentAmount || !selectedPaymentDate || paymentAmount <= 0}
-              className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-            >
-              Confirm Payment
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
           </div>
         </div>
-      </div>
-    );
-  };
+        
+        <div className="p-6 space-y-4">
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <label className="text-gray-600">Invoice Number</label>
+              <p className="font-semibold text-gray-900">{invoice.invoiceNumber}</p>
+            </div>
+            <div>
+              <label className="text-gray-600">College</label>
+              <p className="font-semibold text-gray-900 truncate">{invoice.collegeName}</p>
+            </div>
+            <div>
+              <label className="text-gray-600">Total Amount</label>
+              <p className="font-semibold text-gray-900">₹{invoice.amountRaised?.toLocaleString()}</p>
+            </div>
+            <div>
+              <label className="text-gray-600">Due Amount</label>
+              <p className="font-semibold text-red-600">₹{dueAmount.toLocaleString()}</p>
+            </div>
+          </div>
 
+          {invoice.receivedAmount > 0 && (
+            <div className="bg-blue-50 p-3 rounded-lg">
+              <p className="text-sm text-blue-700">
+                <strong>Already Received:</strong> ₹{invoice.receivedAmount.toLocaleString()}
+              </p>
+            </div>
+          )}
+
+          {/* Payment Date Field - NEW */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Payment Date *
+            </label>
+            <input
+              type="date"
+              value={paymentDate}
+              onChange={(e) => setPaymentDate(e.target.value)}
+              max={new Date().toISOString().split('T')[0]} // Can't select future dates
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Amount Received *
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">₹</span>
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder={`Enter amount (max ₹${dueAmount})`}
+                className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                max={dueAmount}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 bg-gray-50 rounded-b-xl flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={!amount || amount <= 0 || !paymentDate}
+            className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+          >
+            Record Payment
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
   // Statistics Cards Component
   const StatisticsCards = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4 mb-8">
@@ -1044,10 +1211,8 @@ const ContractInvoicesTab = () => {
                         <p className="font-semibold text-red-600">₹{dueAmount.toLocaleString()}</p>
                       </div>
                       <div>
-                        <label className="text-gray-600">Last Payment</label>
-                        <p className="font-semibold text-blue-600 text-xs">
-                          {formatDisplayDate(invoice.lastPaymentDate)}
-                        </p>
+                        <label className="text-gray-600">Type</label>
+                        <p className="font-semibold">{getInvoiceTypeText(invoice.invoiceType)}</p>
                       </div>
                     </div>
 
@@ -1063,7 +1228,7 @@ const ContractInvoicesTab = () => {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            openPaymentDatePicker(invoice);
+                            setPaymentModal({ isOpen: true, invoice });
                           }}
                           className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors"
                         >
@@ -1116,9 +1281,6 @@ const ContractInvoicesTab = () => {
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                       Payment Status
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      ✅ Payment Date
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                       Actions
@@ -1182,17 +1344,6 @@ const ContractInvoicesTab = () => {
                           {getPaymentStatusBadge(invoice)}
                         </td>
                         <td className="px-6 py-4">
-                          <div className="text-sm">
-                            {invoice.lastPaymentDate ? (
-                              <span className="text-green-600 font-medium">
-                                {formatDisplayDate(invoice.lastPaymentDate)}
-                              </span>
-                            ) : (
-                              <span className="text-gray-400">No Payment</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
                             <button
                               onClick={(e) => {
@@ -1208,7 +1359,7 @@ const ContractInvoicesTab = () => {
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  openPaymentDatePicker(invoice);
+                                  setPaymentModal({ isOpen: true, invoice });
                                 }}
                                 className="inline-flex items-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
                               >
@@ -1250,7 +1401,9 @@ const ContractInvoicesTab = () => {
                                   const history = invoice.paymentHistory
                                     .map(
                                       (p) =>
-                                        `₹${p.amount} on ${formatDisplayDate(p.date)}`
+                                        `₹${p.amount} on ${new Date(
+                                          p.date
+                                        ).toLocaleDateString()}`
                                     )
                                     .join("\n");
                                   alert(`Payment History:\n${history}`);
@@ -1272,11 +1425,13 @@ const ContractInvoicesTab = () => {
         )}
       </div>
 
-      {/* Modals */}
-      {showPaymentDatePicker && (
-        <PaymentDatePickerModal />
-      )}
-
+{paymentModal.isOpen && (
+  <PaymentModal
+    invoice={paymentModal.invoice}
+    onClose={() => setPaymentModal({ isOpen: false, invoice: null })}
+    onSubmit={handleReceivePayment} // This now accepts 3 parameters
+  />
+)}
       {invoiceModal.isOpen && (
         <InvoiceModal
           invoice={invoiceModal.invoice}
