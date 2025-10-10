@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"; // ✅ useEffect import karo
+import React, { useState, useEffect } from "react";
 import gryphonLogo from "../../assets/gryphon_logo.png";
 import signature from "../../assets/sign.png";
 
@@ -10,10 +10,21 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Custom toast state
+  const [toast, setToast] = useState(null);
+
   // ✅ Yeh IMPORTANT fix hai - jab invoice prop change ho toh state update ho
   useEffect(() => {
     setEditableInvoice(invoice);
   }, [invoice]);
+
+  // cleanup toast timer on unmount
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   const handleEditToggle = () => {
     setIsEditing(!isEditing);
@@ -25,12 +36,12 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
       
       // ✅ Validation karo
       if (!editableInvoice.invoiceNumber?.trim()) {
-        alert("Invoice number is required!");
+        setToast({ type: 'error', message: "Invoice number is required!" });
         return;
       }
 
       if (!editableInvoice.raisedDate) {
-        alert("Invoice date is required!");
+        setToast({ type: 'error', message: "Invoice date is required!" });
         return;
       }
 
@@ -61,11 +72,11 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
         onInvoiceUpdate(updatedInvoice);
       }
       
-      alert("Invoice details updated successfully!");
+      setToast({ type: 'success', message: "Invoice details updated successfully!" });
       
     } catch (error) {
       console.error("Error updating invoice:", error);
-      alert("Failed to update invoice details: " + error.message);
+      setToast({ type: 'error', message: "Failed to update invoice details: " + error.message });
     } finally {
       setIsSaving(false);
     }
@@ -372,7 +383,7 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
   const projectCodes = getAllProjectCodes();
 
   return (
-    <>
+    <div>
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-500 p-4 no-print">
         <div
           className="bg-white border-2 border-gray-800 shadow-2xl p-4 w-full max-w-4xl max-h-[90vh] overflow-y-auto invoice-modal-print"
@@ -744,7 +755,27 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
           </div>
         </div>
       </div>
-    </>
+      
+      {/* Custom Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <div className={`px-4 py-3 rounded-lg shadow-lg border text-sm font-medium transition-all duration-300 ${
+            toast.type === 'success' 
+              ? 'bg-green-50 border-green-200 text-green-800' 
+              : toast.type === 'error'
+              ? 'bg-red-50 border-red-200 text-red-800'
+              : 'bg-blue-50 border-blue-200 text-blue-800'
+          }`}>
+            <div className="flex items-center gap-2">
+              {toast.type === 'success' && <span className="text-green-600">✓</span>}
+              {toast.type === 'error' && <span className="text-red-600">✕</span>}
+              {toast.type === 'warning' && <span className="text-amber-600">⚠</span>}
+              <span>{toast.message}</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 

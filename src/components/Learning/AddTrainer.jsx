@@ -74,7 +74,7 @@ function AddTrainer({ onClose, onTrainerAdded }) {
         const nextId = `GA-T${(maxNumber + 1).toString().padStart(3, "0")}`;
         setTrainerData((prev) => ({ ...prev, trainerId: nextId }));
       } catch (err) {
-
+        console.error("Error generating trainer ID:", err);
         setTrainerData((prev) => ({ ...prev, trainerId: "GA-T001" }));
       }
     };

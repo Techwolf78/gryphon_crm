@@ -555,6 +555,7 @@ function LearningDevelopment() {
         <JDMergeModal
           onClose={() => setShowJDMergeModal(false)}
           onProceed={handleJDCollegesSelected}
+          preSelectedColleges={selectedJDColleges}
         />
       )}
 
@@ -564,8 +565,15 @@ function LearningDevelopment() {
           onClose={() => {
             setShowOperationsConfigModal(false);
             setSelectedJDColleges([]);
+            setOperationsConfig(null);
           }}
           onProceed={handleOperationsConfigured}
+          onBack={() => {
+            setShowOperationsConfigModal(false);
+            setShowJDMergeModal(true);
+          }}
+          existingConfig={operationsConfig}
+          isEditing={!!operationsConfig}
         />
       )}
 

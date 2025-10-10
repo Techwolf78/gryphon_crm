@@ -10,7 +10,7 @@ const getUserIP = async () => {
     const res = await fetch("https://api.ipify.org?format=json");
     return (await res.json()).ip;
   } catch (err) {
-
+    console.error("Error fetching user IP:", err);
     return "N/A";
   }
 };
@@ -53,7 +53,7 @@ export const AuthProvider = ({ children }) => {
       }
       return false;
     } catch (error) {
-
+      console.error("Error refreshing session:", error);
       logout();
       return false;
     }
@@ -92,7 +92,7 @@ export const AuthProvider = ({ children }) => {
             setPhotoURL("");
           }
         } catch (error) {
-
+          console.error("Error loading user data:", error);
           setUser({ ...firebaseUser, role: "guest" });
           setPhotoURL("");
         }

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import * as XLSX from "xlsx-js-style";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
@@ -22,9 +22,9 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
       fetchStudentData();
     }
 
-  }, [trainingId, type]);
+  }, [trainingId, type, fetchStudentData]);
 
-  const fetchStudentData = async () => {
+  const fetchStudentData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -47,11 +47,11 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
       }
       setStudentData(students);
     } catch (err) {
-
+      console.error("Error fetching student data:", err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [trainingId]);
 
   const startEditing = (rowIndex) => {
     setEditRowIndex(rowIndex);
@@ -80,7 +80,7 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
       await saveToFirestore(updatedData);
       setEditRowIndex(null);
     } catch (error) {
-
+      console.error("Error saving changes:", error);
     } finally {
       setIsSaving(false);
     }
@@ -92,17 +92,12 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
       return;
     }
 
-    try {
-      const batchUpdates = data.map(student => {
-        const studentDocRef = doc(db, "trainingForms", trainingId, "students", student.id);
-        return setDoc(studentDocRef, student);
-      });
+    const batchUpdates = data.map(student => {
+      const studentDocRef = doc(db, "trainingForms", trainingId, "students", student.id);
+      return setDoc(studentDocRef, student);
+    });
 
-      await Promise.all(batchUpdates);
-    } catch (err) {
-
-      throw err;
-    }
+    await Promise.all(batchUpdates);
   };
 
 

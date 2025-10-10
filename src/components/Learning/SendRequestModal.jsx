@@ -20,7 +20,7 @@ const SendRequestModal = ({ trainer, onClose, onRequestSent }) => {
       });
       onRequestSent();
     } catch (err) {
-
+      console.error("Error sending delete request:", err);
       toast.error('Failed to send request. Please try again.');
     }
   };

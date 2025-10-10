@@ -180,13 +180,13 @@ useEffect(() => {
               }
             }
           } catch (err) {
-
+            console.error("Error loading individual trainer data:", err);
           }
         }
 
         setTrainers(assignedTrainers);
       } catch (err) {
-
+        console.error("Error fetching assigned trainers:", err);
         setError("Failed to load trainers");
       }
     };
@@ -216,7 +216,7 @@ useEffect(() => {
         if (phaseSnap.exists()) setPhaseDocData(phaseSnap.data());
         else setPhaseDocData(null);
       } catch (err) {
-
+        console.error("Error fetching training form and phase data:", err);
         setError("Failed to load training details");
       }
     };
@@ -241,7 +241,7 @@ useEffect(() => {
       assignments.sort((a, b) => new Date(a.date) - new Date(b.date));
       setTrainerAssignments(assignments);
     } catch (err) {
-
+      console.error("Error fetching trainer schedule:", err);
       setError("Failed to fetch trainer schedule");
     } finally {
       setFetchingSchedule(false);
@@ -322,7 +322,7 @@ useEffect(() => {
                 tDocSnap.data().charges || tDocSnap.data().feePerHour || 0;
           }
         } catch (err) {
-
+          console.error("Error fetching trainer fee data:", err);
         }
       }
       
@@ -465,7 +465,7 @@ useEffect(() => {
         onClose();
       }, 2500);
     } catch (err) {
-
+      console.error("Error sending email:", err);
       setError("Failed to send email. Please try again.");
     } finally {
       setLoading(false);

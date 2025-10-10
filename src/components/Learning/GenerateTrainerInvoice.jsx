@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { db } from "../../firebase";
 import { collection, getDocs, query, where, orderBy, limit } from "firebase/firestore";
 import InvoiceModal from "./InvoiceModal";
@@ -30,6 +30,9 @@ function GenerateTrainerInvoice() {
   const filtersBtnRef = useRef();
   const filtersDropdownRef = useRef();
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+  
+  // Custom toast state (like InitiationDashboard)
+  const [toast, setToast] = useState(null);
   
   // 🚀 NEW: Caching and Performance State with localStorage persistence
   const [lastFetchTime, setLastFetchTime] = useState(() => {
@@ -572,39 +575,66 @@ function GenerateTrainerInvoice() {
     }));
   };
 
-  const handleGenerateInvoice = (trainer) => {
+  const handleGenerateInvoice = useCallback((trainer) => {
+    // 🆕 UNDO: Store the trainer's current state before generating invoice
+    const trainerSnapshot = {
+      trainerId: trainer.trainerId,
+      collegeName: trainer.collegeName,
+      phase: trainer.phase,
+      hasExistingInvoice: trainer.hasExistingInvoice,
+      invoiceCount: trainer.invoiceCount,
+      invoiceStatus: trainer.invoiceStatus,
+      timestamp: Date.now()
+    };
+    
+    // Store in localStorage for persistence across page refreshes
+    try {
+      const existingSnapshots = JSON.parse(localStorage.getItem('invoice_generation_snapshots') || '[]');
+      existingSnapshots.push(trainerSnapshot);
+      // Keep only last 10 snapshots to avoid storage bloat
+      if (existingSnapshots.length > 10) {
+        existingSnapshots.shift();
+      }
+      localStorage.setItem('invoice_generation_snapshots', JSON.stringify(existingSnapshots));
+    } catch (error) {
+      console.warn('Failed to store trainer snapshot:', error);
+    }
+    
     setSelectedTrainer(trainer);
     setShowInvoiceModal(true);
-  };
+  }, []);
 
   // 🎯 NEW: Handle invoice generation completion with forced refresh
-  const handleInvoiceGenerated = async () => {
+  const handleInvoiceGenerated = useCallback(async () => {
     console.log('🎉 Invoice generated successfully - starting data refresh...');
     
-    // Clear all cache to ensure fresh data
-    clearCacheFromStorage();
-    setCachedData(null);
-    setLastFetchTime(null);
-    console.log('🗑️ Cache cleared successfully');
-    
-    // Add a longer delay to ensure database consistency and indexing
-    console.log('⏳ Waiting for database consistency and indexing...');
-    await new Promise(resolve => setTimeout(resolve, 2000)); // Increased to 2 seconds
-    
-    console.log('🔄 Forcing fresh data fetch to update invoice status...');
-    await fetchTrainers(true); // Force refresh to show updated invoice status
-    
-    console.log('✅ Data refresh completed - invoice status should now be updated');
-    
-    // Log final state for debugging
-    setTimeout(() => {
-      console.log('📊 Final trainer data after refresh:', trainerData.map(t => ({
-        name: t.trainerName,
-        hasInvoice: t.hasExistingInvoice,
-        status: t.invoiceStatus
-      })));
-    }, 100);
-  };
+    // Move all heavy operations to background to allow immediate modal closing
+    setTimeout(async () => {
+      // Clear all cache to ensure fresh data
+      clearCacheFromStorage();
+      setCachedData(null);
+      setLastFetchTime(null);
+      console.log('🗑️ Cache cleared successfully');
+      
+      // Add a longer delay to ensure database consistency and indexing
+      console.log('⏳ Waiting for database consistency and indexing...');
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Increased to 2 seconds
+      
+      console.log('🔄 Forcing fresh data fetch to update invoice status...');
+      await fetchTrainers(true); // Force refresh to show updated invoice status
+      
+      console.log('✅ Data refresh completed - invoice status should now be updated');
+      
+      // Log final state for debugging
+      setTimeout(() => {
+        console.log('📊 Final trainer data after refresh:', trainerData.map(t => ({
+          name: t.trainerName,
+          hasInvoice: t.hasExistingInvoice,
+          status: t.invoiceStatus
+        })));
+      }, 100);
+    }, 0); // Execute immediately in next tick, but asynchronously
+  }, [trainerData, fetchTrainers]);
 
   // 🔄 ENHANCED: Manual refresh with cache invalidation and visual feedback
   const handleRefreshData = () => {
@@ -641,7 +671,13 @@ function GenerateTrainerInvoice() {
     }
   };
 
-  // 🧹 Cleanup: Clear session data when user is inactive for too long
+  // cleanup toast timer on unmount
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
   useEffect(() => {
     const cleanupOldSessionData = () => {
       try {
@@ -680,78 +716,80 @@ function GenerateTrainerInvoice() {
   };
 
   // Filter and search logic
-  // 🔄 NEW: Filter data with college-first structure
-  const filteredGroupedData = Object.keys(groupedData).reduce((acc, college) => {
-    const collegePhases = {};
-    
-    Object.keys(groupedData[college]).forEach((phase) => {
-      const filteredTrainers = groupedData[college][phase].filter((trainer) => {
-        // compute invoice availability
-        const invoiceAvailable = trainer.latestEndDate
-          ? Date.now() >=
-            new Date(trainer.latestEndDate).getTime() + 24 * 60 * 60 * 1000
-          : false;
+  // 🔄 NEW: Filter data with college-first structure - MEMOIZED for performance
+  const filteredGroupedData = useMemo(() => {
+    return Object.keys(groupedData).reduce((acc, college) => {
+      const collegePhases = {};
+      
+      Object.keys(groupedData[college]).forEach((phase) => {
+        const filteredTrainers = groupedData[college][phase].filter((trainer) => {
+          // compute invoice availability
+          const invoiceAvailable = trainer.latestEndDate
+            ? Date.now() >=
+              new Date(trainer.latestEndDate).getTime() + 24 * 60 * 60 * 1000
+            : false;
 
-        // when showOnlyActive is true, only include trainers that either already have an invoice or are available
-        if (showOnlyActive && !trainer.hasExistingInvoice && !invoiceAvailable) {
-          return false;
+          // when showOnlyActive is true, only include trainers that either already have an invoice or are available
+          if (showOnlyActive && !trainer.hasExistingInvoice && !invoiceAvailable) {
+            return false;
+          }
+          const matchesSearch =
+            trainer.trainerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            trainer.trainerId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            trainer.businessName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            trainer.projectCode.toLowerCase().includes(searchTerm.toLowerCase());
+
+          // Date range filter
+          const matchesDateRange =
+            (!startDateFilter ||
+              new Date(trainer.earliestStartDate) >= new Date(startDateFilter)) &&
+            (!endDateFilter ||
+              new Date(trainer.latestEndDate) <= new Date(endDateFilter));
+
+          // Project code filter
+          const matchesProjectCode = projectCodeFilter
+            ? trainer.projectCode
+                .toLowerCase()
+                .includes(projectCodeFilter.toLowerCase())
+            : true;
+
+          // College name filter
+          const matchesBusinessName = businessNameFilter
+            ? trainer.businessName
+                .toLowerCase()
+                .includes(businessNameFilter.toLowerCase())
+            : true;
+
+          return (
+            matchesSearch &&
+            matchesDateRange &&
+            matchesProjectCode &&
+            matchesBusinessName
+          );
+        });
+
+        if (filteredTrainers.length > 0) {
+          collegePhases[phase] = filteredTrainers;
         }
-        const matchesSearch =
-          trainer.trainerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          trainer.trainerId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          trainer.businessName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          trainer.projectCode.toLowerCase().includes(searchTerm.toLowerCase());
-
-        // Date range filter
-        const matchesDateRange =
-          (!startDateFilter ||
-            new Date(trainer.earliestStartDate) >= new Date(startDateFilter)) &&
-          (!endDateFilter ||
-            new Date(trainer.latestEndDate) <= new Date(endDateFilter));
-
-        // Project code filter
-        const matchesProjectCode = projectCodeFilter
-          ? trainer.projectCode
-              .toLowerCase()
-              .includes(projectCodeFilter.toLowerCase())
-          : true;
-
-        // College name filter
-        const matchesBusinessName = businessNameFilter
-          ? trainer.businessName
-              .toLowerCase()
-              .includes(businessNameFilter.toLowerCase())
-          : true;
-
-        return (
-          matchesSearch &&
-          matchesDateRange &&
-          matchesProjectCode &&
-          matchesBusinessName
-        );
       });
 
-      if (filteredTrainers.length > 0) {
-        collegePhases[phase] = filteredTrainers;
+      if (Object.keys(collegePhases).length > 0) {
+        acc[college] = collegePhases;
       }
-    });
 
-    if (Object.keys(collegePhases).length > 0) {
-      acc[college] = collegePhases;
-    }
+      return acc;
+    }, {});
+  }, [groupedData, showOnlyActive, searchTerm, startDateFilter, endDateFilter, projectCodeFilter, businessNameFilter]);
 
-    return acc;
-  }, {});
-
-  // Get unique project codes for filter
-  const projectCodes = [
+  // Get unique project codes for filter - MEMOIZED
+  const projectCodes = useMemo(() => [
     ...new Set(trainerData.map((item) => item.projectCode)),
-  ].filter(Boolean);
+  ].filter(Boolean), [trainerData]);
 
-  // Get unique college names for filter
-  const businessNames = [
+  // Get unique college names for filter - MEMOIZED
+  const businessNames = useMemo(() => [
     ...new Set(trainerData.map((item) => item.businessName)),
-  ].filter(Boolean);
+  ].filter(Boolean), [trainerData]);
 
   // Get status icon and text for download button
   const getDownloadStatus = (trainer) => {
@@ -797,9 +835,11 @@ function GenerateTrainerInvoice() {
     }
   };
 
-  // Check if any filters are active (for badge on Filters button)
-  const isAnyFilterActive =
-    startDateFilter || endDateFilter || projectCodeFilter || businessNameFilter;
+  // Check if any filters are active (for badge on Filters button) - MEMOIZED
+  const isAnyFilterActive = useMemo(() =>
+    startDateFilter || endDateFilter || projectCodeFilter || businessNameFilter,
+    [startDateFilter, endDateFilter, projectCodeFilter, businessNameFilter]
+  );
 
   // Handle filters dropdown toggle with always downward positioning
   const toggleFiltersDropdown = () => {
@@ -860,10 +900,12 @@ function GenerateTrainerInvoice() {
     };
   }, [filtersDropdownOpen]);
 
-  const handleDownloadInvoice = async (trainer) => {
+  const handleDownloadInvoice = useCallback(async (trainer) => {
     const statusKey = trainer.isMerged 
       ? `${trainer.trainerId}_merged_jd_${trainer.phase}_${trainer.allProjects.join('_')}`
       : `${trainer.trainerId}_${trainer.businessName}_${trainer.phase}_${trainer.projectCode}`;
+    
+    console.log('📥 Starting download for trainer:', trainer.trainerName, 'Status key:', statusKey);
     
     setDownloadingInvoice(statusKey);
     setPdfStatus((prev) => ({
@@ -902,6 +944,8 @@ function GenerateTrainerInvoice() {
         });
       }
 
+      console.log('🔍 Found invoices:', allInvoices.length, 'for trainer:', trainer.trainerName);
+
       if (allInvoices.length > 0) {
         if (allInvoices.length > 1) {
           // For multiple invoices, show selection dialog
@@ -919,13 +963,15 @@ function GenerateTrainerInvoice() {
               inv => inv.billNumber === selectedInvoice.split(' ')[0]
             );
             if (selectedInvoiceData) {
+              console.log('📄 Generating PDF for selected invoice:', selectedInvoiceData.billNumber);
               const success = await generateInvoicePDF(selectedInvoiceData);
+              console.log('📄 PDF generation result:', success);
               setPdfStatus((prev) => ({
                 ...prev,
                 [statusKey]: success ? "success" : "error",
               }));
             } else {
-              alert("Invalid invoice number selected");
+              setToast({ type: 'error', message: "Invalid invoice number selected" });
               setPdfStatus((prev) => ({
                 ...prev,
                 [statusKey]: "error",
@@ -939,21 +985,24 @@ function GenerateTrainerInvoice() {
           }
         } else {
           // Single invoice - download it directly
+          console.log('📄 Generating PDF for single invoice:', allInvoices[0].billNumber);
           const success = await generateInvoicePDF(allInvoices[0]);
+          console.log('📄 PDF generation result:', success);
           setPdfStatus((prev) => ({
             ...prev,
             [statusKey]: success ? "success" : "error",
           }));
         }
       } else {
-        alert("No invoice found for this trainer");
+        setToast({ type: 'warning', message: "No invoice found for this trainer" });
         setPdfStatus((prev) => ({
           ...prev,
           [statusKey]: "not_found",
         }));
       }
-    } catch {
-      alert("Failed to download invoice. Please try again.");
+    } catch (error) {
+      console.error('❌ Download invoice error:', error);
+      setToast({ type: 'error', message: "Failed to download invoice. Please try again." });
       setPdfStatus((prev) => ({
         ...prev,
         [statusKey]: "error",
@@ -961,8 +1010,8 @@ function GenerateTrainerInvoice() {
     } finally {
       setDownloadingInvoice(null);
     }
-  };  // Function to handle editing an invoice
-  const handleEditInvoice = async (trainer) => {
+  }, []);  // Function to handle editing an invoice
+  const handleEditInvoice = useCallback(async (trainer) => {
     try {
       let allInvoices = [];
 
@@ -1014,7 +1063,7 @@ function GenerateTrainerInvoice() {
               setSelectedTrainer(trainer);
               setShowInvoiceModal(true);
             } else {
-              alert("Invalid invoice number selected");
+              setToast({ type: 'error', message: "Invalid invoice number selected" });
             }
           }
         } else {
@@ -1023,12 +1072,12 @@ function GenerateTrainerInvoice() {
           setShowInvoiceModal(true);
         }
       } else {
-        alert("No invoice found for this trainer");
+        setToast({ type: 'warning', message: "No invoice found for this trainer" });
       }
     } catch {
-      alert("Failed to find invoice. Please try again.");
+      setToast({ type: 'error', message: "Failed to find invoice. Please try again." });
     }
-  };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1142,7 +1191,28 @@ function GenerateTrainerInvoice() {
             setSelectedTrainer(null);
           }}
           onInvoiceGenerated={handleInvoiceGenerated}
+          onToast={setToast}
         />
+      )}
+      
+      {/* Custom Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <div className={`px-4 py-3 rounded-lg shadow-lg border text-sm font-medium transition-all duration-300 ${
+            toast.type === 'success' 
+              ? 'bg-green-50 border-green-200 text-green-800' 
+              : toast.type === 'error'
+              ? 'bg-red-50 border-red-200 text-red-800'
+              : 'bg-blue-50 border-blue-200 text-blue-800'
+          }`}>
+            <div className="flex items-center gap-2">
+              {toast.type === 'success' && <FiCheckCircle className="text-green-600" />}
+              {toast.type === 'error' && <FiXCircle className="text-red-600" />}
+              {toast.type === 'warning' && <FiAlertCircle className="text-amber-600" />}
+              <span>{toast.message}</span>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

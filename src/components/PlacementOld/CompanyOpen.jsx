@@ -95,7 +95,7 @@ const getCollegeAbbreviation = (collegeName) => {
     .toUpperCase();
 };
 
-function CompanyDetails({ company, onClose, fetchStudents, students, loadingStudents, studentDataError }) {
+function CompanyDetails({ company, onClose, fetchStudents, students, loadingStudents }) {
   const [showStudentData, setShowStudentData] = useState(false);
   return (
     <div className="fixed inset-0 flex items-center justify-center z-54">
@@ -316,7 +316,7 @@ function CompanyOpen() {
       }));
       setCompanies(data);
     } catch (err) {
-
+      console.error("Error fetching companies:", err);
       setError("Failed to load companies. Please try again.");
     } finally {
       setLoading(false);
@@ -332,7 +332,7 @@ function CompanyOpen() {
       }));
       setUsers(usersData);
     } catch (error) {
-
+      console.error("Error fetching users:", error);
     }
   };
 
@@ -374,10 +374,10 @@ const fetchStudents = async () => {
     setStudents(allStudents);
 
     if (allStudents.length === 0) {
-
+      // No students found for this company
     }
   } catch (error) {
-
+    console.error("Error fetching students:", error);
     setStudentDataError("Failed to load student data. Please try again.");
   } finally {
     setLoadingStudents(false);
@@ -396,7 +396,7 @@ const fetchStudents = async () => {
       fetchCompanies();
       setDropdownOpen(null);
     } catch (error) {
-
+      console.error("Error updating company status:", error);
     }
   };
 

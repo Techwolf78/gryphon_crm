@@ -490,28 +490,11 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
   return (
     <>
       <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-        <div className="relative top-4 mx-auto p-4 w-full max-w-6xl max-h-[95vh] overflow-y-auto">
-          <div className="bg-white rounded-lg shadow-xl">
-        {/* Page Header */}
-        <div className="bg-white shadow-sm border-b border-gray-200">
-          <div className="mx-auto p-3">
-            <div className="flex items-center justify-between">
-              {/* Left: Back */}
-              <div className="flex-1">
-                {onBack && (
-                  <button
-                    onClick={onBack}
-                    className="inline-flex items-center text-blue-600 hover:text-blue-800 transition-colors text-xs font-medium"
-                    disabled={loading}
-                  >
-                    <FiChevronLeft className="w-3 h-3 mr-1" />
-                    Back to Operations
-                  </button>
-                )}
-              </div>
-              {/* Center: College Name */}
-              <div className="flex-1 text-center">
-                <h1 className="text-sm font-semibold text-gray-800 leading-tight">
+        <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-6xl shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto">
+          <div className="mt-3">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
                   {selectedColleges?.length > 0 ? (
                     <>
                       {selectedColleges.length === 1 
@@ -529,31 +512,33 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                       JD Training Setup
                     </span>
                   )}
-                </h1>
-                <p className="mt-0.5 text-[10px] tracking-wide uppercase text-gray-400">
-                  JD Training Initiation
+                </h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Configure training details for merged colleges ({selectedColleges?.length || 0} colleges)
                 </p>
               </div>
-              {/* Right: Close button */}
-              <div className="flex-1 text-right">
+              <div className="flex items-center space-x-2">
+                {onBack && (
+                  <button
+                    onClick={onBack}
+                    className="flex items-center px-3 py-1 rounded text-sm font-medium transition-colors text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                    disabled={loading}
+                  >
+                    <FiChevronLeft className="w-4 h-4 mr-1" />
+                    Back
+                  </button>
+                )}
                 <button
                   onClick={onClose}
                   className="text-gray-400 hover:text-gray-600"
                   disabled={loading}
                 >
-                  <FiX className="w-5 h-5" />
+                  <FiX className="w-6 h-6" />
                 </button>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Main Content */}
-        <div className="mx-auto py-3">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            {/* Page Content */}
-            <div className="p-3">
-              <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Selected Colleges Summary */}
                 <div className="space-y-3">
                   <div className="pb-2 border-b border-gray-200">
@@ -763,10 +748,9 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                   </div>
                 )}
               </form>
-            </div>
 
-            {/* Page Footer */}
-            <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 rounded-b-lg">
+              {/* Page Footer */}
+              <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 rounded-b-lg">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <button
@@ -823,8 +807,6 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                   onChecklistComplete={setIsChecklistComplete}
                 />
               </div>
-            </div>
-          </div>
             </div>
           </div>
         </div>
