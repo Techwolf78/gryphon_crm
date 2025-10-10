@@ -20,7 +20,7 @@ import {
 } from "react-icons/fi";
 import specializationOptions from "./specializationOptions";
 
-function AddTrainer({ onClose, onTrainerAdded }) {
+function AddTrainer({ onClose, onTrainerAdded, trainers = [] }) {
   const [trainerData, setTrainerData] = useState({
     trainerId: "",
     name: "",
@@ -49,6 +49,35 @@ function AddTrainer({ onClose, onTrainerAdded }) {
   const [importStatus, setImportStatus] = useState("");
   const [importProgress, setImportProgress] = useState(0);
   const [currentSection, setCurrentSection] = useState("basic");
+  const [nameExists, setNameExists] = useState(false);
+
+  const getDomains = (trainer) => {
+    let domains = [];
+    if (Array.isArray(trainer.domain)) domains = trainer.domain;
+    else if (typeof trainer.domain === 'string') domains = trainer.domain.split(',').map(d => d.trim());
+    return domains.map(d => d.toLowerCase().trim());
+  };
+
+  useEffect(() => {
+    if (!trainerData.name.trim()) {
+      setNameExists(false);
+      return;
+    }
+    const newName = trainerData.name.toLowerCase().trim();
+    const newDomains = getDomains({domain: trainerData.domain});
+    for (const trainer of trainers) {
+      if (trainer.name.toLowerCase().trim() === newName) {
+        const existingDomains = getDomains(trainer);
+        for (const domain of newDomains) {
+          if (existingDomains.includes(domain)) {
+            setNameExists(true);
+            return;
+          }
+        }
+      }
+    }
+    setNameExists(false);
+  }, [trainerData.name, trainerData.domain, trainers]);
 
   // Generate next trainer ID
   useEffect(() => {
@@ -92,6 +121,12 @@ function AddTrainer({ onClose, onTrainerAdded }) {
     e.preventDefault();
     setLoading(true);
     setError("");
+
+    if (nameExists) {
+      setError("Trainer with same name and domain already exists");
+      setLoading(false);
+      return;
+    }
 
     try {
       const trainerToSave = {
@@ -346,6 +381,7 @@ function AddTrainer({ onClose, onTrainerAdded }) {
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             required
           />
+          {nameExists && <p className="text-red-500 text-sm mt-1">Trainer exists</p>}
         </div>
       </div>
 
@@ -635,8 +671,10 @@ function AddTrainer({ onClose, onTrainerAdded }) {
         </button>
         <button
           type="submit"
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center"
-          disabled={loading}
+          className={`px-4 py-2 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center ${
+            loading || nameExists ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+          }`}
+          disabled={loading || nameExists}
         >
           {loading ? (
             <>

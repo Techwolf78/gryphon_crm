@@ -11,6 +11,11 @@ import TrainerInvoiceSkeleton from "./Invoice/TrainerInvoiceSkeleton";
 import TrainerTable from "./Invoice/TrainerTable";
 
 function GenerateTrainerInvoice() {
+  // Cache duration: 5 minutes (but adaptive based on usage)
+  const CACHE_DURATION = 5 * 60 * 1000;
+  const EXTENDED_CACHE_DURATION = 15 * 60 * 1000; // 15 minutes for heavy users
+  const CACHE_VERSION = 'v2.0_college_first'; // 🆕 Version to invalidate old cache structure
+  
   const [trainerData, setTrainerData] = useState([]);
   const [groupedData, setGroupedData] = useState({});
   const [loading, setLoading] = useState(true);
@@ -34,51 +39,32 @@ function GenerateTrainerInvoice() {
   // Custom toast state (like InitiationDashboard)
   const [toast, setToast] = useState(null);
   
-  // 🚀 NEW: Caching and Performance State with localStorage persistence
-  const [lastFetchTime, setLastFetchTime] = useState(() => {
-    try {
-      return parseInt(localStorage.getItem('trainer_invoice_last_fetch')) || null;
-    } catch {
-      return null;
-    }
-  });
-  const [cachedData, setCachedData] = useState(() => {
-    try {
-      const cached = localStorage.getItem('trainer_invoice_cache');
-      const cacheVersion = localStorage.getItem('trainer_invoice_cache_version');
-      
-      // 🔄 Clear cache if version doesn't match (structure change)
-      if (cacheVersion !== CACHE_VERSION) {
-        console.log('🔄 Cache version mismatch - clearing old cache structure');
-        localStorage.removeItem('trainer_invoice_cache');
-        localStorage.removeItem('trainer_invoice_last_fetch');
-        localStorage.setItem('trainer_invoice_cache_version', CACHE_VERSION);
-        return null;
-      }
-      
-      return cached ? JSON.parse(cached) : null;
-    } catch {
-      return null;
-    }
-  });
+  // 🧠 Cache state management
+  const [cachedData, setCachedData] = useState(null);
+  const [lastFetchTime, setLastFetchTime] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
-  const hasLoadedRef = useRef(false); // Track if we've loaded data in this session
-  
-  // Cache duration: 5 minutes (but adaptive based on usage)
-  const CACHE_DURATION = 5 * 60 * 1000;
-  const EXTENDED_CACHE_DURATION = 15 * 60 * 1000; // 15 minutes for heavy users
-  const CACHE_VERSION = 'v2.0_college_first'; // 🆕 Version to invalidate old cache structure
+  const hasLoadedRef = useRef(false);
   
   // 🧠 Intelligent cache management with version check
-  const getAdaptiveCacheDuration = () => {
-    try {
-      const sessionVisits = parseInt(localStorage.getItem('trainer_invoice_session_visits') || '0');
-      // If user has visited multiple times in this session, extend cache duration
-      return sessionVisits > 3 ? EXTENDED_CACHE_DURATION : CACHE_DURATION;
-    } catch {
-      return CACHE_DURATION;
-    }
-  };
+  const getAdaptiveCacheDuration = useMemo(() => {
+    return () => {
+      try {
+        const sessionVisits = parseInt(localStorage.getItem('trainer_invoice_session_visits') || '0');
+        // If user has visited multiple times in this session, extend cache duration
+        const duration = sessionVisits > 3 ? EXTENDED_CACHE_DURATION : CACHE_DURATION;
+        console.log('🎯 Adaptive cache duration:', {
+          sessionVisits,
+          duration,
+          isExtended: duration > CACHE_DURATION,
+          CACHE_DURATION,
+          EXTENDED_CACHE_DURATION
+        });
+        return duration;
+      } catch {
+        return CACHE_DURATION;
+      }
+    };
+  }, [CACHE_DURATION, EXTENDED_CACHE_DURATION]);
   
   const trackUserVisit = () => {
     try {
@@ -92,9 +78,15 @@ function GenerateTrainerInvoice() {
   // 🔄 Helper functions for localStorage cache management
   const saveCacheToStorage = (data, timestamp) => {
     try {
+      console.log('💾 Saving cache to localStorage:', {
+        dataSize: JSON.stringify(data).length,
+        timestamp,
+        CACHE_VERSION
+      });
       localStorage.setItem('trainer_invoice_cache', JSON.stringify(data));
       localStorage.setItem('trainer_invoice_last_fetch', timestamp.toString());
       localStorage.setItem('trainer_invoice_cache_version', CACHE_VERSION); // 🆕 Save version
+      console.log('✅ Cache saved successfully');
     } catch (error) {
       console.warn('⚠️ Failed to save cache to localStorage:', error);
     }
@@ -113,9 +105,10 @@ function GenerateTrainerInvoice() {
   // 🚀 OPTIMIZED: Enhanced data fetch function with persistent caching
   const fetchTrainers = useCallback(async (forceRefresh = false) => {
     const now = Date.now();
+    const adaptiveDuration = getAdaptiveCacheDuration();
     
     // 📱 Use cache if data is fresh and not forcing refresh
-    if (!forceRefresh && cachedData && lastFetchTime && (now - lastFetchTime) < CACHE_DURATION) {
+    if (!forceRefresh && cachedData && lastFetchTime && (now - lastFetchTime) < adaptiveDuration) {
       console.log('🎯 Using cached data from localStorage, skipping Firebase request');
       setTrainerData(cachedData.trainerData);
       setGroupedData(cachedData.groupedData);
@@ -124,7 +117,14 @@ function GenerateTrainerInvoice() {
       return;
     }
     
-    console.log('🔄 Fetching fresh data from Firebase...', forceRefresh ? '(Force refresh)' : '(Cache expired/missing)');
+    console.log('🔄 Fetching fresh data from Firebase...', forceRefresh ? '(Force refresh)' : '(Cache expired/missing)', {
+      forceRefresh,
+      hasCachedData: !!cachedData,
+      lastFetchTime,
+      timeSinceLastFetch: lastFetchTime ? now - lastFetchTime : null,
+      adaptiveDuration,
+      cacheExpired: lastFetchTime ? (now - lastFetchTime) >= adaptiveDuration : true
+    });
     setLoading(true);
     if (forceRefresh) {
       setRefreshing(true);
@@ -495,13 +495,18 @@ function GenerateTrainerInvoice() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [lastFetchTime, cachedData, CACHE_DURATION]);
+  }, [lastFetchTime, cachedData, getAdaptiveCacheDuration]);
 
   // 🚀 OPTIMIZED: Check cache on mount, fetch if needed (with session tracking)
   useEffect(() => {
     // 🔄 ONE-TIME: Force clear cache for structural change (remove this after deployment)
     const forceStructureUpdate = () => {
       const currentVersion = localStorage.getItem('trainer_invoice_cache_version');
+      console.log('🔍 Cache version check:', {
+        currentVersion,
+        CACHE_VERSION,
+        versionsMatch: currentVersion === CACHE_VERSION
+      });
       if (currentVersion !== CACHE_VERSION) {
         console.log('🔄 Forcing cache clear for College → Phase structure change...');
         clearCacheFromStorage();
@@ -530,6 +535,15 @@ function GenerateTrainerInvoice() {
     const now = Date.now();
     const adaptiveDuration = getAdaptiveCacheDuration();
     const isCacheValid = cachedData && lastFetchTime && (now - lastFetchTime) < adaptiveDuration;
+    
+    console.log('📊 Cache validation:', {
+      hasCachedData: !!cachedData,
+      lastFetchTime,
+      timeSinceLastFetch: lastFetchTime ? now - lastFetchTime : null,
+      adaptiveDuration,
+      isCacheValid,
+      cacheAgeMinutes: lastFetchTime ? Math.round((now - lastFetchTime) / (1000 * 60)) : null
+    });
     
     if (isCacheValid) {
       const cacheAge = Math.round((now - lastFetchTime) / (1000 * 60));
@@ -647,7 +661,7 @@ function GenerateTrainerInvoice() {
   };
   
   // 💡 NEW: Function to check cache status for UI indicators
-  const getCacheStatus = () => {
+  const getCacheStatus = useCallback(() => {
     if (!lastFetchTime) return { status: 'never', message: 'Never loaded', isExpired: false };
     
     const now = Date.now();
@@ -655,6 +669,15 @@ function GenerateTrainerInvoice() {
     const minutesAgo = Math.floor(timeSinceLastFetch / (1000 * 60));
     const adaptiveDuration = getAdaptiveCacheDuration();
     const isExtended = adaptiveDuration > CACHE_DURATION;
+    
+    console.log('🔍 Cache status check:', {
+      timeSinceLastFetch,
+      minutesAgo,
+      adaptiveDuration,
+      CACHE_DURATION,
+      isExtended,
+      cacheExpired: timeSinceLastFetch >= adaptiveDuration
+    });
     
     if (timeSinceLastFetch < adaptiveDuration) {
       return { 
@@ -669,7 +692,7 @@ function GenerateTrainerInvoice() {
         isExpired: true
       };
     }
-  };
+  }, [lastFetchTime, getAdaptiveCacheDuration, CACHE_DURATION]);
 
   // cleanup toast timer on unmount
   useEffect(() => {

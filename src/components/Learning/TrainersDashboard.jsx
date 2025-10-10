@@ -54,6 +54,30 @@ function TrainersDashboard() {
   const filterDropdownRef = useRef(null);
   const { user } = useAuth();
   const isPrivileged = ["director", "head"].includes(user?.role?.toLowerCase());
+
+  const getDomains = (trainer) => {
+    let domains = [];
+    if (Array.isArray(trainer.domain)) domains = trainer.domain;
+    else if (typeof trainer.domain === 'string') domains = trainer.domain.split(',').map(d => d.trim());
+    return domains.map(d => d.toLowerCase().trim());
+  };
+
+  const checkUniqueness = (newTrainer, excludeId = null) => {
+    const newName = newTrainer.name.toLowerCase().trim();
+    const newDomains = getDomains(newTrainer);
+    for (const trainer of trainers) {
+      if (excludeId && trainer.id === excludeId) continue;
+      if (trainer.name.toLowerCase().trim() === newName) {
+        const existingDomains = getDomains(trainer);
+        for (const domain of newDomains) {
+          if (existingDomains.includes(domain)) {
+            return false; // conflict
+          }
+        }
+      }
+    }
+    return true;
+  };
   useEffect(() => {
     const loadAll = async () => {
       try {
@@ -173,21 +197,35 @@ function TrainersDashboard() {
 
   const handleTrainerAdded = (newTrainerOrArray) => {
     if (Array.isArray(newTrainerOrArray)) {
+      for (const t of newTrainerOrArray) {
+        if (!checkUniqueness(t)) {
+          toast.error("Some trainers have same name and domain as existing ones");
+          return;
+        }
+      }
       setTrainers((prev) => {
         const existingIds = new Set(prev.map((t) => t.id));
         const additions = newTrainerOrArray.filter((t) => !existingIds.has(t.id));
         return [...prev, ...additions];
       });
-    toast.success(`${newTrainerOrArray.length} trainer(s) imported`);
+      toast.success(`${newTrainerOrArray.length} trainer(s) imported`);
     } else if (newTrainerOrArray && newTrainerOrArray.id) {
+      if (!checkUniqueness(newTrainerOrArray)) {
+        toast.error("Trainer with same name and domain already exists");
+        return;
+      }
       setTrainers((prev) => [...prev, newTrainerOrArray]);
-    toast.success("Trainer added");
+      toast.success("Trainer added");
     }
     setShowAddTrainer(false);
   };
 
   const handleTrainerUpdated = (updatedTrainer) => {
     if (updatedTrainer && updatedTrainer.id) {
+      if (!checkUniqueness(updatedTrainer, updatedTrainer.id)) {
+        toast.error("Trainer with same name and domain already exists");
+        return;
+      }
       setTrainers((prev) =>
         prev.map((t) => (t.id === updatedTrainer.id ? { ...t, ...updatedTrainer } : t))
       );
@@ -699,6 +737,7 @@ function TrainersDashboard() {
               <AddTrainer
                 onClose={() => setShowAddTrainer(false)}
                 onTrainerAdded={handleTrainerAdded}
+                trainers={trainers}
               />
             )}
             {showEditTrainer && selectedTrainer && (
@@ -706,6 +745,7 @@ function TrainersDashboard() {
                 trainerId={selectedTrainer.id}
                 onClose={() => setShowEditTrainer(false)}
                 onTrainerUpdated={handleTrainerUpdated}
+                trainers={trainers}
               />
             )}
             {showDeleteTrainer && trainerToDelete && (
