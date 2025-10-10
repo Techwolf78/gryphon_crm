@@ -503,263 +503,281 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
   };
 
   const handleSubmit = async (
-    formData,
-    contract,
-    installment,
-    isEdit = false,
-    isRegenerate = false
-  ) => {
-    if (!contract || !installment) {
-      alert("Error: Contract or installment data missing.");
-      return;
-    }
+  formData,
+  contract,
+  installment,
+  isEdit = false,
+  isRegenerate = false
+) => {
+  if (!contract || !installment) {
+    alert("Error: Contract or installment data missing.");
+    return;
+  }
 
-    try {
-      const financialYear = getCurrentFinancialYear();
-      const currentDate = new Date();
+  try {
+    const financialYear = getCurrentFinancialYear();
+    const currentDate = new Date();
 
-      // Determine collection name based on invoice type
-      const isProforma = formData.invoiceType === "Proforma Invoice";
-      const isCashInvoice = formData.invoiceType === "Cash Invoice";
-      const collectionName = isProforma
-        ? "ProformaInvoices"
-        : "ContractInvoices";
+    // Determine collection name based on invoice type
+    const isProforma = formData.invoiceType === "Proforma Invoice";
+    const isCashInvoice = formData.invoiceType === "Cash Invoice";
+    const collectionName = isProforma
+      ? "ProformaInvoices"
+      : "ContractInvoices";
 
-      if (isEdit && !isRegenerate && editInvoice) {
-        // CASE 1: Proforma se Tax Invoice convert karna
-        if (editInvoice.invoiceType === "Proforma Invoice" && !isProforma) {
-          const updatedInvoiceNumber = await generateInvoiceNumber(
-            "Tax Invoice"
-          );
-
-          // 1. Naya Tax Invoice create karo
-          const taxInvoiceData = {
-            ...editInvoice,
-            invoiceType: "Tax Invoice",
-            invoiceNumber: updatedInvoiceNumber,
-            convertedFromProforma: true,
-            originalProformaNumber: editInvoice.invoiceNumber,
-            conversionDate: currentDate,
-            raisedDate: currentDate,
-            updatedDate: currentDate,
-            status: "registered",
-            approvalStatus: "pending",
-          };
-
-          const { id: _, ...taxDataWithoutId } = taxInvoiceData;
-          const docRef = await addDoc(
-            collection(db, "ContractInvoices"),
-            taxDataWithoutId
-          );
-
-          // 2. Purane Proforma ko mark karo as converted
-          await updateDoc(doc(db, "ProformaInvoices", editInvoice.id), {
-            convertedToTax: true,
-            convertedTaxInvoiceNumber: updatedInvoiceNumber,
-            conversionDate: currentDate,
-          });
-
-          // 3. State update karo
-          const newInvoice = {
-            id: docRef.id,
-            ...taxInvoiceData,
-          };
-
-          setExistingInvoices((prev) => [...prev, newInvoice]);
-          setExistingProformas((prev) =>
-            prev.map((inv) =>
-              inv.id === editInvoice.id
-                ? {
-                    ...inv,
-                    convertedToTax: true,
-                    convertedTaxInvoiceNumber: updatedInvoiceNumber,
-                  }
-                : inv
-            )
-          );
-
-          alert(
-            `Invoice converted to Tax Invoice successfully! Invoice Number: ${updatedInvoiceNumber}`
-          );
-        }
-        // YEH LINE ADD KARO - pehle if ka closing
-      } else if (isRegenerate && editInvoice) {
-        // CASE 2: Regenerate invoice (same logic with collection selection)
-        const newInvoiceNumber = await generateInvoiceNumber(
-          formData.invoiceType
+    if (isEdit && !isRegenerate && editInvoice) {
+      // CASE 1: Proforma se Tax Invoice convert karna
+      if (editInvoice.invoiceType === "Proforma Invoice" && !isProforma) {
+        const updatedInvoiceNumber = await generateInvoiceNumber(
+          "Tax Invoice"
         );
 
-        const regenerateData = {
+        // 1. Naya Tax Invoice create karo
+        const taxInvoiceData = {
           ...editInvoice,
-          invoiceNumber: newInvoiceNumber,
-          invoiceType: formData.invoiceType,
+          invoiceType: "Tax Invoice",
+          invoiceNumber: updatedInvoiceNumber,
+          convertedFromProforma: true,
+          originalProformaNumber: editInvoice.invoiceNumber,
+          conversionDate: currentDate,
           raisedDate: currentDate,
           updatedDate: currentDate,
           status: "registered",
-          approvalStatus: isProforma ? "not_required" : "pending",
-          financialYear: financialYear.year,
-          receivedAmount: 0,
-          dueAmount: editInvoice.netPayableAmount || editInvoice.amountRaised,
-          paymentHistory: [],
-          cancelled: false,
-          cancellationDate: null,
-          cancellationReason: null,
-          regeneratedFrom: editInvoice.invoiceNumber,
+          approvalStatus: "pending",
         };
 
-        // Cash Invoice ke liye GST zero karo
-        if (formData.invoiceType === "Cash Invoice") {
-          regenerateData.gstAmount = 0;
-          regenerateData.netPayableAmount =
-            regenerateData.baseAmount || regenerateData.netPayableAmount / 1.18;
-          regenerateData.amountRaised = regenerateData.netPayableAmount;
-          regenerateData.dueAmount = regenerateData.netPayableAmount;
-        }
-
-        const { id: _, ...dataWithoutId } = regenerateData;
-
+        const { id: _, ...taxDataWithoutId } = taxInvoiceData;
         const docRef = await addDoc(
-          collection(db, collectionName),
-          dataWithoutId
+          collection(db, "ContractInvoices"),
+          taxDataWithoutId
         );
 
-        const newInvoice = {
-          id: docRef.id,
-          ...regenerateData,
-        };
-
-        // State update based on collection
-        if (collectionName === "ContractInvoices") {
-          setExistingInvoices((prev) => [...prev, newInvoice]);
-        } else {
-          setExistingProformas((prev) => [...prev, newInvoice]);
-        }
-
-        // Purane invoice ko mark karo as regenerated
-        const oldCollection =
-          editInvoice.invoiceType === "Proforma Invoice"
-            ? "ProformaInvoices"
-            : "ContractInvoices";
-        await updateDoc(doc(db, oldCollection, editInvoice.id), {
-          regenerated: true,
-          regeneratedTo: newInvoiceNumber,
+        // 2. Purane Proforma ko mark karo as converted
+        await updateDoc(doc(db, "ProformaInvoices", editInvoice.id), {
+          convertedToTax: true,
+          convertedTaxInvoiceNumber: updatedInvoiceNumber,
+          conversionDate: currentDate,
         });
 
-        // State update for old invoice
-        if (oldCollection === "ContractInvoices") {
-          setExistingInvoices((prev) =>
-            prev.map((inv) =>
-              inv.id === editInvoice.id ? { ...inv, regenerated: true } : inv
-            )
-          );
-        } else {
-          setExistingProformas((prev) =>
-            prev.map((inv) =>
-              inv.id === editInvoice.id ? { ...inv, regenerated: true } : inv
-            )
-          );
-        }
-
-        alert(
-          `Invoice regenerated successfully! New Invoice Number: ${newInvoiceNumber}`
-        );
-      } else {
-        // CASE 3: Naya invoice generate karna
-        const invoiceNumber = await generateInvoiceNumber(formData.invoiceType);
-        const selectedInstallment = contract.paymentDetails.find(
-          (p) => p.name === installment.name
-        );
-
-        let totalAmount = selectedInstallment
-          ? selectedInstallment.totalAmount
-          : contract.netPayableAmount;
-
-        let baseAmount, gstAmount;
-
-        // Cash Invoice ke liye different calculation
-        if (formData.invoiceType === "Cash Invoice") {
-          baseAmount = totalAmount;
-          gstAmount = 0;
-          totalAmount = baseAmount;
-        } else {
-          // Tax/Proforma invoice ke liye normal calculation
-          baseAmount = totalAmount / 1.18;
-          gstAmount = totalAmount - baseAmount;
-        }
-
-        const invoiceData = {
-          ...formData,
-          invoiceNumber,
-          raisedDate: currentDate,
-          status: "registered",
-          approvalStatus: isProforma ? "not_required" : "pending",
-          originalInvoiceId: contract.id,
-          projectCode: contract.projectCode,
-          collegeName: contract.collegeName,
-          collegeCode: contract.collegeCode,
-          course: contract.course,
-          year: contract.year,
-          deliveryType: contract.deliveryType,
-          passingYear: contract.passingYear,
-          studentCount: contract.studentCount,
-          perStudentCost: contract.perStudentCost,
-          totalCost: contract.totalCost,
-          installment: installment.name,
-          baseAmount: baseAmount,
-          gstAmount: gstAmount,
-          netPayableAmount: totalAmount,
-          amountRaised: totalAmount,
-          receivedAmount: 0,
-          dueAmount: totalAmount,
-          paymentHistory: [],
-          gstNumber: contract.gstNumber,
-          gstType: contract.gstType,
-          tpoName: contract.tpoName,
-          tpoEmail: contract.tpoEmail,
-          tpoPhone: contract.tpoPhone,
-          address: contract.address,
-          city: contract.city,
-          state: contract.state,
-          pincode: contract.pincode,
-          paymentDetails: contract.paymentDetails,
-          contractStartDate: contract.contractStartDate,
-          contractEndDate: contract.contractEndDate,
-          financialYear: financialYear.year,
-          academicYear: financialYear.year,
-        };
-
-        const docRef = await addDoc(
-          collection(db, collectionName),
-          invoiceData
-        );
-
+        // 3. State update karo
         const newInvoice = {
           id: docRef.id,
-          ...invoiceData,
+          ...taxInvoiceData,
         };
 
-        // State update based on collection
-        if (collectionName === "ContractInvoices") {
-          setExistingInvoices((prev) => [...prev, newInvoice]);
-        } else {
-          setExistingProformas((prev) => [...prev, newInvoice]);
-        }
+        setExistingInvoices((prev) => [...prev, newInvoice]);
+        setExistingProformas((prev) =>
+          prev.map((inv) =>
+            inv.id === editInvoice.id
+              ? {
+                  ...inv,
+                  convertedToTax: true,
+                  convertedTaxInvoiceNumber: updatedInvoiceNumber,
+                }
+              : inv
+          )
+        );
 
-        alert(`Invoice ${invoiceNumber} raised successfully!`);
+        alert(
+          `Invoice converted to Tax Invoice successfully! Invoice Number: ${updatedInvoiceNumber}`
+        );
       }
+    } else if (isRegenerate && editInvoice) {
+  // CASE 2: Regenerate invoice (same logic with collection selection)
+  const newInvoiceNumber = await generateInvoiceNumber(
+    formData.invoiceType
+  );
 
-      setShowModal(false);
-      setSelectedContract(null);
-      setSelectedInstallment(null);
-      setEditInvoice(null);
-    } catch (err) {
-      alert(
-        `Failed to ${isEdit ? "convert" : "raise"} invoice. Error: ${
-          err.message
-        }`
-      );
-    }
+  const regenerateData = {
+    ...editInvoice,
+    invoiceNumber: newInvoiceNumber,
+    invoiceType: formData.invoiceType,
+    raisedDate: currentDate,
+    updatedDate: currentDate,
+    status: "registered",
+    approvalStatus: isProforma ? "not_required" : "pending",
+    financialYear: financialYear.year,
+    receivedAmount: 0,
+    dueAmount: editInvoice.netPayableAmount || editInvoice.amountRaised,
+    paymentHistory: [],
+    cancelled: false,
+    cancellationDate: null,
+    cancellationReason: null,
+    regeneratedFrom: editInvoice.invoiceNumber,
   };
+
+  // ✅ Cash Invoice ke liye amounts properly set karo
+  if (formData.invoiceType === "Cash Invoice") {
+    // ✅ EditInvoice se baseAmount use karo (jo Firebase se aaya hai)
+    const baseAmount = editInvoice.baseAmount || 
+                      (editInvoice.paymentDetails && editInvoice.paymentDetails[0] && editInvoice.paymentDetails[0].baseAmount) ||
+                      0;
+    
+    regenerateData.baseAmount = baseAmount;
+    regenerateData.gstAmount = 0;
+    regenerateData.netPayableAmount = baseAmount;
+    regenerateData.amountRaised = baseAmount;
+    regenerateData.dueAmount = baseAmount;
+  }
+
+  const { id: _, ...dataWithoutId } = regenerateData;
+
+  const docRef = await addDoc(
+    collection(db, collectionName),
+    dataWithoutId
+  );
+
+  const newInvoice = {
+    id: docRef.id,
+    ...regenerateData,
+  };
+
+  // State update based on collection
+  if (collectionName === "ContractInvoices") {
+    setExistingInvoices((prev) => [...prev, newInvoice]);
+  } else {
+    setExistingProformas((prev) => [...prev, newInvoice]);
+  }
+
+  // Purane invoice ko mark karo as regenerated
+  const oldCollection =
+    editInvoice.invoiceType === "Proforma Invoice"
+      ? "ProformaInvoices"
+      : "ContractInvoices";
+  await updateDoc(doc(db, oldCollection, editInvoice.id), {
+    regenerated: true,
+    regeneratedTo: newInvoiceNumber,
+  });
+
+  // State update for old invoice
+  if (oldCollection === "ContractInvoices") {
+    setExistingInvoices((prev) =>
+      prev.map((inv) =>
+        inv.id === editInvoice.id ? { ...inv, regenerated: true } : inv
+      )
+    );
+  } else {
+    setExistingProformas((prev) =>
+      prev.map((inv) =>
+        inv.id === editInvoice.id ? { ...inv, regenerated: true } : inv
+      )
+    );
+  }
+
+  alert(
+    `Invoice regenerated successfully! New Invoice Number: ${newInvoiceNumber}`
+  );
+} else {
+  // CASE 3: Naya invoice generate karna
+  const invoiceNumber = await generateInvoiceNumber(formData.invoiceType);
+  const selectedInstallment = contract.paymentDetails.find(
+    (p) => p.name === installment.name
+  );
+
+  // ✅ Pehle check karo ki paymentDetails mein amounts hain ya nahi
+  let baseAmount, gstAmount, totalAmount;
+
+  if (selectedInstallment && selectedInstallment.baseAmount && selectedInstallment.gstAmount && selectedInstallment.totalAmount) {
+    // ✅ Agar paymentDetails mein amounts hain toh wahi use karo
+    baseAmount = selectedInstallment.baseAmount;
+    gstAmount = selectedInstallment.gstAmount;
+    totalAmount = selectedInstallment.totalAmount;
+    
+    // ✅ Cash Invoice ke liye amounts adjust karo
+    if (formData.invoiceType === "Cash Invoice") {
+      gstAmount = 0;
+      totalAmount = baseAmount; // Cash mein totalAmount = baseAmount
+    }
+  } else {
+    // ✅ Agar paymentDetails mein amounts nahi hain toh manually calculate karo
+    totalAmount = selectedInstallment
+      ? selectedInstallment.totalAmount
+      : contract.netPayableAmount;
+
+    // Cash Invoice ke liye different calculation
+    if (formData.invoiceType === "Cash Invoice") {
+      baseAmount = totalAmount;
+      gstAmount = 0;
+      totalAmount = baseAmount; // Cash mein totalAmount = baseAmount
+    } else {
+      // Tax/Proforma invoice ke liye normal calculation
+      baseAmount = totalAmount / 1.18;
+      gstAmount = totalAmount - baseAmount;
+    }
+  }
+
+  const invoiceData = {
+    ...formData,
+    invoiceNumber,
+    raisedDate: currentDate,
+    status: "registered",
+    approvalStatus: isProforma ? "not_required" : "pending",
+    originalInvoiceId: contract.id,
+    projectCode: contract.projectCode,
+    collegeName: contract.collegeName,
+    collegeCode: contract.collegeCode,
+    course: contract.course,
+    year: contract.year,
+    deliveryType: contract.deliveryType,
+    passingYear: contract.passingYear,
+    studentCount: contract.studentCount,
+    perStudentCost: contract.perStudentCost,
+    totalCost: contract.totalCost,
+    installment: installment.name,
+    baseAmount: baseAmount,
+    gstAmount: gstAmount,
+    netPayableAmount: totalAmount,
+    amountRaised: totalAmount,
+    receivedAmount: 0,
+    dueAmount: totalAmount,
+    paymentHistory: [],
+    gstNumber: contract.gstNumber,
+    gstType: contract.gstType,
+    tpoName: contract.tpoName,
+    tpoEmail: contract.tpoEmail,
+    tpoPhone: contract.tpoPhone,
+    address: contract.address,
+    city: contract.city,
+    state: contract.state,
+    pincode: contract.pincode,
+    paymentDetails: contract.paymentDetails,
+    contractStartDate: contract.contractStartDate,
+    contractEndDate: contract.contractEndDate,
+    financialYear: financialYear.year,
+    academicYear: financialYear.year,
+  };
+
+  const docRef = await addDoc(
+    collection(db, collectionName),
+    invoiceData
+  );
+
+  const newInvoice = {
+    id: docRef.id,
+    ...invoiceData,
+  };
+
+  // State update based on collection
+  if (collectionName === "ContractInvoices") {
+    setExistingInvoices((prev) => [...prev, newInvoice]);
+  } else {
+    setExistingProformas((prev) => [...prev, newInvoice]);
+  }
+
+  alert(`Invoice ${invoiceNumber} raised successfully!`);
+}
+    setShowModal(false);
+    setSelectedContract(null);
+    setSelectedInstallment(null);
+    setEditInvoice(null);
+  } catch (err) {
+    alert(
+      `Failed to ${isEdit ? "convert" : "raise"} invoice. Error: ${
+        err.message
+      }`
+    );
+  }
+};
   // "Generate TI" button ke handler ko update karo
   const handleRegisterInvoice = async (invoice) => {
     try {
@@ -988,8 +1006,6 @@ const calculateEMIAmount = (contract, installmentName) => {
   return 0;
 };
 
-  // Submit merged invoice - CORRECTED VERSION
-// Submit merged invoice - CORRECTED VERSION with proper rounding
 const handleMergeSubmit = async (formData) => {
   if (!selectedContractsForMerge.length || !selectedInstallmentForMerge) {
     alert("Error: No contracts selected for merge.");
@@ -1001,27 +1017,25 @@ const handleMergeSubmit = async (formData) => {
     const currentDate = new Date();
     const invoiceNumber = await generateInvoiceNumber(formData.invoiceType);
 
-    // Calculate totals from all selected contracts with PROPER ROUNDING
+    // ✅ YEHI IMPORTANT CHANGE HAI - BASE AMOUNT DONO CASES MEIN SAME RAHEGA
     let totalBaseAmount = 0;
     let totalStudentCount = 0;
     const courses = [];
     const years = [];
     let perStudentCost = 0;
 
-    // Pehle sab contracts ke amounts ko properly calculate karo with rounding
+    // ✅ Pehle sab contracts ke TOTAL amounts calculate karo (Tax Invoice ke hisab se)
     selectedContractsForMerge.forEach((contract) => {
-      // Use the calculateEMIAmount function to get installment amount
       const installmentAmount = calculateEMIAmount(
         contract,
         selectedInstallmentForMerge.name
       );
-
-      // Amount ko properly round karo
+      
       const roundedInstallmentAmount = Math.round(installmentAmount);
       
-      // Calculate base amount (without GST) with rounding
-      const installmentBaseAmount = Math.round(roundedInstallmentAmount / 1.18);
-      totalBaseAmount += installmentBaseAmount;
+      // ✅ YEHI LINE CHANGE KARO - HAR CONTRACT KA BASE AMOUNT CALCULATE KARO
+      const contractBaseAmount = Math.round(roundedInstallmentAmount / 1.18);
+      totalBaseAmount += contractBaseAmount;
 
       if (contract.studentCount) {
         totalStudentCount += parseInt(contract.studentCount);
@@ -1042,10 +1056,20 @@ const handleMergeSubmit = async (formData) => {
     // Use first contract for common details
     const firstContract = selectedContractsForMerge[0];
 
-    // Calculate GST properly (18%) with rounding
-    const gstRate = 0.18;
-    const gstAmount = Math.round(totalBaseAmount * gstRate);
-    const netPayableAmount = totalBaseAmount + gstAmount;
+    // ✅ Cash aur Tax ke liye alag GST calculation - BUT BASE AMOUNT SAME RAHEGA
+    let gstAmount = 0;
+    let netPayableAmount = 0;
+
+    if (formData.invoiceType === "Cash Invoice") {
+      // ✅ Cash Invoice: Base Amount same, GST = 0, Total = Base Amount
+      gstAmount = 0;
+      netPayableAmount = totalBaseAmount;
+    } else {
+      // ✅ Tax Invoice: Base Amount same, GST calculate karo
+      const gstRate = 0.18;
+      gstAmount = Math.round(totalBaseAmount * gstRate);
+      netPayableAmount = totalBaseAmount + gstAmount;
+    }
 
     // Final amount ko bhi round karo
     const finalNetPayableAmount = Math.round(netPayableAmount);
@@ -1071,9 +1095,9 @@ const handleMergeSubmit = async (formData) => {
       passingYear: firstContract.passingYear,
       studentCount: totalStudentCount,
       perStudentCost: perStudentCost,
-      totalCost: totalBaseAmount,
+      totalCost: totalBaseAmount, // ✅ Total cost = Base amount (GST excluded)
       installment: selectedInstallmentForMerge.name,
-      baseAmount: totalBaseAmount,
+      baseAmount: totalBaseAmount, // ✅ BASE AMOUNT DONO CASES MEIN SAME
       gstAmount: gstAmount,
       netPayableAmount: finalNetPayableAmount,
       amountRaised: finalNetPayableAmount,
@@ -1092,7 +1116,7 @@ const handleMergeSubmit = async (formData) => {
       paymentDetails: [
         {
           ...selectedInstallmentForMerge,
-          baseAmount: totalBaseAmount,
+          baseAmount: totalBaseAmount, // ✅ Payment details mein bhi same base amount
           gstAmount: gstAmount,
           totalAmount: finalNetPayableAmount,
         },
@@ -1110,6 +1134,9 @@ const handleMergeSubmit = async (formData) => {
         studentCount: c.studentCount,
         gstNumber: c.gstNumber,
         gstType: c.gstType,
+        // ✅ Individual contract amounts bhi store karo reference ke liye
+        installmentAmount: calculateEMIAmount(c, selectedInstallmentForMerge.name),
+        baseAmount: Math.round(calculateEMIAmount(c, selectedInstallmentForMerge.name) / 1.18)
       })),
       individualProjectCodes: selectedContractsForMerge
         .map((c) => c.projectCode)
@@ -1127,7 +1154,15 @@ const handleMergeSubmit = async (formData) => {
     };
 
     setExistingInvoices((prev) => [...prev, newInvoice]);
-    alert(`Merged Invoice ${invoiceNumber} raised successfully!`);
+    
+    // ✅ Success message mein amounts clearly mention karo
+    alert(
+      `Merged Invoice ${invoiceNumber} raised successfully!\n` +
+      `Base Amount: ${formatCurrency(totalBaseAmount)}\n` +
+      `GST Amount: ${formatCurrency(gstAmount)}\n` +
+      `Final Amount: ${formatCurrency(finalNetPayableAmount)}\n` +
+      `Invoice Type: ${formData.invoiceType}`
+    );
 
     // Reset modal
     setShowMergeModal(false);
@@ -1525,19 +1560,17 @@ const handleMergeSubmit = async (formData) => {
                             <p className="text-xs font-medium text-gray-500 mb-0.5">
                               Generated Invoices
                             </p>
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 bg-gray-100 rounded-full h-3 shadow-inner border border-gray-200">
-                                <div
-                                  className="bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 h-3 rounded-full transition-all duration-500 ease-out shadow-sm relative overflow-hidden"
-                                  style={{ width: `${(generatedCount / totalInstallments) * 100}%` }}
-                                >
-                                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse"></div>
-                                </div>
-                              </div>
-                              <span className="text-xs text-gray-600 font-medium bg-gray-50 px-2 py-1 rounded-md border">
-                                {generatedCount}/{totalInstallments}
-                              </span>
-                            </div>
+                            <p className="text-sm text-gray-900">
+                              {contractInvoices.length > 0 ? (
+                                <span className="bg-blue-100 text-blue-800 text-xs font-semibold py-1 px-2 rounded">
+                                  {generatedCount}/{totalInstallments}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400">
+                                  0/{totalInstallments}
+                                </span>
+                              )}
+                            </p>
                           </div>
                         </div>
                         {/* Expanded Content */}
@@ -2000,7 +2033,7 @@ const handleMergeSubmit = async (formData) => {
                           <p className="text-xs font-medium text-gray-500 mb-0.5">
                             Generated Merged Invoices
                           </p>
-                          <div className="flex items-center gap-2">
+                          <p className="text-sm text-gray-900">
                             {(() => {
                               // Count total merged invoices for this group
                               const mergedInvoicesCount = existingInvoices.filter(inv => 
@@ -2011,25 +2044,18 @@ const handleMergeSubmit = async (formData) => {
                               ).length;
 
                               const totalPossible = mergedItem.installmentCount;
-                              const percentage = (mergedInvoicesCount / totalPossible) * 100;
 
-                              return (
-                                <>
-                                  <div className="flex-1 bg-gray-100 rounded-full h-3 shadow-inner border border-gray-200">
-                                    <div
-                                      className="bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 h-3 rounded-full transition-all duration-500 ease-out shadow-sm relative overflow-hidden"
-                                      style={{ width: `${percentage}%` }}
-                                    >
-                                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse"></div>
-                                    </div>
-                                  </div>
-                                  <span className="text-xs text-gray-600 font-medium bg-gray-50 px-2 py-1 rounded-md border">
-                                    {mergedInvoicesCount}/{totalPossible}
-                                  </span>
-                                </>
+                              return mergedInvoicesCount > 0 ? (
+                                <span className="bg-purple-100 text-purple-800 text-xs font-semibold py-1 px-2 rounded">
+                                  {mergedInvoicesCount}/{totalPossible}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400">
+                                  0/{totalPossible}
+                                </span>
                               );
                             })()}
-                          </div>
+                          </p>
                         </div>
                       </div>
 
@@ -2127,20 +2153,16 @@ const handleMergeSubmit = async (formData) => {
                                                 <div className="text-center">
                                                   <div
                                                     className={`font-semibold ${
-                                                      inv.invoiceType === "Tax Invoice"
+                                                      inv.invoiceType ===
+                                                      "Tax Invoice"
                                                         ? "text-green-600"
-                                                        : inv.invoiceType === "Cash Invoice"
-                                                        ? "text-purple-600"
                                                         : "text-blue-600"
                                                     }`}
                                                   >
-                                                    {inv.invoiceType === "Tax Invoice"
-                                                      ? "Tax"
-                                                      : inv.invoiceType === "Cash Invoice"
-                                                      ? "Cash"
-                                                      : inv.invoiceType === "Proforma Invoice"
+                                                    {inv.invoiceType ===
+                                                    "Proforma Invoice"
                                                       ? "Proforma"
-                                                      : inv.invoiceType}
+                                                      : "Tax"}
                                                     {isCancelled &&
                                                       inv.regenerated &&
                                                       " (Cancelled - Regenerated)"}
