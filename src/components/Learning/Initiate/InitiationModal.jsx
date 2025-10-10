@@ -805,6 +805,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
           // no assignments to write
         }
       } catch (assignmentErr) {
+        console.error("Error updating trainer assignments:", assignmentErr);
         // don't block main save; surface a console warning
       }
       // --- end trainerAssignments update ---
@@ -828,6 +829,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
         if (onClose) onClose();
       }, 1500);
     } catch (err) {
+      console.error("Failed to save phase data:", err);
       setError("Failed to save phase data. Please try again.");
       setLoading(false);
     }
@@ -1218,9 +1220,11 @@ function InitiationModal({ training, onClose, onConfirm }) {
           );
           if (!cancelled) setGlobalTrainerAssignments(filtered);
         } catch (err) {
+          console.error("Error processing trainer assignments snapshot:", err);
         }
       },
       (err) => {
+        console.error("Error in trainer assignments snapshot listener:", err);
       }
     );
 

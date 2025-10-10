@@ -26,7 +26,7 @@ function TrainerCalendarPDF({ bookings, selectedTrainer, selectedCollege, disabl
             contactNumber = data.contactNumber || contactNumber;
           }
         } catch (err) {
-
+          console.error("Error fetching contact details from localStorage:", err);
         }
       }
       const pdf = new jsPDF('portrait', 'mm', 'a4');

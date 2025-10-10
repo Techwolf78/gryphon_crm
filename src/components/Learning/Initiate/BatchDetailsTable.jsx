@@ -1358,7 +1358,11 @@ const BatchDetailsTable = ({
 
   const [expandedBatch, setExpandedBatch] = useState({});
   const [swapModal, setSwapModal] = useState({ open: false, source: null });
-  const [duplicateTrainers, setDuplicateTrainers] = useState([]);
+  const [swapConfirmationModal, setSwapConfirmationModal] = useState({ 
+    open: false, 
+    source: null, 
+    target: null 
+  });
 
   // ✅ 4. Memoize filtered trainers to prevent unnecessary re-filtering
 const filteredTrainers = useMemo(() => {
@@ -1408,100 +1412,6 @@ const filteredTrainers = useMemo(() => {
     },
     [courses, getSpecializationColors]
   );
-
-  // GLOBAL TRAINER AVAILABILITY CHECK
-  const isTrainerAvailable = (
-    trainerId,
-    date,
-    dayDuration,
-    excludeTrainerKey = null,
-    currentBatchKey = null
-  ) => {
-    // 1. Check current table (local)
-    for (let rowIdx = 0; rowIdx < table1Data.length; rowIdx++) {
-      const row = table1Data[rowIdx];
-      for (let batchIdx = 0; batchIdx < row.batches.length; batchIdx++) {
-        const batch = row.batches[batchIdx];
-        const batchKey = `${rowIdx}-${batchIdx}`;
-        if (currentBatchKey && batchKey === currentBatchKey) continue;
-        for (
-          let trainerIdx = 0;
-          trainerIdx < batch.trainers.length;
-          trainerIdx++
-        ) {
-          const trainer = batch.trainers[trainerIdx];
-          const currentKey = `${rowIdx}-${batchIdx}-${trainerIdx}`;
-          if (excludeTrainerKey === currentKey) continue;
-          if (
-            trainer.trainerId === trainerId &&
-            trainer.startDate &&
-            trainer.endDate
-          ) {
-            const startDateObj = new Date(trainer.startDate);
-            const endDateObj = new Date(trainer.endDate);
-            const dateObj = new Date(date);
-            if (
-              !isNaN(dateObj.getTime()) &&
-              !isNaN(startDateObj.getTime()) &&
-              !isNaN(endDateObj.getTime()) &&
-              dateObj >= startDateObj &&
-              dateObj <= endDateObj
-            ) {
-              // Conflict logic
-              if (
-                trainer.dayDuration === "AM & PM" ||
-                dayDuration === "AM & PM" ||
-                (trainer.dayDuration === "AM" && dayDuration === "AM") ||
-                (trainer.dayDuration === "PM" && dayDuration === "PM")
-              ) {
-                return false;
-              }
-            }
-          }
-        }
-      }
-    }
-    // 2. Check global assignments
-    const normalizeDate = (d) => {
-      if (!d) return null;
-      const dt = new Date(d);
-      if (isNaN(dt.getTime())) return null;
-      return dt.toISOString().slice(0, 10);
-    };
-
-    for (let assignment of globalTrainerAssignments) {
-      if (assignment.trainerId !== trainerId) continue;
-
-      // Build list of dates for the assignment (supports single date or range)
-      let assignDates = [];
-      if (assignment.date) {
-        const d = normalizeDate(assignment.date);
-        if (d) assignDates.push(d);
-      } else if (assignment.startDate && assignment.endDate) {
-        const list = getDateList(
-          assignment.startDate,
-          assignment.endDate
-        );
-        assignDates = list.map((dd) => normalizeDate(dd)).filter(Boolean);
-      }
-
-      const dateNorm = normalizeDate(date);
-      if (!dateNorm) continue;
-
-      if (assignDates.includes(dateNorm)) {
-        const ad = assignment.dayDuration;
-        if (
-          ad === "AM & PM" ||
-          dayDuration === "AM & PM" ||
-          (ad === "AM" && dayDuration === "AM") ||
-          (ad === "PM" && dayDuration === "PM")
-        ) {
-          return false;
-        }
-      }
-    }
-    return true;
-  };
   const refetchTrainers = useCallback(async () => {
     try {
       const querySnapshot = await getDocs(collection(db, "trainers"));
@@ -1511,7 +1421,7 @@ const filteredTrainers = useMemo(() => {
       });
       setTrainers(trainerList);
     } catch (error) {
-
+      console.error("Error fetching trainers:", error);
     }
   }, []);
 
@@ -1840,7 +1750,6 @@ const filteredTrainers = useMemo(() => {
 
       const hasConflict = batch.trainers.some((t, idx) => {
         if (idx === trainerIdx) return false;
-        if (t.dayDuration !== tempTrainer.dayDuration) return false;
 
         const existingDates =
           t.activeDates || getDateList(t.startDate, t.endDate);
@@ -1848,9 +1757,18 @@ const filteredTrainers = useMemo(() => {
           .map(normalizeDate)
           .filter((date) => date !== null);
 
-        return newTrainerDatesNormalized.some((date) =>
+        const overlap = newTrainerDatesNormalized.some((date) =>
           existingDatesNormalized.includes(date)
         );
+
+        if (!overlap) return false;
+
+        // Conflict if same duration or if AM & PM is involved (blocks everything)
+        if (t.dayDuration === tempTrainer.dayDuration) return true;
+        if (t.dayDuration === "AM & PM" || tempTrainer.dayDuration === "AM & PM") return true;
+
+        // Allow AM and PM together
+        return false;
       });
 
       if (hasConflict) {
@@ -1965,8 +1883,17 @@ const filteredTrainers = useMemo(() => {
 
   const getDateList = useCallback((start, end) => {
     if (!start || !end) return [];
-    const startDate = new Date(start);
-    const endDate = new Date(end);
+    const parseDate = (d) => {
+      if (!d) return null;
+      const parts = d.split('-');
+      if (parts.length !== 3) return null;
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      return new Date(year, month, day);
+    };
+    const startDate = parseDate(start);
+    const endDate = parseDate(end);
 
     // Validate dates
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return [];
@@ -1994,6 +1921,119 @@ const filteredTrainers = useMemo(() => {
     }
     return dates;
   }, [excludeDays]);
+
+  // GLOBAL TRAINER AVAILABILITY CHECK
+  const isTrainerAvailable = useCallback((
+    trainerId,
+    date,
+    dayDuration,
+    excludeTrainerKey = null,
+    currentBatchKey = null
+  ) => {
+    // 1. Check current table (local)
+    for (let rowIdx = 0; rowIdx < table1Data.length; rowIdx++) {
+      const row = table1Data[rowIdx];
+      for (let batchIdx = 0; batchIdx < row.batches.length; batchIdx++) {
+        const batch = row.batches[batchIdx];
+        const batchKey = `${rowIdx}-${batchIdx}`;
+        if (currentBatchKey && batchKey === currentBatchKey) continue;
+        for (
+          let trainerIdx = 0;
+          trainerIdx < batch.trainers.length;
+          trainerIdx++
+        ) {
+          const trainer = batch.trainers[trainerIdx];
+          const currentKey = `${rowIdx}-${batchIdx}-${trainerIdx}`;
+          if (excludeTrainerKey === currentKey) continue;
+          if (
+            trainer.trainerId === trainerId &&
+            trainer.startDate &&
+            trainer.endDate
+          ) {
+            const parseDate = (d) => {
+              if (!d) return null;
+              const parts = d.split('-');
+              if (parts.length !== 3) return null;
+              const year = parseInt(parts[0], 10);
+              const month = parseInt(parts[1], 10) - 1;
+              const day = parseInt(parts[2], 10);
+              return new Date(year, month, day);
+            };
+            const startDateObj = parseDate(trainer.startDate);
+            const endDateObj = parseDate(trainer.endDate);
+            const dateObj = date instanceof Date ? date : parseDate(date);
+            if (
+              startDateObj && endDateObj && dateObj &&
+              dateObj >= startDateObj &&
+              dateObj <= endDateObj
+            ) {
+              // Conflict logic
+              if (
+                trainer.dayDuration === "AM & PM" ||
+                dayDuration === "AM & PM" ||
+                (trainer.dayDuration === "AM" && dayDuration === "AM") ||
+                (trainer.dayDuration === "PM" && dayDuration === "PM")
+              ) {
+                return false;
+              }
+            }
+          }
+        }
+      }
+    }
+    // 2. Check global assignments
+    const normalizeDate = (d) => {
+      if (!d) return null;
+      if (d instanceof Date) {
+        if (isNaN(d.getTime())) return null;
+        return d.toISOString().slice(0, 10);
+      }
+      if (typeof d === 'string') {
+        const parts = d.split('-');
+        if (parts.length !== 3) return null;
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const day = parseInt(parts[2], 10);
+        const dateObj = new Date(year, month, day);
+        if (isNaN(dateObj.getTime())) return null;
+        return dateObj.toISOString().slice(0, 10);
+      }
+      return null;
+    };
+
+    for (let assignment of globalTrainerAssignments) {
+      if (assignment.trainerId !== trainerId) continue;
+
+      // Build list of dates for the assignment (supports single date or range)
+      let assignDates = [];
+      if (assignment.date) {
+        const d = normalizeDate(assignment.date);
+        if (d) assignDates.push(d);
+      } else if (assignment.startDate && assignment.endDate) {
+        const list = getDateList(
+          assignment.startDate,
+          assignment.endDate
+        );
+        assignDates = list.map((dd) => normalizeDate(dd)).filter(Boolean);
+      }
+
+      const dateNorm = normalizeDate(date);
+      if (!dateNorm) continue;
+
+      if (assignDates.includes(dateNorm)) {
+        const ad = assignment.dayDuration;
+        if (
+          ad === "AM & PM" ||
+          dayDuration === "AM & PM" ||
+          (ad === "AM" && dayDuration === "AM") ||
+          (ad === "PM" && dayDuration === "PM")
+        ) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }, [table1Data, globalTrainerAssignments, getDateList]);
 
   const toggleBatchExpansion = (rowIndex) => {
     setExpandedBatch((prev) => ({
@@ -2041,7 +2081,107 @@ const filteredTrainers = useMemo(() => {
   };
 
   const openSwapModal = (rowIdx, batchIdx, trainerIdx) => {
-    setSwapModal({ open: true, source: { rowIdx, batchIdx, trainerIdx } });
+    const sourceTrainerData = table1Data[rowIdx]?.batches[batchIdx]?.trainers[trainerIdx];
+    setSwapModal({ open: true, source: { rowIdx, batchIdx, trainerIdx }, sourceTrainerData });
+  };
+
+  const performSwap = () => {
+    const { source, target, sourceTrainerData, targetTrainerData, sourceNewTimeSlot, targetNewTimeSlot } = swapConfirmationModal;
+
+    // Check if this is a same-batch swap
+    const isSameBatch = source.rowIdx === target.rowIdx && source.batchIdx === target.batchIdx;
+
+    if (onSwapTrainer) {
+      try {
+        onSwapTrainer({
+          domain: selectedDomain, // ✅ ADD: Pass current domain context
+          source: {
+            ...source,
+            trainerData: sourceTrainerData,
+            newTimeSlot: sourceNewTimeSlot,
+            targetBatch: {
+              rowIdx: target.rowIdx,
+              batchIdx: target.batchIdx,
+              batchCode:
+                table1Data[target.rowIdx]?.batches[target.batchIdx]?.batchCode,
+              specialization: table1Data[target.rowIdx]?.batch,
+            },
+          },
+          target: {
+            ...target,
+            trainerData: targetTrainerData,
+            newTimeSlot: targetNewTimeSlot,
+            targetBatch: {
+              rowIdx: source.rowIdx,
+              batchIdx: source.batchIdx,
+              batchCode:
+                table1Data[source.rowIdx]?.batches[source.batchIdx]?.batchCode,
+              specialization: table1Data[source.rowIdx]?.batch,
+            },
+          },
+        });
+      } catch (error) {
+        alert("Error occurred during swap: " + error.message);
+        return;
+      }
+    } else {
+      // Fallback: perform swap locally
+      const updatedData = [...table1Data];
+
+      if (isSameBatch) {
+        // SAME-BATCH SWAP: Exchange dates and time slots within the same batch
+        const batch = updatedData[source.rowIdx].batches[source.batchIdx];
+        const sourceIdx = source.trainerIdx;
+        const targetIdx = target.trainerIdx;
+
+        // Exchange dates and time slots
+        const tempStartDate = batch.trainers[sourceIdx].startDate;
+        const tempEndDate = batch.trainers[sourceIdx].endDate;
+
+        batch.trainers[sourceIdx] = {
+          ...batch.trainers[sourceIdx],
+          startDate: batch.trainers[targetIdx].startDate,
+          endDate: batch.trainers[targetIdx].endDate,
+          dayDuration: sourceNewTimeSlot,
+        };
+
+        batch.trainers[targetIdx] = {
+          ...batch.trainers[targetIdx],
+          startDate: tempStartDate,
+          endDate: tempEndDate,
+          dayDuration: targetNewTimeSlot,
+        };
+      } else {
+        // CROSS-BATCH SWAP: Move trainers between batches
+        // Create new trainer objects for cross-batch placement
+        const sourceNewTrainer = {
+          ...sourceTrainerData,
+          dayDuration: sourceNewTimeSlot,
+        };
+
+        const targetNewTrainer = {
+          ...targetTrainerData,
+          dayDuration: targetNewTimeSlot,
+        };
+
+        // CROSS-BATCH SWAP: Add source trainer to target batch, target trainer to source batch
+        updatedData[target.rowIdx].batches[target.batchIdx].trainers.push(
+          sourceNewTrainer
+        );
+        updatedData[source.rowIdx].batches[source.batchIdx].trainers.push(
+          targetNewTrainer
+        );
+      }
+
+      setTable1Data(updatedData);
+    }
+
+    closeSwapConfirmationModal();
+    closeSwapModal();
+  };
+
+  const closeSwapConfirmationModal = () => {
+    setSwapConfirmationModal({ open: false, source: null, target: null });
   };
 
   const closeSwapModal = () => {
@@ -2116,110 +2256,62 @@ const filteredTrainers = useMemo(() => {
 
     // Check availability in the TARGET batches (cross-swap)
     // Check if source trainer can be added to TARGET batch in new time slot
-    const sourceAvailableInTargetBatch = isTrainerAvailable(
-      sourceTrainerData.trainerId,
-      sourceTrainerData.startDate,
-      sourceNewTimeSlot,
-      `${source.rowIdx}-${source.batchIdx}-${source.trainerIdx}`,
-      `${target.rowIdx}-${target.batchIdx}` // Check target batch
-    );
+    const sourceDates = getDateList(sourceTrainerData.startDate, sourceTrainerData.endDate);
+    let sourceAvailableInTargetBatch = true;
+    for (let date of sourceDates) {
+      if (!isTrainerAvailable(
+        sourceTrainerData.trainerId,
+        date,
+        sourceNewTimeSlot,
+        `${source.rowIdx}-${source.batchIdx}-${source.trainerIdx}`,
+        `${target.rowIdx}-${target.batchIdx}`
+      )) {
+        sourceAvailableInTargetBatch = false;
+        break;
+      }
+    }
 
     // Check if target trainer can be added to SOURCE batch in new time slot
-    const targetAvailableInSourceBatch = isTrainerAvailable(
-      targetTrainerData.trainerId,
-      targetTrainerData.startDate,
-      targetNewTimeSlot,
-      `${target.rowIdx}-${target.batchIdx}-${target.trainerIdx}`,
-      `${source.rowIdx}-${source.batchIdx}` // Check source batch
-    );
+    const targetDates = getDateList(targetTrainerData.startDate, targetTrainerData.endDate);
+    let targetAvailableInSourceBatch = true;
+    for (let date of targetDates) {
+      if (!isTrainerAvailable(
+        targetTrainerData.trainerId,
+        date,
+        targetNewTimeSlot,
+        `${target.rowIdx}-${target.batchIdx}-${target.trainerIdx}`,
+        `${source.rowIdx}-${source.batchIdx}`
+      )) {
+        targetAvailableInSourceBatch = false;
+        break;
+      }
+    }
 
     if (!sourceAvailableInTargetBatch || !targetAvailableInSourceBatch) {
       alert(
         `Cannot perform cross-batch swap due to scheduling conflicts:\n` +
-          `${
-            !sourceAvailableInTargetBatch
-              ? `• ${
-                  sourceTrainerData.trainerName
-                } is not available for ${sourceNewTimeSlot} slot in ${
-                  table1Data[target.rowIdx]?.batch
-                } batch\n`
-              : ""
+          `${!sourceAvailableInTargetBatch
+            ? `• ${sourceTrainerData.trainerName} is not available for ${sourceNewTimeSlot} slot in ${table1Data[target.rowIdx]?.batch} batch\n`
+            : ""
           }` +
-          `${
-            !targetAvailableInSourceBatch
-              ? `• ${
-                  targetTrainerData.trainerName
-                } is not available for ${targetNewTimeSlot} slot in ${
-                  table1Data[source.rowIdx]?.batch
-                } batch`
-              : ""
+          `${!targetAvailableInSourceBatch
+            ? `• ${targetTrainerData.trainerName} is not available for ${targetNewTimeSlot} slot in ${table1Data[source.rowIdx]?.batch} batch`
+            : ""
           }`
       );
       return;
     }
 
-    if (onSwapTrainer) {
-      try {
-        onSwapTrainer({
-          domain: selectedDomain, // ✅ ADD: Pass current domain context
-          source: {
-            ...swapModal.source,
-            trainerData: sourceTrainerData,
-            newTimeSlot: sourceNewTimeSlot,
-            targetBatch: {
-              rowIdx: target.rowIdx,
-              batchIdx: target.batchIdx,
-              batchCode:
-                table1Data[target.rowIdx]?.batches[target.batchIdx]?.batchCode,
-              specialization: table1Data[target.rowIdx]?.batch,
-            },
-          },
-          target: {
-            ...target,
-            trainerData: targetTrainerData,
-            newTimeSlot: targetNewTimeSlot,
-            targetBatch: {
-              rowIdx: source.rowIdx,
-              batchIdx: source.batchIdx,
-              batchCode:
-                table1Data[source.rowIdx]?.batches[source.batchIdx]?.batchCode,
-              specialization: table1Data[source.rowIdx]?.batch,
-            },
-          },
-        });
-      } catch (error) {
-
-        alert("Error occurred during swap: " + error.message);
-        return;
-      }
-    } else {
-      // Fallback: perform cross-batch swap locally
-
-      const updatedData = [...table1Data];
-
-      // Create new trainer objects for cross-batch placement
-      const sourceNewTrainer = {
-        ...sourceTrainerData,
-        dayDuration: sourceNewTimeSlot,
-      };
-
-      const targetNewTrainer = {
-        ...targetTrainerData,
-        dayDuration: targetNewTimeSlot,
-      };
-
-      // CROSS-BATCH SWAP: Add source trainer to target batch, target trainer to source batch
-      updatedData[target.rowIdx].batches[target.batchIdx].trainers.push(
-        sourceNewTrainer
-      );
-      updatedData[source.rowIdx].batches[source.batchIdx].trainers.push(
-        targetNewTrainer
-      );
-
-      setTable1Data(updatedData);
-    }
-
-    closeSwapModal();
+    // Open confirmation modal instead of directly swapping
+    setSwapConfirmationModal({
+      open: true,
+      source: swapModal.source,
+      target: target,
+      sourceTrainerData,
+      targetTrainerData,
+      sourceNewTimeSlot,
+      targetNewTimeSlot,
+    });
   };
 
   // Update the getAMTrainers function to include duration information
@@ -2268,15 +2360,8 @@ const filteredTrainers = useMemo(() => {
             trainer.endDate
           );
 
-          // Only include trainers with matching duration and opposite time slot potential
-          const canSwap =
-            ((trainer.dayDuration === "AM" &&
-              sourceTrainer.dayDuration === "AM") ||
-              (trainer.dayDuration === "PM" &&
-                sourceTrainer.dayDuration === "PM")) &&
-            trainerDuration === sourceDuration;
-
-          if (canSwap) {
+          // Only include trainers with matching duration and same dayDuration
+          if (trainer.dayDuration === sourceTrainer.dayDuration && trainerDuration === sourceDuration) {
             list.push({
               rowIdx,
               batchIdx,
@@ -2426,7 +2511,8 @@ const filteredTrainers = useMemo(() => {
         const { collectionPath: _collectionPath, docIdField: _docIdField } =
           mergeFirestoreConfig;
         // Implement revert logic here if needed. _collectionPath/_docIdField are preserved for future use.
-      } catch (err) {
+      } catch {
+        // Ignore errors in revert logic for now
       }
     }
   };
@@ -2448,9 +2534,21 @@ const filteredTrainers = useMemo(() => {
 
     const normalizeDate = (d) => {
       if (!d) return null;
-      const dateObj = new Date(d);
-      if (isNaN(dateObj.getTime())) return null;
-      return dateObj.toISOString().slice(0, 10);
+      if (d instanceof Date) {
+        if (isNaN(d.getTime())) return null;
+        return d.toISOString().slice(0, 10);
+      }
+      if (typeof d === 'string') {
+        const parts = d.split('-');
+        if (parts.length !== 3) return null;
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const day = parseInt(parts[2], 10);
+        const dateObj = new Date(year, month, day);
+        if (isNaN(dateObj.getTime())) return null;
+        return dateObj.toISOString().slice(0, 10);
+      }
+      return null;
     };
 
     table1Data.forEach((row, rowIndex) => {
@@ -2480,7 +2578,7 @@ const filteredTrainers = useMemo(() => {
           const trainerKey = `${rowIndex}-${batchIndex}-${trainerIdx}`;
 
           dates.forEach((dateISO) => {
-            const keyBase = `${trainer.trainerId}-${dateISO}`;
+            const keyBase = `${rowIndex}-${batchIndex}-${dateISO}-${trainer.dayDuration}`;
 
             if (trainerMap.has(keyBase)) {
               const existing = trainerMap.get(keyBase);
@@ -2488,24 +2586,18 @@ const filteredTrainers = useMemo(() => {
               // If the existing entry is the same trainer instance (same key), skip
               if (existingKey === trainerKey) return;
               
-              // Check time slot overlap
-              const conflict =
-                trainer.dayDuration === "AM & PM" ||
-                existing.dayDuration === "AM & PM" ||
-                (trainer.dayDuration === "AM" &&
-                  existing.dayDuration === "AM") ||
-                (trainer.dayDuration === "PM" && existing.dayDuration === "PM");
+              // If it's the same trainer (multiple instances allowed), skip
+              if (existing.trainerId === trainer.trainerId) return;
+              
+              // Check time slot overlap - conflict if multiple trainers assigned to same slot in same batch
+              const conflict = true; // Any overlap in same batch/date/time slot is a conflict
 
               if (conflict) {
                 duplicatesSet.add(existingKey);
                 duplicatesSet.add(trainerKey);
 
                 // add a readable error for this conflict (grouped by trainer/date)
-                const message = `${trainer.trainerName || trainer.trainerId} (${
-                  trainer.trainerId
-                }) has conflicting assignment on ${dateISO} for slot ${
-                  trainer.dayDuration || existing.dayDuration
-                }`;
+                const message = `${trainer.trainerName || trainer.trainerId} (${trainer.trainerId}) has conflicting assignment on ${dateISO} for slot ${trainer.dayDuration} in batch ${batch.batchCode}`;
                 errors.push({ message });
                 // Debug log to help track false positives
               }
@@ -2513,13 +2605,14 @@ const filteredTrainers = useMemo(() => {
               trainerMap.set(keyBase, {
                 trainerKey,
                 dayDuration: trainer.dayDuration,
+                trainerId: trainer.trainerId,
               });
             }
 
             // Check global assignments (normalize their date too)
             for (let assignment of globalTrainerAssignments) {
               // Skip assignments from the current training project
-              if (assignment.sourceTrainingId === training?.projectCode) {
+              if (assignment.sourceTrainingId === training?.id) {
                 continue;
               }
               
@@ -2532,10 +2625,8 @@ const filteredTrainers = useMemo(() => {
                 const globalConflict =
                   assignment.dayDuration === "AM & PM" ||
                   trainer.dayDuration === "AM & PM" ||
-                  (assignment.dayDuration === "AM" &&
-                    trainer.dayDuration === "AM") ||
-                  (assignment.dayDuration === "PM" &&
-                    trainer.dayDuration === "PM");
+                  (assignment.dayDuration === "AM" && trainer.dayDuration === "AM") ||
+                  (assignment.dayDuration === "PM" && trainer.dayDuration === "PM");
                 if (globalConflict) {
                   duplicatesSet.add(trainerKey);
 
@@ -2582,10 +2673,8 @@ const filteredTrainers = useMemo(() => {
                 const currentTrainingConflict =
                   assignment.dayDuration === "AM & PM" ||
                   trainer.dayDuration === "AM & PM" ||
-                  (assignment.dayDuration === "AM" &&
-                    trainer.dayDuration === "AM") ||
-                  (assignment.dayDuration === "PM" &&
-                    trainer.dayDuration === "PM");
+                  (assignment.dayDuration === "AM" && trainer.dayDuration === "AM") ||
+                  (assignment.dayDuration === "PM" && trainer.dayDuration === "PM");
                 if (currentTrainingConflict) {
                   duplicatesSet.add(trainerKey);
 
@@ -2630,22 +2719,237 @@ const filteredTrainers = useMemo(() => {
       new Map(errors.map((e) => [e.message, e])).values()
     );
 
+    // Check for unavailable trainers
+    let hasUnavailableTrainers = false;
+    table1Data.forEach((row, rowIndex) => {
+      row.batches?.forEach((batch, batchIndex) => {
+        batch.trainers?.forEach((trainer, trainerIdx) => {
+          if (!trainer.trainerId) return;
+
+          const dates = trainer.activeDates && trainer.activeDates.length > 0
+            ? trainer.activeDates
+            : trainer.startDate && trainer.endDate
+            ? getDateList(trainer.startDate, trainer.endDate)
+            : trainer.startDate
+            ? [trainer.startDate]
+            : [];
+
+          for (let date of dates) {
+            if (!isTrainerAvailable(trainer.trainerId, date, trainer.dayDuration, `${rowIndex}-${batchIndex}-${trainerIdx}`, `${rowIndex}-${batchIndex}`)) {
+              hasUnavailableTrainers = true;
+              break;
+            }
+          }
+        });
+      });
+    });
+
+    if (hasUnavailableTrainers) {
+      uniqueErrors.push({ message: "Some selected trainers are already booked and unavailable for the assigned dates. Please select different trainers." });
+    }
+
     return {
-      hasErrors: duplicates.length > 0,
+      hasErrors: duplicates.length > 0 || hasUnavailableTrainers,
       errors: uniqueErrors,
       duplicates: duplicates,
     };
-  }, [table1Data, globalTrainerAssignments, currentTrainingAssignments, getDateList, training]);
+  }, [table1Data, globalTrainerAssignments, currentTrainingAssignments, getDateList, training, isTrainerAvailable]);
 
-  // Update duplicate trainers and notify parent when validation result changes
-  useEffect(() => {
-    setDuplicateTrainers(validationResult.duplicates);
+  const { duplicates: duplicateTrainers } = validationResult;
 
-    // Notify parent component about validation status using the shape expected by InitiationModal
-    if (onValidationChange) {
-      onValidationChange(selectedDomain, validationResult);
+  // Check for duplicates after swap
+  const checkPostSwapDuplicates = useCallback(() => {
+    if (!swapConfirmationModal.source || !swapConfirmationModal.target) {
+      console.log('checkPostSwapDuplicates: No source or target, returning empty set');
+      return new Set();
     }
-  }, [validationResult, selectedDomain, onValidationChange]);
+
+    console.log('checkPostSwapDuplicates: Starting duplicate check', {
+      source: swapConfirmationModal.source,
+      target: swapConfirmationModal.target,
+      sourceTrainerData: swapConfirmationModal.sourceTrainerData,
+      targetTrainerData: swapConfirmationModal.targetTrainerData
+    });
+
+    const normalizeDate = (d) => {
+      if (!d) return null;
+      if (d instanceof Date) {
+        if (isNaN(d.getTime())) return null;
+        return d.toISOString().slice(0, 10);
+      }
+      if (typeof d === 'string') {
+        const parts = d.split('-');
+        if (parts.length !== 3) return null;
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const day = parseInt(parts[2], 10);
+        const dateObj = new Date(year, month, day);
+        if (isNaN(dateObj.getTime())) return null;
+        return dateObj.toISOString().slice(0, 10);
+      }
+      return null;
+    };
+
+    // Create simulated post-swap table data
+    const simulatedData = table1Data.map((row, rowIdx) => ({
+      ...row,
+      batches: row.batches.map((batch, batchIdx) => {
+        const newTrainers = [...batch.trainers];
+
+        // Check if this is a same-batch swap
+        const isSameBatch = swapConfirmationModal.source?.rowIdx === swapConfirmationModal.target?.rowIdx &&
+                           swapConfirmationModal.source?.batchIdx === swapConfirmationModal.target?.batchIdx;
+
+        if (isSameBatch && rowIdx === swapConfirmationModal.source.rowIdx && batchIdx === swapConfirmationModal.source.batchIdx) {
+          // SAME-BATCH SWAP: Exchange dates and time slots within the same batch
+          const sourceIdx = swapConfirmationModal.source.trainerIdx;
+          const targetIdx = swapConfirmationModal.target.trainerIdx;
+
+          // Exchange dates and time slots
+          const tempStartDate = newTrainers[sourceIdx].startDate;
+          const tempEndDate = newTrainers[sourceIdx].endDate;
+
+          newTrainers[sourceIdx] = {
+            ...newTrainers[sourceIdx],
+            startDate: newTrainers[targetIdx].startDate,
+            endDate: newTrainers[targetIdx].endDate,
+            dayDuration: swapConfirmationModal.sourceNewTimeSlot,
+          };
+
+          newTrainers[targetIdx] = {
+            ...newTrainers[targetIdx],
+            startDate: tempStartDate,
+            endDate: tempEndDate,
+            dayDuration: swapConfirmationModal.targetNewTimeSlot,
+          };
+        } else {
+          // CROSS-BATCH SWAP: Move trainers between batches
+          // Find and update the source trainer (moves to target batch)
+          if (rowIdx === swapConfirmationModal.source.rowIdx && batchIdx === swapConfirmationModal.source.batchIdx) {
+            // Remove source trainer from source batch
+            newTrainers.splice(swapConfirmationModal.source.trainerIdx, 1);
+          }
+
+          // Find and update the target trainer (moves to source batch)
+          if (rowIdx === swapConfirmationModal.target.rowIdx && batchIdx === swapConfirmationModal.target.batchIdx) {
+            // Remove target trainer from target batch
+            newTrainers.splice(swapConfirmationModal.target.trainerIdx, 1);
+          }
+
+          // Add source trainer to target batch
+          if (rowIdx === swapConfirmationModal.target.rowIdx && batchIdx === swapConfirmationModal.target.batchIdx) {
+            newTrainers.push({
+              ...swapConfirmationModal.sourceTrainerData,
+              dayDuration: swapConfirmationModal.sourceNewTimeSlot
+            });
+          }
+
+          // Add target trainer to source batch
+          if (rowIdx === swapConfirmationModal.source.rowIdx && batchIdx === swapConfirmationModal.source.batchIdx) {
+            newTrainers.push({
+              ...swapConfirmationModal.targetTrainerData,
+              dayDuration: swapConfirmationModal.targetNewTimeSlot
+            });
+          }
+        }
+
+        return {
+          ...batch,
+          trainers: newTrainers
+        };
+      })
+    }));
+
+    console.log('checkPostSwapDuplicates: Simulated post-swap data:', simulatedData);
+
+    // Check for duplicate trainer entries in the same batch (same trainer appearing multiple times in same batch)
+    const duplicatesSet = new Set();
+    const batchTrainerCount = new Map();
+    simulatedData.forEach((row, rowIndex) => {
+      row.batches?.forEach((batch, batchIndex) => {
+        batch.trainers?.forEach((trainer, trainerIdx) => {
+          if (trainer.trainerId) {
+            const batchKey = `${rowIndex}-${batchIndex}`;
+            if (!batchTrainerCount.has(batchKey)) {
+              batchTrainerCount.set(batchKey, new Set());
+            }
+            const trainerSet = batchTrainerCount.get(batchKey);
+            
+            if (trainerSet.has(trainer.trainerId)) {
+              // Same trainer appears multiple times in the same batch
+              console.log(`checkPostSwapDuplicates: DUPLICATE DETECTED - ${trainer.trainerName} (${trainer.trainerId}) appears multiple times in batch ${batch.batchCode}`);
+              duplicatesSet.add(`${rowIndex}-${batchIndex}-${trainerIdx}`);
+            } else {
+              trainerSet.add(trainer.trainerId);
+            }
+          }
+        });
+      });
+    });
+
+    // Check for duplicates in simulated data
+    const trainerMap = new Map();
+
+    console.log('checkPostSwapDuplicates: Simulated data created', simulatedData);
+
+    simulatedData.forEach((row, rowIndex) => {
+      row.batches?.forEach((batch, batchIndex) => {
+        batch.trainers?.forEach((trainer, trainerIdx) => {
+          if (!trainer.trainerId) return;
+
+          // Build list of normalized active dates for this trainer
+          let dates = [];
+          if (trainer.activeDates && trainer.activeDates.length > 0) {
+            dates = trainer.activeDates
+              .map((dd) => normalizeDate(dd))
+              .filter(Boolean);
+          } else if (trainer.startDate && trainer.endDate) {
+            const generated = getDateList(
+              trainer.startDate,
+              trainer.endDate
+            );
+            dates = generated.map((dd) => normalizeDate(dd)).filter(Boolean);
+          } else if (trainer.startDate) {
+            const single = normalizeDate(trainer.startDate);
+            if (single) dates = [single];
+          }
+
+          if (dates.length === 0) return;
+
+          const trainerKey = `${rowIndex}-${batchIndex}-${trainerIdx}`;
+
+          console.log(`checkPostSwapDuplicates: Processing trainer ${trainer.trainerName} (${trainer.trainerId}) on dates:`, dates, 'with duration:', trainer.dayDuration);
+
+          dates.forEach((dateISO) => {
+            const keyBase = `${rowIndex}-${batchIndex}-${dateISO}-${trainer.dayDuration}`;
+
+            if (trainerMap.has(keyBase)) {
+              const existing = trainerMap.get(keyBase);
+              const existingKey = existing.trainerKey;
+              if (existingKey === trainerKey) return;
+              
+              // If it's the same trainer (multiple instances allowed), skip
+              if (existing.trainerId === trainer.trainerId) return;
+              
+              // Conflict detected - multiple trainers assigned to same date/time slot in same batch
+              console.log(`checkPostSwapDuplicates: CONFLICT DETECTED for ${trainer.trainerId} on ${dateISO} ${trainer.dayDuration} in batch ${batch.batchCode} - another trainer already assigned`);
+              duplicatesSet.add(existingKey);
+              duplicatesSet.add(trainerKey);
+            } else {
+              trainerMap.set(keyBase, {
+                trainerKey,
+                dayDuration: trainer.dayDuration,
+                trainerId: trainer.trainerId,
+              });
+            }
+          });
+        });
+      });
+    });
+
+    console.log('checkPostSwapDuplicates: Final duplicates set:', duplicatesSet);
+    return duplicatesSet;
+  }, [swapConfirmationModal, table1Data, getDateList]);
 
 
 
@@ -2962,8 +3266,8 @@ const filteredTrainers = useMemo(() => {
 
       {/* Swap Modal */}
       {swapModal.open && (
-        <div className="fixed inset-0 z-54 flex items-center justify-center bg-black bg-opacity-30">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-3xl">
+        <div className="fixed inset-0 z-54 flex items-center justify-center bg-transparent backdrop-blur-md bg-opacity-30 min-h-screen">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
               Select Trainer to Swap Batches With
             </h3>
@@ -2980,7 +3284,7 @@ const filteredTrainers = useMemo(() => {
               </p>
             </div>
             <ul className="mb-4 max-h-96 overflow-y-auto">
-              {getAMTrainers().map((t, idx) => {
+              {getAMTrainers().filter(t => t.trainerId !== swapModal.sourceTrainerData?.trainerId).map((t, idx) => {
                 return (
                   <li
                     key={idx}
@@ -3013,6 +3317,7 @@ const filteredTrainers = useMemo(() => {
                       </div>
                     </div>
                     <button
+                      type="button"
                       className="ml-4 px-3 py-1 bg-indigo-600 text-white rounded text-sm whitespace-nowrap hover:bg-indigo-700 transition-colors"
                       onClick={() => handleSwap(t)}
                     >
@@ -3035,11 +3340,389 @@ const filteredTrainers = useMemo(() => {
             </ul>
             <div className="flex justify-end">
               <button
+                type="button"
                 className="mt-2 px-4 py-2 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
                 onClick={closeSwapModal}
               >
                 Cancel
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Swap Confirmation Modal */}
+      {swapConfirmationModal.open && (
+        <div className="fixed inset-0 z-55 flex items-center justify-center bg-transparent backdrop-blur-md min-h-screen bg-opacity-30">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Confirm Time Slot Swap
+            </h3>
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-sm text-amber-800">
+                <strong>Review the changes below before confirming:</strong>
+                <br />• This will swap both trainers and their time slots between batches
+                <br />• Both trainers must be available in their new assignments
+              </p>
+            </div>
+
+            {/* Current Assignments */}
+            <div className="mb-4">
+              <h4 className="text-sm font-medium text-gray-900 mb-2">Current Assignments</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {/* Source Trainer Current Assignment */}
+                <div className="border border-gray-200 rounded-md p-2 bg-red-50">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-medium text-red-800 text-xs truncate">
+                      {swapConfirmationModal.sourceTrainerData?.trainerName} ({swapConfirmationModal.sourceTrainerData?.trainerId})
+                    </span>
+                    <span className="text-xs bg-red-100 text-red-800 px-1.5 py-0.5 rounded text-xs">
+                      Current: {swapConfirmationModal.sourceTrainerData?.dayDuration}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-600 space-y-0.5">
+                    <div>Batch: {table1Data[swapConfirmationModal.source?.rowIdx]?.batches[swapConfirmationModal.source?.batchIdx]?.batchCode}</div>
+                    <div>Specialization: {table1Data[swapConfirmationModal.source?.rowIdx]?.batch}</div>
+                    <div>Dates: {swapConfirmationModal.sourceTrainerData?.startDate} to {swapConfirmationModal.sourceTrainerData?.endDate}</div>
+                  </div>
+                </div>
+
+                {/* Target Trainer Current Assignment */}
+                <div className="border border-gray-200 rounded-md p-2 bg-blue-50">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-medium text-blue-800 text-xs truncate">
+                      {swapConfirmationModal.targetTrainerData?.trainerName} ({swapConfirmationModal.targetTrainerData?.trainerId})
+                    </span>
+                    <span className="text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded text-xs">
+                      Current: {swapConfirmationModal.targetTrainerData?.dayDuration}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-600 space-y-0.5">
+                    <div>Batch: {table1Data[swapConfirmationModal.target?.rowIdx]?.batches[swapConfirmationModal.target?.batchIdx]?.batchCode}</div>
+                    <div>Specialization: {table1Data[swapConfirmationModal.target?.rowIdx]?.batch}</div>
+                    <div>Dates: {swapConfirmationModal.targetTrainerData?.startDate} to {swapConfirmationModal.targetTrainerData?.endDate}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Arrow indicating swap */}
+            <div className="flex justify-center items-center mb-6">
+              <div className="flex items-center space-x-4">
+                <div className="w-16 h-0.5 bg-gray-300"></div>
+                <div className="text-2xl text-gray-400">↕</div>
+                <div className="w-16 h-0.5 bg-gray-300"></div>
+              </div>
+            </div>
+
+            {/* New Assignments After Swap */}
+            <div className="mb-4">
+              <h4 className="text-sm font-medium text-gray-900 mb-2">After Swap</h4>
+              {(() => {
+                const postSwapDuplicates = checkPostSwapDuplicates();
+                const sourceKey = `${swapConfirmationModal.source?.rowIdx}-${swapConfirmationModal.source?.batchIdx}-${swapConfirmationModal.source?.trainerIdx}`;
+                const targetKey = `${swapConfirmationModal.target?.rowIdx}-${swapConfirmationModal.target?.batchIdx}-${swapConfirmationModal.target?.trainerIdx}`;
+                const sourceHasDuplicate = postSwapDuplicates.has(sourceKey);
+                const targetHasDuplicate = postSwapDuplicates.has(targetKey);
+                
+                console.log('UI Rendering: Post-swap duplicates check', {
+                  postSwapDuplicates: Array.from(postSwapDuplicates),
+                  sourceKey,
+                  targetKey,
+                  sourceHasDuplicate,
+                  targetHasDuplicate,
+                  hasDuplicates: postSwapDuplicates.size > 0
+                });
+                
+                return (
+                  <>
+                    {postSwapDuplicates.size > 0 && (
+                      <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-md">
+                        <div className="flex items-center text-red-800 text-xs">
+                          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                          </svg>
+                          <strong>Warning:</strong> This swap will create duplicate trainer assignments. Assignments shown in red have conflicts.
+                        </div>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {/* Source Trainer New Assignment */}
+                      <div className={`border rounded-md p-2 ${sourceHasDuplicate ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-green-50'}`}>
+                        {sourceHasDuplicate && (
+                          <div className="text-xs text-red-600 font-medium mb-1 flex items-center">
+                            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            Duplicate Assignment
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`font-medium text-xs truncate ${sourceHasDuplicate ? 'text-red-800' : 'text-green-800'}`}>
+                            {swapConfirmationModal.sourceTrainerData?.trainerName} ({swapConfirmationModal.sourceTrainerData?.trainerId})
+                          </span>
+                          <span className={`text-xs px-1.5 py-0.5 rounded text-xs ${sourceHasDuplicate ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                            New: {swapConfirmationModal.sourceNewTimeSlot}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-600 space-y-0.5">
+                          <div>Batch: {(() => {
+                            const sameBatch = swapConfirmationModal.source?.rowIdx === swapConfirmationModal.target?.rowIdx &&
+                                             swapConfirmationModal.source?.batchIdx === swapConfirmationModal.target?.batchIdx;
+                            return sameBatch 
+                              ? table1Data[swapConfirmationModal.source?.rowIdx]?.batches[swapConfirmationModal.source?.batchIdx]?.batchCode
+                              : table1Data[swapConfirmationModal.target?.rowIdx]?.batches[swapConfirmationModal.target?.batchIdx]?.batchCode;
+                          })()}</div>
+                          <div>Specialization: {(() => {
+                            const sameBatch = swapConfirmationModal.source?.rowIdx === swapConfirmationModal.target?.rowIdx &&
+                                             swapConfirmationModal.source?.batchIdx === swapConfirmationModal.target?.batchIdx;
+                            return sameBatch 
+                              ? table1Data[swapConfirmationModal.source?.rowIdx]?.batch
+                              : table1Data[swapConfirmationModal.target?.rowIdx]?.batch;
+                          })()}</div>
+                          <div>Dates: {(() => {
+                            const sameBatch = swapConfirmationModal.source?.rowIdx === swapConfirmationModal.target?.rowIdx &&
+                                             swapConfirmationModal.source?.batchIdx === swapConfirmationModal.target?.batchIdx;
+                            return sameBatch 
+                              ? `${swapConfirmationModal.targetTrainerData?.startDate} to ${swapConfirmationModal.targetTrainerData?.endDate}`
+                              : `${swapConfirmationModal.sourceTrainerData?.startDate} to ${swapConfirmationModal.sourceTrainerData?.endDate}`;
+                          })()}</div>
+                        </div>
+                      </div>
+
+                      {/* Target Trainer New Assignment */}
+                      <div className={`border rounded-md p-2 ${targetHasDuplicate ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-green-50'}`}>
+                        {targetHasDuplicate && (
+                          <div className="text-xs text-red-600 font-medium mb-1 flex items-center">
+                            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            Duplicate Assignment
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`font-medium text-xs truncate ${targetHasDuplicate ? 'text-red-800' : 'text-green-800'}`}>
+                            {swapConfirmationModal.targetTrainerData?.trainerName} ({swapConfirmationModal.targetTrainerData?.trainerId})
+                          </span>
+                          <span className={`text-xs px-1.5 py-0.5 rounded text-xs ${targetHasDuplicate ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                            New: {swapConfirmationModal.targetNewTimeSlot}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-600 space-y-0.5">
+                          <div>Batch: {(() => {
+                            const sameBatch = swapConfirmationModal.source?.rowIdx === swapConfirmationModal.target?.rowIdx &&
+                                             swapConfirmationModal.source?.batchIdx === swapConfirmationModal.target?.batchIdx;
+                            return sameBatch 
+                              ? table1Data[swapConfirmationModal.target?.rowIdx]?.batches[swapConfirmationModal.target?.batchIdx]?.batchCode
+                              : table1Data[swapConfirmationModal.source?.rowIdx]?.batches[swapConfirmationModal.source?.batchIdx]?.batchCode;
+                          })()}</div>
+                          <div>Specialization: {(() => {
+                            const sameBatch = swapConfirmationModal.source?.rowIdx === swapConfirmationModal.target?.rowIdx &&
+                                             swapConfirmationModal.source?.batchIdx === swapConfirmationModal.target?.batchIdx;
+                            return sameBatch 
+                              ? table1Data[swapConfirmationModal.target?.rowIdx]?.batch
+                              : table1Data[swapConfirmationModal.source?.rowIdx]?.batch;
+                          })()}</div>
+                          <div>Dates: {(() => {
+                            const sameBatch = swapConfirmationModal.source?.rowIdx === swapConfirmationModal.target?.rowIdx &&
+                                             swapConfirmationModal.source?.batchIdx === swapConfirmationModal.target?.batchIdx;
+                            return sameBatch 
+                              ? `${swapConfirmationModal.sourceTrainerData?.startDate} to ${swapConfirmationModal.sourceTrainerData?.endDate}`
+                              : `${swapConfirmationModal.targetTrainerData?.startDate} to ${swapConfirmationModal.targetTrainerData?.endDate}`;
+                          })()}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Calendar View */}
+            <div className="mb-4">
+              <h4 className="text-sm font-medium text-gray-900 mb-2">Calendar Overview</h4>
+              <div className="border border-gray-200 rounded-md p-3 bg-gray-50">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* Before Swap */}
+                  <div>
+                    <h5 className="text-xs font-medium text-gray-700 mb-1.5">Before Swap</h5>
+                    <div className="space-y-1">
+                      {(() => {
+                        const sourceDates = getDateList(
+                          swapConfirmationModal.sourceTrainerData?.startDate,
+                          swapConfirmationModal.sourceTrainerData?.endDate
+                        );
+                        const targetDates = getDateList(
+                          swapConfirmationModal.targetTrainerData?.startDate,
+                          swapConfirmationModal.targetTrainerData?.endDate
+                        );
+                        const allDates = [...new Set([...sourceDates, ...targetDates])].sort((a, b) => a - b);
+
+                        return allDates.slice(0, 5).map((date, idx) => {
+                          const dateStr = date.toLocaleDateString('en-IN', { 
+                            day: '2-digit', 
+                            month: '2-digit', 
+                            year: 'numeric' 
+                          });
+                          const sourceAssigned = sourceDates.some(d => d.getTime() === date.getTime());
+                          const targetAssigned = targetDates.some(d => d.getTime() === date.getTime());
+
+                          return (
+                            <div key={idx} className="flex items-center justify-between text-xs py-0.5">
+                              <span className="font-mono text-xs">{dateStr}</span>
+                              <div className="flex space-x-1">
+                                {sourceAssigned && (
+                                  <span className="px-1 py-0.5 bg-red-100 text-red-700 rounded text-xs">
+                                    {swapConfirmationModal.sourceTrainerData?.trainerName}: {swapConfirmationModal.sourceTrainerData?.dayDuration}
+                                  </span>
+                                )}
+                                {targetAssigned && (
+                                  <span className="px-1 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
+                                    {swapConfirmationModal.targetTrainerData?.trainerName}: {swapConfirmationModal.targetTrainerData?.dayDuration}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
+                      {getDateList(
+                        swapConfirmationModal.sourceTrainerData?.startDate,
+                        swapConfirmationModal.sourceTrainerData?.endDate
+                      ).length > 5 && (
+                        <div className="text-xs text-gray-500 italic text-center py-0.5">
+                          ... and {getDateList(
+                            swapConfirmationModal.sourceTrainerData?.startDate,
+                            swapConfirmationModal.sourceTrainerData?.endDate
+                          ).length - 5} more dates
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* After Swap */}
+                  <div>
+                    <h5 className="text-xs font-medium text-gray-700 mb-1.5">After Swap</h5>
+                    <div className="space-y-1">
+                      {(() => {
+                        const sameBatch = swapConfirmationModal.source?.rowIdx === swapConfirmationModal.target?.rowIdx &&
+                                         swapConfirmationModal.source?.batchIdx === swapConfirmationModal.target?.batchIdx;
+                        
+                        let sourceDates, targetDates;
+                        if (sameBatch) {
+                          // For same-batch swap: source trainer gets target's dates, target trainer gets source's dates
+                          sourceDates = getDateList(
+                            swapConfirmationModal.targetTrainerData?.startDate,
+                            swapConfirmationModal.targetTrainerData?.endDate
+                          );
+                          targetDates = getDateList(
+                            swapConfirmationModal.sourceTrainerData?.startDate,
+                            swapConfirmationModal.sourceTrainerData?.endDate
+                          );
+                        } else {
+                          // For cross-batch swap: keep original logic
+                          sourceDates = getDateList(
+                            swapConfirmationModal.sourceTrainerData?.startDate,
+                            swapConfirmationModal.sourceTrainerData?.endDate
+                          );
+                          targetDates = getDateList(
+                            swapConfirmationModal.targetTrainerData?.startDate,
+                            swapConfirmationModal.targetTrainerData?.endDate
+                          );
+                        }
+                        
+                        const allDates = [...new Set([...sourceDates, ...targetDates])].sort((a, b) => a - b);
+                        const postSwapDuplicates = checkPostSwapDuplicates();
+
+                        return allDates.slice(0, 5).map((date, idx) => {
+                          const dateStr = date.toLocaleDateString('en-IN', { 
+                            day: '2-digit', 
+                            month: '2-digit', 
+                            year: 'numeric' 
+                          });
+                          const sourceAssigned = sourceDates.some(d => d.getTime() === date.getTime());
+                          const targetAssigned = targetDates.some(d => d.getTime() === date.getTime());
+                          
+                          // Check if these assignments would create duplicates
+                          const sourceKey = sameBatch 
+                            ? `${swapConfirmationModal.source?.rowIdx}-${swapConfirmationModal.source?.batchIdx}-${swapConfirmationModal.source?.trainerIdx}`
+                            : `${swapConfirmationModal.source?.rowIdx}-${swapConfirmationModal.target?.batchIdx}-${swapConfirmationModal.source?.trainerIdx}`;
+                          const targetKey = sameBatch
+                            ? `${swapConfirmationModal.target?.rowIdx}-${swapConfirmationModal.target?.batchIdx}-${swapConfirmationModal.target?.trainerIdx}`
+                            : `${swapConfirmationModal.target?.rowIdx}-${swapConfirmationModal.source?.batchIdx}-${swapConfirmationModal.target?.trainerIdx}`;
+                          const sourceHasDuplicate = sourceAssigned && postSwapDuplicates.has(sourceKey);
+                          const targetHasDuplicate = targetAssigned && postSwapDuplicates.has(targetKey);
+
+                          return (
+                            <div key={idx} className="flex items-center justify-between text-xs py-0.5">
+                              <span className="font-mono text-xs">{dateStr}</span>
+                              <div className="flex space-x-1">
+                                {sourceAssigned && (
+                                  <span className={`px-1 py-0.5 rounded text-xs ${sourceHasDuplicate ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                                    {swapConfirmationModal.sourceTrainerData?.trainerName}: {swapConfirmationModal.sourceNewTimeSlot}
+                                  </span>
+                                )}
+                                {targetAssigned && (
+                                  <span className={`px-1 py-0.5 rounded text-xs ${targetHasDuplicate ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                                    {swapConfirmationModal.targetTrainerData?.trainerName}: {swapConfirmationModal.targetNewTimeSlot}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
+                      {getDateList(
+                        swapConfirmationModal.sourceTrainerData?.startDate,
+                        swapConfirmationModal.sourceTrainerData?.endDate
+                      ).length > 5 && (
+                        <div className="text-xs text-gray-500 italic text-center py-0.5">
+                          ... and {getDateList(
+                            swapConfirmationModal.sourceTrainerData?.startDate,
+                            swapConfirmationModal.sourceTrainerData?.endDate
+                          ).length - 5} more dates
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={closeSwapConfirmationModal}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              {(() => {
+                const postSwapDuplicates = checkPostSwapDuplicates();
+                const hasDuplicates = postSwapDuplicates.size > 0;
+                
+                console.log('UI Rendering: Button state check', {
+                  postSwapDuplicates: Array.from(postSwapDuplicates),
+                  hasDuplicates,
+                  buttonDisabled: hasDuplicates
+                });
+                
+                return (
+                  <button
+                    type="button"
+                    onClick={performSwap}
+                    disabled={hasDuplicates}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors ${
+                      hasDuplicates 
+                        ? 'bg-red-400 cursor-not-allowed' 
+                        : 'bg-indigo-600 hover:bg-indigo-700'
+                    }`}
+                    title={hasDuplicates ? 'Cannot confirm swap due to duplicate assignments' : 'Confirm the time slot swap'}
+                  >
+                    {hasDuplicates ? 'Cannot Swap (Duplicates)' : 'Confirm Swap'}
+                  </button>
+                );
+              })()}
             </div>
           </div>
         </div>

@@ -42,7 +42,7 @@ function LeadFilters({
         const fetchedLeads = snapshot.docs.map((doc) => [doc.id, doc.data()]);
         setAllLeads(fetchedLeads);
       } catch (error) {
-
+        console.error("Error fetching leads for filters:", error);
       }
     };
     fetchAllLeads();

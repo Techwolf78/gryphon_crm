@@ -63,7 +63,7 @@ function TrainersDashboard() {
         const all = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
         setTrainers(all);
       } catch (err) {
-
+        console.error("Error fetching trainers:", err);
         setError("Failed to fetch trainers. Try again.");
       } finally {
         setInitialLoading(false);
@@ -107,7 +107,7 @@ function TrainersDashboard() {
 
           setDeleteRequests(reqs);
         } catch (err) {
-
+          console.error("Error fetching delete requests:", err);
         }
       };
       fetchRequests();

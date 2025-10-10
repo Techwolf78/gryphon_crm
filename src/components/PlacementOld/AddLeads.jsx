@@ -79,7 +79,7 @@ function AddLeads({ show, onClose, onAddLead }) {
       }
       handleClose();
     } catch (error) {
-
+      console.error("Error adding company:", error);
     }
   };
 

@@ -88,7 +88,7 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
         setSelectedSpecs(standard);
         setCustomSpecs(custom);
       } catch (e) {
-
+        console.error("Error loading trainer data:", e);
         setError("Failed to load trainer data");
       } finally {
         setLoading(false);
@@ -141,7 +141,7 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated }) {
       onTrainerUpdated({ id: trainerId, ...trainerToUpdate });
       onClose();
     } catch (err) {
-
+      console.error("Error updating trainer:", err);
       setError(`Failed to update trainer: ${err.message}`);
     } finally {
       setLoading(false);

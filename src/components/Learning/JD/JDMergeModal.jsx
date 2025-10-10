@@ -3,9 +3,9 @@ import { db } from "../../../firebase";
 import { collection, getDocs } from "firebase/firestore";
 import { FiX, FiCheck, FiChevronRight } from "react-icons/fi";
 
-function JDMergeModal({ onClose, onProceed }) {
+function JDMergeModal({ onClose, onProceed, preSelectedColleges = [] }) {
   const [availableColleges, setAvailableColleges] = useState([]);
-  const [selectedColleges, setSelectedColleges] = useState([]);
+  const [selectedColleges, setSelectedColleges] = useState(preSelectedColleges);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
