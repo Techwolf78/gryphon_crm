@@ -44,7 +44,7 @@ const ContractInvoicesTab = () => {
     cashInvoices: 0,
     taxInvoices: 0,
     approvedInvoices: 0,
-    pendingInvoices: 0
+    pendingInvoices: 0,
   });
 
   const fetchInvoices = async () => {
@@ -94,14 +94,15 @@ const ContractInvoicesTab = () => {
       cashInvoices: 0,
       taxInvoices: 0,
       approvedInvoices: 0,
-      pendingInvoices: 0
+      pendingInvoices: 0,
     };
 
-    invoiceData.forEach(invoice => {
+    invoiceData.forEach((invoice) => {
       // Safely parse amounts to numbers
       const totalAmount = parseFloat(invoice.amountRaised) || 0;
       const receivedAmount = parseFloat(invoice.receivedAmount) || 0;
-      const dueAmount = parseFloat(invoice.dueAmount) || (totalAmount - receivedAmount);
+      const dueAmount =
+        parseFloat(invoice.dueAmount) || totalAmount - receivedAmount;
 
       // Count cancelled invoices
       if (invoice.approvalStatus === "cancelled") {
@@ -118,7 +119,7 @@ const ContractInvoicesTab = () => {
         newStats.cashInvoices++;
       } else if (invoice.invoiceType === "Tax Invoice") {
         newStats.taxInvoices++;
-      } 
+      }
 
       // Count approval status
       if (invoice.approved) {
@@ -183,7 +184,7 @@ const ContractInvoicesTab = () => {
           return invoice.invoiceType === "Tax Invoice";
         } else if (filters.invoiceType === "cash") {
           return invoice.invoiceType === "Cash Invoice";
-        } 
+        }
         return true;
       });
     }
@@ -255,29 +256,30 @@ const ContractInvoicesTab = () => {
   const exportToExcel = async () => {
     try {
       setExportLoading(true);
-      const dataToExport = filteredInvoices.length > 0 ? filteredInvoices : invoices;
+      const dataToExport =
+        filteredInvoices.length > 0 ? filteredInvoices : invoices;
 
       // Calculate GST breakdown function - SAME AS InvoiceExcelExport
       const calculateGSTBreakdown = (invoice) => {
         let gstAmount = invoice.gstAmount || 0;
-        
-        if (typeof gstAmount === 'string') {
+
+        if (typeof gstAmount === "string") {
           gstAmount = parseFloat(gstAmount) || 0;
         }
-        
+
         const gstType = invoice.gstType?.toLowerCase();
-        
+
         if (gstType === "igst") {
           return {
             cgst: 0,
             sgst: 0,
-            igst: gstAmount
+            igst: gstAmount,
           };
         } else {
           return {
             cgst: gstAmount / 2,
             sgst: gstAmount / 2,
-            igst: 0
+            igst: 0,
           };
         }
       };
@@ -287,9 +289,9 @@ const ContractInvoicesTab = () => {
         if (!date) return "";
         try {
           const d = date?.toDate ? date.toDate() : new Date(date);
-          return d.toLocaleDateString("en-IN", { 
-            year: "numeric", 
-            month: "long" 
+          return d.toLocaleDateString("en-IN", {
+            year: "numeric",
+            month: "long",
           });
         } catch {
           return "Invalid Date";
@@ -299,8 +301,8 @@ const ContractInvoicesTab = () => {
       // Get Description from deliveryType - SAME AS InvoiceExcelExport
       const getDescription = (invoice) => {
         const deliveryType = invoice.deliveryType || "";
-        
-        switch(deliveryType.toUpperCase()) {
+
+        switch (deliveryType.toUpperCase()) {
           case "TP":
             return "Training and Placement";
           case "OT":
@@ -317,12 +319,12 @@ const ContractInvoicesTab = () => {
       // Calculate rounded amount - SAME AS InvoiceExcelExport
       const calculateRoundedAmount = (amount) => {
         if (!amount && amount !== 0) return 0;
-        
+
         let numAmount = amount;
-        if (typeof amount === 'string') {
+        if (typeof amount === "string") {
           numAmount = parseFloat(amount) || 0;
         }
-        
+
         return Math.round(numAmount);
       };
 
@@ -331,48 +333,56 @@ const ContractInvoicesTab = () => {
         return "9984";
       };
 
-// Format payment history with dates and amounts - UPDATED FUNCTION
-const getPaymentHistoryText = (invoice) => {
-  if (!invoice.paymentHistory || invoice.paymentHistory.length === 0) {
-    return "No Payments";
-  }
-  
-  // Sort payment history by date ascending (oldest first)
-  const sortedPayments = [...invoice.paymentHistory].sort((a, b) => {
-    const dateA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.date);
-    const dateB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.date);
-    return dateA - dateB;
-  });
-  
-  // Format each payment: "₹Amount on Date" - USING THE STORED DATE
-  return sortedPayments.map(payment => {
-    const paymentDate = payment.date; // Use the stored date directly
-    const formattedDate = new Date(paymentDate).toLocaleDateString("en-IN");
-    const amount = payment.amount || 0;
-    
-    return `₹${formatCurrency(amount)} on ${formattedDate}`;
-  }).join('\n');
-};
+      // Format payment history with dates and amounts - UPDATED FUNCTION
+      const getPaymentHistoryText = (invoice) => {
+        if (!invoice.paymentHistory || invoice.paymentHistory.length === 0) {
+          return "No Payments";
+        }
 
-// Get total received amount - helper function
-const getTotalReceived = (invoice) => {
-  if (!invoice.paymentHistory || invoice.paymentHistory.length === 0) {
-    return 0;
-  }
-  
-  return invoice.paymentHistory.reduce((total, payment) => {
-    return total + (payment.amount || 0);
-  }, 0);
-};
+        // Sort payment history by date ascending (oldest first)
+        const sortedPayments = [...invoice.paymentHistory].sort((a, b) => {
+          const dateA = a.timestamp?.toDate
+            ? a.timestamp.toDate()
+            : new Date(a.date);
+          const dateB = b.timestamp?.toDate
+            ? b.timestamp.toDate()
+            : new Date(b.date);
+          return dateA - dateB;
+        });
+
+        // Format each payment: "₹Amount on Date" - USING THE STORED DATE
+        return sortedPayments
+          .map((payment) => {
+            const paymentDate = payment.date; // Use the stored date directly
+            const formattedDate = new Date(paymentDate).toLocaleDateString(
+              "en-IN"
+            );
+            const amount = payment.amount || 0;
+
+            return `₹${formatCurrency(amount)} on ${formattedDate}`;
+          })
+          .join("\n");
+      };
+
+      // Get total received amount - helper function
+      const getTotalReceived = (invoice) => {
+        if (!invoice.paymentHistory || invoice.paymentHistory.length === 0) {
+          return 0;
+        }
+
+        return invoice.paymentHistory.reduce((total, payment) => {
+          return total + (payment.amount || 0);
+        }, 0);
+      };
 
       const excelData = dataToExport.map((invoice) => {
         const gstBreakdown = calculateGSTBreakdown(invoice);
-        
+
         let netPayableAmount = invoice.netPayableAmount || 0;
-        if (typeof netPayableAmount === 'string') {
+        if (typeof netPayableAmount === "string") {
           netPayableAmount = parseFloat(netPayableAmount) || 0;
         }
-        
+
         const roundedAmount = calculateRoundedAmount(netPayableAmount);
         const baseAmount = invoice.baseAmount || 0;
         const totalReceived = getTotalReceived(invoice);
@@ -383,11 +393,11 @@ const getTotalReceived = (invoice) => {
           "Invoice Date": formatDateForExcel(invoice.raisedDate),
           "Party Name": invoice.collegeName || "N/A",
           "GSTIN Number": invoice.gstNumber || "N/A",
-          "Description": getDescription(invoice),
+          Description: getDescription(invoice),
           "Total Value": formatCurrency(baseAmount),
-          "CGST": formatCurrency(gstBreakdown.cgst),
-          "SGST": formatCurrency(gstBreakdown.sgst),
-          "IGST": formatCurrency(gstBreakdown.igst),
+          CGST: formatCurrency(gstBreakdown.cgst),
+          SGST: formatCurrency(gstBreakdown.sgst),
+          IGST: formatCurrency(gstBreakdown.igst),
           "Rounded Off": formatCurrency(roundedAmount - netPayableAmount),
           "Total Invoice Value": formatCurrency(roundedAmount),
           "Total Received": formatCurrency(totalReceived), // NEW: Total received amount
@@ -421,7 +431,7 @@ const getTotalReceived = (invoice) => {
         { wch: 15 }, // Invoice Type
         { wch: 30 }, // NEW: Payment History (wider for multiple lines)
       ];
-      ws['!cols'] = colWidths;
+      ws["!cols"] = colWidths;
 
       XLSX.utils.book_append_sheet(wb, ws, "All Invoices");
       const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
@@ -430,7 +440,11 @@ const getTotalReceived = (invoice) => {
       const timestamp = new Date().toISOString().slice(0, 10);
       let filename = `all_invoices_${timestamp}`;
 
-      if (filters.financialYear || filters.invoiceType !== "all" || filters.status !== "all") {
+      if (
+        filters.financialYear ||
+        filters.invoiceType !== "all" ||
+        filters.status !== "all"
+      ) {
         filename += "_filtered";
       }
       filename += ".xlsx";
@@ -491,50 +505,50 @@ const getTotalReceived = (invoice) => {
   };
 
   // NEW: Get Payment Status Badge
-// NEW: Get Payment Status Badge - FIXED VERSION
-const getPaymentStatusBadge = (invoice) => {
-  if (invoice.approvalStatus === "cancelled") {
-    return (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">
-        <span className="w-1.5 h-1.5 bg-red-500 rounded-full mr-1"></span>
-        Cancelled
-      </span>
-    );
-  }
+  // NEW: Get Payment Status Badge - FIXED VERSION
+  const getPaymentStatusBadge = (invoice) => {
+    if (invoice.approvalStatus === "cancelled") {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">
+          <span className="w-1.5 h-1.5 bg-red-500 rounded-full mr-1"></span>
+          Cancelled
+        </span>
+      );
+    }
 
-  const totalAmount = parseFloat(invoice.amountRaised) || 0;
-  const receivedAmount = parseFloat(invoice.receivedAmount) || 0;
-  
-  // FIXED: Use proper floating point comparison with tolerance
-  const isFullyPaid = Math.abs(totalAmount - receivedAmount) < 0.01; // 0.01 tolerance for floating point errors
-  
-  // FIXED: Also check if dueAmount is zero in database
-  const dbDueAmount = parseFloat(invoice.dueAmount) || 0;
-  const isDueAmountZero = Math.abs(dbDueAmount) < 0.01;
+    const totalAmount = parseFloat(invoice.amountRaised) || 0;
+    const receivedAmount = parseFloat(invoice.receivedAmount) || 0;
 
-  if (isFullyPaid || isDueAmountZero) {
-    return (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
-        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1"></span>
-        Fully Paid
-      </span>
-    );
-  } else if (receivedAmount > 0) {
-    return (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
-        <span className="w-1.5 h-1.5 bg-purple-500 rounded-full mr-1"></span>
-        Partially Paid
-      </span>
-    );
-  } else {
-    return (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
-        <span className="w-1.5 h-1.5 bg-orange-500 rounded-full mr-1"></span>
-        Unpaid
-      </span>
-    );
-  }
-};
+    // FIXED: Use proper floating point comparison with tolerance
+    const isFullyPaid = Math.abs(totalAmount - receivedAmount) < 0.01; // 0.01 tolerance for floating point errors
+
+    // FIXED: Also check if dueAmount is zero in database
+    const dbDueAmount = parseFloat(invoice.dueAmount) || 0;
+    const isDueAmountZero = Math.abs(dbDueAmount) < 0.01;
+
+    if (isFullyPaid || isDueAmountZero) {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+          <span className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1"></span>
+          Fully Paid
+        </span>
+      );
+    } else if (receivedAmount > 0) {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+          <span className="w-1.5 h-1.5 bg-purple-500 rounded-full mr-1"></span>
+          Partially Paid
+        </span>
+      );
+    } else {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
+          <span className="w-1.5 h-1.5 bg-orange-500 rounded-full mr-1"></span>
+          Unpaid
+        </span>
+      );
+    }
+  };
 
   // Financial year options
   const financialYearOptions = [
@@ -596,74 +610,79 @@ const getPaymentStatusBadge = (invoice) => {
     }
   };
 
-// Payment Receive Function - UPDATED WITH DATE
-const handleReceivePayment = async (invoice, receivedAmount, paymentDate) => {
-  try {
-    if (!receivedAmount || receivedAmount <= 0) {
-      alert("Please enter valid amount");
-      return;
+  // Payment Receive Function - UPDATED WITH DATE
+  const handleReceivePayment = async (invoice, receivedAmount, paymentDate) => {
+    try {
+      if (!receivedAmount || receivedAmount <= 0) {
+        alert("Please enter valid amount");
+        return;
+      }
+
+      if (!paymentDate) {
+        alert("Please select payment date");
+        return;
+      }
+
+      if (receivedAmount > invoice.dueAmount) {
+        alert(
+          `Received amount cannot be more than due amount (₹${invoice.dueAmount})`
+        );
+        return;
+      }
+
+      const invoiceRef = doc(db, "ContractInvoices", invoice.id);
+      const newReceivedAmount =
+        (invoice.receivedAmount || 0) + parseFloat(receivedAmount);
+      const newDueAmount = invoice.dueAmount - parseFloat(receivedAmount);
+
+      // Create payment record with selected date
+      const paymentRecord = {
+        amount: parseFloat(receivedAmount),
+        date: paymentDate, // Use selected date instead of current date
+        timestamp: new Date(paymentDate), // Use selected date for timestamp
+        recordedAt: new Date().toISOString(), // Keep when it was actually recorded in system
+      };
+
+      let newStatus = invoice.status;
+      if (newDueAmount === 0) {
+        newStatus = "received";
+      } else if (newReceivedAmount > 0) {
+        newStatus = "partially_received";
+      }
+
+      const updateData = {
+        receivedAmount: newReceivedAmount,
+        dueAmount: newDueAmount,
+        paymentHistory: [...(invoice.paymentHistory || []), paymentRecord],
+        status: newStatus,
+        approved: true,
+        approvalStatus: "approved",
+        approvedAt: new Date().toISOString(),
+        approvedBy: "Auto-Approved via Payment",
+      };
+
+      await updateDoc(invoiceRef, updateData);
+
+      setInvoices((prev) =>
+        prev.map((inv) =>
+          inv.id === invoice.id ? { ...inv, ...updateData } : inv
+        )
+      );
+
+      setFilteredInvoices((prev) =>
+        prev.map((inv) =>
+          inv.id === invoice.id ? { ...inv, ...updateData } : inv
+        )
+      );
+
+      setPaymentModal({ isOpen: false, invoice: null });
+      alert(
+        `Payment of ₹${receivedAmount} recorded successfully for date ${paymentDate}!\n✅ Invoice auto-approved!`
+      );
+    } catch (error) {
+      alert("Error recording payment: " + error.message);
     }
-
-    if (!paymentDate) {
-      alert("Please select payment date");
-      return;
-    }
-
-    if (receivedAmount > invoice.dueAmount) {
-      alert(`Received amount cannot be more than due amount (₹${invoice.dueAmount})`);
-      return;
-    }
-
-    const invoiceRef = doc(db, "ContractInvoices", invoice.id);
-    const newReceivedAmount = (invoice.receivedAmount || 0) + parseFloat(receivedAmount);
-    const newDueAmount = invoice.dueAmount - parseFloat(receivedAmount);
-
-    // Create payment record with selected date
-    const paymentRecord = {
-      amount: parseFloat(receivedAmount),
-      date: paymentDate, // Use selected date instead of current date
-      timestamp: new Date(paymentDate), // Use selected date for timestamp
-      recordedAt: new Date().toISOString(), // Keep when it was actually recorded in system
-    };
-
-    let newStatus = invoice.status;
-    if (newDueAmount === 0) {
-      newStatus = "received";
-    } else if (newReceivedAmount > 0) {
-      newStatus = "partially_received";
-    }
-
-    const updateData = {
-      receivedAmount: newReceivedAmount,
-      dueAmount: newDueAmount,
-      paymentHistory: [...(invoice.paymentHistory || []), paymentRecord],
-      status: newStatus,
-      approved: true,
-      approvalStatus: "approved",
-      approvedAt: new Date().toISOString(),
-      approvedBy: "Auto-Approved via Payment",
-    };
-
-    await updateDoc(invoiceRef, updateData);
-
-    setInvoices((prev) =>
-      prev.map((inv) =>
-        inv.id === invoice.id ? { ...inv, ...updateData } : inv
-      )
-    );
-
-    setFilteredInvoices((prev) =>
-      prev.map((inv) =>
-        inv.id === invoice.id ? { ...inv, ...updateData } : inv
-      )
-    );
-
-    setPaymentModal({ isOpen: false, invoice: null });
-    alert(`Payment of ₹${receivedAmount} recorded successfully for date ${paymentDate}!\n✅ Invoice auto-approved!`);
-  } catch (error) {
-    alert("Error recording payment: " + error.message);
-  }
-};
+  };
 
   const handleViewInvoice = (invoice) => {
     setInvoiceModal({
@@ -677,127 +696,152 @@ const handleReceivePayment = async (invoice, receivedAmount, paymentDate) => {
     return invoice.approvalStatus === "cancelled" || invoice.receivedAmount > 0;
   };
 
-// Payment Modal Component - UPDATED WITH DATE SELECTION
-const PaymentModal = ({ invoice, onClose, onSubmit }) => {
-  const [amount, setAmount] = useState("");
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]); // Default to today
-  const dueAmount = invoice.dueAmount || 0;
+  // Payment Modal Component - UPDATED WITH DATE SELECTION
+  const PaymentModal = ({ invoice, onClose, onSubmit }) => {
+    const [amount, setAmount] = useState("");
+    const [paymentDate, setPaymentDate] = useState(
+      new Date().toISOString().split("T")[0]
+    ); // Default to today
+    const dueAmount = invoice.dueAmount || 0;
 
-  const handleSubmit = () => {
-    if (!amount || amount <= 0) {
-      alert("Please enter valid amount");
-      return;
-    }
+    const handleSubmit = () => {
+      if (!amount || amount <= 0) {
+        alert("Please enter valid amount");
+        return;
+      }
 
-    if (!paymentDate) {
-      alert("Please select payment date");
-      return;
-    }
+      if (!paymentDate) {
+        alert("Please select payment date");
+        return;
+      }
 
-    if (amount > dueAmount) {
-      alert(`Received amount cannot be more than due amount (₹${dueAmount})`);
-      return;
-    }
+      if (amount > dueAmount) {
+        alert(`Received amount cannot be more than due amount (₹${dueAmount})`);
+        return;
+      }
 
-    onSubmit(invoice, amount, paymentDate);
-  };
+      onSubmit(invoice, amount, paymentDate);
+    };
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all">
-        <div className="p-6 border-b border-gray-100">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-gray-900">Receive Payment</h3>
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all">
+          <div className="p-6 border-b border-gray-100">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Receive Payment
+              </h3>
+              <button
+                onClick={onClose}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div className="p-6 space-y-4">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <label className="text-gray-600">Invoice Number</label>
+                <p className="font-semibold text-gray-900">
+                  {invoice.invoiceNumber}
+                </p>
+              </div>
+              <div>
+                <label className="text-gray-600">College</label>
+                <p className="font-semibold text-gray-900 truncate">
+                  {invoice.collegeName}
+                </p>
+              </div>
+              <div>
+                <label className="text-gray-600">Total Amount</label>
+                <p className="font-semibold text-gray-900">
+                  ₹{invoice.amountRaised?.toLocaleString()}
+                </p>
+              </div>
+              <div>
+                <label className="text-gray-600">Due Amount</label>
+                <p className="font-semibold text-red-600">
+                  ₹{dueAmount.toLocaleString()}
+                </p>
+              </div>
+            </div>
+
+            {invoice.receivedAmount > 0 && (
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <p className="text-sm text-blue-700">
+                  <strong>Already Received:</strong> ₹
+                  {invoice.receivedAmount.toLocaleString()}
+                </p>
+              </div>
+            )}
+
+            {/* Payment Date Field - NEW */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Payment Date *
+              </label>
+              <input
+                type="date"
+                value={paymentDate}
+                onChange={(e) => setPaymentDate(e.target.value)}
+                max={new Date().toISOString().split("T")[0]} // Can't select future dates
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Amount Received *
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+                  ₹
+                </span>
+                <input
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder={`Enter amount (max ₹${dueAmount})`}
+                  className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  max={dueAmount}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="px-6 py-4 bg-gray-50 rounded-b-xl flex gap-3">
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              className="flex-1 px-4 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={!amount || amount <= 0 || !paymentDate}
+              className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+            >
+              Record Payment
             </button>
           </div>
         </div>
-        
-        <div className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <label className="text-gray-600">Invoice Number</label>
-              <p className="font-semibold text-gray-900">{invoice.invoiceNumber}</p>
-            </div>
-            <div>
-              <label className="text-gray-600">College</label>
-              <p className="font-semibold text-gray-900 truncate">{invoice.collegeName}</p>
-            </div>
-            <div>
-              <label className="text-gray-600">Total Amount</label>
-              <p className="font-semibold text-gray-900">₹{invoice.amountRaised?.toLocaleString()}</p>
-            </div>
-            <div>
-              <label className="text-gray-600">Due Amount</label>
-              <p className="font-semibold text-red-600">₹{dueAmount.toLocaleString()}</p>
-            </div>
-          </div>
-
-          {invoice.receivedAmount > 0 && (
-            <div className="bg-blue-50 p-3 rounded-lg">
-              <p className="text-sm text-blue-700">
-                <strong>Already Received:</strong> ₹{invoice.receivedAmount.toLocaleString()}
-              </p>
-            </div>
-          )}
-
-          {/* Payment Date Field - NEW */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Payment Date *
-            </label>
-            <input
-              type="date"
-              value={paymentDate}
-              onChange={(e) => setPaymentDate(e.target.value)}
-              max={new Date().toISOString().split('T')[0]} // Can't select future dates
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Amount Received *
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">₹</span>
-              <input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder={`Enter amount (max ₹${dueAmount})`}
-                className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                max={dueAmount}
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="px-6 py-4 bg-gray-50 rounded-b-xl flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={!amount || amount <= 0 || !paymentDate}
-            className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-          >
-            Record Payment
-          </button>
-        </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
   // Statistics Cards Component
   const StatisticsCards = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4 mb-8">
@@ -806,11 +850,23 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-gray-600">Total Invoices</p>
-            <p className="text-2xl font-bold text-gray-900">{stats.totalInvoices}</p>
+            <p className="text-2xl font-bold text-gray-900">
+              {stats.totalInvoices}
+            </p>
           </div>
           <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            <svg
+              className="w-5 h-5 text-blue-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
             </svg>
           </div>
         </div>
@@ -821,11 +877,23 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-gray-600">Cancelled</p>
-            <p className="text-2xl font-bold text-red-600">{stats.cancelledInvoices}</p>
+            <p className="text-2xl font-bold text-red-600">
+              {stats.cancelledInvoices}
+            </p>
           </div>
           <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-            <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg
+              className="w-5 h-5 text-red-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </div>
         </div>
@@ -836,11 +904,23 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-gray-600">Booked</p>
-            <p className="text-2xl font-bold text-green-600">{stats.bookedInvoices}</p>
+            <p className="text-2xl font-bold text-green-600">
+              {stats.bookedInvoices}
+            </p>
           </div>
           <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-            <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            <svg
+              className="w-5 h-5 text-green-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 13l4 4L19 7"
+              />
             </svg>
           </div>
         </div>
@@ -851,11 +931,23 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-gray-600">Total Amount</p>
-            <p className="text-lg font-bold text-gray-900">₹{stats.totalAmount.toLocaleString()}</p>
+            <p className="text-lg font-bold text-gray-900">
+              ₹{stats.totalAmount.toLocaleString()}
+            </p>
           </div>
           <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-            <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+            <svg
+              className="w-5 h-5 text-purple-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"
+              />
             </svg>
           </div>
         </div>
@@ -866,11 +958,23 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-gray-600">Received</p>
-            <p className="text-lg font-bold text-green-600">₹{stats.receivedAmount.toLocaleString()}</p>
+            <p className="text-lg font-bold text-green-600">
+              ₹{stats.receivedAmount.toLocaleString()}
+            </p>
           </div>
           <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-            <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg
+              className="w-5 h-5 text-green-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
           </div>
         </div>
@@ -881,11 +985,23 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-gray-600">Due Amount</p>
-            <p className="text-lg font-bold text-red-600">₹{stats.dueAmount.toLocaleString()}</p>
+            <p className="text-lg font-bold text-red-600">
+              ₹{stats.dueAmount.toLocaleString()}
+            </p>
           </div>
           <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-            <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg
+              className="w-5 h-5 text-red-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
           </div>
         </div>
@@ -901,7 +1017,9 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-gray-600">Tax Invoices</p>
-            <p className="text-xl font-bold text-blue-600">{stats.taxInvoices}</p>
+            <p className="text-xl font-bold text-blue-600">
+              {stats.taxInvoices}
+            </p>
           </div>
           <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
             <span className="text-xs font-bold text-blue-600">T</span>
@@ -914,7 +1032,9 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-gray-600">Cash Invoices</p>
-            <p className="text-xl font-bold text-green-600">{stats.cashInvoices}</p>
+            <p className="text-xl font-bold text-green-600">
+              {stats.cashInvoices}
+            </p>
           </div>
           <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
             <span className="text-xs font-bold text-green-600">C</span>
@@ -949,11 +1069,23 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
         <div className="max-w-md w-full">
           <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
             <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg
+                className="w-6 h-6 text-red-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold text-red-800 mb-2">Error Loading Invoices</h3>
+            <h3 className="text-lg font-semibold text-red-800 mb-2">
+              Error Loading Invoices
+            </h3>
             <p className="text-red-600 mb-4">{error}</p>
             <button
               onClick={fetchInvoices}
@@ -978,7 +1110,9 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
                 Invoice Management
               </h1>
               <p className="text-gray-600">
-                Manage invoice approvals and track payments • Total: {stats.totalInvoices} invoices • Showing: {filteredInvoices.length} invoices
+                Manage invoice approvals and track payments • Total:{" "}
+                {stats.totalInvoices} invoices • Showing:{" "}
+                {filteredInvoices.length} invoices
               </p>
             </div>
 
@@ -987,15 +1121,28 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
                 onClick={() => setShowFilters(!showFilters)}
                 className="inline-flex items-center justify-center px-4 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 transition-colors font-medium"
               >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                <svg
+                  className="w-4 h-4 mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                  />
                 </svg>
                 Filters
               </button>
 
               <button
                 onClick={exportToExcel}
-                disabled={exportLoading || (filteredInvoices.length === 0 && invoices.length === 0)}
+                disabled={
+                  exportLoading ||
+                  (filteredInvoices.length === 0 && invoices.length === 0)
+                }
                 className="inline-flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium shadow-sm"
               >
                 {exportLoading ? (
@@ -1005,8 +1152,18 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
                   </>
                 ) : (
                   <>
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    <svg
+                      className="w-4 h-4 mr-2"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
                     </svg>
                     Export to Excel
                   </>
@@ -1019,8 +1176,18 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
           <div className="mt-6">
             <div className="relative max-w-md">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                <svg
+                  className="h-5 w-5 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
                 </svg>
               </div>
               <input
@@ -1052,7 +1219,9 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
                 </label>
                 <select
                   value={filters.financialYear}
-                  onChange={(e) => setFilters({ ...filters, financialYear: e.target.value })}
+                  onChange={(e) =>
+                    setFilters({ ...filters, financialYear: e.target.value })
+                  }
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                 >
                   <option value="">All Years</option>
@@ -1070,7 +1239,9 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
                 </label>
                 <select
                   value={filters.invoiceType}
-                  onChange={(e) => setFilters({ ...filters, invoiceType: e.target.value })}
+                  onChange={(e) =>
+                    setFilters({ ...filters, invoiceType: e.target.value })
+                  }
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                 >
                   <option value="all">All Types</option>
@@ -1085,7 +1256,9 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
                 </label>
                 <select
                   value={filters.status}
-                  onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                  onChange={(e) =>
+                    setFilters({ ...filters, status: e.target.value })
+                  }
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                 >
                   <option value="all">All Status</option>
@@ -1123,7 +1296,9 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
                 <input
                   type="date"
                   value={filters.startDate}
-                  onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
+                  onChange={(e) =>
+                    setFilters({ ...filters, startDate: e.target.value })
+                  }
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                 />
               </div>
@@ -1134,7 +1309,9 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
                 <input
                   type="date"
                   value={filters.endDate}
-                  onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
+                  onChange={(e) =>
+                    setFilters({ ...filters, endDate: e.target.value })
+                  }
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                 />
               </div>
@@ -1148,11 +1325,23 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
         {filteredInvoices.length === 0 ? (
           <div className="text-center py-12">
             <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              <svg
+                className="w-10 h-10 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
               </svg>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No invoices found</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              No invoices found
+            </h3>
             <p className="text-gray-600 mb-6">
               {invoices.length === 0
                 ? "Get started by creating your first invoice."
@@ -1175,21 +1364,30 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
                 const totalAmount = parseFloat(invoice.amountRaised) || 0;
                 const receivedAmount = parseFloat(invoice.receivedAmount) || 0;
                 const dbDueAmount = parseFloat(invoice.dueAmount) || 0;
-                
+
                 const calculatedDue = totalAmount - receivedAmount;
                 const isFullyPaidByCalc = Math.abs(calculatedDue) < 0.01;
                 const isFullyPaidByDB = Math.abs(dbDueAmount) < 0.01;
                 const isFullyPaid = isFullyPaidByCalc || isFullyPaidByDB;
-                
-                const dueAmount = isFullyPaid ? 0 : (dbDueAmount || calculatedDue);
+
+                const dueAmount = isFullyPaid
+                  ? 0
+                  : dbDueAmount || calculatedDue;
                 const canCancel = !shouldDisableCancel(invoice);
 
                 return (
-                  <div key={invoice.id} className="p-6 border-b border-gray-100 last:border-b-0">
+                  <div
+                    key={invoice.id}
+                    className="p-6 border-b border-gray-100 last:border-b-0"
+                  >
                     <div className="flex justify-between items-start mb-3">
                       <div>
-                        <h3 className="font-semibold text-gray-900">{invoice.invoiceNumber}</h3>
-                        <p className="text-sm text-gray-600">{invoice.collegeName}</p>
+                        <h3 className="font-semibold text-gray-900">
+                          {invoice.invoiceNumber}
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          {invoice.collegeName}
+                        </p>
                       </div>
                       <div className="flex flex-col gap-1 items-end">
                         {getStatusBadge(invoice)}
@@ -1200,19 +1398,27 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
                     <div className="grid grid-cols-2 gap-4 text-sm mb-4">
                       <div>
                         <label className="text-gray-600">Total</label>
-                        <p className="font-semibold">₹{totalAmount.toLocaleString()}</p>
+                        <p className="font-semibold">
+                          ₹{totalAmount.toLocaleString()}
+                        </p>
                       </div>
                       <div>
                         <label className="text-gray-600">Received</label>
-                        <p className="font-semibold text-green-600">₹{receivedAmount.toLocaleString()}</p>
+                        <p className="font-semibold text-green-600">
+                          ₹{receivedAmount.toLocaleString()}
+                        </p>
                       </div>
                       <div>
                         <label className="text-gray-600">Due</label>
-                        <p className="font-semibold text-red-600">₹{dueAmount.toLocaleString()}</p>
+                        <p className="font-semibold text-red-600">
+                          ₹{dueAmount.toLocaleString()}
+                        </p>
                       </div>
                       <div>
                         <label className="text-gray-600">Type</label>
-                        <p className="font-semibold">{getInvoiceTypeText(invoice.invoiceType)}</p>
+                        <p className="font-semibold">
+                          {getInvoiceTypeText(invoice.invoiceType)}
+                        </p>
                       </div>
                     </div>
 
@@ -1224,7 +1430,8 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
                         View
                       </button>
 
-                      {!isFullyPaid && invoice.approvalStatus !== "cancelled" ? (
+                      {!isFullyPaid &&
+                      invoice.approvalStatus !== "cancelled" ? (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -1236,7 +1443,7 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
                         </button>
                       ) : isFullyPaid ? (
                         <span className="flex-1 bg-green-100 text-green-700 px-3 py-2 rounded-lg text-sm font-medium text-center">
-                         Received
+                          Received
                         </span>
                       ) : null}
 
@@ -1290,15 +1497,18 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
                 <tbody className="divide-y divide-gray-100">
                   {filteredInvoices.map((invoice) => {
                     const totalAmount = parseFloat(invoice.amountRaised) || 0;
-                    const receivedAmount = parseFloat(invoice.receivedAmount) || 0;
+                    const receivedAmount =
+                      parseFloat(invoice.receivedAmount) || 0;
                     const dbDueAmount = parseFloat(invoice.dueAmount) || 0;
-                    
+
                     const calculatedDue = totalAmount - receivedAmount;
                     const isFullyPaidByCalc = Math.abs(calculatedDue) < 0.01;
                     const isFullyPaidByDB = Math.abs(dbDueAmount) < 0.01;
                     const isFullyPaid = isFullyPaidByCalc || isFullyPaidByDB;
-                    
-                    const dueAmount = isFullyPaid ? 0 : (dbDueAmount || calculatedDue);
+
+                    const dueAmount = isFullyPaid
+                      ? 0
+                      : dbDueAmount || calculatedDue;
                     const canCancel = !shouldDisableCancel(invoice);
 
                     return (
@@ -1310,14 +1520,19 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
                         <td className="px-6 py-4">
                           <div>
                             <div className="flex items-center gap-3 mb-1">
-                              <h3 className="font-semibold text-gray-900">{invoice.invoiceNumber}</h3>
+                              <h3 className="font-semibold text-gray-900">
+                                {invoice.invoiceNumber}
+                              </h3>
                               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                 {getInvoiceTypeText(invoice.invoiceType)}
                               </span>
                             </div>
-                            <p className="text-sm text-gray-600">{invoice.collegeName}</p>
+                            <p className="text-sm text-gray-600">
+                              {invoice.collegeName}
+                            </p>
                             <p className="text-xs text-gray-500 mt-1">
-                              {invoice.raisedDate && formatDateForExcel(invoice.raisedDate)}
+                              {invoice.raisedDate &&
+                                formatDateForExcel(invoice.raisedDate)}
                             </p>
                           </div>
                         </td>
@@ -1325,21 +1540,25 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
                           <div className="space-y-1">
                             <div className="flex justify-between text-sm">
                               <span className="text-gray-600">Total:</span>
-                              <span className="font-semibold">₹{totalAmount.toLocaleString()}</span>
+                              <span className="font-semibold">
+                                ₹{totalAmount.toLocaleString()}
+                              </span>
                             </div>
                             <div className="flex justify-between text-sm">
                               <span className="text-gray-600">Received:</span>
-                              <span className="font-semibold text-green-600">₹{receivedAmount.toLocaleString()}</span>
+                              <span className="font-semibold text-green-600">
+                                ₹{receivedAmount.toLocaleString()}
+                              </span>
                             </div>
                             <div className="flex justify-between text-sm">
                               <span className="text-gray-600">Due:</span>
-                              <span className="font-semibold text-red-600">₹{dueAmount.toLocaleString()}</span>
+                              <span className="font-semibold text-red-600">
+                                ₹{dueAmount.toLocaleString()}
+                              </span>
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                          {getStatusBadge(invoice)}
-                        </td>
+                        <td className="px-6 py-4">{getStatusBadge(invoice)}</td>
                         <td className="px-6 py-4">
                           {getPaymentStatusBadge(invoice)}
                         </td>
@@ -1355,7 +1574,8 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
                               View
                             </button>
 
-                            {!isFullyPaid && invoice.approvalStatus !== "cancelled" ? (
+                            {!isFullyPaid &&
+                            invoice.approvalStatus !== "cancelled" ? (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1386,7 +1606,7 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
                                 Cancelled
                               </span>
                             ) : (
-                              <span 
+                              <span
                                 className="inline-flex items-center px-3 py-1.5 bg-gray-100 text-gray-400 rounded-lg text-sm font-medium cursor-not-allowed"
                                 title="Cannot cancel - payment already received"
                               >
@@ -1425,13 +1645,13 @@ const PaymentModal = ({ invoice, onClose, onSubmit }) => {
         )}
       </div>
 
-{paymentModal.isOpen && (
-  <PaymentModal
-    invoice={paymentModal.invoice}
-    onClose={() => setPaymentModal({ isOpen: false, invoice: null })}
-    onSubmit={handleReceivePayment} // This now accepts 3 parameters
-  />
-)}
+      {paymentModal.isOpen && (
+        <PaymentModal
+          invoice={paymentModal.invoice}
+          onClose={() => setPaymentModal({ isOpen: false, invoice: null })}
+          onSubmit={handleReceivePayment} // This now accepts 3 parameters
+        />
+      )}
       {invoiceModal.isOpen && (
         <InvoiceModal
           invoice={invoiceModal.invoice}
