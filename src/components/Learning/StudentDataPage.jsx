@@ -78,7 +78,7 @@ function StudentDataPage({ trainingId, onBack }) {
       setHeaders(expectedHeaders);
 
     } catch (err) {
-
+      console.error("Error loading student data:", err);
       setError(`Failed to load data: ${err.message}`);
     } finally {
       setLoading(false);
@@ -333,7 +333,7 @@ function StudentDataPage({ trainingId, onBack }) {
           fetchStudentData(); // Refresh the displayed data
         }
       } catch (err) {
-
+        console.error("Error importing file:", err);
         setError(`Import error: ${err.message}`);
       } finally {
         setLoading(false);
@@ -512,6 +512,7 @@ function StudentDataPage({ trainingId, onBack }) {
       setStudentData(newStudentData);
       setSelectedRows(new Set());
     } catch (error) {
+      console.error("Error deleting students:", error);
       setError(`Failed to delete students: ${error.message}`);
     }
   };

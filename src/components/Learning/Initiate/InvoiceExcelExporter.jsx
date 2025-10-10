@@ -116,7 +116,7 @@ const InvoiceExcelExporter = ({ db, filteredData, exporting, setExporting }) => 
             amount,
           ]);
         } catch (error) {
-
+          console.error("Error processing invoice:", error);
         }
       }
 

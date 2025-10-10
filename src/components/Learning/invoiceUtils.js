@@ -1,9 +1,52 @@
 // Utility for generating trainer invoice PDF
+import { saveAs } from 'file-saver';
+
 export const generateInvoicePDF = async (invoiceData) => {
   try {
+    console.log('🎯 Starting PDF generation for invoice:', invoiceData?.billNumber);
+    console.log('📊 Invoice data received:', invoiceData);
+
+    // Validate required fields
+    const requiredFields = [
+      'trainerName', 'billNumber', 'projectCode', 'domain', 'startDate', 'endDate',
+      'trainingRate', 'totalHours', 'bankName', 'accountNumber', 'ifscCode', 'panNumber'
+    ];
+
+    const missingFields = requiredFields.filter(field => !invoiceData || !invoiceData[field]);
+    if (missingFields.length > 0) {
+      console.error('❌ Missing required fields:', missingFields);
+      throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+    }
+
     const { default: jsPDF } = await import('jspdf');
     const autoTableModule = await import('jspdf-autotable');
     const autoTable = autoTableModule.default;
+
+    // Ensure all fields have default values
+    const safeInvoiceData = {
+      trainerName: invoiceData.trainerName || 'N/A',
+      billNumber: invoiceData.billNumber || 'N/A',
+      projectCode: invoiceData.projectCode || 'N/A',
+      domain: invoiceData.domain || 'N/A',
+      topics: invoiceData.topics || 'N/A',
+      startDate: invoiceData.startDate || '',
+      endDate: invoiceData.endDate || '',
+      billingDate: invoiceData.billingDate || '',
+      trainingRate: invoiceData.trainingRate || 0,
+      totalHours: invoiceData.totalHours || 0,
+      tds: invoiceData.tds || 0,
+      adhocAdjustment: invoiceData.adhocAdjustment || 0,
+      conveyance: invoiceData.conveyance || 0,
+      food: invoiceData.food || 0,
+      lodging: invoiceData.lodging || 0,
+      bankName: invoiceData.bankName || 'N/A',
+      accountNumber: invoiceData.accountNumber || 'N/A',
+      ifscCode: invoiceData.ifscCode || 'N/A',
+      panNumber: invoiceData.panNumber || 'N/A',
+    };
+
+    console.log('🔧 Using safe invoice data:', safeInvoiceData);
+
     const logo = await import('../../assets/gryphon_logo.png');
 
     const doc = new jsPDF();
@@ -11,11 +54,13 @@ export const generateInvoicePDF = async (invoiceData) => {
     doc.setDrawColor(100);
     doc.setLineWidth(0.5);
     doc.rect(8, 8, 195, 280);
+
     // add logo
     try {
       doc.addImage(logo.default || logo, 'PNG', 15, 9, 30, 15);
-    } catch {
-      // ignore logo errors
+      console.log('✅ Logo added successfully');
+    } catch (logoError) {
+      console.warn('⚠️ Logo loading failed:', logoError);
     }
 
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -53,26 +98,26 @@ export const generateInvoicePDF = async (invoiceData) => {
     yPosition += 10;
     doc.text('From', xPosition, yPosition);
     yPosition += 6;
-    doc.text(`${invoiceData.trainerName}`, xPosition, yPosition);
+    doc.text(`${safeInvoiceData.trainerName}`, xPosition, yPosition);
     yPosition += 4.5;
 
     // Bill & Account details
-    const isJDDomain = invoiceData.domain === 'JD';
+    const isJDDomain = safeInvoiceData.domain === 'JD';
     const projectLabel = isJDDomain ? 'Projects' : 'Project Code';
-    const projectValue = isJDDomain && invoiceData.projectCode.includes(',') 
-      ? invoiceData.projectCode.split(',').map(p => p.trim()).join('\n')
-      : invoiceData.projectCode;
+    const projectValue = isJDDomain && safeInvoiceData.projectCode.includes(',') 
+      ? safeInvoiceData.projectCode.split(',').map(p => p.trim()).join('\n')
+      : safeInvoiceData.projectCode;
 
     autoTable(doc, {
       startY: yPosition,
       body: [
         ['Bill Details', 'Account Details of Trainer'],
-        [`Bill Number: ${invoiceData.billNumber}`, `Name in Bank: ${invoiceData.trainerName}`],
-        [`${projectLabel}: ${projectValue}`, `Bank Name: ${invoiceData.bankName}`],
-        [`Domain: ${invoiceData.domain}`, `Bank Account No: ${invoiceData.accountNumber}`],
-        [`Topic: ${invoiceData.topics}`, `IFSC Code: ${invoiceData.ifscCode}`],
-        [`From: ${formatDate(invoiceData.startDate)}`, `PAN Card: ${invoiceData.panNumber}`],
-        [`To: ${formatDate(invoiceData.endDate)}`, `Billing Date: ${formatDate(invoiceData.billingDate)}`],
+        [`Bill Number: ${safeInvoiceData.billNumber}`, `Name in Bank: ${safeInvoiceData.trainerName}`],
+        [`${projectLabel}: ${projectValue}`, `Bank Name: ${safeInvoiceData.bankName}`],
+        [`Domain: ${safeInvoiceData.domain}`, `Bank Account No: ${safeInvoiceData.accountNumber}`],
+        [`Topic: ${safeInvoiceData.topics}`, `IFSC Code: ${safeInvoiceData.ifscCode}`],
+        [`From: ${formatDate(safeInvoiceData.startDate)}`, `PAN Card: ${safeInvoiceData.panNumber}`],
+        [`To: ${formatDate(safeInvoiceData.endDate)}`, `Billing Date: ${formatDate(safeInvoiceData.billingDate)}`],
       ],
       theme: 'grid',
       styles: { textColor: [0, 0, 0], fontSize: 9, cellPadding: 1.2, valign: 'middle', lineColor: [0, 0, 0], lineWidth: 0.2 },
@@ -87,20 +132,20 @@ export const generateInvoicePDF = async (invoiceData) => {
       }
     });
 
-    const trainingAmount = Math.round(invoiceData.totalHours * invoiceData.trainingRate);
-    const conveyance = invoiceData.conveyance || 0;
-    const food = invoiceData.food || 0;
-    const lodging = invoiceData.lodging || 0;
+    const trainingAmount = Math.round(safeInvoiceData.totalHours * safeInvoiceData.trainingRate);
+    const conveyance = safeInvoiceData.conveyance || 0;
+    const food = safeInvoiceData.food || 0;
+    const lodging = safeInvoiceData.lodging || 0;
     const subTotal = trainingAmount + conveyance + food + lodging;
-    const tdsAmount = (trainingAmount * (invoiceData.tds || 0)) / 100;
-    const adhocAdjustment = invoiceData.adhocAdjustment || 0;
+    const tdsAmount = (trainingAmount * (safeInvoiceData.tds || 0)) / 100;
+    const adhocAdjustment = safeInvoiceData.adhocAdjustment || 0;
     const netPayable = subTotal - tdsAmount + adhocAdjustment;
 
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 6,
       body: [
         ['Charges', 'Rate', 'Total Hrs/Days', 'Total Amount'],
-        ['Training Charges per Hour', `Rs. ${invoiceData.trainingRate}`, `${invoiceData.totalHours}`, `Rs. ${trainingAmount}`],
+        ['Training Charges per Hour', `Rs. ${safeInvoiceData.trainingRate}`, `${safeInvoiceData.totalHours}`, `Rs. ${trainingAmount}`],
         ['Conveyance', '-', '-', `Rs. ${conveyance}`],
         ['Food', '-', '-', `Rs. ${food}`],
         ['Lodging', '-', '-', `Rs. ${lodging}`],
@@ -129,7 +174,7 @@ export const generateInvoicePDF = async (invoiceData) => {
       body: [
         [{ content: 'Summary of Training', colSpan: 2, styles: { halign: 'left', fontSize: 10.5, fonStyle: 'bold', cellPadding: 1.8 } }],
         ['No of Sessions', ''],
-        ['No of Hours', `${invoiceData.totalHours}`],
+        ['No of Hours', `${safeInvoiceData.totalHours}`],
         ['No of Attendees', ''],
         ['Average Students/ Batch', '-']
       ],
@@ -181,10 +226,24 @@ export const generateInvoicePDF = async (invoiceData) => {
 
     doc.setGState(new doc.GState({ opacity: 1 }));
 
-    doc.save(`Invoice_${invoiceData.billNumber || 'NA'}.pdf`);
+    const fileName = `Invoice_${safeInvoiceData.billNumber || 'NA'}.pdf`;
+    console.log('💾 Attempting to save PDF with filename:', fileName);
+
+    // Generate PDF as blob for both download and preview
+    const pdfBlob = doc.output('blob');
+    
+    // Download the file and open in new tab
+    saveAs(pdfBlob, fileName);
+    console.log('✅ PDF download initiated successfully');
+    
+    // Also open in new tab for preview
+    const blobUrl = URL.createObjectURL(pdfBlob);
+    window.open(blobUrl, '_blank');
+    console.log('✅ PDF opened in new tab for preview');
+
     return true;
   } catch (error) {
-
+    console.error('❌ PDF generation failed:', error);
     alert('Failed to generate PDF. Please try again.');
     return false;
   }

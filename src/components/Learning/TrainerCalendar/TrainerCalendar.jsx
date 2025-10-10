@@ -192,7 +192,7 @@ function TrainerCalendar({
         if (typeof prefs.showAllPast === 'boolean') setShowAllPast(prefs.showAllPast);
       }
     } catch (e) {
-
+      console.error("Error loading calendar preferences from localStorage:", e);
     }
   }, []);
 
@@ -216,7 +216,7 @@ function TrainerCalendar({
         snap.forEach(d => list.push({ id: d.id, ...d.data() }));
         if (mounted) setTrainers(list);
       } catch (err) {
-
+        console.error("Error fetching trainers data:", err);
       }
     })();
     return () => { mounted = false; };

@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { doc, updateDoc, getDoc, setDoc, deleteDoc, query, where, getDocs, collection } from "firebase/firestore";
 import { db } from "../../../firebase";
+import { useAuth } from "../../../context/AuthContext";
 import {
   FiX,
   FiChevronDown,
@@ -19,9 +20,14 @@ import {
   FiPlus,
   FiTrash2,
   FiHash,
+  FiAlertTriangle,
 } from "react-icons/fi";
 
+const projectCodeToDocId = (projectCode) =>
+  projectCode ? projectCode.replace(/\//g, "-") : "";
+
 const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     businessName: "",
     projectCode: "",
@@ -72,7 +78,46 @@ const EditClosedLeadModal = ({ lead, onClose, onSave }) => {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [topicErrors, setTopicErrors] = useState([]);
   const [paymentErrors, setPaymentErrors] = useState([]);
+  const [duplicateProjectCode, setDuplicateProjectCode] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const progressRef = useRef(0);
   const sections = ["basic", "contacts", "course", "topics", "financial"];
+
+  // Progress bar animation effect
+  useEffect(() => {
+    let interval;
+    if (loading) {
+      setProgress(0);
+      progressRef.current = 0;
+      interval = setInterval(() => {
+        setProgress(prev => {
+          if (prev >= 85) return prev;
+          const increment = Math.random() * 10 + 5; // 5-15 increment
+          const newProgress = Math.min(prev + increment, 85);
+          progressRef.current = newProgress;
+          return newProgress;
+        });
+      }, 200);
+    } else {
+      // When loading completes, smoothly animate to 100%
+      const animateToComplete = () => {
+        const currentProgress = progressRef.current;
+        if (currentProgress >= 100) return;
+        
+        const newProgress = Math.min(currentProgress + 8, 100);
+        progressRef.current = newProgress;
+        setProgress(newProgress);
+        
+        if (newProgress < 100) {
+          setTimeout(animateToComplete, 50);
+        }
+      };
+      animateToComplete();
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [loading]);
 
 // Helper for number display
 const numValue = (val) => (val === 0 || val === "0" ? "" : val);
@@ -411,6 +456,8 @@ const formatIndianNumber = (num, decimals = 2) => {
     setLoading(true);
     setError(null);
 
+    let success = false;
+
     try {
       // Validate required fields
       if (!formData.collegeName || formData.collegeName.trim() === "") {
@@ -439,6 +486,7 @@ const formatIndianNumber = (num, decimals = 2) => {
         course: formData.course?.replace(/\s+$/, ''), // Trim trailing spaces from course
         deliveryType: formData.deliveryType?.replace(/\s+$/, ''), // Trim trailing spaces from deliveryType
         updatedAt: new Date(),
+        updatedBy: user?.email || user?.displayName || "Unknown User",
       };
 
       if (projectCodeChanged) {
@@ -461,6 +509,7 @@ const formatIndianNumber = (num, decimals = 2) => {
           businessName: trimmedCollegeName, // Sync both fields
           course: formData.course?.replace(/\s+$/, ''), // Trim trailing spaces from course
           deliveryType: formData.deliveryType?.replace(/\s+$/, ''), // Trim trailing spaces from deliveryType
+          updatedBy: user?.email || user?.displayName || "Unknown User",
         };
 
         // Delete old document in trainingForms
@@ -490,7 +539,7 @@ const formatIndianNumber = (num, decimals = 2) => {
         const leadsQuery = query(collection(db, "leads"), where("projectCode", "==", originalProjectCode));
         const leadsSnapshot = await getDocs(leadsQuery);
         leadsSnapshot.forEach(async (docSnap) => {
-          await updateDoc(docSnap.ref, { projectCode: newProjectCode, collegeName: trimmedCollegeName, businessName: trimmedCollegeName, totalCost: formData.totalCost, updatedAt: new Date() });
+          await updateDoc(docSnap.ref, { projectCode: newProjectCode, collegeName: trimmedCollegeName, businessName: trimmedCollegeName, totalCost: formData.totalCost, updatedAt: new Date(), updatedBy: user?.email || user?.displayName || "Unknown User" });
         });
       } else {
         // Normal update if Project Code didn't change
@@ -535,20 +584,45 @@ const formatIndianNumber = (num, decimals = 2) => {
         const leadsQuery = query(collection(db, "leads"), where("projectCode", "==", newProjectCode));
         const leadsSnapshot = await getDocs(leadsQuery);
         leadsSnapshot.forEach(async (docSnap) => {
-          await updateDoc(docSnap.ref, { collegeName: trimmedCollegeName, businessName: trimmedCollegeName, totalCost: formData.totalCost, updatedAt: new Date() });
+          await updateDoc(docSnap.ref, { collegeName: trimmedCollegeName, businessName: trimmedCollegeName, totalCost: formData.totalCost, updatedAt: new Date(), updatedBy: user?.email || user?.displayName || "Unknown User" });
         });
       }
 
-      onSave();
-      onClose();
+      success = true;
     } catch (err) {
 
       setError(err.message || "Failed to update lead. Please check your connection and try again.");
     } finally {
       setLoading(false);
+      // Delay form closing to allow progress bar to reach 100% and be visible
+      setTimeout(() => {
+        if (success) {
+          onSave();
+          onClose();
+        }
+      }, 800);
     }
   };
-  const projectCodeToDocId = (projectCode) => projectCode.replace(/\//g, "-");
+  const checkDuplicateProjectCode = async (projectCode, excludeDocId = null) => {
+    try {
+      const sanitizedProjectCode = projectCode.replace(/\//g, "-");
+      const formRef = doc(db, "trainingForms", sanitizedProjectCode);
+      const existingDoc = await getDoc(formRef);
+      
+      // If document exists and it's not the current lead being edited, it's a duplicate
+      if (existingDoc.exists()) {
+        // If we have an excludeDocId, check if this is the same document
+        if (excludeDocId) {
+          const currentDocId = projectCodeToDocId(excludeDocId);
+          return sanitizedProjectCode !== currentDocId;
+        }
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  };
 
   // Function to update trainerAssignments collection when project code changes
   const updateTrainerAssignments = async (oldProjectCode, newProjectCode) => {
@@ -743,20 +817,22 @@ const formatIndianNumber = (num, decimals = 2) => {
     }
   };
 
-  // Validation function to check if form can be submitted
-  const canSubmit = () => {
-    // College code is required
-    if (!formData.collegeCode || formData.collegeCode.trim() === '') {
-      return false;
-    }
-    // Topics validation (existing)
-    if (activeSection === "topics" && topicErrors.some(e => !!e)) {
-      return false;
-    }
-    return true;
-  };
-
-// Update handleChange to auto-update projectCode when collegeCode changes
+// Validation function to check if form can be submitted
+const canSubmit = () => {
+  // College code is required
+  if (!formData.collegeCode || formData.collegeCode.trim() === '') {
+    return false;
+  }
+  // Check for duplicate project code
+  if (duplicateProjectCode) {
+    return false;
+  }
+  // Topics validation (existing)
+  if (activeSection === "topics" && topicErrors.some(e => !!e)) {
+    return false;
+  }
+  return true;
+};// Update handleChange to auto-update projectCode when collegeCode changes
 const handleChange = (e) => {
   const { name, value } = e.target;
   let updatedFormData = { ...formData, [name]: value };
@@ -857,7 +933,22 @@ const handleChange = (e) => {
   }
 
   setFormData(updatedFormData);
-};  if (!lead) return null;
+};
+
+// Add useEffect to check for duplicate project codes when project code changes
+useEffect(() => {
+  if (formData.projectCode && formData.projectCode.trim() !== '') {
+    checkDuplicateProjectCode(formData.projectCode, lead?.projectCode).then((isDuplicate) => {
+      setDuplicateProjectCode(isDuplicate);
+    }).catch(() => {
+      setDuplicateProjectCode(false);
+    });
+  } else {
+    setDuplicateProjectCode(false);
+  }
+}, [formData.projectCode, lead?.projectCode]);
+
+  if (!lead) return null;
 
   return (
     <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-[100] p-2">
@@ -889,8 +980,12 @@ const handleChange = (e) => {
               </button>
               <button
                 onClick={handleSubmit}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                disabled={loading}
+                className={`px-4 py-2 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  canSubmit() && !loading
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    : "bg-gray-400 text-gray-200 cursor-not-allowed"
+                }`}
+                disabled={loading || !canSubmit()}
               >
                 {loading ? "Submitting..." : "Confirm"}
               </button>
@@ -898,7 +993,26 @@ const handleChange = (e) => {
           </div>
         </div>
       )}
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col relative">
+        {/* Loading Overlay */}
+        {loading && (
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-indigo-100 bg-opacity-95 backdrop-blur-md flex items-center justify-center z-50 rounded-xl border-2 border-blue-200">
+            <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center max-w-sm mx-4">
+              <div className="relative mb-4">
+                <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                <div className="absolute inset-0 w-16 h-16 border-4 border-transparent border-t-indigo-500 rounded-full animate-spin" style={{animationDirection: 'reverse', animationDuration: '1.5s'}}></div>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-800 mb-2">Submitting Changes</h3>
+              <p className="text-sm text-gray-600 text-center">Please wait while we process your request...</p>
+              <div className="mt-4 w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                <div 
+                  className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-full transition-all duration-300 ease-out"
+                  style={{width: `${Math.min(progress, 100)}%`}}
+                ></div>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-3">
           <div className="flex justify-between items-center mb-2">
@@ -908,7 +1022,7 @@ const handleChange = (e) => {
             </span>
             <div className="flex items-center space-x-2">
               <span className="text-blue-100 text-xs">
-                Last updated: {new Date(lead.updatedAt?.toDate() || new Date()).toLocaleDateString()}
+                Last updated: {new Date(lead.updatedAt?.toDate() || new Date()).toLocaleDateString()} by {lead.updatedBy || lead.lastUpdatedBy || lead.updatedByName || user?.displayName || user?.email || "Unknown User"}
               </span>
               <button
                 onClick={onClose}
@@ -949,6 +1063,16 @@ const handleChange = (e) => {
             ))}
           </div>
         </div>
+
+        {/* Duplicate Project Code Error */}
+        {duplicateProjectCode && (
+          <div className="bg-red-100 border border-red-300 text-red-700 px-4 py-2 mx-3 rounded-lg shadow-lg">
+            <div className="flex items-center">
+              <FiAlertTriangle className="h-4 w-4 mr-2" />
+              <span className="text-sm font-medium">Error: This project code already exists in the system!</span>
+            </div>
+          </div>
+        )}
 
         {/* Form Content */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-auto">
@@ -1838,11 +1962,25 @@ const handleChange = (e) => {
                                 isCustomDeliveryType: true
                               }));
                             } else {
-                              setFormData(prev => ({
-                                ...prev,
-                                deliveryType: value,
-                                isCustomDeliveryType: false
-                              }));
+                              setFormData(prev => {
+                                const currentProjectCode = prev.projectCode || "";
+                                const parts = currentProjectCode.split("/");
+                                if (parts.length >= 5) {
+                                  parts[3] = value; // Update delivery type in project code
+                                  return {
+                                    ...prev,
+                                    deliveryType: value,
+                                    isCustomDeliveryType: false,
+                                    projectCode: parts.join("/")
+                                  };
+                                } else {
+                                  return {
+                                    ...prev,
+                                    deliveryType: value,
+                                    isCustomDeliveryType: false
+                                  };
+                                }
+                              });
                             }
                           }}
                           className="block w-full pl-3 pr-10 py-1 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
@@ -2338,12 +2476,52 @@ const handleChange = (e) => {
           </div>
           {/* Footer - Modify the submit button to show confirmation */}
           <div className="bg-gray-50 px-3 py-2 border-t flex justify-between items-center">
-            <div className="text-xs text-gray-500">
-              {loading
-                ? "Saving changes..."
-                : `Section ${sections.indexOf(activeSection) + 1} of ${
-                    sections.length
+            <div className="flex items-center space-x-4">
+              <div className="text-xs text-gray-500">
+                {loading
+                  ? "Saving changes..."
+                  : `Section ${sections.indexOf(activeSection) + 1} of ${
+                      sections.length
+                    }`}
+              </div>
+              {/* Submit button on left for all sections except final */}
+              {activeSection !== sections[sections.length - 1] && (
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmation(true)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 flex items-center ${
+                    canSubmit() && !loading
+                      ? "bg-green-600 text-white hover:bg-green-700 focus:ring-green-500"
+                      : "bg-gray-400 text-gray-200 cursor-not-allowed"
                   }`}
+                  disabled={loading || !canSubmit()}
+                  title={!canSubmit() ? "Please fill in the required College Code field" : "Submit changes"}
+                >
+                  Submit Changes
+                  {loading && (
+                    <svg
+                      className="animate-spin h-4 w-4 ml-1.5 -mr-1 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M12 6V4a8 8 0 018 8h-2a6 6 0 01-6-6z"
+                      />
+                    </svg>
+                  )}
+                </button>
+              )}
             </div>
             <div className="flex space-x-2">
               {activeSection !== sections[0] && (
@@ -2371,42 +2549,44 @@ const handleChange = (e) => {
                 </button>
               )}
 
-              {/* Submit button available on all sections */}
-              <button
-                type="button"
-                onClick={() => setShowConfirmation(true)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 flex items-center ${
-                  canSubmit() && !loading
-                    ? "bg-green-600 text-white hover:bg-green-700 focus:ring-green-500"
-                    : "bg-gray-400 text-gray-200 cursor-not-allowed"
-                }`}
-                disabled={loading || !canSubmit()}
-                title={!canSubmit() ? "Please fill in the required College Code field" : "Submit changes"}
-              >
-                Submit Changes
-                {loading && (
-                  <svg
-                    className="animate-spin h-4 w-4 ml-1.5 -mr-1 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M12 6V4a8 8 0 018 8h-2a6 6 0 01-6-6z"
-                    />
-                  </svg>
-                )}
-              </button>
+              {/* Submit button on right for final section */}
+              {activeSection === sections[sections.length - 1] && (
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmation(true)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 flex items-center ${
+                    canSubmit() && !loading
+                      ? "bg-green-600 text-white hover:bg-green-700 focus:ring-green-500"
+                      : "bg-gray-400 text-gray-200 cursor-not-allowed"
+                  }`}
+                  disabled={loading || !canSubmit()}
+                  title={!canSubmit() ? "Please fill in the required College Code field" : "Submit changes"}
+                >
+                  Submit Changes
+                  {loading && (
+                    <svg
+                      className="animate-spin h-4 w-4 ml-1.5 -mr-1 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M12 6V4a8 8 0 018 8h-2a6 6 0 01-6-6z"
+                      />
+                    </svg>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </form>

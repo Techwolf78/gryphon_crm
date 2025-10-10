@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { db } from "../../firebase";
 import { doc, getDoc, collection, addDoc, updateDoc } from "firebase/firestore";
 import { query, where, getDocs } from "firebase/firestore";
-import {  FiX, FiEdit2, FiEye, FiFileText, FiSave, FiArrowLeft } from "react-icons/fi";
+import {  FiX, FiEdit2, FiEye, FiFileText, FiSave, FiArrowLeft, FiCheckCircle, FiXCircle, FiAlertCircle } from "react-icons/fi";
 
 // Import the standardized PDF generation function
 
@@ -21,7 +21,7 @@ const roundToNearestWhole = (num) => {
   return Math.round(num);
 };
 
-function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
+function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
   const days = getTrainingDays(trainer?.earliestStartDate, trainer?.latestEndDate);
     const [invoiceData, setInvoiceData] = useState({
     billNumber: `INV-${Date.now()}`,
@@ -68,10 +68,12 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
             trainerPhone: data.phone || "",
           }));
         } else {
-
+          // Trainer document doesn't exist - this is expected for new trainers
+          console.warn(`Trainer document not found for trainerId: ${trainer?.trainerId}`);
         }
       } catch (error) {
-
+        console.error('Error fetching trainer bank details:', error);
+        // Continue with empty bank details - user can still fill them manually
       }
     };
 
@@ -105,7 +107,8 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated }) {
           }));
         }
       } catch (error) {
-
+        console.error('Error checking for existing invoice:', error);
+        // Continue without existing invoice - user can create a new one
       }
     };
 
@@ -139,22 +142,22 @@ const handleSubmit = async (e) => {
 
     if (existingInvoice && editMode) {
       await updateDoc(doc(db, "invoices", existingInvoice.id), invoiceToSave);
-      alert("Invoice updated successfully!");
+      onToast({ type: 'success', message: "Changes applied successfully!" });
     } else {
       invoiceToSave.createdAt = new Date();
       const docRef = await addDoc(collection(db, "invoices"), invoiceToSave);
-      alert("Invoice generated successfully!");
+      onToast({ type: 'success', message: "Invoice generated successfully!" });
       setExistingInvoice({ id: docRef.id, ...invoiceToSave });
     }
 
-    await onInvoiceGenerated(); // Wait for data refresh to complete
+    await onInvoiceGenerated(invoiceToSave); // Pass the invoice data for undo functionality
     setEditMode(false);
     setViewMode(true);
     onClose();
 
   } catch (error) {
-
-    alert("Error saving invoice. Please try again.");
+    console.error('Error generating/updating invoice:', error);
+    onToast({ type: 'error', message: "Invoice not generated. Please try again." });
   } finally {
     setIsGenerating(false);
   }

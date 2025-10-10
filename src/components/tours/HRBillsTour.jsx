@@ -30,7 +30,7 @@ const getTourStatus = async (userId, tourKey) => {
         return firestoreStatus || null;
       }
     } catch (error) {
-
+      console.error("Error getting tour status from Firestore:", error);
     }
   }
 
@@ -47,7 +47,7 @@ const setTourStatus = async (userId, tourKey, status) => {
       const docRef = doc(db, "hrtour", userId);
       await setDoc(docRef, { [tourKey]: status }, { merge: true });
     } catch (error) {
-
+      console.error("Error setting tour status in Firestore:", error);
     }
   }
 };
@@ -160,7 +160,7 @@ export default function HRBillsTour({ userId, enabled = true }) {
         setCompleted(true);
         setRun(false);
       } catch (error) {
-
+        console.error("Error setting tour completion status:", error);
       }
     }
 

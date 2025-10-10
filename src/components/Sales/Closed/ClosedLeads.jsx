@@ -49,7 +49,7 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
       setActiveLeadData(leadData);
       setShowMOUUploadModal(true);
     } else {
-
+      console.warn("Lead data not found for ID:", leadId);
     }
   };
 
@@ -72,7 +72,7 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
         alert("Training form data not found in Firestore!");
       }
     } catch (error) {
-
+      console.error("Error fetching training form data:", error);
       alert("Failed to fetch form data");
     }
   };
@@ -145,7 +145,7 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
 
 
         } catch (error) {
-
+          console.error("Error enriching lead data:", error);
           enriched[id] = lead;
         }
       })

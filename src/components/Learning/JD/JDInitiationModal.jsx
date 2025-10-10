@@ -19,6 +19,7 @@ import {
   FiCheck,
   FiAlertCircle,
   FiX,
+  FiClock,
 } from "react-icons/fi";
 import JDBatchTable from "./JDBatchTable";
 import DatePicker from "react-datepicker";
@@ -170,8 +171,11 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
             });
           });
           // Filter out assignments that belong to the current training to avoid self-conflict
+          // For JD training (merged across colleges), filter by both the merged training ID and selected colleges
+          const jdTrainingId = selectedColleges?.length > 0 ? `${selectedColleges[0].id}-JD-merged` : `${training?.id}-JD-merged`;
+          const selectedCollegeNames = selectedColleges?.map(c => c.collegeName) || [];
           const filtered = assignments.filter(
-            (a) => a.sourceTrainingId !== (training?.id || "")
+            (a) => a.sourceTrainingId !== jdTrainingId && !selectedCollegeNames.some(collegeName => a.collegeName.includes(collegeName))
           );
           if (!cancelled) setGlobalTrainerAssignments(filtered);
         } catch (err) {
@@ -188,7 +192,7 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
       cancelled = true;
       if (unsubscribe) unsubscribe();
     };
-  }, [training?.id]);
+  }, [training?.id, selectedColleges]);
 
   const validateForm = () => {
     if (!commonFields.trainingStartDate || !commonFields.trainingEndDate) {
@@ -485,27 +489,12 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-        {/* Page Header */}
-        <div className="bg-white shadow-sm border-b border-gray-200">
-          <div className="mx-auto p-3">
-            <div className="flex items-center justify-between">
-              {/* Left: Back */}
-              <div className="flex-1">
-                {onBack && (
-                  <button
-                    onClick={onBack}
-                    className="inline-flex items-center text-blue-600 hover:text-blue-800 transition-colors text-xs font-medium"
-                    disabled={loading}
-                  >
-                    <FiChevronLeft className="w-3 h-3 mr-1" />
-                    Back to Operations
-                  </button>
-                )}
-              </div>
-              {/* Center: College Name */}
-              <div className="flex-1 text-center">
-                <h1 className="text-sm font-semibold text-gray-800 leading-tight">
+      <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-6xl shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto">
+          <div className="mt-3">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
                   {selectedColleges?.length > 0 ? (
                     <>
                       {selectedColleges.length === 1 
@@ -523,25 +512,33 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                       JD Training Setup
                     </span>
                   )}
-                </h1>
-                <p className="mt-0.5 text-[10px] tracking-wide uppercase text-gray-400">
-                  JD Training Initiation
+                </h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Configure training details for merged colleges ({selectedColleges?.length || 0} colleges)
                 </p>
               </div>
-              {/* Right: Placeholder for spacing / future actions */}
-              <div className="flex-1 text-right hidden sm:block">
-                {/* Reserved for future quick actions */}
+              <div className="flex items-center space-x-2">
+                {onBack && (
+                  <button
+                    onClick={onBack}
+                    className="flex items-center px-3 py-1 rounded text-sm font-medium transition-colors text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                    disabled={loading}
+                  >
+                    <FiChevronLeft className="w-4 h-4 mr-1" />
+                    Back
+                  </button>
+                )}
+                <button
+                  onClick={onClose}
+                  className="text-gray-400 hover:text-gray-600"
+                  disabled={loading}
+                >
+                  <FiX className="w-6 h-6" />
+                </button>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Main Content */}
-        <div className="mx-auto py-3">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            {/* Page Content */}
-            <div className="p-3">
-              <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Selected Colleges Summary */}
                 <div className="space-y-3">
                   <div className="pb-2 border-b border-gray-200">
@@ -580,7 +577,7 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                     ))}
                   </div>
                   <div className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded p-2">
-                    ?? Trainer costs will be divided equally among these {selectedColleges.length} colleges
+                    💰 Trainer costs will be divided equally among these {selectedColleges.length} colleges
                   </div>
                 </div>
 
@@ -751,10 +748,9 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                   </div>
                 )}
               </form>
-            </div>
 
-            {/* Page Footer */}
-            <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 rounded-b-lg">
+              {/* Page Footer */}
+              <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 rounded-b-lg">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <button

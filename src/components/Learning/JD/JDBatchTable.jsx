@@ -6,6 +6,7 @@ import {
   FiTrash2,
   FiEye,
   FiEyeOff,
+  FiAlertCircle,
 } from "react-icons/fi";
 import { FaRupeeSign } from "react-icons/fa";
 import Select from 'react-select';
@@ -33,7 +34,7 @@ const JDBatchTable = ({
       });
       setTrainers(trainerList);
     } catch (error) {
-
+      console.error("Error fetching trainers:", error);
     }
   }, []);
 
@@ -138,7 +139,7 @@ const JDBatchTable = ({
           current.setDate(current.getDate() + 1);
         }
       } catch (error) {
-
+        console.error("Error processing trainer dates:", error);
       }
 
       return dates;
@@ -221,7 +222,7 @@ const JDBatchTable = ({
                     }
                   }
                 } catch (error) {
-
+                  console.error("Error processing assignment dates:", error);
                 }
               }
 

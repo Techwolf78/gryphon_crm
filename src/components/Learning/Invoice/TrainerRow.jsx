@@ -8,6 +8,7 @@ import {
   FiCheckCircle,
   FiClock,
   FiRefreshCw,
+  FiTrash2,
 } from "react-icons/fi";
 import { FaEye, FaRupeeSign } from "react-icons/fa";
 import { collection, query, where, getDocs, doc, updateDoc } from "firebase/firestore";
@@ -21,6 +22,9 @@ function TrainerRow({
   downloadingInvoice,
   getDownloadStatus,
   formatDate,
+  recentlyGeneratedInvoices,
+  handleUndoInvoice,
+  countdownTimers
 }) {
   const [invoiceData, setInvoiceData] = useState(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -51,16 +55,9 @@ function TrainerRow({
             ...invoiceDoc.data(),
           };
           
-          console.log(`💾 TrainerRow fetched invoice data for ${item.trainerName}:`, {
-            invoiceId: fetchedInvoiceData.id,
-            status: fetchedInvoiceData.status,
-            payment: fetchedInvoiceData.payment,
-            invoice: fetchedInvoiceData.invoice
-          });
-          
           setInvoiceData(fetchedInvoiceData);
         } else {
-          console.log(`❌ TrainerRow: No invoice found for ${item.trainerName} despite hasExistingInvoice=true`);
+          // No invoice found - this is expected for trainers without invoices
         }
       } catch (fetchError) {
         console.error(`🚨 TrainerRow invoice fetch failed for ${item.trainerName}:`, fetchError);
@@ -108,16 +105,6 @@ function TrainerRow({
 
   // Determine UI status based on invoice data
   const getUiStatus = () => {
-    console.log(`🎯 getUiStatus for ${item.trainerName}:`, {
-      invoiceData: invoiceData ? 'exists' : 'null',
-      payment: invoiceData?.payment,
-      invoice: invoiceData?.invoice,
-      calculatedStatus: !invoiceData ? "pending" 
-        : invoiceData.payment === true ? "done"
-        : invoiceData.invoice === true ? "pending" 
-        : "approve"
-    });
-    
     if (!invoiceData) return "pending";
 
     if (invoiceData.payment === true) {
@@ -210,61 +197,82 @@ function TrainerRow({
       </td>
       <td className="px-3 py-3">
         <div className="space-y-2 min-w-0">
-          {(() => {
-            // 🐛 DEBUG: Log button rendering logic
-            console.log(`🎛️ Button logic for ${item.trainerName}:`, {
-              hasExistingInvoice: item.hasExistingInvoice,
-              invoiceAvailable: invoiceAvailable,
-              willShowExistingButtons: item.hasExistingInvoice,
-              willShowGenerateButton: !item.hasExistingInvoice && invoiceAvailable,
-              willShowUnavailable: !item.hasExistingInvoice && !invoiceAvailable
-            });
-            return null;
-          })()}
-          
           {item.hasExistingInvoice ? (
             <>
-              {console.log(`✅ Rendering EXISTING invoice buttons for ${item.trainerName}`)}
-              {/* Compact Action Buttons - Single Row */}
-              <div className="flex gap-1 w-full">
-                <button
-                  onClick={() => handleDownloadInvoice(item)}
-                  disabled={
-                    downloadingInvoice ===
-                    `${item.trainerId}_${item.collegeName}_${item.phase}`
-                  }
-                  className="flex-1 inline-flex items-center justify-center px-2 py-1.5 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-50 transition-all"
-                >
-                  <FiDownload className="w-3 h-3 mr-1" />
-                  Download
-                </button>
+              {/* Check if this trainer has a recently generated invoice for undo */}
+              {(() => {
+                const undoInvoice = recentlyGeneratedInvoices?.find(inv => 
+                  inv.trainerId === item.trainerId && 
+                  inv.collegeName === item.collegeName && 
+                  inv.phase === item.phase
+                );
+                const hasUndoOption = !!undoInvoice;
+                const timeLeft = hasUndoOption ? countdownTimers?.[undoInvoice?.id] || Math.max(0, Math.ceil((undoInvoice?.expiresAt - Date.now()) / 1000)) : 0;
                 
-                <button
-                  onClick={() => handleEditInvoice(item)}
-                  className="flex-1 inline-flex items-center justify-center px-2 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-all"
-                >
-                  <FaEye className="w-3 h-3 mr-1" />
-                  View
-                </button>
-                
-                {uiStatus === "approve" && (
-                  <button
-                    onClick={updateInvoiceStatus}
-                    disabled={updatingStatus}
-                    className="flex-1 inline-flex items-center justify-center px-2 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700 transition-all disabled:opacity-50"
-                  >
-                    {updatingStatus ? (
-                      <FiRefreshCw className="animate-spin w-3 h-3 mr-1" />
-                    ) : (
-                      <>
-                        <span className="mr-1">✓</span>
-                        Approve
-                      </>
+                return (
+                  <>
+                    {/* Compact Action Buttons - Single Row */}
+                    <div className={`flex gap-1 w-full ${hasUndoOption ? 'grid grid-cols-4' : ''}`}>
+                      <button
+                        onClick={() => handleDownloadInvoice(item)}
+                        disabled={
+                          downloadingInvoice ===
+                          `${item.trainerId}_${item.collegeName}_${item.phase}`
+                        }
+                        className={`${hasUndoOption ? 'col-span-1' : 'flex-1'} inline-flex items-center justify-center px-2 py-1.5 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-50 transition-all`}
+                      >
+                        <FiDownload className="w-3 h-3 mr-1" />
+                        Download
+                      </button>
+                      
+                      <button
+                        onClick={() => handleEditInvoice(item)}
+                        className={`${hasUndoOption ? 'col-span-1' : 'flex-1'} inline-flex items-center justify-center px-2 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-all`}
+                      >
+                        <FaEye className="w-3 h-3 mr-1" />
+                        View
+                      </button>
+                      
+                      {uiStatus === "approve" && (
+                        <button
+                          onClick={updateInvoiceStatus}
+                          disabled={updatingStatus}
+                          className={`${hasUndoOption ? 'col-span-1' : 'flex-1'} inline-flex items-center justify-center px-2 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700 transition-all disabled:opacity-50`}
+                        >
+                          {updatingStatus ? (
+                            <FiRefreshCw className="animate-spin w-3 h-3 mr-1" />
+                          ) : (
+                            <>
+                              <span className="mr-1">✓</span>
+                              Approve
+                            </>
+                          )}
+                        </button>
+                      )}
+                      
+                      {hasUndoOption && timeLeft > 0 && (
+                        <button
+                          onClick={() => handleUndoInvoice(undoInvoice)}
+                          className="col-span-1 inline-flex items-center justify-center px-2 py-1.5 text-xs font-medium text-white bg-red-500 rounded hover:bg-red-600 transition-all"
+                        >
+                          <FiTrash2 className="w-3 h-3 mr-1" />
+                          Undo
+                        </button>
+                      )}
+                    </div>
+                    
+                    {/* Show countdown timer below buttons if undo is available */}
+                    {hasUndoOption && timeLeft > 0 && (
+                      <div className="text-center mt-1">
+                        <span className="text-xs text-red-600 font-mono bg-red-50 px-2 py-0.5 rounded">
+                          Undo expires in {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+                        </span>
+                      </div>
                     )}
-                  </button>
-                )}
-              </div>
-
+                  </>
+                );
+              })()}
+              
               {/* Enhanced Remarks Section */}
               {invoiceData?.remarks && (
                 <div className="bg-gray-50 p-3 rounded-lg border">
@@ -284,7 +292,6 @@ function TrainerRow({
             </>
           ) : invoiceAvailable ? (
             <>
-              {console.log(`🚀 Rendering GENERATE invoice button for ${item.trainerName}`)}
               <div className="flex justify-center">
                 <button
                   onClick={() => handleGenerateInvoice(item)}
@@ -297,7 +304,6 @@ function TrainerRow({
             </>
           ) : (
             <>
-              {console.log(`⏰ Rendering UNAVAILABLE message for ${item.trainerName}`)}
               <div className="text-center space-y-2">
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                   <div className="text-xs text-amber-700 flex items-center justify-center mb-2">

@@ -847,7 +847,7 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
         const deletePromises = snap.docs.map(doc => deleteDoc(doc.ref));
         await Promise.all(deletePromises);
       } else {
-
+        // No training phases to delete
       }
       
       // Commit all deletions
@@ -860,13 +860,13 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
       try {
         localStorage.removeItem(`ld_initiation_trainings_${selectedUserFilter || user?.uid}`);
       } catch (cacheError) {
-
+        console.error("Error clearing cache:", cacheError);
       }
       
       setShowDeleteConfirm(false);
       setSelectedTrainingForDelete(null);
     } catch (error) {
-
+      console.error("Failed to delete training:", error);
       // Optionally show error toast or alert
       alert("Failed to delete training. Please try again.");
       setShowDeleteConfirm(false);
@@ -906,8 +906,8 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
         localStorage.removeItem(
           `ld_initiation_trainings_${selectedUserFilter || user?.uid}`
         );
-      } catch {
-        // Error clearing cache
+      } catch (cacheError) {
+        console.error("Error clearing cache:", cacheError);
       }
 
       // Show undo toast
@@ -922,7 +922,8 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
         prevStatus,
         timer,
       });
-    } catch {
+    } catch (error) {
+      console.error("Failed to update status:", error);
       // Failed to update status
       fetchData();
     }
@@ -963,10 +964,11 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
           localStorage.removeItem(
             `ld_initiation_trainings_${selectedUserFilter || user?.uid}`
           );
-        } catch {
-          // Error clearing cache
+        } catch (cacheError) {
+          console.error("Error clearing cache:", cacheError);
         }
-      } catch {
+      } catch (error) {
+        console.error("Failed to undo status:", error);
         // Failed to undo status
         fetchData();
       }
@@ -1007,10 +1009,11 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
         localStorage.removeItem(
           `ld_initiation_trainings_${selectedUserFilter || user?.uid}`
         );
-      } catch {
-        // Error clearing cache
+      } catch (cacheError) {
+        console.error("Error clearing cache:", cacheError);
       }
-    } catch {
+    } catch (error) {
+      console.error("Failed to undo assignment:", error);
       // Failed to undo assignment
       fetchData();
     }
@@ -1029,8 +1032,8 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
   useEffect(() => {
     try {
       localStorage.setItem("ld_initiation_activeStatusTab", activeStatusTab);
-    } catch {
-      // ignore storage errors
+    } catch (error) {
+      console.error("Error persisting active status tab:", error);
     }
   }, [activeStatusTab]);
 
@@ -1038,8 +1041,8 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
   useEffect(() => {
     try {
       localStorage.setItem("ld_initiation_activeHealthTab", activeHealthTab);
-    } catch {
-      // ignore storage errors
+    } catch (error) {
+      console.error("Error persisting active health tab:", error);
     }
   }, [activeHealthTab]);
 
@@ -1050,8 +1053,8 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
         "ld_initiation_selectedUserFilter",
         selectedUserFilter
       );
-    } catch {
-      // ignore storage errors
+    } catch (error) {
+      console.error("Error persisting selected user filter:", error);
     }
   }, [selectedUserFilter]);
 
@@ -1060,8 +1063,8 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
     try {
       localStorage.setItem("ld_initiation_dateFilterStart", dateFilterStart);
       localStorage.setItem("ld_initiation_dateFilterEnd", dateFilterEnd);
-    } catch {
-      // ignore storage errors
+    } catch (error) {
+      console.error("Error persisting date filter:", error);
     }
   }, [dateFilterStart, dateFilterEnd]);
 
@@ -1096,10 +1099,11 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
         localStorage.removeItem(
           `ld_initiation_trainings_${selectedUserFilter || user?.uid}`
         );
-      } catch {
-        // ignore storage errors
+      } catch (cacheError) {
+        console.error("Error clearing cache:", cacheError);
       }
-    } catch {
+    } catch (error) {
+      console.error("Failed to revert to automatic status:", error);
       fetchData();
     }
   };

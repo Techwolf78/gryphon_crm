@@ -30,6 +30,71 @@ import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "../../firebase";
 import ReactModal from "react-modal"; // Add this import at the top
 
+const formatCurrency = (amount) => {
+  const numAmount = Number(amount);
+  if (numAmount > 10000000) {
+    const crores = numAmount / 10000000;
+    let str = crores.toFixed(4);
+    str = str.replace(/\.?0+$/, '');
+    return `₹${str} cr`;
+  } else {
+    return `₹${numAmount.toLocaleString('en-IN')}`;
+  }
+};
+
+const CustomTooltip = ({ active, payload, label, timePeriod }) => {
+  if (active && payload && payload.length) {
+    const dataPoint = payload[0].payload;
+    let timeLabel = "";
+
+    switch (timePeriod) {
+      case "week":
+        timeLabel = `Day: ${label}`;
+        break;
+      case "month":
+        timeLabel = `Week: ${label}`;
+        break;
+      case "quarter":
+        // Show month and year for clarity
+        timeLabel = `Month: ${label} ${new Date().getFullYear()}`;
+        break;
+      case "year":
+        // Show month and year for clarity
+        timeLabel = `Month: ${label} ${new Date().getFullYear()}`;
+        break;
+      default:
+        timeLabel = `Period: ${label}`;
+    }
+
+    return (
+      <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
+        <p className="font-medium text-gray-900">{timeLabel}</p>
+        <p className="text-sm" style={{ color: payload[0].color }}>
+          Revenue: {formatCurrency(payload[0].value)}
+        </p>
+        <p className="text-xs text-gray-500 mt-1">
+          {dataPoint.dealCount} closed deal(s)
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
+CustomTooltip.propTypes = {
+  active: PropTypes.bool,
+  payload: PropTypes.array,
+  label: PropTypes.string,
+  timePeriod: PropTypes.string,
+};
+
+CustomTooltip.defaultProps = {
+  active: false,
+  payload: [],
+  label: "",
+  timePeriod: "quarter",
+};
+
 const TeamPerformance = ({
   teamPerformance,
   isLoading,
@@ -425,59 +490,6 @@ LeadDistribution.defaultProps = {
   isLoading: false,
 };
 
-const CustomTooltip = ({ active, payload, label, timePeriod }) => {
-  if (active && payload && payload.length) {
-    const dataPoint = payload[0].payload;
-    let timeLabel = "";
-
-    switch (timePeriod) {
-      case "week":
-        timeLabel = `Day: ${label}`;
-        break;
-      case "month":
-        timeLabel = `Week: ${label}`;
-        break;
-      case "quarter":
-        // Show month and year for clarity
-        timeLabel = `Month: ${label} ${new Date().getFullYear()}`;
-        break;
-      case "year":
-        // Show month and year for clarity
-        timeLabel = `Month: ${label} ${new Date().getFullYear()}`;
-        break;
-      default:
-        timeLabel = `Period: ${label}`;
-    }
-
-    return (
-      <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
-        <p className="font-medium text-gray-900">{timeLabel}</p>
-        <p className="text-sm" style={{ color: payload[0].color }}>
-          Revenue: {formatCurrency(payload[0].value)}
-        </p>
-        <p className="text-xs text-gray-500 mt-1">
-          {dataPoint.dealCount} closed deal(s)
-        </p>
-      </div>
-    );
-  }
-  return null;
-};
-
-CustomTooltip.propTypes = {
-  active: PropTypes.bool,
-  payload: PropTypes.array,
-  label: PropTypes.string,
-  timePeriod: PropTypes.string,
-};
-
-CustomTooltip.defaultProps = {
-  active: false,
-  payload: [],
-  label: "",
-  timePeriod: "quarter",
-};
-
 const SalesDashboard = ({ filters }) => {
   const userDropdownRef = useRef(null);
   const filterDropdownRef = useRef(null);
@@ -519,57 +531,6 @@ const SalesDashboard = ({ filters }) => {
   const [modalLeads, setModalLeads] = useState([]);
   const [modalMember, setModalMember] = useState(null);
   const [isYearDropdownOpen, setIsYearDropdownOpen] = useState(false);
-
-  const formatCurrency = (amount) => {
-    const numAmount = Number(amount);
-    if (numAmount > 10000000) {
-      const crores = numAmount / 10000000;
-      let str = crores.toFixed(4);
-      str = str.replace(/\.?0+$/, '');
-      return `₹${str} cr`;
-    } else {
-      return `₹${numAmount.toLocaleString('en-IN')}`;
-    }
-  };
-
-  const CustomTooltip = ({ active, payload, label, timePeriod }) => {
-    if (active && payload && payload.length) {
-      const dataPoint = payload[0].payload;
-      let timeLabel = "";
-
-      switch (timePeriod) {
-        case "week":
-          timeLabel = `Day: ${label}`;
-          break;
-        case "month":
-          timeLabel = `Week: ${label}`;
-          break;
-        case "quarter":
-          // Show month and year for clarity
-          timeLabel = `Month: ${label} ${new Date().getFullYear()}`;
-          break;
-        case "year":
-          // Show month and year for clarity
-          timeLabel = `Month: ${label} ${new Date().getFullYear()}`;
-          break;
-        default:
-          timeLabel = `Period: ${label}`;
-      }
-
-      return (
-        <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
-          <p className="font-medium text-gray-900">{timeLabel}</p>
-          <p className="text-sm" style={{ color: payload[0].color }}>
-            Revenue: {formatCurrency(payload[0].value)}
-          </p>
-          <p className="text-xs text-gray-500 mt-1">
-            {dataPoint.dealCount} closed deal(s)
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
 
   const getCurrentQuarter = () => {
     const now = new Date();
@@ -783,7 +744,7 @@ const SalesDashboard = ({ filters }) => {
     setCurrentPeriodInfo(info);
   };
 
-  const processLeadsData = (input) => {
+  const processLeadsData = (input, dateRange) => {
     const leadCategories = {
       Engineering: 0,
       MBA: 0,
@@ -901,51 +862,51 @@ if (selectedUserId) {
       if (lead.phase === "closed" && lead.totalCost) {
         revenue += lead.totalCost;
 
-        if (lead.closedDate) {
+        if (lead.createdAt) {
           try {
-            const closedDate = new Date(lead.closedDate);
-            if (Number.isNaN(closedDate.getTime()))
+            const createdDate = new Date(lead.createdAt);
+            if (Number.isNaN(createdDate.getTime()))
               throw new Error("Invalid date");
 
             let dateKey;
             if (timePeriod === "week") {
               dateKey = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
-                closedDate.getDay()
+                createdDate.getDay()
               ];
             } else if (timePeriod === "month") {
               const firstDay = new Date(
-                closedDate.getFullYear(),
-                closedDate.getMonth(),
+                createdDate.getFullYear(),
+                createdDate.getMonth(),
                 1
               );
-              const pastDaysOfMonth = closedDate.getDate() - 1;
+              const pastDaysOfMonth = createdDate.getDate() - 1;
               dateKey = `Week ${
                 Math.floor((firstDay.getDay() + pastDaysOfMonth) / 7) + 1
               }`;
             } else if (timePeriod === "quarter") {
-  const startMonth = currentDateRange?.start?.getMonth?.() ?? 3; // Default to April
-  let months;
-  if (startMonth === 3) {
-    months = ["Apr", "May", "Jun"];
-  } else if (startMonth === 6) {
-    months = ["Jul", "Aug", "Sep"];
-  } else if (startMonth === 9) {
-    months = ["Oct", "Nov", "Dec"];
-  } else if (startMonth === 0) {
-    months = ["Jan", "Feb", "Mar"];
-  } else {
-    const quarterStart = Math.floor(startMonth / 3) * 3;
-    months = [
-      new Date(2000, quarterStart, 1).toLocaleString("default", { month: "short" }),
-      new Date(2000, quarterStart + 1, 1).toLocaleString("default", { month: "short" }),
-      new Date(2000, quarterStart + 2, 1).toLocaleString("default", { month: "short" }),
-    ];
-  }
-  let monthIdx = closedDate.getMonth() - startMonth;
-  if (monthIdx < 0 || monthIdx > 2) monthIdx = 0; // fallback to first month
-  dateKey = months[monthIdx];
-} else {
-              const month = closedDate.getMonth();
+              const startMonth = dateRange?.start?.getMonth?.() ?? 3; // Default to April
+              let months;
+              if (startMonth === 3) {
+                months = ["Apr", "May", "Jun"];
+              } else if (startMonth === 6) {
+                months = ["Jul", "Aug", "Sep"];
+              } else if (startMonth === 9) {
+                months = ["Oct", "Nov", "Dec"];
+              } else if (startMonth === 0) {
+                months = ["Jan", "Feb", "Mar"];
+              } else {
+                const quarterStart = Math.floor(startMonth / 3) * 3;
+                months = [
+                  new Date(2000, quarterStart, 1).toLocaleString("default", { month: "short" }),
+                  new Date(2000, quarterStart + 1, 1).toLocaleString("default", { month: "short" }),
+                  new Date(2000, quarterStart + 2, 1).toLocaleString("default", { month: "short" }),
+                ];
+              }
+              let monthIdx = createdDate.getMonth() - startMonth;
+              if (isNaN(monthIdx) || monthIdx < 0 || monthIdx > 2) monthIdx = 0; // fallback to first month
+              dateKey = months[monthIdx];
+            } else {
+              const month = createdDate.getMonth();
               dateKey = [
                 "Apr",
                 "May",
@@ -968,16 +929,14 @@ if (selectedUserId) {
             revenueByDate[dateKey].revenue += lead.totalCost;
             revenueByDate[dateKey].dealCount += 1;
           } catch (e) {
-
+            console.error("Error processing lead data:", e);
           }
         }
       }
 
       if (lead.tcv) {
         projectedTCV += lead.tcv;
-      }
-
-if (lead.assignedTo && lead.assignedTo.uid) {
+      }if (lead.assignedTo && lead.assignedTo.uid) {
   const user = users.find((u) => u.uid === lead.assignedTo.uid);
   const memberId = user ? user.id : lead.assignedTo.uid;
   const memberName = lead.assignedTo.name || "Unknown";
@@ -1012,14 +971,14 @@ if (lead.assignedTo && lead.assignedTo.uid) {
     // Generate chart data
     for (let i = 0; i < timePoints; i++) {
       let dateKey;
+      let months;
       if (timePeriod === "week") {
         dateKey = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][i];
       } else if (timePeriod === "month") {
         dateKey = `Week ${i + 1}`;
       } else if (timePeriod === "quarter") {
-        // Use currentDateRange.start to determine the quarter months
-        const startMonth = currentDateRange?.start?.getMonth?.() ?? 3; // Default to April
-        let months;
+        // Use dateRange.start to determine the quarter months
+        const startMonth = dateRange?.start?.getMonth?.() ?? 3; // Default to April
         if (startMonth === 3) {
           months = ["Apr", "May", "Jun"];
         } else if (startMonth === 6) {
@@ -1062,17 +1021,20 @@ if (lead.assignedTo && lead.assignedTo.uid) {
         dateKey = fiscalMonths[i];
       }
 
-      const now = new Date();
-      const currentMonth = now.getMonth();
       let isCurrentMonth = false;
 
-      if (timePeriod === "year") {
-        const fiscalMonthIndex =
-          currentMonth < 3 ? currentMonth + 9 : currentMonth - 3;
-        isCurrentMonth = i === fiscalMonthIndex;
-      } else if (timePeriod === "quarter") {
-        const quarterStartMonth = Math.floor(currentMonth / 3) * 3;
-        isCurrentMonth = currentMonth - quarterStartMonth === i;
+      if (timePeriod === "quarter" || timePeriod === "year") {
+        const now = new Date();
+        const currentMonth = now.getMonth();
+
+        if (timePeriod === "year") {
+          const fiscalMonthIndex =
+            currentMonth < 3 ? currentMonth + 9 : currentMonth - 3;
+          isCurrentMonth = i === fiscalMonthIndex;
+        } else if (timePeriod === "quarter") {
+          const quarterStartMonth = Math.floor(currentMonth / 3) * 3;
+          isCurrentMonth = currentMonth - quarterStartMonth === i;
+        }
       }
 
       chartData.push({
@@ -1148,7 +1110,7 @@ if (lead.assignedTo && lead.assignedTo.uid) {
       const filteredUsers = usersData;
       setUsers(filteredUsers);
     } catch (error) {
-
+      console.error("Error fetching users:", error);
       setUsers([]);
     } finally {
       setIsLoading(false);
@@ -1178,10 +1140,10 @@ if (lead.assignedTo && lead.assignedTo.uid) {
         return created >= range.start && created <= range.end;
       });
 
-      const currentData = processLeadsData(leads);
+      const currentData = processLeadsData(leads, range);
       setDashboardData(currentData);
     } catch (error) {
-
+      console.error("Error fetching data for range:", error);
       setDashboardData({
         revenue: 0,
         revenuePrevQuarter: 0,
@@ -1319,7 +1281,7 @@ if (lead.assignedTo && lead.assignedTo.uid) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-2 md:p-4">
+    <div className="min-h-screen bg-gray-50 p-2">
       <div className="mx-auto max-w-8xl w-full">
         {/* Header Section */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -1631,12 +1593,6 @@ if (lead.assignedTo && lead.assignedTo.uid) {
                 <div className="h-full flex items-center justify-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500" />
                 </div>
-              ) : dashboardData.chartData.every((d) => d.revenue === 0) ? (
-                <div className="h-full flex items-center justify-center">
-    <span className="text-gray-400 text-lg font-medium">
-      No revenue data for this period
-    </span>
-  </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart
@@ -1677,7 +1633,7 @@ if (lead.assignedTo && lead.assignedTo.uid) {
                       tickFormatter={(value) => {
                         // For quarter/year, show month and year for clarity
                         if (timePeriod === "quarter" || timePeriod === "year") {
-                          return `${value} ${selectedYear}`;
+                          return `${value} ${currentDateRange.start.getFullYear()}`;
                         }
                         return value;
                       }}

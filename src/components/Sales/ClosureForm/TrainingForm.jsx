@@ -461,7 +461,7 @@ const TrainingForm = ({
               await setDoc(doc(db, "trainingForms", sanitizedProjectCode), formDocData);
               await setDoc(doc(db, "placementData", sanitizedProjectCode), formDocData);
             } catch (error) {
-
+              console.error("Error saving training form:", error);
             }
  
             // Upload students (if student list exists)
@@ -472,7 +472,7 @@ const TrainingForm = ({
             setHasUnsavedChanges(false);
             setTimeout(onClose, 1000);
         } catch (err) {
-
+          console.error("Error submitting training form:", err);
         } finally {
             setIsSubmitting(false);
         }

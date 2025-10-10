@@ -102,7 +102,7 @@ const AdminTour = ({ userId }) => {
         lastUpdated: new Date(),
       });
     } catch (error) {
-
+      console.error("Error updating tour status:", error);
     }
   };
 
