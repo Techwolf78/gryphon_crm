@@ -1,4 +1,3 @@
-// components/MergeInvoicesModal.js
 import React, { useState, useEffect } from 'react';
 
 const MergeInvoicesModal = ({ 
@@ -13,11 +12,13 @@ const MergeInvoicesModal = ({
   const [terms, setTerms] = useState('');
   const [totalAmount, setTotalAmount] = useState(0);
   const [totalStudents, setTotalStudents] = useState(0);
+  const [baseAmount, setBaseAmount] = useState(0);
+  const [gstAmount, setGstAmount] = useState(0);
 
 // MergeInvoicesModal.js - Amount calculation update
 useEffect(() => {
   if (contracts && installment) {
-    // Safe amount calculation WITH ROUNDING
+    // ✅ TOTAL AMOUNT calculate karo (Tax Invoice ke hisab se)
     const calculatedTotal = contracts.reduce((sum, contract) => {
       if (!contract.paymentDetails || !Array.isArray(contract.paymentDetails)) return sum;
       
@@ -25,7 +26,6 @@ useEffect(() => {
       if (!inst) return sum;
       
       const amount = parseFloat(inst.totalAmount) || 0;
-      // Amount ko round karo
       return sum + Math.round(amount);
     }, 0);
 
@@ -36,21 +36,53 @@ useEffect(() => {
 
     setTotalAmount(calculatedTotal);
     setTotalStudents(calculatedStudents);
+    
+    // ✅ BASE AMOUNT DONO CASES MEIN SAME RAHEGA
+    const calculatedBaseAmount = Math.round(calculatedTotal / 1.18);
+    const calculatedGstAmount = calculatedTotal - calculatedBaseAmount;
+    
+    setBaseAmount(calculatedBaseAmount);
+    setGstAmount(calculatedGstAmount);
   }
-  
 }, [contracts, installment]);
 
+// ✅ Jab invoice type change ho toh SIRF display change hoga
+const getDisplayAmounts = () => {
+  if (invoiceType === 'Cash Invoice') {
+    return {
+      baseAmount: baseAmount,
+      gstAmount: 0,
+      totalAmount: baseAmount // Cash invoice mein total = base amount
+    };
+  } else {
+    return {
+      baseAmount: baseAmount,
+      gstAmount: gstAmount,
+      totalAmount: totalAmount // Tax invoice mein total = base + GST
+    };
+  }
+};
   if (!isOpen) return null;
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    
+    const displayAmounts = getDisplayAmounts();
+    
     onSubmit({
       invoiceType,
-      terms: terms || 'Standard terms and conditions apply'
+      terms: terms || 'Standard terms and conditions apply',
+      // ✅ Actual calculations parent ko bhejo
+      actualBaseAmount: baseAmount,
+      actualGstAmount: gstAmount,
+      actualTotalAmount: totalAmount,
+      // ✅ Display ke liye amounts
+      baseAmount: displayAmounts.baseAmount,
+      gstAmount: displayAmounts.gstAmount,
+      totalAmount: displayAmounts.totalAmount
     });
   };
 
-  // Safe currency formatting function
   const formatCurrency = (amount) => {
     if (!amount && amount !== 0) return "₹0";
     const numAmount = Number(amount);
@@ -62,6 +94,8 @@ useEffect(() => {
       maximumFractionDigits: 0
     }).format(numAmount);
   };
+
+  const displayAmounts = getDisplayAmounts();
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-500">
@@ -87,21 +121,48 @@ useEffect(() => {
                 <span className="ml-2">{installment?.name || 'N/A'}</span>
               </div>
               <div>
-                <span className="text-purple-600 font-medium">Total Amount:</span>
-                <span className="ml-2 font-semibold">
-                  {formatCurrency(totalAmount)}
-                </span>
-              </div>
-              <div>
                 <span className="text-purple-600 font-medium">Total Students:</span>
                 <span className="ml-2">{totalStudents}</span>
               </div>
+              <div>
+                <span className="text-purple-600 font-medium">Project Code:</span>
+                <span className="ml-2 font-mono text-sm">{projectCode || 'N/A'}</span>
+              </div>
             </div>
+            
+            {/* ✅ Amount Breakdown - Cash aur Tax ke liye alag display */}
+            <div className="mt-3 pt-3 border-t border-purple-200">
+              <h4 className="font-medium text-purple-700 mb-1">Amount Breakdown:</h4>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span className="text-purple-600">Base Amount:</span>
+                  <span className="ml-1 font-semibold">
+                    {formatCurrency(displayAmounts.baseAmount)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-purple-600">GST Amount:</span>
+                  <span className="ml-1 font-semibold">
+                    {formatCurrency(displayAmounts.gstAmount)}
+                  </span>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-purple-600">Final Amount:</span>
+                  <span className="ml-1 font-semibold text-green-600">
+                    {formatCurrency(displayAmounts.totalAmount)}
+                  </span>
+                  <span className="ml-2 text-xs text-purple-500">
+                    ({invoiceType === 'Cash Invoice' ? 'Cash Invoice - No GST' : 'Tax Invoice - With GST'})
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+            
             <div className="mt-2">
               <span className="text-purple-600 font-medium">Project Code:</span>
               <span className="ml-2 font-mono text-sm">{projectCode || 'N/A'}</span>
             </div>
-          </div>
 
           {/* Contracts List */}
           <div>
@@ -139,8 +200,7 @@ useEffect(() => {
             </div>
           </div>
 
-          {/* Invoice Type - Cash Invoice bhi add karo */}
-          <div>
+           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Invoice Type
             </label>
@@ -154,6 +214,14 @@ useEffect(() => {
               <option value="Cash Invoice">Cash Invoice</option>
               <option value="Proforma Invoice">Proforma Invoice</option>
             </select>
+            <p className="text-xs text-gray-500 mt-1">
+              {invoiceType === 'Cash Invoice' 
+                ? 'Cash Invoice: Base Amount will be used as Final Amount (No GST)' 
+                : invoiceType === 'Tax Invoice'
+                ? 'Tax Invoice: Base Amount + 18% GST = Final Amount'
+                : 'Proforma Invoice: For quotation purposes'
+              }
+            </p>
           </div>
 
           {/* Terms */}
