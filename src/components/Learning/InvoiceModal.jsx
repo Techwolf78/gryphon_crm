@@ -6,23 +6,12 @@ import {  FiX, FiEdit2, FiEye, FiFileText, FiSave, FiArrowLeft, FiCheckCircle, F
 
 // Import the standardized PDF generation function
 
-function getTrainingDays(startDate, endDate) {
-  if (!startDate || !endDate) return 0;
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  if (isNaN(start) || isNaN(end) || end < start) return 0;
-  const diffTime = Math.abs(end - start);
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-  return diffDays;
-}
-
 // Helper function to round numbers to nearest whole number
 const roundToNearestWhole = (num) => {
   return Math.round(num);
 };
 
 function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
-  const days = getTrainingDays(trainer?.earliestStartDate, trainer?.latestEndDate);
     const [invoiceData, setInvoiceData] = useState({
     billNumber: `INV-${Date.now()}`,
     projectCode: Array.isArray(trainer?.allProjects) ? trainer.allProjects.join(", ") : trainer?.projectCode || "",
@@ -35,11 +24,11 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
     totalHours: trainer?.totalCollegeHours || 0,
     tds: 10,
     adhocAdjustment: 0,
-    conveyance: trainer?.conveyance || 0,
+    conveyance: trainer?.totalConveyance || 0,
     perDayFood: trainer?.food || 0,
     perDayLodging: trainer?.lodging || 0,
-    food: (trainer?.food || 0) * days,
-    lodging: (trainer?.lodging || 0) * days,
+    food: trainer?.totalFood || 0,
+    lodging: trainer?.totalLodging || 0,
     businessName: trainer?.businessName || "",
     collegeName: trainer?.collegeName || "",
   });
@@ -477,7 +466,7 @@ const handleSubmit = async (e) => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-0.5">
-                  Food (₹{invoiceData.perDayFood.toFixed(2)} × {days} d)
+                  Food (₹)
                 </label>
                 <input
                   type="number"
@@ -493,7 +482,7 @@ const handleSubmit = async (e) => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-0.5">
-                  Lodging (₹{invoiceData.perDayLodging.toFixed(2)} × {days} d)
+                  Lodging (₹)
                 </label>
                 <input
                   type="number"
@@ -578,11 +567,11 @@ const handleSubmit = async (e) => {
                   {roundToNearestWhole(parseFloat(invoiceData.conveyance) || 0).toLocaleString()}
                 </div>
                 <div className="text-sm">
-                  <span className="font-medium">Food ({invoiceData.perDayFood.toFixed(2)} × {days}):</span> ₹
+                  <span className="font-medium">Food:</span> ₹
                   {roundToNearestWhole(parseFloat(invoiceData.food) || 0).toLocaleString()}
                 </div>
                 <div className="text-sm">
-                  <span className="font-medium">Lodging ({invoiceData.perDayLodging.toFixed(2)} × {days}):</span> ₹
+                  <span className="font-medium">Lodging:</span> ₹
                   {roundToNearestWhole(parseFloat(invoiceData.lodging) || 0).toLocaleString()}
                 </div>
                 <div className="text-sm font-semibold border-t border-blue-200 pt-2">

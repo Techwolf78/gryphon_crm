@@ -52,13 +52,6 @@ function GenerateTrainerInvoice() {
         const sessionVisits = parseInt(localStorage.getItem('trainer_invoice_session_visits') || '0');
         // If user has visited multiple times in this session, extend cache duration
         const duration = sessionVisits > 3 ? EXTENDED_CACHE_DURATION : CACHE_DURATION;
-        console.log('🎯 Adaptive cache duration:', {
-          sessionVisits,
-          duration,
-          isExtended: duration > CACHE_DURATION,
-          CACHE_DURATION,
-          EXTENDED_CACHE_DURATION
-        });
         return duration;
       } catch {
         return CACHE_DURATION;
@@ -78,15 +71,9 @@ function GenerateTrainerInvoice() {
   // 🔄 Helper functions for localStorage cache management
   const saveCacheToStorage = (data, timestamp) => {
     try {
-      console.log('💾 Saving cache to localStorage:', {
-        dataSize: JSON.stringify(data).length,
-        timestamp,
-        CACHE_VERSION
-      });
       localStorage.setItem('trainer_invoice_cache', JSON.stringify(data));
       localStorage.setItem('trainer_invoice_last_fetch', timestamp.toString());
       localStorage.setItem('trainer_invoice_cache_version', CACHE_VERSION); // 🆕 Save version
-      console.log('✅ Cache saved successfully');
     } catch (error) {
       console.warn('⚠️ Failed to save cache to localStorage:', error);
     }
@@ -109,7 +96,6 @@ function GenerateTrainerInvoice() {
     
     // 📱 Use cache if data is fresh and not forcing refresh
     if (!forceRefresh && cachedData && lastFetchTime && (now - lastFetchTime) < adaptiveDuration) {
-      console.log('🎯 Using cached data from localStorage, skipping Firebase request');
       setTrainerData(cachedData.trainerData);
       setGroupedData(cachedData.groupedData);
       setExpandedPhases(cachedData.expandedPhases);
@@ -117,14 +103,6 @@ function GenerateTrainerInvoice() {
       return;
     }
     
-    console.log('🔄 Fetching fresh data from Firebase...', forceRefresh ? '(Force refresh)' : '(Cache expired/missing)', {
-      forceRefresh,
-      hasCachedData: !!cachedData,
-      lastFetchTime,
-      timeSinceLastFetch: lastFetchTime ? now - lastFetchTime : null,
-      adaptiveDuration,
-      cacheExpired: lastFetchTime ? (now - lastFetchTime) >= adaptiveDuration : true
-    });
     setLoading(true);
     if (forceRefresh) {
       setRefreshing(true);
@@ -140,7 +118,6 @@ function GenerateTrainerInvoice() {
       );
       
       const trainingFormsSnap = await getDocs(trainingFormsQuery);
-      console.log(`📊 Fetched ${trainingFormsSnap.docs.length} training forms`);
 
       for (const formDoc of trainingFormsSnap.docs) {
         const formId = formDoc.id;
@@ -344,9 +321,47 @@ function GenerateTrainerInvoice() {
       const collegePhaseBasedTrainers = Object.values(
         collegePhaseBasedGrouping
       ).map(trainer => {
+        // Helper function to calculate training days (matching InitiationModal logic)
+        const getTrainingDays = (startDate, endDate, excludeDays = "None") => {
+          if (!startDate || !endDate) return 0;
+          const start = new Date(startDate);
+          const end = new Date(endDate);
+          if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) return 0;
+          
+          let days = 0;
+          const cur = new Date(start);
+          while (cur <= end) {
+            const dayOfWeek = cur.getDay(); // 0 = Sunday, 6 = Saturday
+            let shouldInclude = true;
+            
+            if (excludeDays === "Saturday" && dayOfWeek === 6) {
+              shouldInclude = false;
+            } else if (excludeDays === "Sunday" && dayOfWeek === 0) {
+              shouldInclude = false;
+            } else if (excludeDays === "Both" && (dayOfWeek === 0 || dayOfWeek === 6)) {
+              shouldInclude = false;
+            }
+            // If excludeDays === "None", include all days
+            
+            if (shouldInclude) days++;
+            cur.setDate(cur.getDate() + 1);
+          }
+          return days;
+        };
+
         const finalTrainer = {
           ...trainer,
           topics: Array.from(trainer.allTopics), // Convert Set to Array for topics
+          // Calculate total allowances from all batches (per-day rate × number of training days)
+          totalFood: trainer.allBatches.reduce((sum, batch) => {
+            const days = batch.activeDates?.length || getTrainingDays(batch.startDate, batch.endDate);
+            return sum + ((batch.food || 0) * days);
+          }, 0),
+          totalLodging: trainer.allBatches.reduce((sum, batch) => {
+            const days = batch.activeDates?.length || getTrainingDays(batch.startDate, batch.endDate);
+            return sum + ((batch.lodging || 0) * days);
+          }, 0),
+          totalConveyance: trainer.allBatches.reduce((sum, batch) => sum + (batch.conveyance || 0), 0),
         };
 
         // For merged trainings, update display fields
@@ -361,7 +376,6 @@ function GenerateTrainerInvoice() {
 
       // 🔥 OPTIMIZED: Batch invoice status checks to reduce Firebase calls
       // Check invoice status for each trainer
-      console.log('📊 Checking invoice status for trainers...');
       const updatedTrainersList = await Promise.all(
         collegePhaseBasedTrainers.map(async (trainer) => {
           try {
@@ -388,29 +402,12 @@ function GenerateTrainerInvoice() {
 
             const querySnapshot = await getDocs(invoiceQuery);
             totalInvoiceCount = querySnapshot.size;
-            
-            console.log(`🔍 Invoice query for ${trainer.trainerId} at ${trainer.collegeName} (${trainer.phase}):`, {
-              totalInvoiceCount,
-              querySize: querySnapshot.size,
-              invoiceDocsFound: querySnapshot.docs.length
-            });
 
             if (totalInvoiceCount > 0) {
               // Find the most recent invoice (first doc due to orderBy desc)
               const latestDoc = querySnapshot.docs[0];
               latestInvoice = latestDoc.data();
               invoiceStatus = latestInvoice.status || "generated";
-              
-              console.log(`💰 Found invoice for ${trainer.trainerName}:`, {
-                invoiceId: latestDoc.id,
-                status: invoiceStatus,
-                createdAt: latestInvoice.createdAt,
-                trainerId: latestInvoice.trainerId,
-                phase: latestInvoice.phase,
-                collegeName: latestInvoice.collegeName
-              });
-            } else {
-              console.log(`❌ No invoices found for ${trainer.trainerName} (${trainer.trainerId})`);
             }
 
             const trainerWithInvoiceStatus = {
@@ -419,14 +416,6 @@ function GenerateTrainerInvoice() {
               invoiceCount: totalInvoiceCount,
               invoiceStatus: invoiceStatus,
             };
-            
-            console.log(`👤 Final trainer object for ${trainer.trainerName}:`, {
-              trainerName: trainer.trainerName,
-              trainerId: trainer.trainerId,
-              hasExistingInvoice: trainerWithInvoiceStatus.hasExistingInvoice,
-              invoiceCount: trainerWithInvoiceStatus.invoiceCount,
-              invoiceStatus: trainerWithInvoiceStatus.invoiceStatus
-            });
             
             return trainerWithInvoiceStatus;
           } catch (trainerError) {
@@ -486,7 +475,6 @@ function GenerateTrainerInvoice() {
       console.error('❌ Error fetching trainers:', error);
       // If fetch fails but we have cached data, use it
       if (!forceRefresh && cachedData) {
-        console.log('🔄 Using stale cache due to fetch error');
         setTrainerData(cachedData.trainerData);
         setGroupedData(cachedData.groupedData);
         setExpandedPhases(cachedData.expandedPhases);
@@ -499,63 +487,21 @@ function GenerateTrainerInvoice() {
 
   // 🚀 OPTIMIZED: Check cache on mount, fetch if needed (with session tracking)
   useEffect(() => {
-    // 🔄 ONE-TIME: Force clear cache for structural change (remove this after deployment)
-    const forceStructureUpdate = () => {
-      const currentVersion = localStorage.getItem('trainer_invoice_cache_version');
-      console.log('🔍 Cache version check:', {
-        currentVersion,
-        CACHE_VERSION,
-        versionsMatch: currentVersion === CACHE_VERSION
-      });
-      if (currentVersion !== CACHE_VERSION) {
-        console.log('🔄 Forcing cache clear for College → Phase structure change...');
-        clearCacheFromStorage();
-        setCachedData(null);
-        setLastFetchTime(null);
-        localStorage.setItem('trainer_invoice_cache_version', CACHE_VERSION);
-        return true; // Indicates cache was cleared
-      }
-      return false;
-    };
-    
     // Track user visit for adaptive caching
     trackUserVisit();
     
     // Force structure update first
-    const cacheWasCleared = forceStructureUpdate();
-    
-    // Prevent multiple loads in the same session (unless cache was just cleared)
-    if (hasLoadedRef.current && !cacheWasCleared) {
-      console.log('⚡ Already loaded in this session - using existing state');
-      return;
-    }
-    
-    console.log('🎬 First mount in session - checking cache status...');
-    
     const now = Date.now();
     const adaptiveDuration = getAdaptiveCacheDuration();
     const isCacheValid = cachedData && lastFetchTime && (now - lastFetchTime) < adaptiveDuration;
     
-    console.log('📊 Cache validation:', {
-      hasCachedData: !!cachedData,
-      lastFetchTime,
-      timeSinceLastFetch: lastFetchTime ? now - lastFetchTime : null,
-      adaptiveDuration,
-      isCacheValid,
-      cacheAgeMinutes: lastFetchTime ? Math.round((now - lastFetchTime) / (1000 * 60)) : null
-    });
-    
     if (isCacheValid) {
-      const cacheAge = Math.round((now - lastFetchTime) / (1000 * 60));
-      const isExtended = adaptiveDuration > CACHE_DURATION;
-      console.log(`💾 Valid cache found (${cacheAge}m old, ${isExtended ? 'extended' : 'standard'} duration) - loading instantly`);
       setTrainerData(cachedData.trainerData);
       setGroupedData(cachedData.groupedData);
       setExpandedPhases(cachedData.expandedPhases);
       setLoading(false);
       hasLoadedRef.current = true;
     } else {
-      console.log('🔄 Cache expired or missing - fetching fresh data from Firebase');
       fetchTrainers().then(() => {
         hasLoadedRef.current = true;
       });
@@ -620,7 +566,6 @@ function GenerateTrainerInvoice() {
 
   // 🎯 NEW: Handle invoice generation completion with forced refresh
   const handleInvoiceGenerated = useCallback(async () => {
-    console.log('🎉 Invoice generated successfully - starting data refresh...');
     
     // Move all heavy operations to background to allow immediate modal closing
     setTimeout(async () => {
@@ -628,31 +573,17 @@ function GenerateTrainerInvoice() {
       clearCacheFromStorage();
       setCachedData(null);
       setLastFetchTime(null);
-      console.log('🗑️ Cache cleared successfully');
       
       // Add a longer delay to ensure database consistency and indexing
-      console.log('⏳ Waiting for database consistency and indexing...');
       await new Promise(resolve => setTimeout(resolve, 2000)); // Increased to 2 seconds
       
-      console.log('🔄 Forcing fresh data fetch to update invoice status...');
       await fetchTrainers(true); // Force refresh to show updated invoice status
       
-      console.log('✅ Data refresh completed - invoice status should now be updated');
-      
-      // Log final state for debugging
-      setTimeout(() => {
-        console.log('📊 Final trainer data after refresh:', trainerData.map(t => ({
-          name: t.trainerName,
-          hasInvoice: t.hasExistingInvoice,
-          status: t.invoiceStatus
-        })));
-      }, 100);
     }, 0); // Execute immediately in next tick, but asynchronously
-  }, [trainerData, fetchTrainers]);
+  }, [fetchTrainers]);
 
   // 🔄 ENHANCED: Manual refresh with cache invalidation and visual feedback
   const handleRefreshData = () => {
-    console.log('🔄 Manual refresh triggered - clearing cache and forcing fresh data fetch');
     clearCacheFromStorage(); // Clear localStorage cache
     setCachedData(null); // Clear state cache
     setLastFetchTime(null);
@@ -669,15 +600,6 @@ function GenerateTrainerInvoice() {
     const minutesAgo = Math.floor(timeSinceLastFetch / (1000 * 60));
     const adaptiveDuration = getAdaptiveCacheDuration();
     const isExtended = adaptiveDuration > CACHE_DURATION;
-    
-    console.log('🔍 Cache status check:', {
-      timeSinceLastFetch,
-      minutesAgo,
-      adaptiveDuration,
-      CACHE_DURATION,
-      isExtended,
-      cacheExpired: timeSinceLastFetch >= adaptiveDuration
-    });
     
     if (timeSinceLastFetch < adaptiveDuration) {
       return { 
@@ -710,7 +632,6 @@ function GenerateTrainerInvoice() {
         // If no activity for 1 hour, clear session data
         if (lastActivity && (now - parseInt(lastActivity)) > (60 * 60 * 1000)) {
           localStorage.removeItem('trainer_invoice_session_visits');
-          console.log('🧹 Cleared old session data due to inactivity');
         }
         
         // Update last activity
@@ -928,8 +849,6 @@ function GenerateTrainerInvoice() {
       ? `${trainer.trainerId}_merged_jd_${trainer.phase}_${trainer.allProjects.join('_')}`
       : `${trainer.trainerId}_${trainer.businessName}_${trainer.phase}_${trainer.projectCode}`;
     
-    console.log('📥 Starting download for trainer:', trainer.trainerName, 'Status key:', statusKey);
-    
     setDownloadingInvoice(statusKey);
     setPdfStatus((prev) => ({
       ...prev,
@@ -967,8 +886,6 @@ function GenerateTrainerInvoice() {
         });
       }
 
-      console.log('🔍 Found invoices:', allInvoices.length, 'for trainer:', trainer.trainerName);
-
       if (allInvoices.length > 0) {
         if (allInvoices.length > 1) {
           // For multiple invoices, show selection dialog
@@ -986,9 +903,7 @@ function GenerateTrainerInvoice() {
               inv => inv.billNumber === selectedInvoice.split(' ')[0]
             );
             if (selectedInvoiceData) {
-              console.log('📄 Generating PDF for selected invoice:', selectedInvoiceData.billNumber);
               const success = await generateInvoicePDF(selectedInvoiceData);
-              console.log('📄 PDF generation result:', success);
               setPdfStatus((prev) => ({
                 ...prev,
                 [statusKey]: success ? "success" : "error",
@@ -1008,9 +923,7 @@ function GenerateTrainerInvoice() {
           }
         } else {
           // Single invoice - download it directly
-          console.log('📄 Generating PDF for single invoice:', allInvoices[0].billNumber);
           const success = await generateInvoicePDF(allInvoices[0]);
-          console.log('📄 PDF generation result:', success);
           setPdfStatus((prev) => ({
             ...prev,
             [statusKey]: success ? "success" : "error",

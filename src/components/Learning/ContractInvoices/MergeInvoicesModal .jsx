@@ -18,11 +18,12 @@ const MergeInvoicesModal = ({
 // MergeInvoicesModal.js - Amount calculation update
 useEffect(() => {
   if (contracts && installment) {
-    // ✅ TOTAL AMOUNT calculate karo (Tax Invoice ke hisab se)
+    // ✅ TOTAL AMOUNT calculate karo by finding installment at same index in each contract
     const calculatedTotal = contracts.reduce((sum, contract) => {
       if (!contract.paymentDetails || !Array.isArray(contract.paymentDetails)) return sum;
       
-      const inst = contract.paymentDetails.find(p => p.name === installment.name);
+      // Find installment at the same index position
+      const inst = contract.paymentDetails[installment.idx];
       if (!inst) return sum;
       
       const amount = parseFloat(inst.totalAmount) || 0;
@@ -95,6 +96,34 @@ const getDisplayAmounts = () => {
     }).format(numAmount);
   };
 
+  // Helper function to format currency in Indian numbering system with abbreviations
+  const formatIndianCurrency = (amount) => {
+    if (!amount && amount !== 0) return "0";
+
+    let numAmount = Number(amount);
+    if (isNaN(numAmount)) return "0";
+
+    // For amounts less than 1 lakh, show regular formatting
+    if (numAmount < 100000) {
+      return new Intl.NumberFormat('en-IN').format(numAmount);
+    }
+
+    // For amounts >= 1 lakh, use abbreviations
+    if (numAmount >= 10000000000) { // 1000 Cr and above
+      return `${(numAmount / 10000000).toFixed(1)}K Cr`;
+    } else if (numAmount >= 1000000000) { // 100 Cr to 999 Cr
+      return `${(numAmount / 10000000).toFixed(1)} Cr`;
+    } else if (numAmount >= 100000000) { // 10 Cr to 99 Cr
+      return `${(numAmount / 10000000).toFixed(1)} Cr`;
+    } else if (numAmount >= 10000000) { // 1 Cr to 9.9 Cr
+      return `${(numAmount / 10000000).toFixed(1)} Cr`;
+    } else if (numAmount >= 1000000) { // 10 Lakh to 99 Lakh
+      return `${(numAmount / 100000).toFixed(0)} Lakh`;
+    } else { // 1 Lakh to 9.9 Lakh
+      return `${(numAmount / 100000).toFixed(1)} Lakh`;
+    }
+  };
+
   const displayAmounts = getDisplayAmounts();
 
   return (
@@ -137,19 +166,19 @@ const getDisplayAmounts = () => {
                 <div>
                   <span className="text-purple-600">Base Amount:</span>
                   <span className="ml-1 font-semibold">
-                    {formatCurrency(displayAmounts.baseAmount)}
+                    {formatIndianCurrency(displayAmounts.baseAmount)}
                   </span>
                 </div>
                 <div>
                   <span className="text-purple-600">GST Amount:</span>
                   <span className="ml-1 font-semibold">
-                    {formatCurrency(displayAmounts.gstAmount)}
+                    {formatIndianCurrency(displayAmounts.gstAmount)}
                   </span>
                 </div>
                 <div className="col-span-2">
                   <span className="text-purple-600">Final Amount:</span>
                   <span className="ml-1 font-semibold text-green-600">
-                    {formatCurrency(displayAmounts.totalAmount)}
+                    {formatIndianCurrency(displayAmounts.totalAmount)}
                   </span>
                   <span className="ml-2 text-xs text-purple-500">
                     ({invoiceType === 'Cash Invoice' ? 'Cash Invoice - No GST' : 'Tax Invoice - With GST'})
@@ -180,7 +209,8 @@ const getDisplayAmounts = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {contracts?.map((contract, index) => {
-                    const inst = contract.paymentDetails?.find(p => p.name === installment?.name);
+                    // Find installment at the same index position
+                    const inst = contract.paymentDetails?.[installment?.idx];
                     const amount = parseFloat(inst?.totalAmount) || 0;
                     
                     return (
@@ -190,7 +220,7 @@ const getDisplayAmounts = () => {
                         <td className="px-3 py-2">{contract.year || 'N/A'}</td>
                         <td className="px-3 py-2">{contract.studentCount || '0'}</td>
                         <td className="px-3 py-2 font-semibold">
-                          {formatCurrency(amount)}
+                          {formatIndianCurrency(amount)}
                         </td>
                       </tr>
                     );

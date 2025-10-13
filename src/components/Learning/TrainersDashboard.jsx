@@ -177,8 +177,8 @@ function TrainersDashboard() {
 
   const filteredTrainers = trainers.filter((trainer) => {
     const matchesSearch = [trainer.name, trainer.trainerId, trainer.domain]
-      .map((f) => (f || "").trim())
-      .some((f) => f.includes(searchTerm.trim()));
+      .map((f) => (f || "").toLowerCase().trim())
+      .some((f) => f.includes(searchTerm.toLowerCase().trim()));
     const trainerDomains = Array.isArray(trainer.domain) ? trainer.domain : trainer.domain ? trainer.domain.split(',').map(d => d.trim()) : [];
     const matchesDomain = selectedDomain === "All" || trainerDomains.some(d => d.trim() === selectedDomain.trim());
     const matchesPayment = selectedPaymentType === "All" || trainer.paymentType === selectedPaymentType;
