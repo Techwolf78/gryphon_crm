@@ -392,31 +392,26 @@ useEffect(() => {
         })
         .join("");
 
-      const templateParams = {
-        to_email: emailData.to,
-        salutation: selectedTrainer?.salutation || "Dear",
-        trainer_last_name: (
-          selectedTrainer?.name ||
-          selectedTrainer?.trainerName ||
-          ""
-        ).split(" ").slice(-1).join(" "),
-        college_name: trainingFormDoc?.collegeName || trainingData?.collegeName || "",
-        venue_address: emailData.venue,
-        contact_person: emailData.contactPerson,
-        contact_number: emailData.contactNumber,
+   const templateParams = {
+  to_email: emailData.to,
+  email: emailData.to, // Dono fields set karein
+  salutation: selectedTrainer?.salutation || "Dear",
+  trainer_last_name: (selectedTrainer?.name || selectedTrainer?.trainerName || "").split(" ").slice(-1).join(" "),
+  college_name: trainingFormDoc?.collegeName || trainingData?.collegeName || "",
+  venue_address: emailData.venue,
+  contact_person: emailData.contactPerson,
+  contact_number: emailData.contactNumber,
+  
+  conveyance: trainerCostDetails.conveyance,
+  food: trainerCostDetails.food,
+  lodging: trainerCostDetails.lodging,
+  total_expenses: totalExpenses,
 
-        conveyance: trainerCostDetails.conveyance,
-        food: trainerCostDetails.food,
-        lodging: trainerCostDetails.lodging,
-        total_expenses: totalExpenses,
-
-        schedule_rows: scheduleRows,
-        total_days: trainerAssignments.length,
-        total_hours: totalHours,
-        start_date: trainerAssignments[0]
-          ? formatDate(trainerAssignments[0].date)
-          : "",
-        fee_per_hour: feePerHour,
+  schedule_rows: scheduleRows,
+  total_days: trainerAssignments.length,
+  total_hours: totalHours,
+  start_date: trainerAssignments[0] ? formatDate(trainerAssignments[0].date) : "",
+  fee_per_hour: feePerHour,
         fee_per_day:
           trainerAssignments.length > 0
             ? (() => {
@@ -453,10 +448,10 @@ useEffect(() => {
       };
 
       await emailjs.send(
-        "service_pskknsn",
-        "template_p2as3pp",
+        "service_75e50yr",
+        "template_c7rfyrl",
         templateParams,
-        "zEVWxxT-QvGIrhvTV"
+        "8E18_R6lWdplPsFtQ"
       );
 
       setSuccess(true);
@@ -713,7 +708,6 @@ useEffect(() => {
             </div>
           )}
 
-          {/* Step 3: Confirm Email */}
           {/* Step 3: Confirm Email */}
           {currentStep === 3 && (
             <div>
