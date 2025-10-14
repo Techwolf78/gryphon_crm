@@ -133,28 +133,7 @@ export default function ContractInvoiceTable() {
   };
 
   // Get contracts for merged view (not having any individual invoices)
-  const getMergableContracts = () => {
-    const contractsWithIndividualInvoices = new Set();
 
-    // Collect all contract IDs that have individual invoices
-    existingInvoices.forEach((invoice) => {
-      if (!invoice.isMergedInvoice && invoice.originalInvoiceId) {
-        contractsWithIndividualInvoices.add(invoice.originalInvoiceId);
-      }
-    });
-
-    // Also include contracts that have proforma invoices
-    existingProformas.forEach((proforma) => {
-      if (proforma.originalInvoiceId) {
-        contractsWithIndividualInvoices.add(proforma.originalInvoiceId);
-      }
-    });
-
-    // Filter out contracts that have individual invoices
-    return invoices.filter(
-      (contract) => !contractsWithIndividualInvoices.has(contract.id)
-    );
-  };
 
   const formatCurrency = (amount) => {
     if (!amount && amount !== 0) return "-";
@@ -169,6 +148,34 @@ export default function ContractInvoiceTable() {
       }).format(numAmount);
     } catch {
       return `₹${amount}`;
+    }
+  };
+
+  // Helper function to format currency in Indian numbering system with abbreviations
+  const formatIndianCurrency = (amount) => {
+    if (!amount && amount !== 0) return "0";
+
+    let numAmount = Number(amount);
+    if (isNaN(numAmount)) return "0";
+
+    // For amounts less than 1 lakh, show regular formatting
+    if (numAmount < 100000) {
+      return new Intl.NumberFormat('en-IN').format(numAmount);
+    }
+
+    // For amounts >= 1 lakh, use abbreviations
+    if (numAmount >= 10000000000) { // 1000 Cr and above
+      return `${(numAmount / 10000000).toFixed(1)}K Cr`;
+    } else if (numAmount >= 1000000000) { // 100 Cr to 999 Cr
+      return `${(numAmount / 10000000).toFixed(1)} Cr`;
+    } else if (numAmount >= 100000000) { // 10 Cr to 99 Cr
+      return `${(numAmount / 10000000).toFixed(1)} Cr`;
+    } else if (numAmount >= 10000000) { // 1 Cr to 9.9 Cr
+      return `${(numAmount / 10000000).toFixed(1)} Cr`;
+    } else if (numAmount >= 1000000) { // 10 Lakh to 99 Lakh
+      return `${(numAmount / 100000).toFixed(0)} Lakh`;
+    } else { // 1 Lakh to 9.9 Lakh
+      return `${(numAmount / 100000).toFixed(1)} Lakh`;
     }
   };
 
@@ -430,7 +437,9 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
       );
 
       // Purane Proforma ko mark karo as converted
-      await updateDoc(doc(db, "ProformaInvoices", invoice.id), {
+      // For merged invoices, the original is in ContractInvoices, not ProformaInvoices
+      const originalCollection = invoice.isMergedInvoice ? "ContractInvoices" : "ProformaInvoices";
+      await updateDoc(doc(db, originalCollection, invoice.id), {
         convertedToTax: true,
         convertedTaxInvoiceNumber: taxInvoiceNumber,
         conversionDate: currentDate,
@@ -443,17 +452,35 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
       };
 
       setExistingInvoices((prev) => [...prev, newInvoice]);
-      setExistingProformas((prev) =>
-        prev.map((inv) =>
-          inv.id === invoice.id
-            ? {
-                ...inv,
-                convertedToTax: true,
-                convertedTaxInvoiceNumber: taxInvoiceNumber,
-              }
-            : inv
-        )
-      );
+
+      // Update the original invoice state (different for merged vs individual)
+      if (invoice.isMergedInvoice) {
+        // For merged invoices, update existingInvoices
+        setExistingInvoices((prev) =>
+          prev.map((inv) =>
+            inv.id === invoice.id
+              ? {
+                  ...inv,
+                  convertedToTax: true,
+                  convertedTaxInvoiceNumber: taxInvoiceNumber,
+                }
+              : inv
+          )
+        );
+      } else {
+        // For individual invoices, update existingProformas
+        setExistingProformas((prev) =>
+          prev.map((inv) =>
+            inv.id === invoice.id
+              ? {
+                  ...inv,
+                  convertedToTax: true,
+                  convertedTaxInvoiceNumber: taxInvoiceNumber,
+                }
+              : inv
+          )
+        );
+      }
 
       alert(
         `Invoice converted to Tax Invoice successfully! Invoice Number: ${taxInvoiceNumber}`
@@ -488,6 +515,22 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
     }
 
     try {
+      // If this is a converted Tax invoice, also delete the original Proforma
+      if (invoice.convertedFromProforma) {
+        // Search for original proforma in both collections
+        const original = [...existingInvoices, ...existingProformas].find(
+          (inv) => inv.invoiceNumber === invoice.originalProformaNumber
+        );
+        if (original) {
+          const originalCollection = original.isMergedInvoice ? "ContractInvoices" : "ProformaInvoices";
+          await deleteDoc(doc(db, originalCollection, original.id));
+          
+          // Update local state - remove from both arrays to be safe
+          setExistingInvoices((prev) => prev.filter((inv) => inv.id !== original.id));
+          setExistingProformas((prev) => prev.filter((inv) => inv.id !== original.id));
+        }
+      }
+
       // Delete the invoice from database
       await deleteDoc(doc(db, "ContractInvoices", invoice.id));
 
@@ -520,7 +563,6 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
 
     // Determine collection name based on invoice type
     const isProforma = formData.invoiceType === "Proforma Invoice";
-    const isCashInvoice = formData.invoiceType === "Cash Invoice";
     const collectionName = isProforma
       ? "ProformaInvoices"
       : "ContractInvoices";
@@ -724,6 +766,7 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
     perStudentCost: contract.perStudentCost,
     totalCost: contract.totalCost,
     installment: installment.name,
+    installmentIndex: contract.paymentDetails.findIndex(p => p === installment),
     baseAmount: baseAmount,
     gstAmount: gstAmount,
     netPayableAmount: totalAmount,
@@ -791,8 +834,8 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
       );
 
       alert("Invoice registered successfully!");
-    } catch (err) {
-      alert("Failed to register invoice");
+    } catch (error) {
+      alert("Failed to register invoice: " + error.message);
     }
   };
 
@@ -833,71 +876,45 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
   };
 
 const getMergedContracts = () => {
-  const mergableContracts = getMergableContracts();
-  const merged = {};
-
-  mergableContracts.forEach((contract) => {
-    const collegeName = contract.collegeName;
-
-    // ✅ Check if contract has valid installment structure
-    if (
-      !contract.paymentDetails ||
-      !Array.isArray(contract.paymentDetails) ||
-      contract.paymentDetails.length === 0
-    ) {
-      return; // Skip contracts without proper installment structure
+  // Collect contract IDs that have individual invoices generated
+  const individualInvoiceContractIds = new Set();
+  existingInvoices.forEach((invoice) => {
+    if (!invoice.isMergedInvoice && invoice.originalInvoiceId) {
+      individualInvoiceContractIds.add(invoice.originalInvoiceId);
     }
-
-    // ✅ Installment COUNT se group karo (names/percentages se koi lena-dena nahi)
-    const installmentCount = contract.paymentDetails.length;
-
-    // ✅ Final grouping key: collegeName + installmentCount
-    const key = `${collegeName}-${installmentCount}`;
-
-    if (!merged[key]) {
-      merged[key] = {
-        collegeName: contract.collegeName,
-        installmentCount: installmentCount,
-        contracts: [contract],
-        installments: {},
-      };
-    } else {
-      merged[key].contracts.push(contract);
-    }
-
-    // Process installments for this college+count group - EMI FIX
-    contract.paymentDetails?.forEach((installment) => {
-      const installmentName = installment.name;
-      const installmentAmount = calculateEMIAmount(contract, installmentName);
-
-      if (!merged[key].installments[installmentName]) {
-        merged[key].installments[installmentName] = {
-          name: installment.name,
-          percentage: installment.percentage,
-          contracts: [contract],
-          totalAmount: installmentAmount, // ✅ EMI amount use karo
-          courses: [contract.course],
-          years: [contract.year],
-          studentCounts: [contract.studentCount],
-        };
-      } else {
-        merged[key].installments[installmentName].contracts.push(contract);
-        // 🔥 YEH LINE CHANGE KARO - PROPER ROUNDING ADD KARO
-        merged[key].installments[installmentName].totalAmount = Math.round(
-          merged[key].installments[installmentName].totalAmount + installmentAmount
-        );
-        merged[key].installments[installmentName].courses.push(
-          contract.course
-        );
-        merged[key].installments[installmentName].years.push(contract.year);
-        merged[key].installments[installmentName].studentCounts.push(
-          contract.studentCount
-        );
-      }
-    });
   });
 
-  return Object.values(merged);
+  // Filter contracts to only include those without any individual invoices
+  const availableContracts = invoices.filter(contract => !individualInvoiceContractIds.has(contract.id));
+
+  // Group available contracts by college AND installment count
+  const allMerged = {};
+
+  availableContracts.forEach((contract) => {
+    const collegeName = contract.collegeName;
+    const installmentCount = getPaymentInstallmentCount(contract.paymentType, contract.paymentDetails);
+
+    // ✅ Final grouping key: collegeName + installmentCount (merge contracts with same college and same number of installments)
+    const key = `${collegeName}-${installmentCount}`;
+
+    if (!allMerged[key]) {
+      allMerged[key] = {
+        collegeName,
+        installmentCount,
+        paymentTypes: [contract.paymentType || 'UNKNOWN'],
+        contracts: [contract],
+      };
+    } else {
+      if (!allMerged[key].paymentTypes.includes(contract.paymentType)) {
+        allMerged[key].paymentTypes.push(contract.paymentType);
+      }
+      allMerged[key].contracts.push(contract);
+    }
+  });
+
+  const filteredMerged = Object.values(allMerged);
+
+  return filteredMerged;
 };
   // Generate merged project code
   const generateMergedProjectCode = (mergedItem) => {
@@ -956,56 +973,6 @@ const getMergedContracts = () => {
     setShowMergeModal(true);
   };
 
-  // Temporary EMI fix - agar data mein amounts nahi hain toh
-// Fixed EMI calculation with proper rounding
-const calculateEMIAmount = (contract, installmentName) => {
-  if (!contract.paymentDetails || !Array.isArray(contract.paymentDetails)) {
-    return 0;
-  }
-
-  const installmentDetail = contract.paymentDetails.find(
-    (p) => p.name === installmentName
-  );
-
-  // Pehle check karo ki installment detail mein amount hai ya nahi
-  if (installmentDetail && installmentDetail.totalAmount) {
-    const amount = parseFloat(installmentDetail.totalAmount);
-    return isNaN(amount) ? 0 : Math.round(amount); // 🔥 ROUND ADD KARO
-  }
-
-  // EMI ke liye total amount se calculate karo
-  if (contract.paymentType === "EMI") {
-    const totalAmount =
-      parseFloat(contract.netPayableAmount) ||
-      parseFloat(contract.totalCost) ||
-      0;
-
-    if (totalAmount > 0 && contract.paymentDetails.length > 0) {
-      // Equal installments mein divide karo aur ROUND KARO
-      const emiAmount = totalAmount / contract.paymentDetails.length;
-      return Math.round(emiAmount); // 🔥 ROUND ADD KARO
-    }
-  }
-
-  // Percentage se calculate karo
-  if (installmentDetail && installmentDetail.percentage) {
-    const totalAmount =
-      parseFloat(contract.netPayableAmount) ||
-      parseFloat(contract.totalCost) ||
-      0;
-    const percentage = parseFloat(installmentDetail.percentage) || 0;
-
-    if (totalAmount > 0 && percentage > 0) {
-      // Percentage calculate karo aur ROUND KARO
-      const percentageAmount = (totalAmount * percentage) / 100;
-      return Math.round(percentageAmount); // 🔥 ROUND ADD KARO
-    }
-  }
-
-  // Last resort: 0 return karo
-  return 0;
-};
-
 const handleMergeSubmit = async (formData) => {
   if (!selectedContractsForMerge.length || !selectedInstallmentForMerge) {
     alert("Error: No contracts selected for merge.");
@@ -1026,12 +993,10 @@ const handleMergeSubmit = async (formData) => {
 
     // ✅ Pehle sab contracts ke TOTAL amounts calculate karo (Tax Invoice ke hisab se)
     selectedContractsForMerge.forEach((contract) => {
-      const installmentAmount = calculateEMIAmount(
-        contract,
-        selectedInstallmentForMerge.name
-      );
+      // Find installment at the same index position
+      const installmentDetail = contract.paymentDetails?.[selectedInstallmentForMerge.idx];
       
-      const roundedInstallmentAmount = Math.round(installmentAmount);
+      const roundedInstallmentAmount = Math.round(parseFloat(installmentDetail?.totalAmount) || 0);
       
       // ✅ YEHI LINE CHANGE KARO - HAR CONTRACT KA BASE AMOUNT CALCULATE KARO
       const contractBaseAmount = Math.round(roundedInstallmentAmount / 1.18);
@@ -1097,6 +1062,7 @@ const handleMergeSubmit = async (formData) => {
       perStudentCost: perStudentCost,
       totalCost: totalBaseAmount, // ✅ Total cost = Base amount (GST excluded)
       installment: selectedInstallmentForMerge.name,
+      installmentIndex: selectedInstallmentForMerge.idx,
       baseAmount: totalBaseAmount, // ✅ BASE AMOUNT DONO CASES MEIN SAME
       gstAmount: gstAmount,
       netPayableAmount: finalNetPayableAmount,
@@ -1135,8 +1101,8 @@ const handleMergeSubmit = async (formData) => {
         gstNumber: c.gstNumber,
         gstType: c.gstType,
         // ✅ Individual contract amounts bhi store karo reference ke liye
-        installmentAmount: calculateEMIAmount(c, selectedInstallmentForMerge.name),
-        baseAmount: Math.round(calculateEMIAmount(c, selectedInstallmentForMerge.name) / 1.18)
+        installmentAmount: Math.round(parseFloat(c.paymentDetails?.[selectedInstallmentForMerge.idx]?.totalAmount) || 0),
+        baseAmount: Math.round((parseFloat(c.paymentDetails?.[selectedInstallmentForMerge.idx]?.totalAmount) || 0) / 1.18)
       })),
       individualProjectCodes: selectedContractsForMerge
         .map((c) => c.projectCode)
@@ -1283,13 +1249,6 @@ const handleMergeSubmit = async (formData) => {
   };
 
   // Helper functions for displaying useful info
-  const getUniquePaymentTypes = (contracts) => {
-    const types = [
-      ...new Set(contracts.map((c) => getPaymentTypeName(c.paymentType))),
-    ];
-    return types.join(", ");
-  };
-
   const getTotalStudentCount = (contracts) => {
     return contracts.reduce((total, contract) => {
       return total + (parseInt(contract.studentCount) || 0);
@@ -1488,37 +1447,38 @@ const handleMergeSubmit = async (formData) => {
                     return (
                       <div
                         key={invoice.id}
-                        className="bg-white rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden"
+                        className="bg-white rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden hover:shadow-md transition-shadow duration-200"
                       >
                         {/* College Header */}
                         <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <h2 className="text-lg font-bold text-white">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h2 className="text-lg font-bold text-white truncate">
                                   {invoice.collegeName ||
                                     invoice.collegeCode ||
                                     "N/A"}
                                 </h2>
-                                <span className="bg-blue-800 text-white text-xs font-semibold py-1 px-2 rounded-full">
+                                <span className="bg-blue-800/80 text-white text-xs font-semibold py-1 px-2 rounded-full border border-blue-600/50">
                                   {generatedCount}/{totalInstallments}
                                 </span>
                               </div>
-                              <p className="text-blue-100 text-sm mt-1">
+                              <p className="text-blue-100 text-sm truncate">
                                 Project Code:{" "}
                                 {invoice.projectCode || invoice.id} • Payment
                                 Type: {getPaymentTypeName(invoice.paymentType)}{" "}
                                 • Students: {invoice.studentCount || "N/A"} •
                                 Total Amount:{" "}
-                                {formatCurrency(
+                                {formatIndianCurrency(
                                   invoice.netPayableAmount || invoice.totalCost
                                 )}
                               </p>
                             </div>
-                            <div className="text-blue-100">
+                            <div className="ml-3 flex-shrink-0">
                               <button
                                 onClick={() => toggleExpand(invoice.id)}
-                                className="text-white"
+                                className="text-white hover:bg-blue-700/50 p-1 rounded-lg transition-colors duration-200"
+                                title={expandedRows.has(invoice.id) ? "Collapse details" : "Expand details"}
                               >
                                 <FontAwesomeIcon
                                   icon={
@@ -1526,12 +1486,61 @@ const handleMergeSubmit = async (formData) => {
                                       ? faChevronUp
                                       : faChevronDown
                                   }
+                                  className="w-5 h-5"
                                 />
                               </button>
                             </div>
                           </div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 p-4">
+
+                        {/* Mobile Card View */}
+                        <div className="block md:hidden p-4 space-y-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-gray-50/50 rounded-lg p-3">
+                              <p className="text-xs font-bold text-gray-500 mb-1">
+                                Course
+                              </p>
+                              <p className="text-sm text-gray-900 font-medium">
+                                {invoice.course || "N/A"}
+                              </p>
+                            </div>
+                            <div className="bg-gray-50/50 rounded-lg p-3">
+                              <p className="text-xs font-bold text-gray-500 mb-1">
+                                Year
+                              </p>
+                              <p className="text-sm text-gray-900 font-medium">
+                                {invoice.year || "N/A"}
+                              </p>
+                            </div>
+                            <div className="bg-gray-50/50 rounded-lg p-3">
+                              <p className="text-xs font-bold text-gray-500 mb-1">
+                                Per Student Cost
+                              </p>
+                              <p className="text-sm text-gray-900 font-medium">
+                                {formatIndianCurrency(invoice.perStudentCost)}
+                              </p>
+                            </div>
+                            <div className="bg-gray-50/50 rounded-lg p-3">
+                              <p className="text-xs font-bold text-gray-500 mb-1">
+                                Generated Invoices
+                              </p>
+                              <p className="text-sm text-gray-900">
+                                {contractInvoices.length > 0 ? (
+                                  <span className="bg-blue-100 text-blue-800 text-xs font-semibold py-1 px-2 rounded-full border border-blue-300">
+                                    {generatedCount}/{totalInstallments}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400 font-medium">
+                                    0/{totalInstallments}
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Desktop Grid View */}
+                        <div className="hidden md:grid md:grid-cols-4 gap-4 mb-4 p-4">
                           <div>
                             <p className="text-xs font-bold text-gray-500 mb-0.5">
                               Course
@@ -1553,7 +1562,7 @@ const handleMergeSubmit = async (formData) => {
                               Per Student Cost
                             </p>
                             <p className="text-sm text-gray-900">
-                              {formatCurrency(invoice.perStudentCost)}
+                              {formatIndianCurrency(invoice.perStudentCost)}
                             </p>
                           </div>
                           <div>
@@ -1573,349 +1582,509 @@ const handleMergeSubmit = async (formData) => {
                             </p>
                           </div>
                         </div>
+
                         {/* Expanded Content */}
                         {expandedRows.has(invoice.id) && (
-                          <div className="p-4 transition-all duration-300 ease-in-out">
-                            {/* Installments Table */}
-                            <div className="overflow-x-auto">
-                              <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
-                                  <tr>
-                                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                      Installment
-                                    </th>
-                                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                      Percentage
-                                    </th>
-                                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                      Amount
-                                    </th>
-                                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                      Invoice Type
-                                    </th>
-                                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                      Received Amount
-                                    </th>
-                                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                      Due Amount
-                                    </th>
-                                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                      Actions
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                  {(() => {
-                                    const allInvoicesForContract =
-                                      existingInvoices
-                                        .filter(
-                                          (inv) =>
-                                            inv.originalInvoiceId === invoice.id
-                                        )
-                                        .concat(
-                                          existingProformas.filter(
-                                            (inv) =>
-                                              inv.originalInvoiceId ===
-                                                invoice.id &&
-                                              !inv.convertedToTax
-                                          )
-                                        );
+                          <div className="border-t border-gray-100">
+                            {/* Mobile Installments Cards */}
+                            <div className="block md:hidden p-4 space-y-3">
+                              {(() => {
+                                const allInvoicesForContract =
+                                  existingInvoices
+                                    .filter(
+                                      (inv) =>
+                                        inv.originalInvoiceId === invoice.id
+                                    )
+                                    .concat(
+                                      existingProformas.filter(
+                                        (inv) =>
+                                          inv.originalInvoiceId ===
+                                            invoice.id &&
+                                          !inv.convertedToTax
+                                      )
+                                    );
 
-                                    return invoice.paymentDetails?.map(
-                                      (installment, index) => {
-                                        const invoicesForInstallment =
-                                          allInvoicesForContract.filter(
-                                            (inv) =>
-                                              inv.installment ===
-                                              installment.name
-                                          );
+                                return invoice.paymentDetails?.map(
+                                  (installment, index) => {
+                                    const invoicesForInstallment =
+                                      allInvoicesForContract.filter(
+                                        (inv) =>
+                                          inv.installment === installment.name &&
+                                          (inv.installmentIndex === undefined || inv.installmentIndex === index)
+                                      );
 
-                                        // Sort: active first, then cancelled, by raisedDate desc
-                                        invoicesForInstallment.sort((a, b) => {
-                                          const aCancelled =
-                                            a.status === "cancelled" ||
-                                            a.approvalStatus === "cancelled";
-                                          const bCancelled =
-                                            b.status === "cancelled" ||
-                                            b.approvalStatus === "cancelled";
-                                          if (aCancelled && !bCancelled)
-                                            return 1;
-                                          if (bCancelled && !aCancelled)
-                                            return -1;
+                                    // Sort: active first, then cancelled, by raisedDate desc
+                                    invoicesForInstallment.sort((a, b) => {
+                                      const aCancelled =
+                                        a.status === "cancelled" ||
+                                        a.approvalStatus === "cancelled";
+                                      const bCancelled =
+                                        b.status === "cancelled" ||
+                                        b.approvalStatus === "cancelled";
+                                      if (aCancelled && !bCancelled)
+                                        return 1;
+                                      if (bCancelled && !aCancelled)
+                                        return -1;
+                                      return (
+                                        new Date(b.raisedDate || 0) -
+                                        new Date(a.raisedDate || 0)
+                                      );
+                                    });
+
+                                    if (invoicesForInstallment.length > 0) {
+                                      return invoicesForInstallment.map(
+                                        (inv, invIndex) => {
+                                          const isCancelled =
+                                            inv.status === "cancelled" ||
+                                            inv.approvalStatus ===
+                                              "cancelled";
+                                          const totalAmount =
+                                            inv.amountRaised ||
+                                            inv.netPayableAmount ||
+                                            installment.totalAmount;
+                                          const receivedAmount =
+                                            inv.receivedAmount || 0;
+
+                                          // Calculate total TDS amount from payment history
+                                          const totalTdsAmount = inv.paymentHistory?.reduce((sum, payment) => {
+                                            return sum + (parseFloat(payment.tdsAmount) || 0);
+                                          }, 0) || 0;
+
+                                          // Due amount should account for TDS: totalAmount - (receivedAmount + totalTdsAmount)
+                                          const dueAmount =
+                                            totalAmount - (receivedAmount + totalTdsAmount);
+
                                           return (
-                                            new Date(b.raisedDate || 0) -
-                                            new Date(a.raisedDate || 0)
-                                          );
-                                        });
-
-                                        if (invoicesForInstallment.length > 0) {
-                                          return invoicesForInstallment.map(
-                                            (inv, invIndex) => {
-                                              const isCancelled =
-                                                inv.status === "cancelled" ||
-                                                inv.approvalStatus ===
-                                                  "cancelled";
-                                              const totalAmount =
-                                                inv.amountRaised ||
-                                                inv.netPayableAmount ||
-                                                installment.totalAmount;
-                                              const receivedAmount =
-                                                inv.receivedAmount || 0;
-                                              const dueAmount =
-                                                totalAmount - receivedAmount;
-
-                                              return (
-                                                <tr
-                                                  key={`${index}-${invIndex}`}
-                                                  className={`hover:bg-gray-50 cursor-pointer ${
-                                                    isCancelled
-                                                      ? "bg-red-50"
-                                                      : ""
-                                                  }`}
-                                                  onClick={() =>
-                                                    setSelectedInvoice(inv)
-                                                  }
-                                                >
-                                                  <td className="px-4 py-2 text-sm text-gray-900">
+                                            <div
+                                              key={`${index}-${invIndex}`}
+                                              className={`bg-gradient-to-r ${isCancelled ? 'from-red-50 to-red-100/50' : 'from-gray-50 to-gray-100/50'} rounded-xl p-4 border ${isCancelled ? 'border-red-200' : 'border-gray-200'} cursor-pointer hover:shadow-md transition-all duration-200`}
+                                              onClick={() =>
+                                                setSelectedInvoice(inv)
+                                              }
+                                            >
+                                              <div className="flex items-center justify-between mb-3">
+                                                <div className="flex items-center gap-2">
+                                                  <h4 className="text-sm font-semibold text-gray-900">
                                                     {installment.name}
-                                                    {isCancelled && (
-                                                      <span className="ml-1 text-xs text-red-500">
-                                                        (Cancelled)
+                                                  </h4>
+                                                  {isCancelled && (
+                                                    <span className="bg-red-100 text-red-700 text-xs font-medium py-0.5 px-2 rounded-full border border-red-300">
+                                                      Cancelled
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                <div className="text-right">
+                                                  <div className={`text-sm font-bold ${dueAmount > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                    {dueAmount === 0 ? "Paid" : formatIndianCurrency(dueAmount) + " Due"}
+                                                  </div>
+                                                </div>
+                                              </div>
+
+                                              <div className="grid grid-cols-2 gap-3 mb-3">
+                                                <div>
+                                                  <p className="text-xs text-gray-500 mb-1">Percentage</p>
+                                                  <p className="text-sm font-medium text-gray-900">{installment.percentage}%</p>
+                                                </div>
+                                                <div>
+                                                  <p className="text-xs text-gray-500 mb-1">Amount</p>
+                                                  <p className="text-sm font-semibold text-gray-900">{formatIndianCurrency(installment.totalAmount)}</p>
+                                                </div>
+                                              </div>
+
+                                              <div className="flex items-center justify-between">
+                                                <div className="flex-1">
+                                                  <div className="flex items-center gap-2 mb-2">
+                                                    <span className={`text-xs font-semibold py-1 px-2 rounded-full ${
+                                                      inv.invoiceType === "Tax Invoice"
+                                                        ? "bg-green-100 text-green-800 border border-green-300"
+                                                        : inv.invoiceType === "Cash Invoice"
+                                                        ? "bg-orange-100 text-orange-800 border border-orange-300"
+                                                        : "bg-blue-100 text-blue-800 border border-blue-300"
+                                                    }`}>
+                                                      {inv.invoiceType === "Proforma Invoice" ? "Proforma" :
+                                                       inv.invoiceType === "Cash Invoice" ? "Cash" : "Tax"}
+                                                    </span>
+                                                    {inv.invoiceType === "Tax Invoice" && getApprovalStatusBadge(inv)}
+                                                  </div>
+                                                  <div className="text-xs text-gray-500">
+                                                    {inv.invoiceNumber || "N/A"}
+                                                    {inv.convertedFromProforma && (
+                                                      <span className="text-purple-600 block">
+                                                        From: {inv.originalProformaNumber}
                                                       </span>
                                                     )}
-                                                  </td>
-                                                  <td className="px-4 py-2 text-sm text-gray-500">
-                                                    {installment.percentage}%
-                                                  </td>
-                                                  <td className="px-4 py-2 text-sm text-gray-500 font-semibold">
-                                                    {formatCurrency(
-                                                      installment.totalAmount
-                                                    )}
-                                                  </td>
-                                                  <td className="px-4 py-2 text-sm text-gray-500">
-                                                    <div className="text-center">
-                                                      {/* Invoice type (Tax / Cash / Proforma) */}
-                                                      <div
-                                                        className={`font-semibold ${
-                                                          inv.invoiceType ===
-                                                          "Tax Invoice"
-                                                            ? "text-green-600"
-                                                            : inv.invoiceType ===
-                                                              "Cash Invoice"
-                                                            ? "text-orange-600"
-                                                            : "text-blue-600"
-                                                        }`}
-                                                      >
-                                                        {inv.invoiceType ===
-                                                        "Proforma Invoice"
-                                                          ? "Proforma"
-                                                          : inv.invoiceType ===
-                                                            "Cash Invoice"
-                                                          ? "Cash"
-                                                          : "Tax"}
-                                                        {isCancelled &&
-                                                          inv.regenerated &&
-                                                          " (Cancelled - Regenerated)"}
-                                                        {!isCancelled &&
-                                                          inv.regeneratedFrom &&
-                                                          ` (Regenerated from ${inv.regeneratedFrom})`}
-                                                      </div>
+                                                  </div>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                  <button
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      setSelectedInvoice(inv);
+                                                    }}
+                                                    className="bg-blue-600 hover:bg-blue-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                  >
+                                                    View
+                                                  </button>
+                                                  {!isCancelled && !inv.regeneratedFrom && (
+                                                    <button
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleCancelInvoice(inv);
+                                                      }}
+                                                      className="bg-red-600 hover:bg-red-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                    >
+                                                      Undo
+                                                    </button>
+                                                  )}
+                                                  {!isCancelled && inv.invoiceType === "Proforma Invoice" && (
+                                                    <button
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleConvertToTax(inv);
+                                                      }}
+                                                      className="bg-purple-600 hover:bg-purple-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                    >
+                                                      Generate TI
+                                                    </button>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            </div>
+                                          );
+                                        }
+                                      );
+                                    } else {
+                                      // No invoices for this installment - mobile card
+                                      return (
+                                        <div
+                                          key={index}
+                                          className="bg-gradient-to-r from-blue-50 to-blue-100/50 rounded-xl p-4 border border-blue-200 cursor-pointer hover:shadow-md transition-all duration-200"
+                                          onClick={() =>
+                                            setRowClickModal({
+                                              isOpen: true,
+                                              invoice: null,
+                                              installment: installment,
+                                              contract: invoice,
+                                            })
+                                          }
+                                        >
+                                          <div className="flex items-center justify-between mb-3">
+                                            <h4 className="text-sm font-semibold text-gray-900">
+                                              {installment.name}
+                                            </h4>
+                                            <span className="bg-yellow-100 text-yellow-800 text-xs font-medium py-1 px-2 rounded-full border border-yellow-300">
+                                              Not Generated
+                                            </span>
+                                          </div>
 
-                                                      {/* Approval status sirf Tax Invoice ke liye, Cash aur Proforma ke liye nahi */}
-                                                      {inv.invoiceType ===
-                                                        "Tax Invoice" &&
-                                                        getApprovalStatusBadge(
-                                                          inv
+                                          <div className="grid grid-cols-2 gap-3 mb-3">
+                                            <div>
+                                              <p className="text-xs text-gray-500 mb-1">Percentage</p>
+                                              <p className="text-sm font-medium text-gray-900">{installment.percentage}%</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs text-gray-500 mb-1">Amount</p>
+                                              <p className="text-sm font-semibold text-gray-900">{formatIndianCurrency(installment.totalAmount)}</p>
+                                            </div>
+                                          </div>
+
+                                          <div className="flex justify-end">
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleGenerateInvoice(invoice, installment);
+                                              }}
+                                              className="bg-blue-600 hover:bg-blue-700 text-white py-1.5 px-4 rounded-lg text-sm font-medium transition-colors duration-200"
+                                            >
+                                              Generate
+                                            </button>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                  }
+                                );
+                              })()}
+                            </div>
+
+                            {/* Desktop Table View */}
+                            <div className="hidden md:block p-4">
+                              <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                  <thead className="bg-gray-50">
+                                    <tr>
+                                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                        Installment
+                                      </th>
+                                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                        Percentage
+                                      </th>
+                                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                        Amount
+                                      </th>
+                                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                        Invoice Type
+                                      </th>
+                                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                        Received Amount
+                                      </th>
+                                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                        Due Amount
+                                      </th>
+                                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                        Actions
+                                      </th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="bg-white divide-y divide-gray-200">
+                                    {(() => {
+                                      const allInvoicesForContract =
+                                        existingInvoices
+                                          .filter(
+                                            (inv) =>
+                                              inv.originalInvoiceId === invoice.id
+                                          )
+                                          .concat(
+                                            existingProformas.filter(
+                                              (inv) =>
+                                                inv.originalInvoiceId ===
+                                                  invoice.id &&
+                                                !inv.convertedToTax
+                                            )
+                                          );
+
+                                      return invoice.paymentDetails?.map(
+                                        (installment, index) => {
+                                          const invoicesForInstallment =
+                                            allInvoicesForContract.filter(
+                                              (inv) =>
+                                                inv.installment === installment.name &&
+                                                (inv.installmentIndex === undefined || inv.installmentIndex === index)
+                                            );
+
+                                          // Sort: active first, then cancelled, by raisedDate desc
+                                          invoicesForInstallment.sort((a, b) => {
+                                            const aCancelled =
+                                              a.status === "cancelled" ||
+                                              a.approvalStatus === "cancelled";
+                                            const bCancelled =
+                                              b.status === "cancelled" ||
+                                              b.approvalStatus === "cancelled";
+                                            if (aCancelled && !bCancelled)
+                                              return 1;
+                                            if (bCancelled && !aCancelled)
+                                              return -1;
+                                            return (
+                                              new Date(b.raisedDate || 0) -
+                                              new Date(a.raisedDate || 0)
+                                            );
+                                          });
+
+                                          if (invoicesForInstallment.length > 0) {
+                                            return invoicesForInstallment.map(
+                                              (inv, invIndex) => {
+                                                const isCancelled =
+                                                  inv.status === "cancelled" ||
+                                                  inv.approvalStatus ===
+                                                    "cancelled";
+                                                const totalAmount =
+                                                  inv.amountRaised ||
+                                                  inv.netPayableAmount ||
+                                                  installment.totalAmount;
+                                                const receivedAmount =
+                                                  inv.receivedAmount || 0;
+
+                                                // Calculate total TDS amount from payment history
+                                                const totalTdsAmount = inv.paymentHistory?.reduce((sum, payment) => {
+                                                  return sum + (parseFloat(payment.tdsAmount) || 0);
+                                                }, 0) || 0;
+
+                                                // Due amount should account for TDS: totalAmount - (receivedAmount + totalTdsAmount)
+                                                const dueAmount =
+                                                  totalAmount - (receivedAmount + totalTdsAmount);
+
+                                                return (
+                                                  <tr
+                                                    key={`${index}-${invIndex}`}
+                                                    className={`hover:bg-gray-50 cursor-pointer transition-colors duration-200 ${isCancelled ? "bg-red-50" : ""}`}
+                                                    onClick={() =>
+                                                      setSelectedInvoice(inv)
+                                                    }
+                                                  >
+                                                    <td className="px-4 py-3 text-sm text-gray-900 font-medium">
+                                                      {installment.name}
+                                                      {isCancelled && (
+                                                        <span className="ml-2 text-xs text-red-500 font-medium">
+                                                          (Cancelled)
+                                                        </span>
+                                                      )}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-sm text-gray-500">
+                                                      {installment.percentage}%
+                                                    </td>
+                                                    <td className="px-4 py-3 text-sm text-gray-900 font-semibold">
+                                                      {formatIndianCurrency(
+                                                        installment.totalAmount
+                                                      )}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-sm text-gray-500">
+                                                      <div className="text-center">
+                                                        {/* Invoice type (Tax / Cash / Proforma) */}
+                                                        <div
+                                                          className={`font-semibold ${inv.invoiceType === "Tax Invoice" ? "text-green-600" : inv.invoiceType === "Cash Invoice" ? "text-orange-600" : "text-blue-600"}`}
+                                                        >
+                                                          {inv.invoiceType === "Proforma Invoice" ? "Proforma" : inv.invoiceType === "Cash Invoice" ? "Cash" : "Tax"}
+                                                          {isCancelled && inv.regenerated && " (Cancelled - Regenerated)"}
+                                                          {!isCancelled && inv.regeneratedFrom && ` (Regenerated from ${inv.regeneratedFrom})`}
+                                                        </div>
+
+                                                        {/* Approval status sirf Tax Invoice ke liye, Cash aur Proforma ke liye nahi */}
+                                                        {inv.invoiceType === "Tax Invoice" && getApprovalStatusBadge(inv)}
+
+                                                        {/* Cash Invoice ke liye special badge */}
+                                                        {inv.invoiceType === "Cash Invoice" && (
+                                                          <span className="ml-1 px-1.5 py-0.5 rounded text-xs bg-orange-100 text-orange-800 border border-orange-300">
+                                                            Cash
+                                                          </span>
                                                         )}
 
-                                                      {/* Cash Invoice ke liye special badge */}
-                                                      {inv.invoiceType ===
-                                                        "Cash Invoice" && (
-                                                        <span className="ml-1 px-1.5 py-0.5 rounded text-xs bg-orange-100 text-orange-800 border border-orange-300">
-                                                          Cash
-                                                        </span>
-                                                      )}
+                                                        {/* Proforma Invoice ke liye badge */}
+                                                        {inv.invoiceType === "Proforma Invoice" && (
+                                                          <span className="ml-1 px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 border border-blue-300">
+                                                            Proforma
+                                                          </span>
+                                                        )}
 
-                                                      {/* Proforma Invoice ke liye badge */}
-                                                      {inv.invoiceType ===
-                                                        "Proforma Invoice" && (
-                                                        <span className="ml-1 px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 border border-blue-300">
-                                                          Proforma
-                                                        </span>
-                                                      )}
-
-                                                      {/* Invoice number */}
-                                                      <div className="text-xs text-gray-400 mt-0.5">
-                                                        {inv.invoiceNumber ||
-                                                          "N/A"}
-                                                      </div>
-
-                                                      {/* From: Proforma number niche dikhana hai */}
-                                                      {inv.convertedFromProforma && (
-                                                        <div className="text-xs text-purple-600 mt-0.5">
-                                                          From:{" "}
-                                                          {
-                                                            inv.originalProformaNumber
-                                                          }
+                                                        {/* Invoice number */}
+                                                        <div className="text-xs text-gray-400 mt-0.5">
+                                                          {inv.invoiceNumber || "N/A"}
                                                         </div>
-                                                      )}
-                                                    </div>
-                                                  </td>
 
-                                                  <td className="px-4 py-2 text-sm">
-                                                    <span
-                                                      className={`font-semibold ${
-                                                        receivedAmount > 0
-                                                          ? "text-green-600"
-                                                          : "text-gray-600"
-                                                      }`}
-                                                    >
-                                                      {formatCurrency(
-                                                        receivedAmount
-                                                      )}
-                                                    </span>
-                                                  </td>
-                                                  <td className="px-4 py-2 text-sm">
-                                                    <span
-                                                      className={`font-semibold ${
-                                                        dueAmount > 0
-                                                          ? "text-red-600"
-                                                          : "text-green-600"
-                                                      }`}
-                                                    >
-                                                      {dueAmount === 0
-                                                        ? "0"
-                                                        : formatCurrency(
-                                                            dueAmount
-                                                          )}
-                                                    </span>
-                                                  </td>
-                                                  <td className="px-4 py-2 text-sm">
-                                                    <div className="flex gap-2">
-                                                      <button
-                                                        onClick={(e) => {
-                                                          e.stopPropagation();
-                                                          setSelectedInvoice(
-                                                            inv
-                                                          );
-                                                        }}
-                                                        className="bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded text-xs whitespace-nowrap"
-                                                      >
-                                                        View
-                                                      </button>
-                                                      {!isCancelled &&
-                                                        !inv.regeneratedFrom && (
+                                                        {/* From: Proforma number niche dikhana hai */}
+                                                        {inv.convertedFromProforma && (
+                                                          <div className="text-xs text-purple-600 mt-0.5">
+                                                            From:{" "}
+                                                            {inv.originalProformaNumber}
+                                                          </div>
+                                                        )}
+                                                      </div>
+                                                    </td>
+
+                                                    <td className="px-4 py-3 text-sm">
+                                                      <span className={`font-semibold ${receivedAmount > 0 ? "text-green-600" : "text-gray-600"}`}>
+                                                        {formatIndianCurrency(receivedAmount)}
+                                                      </span>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-sm">
+                                                      <span className={`font-semibold ${dueAmount > 0 ? "text-red-600" : "text-green-600"}`}>
+                                                        {dueAmount === 0 ? "0" : formatIndianCurrency(dueAmount)}
+                                                      </span>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-sm">
+                                                      <div className="flex gap-2">
+                                                        <button
+                                                          onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedInvoice(inv);
+                                                          }}
+                                                          className="bg-blue-600 hover:bg-blue-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                        >
+                                                          View
+                                                        </button>
+                                                        {!isCancelled && !inv.regeneratedFrom && (
                                                           <button
                                                             onClick={(e) => {
                                                               e.stopPropagation();
-                                                              handleCancelInvoice(
-                                                                inv
-                                                              );
+                                                              handleCancelInvoice(inv);
                                                             }}
-                                                            className="bg-red-500 hover:bg-red-700 text-white py-1 px-2 rounded text-xs whitespace-nowrap"
+                                                            className="bg-red-600 hover:bg-red-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
                                                             title="Cancel this invoice"
                                                           >
                                                             Undo
                                                           </button>
                                                         )}
-                                                      {isCancelled &&
-                                                        !inv.regenerated && (
+                                                        {isCancelled && !inv.regenerated && (
                                                           <button
                                                             onClick={(e) => {
                                                               e.stopPropagation();
-                                                              handleGenerateInvoice(
-                                                                invoice,
-                                                                installment,
-                                                                true,
-                                                                inv
-                                                              );
+                                                              handleGenerateInvoice(invoice, installment, true, inv);
                                                             }}
-                                                            className="bg-orange-500 hover:bg-orange-700 text-white py-1 px-2 rounded text-xs whitespace-nowrap"
+                                                            className="bg-orange-600 hover:bg-orange-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
                                                             title="Regenerate cancelled invoice"
                                                           >
                                                             Regenerate
                                                           </button>
                                                         )}
-                                                      {!isCancelled &&
-                                                        inv.invoiceType ===
-                                                          "Proforma Invoice" && (
+                                                        {!isCancelled && inv.invoiceType === "Proforma Invoice" && (
                                                           <button
                                                             onClick={(e) => {
                                                               e.stopPropagation();
-                                                              handleConvertToTax(
-                                                                inv
-                                                              );
+                                                              handleConvertToTax(inv);
                                                             }}
-                                                            className="bg-purple-500 hover:bg-purple-700 text-white py-1 px-2 rounded text-xs whitespace-nowrap"
+                                                            className="bg-purple-600 hover:bg-purple-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
                                                           >
                                                             Generate TI
                                                           </button>
                                                         )}
-                                                    </div>
-                                                  </td>
-                                                </tr>
-                                              );
-                                            }
-                                          );
-                                        } else {
-                                          // No invoices for this installment
-                                          return (
-                                            <tr
-                                              key={index}
-                                              className="hover:bg-gray-50 cursor-pointer"
-                                              onClick={() =>
-                                                setRowClickModal({
-                                                  isOpen: true,
-                                                  invoice: null,
-                                                  installment: installment,
-                                                  contract: invoice,
-                                                })
+                                                      </div>
+                                                    </td>
+                                                  </tr>
+                                                );
                                               }
-                                            >
-                                              <td className="px-4 py-2 text-sm text-gray-900">
-                                                {installment.name}
-                                              </td>
-                                              <td className="px-4 py-2 text-sm text-gray-500">
-                                                {installment.percentage}%
-                                              </td>
-                                              <td className="px-4 py-2 text-sm text-gray-500 font-semibold">
-                                                {formatCurrency(
-                                                  installment.totalAmount
-                                                )}
-                                              </td>
-                                              <td className="px-4 py-2 text-sm text-gray-500">
-                                                -
-                                              </td>
-                                              <td className="px-4 py-2 text-sm">
-                                                ₹0
-                                              </td>
-                                              <td className="px-4 py-2 text-sm">
-                                                {formatCurrency(
-                                                  installment.totalAmount
-                                                )}
-                                              </td>
-                                              <td className="px-4 py-2 text-sm">
-                                                <button
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleGenerateInvoice(
-                                                      invoice,
-                                                      installment
-                                                    );
-                                                  }}
-                                                  className="bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded text-xs whitespace-nowrap"
-                                                >
-                                                  Generate
-                                                </button>
-                                              </td>
-                                            </tr>
-                                          );
+                                            );
+                                          } else {
+                                            // No invoices for this installment
+                                            return (
+                                              <tr
+                                                key={index}
+                                                className="hover:bg-gray-50 cursor-pointer transition-colors duration-200"
+                                                onClick={() =>
+                                                  setRowClickModal({
+                                                    isOpen: true,
+                                                    invoice: null,
+                                                    installment: installment,
+                                                    contract: invoice,
+                                                  })
+                                                }
+                                              >
+                                                <td className="px-4 py-3 text-sm text-gray-900 font-medium">
+                                                  {installment.name}
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-gray-500">
+                                                  {installment.percentage}%
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-gray-900 font-semibold">
+                                                  {formatCurrency(installment.totalAmount)}
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-gray-500">
+                                                  -
+                                                </td>
+                                                <td className="px-4 py-3 text-sm">
+                                                  ₹0
+                                                </td>
+                                                <td className="px-4 py-3 text-sm">
+                                                  {formatIndianCurrency(installment.totalAmount)}
+                                                </td>
+                                                <td className="px-4 py-3 text-sm">
+                                                  <button
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      handleGenerateInvoice(invoice, installment);
+                                                    }}
+                                                    className="bg-blue-600 hover:bg-blue-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                  >
+                                                    Generate
+                                                  </button>
+                                                </td>
+                                              </tr>
+                                            );
+                                          }
                                         }
-                                      }
-                                    );
-                                  })()}
-                                </tbody>
-                              </table>
+                                      );
+                                    })()}
+                                  </tbody>
+                                </table>
+                              </div>
                             </div>
                           </div>
                         )}
@@ -1937,11 +2106,10 @@ const handleMergeSubmit = async (formData) => {
                         />
                       </div>
                       <h3 className="text-base font-semibold text-gray-900 mb-1">
-                        No contracts available for merging
+                        No contracts in merged view
                       </h3>
                       <p className="text-gray-500 text-xs mb-4">
-                        All contracts have individual invoices generated. Switch
-                        to Individual View to see them.
+                        All contracts are either in individual view or have no available installments for merging.
                       </p>
                       <button
                         onClick={() => setActiveTab("individual")}
@@ -1955,39 +2123,39 @@ const handleMergeSubmit = async (formData) => {
                   getFilteredContracts(mergedContracts, true).map((mergedItem, index) => (
                     <div
                       key={index}
-                      className="bg-white rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden"
+                      className="bg-white rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden hover:shadow-md transition-shadow duration-200"
                     >
                       {/* College Header */}
                       <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-4 py-3">
                         <div className="flex items-center justify-between">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h2 className="text-lg font-bold text-white">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h2 className="text-lg font-bold text-white truncate">
                                 {mergedItem.collegeName}
                               </h2>
-                              <span className="bg-purple-800 text-white text-xs font-semibold py-1 px-2 rounded-full">
+                              <span className="bg-purple-800/80 text-white text-xs font-semibold py-1 px-2 rounded-full border border-purple-600/50">
                                 {mergedItem.contracts.length} Contracts
                               </span>
                               <span className="bg-green-600 text-white text-xs font-semibold py-1 px-2 rounded-full">
                                 {mergedItem.installmentCount} Installments Each
                               </span>
                             </div>
-                            <p className="text-purple-100 text-sm mt-1">
+                            <p className="text-purple-100 text-sm truncate">
                               Project Code: {generateMergedProjectCode(mergedItem)} •
-                              Payment Types:{" "}
-                              {getUniquePaymentTypes(mergedItem.contracts)} •
+                              Payment Types: {mergedItem.paymentTypes.join(", ")} •
                               Total Students:{" "}
                               {getTotalStudentCount(mergedItem.contracts)} •
                               Total Amount:{" "}
-                              {formatCurrency(
+                              {formatIndianCurrency(
                                 getTotalContractAmount(mergedItem.contracts)
                               )}
                             </p>
                           </div>
-                          <div className="text-purple-100">
+                          <div className="ml-3 flex-shrink-0">
                             <button
                               onClick={() => toggleExpand(`merged-${index}`)}
-                              className="text-white"
+                              className="text-white hover:bg-purple-700/50 p-1 rounded-lg transition-colors duration-200"
+                              title={expandedRows.has(`merged-${index}`) ? "Collapse details" : "Expand details"}
                             >
                               <FontAwesomeIcon
                                 icon={
@@ -1995,14 +2163,84 @@ const handleMergeSubmit = async (formData) => {
                                     ? faChevronUp
                                     : faChevronDown
                                 }
+                                className="w-5 h-5"
                               />
                             </button>
                           </div>
                         </div>
                       </div>
 
-                      {/* Contract Details - Similar to Individual View */}
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 p-4">
+                      {/* Mobile Contract Details Cards */}
+                      <div className="block md:hidden p-4 space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-gray-50/50 rounded-lg p-3">
+                            <p className="text-xs font-bold text-gray-500 mb-1">
+                              Course
+                            </p>
+                            <p className="text-sm text-gray-900 font-medium">
+                              {[...new Set(mergedItem.contracts.map(c => c.course))].join(", ") || "N/A"}
+                            </p>
+                          </div>
+                          <div className="bg-gray-50/50 rounded-lg p-3">
+                            <p className="text-xs font-bold text-gray-500 mb-1">
+                              Year
+                            </p>
+                            <p className="text-sm text-gray-900 font-medium">
+                              {[...new Set(mergedItem.contracts.map(c => c.year))].join(", ") || "N/A"}
+                            </p>
+                          </div>
+                          <div className="bg-gray-50/50 rounded-lg p-3">
+                            <p className="text-xs font-bold text-gray-500 mb-1">
+                              Per Student Cost
+                            </p>
+                            <p className="text-sm text-gray-900 font-medium">
+                              {formatIndianCurrency(
+                                mergedItem.contracts.reduce((total, c) => total + (parseFloat(c.perStudentCost) || 0), 0) / mergedItem.contracts.length
+                              )}
+                            </p>
+                          </div>
+                          <div className="bg-gray-50/50 rounded-lg p-3">
+                            <p className="text-xs font-bold text-gray-500 mb-1">
+                              Generated Merged Invoices
+                            </p>
+                            <p className="text-sm text-gray-900">
+                              {(() => {
+                                // Count total merged invoices for this group
+                                const mergedInvoicesCount = existingInvoices.filter(inv => 
+                                  inv.isMergedInvoice && 
+                                  inv.mergedContracts &&
+                                  inv.mergedContracts.length === mergedItem.contracts.length &&
+                                  inv.mergedContracts.every(mc => mergedItem.contracts.some(c => c.id === mc.id))
+                                ).length;
+
+                                // Count installments that have individual invoices
+                                const individualInvoicesCount = mergedItem.contracts.reduce((count, contract) => {
+                                  return count + existingInvoices.filter(inv => 
+                                    !inv.isMergedInvoice && 
+                                    inv.originalInvoiceId === contract.id
+                                  ).length;
+                                }, 0);
+
+                                const totalProcessed = mergedInvoicesCount + individualInvoicesCount;
+                                const totalPossible = mergedItem.installmentCount;
+
+                                return totalProcessed > 0 ? (
+                                  <span className="bg-purple-100 text-purple-800 text-xs font-semibold py-1 px-2 rounded-full border border-purple-300">
+                                    {totalProcessed}/{totalPossible}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400 font-medium">
+                                    0/{totalPossible}
+                                  </span>
+                                );
+                              })()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Desktop Grid View */}
+                      <div className="hidden md:grid md:grid-cols-4 gap-4 mb-4 p-4">
                         <div>
                           <p className="text-xs font-bold text-gray-500 mb-0.5">
                             Course
@@ -2024,7 +2262,7 @@ const handleMergeSubmit = async (formData) => {
                             Per Student Cost
                           </p>
                           <p className="text-sm text-gray-900">
-                            {formatCurrency(
+                            {formatIndianCurrency(
                               mergedItem.contracts.reduce((total, c) => total + (parseFloat(c.perStudentCost) || 0), 0) / mergedItem.contracts.length
                             )}
                           </p>
@@ -2043,11 +2281,20 @@ const handleMergeSubmit = async (formData) => {
                                 inv.mergedContracts.every(mc => mergedItem.contracts.some(c => c.id === mc.id))
                               ).length;
 
+                              // Count installments that have individual invoices
+                              const individualInvoicesCount = mergedItem.contracts.reduce((count, contract) => {
+                                return count + existingInvoices.filter(inv => 
+                                  !inv.isMergedInvoice && 
+                                  inv.originalInvoiceId === contract.id
+                                ).length;
+                              }, 0);
+
+                              const totalProcessed = mergedInvoicesCount + individualInvoicesCount;
                               const totalPossible = mergedItem.installmentCount;
 
-                              return mergedInvoicesCount > 0 ? (
+                              return totalProcessed > 0 ? (
                                 <span className="bg-purple-100 text-purple-800 text-xs font-semibold py-1 px-2 rounded">
-                                  {mergedInvoicesCount}/{totalPossible}
+                                  {totalProcessed}/{totalPossible}
                                 </span>
                               ) : (
                                 <span className="text-gray-400">
@@ -2061,250 +2308,526 @@ const handleMergeSubmit = async (formData) => {
 
                       {/* Expanded Content */}
                       {expandedRows.has(`merged-${index}`) && (
-                        <div className="p-4 transition-all duration-300 ease-in-out">
-                          <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                              <thead className="bg-gray-50">
-                                <tr>
-                                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                    Installment
-                                  </th>
-                                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                    Percentage
-                                  </th>
-                                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                    Amount
-                                  </th>
-                                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                    Invoice Type
-                                  </th>
-                                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                    Received Amount
-                                  </th>
-                                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                    Due Amount
-                                  </th>
-                                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                    Actions
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody className="bg-white divide-y divide-gray-200">
-                                {Object.values(mergedItem.installments).map(
-                                  (installment, idx) => {
-                                    // Find existing merged invoices for this installment
-                                    const existingMergedInvoices =
-                                      existingInvoices.filter(
-                                        (inv) =>
-                                          inv.isMergedInvoice &&
-                                          inv.installment === installment.name &&
-                                          // Check if this invoice belongs to the same group of contracts
-                                          inv.mergedContracts &&
-                                          inv.mergedContracts.length === mergedItem.contracts.length &&
-                                          inv.mergedContracts.every(mc =>
-                                            mergedItem.contracts.some(c => c.id === mc.id)
-                                          )
-                                      );
+                        <div className="border-t border-gray-100">
+                          {/* Mobile Installments Cards */}
+                          <div className="block md:hidden p-4 space-y-3">
+                            {(() => {
+                              // ✅ Collect installments by index across all contracts
+                              const installmentsByIndex = {};
 
-                                    // For merged view, show each installment with its status
-                                    if (existingMergedInvoices.length > 0) {
-                                      // Show existing merged invoices
-                                      return existingMergedInvoices.map(
-                                        (inv, invIndex) => {
-                                          const totalAmount =
-                                            inv.amountRaised ||
-                                            inv.netPayableAmount ||
-                                            installment.totalAmount;
-                                          const receivedAmount =
-                                            inv.receivedAmount || 0;
-                                          const dueAmount =
-                                            totalAmount - receivedAmount;
-                                          const isCancelled =
-                                            inv.status === "cancelled" ||
-                                            inv.approvalStatus === "cancelled";
+                              mergedItem.contracts.forEach(contract => {
+                                contract.paymentDetails?.forEach((installment, idx) => {
+                                  if (!installmentsByIndex[idx]) {
+                                    installmentsByIndex[idx] = {
+                                      names: new Set(),
+                                      percentages: new Set(),
+                                      totalAmount: 0,
+                                      contracts: []
+                                    };
+                                  }
 
-                                          return (
-                                            <tr
-                                              key={`${idx}-${invIndex}`}
-                                              className={`hover:bg-gray-50 cursor-pointer ${
-                                                isCancelled ? "bg-red-50" : ""
-                                              }`}
-                                              onClick={() =>
-                                                setSelectedInvoice(inv)
-                                              }
-                                            >
-                                              <td className="px-4 py-2 text-sm text-gray-900">
-                                                {installment.name}
-                                                {isCancelled && (
-                                                  <span className="ml-1 text-xs text-red-500">
-                                                    (Cancelled)
-                                                  </span>
-                                                )}
-                                              </td>
-                                              <td className="px-4 py-2 text-sm text-gray-500">
-                                                {installment.percentage}%
-                                              </td>
-                                              <td className="px-4 py-2 text-sm text-gray-500 font-semibold">
-                                                {formatCurrency(
-                                                  installment.totalAmount
-                                                )}
-                                              </td>
-                                              <td className="px-4 py-2 text-sm text-gray-500">
-                                                <div className="text-center">
-                                                  <div
-                                                    className={`font-semibold ${
-                                                      inv.invoiceType ===
-                                                      "Tax Invoice"
-                                                        ? "text-green-600"
-                                                        : "text-blue-600"
-                                                    }`}
-                                                  >
-                                                    {inv.invoiceType ===
-                                                    "Proforma Invoice"
-                                                      ? "Proforma"
-                                                      : "Tax"}
-                                                    {isCancelled &&
-                                                      inv.regenerated &&
-                                                      " (Cancelled - Regenerated)"}
-                                                    {!isCancelled &&
-                                                      inv.regeneratedFrom &&
-                                                      ` (Regenerated from ${inv.regeneratedFrom})`}
-                                                  </div>
-                                                  {getApprovalStatusBadge(inv)}
-                                                  <div className="text-xs text-gray-400 mt-0.5">
-                                                    {inv.invoiceNumber || "N/A"}
-                                                  </div>
-                                                </div>
-                                              </td>
-                                              <td className="px-4 py-2 text-sm">
-                                                <span
-                                                  className={`font-semibold ${
-                                                    receivedAmount > 0
-                                                      ? "text-green-600"
-                                                      : "text-gray-600"
-                                                  }`}
-                                                >
-                                                  {formatCurrency(
-                                                    receivedAmount
-                                                  )}
-                                                </span>
-                                              </td>
-                                              <td className="px-4 py-2 text-sm">
-                                                <span
-                                                  className={`font-semibold ${
-                                                    dueAmount > 0
-                                                      ? "text-red-600"
-                                                      : "text-green-600"
-                                                  }`}
-                                                >
-                                                  {dueAmount === 0
-                                                    ? "0"
-                                                    : formatCurrency(dueAmount)}
-                                                </span>
-                                              </td>
-                                              <td className="px-4 py-2 text-sm">
-                                                <div className="flex gap-2">
-                                                  <button
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      setSelectedInvoice(inv);
-                                                    }}
-                                                    className="bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded text-xs whitespace-nowrap"
-                                                  >
-                                                    View
-                                                  </button>
-                                                  {!isCancelled &&
-                                                    !inv.regeneratedFrom && (
-                                                      <button
-                                                        onClick={(e) => {
-                                                          e.stopPropagation();
-                                                          handleCancelInvoice(
-                                                            inv
-                                                          );
-                                                        }}
-                                                        className="bg-red-500 hover:bg-red-700 text-white py-1 px-2 rounded text-xs whitespace-nowrap"
-                                                        title="Cancel this invoice"
-                                                      >
-                                                        Undo
-                                                      </button>
-                                                    )}
-                                                  {isCancelled &&
-                                                    !inv.regenerated && (
-                                                      <button
-                                                        onClick={(e) => {
-                                                          e.stopPropagation();
-                                                          /* Handle regenerate for merged invoice */
-                                                        }}
-                                                        className="bg-orange-500 hover:bg-orange-700 text-white py-1 px-2 rounded text-xs whitespace-nowrap"
-                                                        title="Regenerate cancelled invoice"
-                                                      >
-                                                        Regenerate
-                                                      </button>
-                                                    )}
-                                                </div>
-                                              </td>
-                                            </tr>
-                                          );
-                                        }
-                                      );
-                                    } else {
-                                      // No invoice generated yet for this merged installment
-                                      return (
-                                        <tr
-                                          key={idx}
-                                          className="hover:bg-gray-50 cursor-pointer"
-                                          onClick={() =>
-                                            setRowClickModal({
-                                              isOpen: true,
-                                              invoice: null,
-                                              installment: installment,
-                                              contract: mergedItem.contracts[0],
-                                            })
-                                          }
-                                        >
-                                          <td className="px-4 py-2 text-sm text-gray-900">
+                                  installmentsByIndex[idx].names.add(installment.name);
+                                  installmentsByIndex[idx].percentages.add(installment.percentage);
+                                  installmentsByIndex[idx].totalAmount += parseFloat(installment.totalAmount) || 0;
+                                  installmentsByIndex[idx].contracts.push(contract);
+                                });
+                              });
+
+                              // Convert to array and sort by index
+                              const sortedInstallments = Object.entries(installmentsByIndex)
+                                .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                                .map(([idx, data]) => ({
+                                  idx: parseInt(idx),
+                                  name: Array.from(data.names).join('/'),
+                                  percentage: Array.from(data.percentages)[0], // Take first percentage (should be same)
+                                  totalAmount: data.totalAmount,
+                                  contracts: data.contracts
+                                }));
+
+                              return sortedInstallments.map((installment, idx) => {
+                                // Find existing merged invoices for this installment index
+                                const existingMergedInvoices =
+                                  existingInvoices.filter(
+                                    (inv) =>
+                                      inv.isMergedInvoice &&
+                                      inv.installmentIndex === installment.idx &&
+                                      // Check if this invoice belongs to the same group of contracts
+                                      inv.mergedContracts &&
+                                      inv.mergedContracts.length === mergedItem.contracts.length &&
+                                      inv.mergedContracts.every(mc =>
+                                        mergedItem.contracts.some(c => c.id === mc.id)
+                                      )
+                                  );
+
+                                // Filter out Proforma invoices that have been converted to Tax
+                                const activeInvoices = existingMergedInvoices.filter(inv => 
+                                  !(inv.invoiceType === "Proforma Invoice" && inv.convertedToTax)
+                                );
+
+                                // Sort by creation date (most recent first) and take the first one
+                                activeInvoices.sort((a, b) => {
+                                  const aCancelled = a.status === "cancelled" || a.approvalStatus === "cancelled";
+                                  const bCancelled = b.status === "cancelled" || b.approvalStatus === "cancelled";
+                                  if (aCancelled && !bCancelled) return 1;
+                                  if (bCancelled && !aCancelled) return -1;
+                                  return new Date(b.raisedDate || 0) - new Date(a.raisedDate || 0);
+                                });
+
+                                // Take only the most recent active invoice
+                                const invoiceToShow = activeInvoices[0];
+
+                                // For merged view, show each installment with its status
+                                if (invoiceToShow) {
+                                  const inv = invoiceToShow;
+                                  const totalAmount =
+                                    inv.amountRaised ||
+                                    inv.netPayableAmount ||
+                                    installment.totalAmount;
+                                  const receivedAmount =
+                                    inv.receivedAmount || 0;
+
+                                  // Calculate total TDS amount from payment history
+                                  const totalTdsAmount = inv.paymentHistory?.reduce((sum, payment) => {
+                                    return sum + (parseFloat(payment.tdsAmount) || 0);
+                                  }, 0) || 0;
+
+                                  // Due amount should account for TDS: totalAmount - (receivedAmount + totalTdsAmount)
+                                  const dueAmount =
+                                    totalAmount - (receivedAmount + totalTdsAmount);
+                                  const isCancelled =
+                                    inv.status === "cancelled" ||
+                                    inv.approvalStatus === "cancelled";
+
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className={`bg-gradient-to-r ${isCancelled ? 'from-red-50 to-red-100/50' : 'from-gray-50 to-gray-100/50'} rounded-xl p-4 border ${isCancelled ? 'border-red-200' : 'border-gray-200'} cursor-pointer hover:shadow-md transition-all duration-200`}
+                                      onClick={() =>
+                                        setSelectedInvoice(inv)
+                                      }
+                                    >
+                                      <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-2">
+                                          <h4 className="text-sm font-semibold text-gray-900">
                                             {installment.name}
-                                          </td>
-                                          <td className="px-4 py-2 text-sm text-gray-500">
-                                            {installment.percentage}%
-                                          </td>
-                                          <td className="px-4 py-2 text-sm text-gray-500 font-semibold">
-                                            {formatCurrency(
-                                              installment.totalAmount
+                                          </h4>
+                                          {isCancelled && (
+                                            <span className="bg-red-100 text-red-700 text-xs font-medium py-0.5 px-2 rounded-full border border-red-300">
+                                              Cancelled
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="text-right">
+                                          <div className={`text-sm font-bold ${dueAmount > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                            {dueAmount === 0 ? "Paid" : formatIndianCurrency(dueAmount) + " Due"}
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <div className="grid grid-cols-2 gap-3 mb-3">
+                                        <div>
+                                          <p className="text-xs text-gray-500 mb-1">Percentage</p>
+                                          <p className="text-sm font-medium text-gray-900">{installment.percentage}%</p>
+                                        </div>
+                                        <div>
+                                          <p className="text-xs text-gray-500 mb-1">Amount</p>
+                                          <p className="text-sm font-semibold text-gray-900">{formatIndianCurrency(installment.totalAmount)}</p>
+                                        </div>
+                                      </div>
+
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex-1">
+                                          <div className="flex items-center gap-2 mb-2">
+                                            <span className={`text-xs font-semibold py-1 px-2 rounded-full ${
+                                              inv.invoiceType === "Tax Invoice"
+                                                ? "bg-green-100 text-green-800 border border-green-300"
+                                                : inv.invoiceType === "Cash Invoice"
+                                                ? "bg-orange-100 text-orange-800 border border-orange-300"
+                                                : "bg-blue-100 text-blue-800 border border-blue-300"
+                                            }`}>
+                                              {inv.invoiceType === "Proforma Invoice" ? "Proforma" :
+                                               inv.invoiceType === "Cash Invoice" ? "Cash" : "Tax"}
+                                            </span>
+                                            {inv.invoiceType === "Tax Invoice" && getApprovalStatusBadge(inv)}
+                                          </div>
+                                          <div className="text-xs text-gray-500">
+                                            {inv.invoiceNumber || "N/A"}
+                                            {inv.convertedFromProforma && (
+                                              <span className="text-purple-600 block">
+                                                From: {inv.originalProformaNumber}
+                                              </span>
                                             )}
-                                          </td>
-                                          <td className="px-4 py-2 text-sm text-gray-500">
-                                            -
-                                          </td>
-                                          <td className="px-4 py-2 text-sm">
-                                            ₹0
-                                          </td>
-                                          <td className="px-4 py-2 text-sm">
-                                            {formatCurrency(
-                                              installment.totalAmount
-                                            )}
-                                          </td>
-                                          <td className="px-4 py-2 text-sm">
+                                          </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setSelectedInvoice(inv);
+                                            }}
+                                            className="bg-blue-600 hover:bg-blue-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                          >
+                                            View
+                                          </button>
+                                          {!isCancelled && !inv.regeneratedFrom && (
                                             <button
                                               onClick={(e) => {
                                                 e.stopPropagation();
-                                                handleMergeGenerate(
-                                                  mergedItem,
-                                                  installment
-                                                );
+                                                handleCancelInvoice(inv);
                                               }}
-                                              className="bg-purple-500 hover:bg-purple-700 text-white py-1 px-2 rounded text-xs whitespace-nowrap"
+                                              className="bg-red-600 hover:bg-red-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
                                             >
-                                              Generate Merged
+                                              Undo
                                             </button>
-                                          </td>
-                                        </tr>
+                                          )}
+                                          {!isCancelled && inv.invoiceType === "Proforma Invoice" && (
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleConvertToTax(inv);
+                                              }}
+                                              className="bg-purple-600 hover:bg-purple-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                            >
+                                              Generate TI
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                } else {
+                                  // No invoice generated yet for this merged installment
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className="bg-gradient-to-r from-purple-50 to-purple-100/50 rounded-xl p-4 border border-purple-200 cursor-pointer hover:shadow-md transition-all duration-200"
+                                      onClick={() =>
+                                        setRowClickModal({
+                                          isOpen: true,
+                                          invoice: null,
+                                          installment: installment,
+                                          contract: mergedItem.contracts[0],
+                                        })
+                                      }
+                                    >
+                                      <div className="flex items-center justify-between mb-3">
+                                        <h4 className="text-sm font-semibold text-gray-900">
+                                          {installment.name}
+                                        </h4>
+                                        <span className="bg-yellow-100 text-yellow-800 text-xs font-medium py-0.5 px-2 rounded-full border border-yellow-300">
+                                          Not Generated
+                                        </span>
+                                      </div>
+
+                                      <div className="grid grid-cols-2 gap-3 mb-3">
+                                        <div>
+                                          <p className="text-xs text-gray-500 mb-1">Percentage</p>
+                                          <p className="text-sm font-medium text-gray-900">{installment.percentage}%</p>
+                                        </div>
+                                        <div>
+                                          <p className="text-xs text-gray-500 mb-1">Amount</p>
+                                          <p className="text-sm font-semibold text-gray-900">{formatIndianCurrency(installment.totalAmount)}</p>
+                                        </div>
+                                      </div>
+
+                                      <div className="flex justify-end">
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleMergeGenerate(mergedItem, installment);
+                                          }}
+                                          className="bg-purple-600 hover:bg-purple-700 text-white py-1.5 px-4 rounded-lg text-sm font-medium transition-colors duration-200"
+                                        >
+                                          Generate Merged
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                              });
+                            })()}
+                          </div>
+
+                          {/* Desktop Table View */}
+                          <div className="hidden md:block p-4">
+                            <div className="overflow-x-auto">
+                              <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                  <tr>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                      Installment
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                      Percentage
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                      Amount
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                      Invoice Type
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                      Received Amount
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                      Due Amount
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                      Actions
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                  {(() => {
+                                    // ✅ Collect installments by index across all contracts
+                                    const installmentsByIndex = {};
+
+                                    mergedItem.contracts.forEach(contract => {
+                                      contract.paymentDetails?.forEach((installment, idx) => {
+                                        if (!installmentsByIndex[idx]) {
+                                          installmentsByIndex[idx] = {
+                                            names: new Set(),
+                                            percentages: new Set(),
+                                            totalAmount: 0,
+                                            contracts: []
+                                          };
+                                        }
+
+                                        installmentsByIndex[idx].names.add(installment.name);
+                                        installmentsByIndex[idx].percentages.add(installment.percentage);
+                                        installmentsByIndex[idx].totalAmount += parseFloat(installment.totalAmount) || 0;
+                                        installmentsByIndex[idx].contracts.push(contract);
+                                      });
+                                    });
+
+                                    // Convert to array and sort by index
+                                    const sortedInstallments = Object.entries(installmentsByIndex)
+                                      .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                                      .map(([idx, data]) => ({
+                                      idx: parseInt(idx),
+                                      name: Array.from(data.names).join('/'),
+                                      percentage: Array.from(data.percentages)[0], // Take first percentage (should be same)
+                                      totalAmount: data.totalAmount,
+                                      contracts: data.contracts
+                                    }));
+
+                                    return sortedInstallments.map((installment, idx) => {
+                                      // Find existing merged invoices for this installment index
+                                      const existingMergedInvoices =
+                                        existingInvoices.filter(
+                                          (inv) =>
+                                            inv.isMergedInvoice &&
+                                            inv.installmentIndex === installment.idx &&
+                                            // Check if this invoice belongs to the same group of contracts
+                                            inv.mergedContracts &&
+                                            inv.mergedContracts.length === mergedItem.contracts.length &&
+                                            inv.mergedContracts.every(mc =>
+                                              mergedItem.contracts.some(c => c.id === mc.id)
+                                            )
+                                        );
+
+                                      // Filter out Proforma invoices that have been converted to Tax
+                                      const activeInvoices = existingMergedInvoices.filter(inv => 
+                                        !(inv.invoiceType === "Proforma Invoice" && inv.convertedToTax)
                                       );
-                                    }
-                                  }
-                                )}
-                              </tbody>
-                            </table>
+
+                                      // Sort by creation date (most recent first) and take the first one
+                                      activeInvoices.sort((a, b) => {
+                                        const aCancelled = a.status === "cancelled" || a.approvalStatus === "cancelled";
+                                        const bCancelled = b.status === "cancelled" || b.approvalStatus === "cancelled";
+                                        if (aCancelled && !bCancelled) return 1;
+                                        if (bCancelled && !aCancelled) return -1;
+                                        return new Date(b.raisedDate || 0) - new Date(a.raisedDate || 0);
+                                      });
+
+                                      // Take only the most recent active invoice
+                                      const invoiceToShow = activeInvoices[0];
+
+                                      // For merged view, show each installment with its status
+                                      if (invoiceToShow) {
+                                        const inv = invoiceToShow;
+                                        const totalAmount =
+                                          inv.amountRaised ||
+                                          inv.netPayableAmount ||
+                                          installment.totalAmount;
+                                        const receivedAmount =
+                                          inv.receivedAmount || 0;
+
+                                        // Calculate total TDS amount from payment history
+                                        const totalTdsAmount = inv.paymentHistory?.reduce((sum, payment) => {
+                                          return sum + (parseFloat(payment.tdsAmount) || 0);
+                                        }, 0) || 0;
+
+                                        // Due amount should account for TDS: totalAmount - (receivedAmount + totalTdsAmount)
+                                        const dueAmount =
+                                          totalAmount - (receivedAmount + totalTdsAmount);
+                                        const isCancelled =
+                                          inv.status === "cancelled" ||
+                                          inv.approvalStatus === "cancelled";
+
+                                        return (
+                                          <tr
+                                            key={idx}
+                                            className={`hover:bg-gray-50 cursor-pointer transition-colors duration-200 ${isCancelled ? "bg-red-50" : ""}`}
+                                            onClick={() =>
+                                              setSelectedInvoice(inv)
+                                            }
+                                          >
+                                            <td className="px-4 py-3 text-sm text-gray-900 font-medium">
+                                              {installment.name}
+                                              {isCancelled && (
+                                                <span className="ml-2 text-xs text-red-500 font-medium">
+                                                  (Cancelled)
+                                                </span>
+                                              )}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-gray-500">
+                                              {installment.percentage}%
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-gray-900 font-semibold">
+                                              {formatIndianCurrency(
+                                                installment.totalAmount
+                                              )}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-gray-500">
+                                              <div className="text-center">
+                                                <div
+                                                  className={`font-semibold ${inv.invoiceType === "Tax Invoice" ? "text-green-600" : inv.invoiceType === "Cash Invoice" ? "text-orange-600" : "text-blue-600"}`}
+                                                >
+                                                  {inv.invoiceType === "Proforma Invoice" ? "Proforma" : inv.invoiceType === "Cash Invoice" ? "Cash" : "Tax"}
+                                                  {isCancelled && inv.regenerated && " (Cancelled - Regenerated)"}
+                                                  {!isCancelled && inv.regeneratedFrom && ` (Regenerated from ${inv.regeneratedFrom})`}
+                                                </div>
+
+                                                {/* Approval status sirf Tax Invoice ke liye, Cash aur Proforma ke liye nahi */}
+                                                {inv.invoiceType === "Tax Invoice" && getApprovalStatusBadge(inv)}
+
+                                                {/* Cash Invoice ke liye special badge */}
+                                                {inv.invoiceType === "Cash Invoice" && (
+                                                  <span className="ml-1 px-1.5 py-0.5 rounded text-xs bg-orange-100 text-orange-800 border border-orange-300">
+                                                    Cash
+                                                  </span>
+                                                )}
+
+                                                {/* Proforma Invoice ke liye badge */}
+                                                {inv.invoiceType === "Proforma Invoice" && (
+                                                  <span className="ml-1 px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 border border-blue-300">
+                                                    Proforma
+                                                  </span>
+                                                )}
+
+                                                <div className="text-xs text-gray-400 mt-0.5">
+                                                  {inv.invoiceNumber || "N/A"}
+                                                </div>
+
+                                                {/* From: Proforma number niche dikhana hai agar converted hai */}
+                                                {inv.convertedFromProforma && (
+                                                  <div className="text-xs text-purple-600 mt-0.5">
+                                                    From: {inv.originalProformaNumber}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-sm">
+                                              <span className={`font-semibold ${receivedAmount > 0 ? "text-green-600" : "text-gray-600"}`}>
+                                                {formatIndianCurrency(receivedAmount)}
+                                              </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-sm">
+                                              <span className={`font-semibold ${dueAmount > 0 ? "text-red-600" : "text-green-600"}`}>
+                                                {dueAmount === 0 ? "0" : formatIndianCurrency(dueAmount)}
+                                              </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-sm">
+                                              <div className="flex gap-2">
+                                                <button
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedInvoice(inv);
+                                                  }}
+                                                  className="bg-blue-600 hover:bg-blue-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                >
+                                                  View
+                                                </button>
+                                                {!isCancelled && !inv.regeneratedFrom && (
+                                                  <button
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      handleCancelInvoice(inv);
+                                                    }}
+                                                    className="bg-red-600 hover:bg-red-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                    title="Cancel this invoice"
+                                                  >
+                                                    Undo
+                                                  </button>
+                                                )}
+                                                {!isCancelled && inv.invoiceType === "Proforma Invoice" && (
+                                                  <button
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      handleConvertToTax(inv);
+                                                    }}
+                                                    className="bg-purple-600 hover:bg-purple-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                  >
+                                                    Generate TI
+                                                  </button>
+                                                )}
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        );
+                                      } else {
+                                        // No invoice generated yet for this merged installment
+                                        return (
+                                          <tr
+                                            key={idx}
+                                            className="hover:bg-gray-50 cursor-pointer transition-colors duration-200"
+                                            onClick={() =>
+                                              setRowClickModal({
+                                                isOpen: true,
+                                                invoice: null,
+                                                installment: installment,
+                                                contract: mergedItem.contracts[0],
+                                              })
+                                            }
+                                          >
+                                            <td className="px-4 py-3 text-sm text-gray-900 font-medium">
+                                              {installment.name}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-gray-500">
+                                              {installment.percentage}%
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-gray-900 font-semibold">
+                                              {formatIndianCurrency(installment.totalAmount)}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-gray-500">
+                                              -
+                                            </td>
+                                            <td className="px-4 py-3 text-sm">
+                                              ₹0
+                                            </td>
+                                            <td className="px-4 py-3 text-sm">
+                                              {formatIndianCurrency(installment.totalAmount)}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm">
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleMergeGenerate(mergedItem, installment);
+                                                }}
+                                                className="bg-purple-600 hover:bg-purple-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                              >
+                                                Generate Merged
+                                              </button>
+                                            </td>
+                                          </tr>
+                                        );
+                                      }
+                                    });
+                                  })()}
+                                </tbody>
+                              </table>
+                            </div>
                           </div>
                         </div>
                       )}

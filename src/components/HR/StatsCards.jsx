@@ -1,58 +1,91 @@
 import React from "react";
-import { FiPlus, FiCheckCircle, FiXCircle, FiClock } from "react-icons/fi";
+import { FiFileText, FiCheckCircle, FiXCircle, FiClock, FiTrendingUp } from "react-icons/fi";
 
 const StatsCards = ({ totalBills, approvedBills, pendingBills, rejectedBills }) => {
+  const stats = [
+    {
+      title: "Total Bills",
+      value: totalBills,
+      icon: FiFileText,
+      color: "from-blue-500 to-blue-600",
+      bgColor: "from-blue-50 to-blue-100",
+      textColor: "text-blue-700",
+      description: "All submissions"
+    },
+    {
+      title: "Approved",
+      value: approvedBills,
+      icon: FiCheckCircle,
+      color: "from-emerald-500 to-emerald-600",
+      bgColor: "from-emerald-50 to-emerald-100",
+      textColor: "text-emerald-700",
+      description: "Ready for payment"
+    },
+    {
+      title: "Pending",
+      value: pendingBills,
+      icon: FiClock,
+      color: "from-amber-500 to-amber-600",
+      bgColor: "from-amber-50 to-amber-100",
+      textColor: "text-amber-700",
+      description: "Awaiting approval"
+    },
+    {
+      title: "Rejected",
+      value: rejectedBills,
+      icon: FiXCircle,
+      color: "from-red-500 to-red-600",
+      bgColor: "from-red-50 to-red-100",
+      textColor: "text-red-700",
+      description: "Needs revision"
+    }
+  ];
+
   return (
-    <div className="py-2">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-      <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100" data-tour="total-bills-card">
-        <div className="flex items-center">
-          <div className="rounded-lg p-2 bg-blue-50 text-blue-600">
-            <FiPlus className="h-4 w-4" />
-          </div>
-          <div className="ml-4">
-            <h2 className="text-lg font-semibold text-gray-900">{totalBills}</h2>
-            <p className="text-sm text-gray-600">Total Bills</p>
-          </div>
-        </div>
-      </div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      {stats.map((stat) => {
+        const Icon = stat.icon;
+        return (
+          <div
+            key={stat.title}
+            className="group bg-white rounded-lg shadow-sm border border-slate-200/60 hover:shadow-md hover:border-slate-300/60 transition-all duration-300 overflow-hidden"
+          >
+            <div className="p-3">
+              {/* Title at top */}
+              <div className="text-xs font-semibold text-slate-900 mb-2">
+                {stat.title}
+              </div>
 
-      <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100" data-tour="approved-bills-card">
-        <div className="flex items-center">
-          <div className="rounded-lg p-2 bg-emerald-50 text-emerald-600">
-            <FiCheckCircle className="h-4 w-4" />
-          </div>
-          <div className="ml-4">
-            <h2 className="text-lg font-semibold text-gray-900">{approvedBills}</h2>
-            <p className="text-sm text-gray-600">Approved</p>
-          </div>
-        </div>
-      </div>
+              {/* Number on left, Icon on right */}
+              <div className="flex items-center justify-between mb-1">
+                <div className="text-xl font-bold text-slate-900 tabular-nums">
+                  {stat.value}
+                </div>
+                <div className={`w-6 h-6 bg-gradient-to-r ${stat.bgColor} rounded flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
+                  <Icon className={`w-3 h-3 ${stat.textColor}`} />
+                </div>
+              </div>
 
-      <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100" data-tour="rejected-bills-card">
-        <div className="flex items-center">
-          <div className="rounded-lg p-2 bg-rose-50 text-rose-600">
-            <FiXCircle className="h-4 w-4" />
-          </div>
-          <div className="ml-4">
-            <h2 className="text-lg font-semibold text-gray-900">{rejectedBills}</h2>
-            <p className="text-sm text-gray-600">Rejected</p>
-          </div>
-        </div>
-      </div>
+              {/* Description */}
+              <div className="text-xs text-slate-500">
+                {stat.description}
+              </div>
 
-      <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100" data-tour="pending-bills-card">
-        <div className="flex items-center">
-          <div className="rounded-lg p-2 bg-amber-50 text-amber-600">
-            <FiClock className="h-4 w-4" />
+              {/* Progress bar for visual interest */}
+              <div className="mt-2 pt-2 border-t border-slate-100">
+                <div className="w-full bg-slate-100 rounded-full h-1 overflow-hidden">
+                  <div
+                    className={`h-full bg-gradient-to-r ${stat.color} rounded-full transition-all duration-500 ease-out`}
+                    style={{
+                      width: totalBills > 0 ? `${(stat.value / totalBills) * 100}%` : '0%'
+                    }}
+                  ></div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="ml-4">
-            <h2 className="text-lg font-semibold text-gray-900">{pendingBills}</h2>
-            <p className="text-sm text-gray-600">Pending Review</p>
-          </div>
-        </div>
-      </div>
-      </div>
+        );
+      })}
     </div>
   );
 };

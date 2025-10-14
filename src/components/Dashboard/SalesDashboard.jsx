@@ -1267,7 +1267,7 @@ if (selectedUserId) {
       const snapshot = await getDocs(leadsQuery);
       let leads = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
-      // Filter by the current date range (selected year) like the dashboard does
+      // Filter by the current date range (selected year) like the dashboard doe
       leads = leads.filter(lead => {
         if (!lead.createdAt) return true; // Include if missing createdAt
         const created = new Date(lead.createdAt);

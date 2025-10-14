@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import InvoiceModal from "../components/HR/InvoiceModal";
@@ -16,6 +16,9 @@ const Register = () => {
   const [showDatePicker, setShowDatePicker] = useState(false); // ✅ NEW: Date picker modal state
   const [selectedDate, setSelectedDate] = useState(""); // ✅ NEW: Selected date state
   const [invoiceToRegister, setInvoiceToRegister] = useState(null); // ✅ NEW: Invoice to register
+  const [showFilters, setShowFilters] = useState(false); // ✅ NEW: Filters dropdown state
+
+  const filtersRef = useRef(null); // ✅ NEW: Ref for filters dropdown
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -78,7 +81,7 @@ const Register = () => {
   };
 
   // Apply filters
-  const applyFilters = () => {
+  const applyFilters = useCallback(() => {
     let filtered = [...invoices];
 
     // Financial Year filter
@@ -117,7 +120,7 @@ const Register = () => {
     // Registration Status filter
     if (filters.status !== "all") {
       filtered = filtered.filter((invoice) => {
-        if (filters.status === "Booked") {
+        if (filters.status === "registered") {
           return invoice.registered === true;
         } else if (filters.status === "unregistered") {
           return invoice.registered === false;
@@ -166,7 +169,7 @@ const Register = () => {
     }
 
     setFilteredInvoices(filtered);
-  };
+  }, [filters, invoices]);
 
   // Clear filters
   const clearFilters = () => {
@@ -319,7 +322,7 @@ const calculateRoundedAmount = (amount) => {
 };
 
 // Get HSN code
-const getHSNCode = (invoice) => {
+const getHSNCode = () => {
   return "9984";
 };
 
@@ -492,6 +495,26 @@ const getDescription = (invoice) => {
     return "";
   };
 
+  const getRowHoverColor = (invoice) => {
+    if (invoice.approvalStatus === "cancelled") {
+      return "hover:bg-red-100";
+    }
+    if (invoice.approved) {
+      return "hover:bg-green-100";
+    }
+    return "hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50";
+  };
+
+  const getRowTextColor = (invoice) => {
+    if (invoice.approvalStatus === "cancelled") {
+      return "text-red-800";
+    }
+    if (invoice.approved) {
+      return "text-green-800";
+    }
+    return "text-gray-900";
+  };
+
   // ✅ NEW: Format date for display
   const formatDisplayDate = (date) => {
     if (!date) return "Not Booked";
@@ -510,21 +533,38 @@ const getDescription = (invoice) => {
   // Apply filters when filters change
   useEffect(() => {
     applyFilters();
-  }, [filters, invoices]);
+  }, [filters, invoices, applyFilters]);
+
+  // ✅ NEW: Close filters dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (filtersRef.current && !filtersRef.current.contains(event.target)) {
+        setShowFilters(false);
+      }
+    };
+
+    if (showFilters) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showFilters]);
 
   if (loading) {
-    return <div className="text-center py-8">Loading all invoices...</div>;
+    return <div className="text-center py-4">Loading all invoices...</div>;
   }
 
   if (error) {
     return (
-      <div className="p-6">
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+      <div className="p-3">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded">
           <strong>Error:</strong> {error}
         </div>
         <button
           onClick={fetchInvoices}
-          className="mt-4 bg-blue-500 text-white px-4 py-2 rounded"
+          className="mt-3 bg-blue-500 text-white px-4 py-2 rounded"
         >
           Retry
         </button>
@@ -533,20 +573,292 @@ const getDescription = (invoice) => {
   }
 
   return (
-    <div className="p-6">
+    <div className="">
       {/* Header Section with Export Button */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 mb-2">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900">
+          <h2 className="text-lg font-semibold text-gray-900">
             Invoice Registration
           </h2>
-          <p className="text-gray-600 text-sm mt-1">
+          <p className="text-gray-600 text-sm">
             Register approved invoices • Total: {invoices.length} invoices •
             Showing: {filteredInvoices.length} invoices
           </p>
         </div>
 
         <div className="flex gap-2">
+          {/* Reset Filters Button - Only visible when filters are applied */}
+          {[
+            filters.financialYear,
+            filters.invoiceType !== "all",
+            filters.status !== "all", 
+            filters.approvalStatus !== "all",
+            filters.startDate,
+            filters.endDate
+          ].filter(Boolean).length > 0 && (
+            <button
+              onClick={() => {
+                clearFilters();
+                setShowFilters(false);
+              }}
+              className="bg-red-500 hover:bg-red-600 text-white py-1.5 px-3 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+              title="Reset all filters"
+            >
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                />
+              </svg>
+              Reset
+            </button>
+          )}
+
+          {/* Filters Button with Dropdown */}
+          <div className="relative" ref={filtersRef}>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`bg-blue-600 hover:bg-blue-700 text-white py-1.5 px-3 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors ${
+                showFilters ? 'bg-blue-700' : ''
+              }`}
+            >
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                />
+              </svg>
+              Filters
+              <svg
+                className={`w-3.5 h-3.5 transition-transform duration-200 ${showFilters ? 'rotate-180' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+              {(filters.financialYear || filters.invoiceType !== "all" || filters.status !== "all" || filters.approvalStatus !== "all" || filters.startDate || filters.endDate) && (
+                <span className="bg-red-500 text-white text-[10px] rounded-full px-1 py-0.5">
+                  {[
+                    filters.financialYear,
+                    filters.invoiceType !== "all",
+                    filters.status !== "all", 
+                    filters.approvalStatus !== "all",
+                    filters.startDate,
+                    filters.endDate
+                  ].filter(Boolean).length}
+                </span>
+              )}
+            </button>
+
+            {/* Filters Dropdown */}
+            {showFilters && (
+              <div className="absolute top-full right-8 mt-2 w-80 max-h-96 bg-white rounded-xl shadow-xl border border-gray-200 z-50 overflow-hidden">
+                {/* Header */}
+                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-1">
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                      </svg>
+                      <h3 className="text-sm font-semibold text-white">Advanced Filters</h3>
+                    </div>
+                    <button
+                      onClick={() => setShowFilters(false)}
+                      className="text-white/80 hover:text-white hover:bg-white/10 rounded-lg p-1 transition-all duration-200"
+                      title="Close filters"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  <p className="text-blue-100 text-xs mt-0.5">Refine your invoice search</p>
+                </div>
+
+                {/* Content */}
+                <div className="p-3 overflow-y-auto max-h-80">
+                  <div className="space-y-3">
+                    {/* Financial Year */}
+                    <div className="space-y-1">
+                      <label className="flex items-center text-xs font-semibold text-gray-700">
+                        <svg className="w-3.5 h-3.5 mr-1.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        Financial Year
+                      </label>
+                      <select
+                        value={filters.financialYear}
+                        onChange={(e) =>
+                          setFilters({ ...filters, financialYear: e.target.value })
+                        }
+                        className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white hover:border-gray-400"
+                      >
+                        <option value="">All Years</option>
+                        {financialYearOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Invoice Type */}
+                    <div className="space-y-1">
+                      <label className="flex items-center text-xs font-semibold text-gray-700">
+                        <svg className="w-3.5 h-3.5 mr-1.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Invoice Type
+                      </label>
+                      <select
+                        value={filters.invoiceType}
+                        onChange={(e) =>
+                          setFilters({ ...filters, invoiceType: e.target.value })
+                        }
+                        className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white hover:border-gray-400"
+                      >
+                        <option value="all">All Types</option>
+                        <option value="tax">Tax Invoice</option>
+                        <option value="cash">Cash Invoice</option>
+                      </select>
+                    </div>
+
+                    {/* Registration Status */}
+                    <div className="space-y-1">
+                      <label className="flex items-center text-xs font-semibold text-gray-700">
+                        <svg className="w-3.5 h-3.5 mr-1.5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Registration Status
+                      </label>
+                      <select
+                        value={filters.status}
+                        onChange={(e) =>
+                          setFilters({ ...filters, status: e.target.value })
+                        }
+                        className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white hover:border-gray-400"
+                      >
+                        <option value="all">All Status</option>
+                        <option value="registered">Booked</option>
+                        <option value="unregistered">Not Booked</option>
+                      </select>
+                    </div>
+
+                    {/* Approval Status */}
+                    <div className="space-y-1">
+                      <label className="flex items-center text-xs font-semibold text-gray-700">
+                        <svg className="w-3.5 h-3.5 mr-1.5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Approval Status
+                      </label>
+                      <select
+                        value={filters.approvalStatus}
+                        onChange={(e) =>
+                          setFilters({ ...filters, approvalStatus: e.target.value })
+                        }
+                        className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white hover:border-gray-400"
+                      >
+                        <option value="all">All Status</option>
+                        <option value="approved">Approved</option>
+                        <option value="pending">Pending Approval</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </div>
+
+                    {/* Date Range */}
+                    <div className="space-y-2">
+                      <label className="flex items-center text-xs font-semibold text-gray-700">
+                        <svg className="w-3.5 h-3.5 mr-1.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        Date Range (Generated)
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-0.5">
+                            Start Date
+                          </label>
+                          <input
+                            type="date"
+                            value={filters.startDate}
+                            onChange={(e) =>
+                              setFilters({ ...filters, startDate: e.target.value })
+                            }
+                            className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white hover:border-gray-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-0.5">
+                            End Date
+                          </label>
+                          <input
+                            type="date"
+                            value={filters.endDate}
+                            onChange={(e) =>
+                              setFilters({ ...filters, endDate: e.target.value })
+                            }
+                            className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white hover:border-gray-400"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer Actions */}
+                <div className="px-3 py-2 bg-gray-50 border-t border-gray-200">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        applyFilters();
+                        setShowFilters(false);
+                      }}
+                      className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-1.5 px-3 rounded-lg text-xs font-semibold transition-all duration-200 shadow-sm hover:shadow-md transform hover:-translate-y-0.5 flex items-center justify-center"
+                    >
+                      <svg className="w-3 h-3 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Apply Filters
+                    </button>
+                    <button
+                      onClick={() => {
+                        clearFilters();
+                        setShowFilters(false);
+                      }}
+                      className="flex-1 bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white py-1.5 px-3 rounded-lg text-xs font-semibold transition-all duration-200 shadow-sm hover:shadow-md transform hover:-translate-y-0.5 flex items-center justify-center"
+                    >
+                      <svg className="w-3 h-3 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Export Button */}
           <button
             onClick={exportToExcel}
@@ -554,17 +866,17 @@ const getDescription = (invoice) => {
               exportLoading ||
               (filteredInvoices.length === 0 && invoices.length === 0)
             }
-            className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="bg-green-600 hover:bg-green-700 text-white py-1.5 px-3 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {exportLoading ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                <div className="animate-spin rounded-full h-3.5 w-3.5 border-t-2 border-b-2 border-white"></div>
                 Exporting...
               </>
             ) : (
               <>
                 <svg
-                  className="w-4 h-4"
+                  className="w-3.5 h-3.5"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -583,10 +895,10 @@ const getDescription = (invoice) => {
 
           <button
             onClick={fetchInvoices}
-            className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 flex items-center gap-2"
+            className="bg-gray-500 text-white py-1.5 px-3 rounded hover:bg-gray-600 text-sm flex items-center gap-2"
           >
             <svg
-              className="w-4 h-4"
+              className="w-3.5 h-3.5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -603,254 +915,251 @@ const getDescription = (invoice) => {
         </div>
       </div>
 
-      {/* Filter Section */}
-      <div className="bg-white p-4 rounded-lg border mb-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">
-          Filter Invoices
-        </h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Financial Year Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Financial Year
-            </label>
-            <select
-              value={filters.financialYear}
-              onChange={(e) =>
-                setFilters({ ...filters, financialYear: e.target.value })
-              }
-              className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">All Years</option>
-              {financialYearOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Invoice Type Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Invoice Type
-            </label>
-            <select
-              value={filters.invoiceType}
-              onChange={(e) =>
-                setFilters({ ...filters, invoiceType: e.target.value })
-              }
-              className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="all">All Types</option>
-              <option value="tax">Tax Invoice</option>
-              <option value="cash">Cash Invoice</option>
-            </select>
-          </div>
-
-          {/* Registration Status Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Registration Status
-            </label>
-            <select
-              value={filters.status}
-              onChange={(e) =>
-                setFilters({ ...filters, status: e.target.value })
-              }
-              className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="all">All Status</option>
-              <option value="registered">Booked</option>
-              <option value="unregistered">Not Booked</option>
-            </select>
-          </div>
-
-          {/* Approval Status Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Approval Status
-            </label>
-            <select
-              value={filters.approvalStatus}
-              onChange={(e) =>
-                setFilters({ ...filters, approvalStatus: e.target.value })
-              }
-              className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="all">All Status</option>
-              <option value="approved">Approved</option>
-              <option value="pending">Pending Approval</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Date Range Filters and Action Buttons */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Start Date
-            </label>
-            <input
-              type="date"
-              value={filters.startDate}
-              onChange={(e) =>
-                setFilters({ ...filters, startDate: e.target.value })
-              }
-              className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              End Date
-            </label>
-            <input
-              type="date"
-              value={filters.endDate}
-              onChange={(e) =>
-                setFilters({ ...filters, endDate: e.target.value })
-              }
-              className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-          <div className="flex items-end gap-2">
-            <button
-              onClick={applyFilters}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md font-medium"
-            >
-              Apply Filters
-            </button>
-            <button
-              onClick={clearFilters}
-              className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded-md font-medium"
-            >
-              Clear
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Invoices Table */}
+      {/* Modern SaaS Table Design */}
       {filteredInvoices.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">
-          {invoices.length === 0
-            ? "No invoices found."
-            : "No invoices match the current filters."}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+          <div className="max-w-md mx-auto">
+            <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              {invoices.length === 0 ? "No invoices found" : "No matching invoices"}
+            </h3>
+            <p className="text-gray-500 text-sm">
+              {invoices.length === 0
+                ? "Get started by creating your first invoice."
+                : "Try adjusting your filters to see more results."}
+            </p>
+          </div>
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full bg-white border border-gray-200">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="px-4 py-3 border border-gray-200 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Invoice Number
-                </th>
-                <th className="px-4 py-3 border border-gray-200 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  College
-                </th>
-                <th className="px-4 py-3 border border-gray-200 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Amount
-                </th>
-                <th className="px-4 py-3 border border-gray-200 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Registration Status
-                </th>
-                <th className="px-4 py-3 border border-gray-200 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  ✅ Booking Date
-                </th>
-                <th className="px-4 py-3 border border-gray-200 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Approval Status
-                </th>
-                <th className="px-4 py-3 border border-gray-200 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredInvoices.map((invoice) => (
-                <tr
-                  key={invoice.id}
-                  className={`hover:bg-gray-100 transition-colors ${getRowBackgroundColor(
-                    invoice
-                  )}`}
-                >
-                  <td className="px-4 py-3 border border-gray-200 font-semibold">
-                    {invoice.invoiceNumber || "N/A"}
-                    {invoice.approvalStatus === "cancelled" && (
-                      <span className="ml-2 text-red-600 text-xs">
-                        (CANCELLED)
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 border border-gray-200">
-                    {invoice.collegeName || "N/A"}
-                  </td>
-                  <td className="px-4 py-3 border border-gray-200 font-semibold">
-                    ₹{invoice.amount?.toLocaleString() || "0"}
-                  </td>
-                  <td className="px-4 py-3 border border-gray-200">
-                    {invoice.registered ? (
-                      <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
-                        ✓ Booked
-                      </span>
-                    ) : (
-                      <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">
-                        Not Booked
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 border border-gray-200">
-                    {/* ✅ BOOKING DATE COLUMN */}
-                    {invoice.registeredAt ? (
-                      <span className="text-sm text-gray-700">
-                        {formatDisplayDate(invoice.registeredAt)}
-                      </span>
-                    ) : (
-                      <span className="text-sm text-gray-400">Not Booked</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 border border-gray-200">
-                    {/* ✅ UPDATED APPROVAL STATUS BADGE */}
-                    {invoice.approvalStatus === "cancelled" ? (
-                      <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">
-                        Cancelled
-                      </span>
-                    ) : invoice.approved || invoice.receivedAmount > 0 ? (
-                      <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
-                        ✓ Approved
-                      </span>
-                    ) : (
-                      <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">
-                        Pending Approval
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 border border-gray-200">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleView(invoice)}
-                        className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
-                      >
-                        View
-                      </button>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          {/* Table Content */}
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    <div className="flex items-center space-x-1">
+                      <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                      </svg>
+                      <span>Invoice Details</span>
+                    </div>
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    <div className="flex items-center space-x-1">
+                      <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                      <span>Organization</span>
+                    </div>
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    <div className="flex items-center space-x-1">
+                      <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                      </svg>
+                      <span>Amount</span>
+                    </div>
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    <div className="flex items-center space-x-1">
+                      <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>Registration</span>
+                    </div>
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    <div className="flex items-center space-x-1">
+                      <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <span>Booking Date</span>
+                    </div>
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    <div className="flex items-center space-x-1">
+                      <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>Approval</span>
+                    </div>
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    <div className="flex items-center space-x-1">
+                      <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span>Actions</span>
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredInvoices.map((invoice) => (
+                  <tr
+                    key={invoice.id}
+                    className={`group transition-all duration-200 ease-in-out ${
+                      getRowBackgroundColor(invoice)
+                    } ${getRowHoverColor(invoice)}`}
+                  >
+                    {/* Invoice Number & Status */}
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-sm">
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                        </div>
+                        <div className="ml-3">
+                          <div className={`text-xs font-semibold group-hover:text-blue-700 transition-colors ${getRowTextColor(invoice)}`}>
+                            {invoice.invoiceNumber || "N/A"}
+                          </div>
+                          {invoice.approvalStatus === "cancelled" && (
+                            <div className="flex items-center mt-0.5">
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                </svg>
+                                Cancelled
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
 
-                      {/* ✅ DIRECT BOOKED BUTTON - SIRF CANCELLED NA HO AUR PEHLE SE BOOKED NA HO */}
-                      {invoice.approvalStatus !== "cancelled" &&
-                        !invoice.registered && (
+                    {/* College Name */}
+                    <td className="px-3 py-2">
+                      <div className={`text-xs font-medium break-words ${getRowTextColor(invoice)}`}>
+                        {invoice.collegeName || "N/A"}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5 break-words">
+                        {invoice.collegeState || "N/A"}
+                      </div>
+                    </td>
+
+                    {/* Amount */}
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <div className={`text-sm font-bold ${getRowTextColor(invoice)}`}>
+                        ₹{invoice.amount?.toLocaleString('en-IN') || "0"}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        {invoice.invoiceType === "Tax Invoice" ? "Tax Invoice" : "Cash Invoice"}
+                      </div>
+                    </td>
+
+                    {/* Registration Status */}
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {invoice.registered ? (
+                        <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-sm">
+                          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                          Booked
+                        </div>
+                      ) : (
+                        <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-sm">
+                          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0 1 1 0 012 0zm-1 3a1 1 0 00-1 1v4a1 1 0 102 0V9a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                          Pending
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Booking Date */}
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {invoice.registeredAt ? (
+                        <div className={`text-xs font-medium ${getRowTextColor(invoice)}`}>
+                          {formatDisplayDate(invoice.registeredAt)}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-gray-400 italic">
+                          Not booked
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Approval Status */}
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {invoice.approvalStatus === "cancelled" ? (
+                        <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-sm">
+                          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                          </svg>
+                          Cancelled
+                        </div>
+                      ) : invoice.approved || invoice.receivedAmount > 0 ? (
+                        <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-sm">
+                          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                          Approved
+                        </div>
+                      ) : (
+                        <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-sm">
+                          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0 1 1 0 012 0zm-1 3a1 1 0 00-1 1v4a1 1 0 102 0V9a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                          Pending
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Actions */}
+                    <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex items-center justify-end space-x-1">
+                        <button
+                          onClick={() => handleView(invoice)}
+                          className="inline-flex items-center px-2 py-1 border border-gray-300 rounded-md text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 shadow-sm hover:shadow-md"
+                          title="View invoice details"
+                        >
+                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                          View
+                        </button>
+
+                        {invoice.approvalStatus !== "cancelled" && !invoice.registered && (
                           <button
                             onClick={() => openDatePicker(invoice)}
-                            className="bg-purple-500 text-white px-3 py-1 rounded text-sm hover:bg-purple-600"
+                            className="inline-flex items-center px-2 py-1 border border-transparent rounded-md text-xs font-medium text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-all duration-200 shadow-sm hover:shadow-md transform hover:-translate-y-0.5"
+                            title="Book this invoice"
                           >
+                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
                             Book
                           </button>
                         )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Table Footer */}
+          <div className="px-3 py-2 border-t border-gray-200 bg-gray-50">
+            <div className="flex items-center justify-between text-xs text-gray-600">
+              <div className="flex items-center space-x-3">
+                <span>Showing {filteredInvoices.length} of {invoices.length} invoices</span>
+                <div className="flex items-center space-x-1">
+                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                  <span>Real-time updates</span>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="text-xs text-gray-500">Last updated: {new Date().toLocaleTimeString()}</span>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -865,11 +1174,11 @@ const getDescription = (invoice) => {
       {/* ✅ DATE PICKER MODAL */}
       {showDatePicker && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-96">
-            <h3 className="text-lg font-semibold mb-4">Select Booking Date</h3>
+          <div className="bg-white p-4 rounded-lg w-96">
+            <h3 className="text-lg font-semibold mb-2">Select Booking Date</h3>
             
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="mb-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Booking Date
               </label>
               <input

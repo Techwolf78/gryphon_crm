@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { db } from "../../firebase";
-import { collection, getDocs, query, where, orderBy, limit } from "firebase/firestore";
+import { collection, getDocs, query, where, orderBy, limit, updateDoc, doc } from "firebase/firestore";
 import InvoiceModal from "./InvoiceModal";
 import { generateInvoicePDF } from "./invoiceUtils";
 import { FiSearch, FiFilter, FiRefreshCw, FiTrash2, FiUser, FiCheckCircle, FiAlertCircle, FiXCircle, FiInfo, FiClock } from "react-icons/fi";
@@ -11,6 +11,11 @@ import TrainerInvoiceSkeleton from "./Invoice/TrainerInvoiceSkeleton";
 import TrainerTable from "./Invoice/TrainerTable";
 
 function GenerateTrainerInvoice() {
+  // Cache duration: 5 minutes (but adaptive based on usage)
+  const CACHE_DURATION = 5 * 60 * 1000;
+  const EXTENDED_CACHE_DURATION = 15 * 60 * 1000; // 15 minutes for heavy users
+  const CACHE_VERSION = 'v2.0_college_first'; // 🆕 Version to invalidate old cache structure
+  
   const [trainerData, setTrainerData] = useState([]);
   const [groupedData, setGroupedData] = useState({});
   const [loading, setLoading] = useState(true);
@@ -34,51 +39,25 @@ function GenerateTrainerInvoice() {
   // Custom toast state (like InitiationDashboard)
   const [toast, setToast] = useState(null);
   
-  // 🚀 NEW: Caching and Performance State with localStorage persistence
-  const [lastFetchTime, setLastFetchTime] = useState(() => {
-    try {
-      return parseInt(localStorage.getItem('trainer_invoice_last_fetch')) || null;
-    } catch {
-      return null;
-    }
-  });
-  const [cachedData, setCachedData] = useState(() => {
-    try {
-      const cached = localStorage.getItem('trainer_invoice_cache');
-      const cacheVersion = localStorage.getItem('trainer_invoice_cache_version');
-      
-      // 🔄 Clear cache if version doesn't match (structure change)
-      if (cacheVersion !== CACHE_VERSION) {
-        console.log('🔄 Cache version mismatch - clearing old cache structure');
-        localStorage.removeItem('trainer_invoice_cache');
-        localStorage.removeItem('trainer_invoice_last_fetch');
-        localStorage.setItem('trainer_invoice_cache_version', CACHE_VERSION);
-        return null;
-      }
-      
-      return cached ? JSON.parse(cached) : null;
-    } catch {
-      return null;
-    }
-  });
+  // 🧠 Cache state management
+  const [cachedData, setCachedData] = useState(null);
+  const [lastFetchTime, setLastFetchTime] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
-  const hasLoadedRef = useRef(false); // Track if we've loaded data in this session
-  
-  // Cache duration: 5 minutes (but adaptive based on usage)
-  const CACHE_DURATION = 5 * 60 * 1000;
-  const EXTENDED_CACHE_DURATION = 15 * 60 * 1000; // 15 minutes for heavy users
-  const CACHE_VERSION = 'v2.0_college_first'; // 🆕 Version to invalidate old cache structure
+  const hasLoadedRef = useRef(false);
   
   // 🧠 Intelligent cache management with version check
-  const getAdaptiveCacheDuration = () => {
-    try {
-      const sessionVisits = parseInt(localStorage.getItem('trainer_invoice_session_visits') || '0');
-      // If user has visited multiple times in this session, extend cache duration
-      return sessionVisits > 3 ? EXTENDED_CACHE_DURATION : CACHE_DURATION;
-    } catch {
-      return CACHE_DURATION;
-    }
-  };
+  const getAdaptiveCacheDuration = useMemo(() => {
+    return () => {
+      try {
+        const sessionVisits = parseInt(localStorage.getItem('trainer_invoice_session_visits') || '0');
+        // If user has visited multiple times in this session, extend cache duration
+        const duration = sessionVisits > 3 ? EXTENDED_CACHE_DURATION : CACHE_DURATION;
+        return duration;
+      } catch {
+        return CACHE_DURATION;
+      }
+    };
+  }, [CACHE_DURATION, EXTENDED_CACHE_DURATION]);
   
   const trackUserVisit = () => {
     try {
@@ -113,10 +92,10 @@ function GenerateTrainerInvoice() {
   // 🚀 OPTIMIZED: Enhanced data fetch function with persistent caching
   const fetchTrainers = useCallback(async (forceRefresh = false) => {
     const now = Date.now();
+    const adaptiveDuration = getAdaptiveCacheDuration();
     
     // 📱 Use cache if data is fresh and not forcing refresh
-    if (!forceRefresh && cachedData && lastFetchTime && (now - lastFetchTime) < CACHE_DURATION) {
-      console.log('🎯 Using cached data from localStorage, skipping Firebase request');
+    if (!forceRefresh && cachedData && lastFetchTime && (now - lastFetchTime) < adaptiveDuration) {
       setTrainerData(cachedData.trainerData);
       setGroupedData(cachedData.groupedData);
       setExpandedPhases(cachedData.expandedPhases);
@@ -124,7 +103,6 @@ function GenerateTrainerInvoice() {
       return;
     }
     
-    console.log('🔄 Fetching fresh data from Firebase...', forceRefresh ? '(Force refresh)' : '(Cache expired/missing)');
     setLoading(true);
     if (forceRefresh) {
       setRefreshing(true);
@@ -140,7 +118,6 @@ function GenerateTrainerInvoice() {
       );
       
       const trainingFormsSnap = await getDocs(trainingFormsQuery);
-      console.log(`📊 Fetched ${trainingFormsSnap.docs.length} training forms`);
 
       for (const formDoc of trainingFormsSnap.docs) {
         const formId = formDoc.id;
@@ -344,9 +321,47 @@ function GenerateTrainerInvoice() {
       const collegePhaseBasedTrainers = Object.values(
         collegePhaseBasedGrouping
       ).map(trainer => {
+        // Helper function to calculate training days (matching InitiationModal logic)
+        const getTrainingDays = (startDate, endDate, excludeDays = "None") => {
+          if (!startDate || !endDate) return 0;
+          const start = new Date(startDate);
+          const end = new Date(endDate);
+          if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) return 0;
+          
+          let days = 0;
+          const cur = new Date(start);
+          while (cur <= end) {
+            const dayOfWeek = cur.getDay(); // 0 = Sunday, 6 = Saturday
+            let shouldInclude = true;
+            
+            if (excludeDays === "Saturday" && dayOfWeek === 6) {
+              shouldInclude = false;
+            } else if (excludeDays === "Sunday" && dayOfWeek === 0) {
+              shouldInclude = false;
+            } else if (excludeDays === "Both" && (dayOfWeek === 0 || dayOfWeek === 6)) {
+              shouldInclude = false;
+            }
+            // If excludeDays === "None", include all days
+            
+            if (shouldInclude) days++;
+            cur.setDate(cur.getDate() + 1);
+          }
+          return days;
+        };
+
         const finalTrainer = {
           ...trainer,
           topics: Array.from(trainer.allTopics), // Convert Set to Array for topics
+          // Calculate total allowances from all batches (per-day rate × number of training days)
+          totalFood: trainer.allBatches.reduce((sum, batch) => {
+            const days = batch.activeDates?.length || getTrainingDays(batch.startDate, batch.endDate);
+            return sum + ((batch.food || 0) * days);
+          }, 0),
+          totalLodging: trainer.allBatches.reduce((sum, batch) => {
+            const days = batch.activeDates?.length || getTrainingDays(batch.startDate, batch.endDate);
+            return sum + ((batch.lodging || 0) * days);
+          }, 0),
+          totalConveyance: trainer.allBatches.reduce((sum, batch) => sum + (batch.conveyance || 0), 0),
         };
 
         // For merged trainings, update display fields
@@ -361,7 +376,6 @@ function GenerateTrainerInvoice() {
 
       // 🔥 OPTIMIZED: Batch invoice status checks to reduce Firebase calls
       // Check invoice status for each trainer
-      console.log('📊 Checking invoice status for trainers...');
       const updatedTrainersList = await Promise.all(
         collegePhaseBasedTrainers.map(async (trainer) => {
           try {
@@ -388,29 +402,12 @@ function GenerateTrainerInvoice() {
 
             const querySnapshot = await getDocs(invoiceQuery);
             totalInvoiceCount = querySnapshot.size;
-            
-            console.log(`🔍 Invoice query for ${trainer.trainerId} at ${trainer.collegeName} (${trainer.phase}):`, {
-              totalInvoiceCount,
-              querySize: querySnapshot.size,
-              invoiceDocsFound: querySnapshot.docs.length
-            });
 
             if (totalInvoiceCount > 0) {
               // Find the most recent invoice (first doc due to orderBy desc)
               const latestDoc = querySnapshot.docs[0];
               latestInvoice = latestDoc.data();
               invoiceStatus = latestInvoice.status || "generated";
-              
-              console.log(`💰 Found invoice for ${trainer.trainerName}:`, {
-                invoiceId: latestDoc.id,
-                status: invoiceStatus,
-                createdAt: latestInvoice.createdAt,
-                trainerId: latestInvoice.trainerId,
-                phase: latestInvoice.phase,
-                collegeName: latestInvoice.collegeName
-              });
-            } else {
-              console.log(`❌ No invoices found for ${trainer.trainerName} (${trainer.trainerId})`);
             }
 
             const trainerWithInvoiceStatus = {
@@ -418,15 +415,8 @@ function GenerateTrainerInvoice() {
               hasExistingInvoice: totalInvoiceCount > 0,
               invoiceCount: totalInvoiceCount,
               invoiceStatus: invoiceStatus,
+              invoiceData: latestInvoice, // Store full invoice data for remarks display
             };
-            
-            console.log(`👤 Final trainer object for ${trainer.trainerName}:`, {
-              trainerName: trainer.trainerName,
-              trainerId: trainer.trainerId,
-              hasExistingInvoice: trainerWithInvoiceStatus.hasExistingInvoice,
-              invoiceCount: trainerWithInvoiceStatus.invoiceCount,
-              invoiceStatus: trainerWithInvoiceStatus.invoiceStatus
-            });
             
             return trainerWithInvoiceStatus;
           } catch (trainerError) {
@@ -436,6 +426,7 @@ function GenerateTrainerInvoice() {
               hasExistingInvoice: false,
               invoiceCount: 0,
               invoiceStatus: null,
+              invoiceData: null,
             };
           }
         })
@@ -486,7 +477,6 @@ function GenerateTrainerInvoice() {
       console.error('❌ Error fetching trainers:', error);
       // If fetch fails but we have cached data, use it
       if (!forceRefresh && cachedData) {
-        console.log('🔄 Using stale cache due to fetch error');
         setTrainerData(cachedData.trainerData);
         setGroupedData(cachedData.groupedData);
         setExpandedPhases(cachedData.expandedPhases);
@@ -495,53 +485,25 @@ function GenerateTrainerInvoice() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [lastFetchTime, cachedData, CACHE_DURATION]);
+  }, [lastFetchTime, cachedData, getAdaptiveCacheDuration]);
 
   // 🚀 OPTIMIZED: Check cache on mount, fetch if needed (with session tracking)
   useEffect(() => {
-    // 🔄 ONE-TIME: Force clear cache for structural change (remove this after deployment)
-    const forceStructureUpdate = () => {
-      const currentVersion = localStorage.getItem('trainer_invoice_cache_version');
-      if (currentVersion !== CACHE_VERSION) {
-        console.log('🔄 Forcing cache clear for College → Phase structure change...');
-        clearCacheFromStorage();
-        setCachedData(null);
-        setLastFetchTime(null);
-        localStorage.setItem('trainer_invoice_cache_version', CACHE_VERSION);
-        return true; // Indicates cache was cleared
-      }
-      return false;
-    };
-    
     // Track user visit for adaptive caching
     trackUserVisit();
     
     // Force structure update first
-    const cacheWasCleared = forceStructureUpdate();
-    
-    // Prevent multiple loads in the same session (unless cache was just cleared)
-    if (hasLoadedRef.current && !cacheWasCleared) {
-      console.log('⚡ Already loaded in this session - using existing state');
-      return;
-    }
-    
-    console.log('🎬 First mount in session - checking cache status...');
-    
     const now = Date.now();
     const adaptiveDuration = getAdaptiveCacheDuration();
     const isCacheValid = cachedData && lastFetchTime && (now - lastFetchTime) < adaptiveDuration;
     
     if (isCacheValid) {
-      const cacheAge = Math.round((now - lastFetchTime) / (1000 * 60));
-      const isExtended = adaptiveDuration > CACHE_DURATION;
-      console.log(`💾 Valid cache found (${cacheAge}m old, ${isExtended ? 'extended' : 'standard'} duration) - loading instantly`);
       setTrainerData(cachedData.trainerData);
       setGroupedData(cachedData.groupedData);
       setExpandedPhases(cachedData.expandedPhases);
       setLoading(false);
       hasLoadedRef.current = true;
     } else {
-      console.log('🔄 Cache expired or missing - fetching fresh data from Firebase');
       fetchTrainers().then(() => {
         hasLoadedRef.current = true;
       });
@@ -606,7 +568,6 @@ function GenerateTrainerInvoice() {
 
   // 🎯 NEW: Handle invoice generation completion with forced refresh
   const handleInvoiceGenerated = useCallback(async () => {
-    console.log('🎉 Invoice generated successfully - starting data refresh...');
     
     // Move all heavy operations to background to allow immediate modal closing
     setTimeout(async () => {
@@ -614,31 +575,17 @@ function GenerateTrainerInvoice() {
       clearCacheFromStorage();
       setCachedData(null);
       setLastFetchTime(null);
-      console.log('🗑️ Cache cleared successfully');
       
       // Add a longer delay to ensure database consistency and indexing
-      console.log('⏳ Waiting for database consistency and indexing...');
       await new Promise(resolve => setTimeout(resolve, 2000)); // Increased to 2 seconds
       
-      console.log('🔄 Forcing fresh data fetch to update invoice status...');
       await fetchTrainers(true); // Force refresh to show updated invoice status
       
-      console.log('✅ Data refresh completed - invoice status should now be updated');
-      
-      // Log final state for debugging
-      setTimeout(() => {
-        console.log('📊 Final trainer data after refresh:', trainerData.map(t => ({
-          name: t.trainerName,
-          hasInvoice: t.hasExistingInvoice,
-          status: t.invoiceStatus
-        })));
-      }, 100);
     }, 0); // Execute immediately in next tick, but asynchronously
-  }, [trainerData, fetchTrainers]);
+  }, [fetchTrainers]);
 
   // 🔄 ENHANCED: Manual refresh with cache invalidation and visual feedback
   const handleRefreshData = () => {
-    console.log('🔄 Manual refresh triggered - clearing cache and forcing fresh data fetch');
     clearCacheFromStorage(); // Clear localStorage cache
     setCachedData(null); // Clear state cache
     setLastFetchTime(null);
@@ -647,7 +594,7 @@ function GenerateTrainerInvoice() {
   };
   
   // 💡 NEW: Function to check cache status for UI indicators
-  const getCacheStatus = () => {
+  const getCacheStatus = useCallback(() => {
     if (!lastFetchTime) return { status: 'never', message: 'Never loaded', isExpired: false };
     
     const now = Date.now();
@@ -669,7 +616,7 @@ function GenerateTrainerInvoice() {
         isExpired: true
       };
     }
-  };
+  }, [lastFetchTime, getAdaptiveCacheDuration, CACHE_DURATION]);
 
   // cleanup toast timer on unmount
   useEffect(() => {
@@ -687,7 +634,6 @@ function GenerateTrainerInvoice() {
         // If no activity for 1 hour, clear session data
         if (lastActivity && (now - parseInt(lastActivity)) > (60 * 60 * 1000)) {
           localStorage.removeItem('trainer_invoice_session_visits');
-          console.log('🧹 Cleared old session data due to inactivity');
         }
         
         // Update last activity
@@ -905,8 +851,6 @@ function GenerateTrainerInvoice() {
       ? `${trainer.trainerId}_merged_jd_${trainer.phase}_${trainer.allProjects.join('_')}`
       : `${trainer.trainerId}_${trainer.businessName}_${trainer.phase}_${trainer.projectCode}`;
     
-    console.log('📥 Starting download for trainer:', trainer.trainerName, 'Status key:', statusKey);
-    
     setDownloadingInvoice(statusKey);
     setPdfStatus((prev) => ({
       ...prev,
@@ -944,8 +888,6 @@ function GenerateTrainerInvoice() {
         });
       }
 
-      console.log('🔍 Found invoices:', allInvoices.length, 'for trainer:', trainer.trainerName);
-
       if (allInvoices.length > 0) {
         if (allInvoices.length > 1) {
           // For multiple invoices, show selection dialog
@@ -963,9 +905,7 @@ function GenerateTrainerInvoice() {
               inv => inv.billNumber === selectedInvoice.split(' ')[0]
             );
             if (selectedInvoiceData) {
-              console.log('📄 Generating PDF for selected invoice:', selectedInvoiceData.billNumber);
               const success = await generateInvoicePDF(selectedInvoiceData);
-              console.log('📄 PDF generation result:', success);
               setPdfStatus((prev) => ({
                 ...prev,
                 [statusKey]: success ? "success" : "error",
@@ -985,9 +925,7 @@ function GenerateTrainerInvoice() {
           }
         } else {
           // Single invoice - download it directly
-          console.log('📄 Generating PDF for single invoice:', allInvoices[0].billNumber);
           const success = await generateInvoicePDF(allInvoices[0]);
-          console.log('📄 PDF generation result:', success);
           setPdfStatus((prev) => ({
             ...prev,
             [statusKey]: success ? "success" : "error",
@@ -1078,6 +1016,48 @@ function GenerateTrainerInvoice() {
       setToast({ type: 'error', message: "Failed to find invoice. Please try again." });
     }
   }, []);
+
+  // Handle invoice approval (sets invoice=true and status=approved for HR review)
+  const handleApproveInvoice = useCallback(async (trainer) => {
+    try {
+      // Find the invoice document
+      const q = query(
+        collection(db, "invoices"),
+        where("trainerId", "==", trainer.trainerId),
+        where("collegeName", "==", trainer.collegeName),
+        where("phase", "==", trainer.phase)
+      );
+
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const invoiceDoc = querySnapshot.docs[0];
+        const invoiceRef = doc(db, "invoices", invoiceDoc.id);
+        
+        // Update invoice to pending status and make it available for HR review
+        await updateDoc(invoiceRef, {
+          status: "pending",
+          invoice: true, // This makes it visible to HR
+          approvedDate: new Date().toISOString().split("T")[0],
+          approvedBy: "Learning Department",
+          updatedAt: new Date()
+        });
+
+        // Clear cache and refresh data
+        clearCacheFromStorage();
+        setCachedData(null);
+        setLastFetchTime(null);
+        await fetchTrainers(true); // Force refresh
+        
+        setToast({ type: 'success', message: `Invoice approved and sent to HR for review` });
+      } else {
+        setToast({ type: 'error', message: "Invoice not found" });
+      }
+    } catch (error) {
+      console.error('Error approving invoice:', error);
+      setToast({ type: 'error', message: "Failed to approve invoice" });
+    }
+  }, [fetchTrainers]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1175,6 +1155,7 @@ function GenerateTrainerInvoice() {
                 handleDownloadInvoice={handleDownloadInvoice}
                 handleEditInvoice={handleEditInvoice}
                 handleGenerateInvoice={handleGenerateInvoice}
+                handleApproveInvoice={handleApproveInvoice}
                 downloadingInvoice={downloadingInvoice}
                 getDownloadStatus={getDownloadStatus}
                 formatDate={formatDate}

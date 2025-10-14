@@ -43,6 +43,7 @@ export const generateInvoicePDF = async (invoiceData) => {
       accountNumber: invoiceData.accountNumber || 'N/A',
       ifscCode: invoiceData.ifscCode || 'N/A',
       panNumber: invoiceData.panNumber || 'N/A',
+      gst: invoiceData.gst || 'NA',
     };
 
     console.log('🔧 Using safe invoice data:', safeInvoiceData);
@@ -139,7 +140,9 @@ export const generateInvoicePDF = async (invoiceData) => {
     const subTotal = trainingAmount + conveyance + food + lodging;
     const tdsAmount = (trainingAmount * (safeInvoiceData.tds || 0)) / 100;
     const adhocAdjustment = safeInvoiceData.adhocAdjustment || 0;
-    const netPayable = subTotal - tdsAmount + adhocAdjustment;
+    const amountBeforeGST = subTotal - tdsAmount + adhocAdjustment;
+    const gstAmount = safeInvoiceData.gst === "18" ? Math.round(amountBeforeGST * 0.18) : 0;
+    const netPayable = amountBeforeGST - gstAmount;
 
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 6,
@@ -152,6 +155,7 @@ export const generateInvoicePDF = async (invoiceData) => {
         [{ content: 'Total Amount', colSpan: 3, styles: { halign: 'left' } }, `Rs. ${subTotal}`],
         ['Adhoc Addition/Deduction', '-', '-', `Rs. ${adhocAdjustment}`],
         ['Less (TDS)', '-', '-', `Rs. ${tdsAmount}`],
+        ['GST', safeInvoiceData.gst === "NA" ? "NA" : `${safeInvoiceData.gst}%`, '-', `Rs. ${gstAmount === 0 ? '0' : '-' + gstAmount}`],
         [{ content: 'Net Payment', colSpan: 3, styles: { halign: 'left', fontStyle: 'bold' } }, `Rs. ${netPayable}`],
       ],
       theme: 'grid',
@@ -162,7 +166,7 @@ export const generateInvoicePDF = async (invoiceData) => {
           data.cell.styles.cellPadding = 1.8;
           data.cell.styles.fontSize = 10.5;
         }
-        if (data.row.index === 8 || data.row.index === 5 || data.row.index === 6 || data.row.index === 7) {
+        if (data.row.index === 9 || data.row.index === 5 || data.row.index === 6 || data.row.index === 7 || data.row.index === 8) {
           data.cell.styles.fontStyle = 'bold';
           data.cell.styles.fontSize = 10;
         }

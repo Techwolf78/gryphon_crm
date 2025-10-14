@@ -106,6 +106,7 @@ const TrainerRow = React.memo(
     excludeDays,
     commonFields,
     getTrainingHoursPerDay,
+    selectedDomain,
   }) => {
     // ✅ ADD: Calculate unique key for this trainer
     const trainerKey = `${rowIndex}-${batchIndex}-${trainerIdx}`;
@@ -236,21 +237,36 @@ const TrainerRow = React.memo(
       initializeDailyHours();
     }, [initializeDailyHours]);
 
+  const getDomains = (trainer) => {
+    let domains = [];
+    if (Array.isArray(trainer.domain)) domains = trainer.domain;
+    else if (typeof trainer.domain === 'string') domains = trainer.domain.split(',').map(d => d.trim());
+    return domains.map(d => d.toLowerCase().trim());
+  };
+
+  const normalizeDomainForFilter = (domain) => {
+    const lower = domain.toLowerCase();
+    if (lower.includes("tools")) return "tools";
+    return lower;
+  };
+
   const trainerOptions = useMemo(() => {
-    return trainers.map((tr) => {
-      const isAvailable = isTrainerAvailable(
-        tr.trainerId,
-        trainer.startDate,
-        trainer.dayDuration,
-        `${rowIndex}-${batchIndex}-${trainerIdx}`
-      );
-      return {
-        value: tr.trainerId,
-        label: `${tr.name || tr.trainerName || tr.displayName || tr.trainerId} (${tr.trainerId})${!isAvailable ? " (Already booked)" : ""}`,
-        isDisabled: !isAvailable,
-      };
-    });
-  }, [trainers, trainer.startDate, trainer.dayDuration, rowIndex, batchIndex, trainerIdx, isTrainerAvailable]);
+    return trainers
+      .filter(trainer => getDomains(trainer).some(d => normalizeDomainForFilter(d) === normalizeDomainForFilter(selectedDomain)))
+      .map((tr) => {
+        const isAvailable = isTrainerAvailable(
+          tr.trainerId,
+          trainer.startDate,
+          trainer.dayDuration,
+          `${rowIndex}-${batchIndex}-${trainerIdx}`
+        );
+        return {
+          value: tr.trainerId,
+          label: `${tr.name || tr.trainerName || tr.displayName || tr.trainerId} (${tr.trainerId})${!isAvailable ? " (Already booked)" : ""}`,
+          isDisabled: !isAvailable,
+        };
+      });
+  }, [trainers, trainer.startDate, trainer.dayDuration, rowIndex, batchIndex, trainerIdx, isTrainerAvailable, selectedDomain]);
 
   return (
     <>
