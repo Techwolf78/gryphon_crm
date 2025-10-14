@@ -27,6 +27,7 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated, trainers = [] }) {
     charges: "",
     specialization: "",
     otherSpecialization: "",
+    gst: "",
   });
 
   const [loading, setLoading] = useState(false);
@@ -89,6 +90,7 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated, trainers = [] }) {
           bankAddress: data.bankAddress || "",
           paymentType: data.paymentType || "Per Hour",
           charges: data.charges || "",
+          gst: data.gst || "",
           specialization: [...standard, ...(showOthers ? ["Others"] : [])].join(", "),
           otherSpecialization: custom.join(", "),
         });
@@ -169,8 +171,9 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated, trainers = [] }) {
         bankAddress: trainerData.bankAddress,
         paymentType: trainerData.paymentType,
         charges: Number(trainerData.charges) || 0,
-  specialization: specializationArr,
-  otherSpecialization: otherArr,
+        gst: trainerData.gst || "",
+        specialization: specializationArr,
+        otherSpecialization: otherArr,
         updatedAt: new Date(),
       };
       await updateDoc(doc(db, "trainers", trainerId), trainerToUpdate);
@@ -413,6 +416,22 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated, trainers = [] }) {
               </span>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            GST Number
+          </label>
+          <input
+            type="text"
+            name="gst"
+            value={trainerData.gst}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            placeholder="GST Number (optional)"
+          />
         </div>
       </div>
 

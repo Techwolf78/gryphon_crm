@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { db } from "../../firebase";
-import { collection, getDocs, query, where, orderBy, limit } from "firebase/firestore";
+import { collection, getDocs, query, where, orderBy, limit, updateDoc, doc } from "firebase/firestore";
 import InvoiceModal from "./InvoiceModal";
 import { generateInvoicePDF } from "./invoiceUtils";
 import { FiSearch, FiFilter, FiRefreshCw, FiTrash2, FiUser, FiCheckCircle, FiAlertCircle, FiXCircle, FiInfo, FiClock } from "react-icons/fi";
@@ -415,6 +415,7 @@ function GenerateTrainerInvoice() {
               hasExistingInvoice: totalInvoiceCount > 0,
               invoiceCount: totalInvoiceCount,
               invoiceStatus: invoiceStatus,
+              invoiceData: latestInvoice, // Store full invoice data for remarks display
             };
             
             return trainerWithInvoiceStatus;
@@ -425,6 +426,7 @@ function GenerateTrainerInvoice() {
               hasExistingInvoice: false,
               invoiceCount: 0,
               invoiceStatus: null,
+              invoiceData: null,
             };
           }
         })
@@ -1015,6 +1017,48 @@ function GenerateTrainerInvoice() {
     }
   }, []);
 
+  // Handle invoice approval (sets invoice=true and status=approved for HR review)
+  const handleApproveInvoice = useCallback(async (trainer) => {
+    try {
+      // Find the invoice document
+      const q = query(
+        collection(db, "invoices"),
+        where("trainerId", "==", trainer.trainerId),
+        where("collegeName", "==", trainer.collegeName),
+        where("phase", "==", trainer.phase)
+      );
+
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const invoiceDoc = querySnapshot.docs[0];
+        const invoiceRef = doc(db, "invoices", invoiceDoc.id);
+        
+        // Update invoice to pending status and make it available for HR review
+        await updateDoc(invoiceRef, {
+          status: "pending",
+          invoice: true, // This makes it visible to HR
+          approvedDate: new Date().toISOString().split("T")[0],
+          approvedBy: "Learning Department",
+          updatedAt: new Date()
+        });
+
+        // Clear cache and refresh data
+        clearCacheFromStorage();
+        setCachedData(null);
+        setLastFetchTime(null);
+        await fetchTrainers(true); // Force refresh
+        
+        setToast({ type: 'success', message: `Invoice approved and sent to HR for review` });
+      } else {
+        setToast({ type: 'error', message: "Invoice not found" });
+      }
+    } catch (error) {
+      console.error('Error approving invoice:', error);
+      setToast({ type: 'error', message: "Failed to approve invoice" });
+    }
+  }, [fetchTrainers]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {loading ? (
@@ -1111,6 +1155,7 @@ function GenerateTrainerInvoice() {
                 handleDownloadInvoice={handleDownloadInvoice}
                 handleEditInvoice={handleEditInvoice}
                 handleGenerateInvoice={handleGenerateInvoice}
+                handleApproveInvoice={handleApproveInvoice}
                 downloadingInvoice={downloadingInvoice}
                 getDownloadStatus={getDownloadStatus}
                 formatDate={formatDate}

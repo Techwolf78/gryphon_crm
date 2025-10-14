@@ -11,6 +11,7 @@ function TrainerTable({
   handleDownloadInvoice,
   handleEditInvoice,
   handleGenerateInvoice,
+  handleApproveInvoice,
   downloadingInvoice,
   getDownloadStatus,
   formatDate,
@@ -120,6 +121,9 @@ function TrainerTable({
                                 Timeline & Hours
                               </th>
                               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                Status
+                              </th>
+                              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                                 Invoice Status
                               </th>
                             </tr>
@@ -132,6 +136,7 @@ function TrainerTable({
                               handleDownloadInvoice={handleDownloadInvoice}
                               handleEditInvoice={handleEditInvoice}
                               handleGenerateInvoice={handleGenerateInvoice}
+                              handleApproveInvoice={handleApproveInvoice}
                               downloadingInvoice={downloadingInvoice}
                               getDownloadStatus={getDownloadStatus}
                               formatDate={formatDate}

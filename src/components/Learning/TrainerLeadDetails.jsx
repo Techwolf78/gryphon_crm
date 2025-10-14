@@ -27,30 +27,30 @@ function TrainerLeadDetails({ trainer, onClose }) {
       ></div>
       
       {/* Modal with slide-up animation */}
-      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto transition-all duration-300">
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto transition-all duration-300">
         {/* Header with sticky positioning */}
-        <div className="sticky top-0 bg-white z-10 p-6 pb-4 border-b border-gray-100">
+        <div className="sticky top-0 bg-white z-10 p-3 pb-2 border-b border-gray-100">
           <div className="flex justify-between items-start">
             <div>
-              <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+              <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                 <FiUser className="text-blue-600" />
                 {trainer.name}
               </h2>
-              <p className="text-gray-500 mt-1">{trainer.trainerId}</p>
+              <p className="text-gray-500 text-sm mt-0.5">{trainer.trainerId}</p>
             </div>
             <button
               className="text-gray-400 hover:text-gray-600 transition-colors p-1 -mr-2"
               onClick={onClose}
             >
-              <FiX size={24} />
+              <FiX size={20} />
             </button>
           </div>
         </div>
 
         {/* Content with organized sections */}
-        <div className="p-6 space-y-6">
+        <div className="p-3 space-y-3">
           {/* Basic Information */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <DetailCard 
               icon={<FiUser className="text-blue-500" />}
               title="Domain"
@@ -65,7 +65,7 @@ function TrainerLeadDetails({ trainer, onClose }) {
 
           {/* Contact Information */}
           <Section title="Contact Information">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               <DetailCard 
                 icon={<FiPhone className="text-blue-500" />}
                 title="Phone"
@@ -87,7 +87,7 @@ function TrainerLeadDetails({ trainer, onClose }) {
 
           {/* Specializations */}
           <Section title="Specializations">
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {[
                 ...(Array.isArray(trainer.specialization) ? trainer.specialization : []),
                 ...(Array.isArray(trainer.otherSpecialization) ? trainer.otherSpecialization : [])
@@ -96,7 +96,7 @@ function TrainerLeadDetails({ trainer, onClose }) {
                 .map((spec, index) => (
                   <span 
                     key={index} 
-                    className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
+                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
                   >
                     {spec}
                   </span>
@@ -106,7 +106,7 @@ function TrainerLeadDetails({ trainer, onClose }) {
 
           {/* Bank Details */}
           <Section title="Bank Information">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               <DetailCard 
                 icon={<FiCreditCard className="text-purple-500" />}
                 title="Account Number"
@@ -136,11 +136,17 @@ function TrainerLeadDetails({ trainer, onClose }) {
 
           {/* Additional Information */}
           <Section title="Additional Information">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               <DetailCard 
                 title="PAN Number"
                 value={trainer.pan}
                 copyable
+                copyToClipboard={copyToClipboard}
+              />
+              <DetailCard 
+                title="GST Number"
+                value={trainer.gst}
+                copyable={!!trainer.gst}
                 copyToClipboard={copyToClipboard}
               />
               <DetailCard 
@@ -167,8 +173,8 @@ function TrainerLeadDetails({ trainer, onClose }) {
 
 // Reusable Section Component
 const Section = ({ title, children }) => (
-  <div className="space-y-3">
-    <h3 className="text-lg font-semibold text-gray-700">{title}</h3>
+  <div className="space-y-1.5">
+    <h3 className="text-base font-semibold text-gray-700">{title}</h3>
     {children}
   </div>
 );
@@ -184,7 +190,7 @@ const DetailCard = ({ icon, title, value, copyable = false, action, copyToClipbo
   };
 
   return (
-    <div className="bg-gray-50 rounded-lg p-3 hover:bg-gray-100 transition-colors relative">
+    <div className="bg-gray-50 rounded-lg p-1.5 hover:bg-gray-100 transition-colors relative">
       {/* Tooltip animation style */}
       <style>
         {`
@@ -212,11 +218,11 @@ const DetailCard = ({ icon, title, value, copyable = false, action, copyToClipbo
         `}
       </style>
       <div className="flex justify-between items-start">
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-2">
           {icon && <div className="mt-0.5">{icon}</div>}
           <div>
-            <p className="text-sm font-medium text-gray-500">{title}</p>
-            <p className="text-gray-800 font-medium">{value || "-"}</p>
+            <p className="text-xs font-medium text-gray-500">{title}</p>
+            <p className="text-gray-800 font-medium text-sm">{value || "-"}</p>
           </div>
         </div>
         <div className="flex gap-1 relative">

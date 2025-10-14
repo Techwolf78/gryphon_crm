@@ -38,6 +38,7 @@ function AddTrainer({ onClose, onTrainerAdded, trainers = [] }) {
     charges: "",
     specialization: "",
     otherSpecialization: "",
+    gst: "",
   });
 
   const [loading, setLoading] = useState(false);
@@ -145,6 +146,7 @@ function AddTrainer({ onClose, onTrainerAdded, trainers = [] }) {
         bankAddress: trainerData.bankAddress,
         paymentType: trainerData.paymentType,
         charges: Number(trainerData.charges) || 0,
+        gst: trainerData.gst || "",
         createdAt: new Date(),
       };
 
@@ -260,6 +262,7 @@ function AddTrainer({ onClose, onTrainerAdded, trainers = [] }) {
             bankAddress: importedData["Bank Address"] || "",
             paymentType: importedData["Payment Type"] || "Per Hour",
             charges: Number(importedData["Charges"]) || 0,
+            gst: importedData["GST"] || "",
             specialization: specializations,
             otherSpecialization: otherSpecializations,
             createdAt: new Date(),
@@ -317,6 +320,7 @@ function AddTrainer({ onClose, onTrainerAdded, trainers = [] }) {
         "Bank Address": "",
         "Payment Type": "Per Hour",
         Charges: "",
+        GST: "",
         Specialization: "",
       },
     ];
@@ -553,6 +557,22 @@ function AddTrainer({ onClose, onTrainerAdded, trainers = [] }) {
               </span>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            GST Number
+          </label>
+          <input
+            type="text"
+            name="gst"
+            value={trainerData.gst}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            placeholder="GST Number (optional)"
+          />
         </div>
       </div>
 

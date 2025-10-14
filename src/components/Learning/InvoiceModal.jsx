@@ -31,6 +31,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
     lodging: trainer?.totalLodging || 0,
     businessName: trainer?.businessName || "",
     collegeName: trainer?.collegeName || "",
+    gst: "", // GST option: "NA", "0", "18"
   });
   const [existingInvoice, setExistingInvoice] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -55,10 +56,16 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
             panNumber: data.pan || "",
             trainerEmail: data.email || "",
             trainerPhone: data.phone || "",
+            // Only set GST if it's not already set from existing invoice AND we're creating a new invoice
+            ...(!existingInvoice && (prev.gst === undefined || prev.gst === "") ? { gst: data.gst ? "0" : "NA" } : {}),
           }));
         } else {
           // Trainer document doesn't exist - this is expected for new trainers
           console.warn(`Trainer document not found for trainerId: ${trainer?.trainerId}`);
+          setInvoiceData((prev) => ({
+            ...prev,
+            gst: "NA", // Default to NA if trainer not found
+          }));
         }
       } catch (error) {
         console.error('Error fetching trainer bank details:', error);
@@ -93,6 +100,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
             ...prev,
             ...latestInvoice,
             billingDate: latestInvoice.billingDate || new Date().toISOString().split("T")[0],
+            gst: latestInvoice.gst !== undefined ? latestInvoice.gst : (trainer?.gst ? "0" : "NA"),
           }));
         }
       } catch (error) {
@@ -103,7 +111,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
 
     checkExistingInvoice();
     fetchTrainerBankDetails();
-  }, [trainer?.trainerId, trainer?.collegeName, trainer?.phase]);
+  }, [trainer?.trainerId, trainer?.collegeName, trainer?.phase, trainer?.gst, existingInvoice]);
 
 const handleSubmit = async (e) => {
   e.preventDefault();
@@ -130,8 +138,22 @@ const handleSubmit = async (e) => {
     };
 
     if (existingInvoice && editMode) {
-      await updateDoc(doc(db, "invoices", existingInvoice.id), invoiceToSave);
-      onToast({ type: 'success', message: "Changes applied successfully!" });
+      // If editing a rejected invoice, reset status for HR re-approval
+      const wasRejected = existingInvoice.status === "rejected";
+      const updateData = {
+        ...invoiceToSave,
+        ...(wasRejected && {
+          status: "pending", // Reset to pending for HR re-approval
+          payment: false,   // Reset payment status
+          invoice: true,    // Keep invoice approval from Learning
+          // Clear rejection data
+          rejectedDate: null,
+          rejectedBy: null,
+          rejectionRemarks: null,
+        }),
+      };
+      await updateDoc(doc(db, "invoices", existingInvoice.id), updateData);
+      onToast({ type: 'success', message: wasRejected ? "Invoice updated and sent back to HR for approval!" : "Changes applied successfully!" });
     } else {
       invoiceToSave.createdAt = new Date();
       const docRef = await addDoc(collection(db, "invoices"), invoiceToSave);
@@ -192,9 +214,17 @@ const handleSubmit = async (e) => {
     const trainingFees = roundToNearestWhole((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0));
     const tdsAmount = roundToNearestWhole((trainingFees * (parseFloat(invoiceData.tds) || 0)) / 100);
     const totalAmount = calculateTotalAmount();
-    return roundToNearestWhole(
+    const amountBeforeGST = roundToNearestWhole(
       totalAmount + (parseFloat(invoiceData.adhocAdjustment) || 0) - tdsAmount
     );
+    
+    // Apply GST deduction if applicable
+    let gstAmount = 0;
+    if (invoiceData.gst === "18") {
+      gstAmount = roundToNearestWhole(amountBeforeGST * 0.18);
+    }
+    
+    return roundToNearestWhole(amountBeforeGST - gstAmount);
   };
 
   const isReadOnly = viewMode || (existingInvoice && !editMode);
@@ -552,43 +582,126 @@ const handleSubmit = async (e) => {
                   readOnly={isReadOnly}
                 />
               </div>
+
+              {/* GST Section */}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  GST Application
+                </label>
+                <div className="flex gap-4">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="gst"
+                      value="NA"
+                      checked={invoiceData.gst === "NA"}
+                      onChange={handleChange}
+                      disabled={isReadOnly || (invoiceData.gst !== "NA" && invoiceData.gst !== "")}
+                      className="mr-2"
+                    />
+                    <span className="text-sm">NA</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="gst"
+                      value="0"
+                      checked={invoiceData.gst === "0"}
+                      onChange={handleChange}
+                      disabled={isReadOnly || invoiceData.gst === "NA"}
+                      className="mr-2"
+                    />
+                    <span className="text-sm">0%</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="gst"
+                      value="18"
+                      checked={invoiceData.gst === "18"}
+                      onChange={handleChange}
+                      disabled={isReadOnly || invoiceData.gst === "NA"}
+                      className="mr-2"
+                    />
+                    <span className="text-sm">18%</span>
+                  </label>
+                </div>
+                {invoiceData.gst === "NA" && (
+                  <p className="text-xs text-gray-500 mt-1">GST not applicable (trainer has no GST number)</p>
+                )}
+              </div>
             </div>
 
             {/* Calculation Summary */}
-            <div className="p-2 bg-blue-50 border border-blue-200 rounded-lg">
-              <h3 className="text-base font-semibold text-blue-800 mb-2">Payment Summary</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <div className="text-sm">
-                  <span className="font-medium">Training Fees:</span> ₹
-                  {roundToNearestWhole((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0)).toLocaleString()}
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h3 className="text-lg font-semibold text-blue-800 mb-4">Payment Summary</h3>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-medium">Training Fees:</span>
+                  <span>₹{roundToNearestWhole((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0)).toLocaleString()}</span>
                 </div>
-                <div className="text-sm">
-                  <span className="font-medium">Conveyance (one-time):</span> ₹
-                  {roundToNearestWhole(parseFloat(invoiceData.conveyance) || 0).toLocaleString()}
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-medium">Conveyance (one-time):</span>
+                  <span>₹{roundToNearestWhole(parseFloat(invoiceData.conveyance) || 0).toLocaleString()}</span>
                 </div>
-                <div className="text-sm">
-                  <span className="font-medium">Food:</span> ₹
-                  {roundToNearestWhole(parseFloat(invoiceData.food) || 0).toLocaleString()}
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-medium">Food:</span>
+                  <span>₹{roundToNearestWhole(parseFloat(invoiceData.food) || 0).toLocaleString()}</span>
                 </div>
-                <div className="text-sm">
-                  <span className="font-medium">Lodging:</span> ₹
-                  {roundToNearestWhole(parseFloat(invoiceData.lodging) || 0).toLocaleString()}
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-medium">Lodging:</span>
+                  <span>₹{roundToNearestWhole(parseFloat(invoiceData.lodging) || 0).toLocaleString()}</span>
                 </div>
-                <div className="text-sm font-semibold border-t border-blue-200 pt-2">
-                  <span className="text-blue-800">Total Amount:</span> ₹
-                  {calculateTotalAmount().toLocaleString()}
+
+                <div className="border-t border-blue-300 pt-3">
+                  <div className="flex justify-between items-center text-sm font-semibold">
+                    <span className="text-blue-800">Total Amount:</span>
+                    <span className="text-blue-800">₹{calculateTotalAmount().toLocaleString()}</span>
+                  </div>
                 </div>
-                <div className="text-sm">
-                  <span className="font-medium">TDS ({invoiceData.tds}% on Training Fees):</span> ₹
-                  {roundToNearestWhole((((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0) * (parseFloat(invoiceData.tds) || 0)) / 100)).toLocaleString()}
+
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-medium">TDS ({invoiceData.tds}% on Training Fees):</span>
+                  <span>₹{roundToNearestWhole((((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0) * (parseFloat(invoiceData.tds) || 0)) / 100)).toLocaleString()}</span>
                 </div>
-                <div className="text-sm">
-                  <span className="font-medium">Adhoc Adjustment:</span> ₹
-                  {roundToNearestWhole(parseFloat(invoiceData.adhocAdjustment) || 0).toLocaleString()}
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-medium">Adhoc Adjustment:</span>
+                  <span>₹{roundToNearestWhole(parseFloat(invoiceData.adhocAdjustment) || 0).toLocaleString()}</span>
                 </div>
-                <div className="text-sm font-semibold border-t border-blue-200 pt-2 text-green-600">
-                  <span className="font-bold">Net Payment:</span> ₹
-                  {calculateNetPayment().toLocaleString()}
+
+                <div className="border-t border-blue-300 pt-3">
+                  <div className="flex justify-between items-center text-sm font-semibold">
+                    <span className="text-blue-800">Amount:</span>
+                    <span className="text-blue-800">₹{(() => {
+                      const trainingFees = roundToNearestWhole((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0));
+                      const tdsAmount = roundToNearestWhole((trainingFees * (parseFloat(invoiceData.tds) || 0)) / 100);
+                      const totalAmount = calculateTotalAmount();
+                      return roundToNearestWhole(totalAmount + (parseFloat(invoiceData.adhocAdjustment) || 0) - tdsAmount);
+                    })().toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-medium">GST ({invoiceData.gst === "NA" ? "NA" : invoiceData.gst + "%"}):</span>
+                  <span className={invoiceData.gst === "18" ? "text-red-600" : ""}>₹{(() => {
+                    const trainingFees = roundToNearestWhole((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0));
+                    const tdsAmount = roundToNearestWhole((trainingFees * (parseFloat(invoiceData.tds) || 0)) / 100);
+                    const totalAmount = calculateTotalAmount();
+                    const amountBeforeGST = roundToNearestWhole(
+                      totalAmount + (parseFloat(invoiceData.adhocAdjustment) || 0) - tdsAmount
+                    );
+                    if (invoiceData.gst === "18") {
+                      return "-" + roundToNearestWhole(amountBeforeGST * 0.18).toLocaleString();
+                    }
+                    return "0";
+                  })()}</span>
+                </div>
+
+                <div className="border-t-2 border-blue-400 pt-3 mt-4">
+                  <div className="flex justify-between items-center text-base font-bold text-green-600">
+                    <span>Net Payment:</span>
+                    <span>₹{calculateNetPayment().toLocaleString()}</span>
+                  </div>
                 </div>
               </div>
             </div>
