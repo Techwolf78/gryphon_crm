@@ -144,8 +144,9 @@ const ContractInvoicesTab = () => {
         }));
 
         setInvoices(data);
-        setFilteredInvoices(data);
-        calculateStats(data);
+        // Exclude Proforma Invoices from HR table - they should only be in Learning/Contract Invoices
+        setFilteredInvoices(data.filter(invoice => invoice.invoiceType !== "Proforma Invoice"));
+        calculateStats(data.filter(invoice => invoice.invoiceType !== "Proforma Invoice"));
       } else {
         setInvoices([]);
         setFilteredInvoices([]);
@@ -161,6 +162,9 @@ const ContractInvoicesTab = () => {
   // Apply filters
   const applyFilters = () => {
     let filtered = [...invoices];
+
+    // Exclude Proforma Invoices from HR table - they should only be in Learning/Contract Invoices
+    filtered = filtered.filter((invoice) => invoice.invoiceType !== "Proforma Invoice");
 
     // Search filter
     if (searchTerm) {
@@ -264,8 +268,9 @@ const ContractInvoicesTab = () => {
       endDate: "",
     });
     setSearchTerm("");
-    setFilteredInvoices(invoices);
-    calculateStats(invoices);
+    // Exclude Proforma Invoices from HR table when clearing filters
+    setFilteredInvoices(invoices.filter(invoice => invoice.invoiceType !== "Proforma Invoice"));
+    calculateStats(invoices.filter(invoice => invoice.invoiceType !== "Proforma Invoice"));
   };
 
   // Export to Excel with same columns as InvoiceExcelExport + Payment History
@@ -634,7 +639,7 @@ const ContractInvoicesTab = () => {
   };
 
   // Payment Receive Function - UPDATED WITH DATE AND TDS
-  const handleReceivePayment = async (invoice, receivedAmount, paymentDate, tdsPercentage = 0, originalAmount = 0, tdsAmount = 0, tdsBaseType = "base") => {
+  const handleReceivePayment = async (invoice, receivedAmount, paymentDateTime, tdsPercentage = 0, originalAmount = 0, tdsAmount = 0, tdsBaseType = "base") => {
     try {
       const actualReceived = parseFloat(receivedAmount) || 0;
       const tdsPercent = parseFloat(tdsPercentage) || 0;
@@ -644,7 +649,7 @@ const ContractInvoicesTab = () => {
         return;
       }
 
-      if (!paymentDate) {
+      if (!paymentDateTime) {
         alert("Please select payment date");
         return;
       }
@@ -666,15 +671,15 @@ const ContractInvoicesTab = () => {
         (invoice.receivedAmount || 0) + actualReceived;
       const newDueAmount = invoice.dueAmount - finalOriginalAmount;
 
-      // Create payment record with TDS info
+      // Create payment record with the combined date and time
       const paymentRecord = {
         amount: actualReceived, // Amount actually received (after TDS)
         originalAmount: finalOriginalAmount, // Original billed amount before TDS
         tdsPercentage: tdsPercent,
         tdsAmount: finalTdsAmount,
         tdsBaseType: tdsBaseType, // "base" or "total"
-        date: paymentDate,
-        timestamp: new Date(paymentDate),
+        date: paymentDateTime,
+        timestamp: new Date(paymentDateTime),
         recordedAt: new Date().toISOString(),
       };
 
@@ -717,7 +722,7 @@ const ContractInvoicesTab = () => {
         : "";
 
       alert(
-        `Payment recorded successfully!\n✅ Amount Received: ₹${actualReceived.toLocaleString()}${tdsMessage}\n📅 Date: ${paymentDate}\n✅ Invoice auto-approved!`
+        `Payment recorded successfully!\n✅ Amount Received: ₹${actualReceived.toLocaleString()}${tdsMessage}\n📅 Date & Time: ${new Date(paymentDateTime).toLocaleDateString('en-IN')} ${new Date(paymentDateTime).toLocaleTimeString('en-IN')}\n✅ Invoice auto-approved!`
       );
     } catch (error) {
       alert("Error recording payment: " + error.message);
@@ -928,7 +933,7 @@ const ContractInvoicesTab = () => {
   const PaymentModal = ({ invoice, onClose, onSubmit }) => {
     const [amount, setAmount] = useState("");
     const [paymentDate, setPaymentDate] = useState(
-      new Date().toISOString().split("T")[0]
+      new Date().toISOString().split('T')[0]
     ); // Default to today
     const [tdsPercentage, setTdsPercentage] = useState(""); // TDS percentage (0-10)
     const [tdsBaseType, setTdsBaseType] = useState("base"); // "base" or "total"
@@ -1017,7 +1022,19 @@ const ContractInvoicesTab = () => {
         return;
       }
 
-      onSubmit(invoice, receivedAmount, paymentDate, tdsPercent, originalAmount, tdsAmount, tdsBaseType);
+      // Combine selected date with current time
+      const selectedDate = new Date(paymentDate);
+      const currentTime = new Date();
+      const paymentDateTime = new Date(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth(),
+        selectedDate.getDate(),
+        currentTime.getHours(),
+        currentTime.getMinutes(),
+        currentTime.getSeconds()
+      );
+
+      onSubmit(invoice, receivedAmount, paymentDateTime.toISOString(), tdsPercent, originalAmount, tdsAmount, tdsBaseType);
     };
 
     return (
@@ -1104,7 +1121,7 @@ const ContractInvoicesTab = () => {
                   type="date"
                   value={paymentDate}
                   onChange={(e) => setPaymentDate(e.target.value)}
-                  max={new Date().toISOString().split("T")[0]}
+                  max={new Date().toISOString().split('T')[0]}
                   className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white hover:border-gray-400"
                 />
               </div>
@@ -1287,7 +1304,7 @@ const ContractInvoicesTab = () => {
     } else if (numAmount >= 1000000) { // 10 Lakh to 99 Lakh
       return `${(numAmount / 100000).toFixed(0)} Lakh`;
     } else { // 1 Lakh to 9.9 Lakh
-      return `${(numAmount / 100000).toFixed(1)} Lakh`;
+      return `${(numAmount / 100000).toFixed(2)} Lakh`;
     }
   };
 
@@ -2432,7 +2449,7 @@ const ContractInvoicesTab = () => {
         <PaymentModal
           invoice={paymentModal.invoice}
           onClose={() => setPaymentModal({ isOpen: false, invoice: null })}
-          onSubmit={handleReceivePayment} // This now accepts 3 parameters
+          onSubmit={handleReceivePayment} // This accepts 7 parameters (invoice, receivedAmount, paymentDateTime, tdsPercentage, originalAmount, tdsAmount, tdsBaseType)
         />
       )}
       {invoiceModal.isOpen && (

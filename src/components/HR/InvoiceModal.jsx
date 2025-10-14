@@ -510,7 +510,6 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
                       {invoice.gstNumber || "GSTIN Not Available"} |
                       <strong> PLACE OF SUPPLY:</strong>{" "}
                       {invoice.state || "State Not Available"}
-                      {interstate && " (Inter-State)"}
                     </p>
                   </div>
                 </div>

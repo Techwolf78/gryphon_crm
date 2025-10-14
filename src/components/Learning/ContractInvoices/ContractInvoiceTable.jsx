@@ -11,6 +11,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "../../../firebase";
+import { useAuth } from "../../../context/AuthContext";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faChevronUp,
@@ -53,6 +54,10 @@ export default function ContractInvoiceTable() {
   const [activeTab, setActiveTab] = useState("individual");
   const [selectedCollegeFilter, setSelectedCollegeFilter] = useState("");
   const [isAllExpanded, setIsAllExpanded] = useState(false);
+  const [showAuditModal, setShowAuditModal] = useState(false);
+  const [auditLogs, setAuditLogs] = useState([]);
+
+  const { user } = useAuth();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -141,11 +146,21 @@ export default function ContractInvoiceTable() {
       const numAmount = Number(amount);
       if (isNaN(numAmount)) return "-";
 
-      return new Intl.NumberFormat("en-IN", {
-        style: "currency",
-        currency: "INR",
-        maximumFractionDigits: 0,
-      }).format(numAmount);
+      // For amounts less than 1 lakh, show regular formatting
+      if (numAmount < 100000) {
+        return new Intl.NumberFormat("en-IN", {
+          style: "currency",
+          currency: "INR",
+          maximumFractionDigits: 0,
+        }).format(numAmount);
+      }
+
+      // For amounts >= 1 lakh, use lakh abbreviations
+      if (numAmount >= 1000000) { // 10 Lakh and above
+        return `${(numAmount / 100000).toFixed(0)} lakh`;
+      } else { // 1 Lakh to 9.9 Lakh
+        return `${(numAmount / 100000).toFixed(2)} lakh`;
+      }
     } catch {
       return `₹${amount}`;
     }
@@ -175,7 +190,7 @@ export default function ContractInvoiceTable() {
     } else if (numAmount >= 1000000) { // 10 Lakh to 99 Lakh
       return `${(numAmount / 100000).toFixed(0)} Lakh`;
     } else { // 1 Lakh to 9.9 Lakh
-      return `${(numAmount / 100000).toFixed(1)} Lakh`;
+      return `${(numAmount / 100000).toFixed(2)} Lakh`;
     }
   };
 
@@ -318,7 +333,7 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
     const finalInvoiceNumber = `GAPL/${financialYear.year}/${prefix}/${invoiceNumber}`;
 
     return finalInvoiceNumber;
-  } catch (error) {
+  } catch {
     // Fallback with timestamp to ensure uniqueness
     const fallbackNumber = `GAPL/${financialYear.year}/${prefix}/F${Date.now().toString().slice(-2)}`;
     return fallbackNumber;
@@ -491,7 +506,7 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
       setSelectedContract(null);
       setSelectedInstallment(null);
       setEditInvoice(null);
-    } catch (error) {
+    } catch {
       alert("Failed to convert to tax invoice. Please try again.");
     }
   };
@@ -531,13 +546,35 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
         }
       }
 
-      // Delete the invoice from database
-      await deleteDoc(doc(db, "ContractInvoices", invoice.id));
+      // Delete the invoice from database - use correct collection based on invoice type and merged status
+      let collectionName = "ContractInvoices"; // Default for merged invoices and Tax/Cash invoices
+      if (!invoice.isMergedInvoice && invoice.invoiceType === "Proforma Invoice") {
+        collectionName = "ProformaInvoices"; // Only non-merged Proforma invoices are in ProformaInvoices
+      }
+      await deleteDoc(doc(db, collectionName, invoice.id));
 
-      // Update local state by removing the invoice
-      setExistingInvoices((prev) =>
-        prev.filter((inv) => inv.id !== invoice.id)
-      );
+      // Log the undo action
+      await addDoc(collection(db, 'audit_logs'), {
+        action: 'undo',
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        timestamp: new Date(),
+        user: user?.email || 'Unknown',
+        details: `Invoice ${invoice.invoiceNumber} cancelled`
+      });
+
+      // Update local state by removing the invoice from the correct array
+      if (invoice.isMergedInvoice || invoice.invoiceType !== "Proforma Invoice") {
+        // Merged invoices (any type) and non-Proforma invoices are in existingInvoices
+        setExistingInvoices((prev) =>
+          prev.filter((inv) => inv.id !== invoice.id)
+        );
+      } else {
+        // Non-merged Proforma invoices are in existingProformas
+        setExistingProformas((prev) =>
+          prev.filter((inv) => inv.id !== invoice.id)
+        );
+      }
 
       alert("Invoice generation undone successfully!");
     } catch (error) {
@@ -1266,6 +1303,22 @@ const handleMergeSubmit = async (formData) => {
     }, 0);
   };
 
+  // Fetch audit logs for undo actions
+  const fetchAuditLogs = async () => {
+    try {
+      const q = query(
+        collection(db, 'audit_logs'),
+        where('action', '==', 'undo'),
+        orderBy('timestamp', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAuditLogs(logs);
+    } catch (error) {
+      console.error('Error fetching audit logs:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50/50">
       <div className="w-full space-y-3">
@@ -1351,6 +1404,28 @@ const handleMergeSubmit = async (formData) => {
                   />
                 </svg>
                 {showExportView ? "Back to Table" : "Export"}
+              </button>
+
+              {/* Audit Logs Button */}
+              <button
+                onClick={() => { fetchAuditLogs(); setShowAuditModal(true); }}
+                className="bg-red-600 hover:bg-red-700 text-white py-1.5 px-3 rounded-lg font-medium flex items-center gap-1.5 whitespace-nowrap"
+                title="View audit logs for undo actions"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+                Audit Logs
               </button>
             </div>
           </div>
@@ -1687,7 +1762,7 @@ const handleMergeSubmit = async (formData) => {
                                                 </div>
                                                 <div>
                                                   <p className="text-xs text-gray-500 mb-1">Amount</p>
-                                                  <p className="text-sm font-semibold text-gray-900">{formatIndianCurrency(installment.totalAmount)}</p>
+                                                  <p className="text-sm font-semibold text-gray-900">{formatCurrency(installment.totalAmount)}</p>
                                                 </div>
                                               </div>
 
@@ -1784,7 +1859,7 @@ const handleMergeSubmit = async (formData) => {
                                             </div>
                                             <div>
                                               <p className="text-xs text-gray-500 mb-1">Amount</p>
-                                              <p className="text-sm font-semibold text-gray-900">{formatIndianCurrency(installment.totalAmount)}</p>
+                                              <p className="text-sm font-semibold text-gray-900">{formatCurrency(installment.totalAmount)}</p>
                                             </div>
                                           </div>
 
@@ -2431,7 +2506,7 @@ const handleMergeSubmit = async (formData) => {
                                         </div>
                                         <div>
                                           <p className="text-xs text-gray-500 mb-1">Amount</p>
-                                          <p className="text-sm font-semibold text-gray-900">{formatIndianCurrency(installment.totalAmount)}</p>
+                                          <p className="text-sm font-semibold text-gray-900">{formatCurrency(installment.totalAmount)}</p>
                                         </div>
                                       </div>
 
@@ -2526,7 +2601,7 @@ const handleMergeSubmit = async (formData) => {
                                         </div>
                                         <div>
                                           <p className="text-xs text-gray-500 mb-1">Amount</p>
-                                          <p className="text-sm font-semibold text-gray-900">{formatIndianCurrency(installment.totalAmount)}</p>
+                                          <p className="text-sm font-semibold text-gray-900">{formatCurrency(installment.totalAmount)}</p>
                                         </div>
                                       </div>
 
@@ -2685,9 +2760,7 @@ const handleMergeSubmit = async (formData) => {
                                               {installment.percentage}%
                                             </td>
                                             <td className="px-4 py-3 text-sm text-gray-900 font-semibold">
-                                              {formatIndianCurrency(
-                                                installment.totalAmount
-                                              )}
+                                              {formatCurrency(installment.totalAmount)}
                                             </td>
                                             <td className="px-4 py-3 text-sm text-gray-500">
                                               <div className="text-center">
@@ -2798,7 +2871,7 @@ const handleMergeSubmit = async (formData) => {
                                               {installment.percentage}%
                                             </td>
                                             <td className="px-4 py-3 text-sm text-gray-900 font-semibold">
-                                              {formatIndianCurrency(installment.totalAmount)}
+                                              {formatCurrency(installment.totalAmount)}
                                             </td>
                                             <td className="px-4 py-3 text-sm text-gray-500">
                                               -
@@ -2941,6 +3014,177 @@ const handleMergeSubmit = async (formData) => {
               })
             }
           />
+        )}
+
+        {showAuditModal && (
+          <div className="fixed inset-0 bg-transparent backdrop-blur-lg bg-opacity-60 flex items-center justify-center z-54 p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl max-h-[85vh] overflow-hidden border border-gray-200/60">
+              {/* Compact Header */}
+              <div className="bg-gradient-to-r from-red-600 to-red-700 px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 bg-white/20 rounded-lg flex items-center justify-center">
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-white">Audit Logs</h2>
+                      <p className="text-red-100 text-xs">Invoice cancellation history</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="bg-white/20 text-white text-xs px-2 py-1 rounded-md font-medium">
+                      {auditLogs.length} {auditLogs.length === 1 ? 'entry' : 'entries'}
+                    </span>
+                    <button
+                      onClick={() => setShowAuditModal(false)}
+                      className="w-6 h-6 bg-white/20 hover:bg-white/30 rounded-md flex items-center justify-center transition-colors duration-200"
+                    >
+                      <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Compact Content */}
+              <div className="overflow-y-auto max-h-[calc(85vh-80px)]">
+                {auditLogs.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 px-4">
+                    <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mb-3">
+                      <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-base font-semibold text-gray-900 mb-1">No Audit Logs</h3>
+                    <p className="text-gray-500 text-sm text-center max-w-sm">
+                      Invoice cancellation actions will appear here
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-4">
+                    {/* Compact Table Header */}
+                    <div className="bg-gray-50 rounded-lg p-3 mb-3">
+                      <div className="grid grid-cols-12 gap-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                        <div className="col-span-1">#</div>
+                        <div className="col-span-2">Action</div>
+                        <div className="col-span-3">Invoice</div>
+                        <div className="col-span-2">User</div>
+                        <div className="col-span-3">Timestamp</div>
+                        <div className="col-span-1">Details</div>
+                      </div>
+                    </div>
+
+                    {/* Compact Log Entries */}
+                    <div className="space-y-1">
+                      {auditLogs.map((log, index) => (
+                        <div
+                          key={log.id}
+                          className="bg-white border border-gray-200 rounded-lg p-3 hover:bg-gray-50 hover:border-gray-300 transition-all duration-150"
+                        >
+                          <div className="grid grid-cols-12 gap-2 items-center text-sm">
+                            {/* Entry Number */}
+                            <div className="col-span-1">
+                              <span className="inline-flex items-center justify-center w-6 h-6 bg-red-100 text-red-700 text-xs font-bold rounded-full">
+                                {auditLogs.length - index}
+                              </span>
+                            </div>
+
+                            {/* Action */}
+                            <div className="col-span-2">
+                              <div className="flex items-center gap-2">
+                                <div className="w-5 h-5 bg-red-100 rounded-md flex items-center justify-center flex-shrink-0">
+                                  <svg className="w-3 h-3 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </div>
+                                <span className="font-medium text-gray-900 truncate">
+                                  {log.action || 'Invoice Cancelled'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Invoice Info */}
+                            <div className="col-span-3">
+                              <div className="space-y-0.5">
+                                <div className="font-mono text-xs text-gray-900">
+                                  {log.invoiceNumber || 'N/A'}
+                                </div>
+                                <div className="text-xs text-gray-500 truncate">
+                                  ID: {log.invoiceId || 'N/A'}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* User */}
+                            <div className="col-span-2">
+                              <div className="flex items-center gap-1.5">
+                                <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                  <svg className="w-2.5 h-2.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                  </svg>
+                                </div>
+                                <span className="text-xs text-gray-900 truncate">
+                                  {log.user || 'Unknown'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Timestamp */}
+                            <div className="col-span-3">
+                              <div className="text-xs text-gray-600">
+                                {log.timestamp?.toDate
+                                  ? log.timestamp.toDate().toLocaleDateString('en-IN', {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })
+                                  : new Date(log.timestamp).toLocaleDateString('en-IN', {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })
+                                }
+                              </div>
+                            </div>
+
+                            {/* Details - Now shows content inline */}
+                            <div className="col-span-1">
+                              {log.details ? (
+                                <div className="text-xs text-blue-700 font-medium bg-blue-50 px-2 py-1 rounded border border-blue-200">
+                                  <div className="truncate" title={log.details}>
+                                    {log.details.length > 15 ? `${log.details.substring(0, 15)}...` : log.details}
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-gray-400">-</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Full Details Expansion - Only if details are very long */}
+                          {log.details && log.details.length > 50 && (
+                            <div className="col-span-12 mt-2">
+                              <div className="bg-blue-50 border border-blue-200 rounded-md p-2">
+                                <div className="text-xs font-medium text-blue-700 mb-1">Full Details:</div>
+                                <div className="text-xs text-blue-800 leading-relaxed">
+                                  {log.details}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
