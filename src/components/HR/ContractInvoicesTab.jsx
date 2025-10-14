@@ -1021,87 +1021,98 @@ const ContractInvoicesTab = () => {
     };
 
     return (
-      <div className="fixed inset-0 bg-transparent backdrop-blur-md bg-opacity-50 flex items-center justify-center z-54 p-3">
-        <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm transform transition-all">
-          <div className="p-2 border-b border-gray-100">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-54 p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 px-4 py-3 rounded-t-2xl">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-900">
-                Receive Payment
-              </h3>
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Receive Payment</h3>
+                  <p className="text-blue-100 text-xs">Record payment for invoice</p>
+                </div>
+              </div>
               <button
                 onClick={onClose}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="w-6 h-6 bg-white/20 hover:bg-white/30 rounded-md flex items-center justify-center text-white transition-all duration-200 hover:scale-105"
               >
-                <svg
-                  className="w-3.5 h-3.5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
           </div>
 
-          <div className="p-2 space-y-1.5 max-h-72 overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
-            <div className="grid grid-cols-2 gap-1.5 text-xs">
-              <div>
-                <label className="text-gray-600 text-xs">Invoice Number</label>
-                <p className="font-semibold text-gray-900 text-xs">
-                  {invoice.invoiceNumber}
-                </p>
-              </div>
-              <div>
-                <label className="text-gray-600 text-xs">College</label>
-                <p className="font-semibold text-gray-900 text-xs truncate">
-                  {invoice.collegeName}
-                </p>
-              </div>
-              <div>
-                <label className="text-gray-600 text-xs">Total Amount</label>
-                <p className="font-semibold text-gray-900 text-xs">
-                  ₹{amounts.totalAmount?.toLocaleString()}
-                </p>
-              </div>
-              <div>
-                <label className="text-gray-600 text-xs">Due Amount</label>
-                <p className="font-semibold text-red-600 text-xs">
-                  ₹{dueAmount.toLocaleString()}
-                </p>
+          {/* Content */}
+          <div className="px-4 py-4 space-y-3 max-h-[60vh] overflow-y-auto">
+            {/* Invoice Summary Card */}
+            <div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-lg p-3 border border-gray-100">
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="space-y-0.5">
+                  <label className="text-gray-500 text-xs font-medium uppercase tracking-wide">Invoice Number</label>
+                  <p className="font-bold text-gray-900 text-xs">{invoice.invoiceNumber}</p>
+                </div>
+                <div className="space-y-0.5">
+                  <label className="text-gray-500 text-xs font-medium uppercase tracking-wide">College</label>
+                  <p className="font-semibold text-gray-800 text-xs truncate">{invoice.collegeName}</p>
+                </div>
+                <div className="space-y-0.5">
+                  <label className="text-gray-500 text-xs font-medium uppercase tracking-wide">Total Amount</label>
+                  <p className="font-bold text-blue-600 text-xs">₹{amounts.totalAmount?.toLocaleString()}</p>
+                </div>
+                <div className="space-y-0.5">
+                  <label className="text-gray-500 text-xs font-medium uppercase tracking-wide">Due Amount</label>
+                  <p className="font-bold text-red-600 text-xs">₹{dueAmount.toLocaleString()}</p>
+                </div>
               </div>
             </div>
 
+            {/* Already Received Alert */}
             {invoice.receivedAmount > 0 && (
-              <div className="bg-blue-50 p-1.5 rounded">
-                <p className="text-xs text-blue-700">
-                  <strong>Already Received:</strong> ₹
-                  {invoice.receivedAmount.toLocaleString()}
-                </p>
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-2">
+                <div className="flex items-center space-x-2">
+                  <div className="w-5 h-5 bg-green-100 rounded-md flex items-center justify-center">
+                    <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-green-800 font-medium text-xs">Already Received</p>
+                    <p className="text-green-700 text-xs">₹{invoice.receivedAmount.toLocaleString()}</p>
+                  </div>
+                </div>
               </div>
             )}
 
-            {/* Payment Date Field - FIRST */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                Payment Date *
+            {/* Payment Date */}
+            <div className="space-y-1">
+              <label className="block text-xs font-semibold text-gray-800">
+                Payment Date <span className="text-red-500">*</span>
               </label>
-              <input
-                type="date"
-                value={paymentDate}
-                onChange={(e) => setPaymentDate(e.target.value)}
-                max={new Date().toISOString().split("T")[0]} // Can't select future dates
-                className="w-full px-1.5 py-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-              />
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                  <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <input
+                  type="date"
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                  max={new Date().toISOString().split("T")[0]}
+                  className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white hover:border-gray-400"
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-0.5">
+            {/* TDS Percentage */}
+            <div className="space-y-1">
+              <label className="block text-xs font-semibold text-gray-800">
                 TDS Percentage (0-10%)
               </label>
               <div className="relative">
@@ -1113,21 +1124,21 @@ const ContractInvoicesTab = () => {
                   min="0"
                   max="10"
                   step="0.01"
-                  className="w-full pl-2 pr-5 py-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  className="w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white hover:border-gray-400"
                 />
-                <span className="absolute right-1.5 top-1/2 transform -translate-y-1/2 text-gray-500 text-xs">
-                  %
-                </span>
+                <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
+                  <span className="text-gray-500 font-medium text-xs">%</span>
+                </div>
               </div>
             </div>
 
-            {/* TDS Base Type Radio Buttons - THIRD */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-0.5">
+            {/* TDS Base Type */}
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-gray-800">
                 TDS Calculation Base
               </label>
-              <div className="space-y-0.5">
-                <div className="flex items-center">
+              <div className="space-y-1">
+                <div className="flex items-center p-2 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
                   <input
                     type="radio"
                     id="tds-base"
@@ -1135,13 +1146,15 @@ const ContractInvoicesTab = () => {
                     value="base"
                     checked={tdsBaseType === "base"}
                     onChange={(e) => setTdsBaseType(e.target.value)}
-                    className="h-2.5 w-2.5 text-blue-600 focus:ring-blue-500 border-gray-300"
+                    className="w-3 h-3 text-blue-600 focus:ring-blue-500 border-gray-300"
                   />
-                  <label htmlFor="tds-base" className="ml-1 text-xs text-gray-700">
-                    Base Amount (excluding GST) (₹{amounts.baseAmount?.toLocaleString()})
+                  <label htmlFor="tds-base" className="ml-2 flex-1">
+                    <span className="text-xs font-medium text-gray-900">Base Amount</span>
+                    <p className="text-xs text-gray-600">TDS calculated on base amount (excluding GST)</p>
+                    <p className="text-xs font-medium text-blue-600">₹{amounts.baseAmount?.toLocaleString()}</p>
                   </label>
                 </div>
-                <div className="flex items-center">
+                <div className="flex items-center p-2 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
                   <input
                     type="radio"
                     id="tds-total"
@@ -1149,29 +1162,32 @@ const ContractInvoicesTab = () => {
                     value="total"
                     checked={tdsBaseType === "total"}
                     onChange={(e) => setTdsBaseType(e.target.value)}
-                    className="h-2.5 w-2.5 text-blue-600 focus:ring-blue-500 border-gray-300"
+                    className="w-3 h-3 text-blue-600 focus:ring-blue-500 border-gray-300"
                   />
-                  <label htmlFor="tds-total" className="ml-1 text-xs text-gray-700">
-                    Total Amount (including GST) (₹{amounts.totalAmount?.toLocaleString()})
+                  <label htmlFor="tds-total" className="ml-2 flex-1">
+                    <span className="text-xs font-medium text-gray-900">Total Amount</span>
+                    <p className="text-xs text-gray-600">TDS calculated on total amount (including GST)</p>
+                    <p className="text-xs font-medium text-blue-600">₹{amounts.totalAmount?.toLocaleString()}</p>
                   </label>
                 </div>
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                Amount Received (After TDS) *
+            {/* Amount Received */}
+            <div className="space-y-1">
+              <label className="block text-xs font-semibold text-gray-800">
+                Amount Received (After TDS) <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <span className="absolute left-1.5 top-1/2 transform -translate-y-1/2 text-gray-500 text-xs">
-                  ₹
-                </span>
+                <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                  <span className="text-gray-500 font-semibold text-xs">₹</span>
+                </div>
                 <input
                   type="number"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder={`Enter received amount (max ₹${dueAmount})`}
-                  className="w-full pl-5 pr-2 py-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  className="w-full pl-6 pr-3 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white hover:border-gray-400"
                   max={dueAmount}
                 />
               </div>
@@ -1179,52 +1195,69 @@ const ContractInvoicesTab = () => {
 
             {/* TDS Calculation Display */}
             {amount && tdsPercentage && (
-              <div className="bg-blue-50 p-1.5 rounded">
-                <div className="text-xs text-blue-700 space-y-0.5">
-                  <div className="flex justify-between">
-                    <span>{tdsBaseType === "base" ? "Base Amount Billed:" : "Total Amount Billed:"}</span>
-                    <span className="font-semibold">₹{(parseFloat(tdsBaseType === "base" ? amounts.baseAmount : amounts.totalAmount) || 0).toFixed(2)}</span>
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-3">
+                <div className="flex items-center space-x-1 mb-2">
+                  <div className="w-4 h-4 bg-blue-100 rounded-md flex items-center justify-center">
+                    <svg className="w-2.5 h-2.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
                   </div>
-                  <div className="flex justify-between">
-                    <span>TDS Deducted ({tdsPercentage}%):</span>
-                    <span className="font-semibold text-red-600">
-                      -₹{tdsBreakdown.tdsAmount.toFixed(2)}
-                    </span>
+                  <h4 className="text-xs font-semibold text-blue-900">TDS Calculation</h4>
+                </div>
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">{tdsBaseType === "base" ? "Base Amount Billed:" : "Total Amount Billed:"}</span>
+                    <span className="font-semibold text-gray-900">₹{(parseFloat(tdsBaseType === "base" ? amounts.baseAmount : amounts.totalAmount) || 0).toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between border-t border-blue-200 pt-0.5 mt-0.5">
-                    <span>Amount Received:</span>
-                    <span className="font-semibold">₹{parseFloat(amount).toLocaleString()}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">TDS Deducted ({tdsPercentage}%):</span>
+                    <span className="font-semibold text-red-600">-₹{tdsBreakdown.tdsAmount.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Due Amount:</span>
-                    <span className={`font-semibold ${(tdsBaseType === "base" ? tdsBreakdown.totalBilled : tdsBreakdown.originalAmount) > dueAmount ? 'text-red-600' : 'text-green-600'}`}>
+                  <div className="flex justify-between items-center border-t border-blue-200 pt-1 mt-1">
+                    <span className="text-gray-600 font-medium">Amount Received:</span>
+                    <span className="font-bold text-gray-900">₹{parseFloat(amount).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 font-medium">Due Amount:</span>
+                    <span className={`font-bold ${(tdsBaseType === "base" ? tdsBreakdown.totalBilled : tdsBreakdown.originalAmount) > dueAmount ? 'text-red-600' : 'text-green-600'}`}>
                       ₹{Math.max(0, dueAmount - (tdsBaseType === "base" ? tdsBreakdown.totalBilled : tdsBreakdown.originalAmount)).toFixed(2)}
                     </span>
                   </div>
                   {(tdsBaseType === "base" ? tdsBreakdown.totalBilled : tdsBreakdown.originalAmount) > dueAmount && (
-                    <p className="text-xs text-red-600 mt-0.5">
-                      ⚠️ Calculated amount exceeds due amount
-                    </p>
+                    <div className="flex items-center space-x-1 mt-1 p-1 bg-red-50 rounded-md border border-red-200">
+                      <svg className="w-3 h-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                      <p className="text-xs text-red-700 font-medium">Calculated amount exceeds due amount</p>
+                    </div>
                   )}
                 </div>
               </div>
             )}
           </div>
 
-          <div className="px-2 py-1.5 bg-gray-50 rounded-b-lg flex gap-1.5">
-            <button
-              onClick={onClose}
-              className="flex-1 px-2 py-1 text-gray-700 bg-white border border-gray-300 rounded text-xs font-medium transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={!amount || amount <= 0 || !paymentDate}
-              className="flex-1 px-2 py-1 bg-blue-600 text-white rounded text-xs font-medium transition-colors hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Record Payment
-            </button>
+          {/* Footer */}
+          <div className="px-4 py-3 bg-gray-50 rounded-b-2xl border-t border-gray-100">
+            <div className="flex gap-2">
+              <button
+                onClick={onClose}
+                className="flex-1 px-3 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg text-xs font-semibold transition-all duration-200 hover:bg-gray-50 hover:border-gray-400 hover:shadow-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={!amount || amount <= 0 || !paymentDate}
+                className="flex-1 px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-xs font-semibold transition-all duration-200 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-sm transform hover:-translate-y-0.5 disabled:transform-none"
+              >
+                <div className="flex items-center justify-center space-x-1">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>Record Payment</span>
+                </div>
+              </button>
+            </div>
           </div>
         </div>
       </div>

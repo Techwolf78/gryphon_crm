@@ -2,8 +2,10 @@ import React, { useState } from "react";
 import HRBillsTour from "../components/tours/HRBillsTour";
 import ContractInvoicesTab from "../components/HR/ContractInvoicesTab";
 import TrainerBillsTab from "../components/HR/TrainerBillsTab";
+import { useAuth } from "../context/AuthContext";
 
 const HR = () => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState(() => {
     try {
       return localStorage.getItem("hr_activeTab") || "trainerBills";
@@ -24,7 +26,7 @@ const HR = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 w-full">
-      <HRBillsTour />
+      <HRBillsTour userId={user?.uid} />
 
       {/* Common Header */}
       <div className="mb-2" data-tour="hr-header">
