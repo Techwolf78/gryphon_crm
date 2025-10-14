@@ -5,6 +5,304 @@ import InvoiceModal from "./InvoiceModal";
 import { saveAs } from "file-saver";
 import * as XLSX from "xlsx";
 
+// Statistics Cards Component
+const StatisticsCards = ({ stats, formatIndianCurrency }) => {
+  console.log('StatisticsCards component rendering');
+  return (
+    <>
+      {/* First Row: Tax, Cash, Approved, Total Invoices, Cancelled, Booked */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2 mb-2">
+        {/* Tax Invoices */}
+        <div className="bg-white rounded-lg p-2 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Tax Invoices</p>
+              <p className="text-xl font-bold text-blue-600 mt-0.5">
+                {stats.taxInvoices}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">Tax documents</p>
+            </div>
+            <div className="w-7 h-7 bg-blue-100 rounded-lg flex items-center justify-center">
+              <svg
+                className="w-4 h-4 text-blue-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        {/* Cash Invoices */}
+        <div className="bg-white rounded-lg p-2 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Cash Invoices</p>
+              <p className="text-xl font-bold text-green-600 mt-0.5">
+                {stats.cashInvoices}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">Cash payments</p>
+            </div>
+            <div className="w-7 h-7 bg-green-100 rounded-lg flex items-center justify-center">
+              <svg
+                className="w-4 h-4 text-green-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z"
+                />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        {/* Approved Invoices */}
+        <div className="bg-white rounded-lg p-2 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Approved</p>
+              <p className="text-xl font-bold text-purple-600 mt-0.5">
+                {stats.approvedInvoices}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">Verified</p>
+            </div>
+            <div className="w-7 h-7 bg-purple-100 rounded-lg flex items-center justify-center">
+              <svg
+                className="w-4 h-4 text-purple-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        {/* Total Invoices */}
+        <div className="bg-white rounded-lg p-2 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Invoices</p>
+              <p className="text-xl font-bold text-gray-900 mt-0.5">
+                {stats.totalInvoices}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">All time</p>
+            </div>
+            <div className="w-7 h-7 bg-blue-100 rounded-lg flex items-center justify-center">
+              <svg
+                className="w-4 h-4 text-blue-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        {/* Cancelled Invoices */}
+        <div className="bg-white rounded-lg p-2 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Cancelled</p>
+              <p className="text-xl font-bold text-red-600 mt-0.5">
+                {stats.cancelledInvoices}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">Voided</p>
+            </div>
+            <div className="w-7 h-7 bg-red-100 rounded-lg flex items-center justify-center">
+              <svg
+                className="w-4 h-4 text-red-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 9l6 6m0-6l-6 6"
+                />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        {/* Booked Invoices */}
+        <div className="bg-white rounded-lg p-2 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Booked</p>
+              <p className="text-xl font-bold text-green-600 mt-0.5">
+                {stats.bookedInvoices}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">Confirmed</p>
+            </div>
+            <div className="w-7 h-7 bg-green-100 rounded-lg flex items-center justify-center">
+              <svg
+                className="w-4 h-4 text-green-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Second Row: Total Amount, Received, Due Amount */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
+        {/* Total Amount */}
+        <div className="bg-white rounded-lg p-2 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Amount</p>
+              <p className="text-sm font-bold text-gray-900 mt-0.5">
+                ₹{(() => {
+                  const formattedAmount = formatIndianCurrency(stats.totalAmount);
+                  console.log('Total Amount showing in UI:', formattedAmount, 'Raw value:', stats.totalAmount);
+                  return formattedAmount;
+                })()}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">Invoice value</p>
+            </div>
+            <div className="w-7 h-7 bg-purple-100 rounded-lg flex items-center justify-center">
+              <svg
+                className="w-4 h-4 text-purple-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        {/* Received Amount */}
+        <div className="bg-white rounded-lg p-2 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Received</p>
+              <p className="text-sm font-bold text-green-600 mt-0.5">
+                ₹{formatIndianCurrency(stats.receivedAmount)}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">Payments collected</p>
+              <div className="mt-0.5 bg-gray-200 rounded-full h-1">
+                <div
+                  className="bg-green-500 h-1 rounded-full transition-all duration-300"
+                  style={{
+                    width: stats.totalAmount > 0 ? `${(stats.receivedAmount / stats.totalAmount) * 100}%` : '0%'
+                  }}
+                  title={`Payment Progress: ${(stats.totalAmount > 0 ? ((stats.receivedAmount / stats.totalAmount) * 100).toFixed(1) : 0)}%`}
+                ></div>
+              </div>
+            </div>
+            <div className="w-7 h-7 bg-green-100 rounded-lg flex items-center justify-center">
+              <svg
+                className="w-4 h-4 text-green-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+                />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        {/* Due Amount */}
+        <div className="bg-white rounded-lg p-2 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Due Amount</p>
+              <p className="text-sm font-bold text-red-600 mt-0.5">
+                ₹{(() => {
+                  const formattedAmount = formatIndianCurrency(stats.dueAmount);
+                  console.log('Due Amount showing in UI:', formattedAmount, 'Raw value:', stats.dueAmount);
+                  return formattedAmount;
+                })()}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">Outstanding</p>
+              <div className="mt-0.5 bg-gray-200 rounded-full h-1">
+                <div
+                  className="bg-red-500 h-1 rounded-full transition-all duration-300"
+                  style={{
+                    width: stats.totalAmount > 0 ? `${(stats.dueAmount / stats.totalAmount) * 100}%` : '0%'
+                  }}
+                  title={`Outstanding: ${(stats.totalAmount > 0 ? ((stats.dueAmount / stats.totalAmount) * 100).toFixed(1) : 0)}%`}
+                ></div>
+              </div>
+            </div>
+            <div className="w-7 h-7 bg-red-100 rounded-lg flex items-center justify-center">
+              <svg
+                className="w-4 h-4 text-red-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
 const ContractInvoicesTab = () => {
   const [invoices, setInvoices] = useState([]);
   const [filteredInvoices, setFilteredInvoices] = useState([]);
@@ -104,7 +402,7 @@ const ContractInvoicesTab = () => {
 
     invoiceData.forEach(invoice => {
       const amounts = getPaymentAmounts(invoice);
-      // stats.totalAmount += amounts.totalAmount || 0; // Remove this line
+      stats.totalAmount += amounts.totalAmount || 0;
       stats.receivedAmount += parseFloat(invoice.receivedAmount) || 0;
 
       // Calculate total TDS amount from payment history
@@ -117,8 +415,8 @@ const ContractInvoicesTab = () => {
       stats.dueAmount += parseFloat(invoice.dueAmount) || calculatedDue;
     });
 
-    // Calculate total amount as received + due (this is what makes logical sense)
-    stats.totalAmount = stats.receivedAmount + stats.dueAmount;
+    // Remove the incorrect totalAmount recalculation - we already summed the individual totals above
+    // stats.totalAmount = stats.receivedAmount + stats.dueAmount;
 
     setStats(stats);
   }, []);
@@ -940,6 +1238,18 @@ const ContractInvoicesTab = () => {
     const amounts = getPaymentAmounts(invoice);
     const dueAmount = invoice.dueAmount || amounts.totalAmount;
 
+    // Auto-calculate received amount when TDS percentage or base type changes
+    useEffect(() => {
+      const tdsPercent = parseFloat(tdsPercentage) || 0;
+      if (tdsPercent > 0) {
+        const baseAmount = tdsBaseType === "base" ? amounts.baseAmount : amounts.totalAmount;
+        const calculatedReceived = baseAmount - (baseAmount * tdsPercent / 100);
+        setAmount(calculatedReceived.toFixed(2));
+      } else {
+        setAmount(""); // Clear amount if no TDS
+      }
+    }, [tdsPercentage, tdsBaseType, amounts.baseAmount, amounts.totalAmount]);
+
     // Calculate TDS breakdown from received amount
     const calculateTDSBreakdown = () => {
       const receivedAmount = parseFloat(amount) || 0;
@@ -1302,301 +1612,11 @@ const ContractInvoicesTab = () => {
     } else if (numAmount >= 10000000) { // 1 Cr to 9.9 Cr
       return `${(numAmount / 10000000).toFixed(1)} Cr`;
     } else if (numAmount >= 1000000) { // 10 Lakh to 99 Lakh
-      return `${(numAmount / 100000).toFixed(0)} Lakh`;
-    } else { // 1 Lakh to 9.9 Lakh
       return `${(numAmount / 100000).toFixed(2)} Lakh`;
-    }
-  };
-
-  // Statistics Cards Component
-  const StatisticsCards = () => (
-    <>
-      {/* First Row: Tax, Cash, Approved, Total Invoices, Cancelled, Booked */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2 mb-2">
-        {/* Tax Invoices */}
-        <div className="bg-white rounded-lg p-2 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Tax Invoices</p>
-              <p className="text-xl font-bold text-blue-600 mt-0.5">
-                {stats.taxInvoices}
-              </p>
-              <p className="text-xs text-gray-400 mt-0.5">Tax documents</p>
-            </div>
-            <div className="w-7 h-7 bg-blue-100 rounded-lg flex items-center justify-center">
-              <svg
-                className="w-4 h-4 text-blue-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-                />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        {/* Cash Invoices */}
-        <div className="bg-white rounded-lg p-2 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Cash Invoices</p>
-              <p className="text-xl font-bold text-green-600 mt-0.5">
-                {stats.cashInvoices}
-              </p>
-              <p className="text-xs text-gray-400 mt-0.5">Cash payments</p>
-            </div>
-            <div className="w-7 h-7 bg-green-100 rounded-lg flex items-center justify-center">
-              <svg
-                className="w-4 h-4 text-green-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z"
-                />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        {/* Approved Invoices */}
-        <div className="bg-white rounded-lg p-2 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Approved</p>
-              <p className="text-xl font-bold text-purple-600 mt-0.5">
-                {stats.approvedInvoices}
-              </p>
-              <p className="text-xs text-gray-400 mt-0.5">Verified</p>
-            </div>
-            <div className="w-7 h-7 bg-purple-100 rounded-lg flex items-center justify-center">
-              <svg
-                className="w-4 h-4 text-purple-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        {/* Total Invoices */}
-        <div className="bg-white rounded-lg p-2 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Invoices</p>
-              <p className="text-xl font-bold text-gray-900 mt-0.5">
-                {stats.totalInvoices}
-              </p>
-              <p className="text-xs text-gray-400 mt-0.5">All time</p>
-            </div>
-            <div className="w-7 h-7 bg-blue-100 rounded-lg flex items-center justify-center">
-              <svg
-                className="w-4 h-4 text-blue-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-                />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        {/* Cancelled Invoices */}
-        <div className="bg-white rounded-lg p-2 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Cancelled</p>
-              <p className="text-xl font-bold text-red-600 mt-0.5">
-                {stats.cancelledInvoices}
-              </p>
-              <p className="text-xs text-gray-400 mt-0.5">Voided</p>
-            </div>
-            <div className="w-7 h-7 bg-red-100 rounded-lg flex items-center justify-center">
-              <svg
-                className="w-4 h-4 text-red-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 9l6 6m0-6l-6 6"
-                />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        {/* Booked Invoices */}
-        <div className="bg-white rounded-lg p-2 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Booked</p>
-              <p className="text-xl font-bold text-green-600 mt-0.5">
-                {stats.bookedInvoices}
-              </p>
-              <p className="text-xs text-gray-400 mt-0.5">Confirmed</p>
-            </div>
-            <div className="w-7 h-7 bg-green-100 rounded-lg flex items-center justify-center">
-              <svg
-                className="w-4 h-4 text-green-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Second Row: Total Amount, Received, Due Amount */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
-        {/* Total Amount */}
-        <div className="bg-white rounded-lg p-2 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Amount</p>
-              <p className="text-sm font-bold text-gray-900 mt-0.5">
-                ₹{formatIndianCurrency(stats.totalAmount)}
-              </p>
-              <p className="text-xs text-gray-400 mt-0.5">Invoice value</p>
-            </div>
-            <div className="w-7 h-7 bg-purple-100 rounded-lg flex items-center justify-center">
-              <svg
-                className="w-4 h-4 text-purple-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        {/* Received Amount */}
-        <div className="bg-white rounded-lg p-2 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Received</p>
-              <p className="text-sm font-bold text-green-600 mt-0.5">
-                ₹{formatIndianCurrency(stats.receivedAmount)}
-              </p>
-              <p className="text-xs text-gray-400 mt-0.5">Payments collected</p>
-              <div className="mt-0.5 bg-gray-200 rounded-full h-1">
-                <div
-                  className="bg-green-500 h-1 rounded-full transition-all duration-300"
-                  style={{
-                    width: stats.totalAmount > 0 ? `${(stats.receivedAmount / stats.totalAmount) * 100}%` : '0%'
-                  }}
-                  title={`Payment Progress: ${(stats.totalAmount > 0 ? ((stats.receivedAmount / stats.totalAmount) * 100).toFixed(1) : 0)}%`}
-                ></div>
-              </div>
-            </div>
-            <div className="w-7 h-7 bg-green-100 rounded-lg flex items-center justify-center">
-              <svg
-                className="w-4 h-4 text-green-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-                />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        {/* Due Amount */}
-        <div className="bg-white rounded-lg p-2 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Due Amount</p>
-              <p className="text-sm font-bold text-red-600 mt-0.5">
-                ₹{formatIndianCurrency(stats.dueAmount)}
-              </p>
-              <p className="text-xs text-gray-400 mt-0.5">Outstanding</p>
-              <div className="mt-0.5 bg-gray-200 rounded-full h-1">
-                <div
-                  className="bg-red-500 h-1 rounded-full transition-all duration-300"
-                  style={{
-                    width: stats.totalAmount > 0 ? `${(stats.dueAmount / stats.totalAmount) * 100}%` : '0%'
-                  }}
-                  title={`Outstanding: ${(stats.totalAmount > 0 ? ((stats.dueAmount / stats.totalAmount) * 100).toFixed(1) : 0)}%`}
-                ></div>
-              </div>
-            </div>
-            <div className="w-7 h-7 bg-red-100 rounded-lg flex items-center justify-center">
-              <svg
-                className="w-4 h-4 text-red-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-
-
-
+    } else { // 1 Lakh to 9.9 Lakh
+    return `${(numAmount / 100000).toFixed(2)} Lakh`;
+  }
+};
   // Fetch invoices on component mount
   useEffect(() => {
     fetchInvoices();
@@ -1940,7 +1960,7 @@ const ContractInvoicesTab = () => {
           <h2 className="text-xs font-semibold text-gray-900">Overview</h2>
           <span className="text-xs text-gray-500">Last updated: {new Date().toLocaleTimeString()}</span>
         </div>
-        <StatisticsCards />
+        <StatisticsCards stats={stats} formatIndianCurrency={formatIndianCurrency} />
       </div>
 
       {/* Main Content */}

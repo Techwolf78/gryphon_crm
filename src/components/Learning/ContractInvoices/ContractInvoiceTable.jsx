@@ -188,7 +188,7 @@ export default function ContractInvoiceTable() {
     } else if (numAmount >= 10000000) { // 1 Cr to 9.9 Cr
       return `${(numAmount / 10000000).toFixed(1)} Cr`;
     } else if (numAmount >= 1000000) { // 10 Lakh to 99 Lakh
-      return `${(numAmount / 100000).toFixed(0)} Lakh`;
+      return `${(numAmount / 100000).toFixed(2)} Lakh`;
     } else { // 1 Lakh to 9.9 Lakh
       return `${(numAmount / 100000).toFixed(2)} Lakh`;
     }
@@ -1033,10 +1033,10 @@ const handleMergeSubmit = async (formData) => {
       // Find installment at the same index position
       const installmentDetail = contract.paymentDetails?.[selectedInstallmentForMerge.idx];
       
-      const roundedInstallmentAmount = Math.round(parseFloat(installmentDetail?.totalAmount) || 0);
+      const installmentAmount = parseFloat(installmentDetail?.totalAmount) || 0;
       
       // ✅ YEHI LINE CHANGE KARO - HAR CONTRACT KA BASE AMOUNT CALCULATE KARO
-      const contractBaseAmount = Math.round(roundedInstallmentAmount / 1.18);
+      const contractBaseAmount = Math.round(installmentAmount / 1.18);
       totalBaseAmount += contractBaseAmount;
 
       if (contract.studentCount) {
@@ -1138,7 +1138,7 @@ const handleMergeSubmit = async (formData) => {
         gstNumber: c.gstNumber,
         gstType: c.gstType,
         // ✅ Individual contract amounts bhi store karo reference ke liye
-        installmentAmount: Math.round(parseFloat(c.paymentDetails?.[selectedInstallmentForMerge.idx]?.totalAmount) || 0),
+        installmentAmount: parseFloat(c.paymentDetails?.[selectedInstallmentForMerge.idx]?.totalAmount) || 0,
         baseAmount: Math.round((parseFloat(c.paymentDetails?.[selectedInstallmentForMerge.idx]?.totalAmount) || 0) / 1.18)
       })),
       individualProjectCodes: selectedContractsForMerge
@@ -1762,7 +1762,7 @@ const handleMergeSubmit = async (formData) => {
                                                 </div>
                                                 <div>
                                                   <p className="text-xs text-gray-500 mb-1">Amount</p>
-                                                  <p className="text-sm font-semibold text-gray-900">{formatCurrency(installment.totalAmount)}</p>
+                                                  <p className="text-sm font-semibold text-gray-900">{formatIndianCurrency(installment.totalAmount)}</p>
                                                 </div>
                                               </div>
 
@@ -1859,7 +1859,7 @@ const handleMergeSubmit = async (formData) => {
                                             </div>
                                             <div>
                                               <p className="text-xs text-gray-500 mb-1">Amount</p>
-                                              <p className="text-sm font-semibold text-gray-900">{formatCurrency(installment.totalAmount)}</p>
+                                              <p className="text-sm font-semibold text-gray-900">{formatIndianCurrency(installment.totalAmount)}</p>
                                             </div>
                                           </div>
 
@@ -2129,7 +2129,7 @@ const handleMergeSubmit = async (formData) => {
                                                   {installment.percentage}%
                                                 </td>
                                                 <td className="px-4 py-3 text-sm text-gray-900 font-semibold">
-                                                  {formatCurrency(installment.totalAmount)}
+                                                  {formatIndianCurrency(installment.totalAmount)}
                                                 </td>
                                                 <td className="px-4 py-3 text-sm text-gray-500">
                                                   -
@@ -2506,7 +2506,7 @@ const handleMergeSubmit = async (formData) => {
                                         </div>
                                         <div>
                                           <p className="text-xs text-gray-500 mb-1">Amount</p>
-                                          <p className="text-sm font-semibold text-gray-900">{formatCurrency(installment.totalAmount)}</p>
+                                          <p className="text-sm font-semibold text-gray-900">{formatIndianCurrency(installment.totalAmount)}</p>
                                         </div>
                                       </div>
 
@@ -2601,7 +2601,7 @@ const handleMergeSubmit = async (formData) => {
                                         </div>
                                         <div>
                                           <p className="text-xs text-gray-500 mb-1">Amount</p>
-                                          <p className="text-sm font-semibold text-gray-900">{formatCurrency(installment.totalAmount)}</p>
+                                          <p className="text-sm font-semibold text-gray-900">{formatIndianCurrency(installment.totalAmount)}</p>
                                         </div>
                                       </div>
 
@@ -2760,7 +2760,7 @@ const handleMergeSubmit = async (formData) => {
                                               {installment.percentage}%
                                             </td>
                                             <td className="px-4 py-3 text-sm text-gray-900 font-semibold">
-                                              {formatCurrency(installment.totalAmount)}
+                                              {formatIndianCurrency(installment.totalAmount)}
                                             </td>
                                             <td className="px-4 py-3 text-sm text-gray-500">
                                               <div className="text-center">
@@ -2871,7 +2871,7 @@ const handleMergeSubmit = async (formData) => {
                                               {installment.percentage}%
                                             </td>
                                             <td className="px-4 py-3 text-sm text-gray-900 font-semibold">
-                                              {formatCurrency(installment.totalAmount)}
+                                              {formatIndianCurrency(installment.totalAmount)}
                                             </td>
                                             <td className="px-4 py-3 text-sm text-gray-500">
                                               -
