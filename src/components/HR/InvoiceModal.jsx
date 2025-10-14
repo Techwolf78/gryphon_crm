@@ -26,6 +26,12 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
     }
   }, [toast]);
 
+  // ✅ Check if place of supply is outside Maharashtra
+  const isInterState = () => {
+    const state = invoice.state || "";
+    return !state.toLowerCase().includes("maharashtra");
+  };
+
   const handleEditToggle = () => {
     setIsEditing(!isEditing);
   };
@@ -381,6 +387,7 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
   const amounts = getPaymentAmounts();
   const amountInWords = convertAmountToWords(amounts.totalAmount);
   const projectCodes = getAllProjectCodes();
+  const interstate = isInterState();
 
   return (
     <div>
@@ -503,6 +510,7 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
                       {invoice.gstNumber || "GSTIN Not Available"} |
                       <strong> PLACE OF SUPPLY:</strong>{" "}
                       {invoice.state || "State Not Available"}
+                      {interstate && " (Inter-State)"}
                     </p>
                   </div>
                 </div>
@@ -544,7 +552,9 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
                               } ${invoice.year || ""} year`}
                           {invoice.studentCount &&
                             ` for ${invoice.studentCount} students`}
-                          {amounts.gstAmount > 0 && ` + 18% GST`}
+                          {amounts.gstAmount > 0 && 
+                            ` + ${interstate ? '18% IGST' : '18% GST (9% CGST + 9% SGST)'}`
+                          }
                         </div>
 
                         {projectCodes.length > 0 && (
@@ -610,7 +620,20 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
                         </td>
                       </tr>
                     </>
+                  ) : interstate ? (
+                    // ✅ IGST for inter-state
+                    <tr>
+                      <td className="border border-gray-300 px-3 py-1 font-semibold">
+                        Add: IGST @ 18%
+                      </td>
+                      <td className="border border-gray-300 px-3 py-1 text-right">
+                        {amounts.gstAmount.toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                        })}
+                      </td>
+                    </tr>
                   ) : (
+                    // ✅ CGST+SGST for intra-state (Maharashtra)
                     <>
                       <tr>
                         <td className="border border-gray-300 px-3 py-1 font-semibold">
