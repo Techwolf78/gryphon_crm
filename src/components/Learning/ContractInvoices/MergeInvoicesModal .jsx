@@ -19,6 +19,7 @@ const MergeInvoicesModal = ({
 useEffect(() => {
   if (contracts && installment) {
     // ✅ TOTAL AMOUNT calculate karo by finding installment at same index in each contract
+    // Keep precision - don't round individual amounts before summing
     const calculatedTotal = contracts.reduce((sum, contract) => {
       if (!contract.paymentDetails || !Array.isArray(contract.paymentDetails)) return sum;
       
@@ -27,7 +28,7 @@ useEffect(() => {
       if (!inst) return sum;
       
       const amount = parseFloat(inst.totalAmount) || 0;
-      return sum + Math.round(amount);
+      return sum + amount; // Keep full precision, don't round here
     }, 0);
 
     const calculatedStudents = contracts.reduce((sum, contract) => {
@@ -35,12 +36,14 @@ useEffect(() => {
       return sum + students;
     }, 0);
 
-    setTotalAmount(calculatedTotal);
+    // Round the total amount to nearest rupee
+    const roundedTotal = Math.round(calculatedTotal);
+    setTotalAmount(roundedTotal);
     setTotalStudents(calculatedStudents);
     
-    // ✅ BASE AMOUNT DONO CASES MEIN SAME RAHEGA
-    const calculatedBaseAmount = Math.round(calculatedTotal / 1.18);
-    const calculatedGstAmount = calculatedTotal - calculatedBaseAmount;
+    // ✅ BASE AMOUNT calculation - divide by 1.18 and round properly
+    const calculatedBaseAmount = Math.round(roundedTotal / 1.18);
+    const calculatedGstAmount = roundedTotal - calculatedBaseAmount;
     
     setBaseAmount(calculatedBaseAmount);
     setGstAmount(calculatedGstAmount);
@@ -84,18 +87,6 @@ const getDisplayAmounts = () => {
     });
   };
 
-  const formatCurrency = (amount) => {
-    if (!amount && amount !== 0) return "₹0";
-    const numAmount = Number(amount);
-    if (isNaN(numAmount)) return "₹0";
-    
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 0
-    }).format(numAmount);
-  };
-
   // Helper function to format currency in Indian numbering system with abbreviations
   const formatIndianCurrency = (amount) => {
     if (!amount && amount !== 0) return "0";
@@ -120,7 +111,7 @@ const getDisplayAmounts = () => {
     } else if (numAmount >= 1000000) { // 10 Lakh to 99 Lakh
       return `${(numAmount / 100000).toFixed(0)} Lakh`;
     } else { // 1 Lakh to 9.9 Lakh
-      return `${(numAmount / 100000).toFixed(1)} Lakh`;
+      return `${(numAmount / 100000).toFixed(2)} Lakh`;
     }
   };
 

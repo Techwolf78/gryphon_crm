@@ -89,275 +89,154 @@ const BillsTable = ({
       <div className="w-full space-y-3">
         {/* Bills Container */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden">
-          {/* Mobile Card View */}
-          <div className="block md:hidden">
-            {bills.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-2">
-                  <FiSearch className="h-6 w-6 text-gray-400" />
-                </div>
-                <h3 className="text-base font-semibold text-gray-900 mb-1">
-                  No bills found
-                </h3>
-                <p className="text-gray-500 text-xs">
-                  Try adjusting your search or filter criteria
-                </p>
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-100">
+          {/* Responsive Table View */}
+          <div className="overflow-x-auto rounded-xl border border-slate-200/60 shadow-sm">
+            <table className="min-w-full divide-y divide-slate-200/60">
+              <thead className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200/60">
+                <tr>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider min-w-[100px]">
+                    Trainer
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider min-w-[110px]">
+                    College
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider min-w-[120px]">
+                    Invoice No.
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-auto">
+                    Hours & Rate
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-auto">
+                    Amount
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider min-w-[80px]">
+                    Submitted
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider min-w-[160px]">
+                    Status
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider min-w-[140px]">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-slate-100">
                 {bills.map((bill) => (
-                  <div
-                    key={bill.id}
-                    className="p-3 hover:bg-gray-50/50 transition-colors duration-200"
-                  >
-                    {/* Header */}
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-semibold text-gray-900 truncate" title={bill.trainerName}>
-                          {bill.trainerName}
-                        </h4>
-                      </div>
-                      <div className="ml-3 flex-shrink-0">
-                        {getStatusBadge(bill.status)}
-                      </div>
-                    </div>
-
-                    {/* Details Grid */}
-                    <div className="grid grid-cols-2 gap-2 mb-2">
-                      <div className="bg-gray-50/50 rounded-lg p-2">
-                        <p className="text-xs font-bold text-gray-500 mb-1">College</p>
-                        <div className="max-w-full">
-                          <p className="text-sm text-gray-900 font-medium truncate" title={bill.collegeName}>
-                            {bill.collegeName}
-                          </p>
-                          <p className="text-xs text-gray-500 truncate">ID: {bill.trainerId}</p>
+                  <tr key={bill.id} className="hover:bg-slate-50/50 transition-all duration-200 group">
+                    <td className="px-2 py-3">
+                      <div className="flex items-center">
+                        <div className="w-6 h-6 bg-gradient-to-r from-blue-400 to-blue-500 rounded-lg flex items-center justify-center mr-2">
+                          <span className="text-xs font-semibold text-white">
+                            {bill.trainerName.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="max-w-[120px]">
+                          <div className="text-sm font-semibold text-slate-900 truncate group-hover:text-blue-700 transition-colors" title={bill.trainerName}>
+                            {bill.trainerName}
+                          </div>
                         </div>
                       </div>
-                      <div className="bg-gray-50/50 rounded-lg p-2">
-                        <p className="text-xs font-bold text-gray-500 mb-1">Invoice Number</p>
-                        <p className="text-xs text-gray-900 font-semibold tabular-nums">
-                          {bill.billNumber || 'N/A'}
-                        </p>
+                    </td>
+                    <td className="px-2 py-3">
+                      <div className="max-w-[140px] overflow-hidden">
+                        <div className="text-sm text-slate-900 font-medium truncate group-hover:text-slate-700 transition-colors" title={bill.collegeName}>
+                          {bill.collegeName}
+                        </div>
+                        <div className="text-xs text-slate-500 truncate mt-0.5">ID: {bill.trainerId}</div>
                       </div>
-                      <div className="bg-gray-50/50 rounded-lg p-2">
-                        <p className="text-xs font-bold text-gray-500 mb-1">Hours & Rate</p>
-                        <p className="text-sm text-gray-900 font-medium">{bill.hours} hours</p>
-                        <p className="text-sm text-gray-600">₹{bill.rate}/hour</p>
+                    </td>
+                    <td className="px-2 py-3">
+                      <div className="text-xs font-semibold text-slate-900 tabular-nums min-w-[100px] max-w-[120px] truncate" title={bill.billNumber}>
+                        {bill.billNumber || 'N/A'}
                       </div>
-                      <div className="bg-gray-50/50 rounded-lg p-2">
-                        <p className="text-xs font-bold text-gray-500 mb-1">Net Amount</p>
-                        <p className="text-lg font-bold text-gray-900">₹{bill.amount.toLocaleString()}</p>
+                    </td>
+                    <td className="px-2 py-3">
+                      <div className="text-sm text-slate-900 font-medium min-w-[80px] max-w-[100px] truncate">{bill.hours} hours</div>
+                      <div className="text-xs text-slate-500 truncate">₹{bill.rate}/hr</div>
+                    </td>
+                    <td className="px-2 py-3">
+                      <div className="text-sm font-bold text-slate-900 tabular-nums min-w-[80px] max-w-[100px] truncate">₹{bill.amount.toLocaleString()}</div>
+                    </td>
+                    <td className="px-2 py-3 text-sm text-slate-600 font-medium">
+                      <div className="flex flex-col min-w-[70px] max-w-[80px]">
+                        <span className="truncate">{new Date(bill.submittedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                        <span className="text-xs text-slate-400 truncate">{new Date(bill.submittedDate).getFullYear()}</span>
                       </div>
-                      <div className="bg-gray-50/50 rounded-lg p-2 col-span-2">
-                        <p className="text-xs font-bold text-gray-500 mb-1">Submitted</p>
-                        <p className="text-sm text-gray-900 font-medium">
-                          {new Date(bill.submittedDate).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => onViewDetails(bill)}
-                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-1.5 px-2 rounded text-sm font-medium transition-colors duration-200 flex items-center justify-center gap-1"
-                      >
-                        <FiEye className="w-3 h-3" />
-                        View
-                      </button>
-                      {bill.status === 'approved' && (
+                    </td>
+                    <td className="px-2 py-3">
+                      {getStatusBadge(bill.status)}
+                    </td>
+                    <td className="px-2 py-3 text-sm font-medium text-right">
+                      <div className="flex items-center justify-end space-x-1 min-w-[140px] max-w-[160px]">
                         <button
-                          disabled
-                          className="flex-1 bg-emerald-100 text-emerald-800 py-1.5 px-2 rounded text-sm font-medium cursor-not-allowed flex items-center justify-center gap-1"
+                          onClick={() => onViewDetails(bill)}
+                          className="inline-flex items-center px-2 py-1 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded transition-all duration-200 hover:shadow-sm"
+                          title="View Details"
                         >
-                          <FiCheckCircle className="w-3 h-3" />
-                          Approved
+                          <FiEye className="mr-1 h-3 w-3" />
+                          View
                         </button>
-                      )}
-                      {bill.status === 'rejected' && (
-                        <button
-                          disabled
-                          className="flex-1 bg-red-100 text-red-800 py-1.5 px-2 rounded text-sm font-medium cursor-not-allowed flex items-center justify-center gap-1"
-                        >
-                          <FiXCircle className="w-3 h-3" />
-                          Rejected
-                        </button>
-                      )}
-                      {(bill.status === 'pending' || bill.status === 'generated') && (
-                        <>
+                        {bill.status === 'approved' && (
                           <button
-                            onClick={() => onAction(bill, 'approved')}
-                            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-1.5 px-2 rounded text-sm font-medium transition-colors duration-200 flex items-center justify-center gap-1"
+                            disabled
+                            className="inline-flex items-center px-2 py-1 text-xs font-medium text-emerald-800 bg-emerald-100 rounded cursor-not-allowed"
+                            title="Bill Already Approved"
                           >
-                            <FiCheckCircle className="w-3 h-3" />
-                            Approve
+                            <FiCheckCircle className="mr-1 h-3 w-3" />
+                            Approved
                           </button>
+                        )}
+                        {bill.status === 'rejected' && (
                           <button
-                            onClick={() => handleRejectClick(bill)}
-                            className="flex-1 bg-red-600 hover:bg-red-700 text-white py-1.5 px-2 rounded text-sm font-medium transition-colors duration-200 flex items-center justify-center gap-1"
+                            disabled
+                            className="inline-flex items-center px-2 py-1 text-xs font-medium text-red-800 bg-red-100 rounded cursor-not-allowed"
+                            title="Bill Already Rejected"
                           >
-                            <FiXCircle className="w-3 h-3" />
-                            Reject
+                            <FiXCircle className="mr-1 h-3 w-3" />
+                            Rejected
                           </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Desktop Table View */}
-          <div className="hidden md:block">
-            <div className="overflow-x-auto rounded-xl border border-slate-200/60 shadow-sm max-w-6xl mx-auto">
-              <table className="min-w-full divide-y divide-slate-200/60 table-fixed">
-                <thead className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200/60">
-                  <tr>
-                    <th scope="col" className="px-2 py-2 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-[140px]">
-                      Trainer
-                    </th>
-                    <th scope="col" className="px-2 py-2 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-[160px]">
-                      College
-                    </th>
-                    <th scope="col" className="px-2 py-2 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-[120px]">
-                      Invoice No.
-                    </th>
-                    <th scope="col" className="px-2 py-2 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-[100px]">
-                      Hours & Rate
-                    </th>
-                    <th scope="col" className="px-2 py-2 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-[90px]">
-                      Amount
-                    </th>
-                    <th scope="col" className="px-2 py-2 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-[80px]">
-                      Submitted
-                    </th>
-                    <th scope="col" className="px-2 py-2 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-[100px]">
-                      Status
-                    </th>
-                    <th scope="col" className="px-2 py-2 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider w-[160px]">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-slate-100">
-                  {bills.map((bill) => (
-                    <tr key={bill.id} className="hover:bg-slate-50/50 transition-all duration-200 group">
-                      <td className="px-2 py-2">
-                        <div className="flex items-center">
-                          <div className="w-6 h-6 bg-gradient-to-r from-blue-400 to-blue-500 rounded-lg flex items-center justify-center mr-2">
-                            <span className="text-xs font-semibold text-white">
-                              {bill.trainerName.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                          <div className="max-w-[100px]">
-                            <div className="text-sm font-semibold text-slate-900 truncate group-hover:text-blue-700 transition-colors" title={bill.trainerName}>
-                              {bill.trainerName}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-2 py-2">
-                        <div className="max-w-[140px] overflow-hidden">
-                          <div className="text-sm text-slate-900 font-medium truncate group-hover:text-slate-700 transition-colors" title={bill.collegeName}>
-                            {bill.collegeName}
-                          </div>
-                          <div className="text-xs text-slate-500 truncate mt-0.5">ID: {bill.trainerId}</div>
-                        </div>
-                      </td>
-                      <td className="px-2 py-2 w-[120px]">
-                        <div className="text-xs font-semibold text-slate-900 tabular-nums" title={bill.billNumber}>
-                          {bill.billNumber || 'N/A'}
-                        </div>
-                      </td>
-                      <td className="px-2 py-2 w-[100px]">
-                        <div className="text-sm text-slate-900 font-medium">{bill.hours} hours</div>
-                        <div className="text-xs text-slate-500">₹{bill.rate}/hr</div>
-                      </td>
-                      <td className="px-2 py-2 w-[90px]">
-                        <div className="text-sm font-bold text-slate-900 tabular-nums">₹{bill.amount.toLocaleString()}</div>
-                      </td>
-                      <td className="px-2 py-2 text-sm text-slate-600 font-medium w-[80px]">
-                        <div className="flex flex-col">
-                          <span>{new Date(bill.submittedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                          <span className="text-xs text-slate-400">{new Date(bill.submittedDate).getFullYear()}</span>
-                        </div>
-                      </td>
-                      <td className="px-2 py-2 w-[100px]">
-                        {getStatusBadge(bill.status)}
-                      </td>
-                      <td className="px-2 py-2 text-sm font-medium text-right w-[160px]">
-                        <div className="flex items-center justify-end space-x-1">
-                          <button
-                            onClick={() => onViewDetails(bill)}
-                            className="inline-flex items-center px-2 py-1 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded transition-all duration-200 hover:shadow-sm"
-                            title="View Details"
-                          >
-                            <FiEye className="mr-1 h-3 w-3" />
-                            View
-                          </button>
-                          {bill.status === 'approved' && (
+                        )}
+                        {(bill.status === 'pending' || bill.status === 'generated') && (
+                          <>
                             <button
-                              disabled
-                              className="inline-flex items-center px-2 py-1 text-xs font-medium text-emerald-800 bg-emerald-100 rounded cursor-not-allowed"
-                              title="Bill Already Approved"
+                              onClick={() => onAction(bill, 'approved')}
+                              className="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 rounded transition-all duration-200 shadow-sm hover:shadow-md"
+                              title="Approve Bill"
                             >
                               <FiCheckCircle className="mr-1 h-3 w-3" />
-                              Approved
+                              Approve
                             </button>
-                          )}
-                          {bill.status === 'rejected' && (
                             <button
-                              disabled
-                              className="inline-flex items-center px-2 py-1 text-xs font-medium text-red-800 bg-red-100 rounded cursor-not-allowed"
-                              title="Bill Already Rejected"
+                              onClick={() => handleRejectClick(bill)}
+                              className="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 rounded transition-all duration-200 shadow-sm hover:shadow-md"
+                              title="Reject Bill"
                             >
                               <FiXCircle className="mr-1 h-3 w-3" />
-                              Rejected
+                              Reject
                             </button>
-                          )}
-                          {(bill.status === 'pending' || bill.status === 'generated') && (
-                            <>
-                              <button
-                                onClick={() => onAction(bill, 'approved')}
-                                className="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 rounded transition-all duration-200 shadow-sm hover:shadow-md"
-                                title="Approve Bill"
-                              >
-                                <FiCheckCircle className="mr-1 h-3 w-3" />
-                                Approve
-                              </button>
-                              <button
-                                onClick={() => handleRejectClick(bill)}
-                                className="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 rounded transition-all duration-200 shadow-sm hover:shadow-md"
-                                title="Reject Bill"
-                              >
-                                <FiXCircle className="mr-1 h-3 w-3" />
-                                Reject
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {bills.length === 0 && (
-              <div className="text-center py-12">
-                <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-2">
-                  <FiSearch className="h-6 w-6 text-gray-400" />
-                </div>
-                <h3 className="text-base font-semibold text-gray-900 mb-1">
-                  No bills found
-                </h3>
-                <p className="text-gray-500 text-xs">
-                  Try adjusting your search or filter criteria
-                </p>
-              </div>
-            )}
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
+
+          {bills.length === 0 && (
+            <div className="text-center py-12">
+              <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-2">
+                <FiSearch className="h-6 w-6 text-gray-400" />
+              </div>
+              <h3 className="text-base font-semibold text-gray-900 mb-1">
+                No bills found
+              </h3>
+              <p className="text-gray-500 text-xs">
+                Try adjusting your search or filter criteria
+              </p>
+            </div>
+          )}
 
           {/* Table Footer with Summary */}
           {bills.length > 0 && (
