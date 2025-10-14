@@ -36,14 +36,13 @@ useEffect(() => {
       return sum + students;
     }, 0);
 
-    // Round the total amount to nearest rupee
-    const roundedTotal = Math.round(calculatedTotal);
-    setTotalAmount(roundedTotal);
+    // ✅ Keep full precision for display - NO ROUNDING
+    setTotalAmount(calculatedTotal);
     setTotalStudents(calculatedStudents);
     
-    // ✅ BASE AMOUNT calculation - divide by 1.18 and round properly
-    const calculatedBaseAmount = Math.round(roundedTotal / 1.18);
-    const calculatedGstAmount = roundedTotal - calculatedBaseAmount;
+    // ✅ BASE AMOUNT calculation - divide by 1.18 and keep precision
+    const calculatedBaseAmount = calculatedTotal / 1.18;
+    const calculatedGstAmount = calculatedTotal - calculatedBaseAmount;
     
     setBaseAmount(calculatedBaseAmount);
     setGstAmount(calculatedGstAmount);
@@ -76,14 +75,14 @@ const getDisplayAmounts = () => {
     onSubmit({
       invoiceType,
       terms: terms || 'Standard terms and conditions apply',
-      // ✅ Actual calculations parent ko bhejo
-      actualBaseAmount: baseAmount,
-      actualGstAmount: gstAmount,
-      actualTotalAmount: totalAmount,
-      // ✅ Display ke liye amounts
-      baseAmount: displayAmounts.baseAmount,
-      gstAmount: displayAmounts.gstAmount,
-      totalAmount: displayAmounts.totalAmount
+      // ✅ Send precise values for display/calculation purposes
+      displayBaseAmount: displayAmounts.baseAmount,
+      displayGstAmount: displayAmounts.gstAmount,
+      displayTotalAmount: displayAmounts.totalAmount,
+      // ✅ Send rounded values for actual invoice generation
+      actualBaseAmount: Math.round(baseAmount),
+      actualGstAmount: Math.round(gstAmount),
+      actualTotalAmount: Math.round(totalAmount)
     });
   };
 
@@ -99,17 +98,17 @@ const getDisplayAmounts = () => {
       return new Intl.NumberFormat('en-IN').format(numAmount);
     }
 
-    // For amounts >= 1 lakh, use abbreviations
+    // For amounts >= 1 lakh, use abbreviations with 2 decimal places for precision
     if (numAmount >= 10000000000) { // 1000 Cr and above
-      return `${(numAmount / 10000000).toFixed(1)}K Cr`;
+      return `${(numAmount / 10000000).toFixed(2)}K Cr`;
     } else if (numAmount >= 1000000000) { // 100 Cr to 999 Cr
-      return `${(numAmount / 10000000).toFixed(1)} Cr`;
+      return `${(numAmount / 10000000).toFixed(2)} Cr`;
     } else if (numAmount >= 100000000) { // 10 Cr to 99 Cr
-      return `${(numAmount / 10000000).toFixed(1)} Cr`;
+      return `${(numAmount / 10000000).toFixed(2)} Cr`;
     } else if (numAmount >= 10000000) { // 1 Cr to 9.9 Cr
-      return `${(numAmount / 10000000).toFixed(1)} Cr`;
+      return `${(numAmount / 10000000).toFixed(2)} Cr`;
     } else if (numAmount >= 1000000) { // 10 Lakh to 99 Lakh
-      return `${(numAmount / 100000).toFixed(0)} Lakh`;
+      return `${(numAmount / 100000).toFixed(2)} Lakh`;
     } else { // 1 Lakh to 9.9 Lakh
       return `${(numAmount / 100000).toFixed(2)} Lakh`;
     }
