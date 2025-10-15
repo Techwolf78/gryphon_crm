@@ -7,7 +7,6 @@ import * as XLSX from "xlsx";
 
 // Statistics Cards Component
 const StatisticsCards = ({ stats, formatIndianCurrency }) => {
-  console.log('StatisticsCards component rendering');
   return (
     <>
       {/* First Row: Tax, Cash, Approved, Total Invoices, Cancelled, Booked */}
@@ -195,11 +194,7 @@ const StatisticsCards = ({ stats, formatIndianCurrency }) => {
             <div className="flex-1">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Amount</p>
               <p className="text-sm font-bold text-gray-900 mt-0.5">
-                ₹{(() => {
-                  const formattedAmount = formatIndianCurrency(stats.totalAmount);
-                  console.log('Total Amount showing in UI:', formattedAmount, 'Raw value:', stats.totalAmount);
-                  return formattedAmount;
-                })()}
+                ₹{formatIndianCurrency(stats.totalAmount, true)}
               </p>
               <p className="text-xs text-gray-400 mt-0.5">Invoice value</p>
             </div>
@@ -227,7 +222,7 @@ const StatisticsCards = ({ stats, formatIndianCurrency }) => {
             <div className="flex-1">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Received</p>
               <p className="text-sm font-bold text-green-600 mt-0.5">
-                ₹{formatIndianCurrency(stats.receivedAmount)}
+                ₹{formatIndianCurrency(stats.receivedAmount, true)}
               </p>
               <p className="text-xs text-gray-400 mt-0.5">Payments collected</p>
               <div className="mt-0.5 bg-gray-200 rounded-full h-1">
@@ -264,11 +259,7 @@ const StatisticsCards = ({ stats, formatIndianCurrency }) => {
             <div className="flex-1">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Due Amount</p>
               <p className="text-sm font-bold text-red-600 mt-0.5">
-                ₹{(() => {
-                  const formattedAmount = formatIndianCurrency(stats.dueAmount);
-                  console.log('Due Amount showing in UI:', formattedAmount, 'Raw value:', stats.dueAmount);
-                  return formattedAmount;
-                })()}
+                ₹{formatIndianCurrency(stats.dueAmount, true)}
               </p>
               <p className="text-xs text-gray-400 mt-0.5">Outstanding</p>
               <div className="mt-0.5 bg-gray-200 rounded-full h-1">
@@ -343,13 +334,13 @@ const ContractInvoicesTab = () => {
       return {
         baseAmount: invoice.baseAmount,
         gstAmount: invoice.gstAmount || 0,
-        totalAmount: invoice.netPayableAmount || invoice.amountRaised || 0,
+        totalAmount: invoice.netPayableAmount || invoice.amountRaised || invoice.totalAmount || 0,
       };
     }
 
     if (!invoice.paymentDetails || invoice.paymentDetails.length === 0) {
       const total =
-        invoice.amount || invoice.netPayableAmount || invoice.amountRaised || 0;
+        invoice.amount || invoice.netPayableAmount || invoice.amountRaised || invoice.totalAmount || 0;
       const baseAmount = total / 1.18;
       const gstAmount = total - baseAmount;
 
@@ -368,6 +359,7 @@ const ContractInvoicesTab = () => {
         payment.totalAmount ||
         invoice.netPayableAmount ||
         invoice.amountRaised ||
+        invoice.totalAmount ||
         0,
     };
   };
@@ -405,14 +397,24 @@ const ContractInvoicesTab = () => {
       stats.totalAmount += amounts.totalAmount || 0;
       stats.receivedAmount += parseFloat(invoice.receivedAmount) || 0;
 
-      // Calculate total TDS amount from payment history
-      const totalTdsAmount = invoice.paymentHistory?.reduce((sum, payment) => {
-        return sum + (parseFloat(payment.tdsAmount) || 0);
+      // Calculate total billed amount from payment history (including GST for tax invoices only)
+      const totalBilledAmount = invoice.paymentHistory?.reduce((sum, payment) => {
+        const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
+        const tdsBaseType = payment.tdsBaseType || "base";
+        const isCashInvoice = invoice.invoiceType === "Cash Invoice";
+        const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? originalAmount * 1.18 : originalAmount);
+        return sum + billedAmount;
       }, 0) || 0;
 
-      // Due amount should account for TDS: totalAmount - (receivedAmount + totalTdsAmount)
-      const calculatedDue = amounts.totalAmount - (parseFloat(invoice.receivedAmount) || 0) - totalTdsAmount;
-      stats.dueAmount += parseFloat(invoice.dueAmount) || calculatedDue;
+      // Due amount should account for total billed amounts including GST
+      const calculatedDue = (amounts.totalAmount || 0) - totalBilledAmount;
+      const dbDueAmount = parseFloat(invoice.dueAmount) || 0;
+      const isFullyPaidByCalc = Math.abs(calculatedDue) < 0.01;
+      const isFullyPaidByDB = Math.abs(dbDueAmount) < 0.01;
+      const isFullyPaid = isFullyPaidByCalc || isFullyPaidByDB;
+
+      const dueAmount = isFullyPaid ? 0 : dbDueAmount || calculatedDue;
+      stats.dueAmount += Math.max(0, dueAmount);
     });
 
     // Remove the incorrect totalAmount recalculation - we already summed the individual totals above
@@ -517,7 +519,23 @@ const ContractInvoicesTab = () => {
         } else if (filters.status === "cancelled") {
           return invoice.approvalStatus === "cancelled";
         } else if (filters.status === "fully_paid") {
-          return invoice.status === "received" || invoice.dueAmount === 0;
+          // Calculate total billed amount from payment history (including GST for tax invoices only)
+          const totalBilledAmount = invoice.paymentHistory?.reduce((sum, payment) => {
+            const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
+            const tdsBaseType = payment.tdsBaseType || "base";
+            const isCashInvoice = invoice.invoiceType === "Cash Invoice";
+            const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? originalAmount * 1.18 : originalAmount);
+            return sum + billedAmount;
+          }, 0) || 0;
+
+          const amounts = getPaymentAmounts(invoice);
+          const totalAmount = amounts.totalAmount || 0;
+          const calculatedDue = totalAmount - totalBilledAmount;
+          const dbDueAmount = parseFloat(invoice.dueAmount) || 0;
+          const isFullyPaidByCalc = Math.abs(calculatedDue) < 0.01;
+          const isFullyPaidByDB = Math.abs(dbDueAmount) < 0.01;
+
+          return isFullyPaidByCalc || isFullyPaidByDB;
         } else if (filters.status === "partially_paid") {
           return invoice.status === "partially_received";
         } else if (filters.status === "unpaid") {
@@ -842,17 +860,27 @@ const ContractInvoicesTab = () => {
       );
     }
 
-    const totalAmount = parseFloat(invoice.amountRaised) || 0;
+    const amounts = getPaymentAmounts(invoice);
+    const totalAmount = amounts.totalAmount || 0;
     const receivedAmount = parseFloat(invoice.receivedAmount) || 0;
 
-    // FIXED: Use proper floating point comparison with tolerance
-    const isFullyPaid = Math.abs(totalAmount - receivedAmount) < 0.01; // 0.01 tolerance for floating point errors
+    // Calculate total billed amount from payment history (including GST for tax invoices only)
+    const totalBilledAmount = invoice.paymentHistory?.reduce((sum, payment) => {
+      const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
+      const tdsBaseType = payment.tdsBaseType || "base";
+      const isCashInvoice = invoice.invoiceType === "Cash Invoice";
+      const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? originalAmount * 1.18 : originalAmount);
+      return sum + billedAmount;
+    }, 0) || 0;
 
-    // FIXED: Also check if dueAmount is zero in database
+    // Due amount should account for total billed amounts including GST
+    const calculatedDue = totalAmount - totalBilledAmount;
     const dbDueAmount = parseFloat(invoice.dueAmount) || 0;
-    const isDueAmountZero = Math.abs(dbDueAmount) < 0.01;
+    const isFullyPaidByCalc = Math.abs(calculatedDue) < 0.01;
+    const isFullyPaidByDB = Math.abs(dbDueAmount) < 0.01;
+    const isFullyPaid = isFullyPaidByCalc || isFullyPaidByDB;
 
-    if (isFullyPaid || isDueAmountZero) {
+    if (isFullyPaid) {
       return (
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
           <span className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1"></span>
@@ -936,6 +964,87 @@ const ContractInvoicesTab = () => {
     }
   };
 
+  // Undo Payments Function - NEW
+  const handleUndoPayments = async (invoice) => {
+    if (!window.confirm("Are you sure you want to undo all payments for this invoice? This will reset the invoice to unpaid status.")) {
+      return;
+    }
+
+    try {
+      const amounts = getPaymentAmounts(invoice);
+      const originalTotalAmount = amounts.totalAmount;
+
+      const invoiceRef = doc(db, "ContractInvoices", invoice.id);
+      await updateDoc(invoiceRef, {
+        receivedAmount: 0,
+        dueAmount: originalTotalAmount,
+        paymentHistory: [],
+        status: "pending",
+        approvalStatus: "pending",
+        approved: false,
+        approvedAt: null,
+        approvedBy: null,
+      });
+
+      setInvoices((prev) =>
+        prev.map((inv) =>
+          inv.id === invoice.id
+            ? {
+                ...inv,
+                receivedAmount: 0,
+                dueAmount: originalTotalAmount,
+                paymentHistory: [],
+                status: "pending",
+                approvalStatus: "pending",
+                approved: false,
+                approvedAt: null,
+                approvedBy: null,
+              }
+            : inv
+        )
+      );
+
+      setFilteredInvoices((prev) =>
+        prev.map((inv) =>
+          inv.id === invoice.id
+            ? {
+                ...inv,
+                receivedAmount: 0,
+                dueAmount: originalTotalAmount,
+                paymentHistory: [],
+                status: "pending",
+                approvalStatus: "pending",
+                approved: false,
+                approvedAt: null,
+                approvedBy: null,
+              }
+            : inv
+        )
+      );
+
+      // Recalculate stats with updated data
+      calculateStats(filteredInvoices.map((inv) =>
+        inv.id === invoice.id
+          ? {
+              ...inv,
+              receivedAmount: 0,
+              dueAmount: originalTotalAmount,
+              paymentHistory: [],
+              status: "pending",
+              approvalStatus: "pending",
+              approved: false,
+              approvedAt: null,
+              approvedBy: null,
+            }
+          : inv
+      ));
+
+      alert("✅ All payments have been undone successfully! Invoice reset to unpaid status.");
+    } catch (error) {
+      alert("❌ Error undoing payments: " + error.message);
+    }
+  };
+
   // Payment Receive Function - UPDATED WITH DATE AND TDS
   const handleReceivePayment = async (invoice, receivedAmount, paymentDateTime, tdsPercentage = 0, originalAmount = 0, tdsAmount = 0, tdsBaseType = "base") => {
     try {
@@ -967,7 +1076,10 @@ const ContractInvoicesTab = () => {
       const invoiceRef = doc(db, "ContractInvoices", invoice.id);
       const newReceivedAmount =
         (invoice.receivedAmount || 0) + actualReceived;
-      const newDueAmount = invoice.dueAmount - finalOriginalAmount;
+
+      // Calculate the total billed amount for this payment
+      const totalBilledAmount = tdsBaseType === "base" ? finalOriginalAmount * 1.18 : finalOriginalAmount;
+      const newDueAmount = Math.max(0, invoice.dueAmount - totalBilledAmount);
 
       // Create payment record with the combined date and time
       const paymentRecord = {
@@ -1001,17 +1113,19 @@ const ContractInvoicesTab = () => {
 
       await updateDoc(invoiceRef, updateData);
 
-      setInvoices((prev) =>
-        prev.map((inv) =>
-          inv.id === invoice.id ? { ...inv, ...updateData } : inv
-        )
+      // Update local state
+      const updatedInvoices = invoices.map((inv) =>
+        inv.id === invoice.id ? { ...inv, ...updateData } : inv
+      );
+      const updatedFilteredInvoices = filteredInvoices.map((inv) =>
+        inv.id === invoice.id ? { ...inv, ...updateData } : inv
       );
 
-      setFilteredInvoices((prev) =>
-        prev.map((inv) =>
-          inv.id === invoice.id ? { ...inv, ...updateData } : inv
-        )
-      );
+      setInvoices(updatedInvoices);
+      setFilteredInvoices(updatedFilteredInvoices);
+
+      // Recalculate stats with updated data
+      calculateStats(updatedFilteredInvoices);
 
       setPaymentModal({ isOpen: false, invoice: null });
 
@@ -1241,12 +1355,12 @@ const ContractInvoicesTab = () => {
     // Auto-calculate received amount when TDS percentage or base type changes
     useEffect(() => {
       const tdsPercent = parseFloat(tdsPercentage) || 0;
-      if (tdsPercent > 0) {
+      if (tdsPercent >= 0) { // Allow TDS 0% and above
         const baseAmount = tdsBaseType === "base" ? amounts.baseAmount : amounts.totalAmount;
         const calculatedReceived = baseAmount - (baseAmount * tdsPercent / 100);
         setAmount(calculatedReceived.toFixed(2));
       } else {
-        setAmount(""); // Clear amount if no TDS
+        setAmount(""); // Clear amount if invalid TDS
       }
     }, [tdsPercentage, tdsBaseType, amounts.baseAmount, amounts.totalAmount]);
 
@@ -1270,28 +1384,31 @@ const ContractInvoicesTab = () => {
       const originalAmount = receivedAmount / (1 - tdsPercent / 100);
       const tdsAmount = originalAmount - receivedAmount;
 
-      // Calculate base amount and GST (assuming 18% GST)
-      const gstRate = 0.18;
-      let baseAmount, gstAmount, totalBilled;
+      // Calculate base amount and GST (assuming 18% GST for tax invoices, 0% for cash invoices)
+      const isCashInvoice = invoice.invoiceType === "Cash Invoice";
+      const gstRate = isCashInvoice ? 0 : 0.18;
+      let baseAmount, gstAmount, totalBilled, actualReceivedAmount;
 
       if (tdsBaseType === "base") {
         // TDS calculated on base amount
-        // originalAmount here is the base amount
+        // originalAmount here is the base amount (after TDS deduction)
         baseAmount = originalAmount;
         gstAmount = baseAmount * gstRate;
         totalBilled = baseAmount + gstAmount;
+        actualReceivedAmount = receivedAmount + gstAmount; // Add GST back to show total received
       } else {
         // TDS calculated on total amount including GST
-        // originalAmount here is the total billed amount
+        // originalAmount here is the total billed amount (after TDS deduction)
         totalBilled = originalAmount;
         baseAmount = totalBilled / (1 + gstRate);
         gstAmount = totalBilled - baseAmount;
+        actualReceivedAmount = receivedAmount; // Total amount after TDS
       }
 
       return {
         originalAmount: tdsBaseType === "base" ? baseAmount : totalBilled,
         tdsAmount: tdsAmount,
-        receivedAfterTDS: receivedAmount,
+        receivedAfterTDS: actualReceivedAmount,
         baseAmount: baseAmount,
         gstAmount: gstAmount,
         totalBilled: totalBilled,
@@ -1324,7 +1441,23 @@ const ContractInvoicesTab = () => {
       const tdsAmount = originalAmount - receivedAmount;
 
       // Calculate the total billed amount for validation
-      const totalBilledAmount = tdsBaseType === "base" ? originalAmount * 1.18 : originalAmount;
+      // For cash invoices, no GST is applied (base = total), for tax invoices, GST is applied
+      const isCashInvoice = invoice.invoiceType === "Cash Invoice";
+      let totalBilledAmount;
+
+      if (isCashInvoice) {
+        // For cash invoices, base = total, no GST
+        totalBilledAmount = originalAmount;
+      } else {
+        // For tax invoices, apply GST based on TDS base type
+        if (tdsBaseType === "base") {
+          // TDS calculated on base amount, GST added to remaining base
+          totalBilledAmount = originalAmount * (1 + 0.18); // base * 1.18
+        } else {
+          // TDS calculated on total amount including GST
+          totalBilledAmount = originalAmount;
+        }
+      }
 
       // Check if the calculated total billed amount exceeds due amount
       if (totalBilledAmount > dueAmount) {
@@ -1344,7 +1477,14 @@ const ContractInvoicesTab = () => {
         currentTime.getSeconds()
       );
 
-      onSubmit(invoice, receivedAmount, paymentDateTime.toISOString(), tdsPercent, originalAmount, tdsAmount, tdsBaseType);
+      // Calculate the actual received amount based on TDS base type
+      let actualReceivedAmount = receivedAmount;
+      if (tdsBaseType === "base" && !isCashInvoice) {
+        // For TDS on base, add GST to the typed amount
+        actualReceivedAmount = receivedAmount + (originalAmount * 0.18);
+      }
+
+      onSubmit(invoice, actualReceivedAmount, paymentDateTime.toISOString(), tdsPercent, originalAmount, tdsAmount, tdsBaseType);
     };
 
     return (
@@ -1390,11 +1530,11 @@ const ContractInvoicesTab = () => {
                 </div>
                 <div className="space-y-0.5">
                   <label className="text-gray-500 text-xs font-medium uppercase tracking-wide">Total Amount</label>
-                  <p className="font-bold text-blue-600 text-xs">₹{amounts.totalAmount?.toLocaleString()}</p>
+                  <p className="font-bold text-blue-600 text-xs">₹{formatIndianCurrency(amounts.totalAmount, false)}</p>
                 </div>
                 <div className="space-y-0.5">
                   <label className="text-gray-500 text-xs font-medium uppercase tracking-wide">Due Amount</label>
-                  <p className="font-bold text-red-600 text-xs">₹{dueAmount.toLocaleString()}</p>
+                  <p className="font-bold text-red-600 text-xs">₹{formatIndianCurrency(dueAmount, false)}</p>
                 </div>
               </div>
             </div>
@@ -1410,7 +1550,7 @@ const ContractInvoicesTab = () => {
                   </div>
                   <div>
                     <p className="text-green-800 font-medium text-xs">Already Received</p>
-                    <p className="text-green-700 text-xs">₹{invoice.receivedAmount.toLocaleString()}</p>
+                    <p className="text-green-700 text-xs">₹{formatIndianCurrency(invoice.receivedAmount, false)}</p>
                   </div>
                 </div>
               </div>
@@ -1438,23 +1578,55 @@ const ContractInvoicesTab = () => {
             </div>
 
             {/* TDS Percentage */}
-            <div className="space-y-1">
+            <div className="space-y-2">
               <label className="block text-xs font-semibold text-gray-800">
-                TDS Percentage (0-10%)
+                TDS Percentage
               </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  value={tdsPercentage}
-                  onChange={(e) => setTdsPercentage(e.target.value)}
-                  placeholder="Enter TDS % (0-10)"
-                  min="0"
-                  max="10"
-                  step="0.01"
-                  className="w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white hover:border-gray-400"
-                />
-                <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
-                  <span className="text-gray-500 font-medium text-xs">%</span>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="flex items-center p-2 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+                  <input
+                    type="radio"
+                    id="tds-0"
+                    name="tdsPercentage"
+                    value="0"
+                    checked={tdsPercentage === "0"}
+                    onChange={(e) => setTdsPercentage(e.target.value)}
+                    className="w-3 h-3 text-blue-600 focus:ring-blue-500 border-gray-300"
+                  />
+                  <label htmlFor="tds-0" className="ml-2 flex-1">
+                    <span className="text-xs font-medium text-gray-900">0%</span>
+                    <p className="text-xs text-gray-600">No TDS</p>
+                  </label>
+                </div>
+                <div className="flex items-center p-2 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+                  <input
+                    type="radio"
+                    id="tds-5"
+                    name="tdsPercentage"
+                    value="5"
+                    checked={tdsPercentage === "5"}
+                    onChange={(e) => setTdsPercentage(e.target.value)}
+                    className="w-3 h-3 text-blue-600 focus:ring-blue-500 border-gray-300"
+                  />
+                  <label htmlFor="tds-5" className="ml-2 flex-1">
+                    <span className="text-xs font-medium text-gray-900">5%</span>
+                    <p className="text-xs text-gray-600">Standard TDS</p>
+                  </label>
+                </div>
+                <div className="flex items-center p-2 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+                  <input
+                    type="radio"
+                    id="tds-10"
+                    name="tdsPercentage"
+                    value="10"
+                    checked={tdsPercentage === "10"}
+                    onChange={(e) => setTdsPercentage(e.target.value)}
+                    className="w-3 h-3 text-blue-600 focus:ring-blue-500 border-gray-300"
+                  />
+                  <label htmlFor="tds-10" className="ml-2 flex-1">
+                    <span className="text-xs font-medium text-gray-900">10%</span>
+                    <p className="text-xs text-gray-600">High TDS</p>
+                  </label>
                 </div>
               </div>
             </div>
@@ -1478,7 +1650,7 @@ const ContractInvoicesTab = () => {
                   <label htmlFor="tds-base" className="ml-2 flex-1">
                     <span className="text-xs font-medium text-gray-900">Base Amount</span>
                     <p className="text-xs text-gray-600">TDS calculated on base amount (excluding GST)</p>
-                    <p className="text-xs font-medium text-blue-600">₹{amounts.baseAmount?.toLocaleString()}</p>
+                    <p className="text-xs font-medium text-blue-600">₹{formatIndianCurrency(amounts.baseAmount, false)}</p>
                   </label>
                 </div>
                 <div className="flex items-center p-2 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
@@ -1494,11 +1666,33 @@ const ContractInvoicesTab = () => {
                   <label htmlFor="tds-total" className="ml-2 flex-1">
                     <span className="text-xs font-medium text-gray-900">Total Amount</span>
                     <p className="text-xs text-gray-600">TDS calculated on total amount (including GST)</p>
-                    <p className="text-xs font-medium text-blue-600">₹{amounts.totalAmount?.toLocaleString()}</p>
+                    <p className="text-xs font-medium text-blue-600">₹{formatIndianCurrency(amounts.totalAmount, false)}</p>
                   </label>
                 </div>
               </div>
             </div>
+
+            {/* Amount Input for TDS Calculation */}
+            {tdsPercentage > 0 && (
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-gray-800">
+                  {tdsBaseType === "base" ? "Base Amount After TDS Deduction" : "Total Amount After TDS Deduction"} <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                    <span className="text-gray-500 font-semibold text-xs">₹</span>
+                  </div>
+                  <input
+                    type="number"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder={tdsBaseType === "base" ? "Enter base amount after TDS (e.g., 45.00)" : "Enter total amount after TDS"}
+                    className="w-full pl-6 pr-3 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white hover:border-gray-400"
+                    max={dueAmount}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Amount Received */}
             <div className="space-y-1">
@@ -1510,18 +1704,19 @@ const ContractInvoicesTab = () => {
                   <span className="text-gray-500 font-semibold text-xs">₹</span>
                 </div>
                 <input
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder={`Enter received amount (max ₹${dueAmount})`}
-                  className="w-full pl-6 pr-3 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white hover:border-gray-400"
-                  max={dueAmount}
+                  type="text"
+                  value={amount && tdsPercentage ? tdsBreakdown.receivedAfterTDS.toFixed(2) : ""}
+                  readOnly
+                  className="w-full pl-6 pr-3 py-2 border border-gray-300 rounded-lg text-xs bg-gray-50 text-gray-900 cursor-not-allowed"
                 />
               </div>
+              <p className="text-xs text-gray-500">
+                {tdsBaseType === "base" ? "Enter base amount after TDS in the calculation above" : "Enter total amount after TDS in the calculation above"}
+              </p>
             </div>
 
             {/* TDS Calculation Display */}
-            {amount && tdsPercentage && (
+            {tdsPercentage > 0 && amount && (
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-3">
                 <div className="flex items-center space-x-1 mb-2">
                   <div className="w-4 h-4 bg-blue-100 rounded-md flex items-center justify-center">
@@ -1531,26 +1726,32 @@ const ContractInvoicesTab = () => {
                   </div>
                   <h4 className="text-xs font-semibold text-blue-900">TDS Calculation</h4>
                 </div>
-                <div className="space-y-1 text-xs">
+                <div className="space-y-2 text-xs">
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">{tdsBaseType === "base" ? "Base Amount Billed:" : "Total Amount Billed:"}</span>
-                    <span className="font-semibold text-gray-900">₹{(parseFloat(tdsBaseType === "base" ? amounts.baseAmount : amounts.totalAmount) || 0).toFixed(2)}</span>
+                    <span className="font-semibold text-gray-900">₹{(tdsBaseType === "base" ? tdsBreakdown.baseAmount : tdsBreakdown.totalBilled).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">TDS Deducted ({tdsPercentage}%):</span>
                     <span className="font-semibold text-red-600">-₹{tdsBreakdown.tdsAmount.toFixed(2)}</span>
                   </div>
+                  {tdsBaseType === "base" && invoice.invoiceType !== "Cash Invoice" && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">GST Amount (18%):</span>
+                      <span className="font-semibold text-blue-600">+₹{tdsBreakdown.gstAmount.toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center border-t border-blue-200 pt-1 mt-1">
                     <span className="text-gray-600 font-medium">Amount Received:</span>
-                    <span className="font-bold text-gray-900">₹{parseFloat(amount).toLocaleString()}</span>
+                    <span className="font-bold text-gray-900">₹{formatIndianCurrency(tdsBreakdown.receivedAfterTDS, false)}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 font-medium">Due Amount:</span>
-                    <span className={`font-bold ${(tdsBaseType === "base" ? tdsBreakdown.totalBilled : tdsBreakdown.originalAmount) > dueAmount ? 'text-red-600' : 'text-green-600'}`}>
-                      ₹{Math.max(0, dueAmount - (tdsBaseType === "base" ? tdsBreakdown.totalBilled : tdsBreakdown.originalAmount)).toFixed(2)}
+                    <span className={`font-bold ${tdsBreakdown.totalBilled > dueAmount ? 'text-red-600' : 'text-green-600'}`}>
+                      ₹{Math.max(0, dueAmount - tdsBreakdown.totalBilled).toFixed(2)}
                     </span>
                   </div>
-                  {(tdsBaseType === "base" ? tdsBreakdown.totalBilled : tdsBreakdown.originalAmount) > dueAmount && (
+                  {tdsBreakdown.totalBilled > dueAmount && (
                     <div className="flex items-center space-x-1 mt-1 p-1 bg-red-50 rounded-md border border-red-200">
                       <svg className="w-3 h-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
@@ -1574,7 +1775,7 @@ const ContractInvoicesTab = () => {
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={!amount || amount <= 0 || !paymentDate}
+                disabled={!amount || amount <= 0 || !paymentDate || (tdsPercentage > 0 && tdsBreakdown.totalBilled > dueAmount)}
                 className="flex-1 px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-xs font-semibold transition-all duration-200 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-sm transform hover:-translate-y-0.5 disabled:transform-none"
               >
                 <div className="flex items-center justify-center space-x-1">
@@ -1591,32 +1792,46 @@ const ContractInvoicesTab = () => {
     );
   };
   // Helper function to format currency in Indian numbering system with abbreviations
-  const formatIndianCurrency = (amount) => {
-    if (!amount && amount !== 0) return "0";
+  const formatIndianCurrency = (amount, abbreviate = false) => {
+    if (!amount && amount !== 0) return "₹0";
 
     let numAmount = Number(amount);
-    if (isNaN(numAmount)) return "0";
+    if (isNaN(numAmount)) return "₹0";
 
-    // For amounts less than 1 lakh, show regular formatting
-    if (numAmount < 100000) {
-      return new Intl.NumberFormat('en-IN').format(numAmount);
+    // Use Math.floor to avoid rounding issues
+    numAmount = Math.floor(numAmount);
+
+    if (abbreviate) {
+      // For amounts less than 1 lakh, show regular formatting
+      if (numAmount < 100000) {
+        return "₹" + new Intl.NumberFormat('en-IN').format(numAmount);
+      }
+
+      // For amounts >= 1 lakh, use abbreviations without rounding
+      if (numAmount >= 10000000000) { // 1000 Cr and above
+        const value = Math.floor((numAmount / 10000000) * 100) / 100;
+        return `₹${value.toFixed(2)}K Cr`;
+      } else if (numAmount >= 1000000000) { // 100 Cr to 999 Cr
+        const value = Math.floor((numAmount / 10000000) * 100) / 100;
+        return `₹${value.toFixed(2)} Cr`;
+      } else if (numAmount >= 100000000) { // 10 Cr to 99 Cr
+        const value = Math.floor((numAmount / 10000000) * 100) / 100;
+        return `₹${value.toFixed(2)} Cr`;
+      } else if (numAmount >= 10000000) { // 1 Cr to 9.9 Cr
+        const value = Math.floor((numAmount / 10000000) * 100) / 100;
+        return `₹${value.toFixed(2)} Cr`;
+      } else if (numAmount >= 1000000) { // 10 Lakh to 99 Lakh
+        const value = Math.floor((numAmount / 100000) * 100) / 100;
+        return `₹${value.toFixed(2)} Lakh`;
+      } else { // 1 Lakh to 9.9 Lakh
+        const value = Math.floor((numAmount / 100000) * 100) / 100;
+        return `₹${value.toFixed(2)} Lakh`;
+      }
+    } else {
+      // Full formatting without abbreviations - Indian numbering system
+      return "₹" + new Intl.NumberFormat('en-IN').format(numAmount);
     }
-
-    // For amounts >= 1 lakh, use abbreviations
-    if (numAmount >= 10000000000) { // 1000 Cr and above
-      return `${(numAmount / 10000000).toFixed(1)}K Cr`;
-    } else if (numAmount >= 1000000000) { // 100 Cr to 999 Cr
-      return `${(numAmount / 10000000).toFixed(1)} Cr`;
-    } else if (numAmount >= 100000000) { // 10 Cr to 99 Cr
-      return `${(numAmount / 10000000).toFixed(1)} Cr`;
-    } else if (numAmount >= 10000000) { // 1 Cr to 9.9 Cr
-      return `${(numAmount / 10000000).toFixed(1)} Cr`;
-    } else if (numAmount >= 1000000) { // 10 Lakh to 99 Lakh
-      return `${(numAmount / 100000).toFixed(2)} Lakh`;
-    } else { // 1 Lakh to 9.9 Lakh
-    return `${(numAmount / 100000).toFixed(2)} Lakh`;
-  }
-};
+  };
   // Fetch invoices on component mount
   useEffect(() => {
     fetchInvoices();
@@ -2027,13 +2242,17 @@ const ContractInvoicesTab = () => {
                 const receivedAmount = parseFloat(invoice.receivedAmount) || 0;
                 const dbDueAmount = parseFloat(invoice.dueAmount) || 0;
 
-                // Calculate total TDS amount from payment history
-                const totalTdsAmount = invoice.paymentHistory?.reduce((sum, payment) => {
-                  return sum + (parseFloat(payment.tdsAmount) || 0);
+                // Calculate total billed amount from payment history (including GST for tax invoices only)
+                const totalBilledAmount = invoice.paymentHistory?.reduce((sum, payment) => {
+                  const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
+                  const tdsBaseType = payment.tdsBaseType || "base";
+                  const isCashInvoice = invoice.invoiceType === "Cash Invoice";
+                  const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? originalAmount * 1.18 : originalAmount);
+                  return sum + billedAmount;
                 }, 0) || 0;
 
-                // Due amount should account for TDS: totalAmount - (receivedAmount + totalTdsAmount)
-                const calculatedDue = totalAmount - (receivedAmount + totalTdsAmount);
+                // Due amount should account for total billed amounts including GST
+                const calculatedDue = totalAmount - totalBilledAmount;
                 const isFullyPaidByCalc = Math.abs(calculatedDue) < 0.01;
                 const isFullyPaidByDB = Math.abs(dbDueAmount) < 0.01;
                 const isFullyPaid = isFullyPaidByCalc || isFullyPaidByDB;
@@ -2147,12 +2366,25 @@ const ContractInvoicesTab = () => {
                             e.stopPropagation();
                             handleCancelInvoice(invoice);
                           }}
-                          className="flex-1 inline-flex items-center justify-center px-2 py-1.5 border border-transparent rounded text-xs font-medium text-white bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-200 shadow-sm hover:shadow-md"
+                          className="flex-1 inline-flex items-center justify-center px-2 py-1.5 border border-transparent rounded text-xs font-medium text-white bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 focus:outline-none transition-all duration-200 shadow-sm hover:shadow-md"
                         >
                           <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                           </svg>
                           Cancel
+                        </button>
+                      ) : isFullyPaid ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleUndoPayments(invoice);
+                          }}
+                          className="flex-1 inline-flex items-center justify-center px-2 py-1.5 border border-transparent rounded text-xs font-medium text-white bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 focus:outline-none transition-all duration-200 shadow-sm hover:shadow-md"
+                        >
+                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                          </svg>
+                          Undo
                         </button>
                       ) : invoice.approvalStatus === "cancelled" ? (
                         <div className="flex-1 inline-flex items-center justify-center px-2 py-1.5 rounded text-xs font-medium bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-sm">
@@ -2245,13 +2477,17 @@ const ContractInvoicesTab = () => {
                     const receivedAmount = parseFloat(invoice.receivedAmount) || 0;
                     const dbDueAmount = parseFloat(invoice.dueAmount) || 0;
 
-                    // Calculate total TDS amount from payment history
-                    const totalTdsAmount = invoice.paymentHistory?.reduce((sum, payment) => {
-                      return sum + (parseFloat(payment.tdsAmount) || 0);
+                    // Calculate total billed amount from payment history (including GST for tax invoices only)
+                    const totalBilledAmount = invoice.paymentHistory?.reduce((sum, payment) => {
+                      const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
+                      const tdsBaseType = payment.tdsBaseType || "base";
+                      const isCashInvoice = invoice.invoiceType === "Cash Invoice";
+                      const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? originalAmount * 1.18 : originalAmount);
+                      return sum + billedAmount;
                     }, 0) || 0;
 
-                    // Due amount should account for TDS: totalAmount - (receivedAmount + totalTdsAmount)
-                    const calculatedDue = totalAmount - (receivedAmount + totalTdsAmount);
+                    // Due amount should account for total billed amounts including GST
+                    const calculatedDue = totalAmount - totalBilledAmount;
                     const isFullyPaidByCalc = Math.abs(calculatedDue) < 0.01;
                     const isFullyPaidByDB = Math.abs(dbDueAmount) < 0.01;
                     const isFullyPaid = isFullyPaidByCalc || isFullyPaidByDB;
@@ -2398,13 +2634,27 @@ const ContractInvoicesTab = () => {
                                   e.stopPropagation();
                                   handleCancelInvoice(invoice);
                                 }}
-                                className="inline-flex items-center px-2 py-1 border border-transparent rounded text-xs font-medium text-white bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-200 shadow-sm hover:shadow-md"
+                                className="inline-flex items-center px-2 py-1 border border-transparent rounded text-xs font-medium text-white bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 focus:outline-none transition-all duration-200 shadow-sm hover:shadow-md"
                                 title="Cancel invoice"
                               >
                                 <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                                 Cancel
+                              </button>
+                            ) : isFullyPaid ? (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUndoPayments(invoice);
+                                }}
+                                className="inline-flex items-center px-2 py-1 border border-transparent rounded text-xs font-medium text-white bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 focus:outline-none transition-all duration-200 shadow-sm hover:shadow-md"
+                                title="Undo all payments"
+                              >
+                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                </svg>
+                                Undo
                               </button>
                             ) : invoice.approvalStatus === "cancelled" ? (
                               <div className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-sm">

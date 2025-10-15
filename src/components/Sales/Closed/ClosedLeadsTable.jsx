@@ -182,77 +182,6 @@ const ClosedLeadsTable = ({
         {isLoading ? "Loading closed leads data..." : `${enrichedLeads.length} closed leads loaded`}
       </div>
 
-      {/* Header Section */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-4 mb-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900 tracking-tight">
-              Closed Deals
-            </h1>
-            <p className="text-gray-600 text-xs mt-0.5">
-              Successfully closed leads • {enrichedLeads.length} deals • {formatCurrency(summary.totalValue)} total value
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span>Live Data</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200/50 p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg flex items-center justify-center">
-              <FiDollarSign className="w-5 h-5 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Value</p>
-              <p className="text-lg font-bold text-gray-900">{formatCurrency(summary.totalValue)}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200/50 p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-emerald-50 to-green-100 rounded-lg flex items-center justify-center">
-              <FiUsers className="w-5 h-5 text-emerald-600" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Students</p>
-              <p className="text-lg font-bold text-gray-900">{summary.totalStudents.toLocaleString()}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200/50 p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-50 to-violet-100 rounded-lg flex items-center justify-center">
-              <FiTrendingUp className="w-5 h-5 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">New Deals</p>
-              <p className="text-lg font-bold text-gray-900">{summary.newLeads}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200/50 p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-amber-50 to-orange-100 rounded-lg flex items-center justify-center">
-              <FiRefreshCw className="w-5 h-5 text-amber-600" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Renewals</p>
-              <p className="text-lg font-bold text-gray-900">{summary.renewalLeads}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Main Container */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden">
         {/* Mobile Card Layout */}
@@ -498,7 +427,7 @@ const ClosedLeadsTable = ({
           <div className={`overflow-x-auto scrollbar-thin scrollbar-thumb-slate-300/60 scrollbar-track-slate-50/50 scrollbar-thumb-rounded-full hover:scrollbar-thumb-slate-400/60 transition-colors ${maxHeight ? 'overflow-y-auto' : ''}`} style={maxHeight ? { maxHeight } : {}}>
             {/* Table */}
             <table className={`min-w-full divide-y divide-gray-200 ${tableClassName}`}>
-              <thead className="bg-gradient-to-r from-slate-600 to-slate-700">
+              <thead className="bg-gradient-to-r from-blue-600 to-indigo-700">
                 <tr>
                   <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">
                     <div className="flex items-center space-x-1">

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import gryphonLogo from "../../assets/gryphon_logo.png";
 import signature from "../../assets/sign.png";
 
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 
 const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
@@ -13,10 +13,45 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
   // Custom toast state
   const [toast, setToast] = useState(null);
 
+  // Training data state for dynamic descriptions
+  const [trainingData, setTrainingData] = useState(null);
+
+  // Editable month for EMI
+  const [editableMonth, setEditableMonth] = useState('');
+
   // ✅ Yeh IMPORTANT fix hai - jab invoice prop change ho toh state update ho
   useEffect(() => {
     setEditableInvoice(invoice);
   }, [invoice]);
+
+  // Fetch training data for dynamic descriptions
+  useEffect(() => {
+    const fetchTrainingData = async () => {
+      if (invoice.projectCode) {
+        try {
+          const docId = invoice.projectCode.replace(/\//g, '-');
+          const docRef = doc(db, 'trainingForms', docId);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setTrainingData(data);
+            
+            // Calculate and set editable month for EMI
+            if (invoice.installment?.toLowerCase().includes('installment')) {
+              const monthsString = data.emiMonths || 'oct, dec, feb, apr, jun, aug, oct, dec, feb, apr, jun, aug';
+              const monthsArray = monthsString.split(', ');
+              const installmentNum = invoice.installment?.match(/(\d+)/)?.[1] || '1';
+              const currentMonth = monthsArray[parseInt(installmentNum) - 1] || 'oct';
+              setEditableMonth(invoice.emiMonth || currentMonth);
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching training data:", error);
+        }
+      }
+    };
+    fetchTrainingData();
+  }, [invoice.projectCode, invoice.installment, invoice.emiMonth]);
 
   // cleanup toast timer on unmount
   useEffect(() => {
@@ -62,6 +97,10 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
         invoiceNumber: editableInvoice.invoiceNumber.trim(),
         raisedDate: new Date(editableInvoice.raisedDate)
       };
+
+      if (invoice.installment?.toLowerCase().includes('installment')) {
+        updateData.emiMonth = editableMonth;
+      }
       
       console.log("Updating invoice with:", updateData);
       
@@ -112,6 +151,9 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
   const handleCancelEdit = () => {
     setIsEditing(false);
     setEditableInvoice(invoice); // Original data par reset karo
+    if (invoice.installment?.toLowerCase().includes('installment')) {
+      setEditableMonth(invoice.emiMonth || 'oct');
+    }
   };
 
 
@@ -389,6 +431,48 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
   const projectCodes = getAllProjectCodes();
   const interstate = isInterState();
 
+  // Function to get dynamic description based on installment
+  const getDynamicDescription = (invoice, trainingData) => {
+    const { installment } = invoice;
+    const percentage = invoice.paymentDetails?.[0]?.percentage || '30';
+
+    if (installment?.toLowerCase().includes('advance')) {
+      return `As per the MOU signed, ${percentage}% before the commencement of training.`;
+    }
+
+    // Special handling for ATTP: first Training (index 1) is after 50% completion
+    if (invoice.installmentIndex === 1 && installment?.toLowerCase().includes('training')) {
+      return `As per the MOU, ${percentage}% after 50% completion of training.`;
+    }
+
+    if (installment?.toLowerCase().includes('50%')) {
+      return `As per the MOU, ${percentage}% after 50% completion of training.`;
+    } else if (installment?.toLowerCase().includes('completion') || installment?.toLowerCase().includes('training')) {
+      return `As per the MOU, ${percentage}% payment after the completion of training.`;
+    } else if (installment?.toLowerCase().includes('placement') || installment?.toLowerCase().includes('companies')) {
+      return `As per the MOU, balance ${percentage}% amount after placement completion.`;
+    } else if (installment?.toLowerCase().includes('installment')) {
+      // For EMI
+      const { perStudentCost, emiMonths, studentCount: trainingStudentCount } = trainingData || {};
+      const studentCount = invoice.studentCount || trainingStudentCount || 90;
+      const monthsString = emiMonths || 'oct, dec, feb, apr, jun, aug, oct, dec, feb, apr, jun, aug';
+      const monthsArray = monthsString.split(', ');
+      const installmentNum = installment?.match(/(\d+)/)?.[1] || '1';
+      const currentMonth = monthsArray[parseInt(installmentNum) - 1] || 'oct';
+      const month = editableMonth || currentMonth;
+      const capitalizedMonth = month.charAt(0).toUpperCase() + month.slice(1);
+      return (
+        <span>
+          As per the MOU signed for the students of {invoice.year || '1st'} year for student count as {studentCount}, @ Rs {perStudentCost || 2000} per student + 18% GST for {capitalizedMonth} month - {installmentNum} Installment
+        </span>
+      );
+    } else {
+      return invoice.isMergedInvoice
+        ? `for ${invoice.course || ""} ${invoice.year || ""} year`
+        : `after completion of the training ${invoice.course || ""} ${invoice.year || ""} year`;
+    }
+  };
+
   return (
     <div>
       <div className="fixed inset-0 bg-transparent backdrop-blur-md bg-opacity-50 flex items-center justify-center z-500 p-4 no-print">
@@ -446,6 +530,20 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
                     </p>
                   )}
                 </div>
+                
+                {/* EMI Month - Editable */}
+                {isEditing && invoice.installment?.toLowerCase().includes('installment') && (
+                  <div>
+                    <input
+                      type="text"
+                      value={editableMonth}
+                      onChange={(e) => setEditableMonth(e.target.value)}
+                      className="text-xs border border-gray-300 px-2 py-1 rounded w-24 mb-1"
+                      placeholder="Month"
+                    />
+                    <p className="text-xs text-gray-600">Current: {invoice.emiMonth || 'N/A'}</p>
+                  </div>
+                )}
                 
                 {invoice.dueDate && (
                   <p className="text-xs text-red-600">
@@ -542,16 +640,9 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
                             ` (${invoice.paymentDetails[0].percentage}%)`}
                         </div>
                         <div className="text-xs text-gray-700 mt-1">
-                          {invoice.isMergedInvoice
-                            ? `for ${invoice.course || ""} ${
-                                invoice.year || ""
-                              } year`
-                            : `after completion of the training ${
-                                invoice.course || ""
-                              } ${invoice.year || ""} year`}
-                          {invoice.studentCount &&
-                            ` for ${invoice.studentCount} students`}
-                          {amounts.gstAmount > 0 && 
+                          {getDynamicDescription(invoice, trainingData)}
+                          {invoice.studentCount && !invoice.installment?.toLowerCase().includes('installment') && ` for ${invoice.studentCount} students`}
+                          {amounts.gstAmount > 0 && !invoice.installment?.toLowerCase().includes('installment') && 
                             ` + ${interstate ? '18% IGST' : '18% GST (9% CGST + 9% SGST)'}`
                           }
                         </div>

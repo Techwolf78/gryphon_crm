@@ -43,8 +43,10 @@ function SendSchedule({
     lodging: 0
   });
 
+  const [feePerHour, setFeePerHour] = useState(0);
+
   const [success, setSuccess] = useState(false);
-  const [error, setError] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
 
   const [trainingFormDoc, setTrainingFormDoc] = useState(null);
   const [phaseDocData, setPhaseDocData] = useState(null);
@@ -114,32 +116,35 @@ useEffect(() => {
   };
 
   useEffect(() => {
-    if ((trainingFormDoc || trainingData) && selectedTrainer) {
-      setEmailData((prev) => ({
-        ...prev,
-        to: "", // Keep empty by default
-        venue:
-          trainingFormDoc?.address ||
-          trainingFormDoc?.venue ||
-          trainingFormDoc?.accountName ||
-          trainingData?.venue ||
-          "",
-        contactPerson:
-          trainingFormDoc?.tpoName ||
-          trainingFormDoc?.contactPerson ||
-          trainingFormDoc?.createdBy?.name ||
-          trainingData?.contactPerson ||
-          "",
-        contactNumber:
-          trainingFormDoc?.tpoPhone ||
-          trainingFormDoc?.trainingPhone ||
-          trainingFormDoc?.accountPhone ||
-          trainingData?.trainingPhone ||
-          trainingData?.tpoPhone ||
-          "",
-      }));
-    }
-  }, [trainingFormDoc, trainingData, selectedTrainer]);
+    if (!selectedTrainer) return;
+    const fetchFee = async () => {
+      try {
+        const trainerQuery = query(
+          collection(db, "trainers"),
+          where(
+            "trainerId",
+            "==",
+            selectedTrainer.trainerId || selectedTrainer.id
+          )
+        );
+        const trainerSnap = await getDocs(trainerQuery);
+        if (!trainerSnap.empty) {
+          const trainerData = trainerSnap.docs[0].data();
+          setFeePerHour(trainerData.charges || trainerData.feePerHour || 0);
+        } else {
+          const tDocRef = doc(db, "trainers", selectedTrainer.id);
+          const tDocSnap = await getDoc(tDocRef);
+          if (tDocSnap.exists())
+            setFeePerHour(
+              tDocSnap.data().charges || tDocSnap.data().feePerHour || 0
+            );
+        }
+      } catch (err) {
+        console.error("Error fetching trainer fee data:", err);
+      }
+    };
+    fetchFee();
+  }, [selectedTrainer]);
 
   // ---------- Fetch trainers assigned to this training ----------
   useEffect(() => {
@@ -187,7 +192,7 @@ useEffect(() => {
         setTrainers(assignedTrainers);
       } catch (err) {
         console.error("Error fetching assigned trainers:", err);
-        setError("Failed to load trainers");
+        setErrorMessage("Failed to load trainers");
       }
     };
 
@@ -217,7 +222,7 @@ useEffect(() => {
         else setPhaseDocData(null);
       } catch (err) {
         console.error("Error fetching training form and phase data:", err);
-        setError("Failed to load training details");
+        setErrorMessage("Failed to load training details");
       }
     };
 
@@ -242,7 +247,7 @@ useEffect(() => {
       setTrainerAssignments(assignments);
     } catch (err) {
       console.error("Error fetching trainer schedule:", err);
-      setError("Failed to fetch trainer schedule");
+      setErrorMessage("Failed to fetch trainer schedule");
     } finally {
       setFetchingSchedule(false);
     }
@@ -254,10 +259,14 @@ useEffect(() => {
     fetchTrainerSchedule(trainer.trainerId || trainer.id);
   };
 
+  const handleViewFinancials = () => {
+    setCurrentStep(3);
+  };
+
   // ADD THIS MISSING FUNCTION
   const handleConfirmSchedule = () => {
-    setCurrentStep(3);
-    setError(""); // Clear any previous errors
+    setCurrentStep(4);
+    setErrorMessage(""); // Clear any previous errors
     setEmailData((prev) => ({
       ...prev,
       to: prev.to || "", // Keep existing email if already entered
@@ -291,53 +300,38 @@ useEffect(() => {
   // ---------- Send Email ----------
   const handleSendEmail = async () => {
     if (!emailData.to.trim()) {
-      setError("Please enter recipient email or click 'Import Email' to load from trainer data");
+      setErrorMessage("Please enter recipient email or click 'Import Email' to load from trainer data");
       return;
     }
 
     setLoading(true);
-    setError("");
+    setErrorMessage("");
 
     try {
-      let feePerHour = 0;
-      if (selectedTrainer) {
-        try {
-          const trainerQuery = query(
-            collection(db, "trainers"),
-            where(
-              "trainerId",
-              "==",
-              selectedTrainer.trainerId || selectedTrainer.id
-            )
-          );
-          const trainerSnap = await getDocs(trainerQuery);
-          if (!trainerSnap.empty) {
-            const trainerData = trainerSnap.docs[0].data();
-            feePerHour = trainerData.charges || trainerData.feePerHour || 0;
-          } else {
-            const tDocRef = doc(db, "trainers", selectedTrainer.id);
-            const tDocSnap = await getDoc(tDocRef);
-            if (tDocSnap.exists())
-              feePerHour =
-                tDocSnap.data().charges || tDocSnap.data().feePerHour || 0;
-          }
-        } catch (err) {
-          console.error("Error fetching trainer fee data:", err);
-        }
-      }
       
       const totalHours = (() => {
-        // Find the trainer's assigned hours from trainersData
-        const trainerDetails = trainersData.find(trainer =>
+        // Find all trainer details for this trainer
+        const allTrainerDetails = trainersData.filter(trainer =>
           trainer.trainerId === selectedTrainer.trainerId ||
           trainer.trainerId === selectedTrainer.id ||
           trainer.id === selectedTrainer.trainerId ||
           trainer.id === selectedTrainer.id
         );
 
-        if (trainerDetails && trainerDetails.assignedHours) {
-          return trainerDetails.assignedHours;
-        }
+        // Sum dailyHours if available
+        let totalDailyHours = 0;
+        let hasDailyHours = false;
+        allTrainerDetails.forEach(detail => {
+          if (detail.dailyHours && Array.isArray(detail.dailyHours)) {
+            totalDailyHours += detail.dailyHours.reduce((sum, h) => sum + (h || 0), 0);
+            hasDailyHours = true;
+          }
+        });
+        if (hasDailyHours) return totalDailyHours;
+
+        // Sum assignedHours
+        const totalAssignedHours = allTrainerDetails.reduce((sum, detail) => sum + (detail.assignedHours || 0), 0);
+        if (totalAssignedHours > 0) return totalAssignedHours;
 
         // Fallback: Calculate from assignment data
         return trainerAssignments.reduce((acc, assignment) => {
@@ -345,33 +339,42 @@ useEffect(() => {
         }, 0);
       })();
 
-      // FIXED: Include expenses in total cost calculation
-      const trainingFees = totalHours * (feePerHour || 0);
-      const totalExpenses = trainerCostDetails.conveyance + trainerCostDetails.food + trainerCostDetails.lodging;
-      const totalCost = trainingFees + totalExpenses;
-      const tdsAmount = totalCost * 0.1; // 10% TDS
-      const payableCost = totalCost - tdsAmount;
+      // FIXED: Use new calculation logic (matching InvoiceModal)
+      const roundToNearestWhole = (num) => Math.round(num);
+      
+      const trainingFees = roundToNearestWhole(totalHours * (feePerHour || 0));
+      const totalExpenses = roundToNearestWhole(trainerCostDetails.conveyance + trainerCostDetails.food + trainerCostDetails.lodging);
+      const totalAmount = roundToNearestWhole(trainingFees + totalExpenses);
+      
+      // TDS applied only on training fees (matching InvoiceModal logic)
+      const tdsAmount = roundToNearestWhole(trainingFees * 0.1); // 10% TDS on training fees only
+      const payableCost = roundToNearestWhole(totalAmount - tdsAmount);
 
       const scheduleRows = trainerAssignments
-        .map((assignment) => {
-          // Find the trainer's assigned hours from trainersData
-          const trainerDetails = trainersData.find(trainer =>
+        .map((assignment, idx) => {
+          // Find all trainer details for this trainer
+          const allTrainerDetails = trainersData.filter(trainer =>
             trainer.trainerId === selectedTrainer.trainerId ||
             trainer.trainerId === selectedTrainer.id ||
             trainer.id === selectedTrainer.trainerId ||
             trainer.id === selectedTrainer.id
-          );
+          ).sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+
+          // Concatenate dailyHours from all trainer details
+          let concatenatedDailyHours = [];
+          allTrainerDetails.forEach(detail => {
+            if (detail.dailyHours && Array.isArray(detail.dailyHours)) {
+              concatenatedDailyHours = concatenatedDailyHours.concat(detail.dailyHours);
+            }
+          });
 
           let hoursPerDay = 0;
-          if (trainerDetails && trainerDetails.assignedHours) {
-            const totalAssignments = trainerAssignments.length;
-            hoursPerDay = totalAssignments > 0 ? trainerDetails.assignedHours / totalAssignments : 0;
+          if (concatenatedDailyHours.length === trainerAssignments.length) {
+            hoursPerDay = concatenatedDailyHours[idx] || 0;
           } else {
-            // Fallback: Calculate from assignment data
+            // Fallback: sum all assignedHours and divide by total assignments
+            const totalAssignedHours = allTrainerDetails.reduce((sum, detail) => sum + (detail.assignedHours || 0), 0);
             const totalAssignments = trainerAssignments.length;
-            const totalAssignedHours = trainerAssignments.reduce((acc, assign) => {
-              return acc + (assign.assignedHours || 0);
-            }, 0);
             hoursPerDay = totalAssignments > 0 ? totalAssignedHours / totalAssignments : 0;
           }
 
@@ -415,28 +418,36 @@ useEffect(() => {
         fee_per_day:
           trainerAssignments.length > 0
             ? (() => {
-                // Find the trainer's assigned hours from trainersData
-                const trainerDetails = trainersData.find(trainer =>
+                // Find all trainer details for this trainer
+                const allTrainerDetails = trainersData.filter(trainer =>
                   trainer.trainerId === selectedTrainer.trainerId ||
                   trainer.trainerId === selectedTrainer.id ||
                   trainer.id === selectedTrainer.trainerId ||
                   trainer.id === selectedTrainer.id
                 );
 
+                // Sum dailyHours if available
+                let totalDailyHours = 0;
+                let hasDailyHours = false;
+                allTrainerDetails.forEach(detail => {
+                  if (detail.dailyHours && Array.isArray(detail.dailyHours)) {
+                    totalDailyHours += detail.dailyHours.reduce((sum, h) => sum + (h || 0), 0);
+                    hasDailyHours = true;
+                  }
+                });
+
                 let hoursPerDay = 0;
-                if (trainerDetails && trainerDetails.assignedHours) {
-                  hoursPerDay = trainerDetails.assignedHours / trainerAssignments.length;
+                if (hasDailyHours) {
+                  hoursPerDay = trainerAssignments.length > 0 ? totalDailyHours / trainerAssignments.length : 0;
                 } else {
-                  const totalAssignedHours = trainerAssignments.reduce((acc, assign) => {
-                    return acc + (assign.assignedHours || 0);
-                  }, 0);
-                  hoursPerDay = totalAssignedHours / trainerAssignments.length;
+                  const totalAssignedHours = allTrainerDetails.reduce((sum, detail) => sum + (detail.assignedHours || 0), 0);
+                  hoursPerDay = trainerAssignments.length > 0 ? totalAssignedHours / trainerAssignments.length : 0;
                 }
 
-                return feePerHour * hoursPerDay;
+                return (feePerHour || 0) * hoursPerDay;
               })()
             : 0,
-        total_cost: totalCost,
+        total_cost: totalAmount,
         tds_amount: tdsAmount,
         payable_cost: payableCost,
         project_code:
@@ -461,7 +472,7 @@ useEffect(() => {
       }, 2500);
     } catch (err) {
       console.error("Error sending email:", err);
-      setError("Failed to send email. Please try again.");
+      setErrorMessage("Failed to send email. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -488,7 +499,7 @@ useEffect(() => {
         {/* Step Indicator */}
         <div className="px-6 py-4 bg-gray-50 border-b">
           <div className="flex items-center space-x-4">
-            {[1, 2, 3, 4].map((step) => (
+            {[1, 2, 3, 4, 5].map((step) => (
               <div key={step} className="flex items-center">
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
@@ -508,10 +519,11 @@ useEffect(() => {
                 >
                   {step === 1 && "Select Trainer"}
                   {step === 2 && "Review Schedule"}
-                  {step === 3 && "Confirm & Email"}
-                  {step === 4 && "Send"}
+                  {step === 3 && "Financial Details"}
+                  {step === 4 && "Confirm & Email"}
+                  {step === 5 && "Send"}
                 </span>
-                {step < 4 && (
+                {step < 5 && (
                   <div
                     className={`w-8 h-0.5 ml-4 ${
                       currentStep > step ? "bg-blue-600" : "bg-gray-300"
@@ -524,9 +536,9 @@ useEffect(() => {
         </div>
 
         <div className="p-6">
-          {error && (
+          {errorMessage && (
             <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
-              {error}
+              {errorMessage}
             </div>
           )}
 
@@ -625,7 +637,7 @@ useEffect(() => {
                       </tr>
                     </thead>
                     <tbody>
-                      {trainerAssignments.map((assignment) => (
+                      {trainerAssignments.map((assignment, index) => (
                         <tr key={assignment.id} className="hover:bg-gray-50">
                           <td className="px-4 py-2 border border-gray-200">
                             {formatDate(assignment.date)}
@@ -644,26 +656,29 @@ useEffect(() => {
                           </td>
                           <td className="px-4 py-2 border border-gray-200">
                             {(() => {
-                              // Find the trainer's assigned hours from trainersData
-                              const trainerDetails = trainersData.find(trainer =>
+                              // Find all trainer details for this trainer
+                              const allTrainerDetails = trainersData.filter(trainer =>
                                 trainer.trainerId === selectedTrainer.trainerId ||
                                 trainer.trainerId === selectedTrainer.id ||
                                 trainer.id === selectedTrainer.trainerId ||
                                 trainer.id === selectedTrainer.id
-                              );
+                              ).sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
 
-                              if (trainerDetails && trainerDetails.assignedHours) {
-                                // Calculate hours per day based on trainer's total assigned hours divided by number of days
-                                const totalAssignments = trainerAssignments.length;
-                                const hoursPerDay = totalAssignments > 0 ? trainerDetails.assignedHours / totalAssignments : 0;
-                                return hoursPerDay.toFixed(2);
+                              // Concatenate dailyHours from all trainer details
+                              let concatenatedDailyHours = [];
+                              allTrainerDetails.forEach(detail => {
+                                if (detail.dailyHours && Array.isArray(detail.dailyHours)) {
+                                  concatenatedDailyHours = concatenatedDailyHours.concat(detail.dailyHours);
+                                }
+                              });
+
+                              if (concatenatedDailyHours.length === trainerAssignments.length) {
+                                return (concatenatedDailyHours[index] || 0).toFixed(2);
                               }
 
-                              // Fallback: Calculate from assignment data
+                              // Fallback: sum all assignedHours and divide by total assignments
+                              const totalAssignedHours = allTrainerDetails.reduce((sum, detail) => sum + (detail.assignedHours || 0), 0);
                               const totalAssignments = trainerAssignments.length;
-                              const totalAssignedHours = trainerAssignments.reduce((acc, assignment) => {
-                                return acc + (assignment.assignedHours || 0);
-                              }, 0);
                               const hoursPerDay = totalAssignments > 0 ? totalAssignedHours / totalAssignments : 0;
                               return hoursPerDay.toFixed(2);
                             })()}
@@ -699,6 +714,110 @@ useEffect(() => {
                   Back
                 </button>
                 <button
+                  onClick={handleViewFinancials}
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Financial Details */}
+          {currentStep === 3 && (
+            <div>
+              <h3 className="text-lg font-medium text-gray-800 mb-4">
+                Calculated Financial Details
+              </h3>
+
+              {(() => {
+                // Calculate financial details using new logic (matching InvoiceModal)
+                const totalHours = (() => {
+                  const allTrainerDetails = trainersData.filter(trainer =>
+                    trainer.trainerId === selectedTrainer.trainerId ||
+                    trainer.trainerId === selectedTrainer.id ||
+                    trainer.id === selectedTrainer.trainerId ||
+                    trainer.id === selectedTrainer.id
+                  );
+
+                  let totalDailyHours = 0;
+                  let hasDailyHours = false;
+                  allTrainerDetails.forEach(detail => {
+                    if (detail.dailyHours && Array.isArray(detail.dailyHours)) {
+                      totalDailyHours += detail.dailyHours.reduce((sum, h) => sum + (h || 0), 0);
+                      hasDailyHours = true;
+                    }
+                  });
+                  if (hasDailyHours) return totalDailyHours;
+
+                  const totalAssignedHours = allTrainerDetails.reduce((sum, detail) => sum + (detail.assignedHours || 0), 0);
+                  if (totalAssignedHours > 0) return totalAssignedHours;
+
+                  return trainerAssignments.reduce((acc, assignment) => {
+                    return acc + (assignment.assignedHours || 0);
+                  }, 0);
+                })();
+
+                // Round to nearest whole number (matching InvoiceModal)
+                const roundToNearestWhole = (num) => Math.round(num);
+
+                const trainingFees = roundToNearestWhole((feePerHour || 0) * totalHours);
+                const totalExpenses = roundToNearestWhole(
+                  (trainerCostDetails.conveyance || 0) +
+                  (trainerCostDetails.food || 0) +
+                  (trainerCostDetails.lodging || 0)
+                );
+                const totalAmount = roundToNearestWhole(trainingFees + totalExpenses);
+                
+                // TDS applied only on training fees (matching InvoiceModal logic)
+                const tdsAmount = roundToNearestWhole((trainingFees * 0.1)); // 10% TDS on training fees only
+                const amountBeforeGST = roundToNearestWhole(totalAmount - tdsAmount);
+                
+                // No GST in SendSchedule (simplified version)
+                const payableCost = amountBeforeGST;
+
+                return (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <h4 className="font-medium text-gray-800 mb-2">Training Details</h4>
+                        <div className="space-y-1 text-sm">
+                          <div>Total Days: {trainerAssignments.length}</div>
+                          <div>Total Hours: {totalHours.toFixed(2)}</div>
+                          <div>Fee per Hour: ₹{feePerHour.toLocaleString('en-IN')}</div>
+                        </div>
+                      </div>
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <h4 className="font-medium text-gray-800 mb-2">Expenses</h4>
+                        <div className="space-y-1 text-sm">
+                          <div>Conveyance: ₹{trainerCostDetails.conveyance.toLocaleString('en-IN')}</div>
+                          <div>Food: ₹{trainerCostDetails.food.toLocaleString('en-IN')}</div>
+                          <div>Lodging: ₹{trainerCostDetails.lodging.toLocaleString('en-IN')}</div>
+                          <div className="font-medium">Total Expenses: ₹{totalExpenses.toLocaleString('en-IN')}</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <h4 className="font-medium text-gray-800 mb-2">Cost Summary</h4>
+                      <div className="space-y-1 text-sm">
+                        <div>Training Fees: ₹{trainingFees.toLocaleString('en-IN')}</div>
+                        <div>Total Amount: ₹{totalAmount.toLocaleString('en-IN')}</div>
+                        <div>TDS (10% on Training Fees): ₹{tdsAmount.toLocaleString('en-IN')}</div>
+                        <div className="font-bold text-lg">Payable Amount: ₹{payableCost.toLocaleString('en-IN')}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="mt-6 flex justify-end space-x-3">
+                <button
+                  onClick={() => setCurrentStep(2)}
+                  className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                >
+                  Back
+                </button>
+                <button
                   onClick={handleConfirmSchedule}
                   className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
                 >
@@ -708,8 +827,8 @@ useEffect(() => {
             </div>
           )}
 
-          {/* Step 3: Confirm Email */}
-          {currentStep === 3 && (
+          {/* Step 4: Confirm & Email */}
+          {currentStep === 4 && (
             <div>
               <h3 className="text-lg font-medium text-gray-800 mb-4">
                 Confirm Details
@@ -787,7 +906,7 @@ useEffect(() => {
 
               <div className="mt-6 flex justify-end space-x-3">
                 <button
-                  onClick={() => setCurrentStep(2)}
+                  onClick={() => setCurrentStep(3)}
                   className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
                 >
                   Back
