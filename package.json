@@ -59,7 +59,6 @@
     "react-select": "^5.10.2",
     "react-time-picker": "^7.0.0",
     "react-toastify": "^11.0.5",
-    "recharts": "^3.0.2",
     "remark-breaks": "^4.0.0",
     "tailwindcss": "^4.1.8",
     "together-ai": "^0.20.0",
