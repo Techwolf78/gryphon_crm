@@ -365,7 +365,7 @@ useEffect(() => {
     try {
       
       const totalHours = (() => {
-        // Calculate based on dayDuration of assignments
+        // Calculate based on dayDuration of assignments using the same calculateHours function
         return trainerAssignments.reduce((acc, assignment) => {
           return acc + calculateHours(assignment.dayDuration);
         }, 0);
@@ -695,20 +695,10 @@ useEffect(() => {
               </h3>
 
               {(() => {
-                // Calculate financial details using new logic (matching InvoiceModal)
-                const totalHours = (() => {
-                  // Calculate based on dayDuration of assignments
-                  return trainerAssignments.reduce((acc, assignment) => {
-                    const duration = assignment.dayDuration || "";
-                    if (duration.includes("AM & PM") || (duration.includes("AM") && duration.includes("PM"))) {
-                      return acc + 6;
-                    } else if (duration.includes("AM") || duration.includes("PM")) {
-                      return acc + 3;
-                    } else {
-                      return acc;
-                    }
-                  }, 0);
-                })();
+                // Calculate financial details using the same calculateHours function as the table
+                const totalHours = trainerAssignments.reduce((acc, assignment) => {
+                  return acc + calculateHours(assignment.dayDuration);
+                }, 0);
 
                 // Round to nearest whole number (matching InvoiceModal)
                 const roundToNearestWhole = (num) => Math.round(num);

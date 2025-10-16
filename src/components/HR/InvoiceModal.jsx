@@ -38,8 +38,17 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
             
             // Calculate and set editable month for EMI
             if (invoice.installment?.toLowerCase().includes('installment')) {
-              const monthsString = data.emiMonths || 'oct, dec, feb, apr, jun, aug, oct, dec, feb, apr, jun, aug';
-              const monthsArray = monthsString.split(', ');
+              // Handle emiMonths as either string or array
+              let monthsArray = [];
+              if (Array.isArray(data.emiMonths)) {
+                monthsArray = data.emiMonths;
+              } else if (typeof data.emiMonths === 'string') {
+                monthsArray = data.emiMonths.split(', ');
+              } else {
+                // Default fallback
+                monthsArray = 'oct, dec, feb, apr, jun, aug, oct, dec, feb, apr, jun, aug'.split(', ');
+              }
+              
               const installmentNum = invoice.installment?.match(/(\d+)/)?.[1] || '1';
               const currentMonth = monthsArray[parseInt(installmentNum) - 1] || 'oct';
               setEditableMonth(invoice.emiMonth || currentMonth);
@@ -86,6 +95,30 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
         return;
       }
 
+      // ✅ Proper date validation and parsing
+      let parsedDate;
+      try {
+        if (typeof editableInvoice.raisedDate === 'string') {
+          // Handle date string from input field (yyyy-mm-dd format)
+          parsedDate = new Date(editableInvoice.raisedDate + 'T00:00:00.000Z');
+        } else if (editableInvoice.raisedDate?.toDate) {
+          // Handle Firestore timestamp
+          parsedDate = editableInvoice.raisedDate.toDate();
+        } else {
+          // Handle Date object or other formats
+          parsedDate = new Date(editableInvoice.raisedDate);
+        }
+        
+        // Validate the parsed date
+        if (isNaN(parsedDate.getTime())) {
+          throw new Error('Invalid date');
+        }
+      } catch {
+        console.error("Date parsing error");
+        setToast({ type: 'error', message: "Invalid invoice date format. Please enter a valid date." });
+        return;
+      }
+
       const collectionName = invoice.invoiceType === "Proforma Invoice" 
         ? "ProformaInvoices" 
         : "ContractInvoices";
@@ -95,7 +128,7 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
       // ✅ Proper date handling karo
       const updateData = {
         invoiceNumber: editableInvoice.invoiceNumber.trim(),
-        raisedDate: new Date(editableInvoice.raisedDate)
+        raisedDate: parsedDate
       };
 
       if (invoice.installment?.toLowerCase().includes('installment')) {
@@ -237,7 +270,7 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
         month: "2-digit",
         year: "numeric",
       });
-    } catch (error) {
+    } catch {
 
       return "Invalid Date";
     }
@@ -455,11 +488,23 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
       // For EMI
       const { perStudentCost, emiMonths, studentCount: trainingStudentCount } = trainingData || {};
       const studentCount = invoice.studentCount || trainingStudentCount || 90;
-      const monthsString = emiMonths || 'oct, dec, feb, apr, jun, aug, oct, dec, feb, apr, jun, aug';
-      const monthsArray = monthsString.split(', ');
+      
+      // Handle emiMonths as either string or array
+      let monthsArray = [];
+      if (Array.isArray(emiMonths)) {
+        monthsArray = emiMonths;
+      } else if (typeof emiMonths === 'string') {
+        monthsArray = emiMonths.split(', ');
+      } else {
+        // Default fallback
+        monthsArray = 'oct, dec, feb, apr, jun, aug, oct, dec, feb, apr, jun, aug'.split(', ');
+      }
+      
       const installmentNum = installment?.match(/(\d+)/)?.[1] || '1';
       const currentMonth = monthsArray[parseInt(installmentNum) - 1] || 'oct';
-      const month = editableMonth || currentMonth;
+      
+      // For merged invoices or when emiMonth is saved in invoice, use that first
+      const month = invoice.emiMonth || editableMonth || currentMonth;
       const capitalizedMonth = month.charAt(0).toUpperCase() + month.slice(1);
       return (
         <span>
@@ -541,7 +586,6 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
                       className="text-xs border border-gray-300 px-2 py-1 rounded w-24 mb-1"
                       placeholder="Month"
                     />
-                    <p className="text-xs text-gray-600">Current: {invoice.emiMonth || 'N/A'}</p>
                   </div>
                 )}
                 
