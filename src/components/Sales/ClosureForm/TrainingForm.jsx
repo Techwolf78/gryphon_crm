@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { FaTimes } from "react-icons/fa";
 import {
   collection,
@@ -10,7 +10,6 @@ import {
   getDoc,
 } from "firebase/firestore";
 import { db } from "../../../firebase";
-import { AuthContext } from "../../../context/AuthContext";
 import CollegeInfoSection from "./CollegeInfoSection";
 import POCInfoSection from "./POCInfoSection";
 import StudentBreakdownSection from "./StudentBreakdownSection";
@@ -23,8 +22,6 @@ import * as XLSX from "xlsx-js-style";
 
 const validateCollegeCode = (value) => /^[A-Z]*$/.test(value);
 const validatePincode = (value) => /^[0-9]{0,6}$/.test(value);
-const validateGST = (value) =>
-  /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(value);
 
 const TrainingForm = ({
   show,
@@ -32,9 +29,7 @@ const TrainingForm = ({
   lead,
   users,
   existingFormData,
-  isLoading,
 }) => {
-  const { currentUser } = useContext(AuthContext);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [formData, setFormData] = useState({
@@ -80,11 +75,10 @@ const TrainingForm = ({
   });
   const [collegeCodeError, setCollegeCodeError] = useState("");
   const [pincodeError, setPincodeError] = useState("");
-  const [gstError, setGstError] = useState("");
   const [studentFile, setStudentFile] = useState(null);
   const [mouFile, setMouFile] = useState(null);
-  const [studentFileError, setStudentFileError] = useState("");
-  const [mouFileError, setMouFileError] = useState("");
+  const [studentFileError] = useState("");
+  const [mouFileError] = useState("");
   const [contractStartDate, setContractStartDate] = useState("");
   const [contractEndDate, setContractEndDate] = useState("");
   const [duplicateProjectCode, setDuplicateProjectCode] = useState(false);
@@ -166,29 +160,6 @@ const TrainingForm = ({
     }
   }, [existingFormData, lead]);
 
-  // Rest of your existing useEffect hooks remain the same...
-  useEffect(() => {
-    if (lead) {
-      setFormData((prev) => ({
-        ...prev,
-        collegeName: lead.businessName || "",
-        address: lead.address || "",
-        city: lead.city || "",
-        state: lead.state || "",
-        studentCount: lead.studentCount || 0,
-        totalCost: (lead.studentCount || 0) * (lead.perStudentCost || 0),
-        perStudentCost: lead.perStudentCost || 0,
-        course: lead.courseType || "",
-        tpoName: lead.pocName || "",
-        tpoEmail: lead.email || "",
-        tpoPhone: lead.phoneNo || "",
-        predictedstdcount: lead.predictedstdcount || "",
-      }));
-      setContractStartDate(lead.contractStartDate || "");
-      setContractEndDate(lead.contractEndDate || "");
-    }
-  }, [lead]);
-
   useEffect(() => {
     const totalStudents = formData.courses.reduce(
       (sum, item) => sum + (parseInt(item.students) || 0),
@@ -221,11 +192,7 @@ const TrainingForm = ({
       }
     }
   }, [
-    formData.collegeCode,
-    formData.course,
-    formData.year,
-    formData.deliveryType,
-    formData.passingYear,
+    formData,
     isEdit,
   ]);
 
@@ -279,11 +246,6 @@ const TrainingForm = ({
         validatePincode(value) ? "" : "Pincode must be up to 6 digits only"
       );
     }
-    if (name === "gstNumber") {
-      setGstError(
-        value && !validateGST(value) ? "Invalid GST number format" : ""
-      );
-    }
     setFormData((prev) => ({ ...prev, [name]: value }));
   }, []);
 
@@ -303,27 +265,22 @@ const TrainingForm = ({
   };
 
   const uploadStudentsToFirestore = async (studentList, formId) => {
-    try {
-      if (!studentList || studentList.length === 0) return;
+    if (!studentList || studentList.length === 0) return;
 
-      const batch = writeBatch(db);
-      const studentsCollectionRef = collection(
-        db,
-        "trainingForms",
-        formId,
-        "students"
-      );
+    const batch = writeBatch(db);
+    const studentsCollectionRef = collection(
+      db,
+      "trainingForms",
+      formId,
+      "students"
+    );
 
-      studentList.forEach((student) => {
-        const docRef = doc(studentsCollectionRef);
-        batch.set(docRef, student);
-      });
+    studentList.forEach((student) => {
+      const docRef = doc(studentsCollectionRef);
+      batch.set(docRef, student);
+    });
 
-      await batch.commit();
-    } catch (error) {
-
-      throw error;
-    }
+    await batch.commit();
   };
 
   const handleStudentFile = (file) => {
@@ -349,7 +306,7 @@ const TrainingForm = ({
       const formRef = doc(db, "trainingForms", sanitizedProjectCode);
       const existingDoc = await getDoc(formRef);
       return existingDoc.exists();
-    } catch (error) {
+    } catch {
 
       return false;
     }
@@ -526,7 +483,6 @@ const TrainingForm = ({
                         handleChange={handleChange}
                         collegeCodeError={collegeCodeError}
                         pincodeError={pincodeError}
-                        gstError={gstError}
                         isEdit ={isEdit}
                      
                         
@@ -590,7 +546,6 @@ TrainingForm.propTypes = {
   lead: PropTypes.object,
   users: PropTypes.object,
   existingFormData: PropTypes.object, // Add this
-  isLoading: PropTypes.bool, // Add this
 };
 
 export default TrainingForm;

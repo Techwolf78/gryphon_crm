@@ -86,9 +86,9 @@ const CollegeInfoForm = ({
             value={stateOptions.find((opt) => opt.value === state)}
             onChange={(selected) => {
               setState(selected ? selected.value : "");
-              setCity(""); // Reset city when state changes
+              setCity(null); // Reset city when state changes
             }}
-            placeholder="Search state"
+            placeholder="Select state"
             isClearable
             styles={{
               control: (provided) => ({
@@ -123,9 +123,9 @@ const CollegeInfoForm = ({
           </label>
           <Select
             options={cityOptions}
-            value={cityOptions.find((opt) => opt.value === city)}
-            onChange={(selected) => setCity(selected ? selected.value : "")}
-            placeholder="Search city"
+            value={city ? cityOptions.find((opt) => opt.value === city) : null}
+            onChange={(selected) => setCity(selected ? selected.value : null)}
+            placeholder="Select city"
             isClearable
             isDisabled={!state}
             styles={{

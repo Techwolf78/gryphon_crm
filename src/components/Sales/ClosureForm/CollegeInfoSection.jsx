@@ -1,4 +1,6 @@
 import React from "react";
+import Select from "react-select";
+import stateCityData from "../stateCityData";
 
 const CollegeInfoSection = ({
   formData,
@@ -6,11 +8,23 @@ const CollegeInfoSection = ({
   handleChange,
   collegeCodeError,
   pincodeError,
-  gstError,
   isEdit,
 }) => {
   const inputClass =
     "w-full px-3 py-2 border-gray-300 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white";
+
+  const stateOptions = Object.keys(stateCityData).map((state) => ({
+    value: state,
+    label: state,
+  }));
+
+  const cityOptions =
+    formData.state && stateCityData[formData.state]
+      ? stateCityData[formData.state].map((city) => ({
+          value: city,
+          label: city,
+        }))
+      : [];
 
   return (
     <section className="p-5 bg-white rounded-xl shadow space-y-6">
@@ -83,33 +97,92 @@ const CollegeInfoSection = ({
           />
         </div>
 
-        {/* City */}
-        <div>
-          <label className="font-medium block mb-1">
-            City <span className="text-red-500">*</span>
-          </label>
-          <input
-            name="city"
-            className={inputClass}
-            placeholder="Enter City"
-            value={formData.city}
-            onChange={handleChange}
-            required
-          />
-        </div>
-
         {/* State */}
         <div>
           <label className="font-medium block mb-1">
             State <span className="text-red-500">*</span>
           </label>
-          <input
-            name="state"
-            className={inputClass}
-            placeholder="Enter State"
-            value={formData.state}
-            onChange={handleChange}
-            required
+          <Select
+            options={stateOptions}
+            value={stateOptions.find((opt) => opt.value === formData.state)}
+            onChange={(selected) => {
+              setFormData((prev) => ({
+                ...prev,
+                state: selected ? selected.value : "",
+                city: null, // Reset city when state changes
+              }));
+            }}
+            placeholder="Select state"
+            isClearable
+            styles={{
+              control: (provided) => ({
+                ...provided,
+                minHeight: '34px',
+                fontSize: '14px',
+                borderRadius: '6px'
+              }),
+              placeholder: (provided) => ({
+                ...provided,
+                fontSize: '14px'
+              }),
+              option: (provided) => ({
+                ...provided,
+                fontSize: '14px'
+              }),
+              input: (provided) => ({
+                ...provided,
+                fontSize: '14px'
+              }),
+              singleValue: (provided) => ({
+                ...provided,
+                fontSize: '14px'
+              })
+            }}
+          />
+        </div>
+
+        {/* City */}
+        <div>
+          <label className="font-medium block mb-1">
+            City <span className="text-red-500">*</span>
+          </label>
+          <Select
+            options={cityOptions}
+            value={formData.city ? cityOptions.find((opt) => opt.value === formData.city) : null}
+            onChange={(selected) =>
+              setFormData((prev) => ({
+                ...prev,
+                city: selected ? selected.value : null,
+              }))
+            }
+            placeholder="Select city"
+            isClearable
+            isDisabled={!formData.state}
+            styles={{
+              control: (provided, state) => ({
+                ...provided,
+                minHeight: '34px',
+                fontSize: '14px',
+                borderRadius: '6px',
+                backgroundColor: state.isDisabled ? '#f9fafb' : provided.backgroundColor
+              }),
+              placeholder: (provided) => ({
+                ...provided,
+                fontSize: '14px'
+              }),
+              option: (provided) => ({
+                ...provided,
+                fontSize: '14px'
+              }),
+              input: (provided) => ({
+                ...provided,
+                fontSize: '14px'
+              }),
+              singleValue: (provided) => ({
+                ...provided,
+                fontSize: '14px'
+              })
+            }}
           />
         </div>
       </div>

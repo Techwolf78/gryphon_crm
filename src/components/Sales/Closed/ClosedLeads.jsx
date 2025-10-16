@@ -533,7 +533,7 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
                 </div>
               </div>
             )}            {/* Stats Dashboard */}
-            <div className="mb-8">
+            <div className="mb-4">
               <ClosedLeadsStats
                 leads={enrichedLeads}
                 targets={targets}
