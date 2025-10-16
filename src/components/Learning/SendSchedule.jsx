@@ -115,6 +115,36 @@ useEffect(() => {
     return slot;
   };
 
+  // Utility: calculate hours for dayDuration
+  const calculateHours = (dayDuration) => {
+    if (!dayDuration) return 0;
+    const pd = phaseData || phaseDocData || {};
+    const { collegeStartTime, lunchStartTime, lunchEndTime, collegeEndTime } = pd;
+
+    if (!collegeStartTime || !collegeEndTime) return dayDuration.includes("AM & PM") ? 7 : dayDuration.includes("AM") || dayDuration.includes("PM") ? 3 : 0;
+
+    const parseTime = (timeStr) => {
+      const [h, m] = timeStr.split(':').map(Number);
+      return h * 60 + m;
+    };
+
+    const start = parseTime(collegeStartTime);
+    const end = parseTime(collegeEndTime);
+    const lunchStart = lunchStartTime && lunchEndTime ? parseTime(lunchStartTime) : null;
+    const lunchEnd = lunchStartTime && lunchEndTime ? parseTime(lunchEndTime) : null;
+
+    const lunchDuration = lunchStart && lunchEnd ? lunchEnd - lunchStart : 0;
+
+    if (dayDuration.includes("AM & PM") || (dayDuration.includes("AM") && dayDuration.includes("PM"))) {
+      return (end - start - lunchDuration) / 60;
+    } else if (dayDuration.includes("AM")) {
+      return lunchStart ? (lunchStart - start) / 60 : (end - start) / 60 / 2;
+    } else if (dayDuration.includes("PM")) {
+      return lunchEnd ? (end - lunchEnd) / 60 : (end - start) / 60 / 2;
+    }
+    return 0;
+  };
+
   useEffect(() => {
     if (!selectedTrainer) return;
     const fetchFee = async () => {
@@ -233,21 +263,46 @@ useEffect(() => {
   const fetchTrainerSchedule = async (trainerId) => {
     setFetchingSchedule(true);
     try {
-      const q = query(
-        collection(db, "trainerAssignments"),
-        where("trainerId", "==", trainerId),
-        where("sourceTrainingId", "==", training.id)
+      // Instead of fetching from Firestore, generate assignments based on trainersData
+      // to match the display in InitiationTrainingDetails
+      const trainerDetails = trainersData.filter(trainer => 
+        trainer.trainerId === trainerId || trainer.id === trainerId
       );
-      const assignmentsSnap = await getDocs(q);
+
       const assignments = [];
-      assignmentsSnap.forEach((doc) =>
-        assignments.push({ id: doc.id, ...doc.data() })
-      );
+      trainerDetails.forEach(detail => {
+        if (detail.startDate && detail.endDate && detail.dayDuration) {
+          const start = new Date(detail.startDate);
+          const end = new Date(detail.endDate);
+          const excludeDays = phaseData?.excludeDays || "None";
+
+          for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            const dayOfWeek = d.getDay();
+            let include = true;
+            if (excludeDays === "Saturday" && dayOfWeek === 6) include = false;
+            else if (excludeDays === "Sunday" && dayOfWeek === 0) include = false;
+            else if (excludeDays === "Both" && (dayOfWeek === 0 || dayOfWeek === 6)) include = false;
+
+            if (include) {
+              assignments.push({
+                id: `${detail.trainerId}_${d.toISOString().split('T')[0]}_${detail.domain}_${detail.batchCode}`,
+                date: d.toISOString().split('T')[0],
+                dayDuration: detail.dayDuration,
+                domain: detail.domain,
+                batchCode: detail.batchCode,
+                trainerId: detail.trainerId,
+                sourceTrainingId: training.id
+              });
+            }
+          }
+        }
+      });
+
       assignments.sort((a, b) => new Date(a.date) - new Date(b.date));
       setTrainerAssignments(assignments);
     } catch (err) {
-      console.error("Error fetching trainer schedule:", err);
-      setErrorMessage("Failed to fetch trainer schedule");
+      console.error("Error generating trainer schedule:", err);
+      setErrorMessage("Failed to generate trainer schedule");
     } finally {
       setFetchingSchedule(false);
     }
@@ -310,32 +365,9 @@ useEffect(() => {
     try {
       
       const totalHours = (() => {
-        // Find all trainer details for this trainer
-        const allTrainerDetails = trainersData.filter(trainer =>
-          trainer.trainerId === selectedTrainer.trainerId ||
-          trainer.trainerId === selectedTrainer.id ||
-          trainer.id === selectedTrainer.trainerId ||
-          trainer.id === selectedTrainer.id
-        );
-
-        // Sum dailyHours if available
-        let totalDailyHours = 0;
-        let hasDailyHours = false;
-        allTrainerDetails.forEach(detail => {
-          if (detail.dailyHours && Array.isArray(detail.dailyHours)) {
-            totalDailyHours += detail.dailyHours.reduce((sum, h) => sum + (h || 0), 0);
-            hasDailyHours = true;
-          }
-        });
-        if (hasDailyHours) return totalDailyHours;
-
-        // Sum assignedHours
-        const totalAssignedHours = allTrainerDetails.reduce((sum, detail) => sum + (detail.assignedHours || 0), 0);
-        if (totalAssignedHours > 0) return totalAssignedHours;
-
-        // Fallback: Calculate from assignment data
+        // Calculate based on dayDuration of assignments
         return trainerAssignments.reduce((acc, assignment) => {
-          return acc + (assignment.assignedHours || 0);
+          return acc + calculateHours(assignment.dayDuration);
         }, 0);
       })();
 
@@ -351,32 +383,8 @@ useEffect(() => {
       const payableCost = roundToNearestWhole(totalAmount - tdsAmount);
 
       const scheduleRows = trainerAssignments
-        .map((assignment, idx) => {
-          // Find all trainer details for this trainer
-          const allTrainerDetails = trainersData.filter(trainer =>
-            trainer.trainerId === selectedTrainer.trainerId ||
-            trainer.trainerId === selectedTrainer.id ||
-            trainer.id === selectedTrainer.trainerId ||
-            trainer.id === selectedTrainer.id
-          ).sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
-
-          // Concatenate dailyHours from all trainer details
-          let concatenatedDailyHours = [];
-          allTrainerDetails.forEach(detail => {
-            if (detail.dailyHours && Array.isArray(detail.dailyHours)) {
-              concatenatedDailyHours = concatenatedDailyHours.concat(detail.dailyHours);
-            }
-          });
-
-          let hoursPerDay = 0;
-          if (concatenatedDailyHours.length === trainerAssignments.length) {
-            hoursPerDay = concatenatedDailyHours[idx] || 0;
-          } else {
-            // Fallback: sum all assignedHours and divide by total assignments
-            const totalAssignedHours = allTrainerDetails.reduce((sum, detail) => sum + (detail.assignedHours || 0), 0);
-            const totalAssignments = trainerAssignments.length;
-            hoursPerDay = totalAssignments > 0 ? totalAssignedHours / totalAssignments : 0;
-          }
+        .map((assignment) => {
+          let hoursPerDay = calculateHours(assignment.dayDuration);
 
           const perDayCost = (feePerHour || 0) * hoursPerDay;
 
@@ -411,40 +419,19 @@ useEffect(() => {
   total_expenses: totalExpenses,
 
   schedule_rows: scheduleRows,
-  total_days: trainerAssignments.length,
+  total_days: new Set(trainerAssignments.map(a => a.date)).size,
   total_hours: totalHours,
   start_date: trainerAssignments[0] ? formatDate(trainerAssignments[0].date) : "",
   fee_per_hour: feePerHour,
         fee_per_day:
           trainerAssignments.length > 0
             ? (() => {
-                // Find all trainer details for this trainer
-                const allTrainerDetails = trainersData.filter(trainer =>
-                  trainer.trainerId === selectedTrainer.trainerId ||
-                  trainer.trainerId === selectedTrainer.id ||
-                  trainer.id === selectedTrainer.trainerId ||
-                  trainer.id === selectedTrainer.id
-                );
-
-                // Sum dailyHours if available
-                let totalDailyHours = 0;
-                let hasDailyHours = false;
-                allTrainerDetails.forEach(detail => {
-                  if (detail.dailyHours && Array.isArray(detail.dailyHours)) {
-                    totalDailyHours += detail.dailyHours.reduce((sum, h) => sum + (h || 0), 0);
-                    hasDailyHours = true;
-                  }
-                });
-
-                let hoursPerDay = 0;
-                if (hasDailyHours) {
-                  hoursPerDay = trainerAssignments.length > 0 ? totalDailyHours / trainerAssignments.length : 0;
-                } else {
-                  const totalAssignedHours = allTrainerDetails.reduce((sum, detail) => sum + (detail.assignedHours || 0), 0);
-                  hoursPerDay = trainerAssignments.length > 0 ? totalAssignedHours / trainerAssignments.length : 0;
-                }
-
-                return (feePerHour || 0) * hoursPerDay;
+                // Calculate average fee per day based on assignments
+                const totalFee = trainerAssignments.reduce((acc, assignment) => {
+                  const hours = calculateHours(assignment.dayDuration);
+                  return acc + (hours * (feePerHour || 0));
+                }, 0);
+                return totalFee / trainerAssignments.length;
               })()
             : 0,
         total_cost: totalAmount,
@@ -637,66 +624,43 @@ useEffect(() => {
                       </tr>
                     </thead>
                     <tbody>
-                      {trainerAssignments.map((assignment, index) => (
-                        <tr key={assignment.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-2 border border-gray-200">
-                            {formatDate(assignment.date)}
-                          </td>
-                          <td className="px-4 py-2 border border-gray-200">
-                            {new Date(assignment.date).toLocaleDateString(
-                              "en-US",
-                              { weekday: "long" }
-                            )}
-                          </td>
-                          <td className="px-4 py-2 border border-gray-200">
-                            {assignment.dayDuration || "-"}
-                          </td>
-                          <td className="px-4 py-2 border border-gray-200">
-                            {getTimingForSlot(assignment.dayDuration)}
-                          </td>
-                          <td className="px-4 py-2 border border-gray-200">
-                            {(() => {
-                              // Find all trainer details for this trainer
-                              const allTrainerDetails = trainersData.filter(trainer =>
-                                trainer.trainerId === selectedTrainer.trainerId ||
-                                trainer.trainerId === selectedTrainer.id ||
-                                trainer.id === selectedTrainer.trainerId ||
-                                trainer.id === selectedTrainer.id
-                              ).sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+                      {trainerAssignments.map((assignment) => {
+                        console.log("Assignment data:", assignment);
+                        return (
+                          <tr key={assignment.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-2 border border-gray-200">
+                              {formatDate(assignment.date)}
+                            </td>
+                            <td className="px-4 py-2 border border-gray-200">
+                              {new Date(assignment.date).toLocaleDateString(
+                                "en-US",
+                                { weekday: "long" }
+                              )}
+                            </td>
+                            <td className="px-4 py-2 border border-gray-200">
+                              {assignment.dayDuration || "-"}
+                            </td>
+                            <td className="px-4 py-2 border border-gray-200">
+                              {getTimingForSlot(assignment.dayDuration)}
+                            </td>
+                            <td className="px-4 py-2 border border-gray-200">
+                              {calculateHours(assignment.dayDuration).toFixed(2)}
+                            </td>
 
-                              // Concatenate dailyHours from all trainer details
-                              let concatenatedDailyHours = [];
-                              allTrainerDetails.forEach(detail => {
-                                if (detail.dailyHours && Array.isArray(detail.dailyHours)) {
-                                  concatenatedDailyHours = concatenatedDailyHours.concat(detail.dailyHours);
-                                }
-                              });
-
-                              if (concatenatedDailyHours.length === trainerAssignments.length) {
-                                return (concatenatedDailyHours[index] || 0).toFixed(2);
-                              }
-
-                              // Fallback: sum all assignedHours and divide by total assignments
-                              const totalAssignedHours = allTrainerDetails.reduce((sum, detail) => sum + (detail.assignedHours || 0), 0);
-                              const totalAssignments = trainerAssignments.length;
-                              const hoursPerDay = totalAssignments > 0 ? totalAssignedHours / totalAssignments : 0;
-                              return hoursPerDay.toFixed(2);
-                            })()}
-                          </td>
-
-                          <td className="px-4 py-2 border border-gray-200">
-                            {assignment.domain || "-"}
-                          </td>
-                          <td className="px-4 py-2 border border-gray-200">
-                            {assignment.batchCode || "-"}
-                          </td>
-                          <td className="px-4 py-2 border border-gray-200">
-                            {trainingFormDoc?.collegeName ||
-                              trainingData?.collegeName ||
-                              "-"}
-                          </td>
-                        </tr>
-                      ))}
+                            <td className="px-4 py-2 border border-gray-200">
+                              {assignment.domain || "-"}
+                            </td>
+                            <td className="px-4 py-2 border border-gray-200">
+                              {assignment.batchCode || "-"}
+                            </td>
+                            <td className="px-4 py-2 border border-gray-200">
+                              {trainingFormDoc?.collegeName ||
+                                trainingData?.collegeName ||
+                                "-"}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -733,28 +697,16 @@ useEffect(() => {
               {(() => {
                 // Calculate financial details using new logic (matching InvoiceModal)
                 const totalHours = (() => {
-                  const allTrainerDetails = trainersData.filter(trainer =>
-                    trainer.trainerId === selectedTrainer.trainerId ||
-                    trainer.trainerId === selectedTrainer.id ||
-                    trainer.id === selectedTrainer.trainerId ||
-                    trainer.id === selectedTrainer.id
-                  );
-
-                  let totalDailyHours = 0;
-                  let hasDailyHours = false;
-                  allTrainerDetails.forEach(detail => {
-                    if (detail.dailyHours && Array.isArray(detail.dailyHours)) {
-                      totalDailyHours += detail.dailyHours.reduce((sum, h) => sum + (h || 0), 0);
-                      hasDailyHours = true;
-                    }
-                  });
-                  if (hasDailyHours) return totalDailyHours;
-
-                  const totalAssignedHours = allTrainerDetails.reduce((sum, detail) => sum + (detail.assignedHours || 0), 0);
-                  if (totalAssignedHours > 0) return totalAssignedHours;
-
+                  // Calculate based on dayDuration of assignments
                   return trainerAssignments.reduce((acc, assignment) => {
-                    return acc + (assignment.assignedHours || 0);
+                    const duration = assignment.dayDuration || "";
+                    if (duration.includes("AM & PM") || (duration.includes("AM") && duration.includes("PM"))) {
+                      return acc + 6;
+                    } else if (duration.includes("AM") || duration.includes("PM")) {
+                      return acc + 3;
+                    } else {
+                      return acc;
+                    }
                   }, 0);
                 })();
 
@@ -782,7 +734,7 @@ useEffect(() => {
                       <div className="bg-gray-50 p-4 rounded-lg">
                         <h4 className="font-medium text-gray-800 mb-2">Training Details</h4>
                         <div className="space-y-1 text-sm">
-                          <div>Total Days: {trainerAssignments.length}</div>
+                          <div>Total Days: {new Set(trainerAssignments.map(a => a.date)).size}</div>
                           <div>Total Hours: {totalHours.toFixed(2)}</div>
                           <div>Fee per Hour: ₹{feePerHour.toLocaleString('en-IN')}</div>
                         </div>
