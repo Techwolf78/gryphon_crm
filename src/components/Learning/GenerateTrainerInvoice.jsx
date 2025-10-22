@@ -12,7 +12,7 @@ import TrainerTable from "./Invoice/TrainerTable";
 
 function GenerateTrainerInvoice() {
   // Cache duration: 5 minutes (but adaptive based on usage)
-  const CACHE_DURATION = 5 * 60 * 1000;
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
   const EXTENDED_CACHE_DURATION = 15 * 60 * 1000; // 15 minutes for heavy users
   const CACHE_VERSION = 'v2.0_college_first'; // 🆕 Version to invalidate old cache structure
   
@@ -492,6 +492,17 @@ function GenerateTrainerInvoice() {
     // Track user visit for adaptive caching
     trackUserVisit();
     
+    // Load lastFetchTime from localStorage immediately
+    const storedLastFetch = localStorage.getItem('trainer_invoice_last_fetch');
+    const storedCacheVersion = localStorage.getItem('trainer_invoice_cache_version');
+    
+    if (storedLastFetch && storedCacheVersion === CACHE_VERSION) {
+      const parsedTime = parseInt(storedLastFetch);
+      if (!isNaN(parsedTime)) {
+        setLastFetchTime(parsedTime);
+      }
+    }
+    
     // Force structure update first
     const now = Date.now();
     const adaptiveDuration = getAdaptiveCacheDuration();
@@ -618,13 +629,9 @@ function GenerateTrainerInvoice() {
     }
   }, [lastFetchTime, getAdaptiveCacheDuration, CACHE_DURATION]);
 
-  // cleanup toast timer on unmount
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
+
+
+
   useEffect(() => {
     const cleanupOldSessionData = () => {
       try {
@@ -1069,10 +1076,10 @@ function GenerateTrainerInvoice() {
           
           {/* 🎯 SIMPLIFIED: Clean status with refresh button focus */}
           {!loading && lastFetchTime && (
-            <div className="px-4 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+            <div className="px-4 py-1 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className={`text-sm font-medium ${
+                  <span className={`text-xs font-medium ${
                     getCacheStatus().isExpired ? 'text-amber-700' : 'text-green-700'
                   }`}>
                     {getCacheStatus().isExpired ? '⚠️ Data may be outdated' : '✅ Data is current'}
@@ -1080,8 +1087,8 @@ function GenerateTrainerInvoice() {
                   
                   {refreshing && (
                     <div className="flex items-center gap-1 text-blue-600">
-                      <FiRefreshCw className="animate-spin text-sm" />
-                      <span className="text-sm">Updating...</span>
+                      <FiRefreshCw className="animate-spin text-xs" />
+                      <span className="text-xs">Updating...</span>
                     </div>
                   )}
                 </div>
@@ -1089,7 +1096,7 @@ function GenerateTrainerInvoice() {
                 <button
                   onClick={handleRefreshData}
                   disabled={refreshing}
-                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm ${
+                  className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-all shadow-sm ${
                     refreshing
                       ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                       : getCacheStatus().isExpired
@@ -1097,7 +1104,7 @@ function GenerateTrainerInvoice() {
                       : 'bg-blue-500 text-white hover:bg-blue-600'
                   }`}
                 >
-                  <FiRefreshCw className={`${refreshing ? 'animate-spin' : ''}`} />
+                  <FiRefreshCw className={`${refreshing ? 'animate-spin' : ''} text-xs`} />
                   {refreshing ? 'Refreshing...' : 'Refresh'}
                 </button>
               </div>

@@ -25,8 +25,8 @@ export const AuthProvider = ({ children }) => {
       const currentUser = auth.currentUser;
       if (!currentUser) return false;
 
-      // Force token refresh and check auth time
-      const token = await currentUser.getIdTokenResult(true);
+      // Check auth time without forcing refresh (less aggressive)
+      const token = await currentUser.getIdTokenResult();
       const authTime = new Date(token.authTime).getTime();
       const sessionAge = Date.now() - authTime;
       
@@ -54,7 +54,7 @@ export const AuthProvider = ({ children }) => {
       return false;
     } catch (error) {
       console.error("Error refreshing session:", error);
-      logout();
+      // Don't logout on refresh errors - just return false
       return false;
     }
   };

@@ -11,15 +11,25 @@ import {
 import { db } from "../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { debounce } from "lodash";
-import FollowupAlerts from "../components/Sales/FollowupAlerts";
-import AddCollegeModal from "../components/Sales/AddCollegeModal";
-import FollowUp from "../components/Sales/Followup";
-import TrainingForm from "../components/Sales/ClosureForm/TrainingForm";
-import LeadDetailsModal from "../components/Sales/EditDetailsModal";
-import ExpectedDateModal from "../components/Sales/ExpectedDateWarning";
-import LeadsTable from "../components/Sales/LeadTable";
-import LeadFilters from "../components/Sales/LeadFilters";
-import SalesTour from "../components/tours/SalesTour";
+import { Suspense, lazy } from "react";
+
+// Lazy load heavy components
+const FollowupAlerts = lazy(() => import("../components/Sales/FollowupAlerts"));
+const AddCollegeModal = lazy(() => import("../components/Sales/AddCollegeModal"));
+const FollowUp = lazy(() => import("../components/Sales/Followup"));
+const TrainingForm = lazy(() => import("../components/Sales/ClosureForm/TrainingForm"));
+const LeadDetailsModal = lazy(() => import("../components/Sales/EditDetailsModal"));
+const ExpectedDateModal = lazy(() => import("../components/Sales/ExpectedDateWarning"));
+const LeadsTable = lazy(() => import("../components/Sales/LeadTable"));
+const LeadFilters = lazy(() => import("../components/Sales/LeadFilters"));
+const SalesTour = lazy(() => import("../components/tours/SalesTour"));
+
+// Loading component for lazy loaded components
+const ComponentLoader = () => (
+  <div className="flex items-center justify-center p-8">
+    <div className="w-8 h-8 border-4 border-red-200 border-t-red-600 rounded-full animate-spin"></div>
+  </div>
+);
 
 const tabLabels = {
   hot: "Hot",
@@ -641,7 +651,7 @@ function Sales() {
     }
   }, []);
 
-  const handleImportComplete = useCallback((importedData) => {
+  const handleImportComplete = useCallback(() => {
     // Handle imported data if needed
   }, []);
 
@@ -768,17 +778,19 @@ function Sales() {
               </div>
             )}
 
-            <LeadFilters
-              filteredLeads={filteredLeads}
-              handleImportComplete={handleImportComplete}
-              filters={rawFilters}
-              setFilters={setRawFilters}
-              isFilterOpen={isFilterOpen}
-              setIsFilterOpen={setIsFilterOpen}
-              users={users}
-              leads={leads}
-              activeTab={activeTab}
-            />
+            <Suspense fallback={<ComponentLoader />}>
+              <LeadFilters
+                filteredLeads={filteredLeads}
+                handleImportComplete={handleImportComplete}
+                filters={rawFilters}
+                setFilters={setRawFilters}
+                isFilterOpen={isFilterOpen}
+                setIsFilterOpen={setIsFilterOpen}
+                users={users}
+                leads={leads}
+                activeTab={activeTab}
+              />
+            </Suspense>
           </div>
 
           {/* Phase Tabs */}
@@ -818,90 +830,106 @@ function Sales() {
         </div>
 
         {/* Leads Table - This will scroll under the sticky header */}
-        <LeadsTable
-          loading={loading}
-          activeTab={activeTab}
-          filteredLeads={filteredLeads}
-          users={users}
-          dropdownOpenId={dropdownOpenId}
-          setDropdownOpenId={setDropdownOpenId}
-          toggleDropdown={toggleDropdown}
-          setSelectedLead={setSelectedLead}
-          setShowFollowUpModal={setShowFollowUpModal}
-          setShowDetailsModal={setShowDetailsModal}
-          setShowClosureModal={setShowClosureModal}
-          updateLeadPhase={updateLeadPhase}
-          dropdownRef={dropdownRef}
-          setShowExpectedDateModal={setShowExpectedDateModal}
-          setPendingPhaseChange={setPendingPhaseChange}
-          setLeadBeingUpdated={setLeadBeingUpdated}
-          gridColumns="grid grid-cols-11 gap-4"
-          headerColorMap={{
-            open: "bg-blue-100",
-            inProgress: "bg-yellow-100",
-            closed: "bg-gray-100",
-          }}
-          borderColorMap={{
-            open: "border-blue-400",
-            inProgress: "border-yellow-400",
-            closed: "border-gray-400",
-          }}
-          setShowModal={setShowModal}
-          leads={leads}
-          viewMyLeadsOnly={viewMyLeadsOnly}
-          currentUser={currentUser}
-          onClosedLeadsCountChange={setClosedLeadsCount} // Add this prop
-        />
+        <Suspense fallback={<ComponentLoader />}>
+          <LeadsTable
+            loading={loading}
+            activeTab={activeTab}
+            filteredLeads={filteredLeads}
+            users={users}
+            dropdownOpenId={dropdownOpenId}
+            setDropdownOpenId={setDropdownOpenId}
+            toggleDropdown={toggleDropdown}
+            setSelectedLead={setSelectedLead}
+            setShowFollowUpModal={setShowFollowUpModal}
+            setShowDetailsModal={setShowDetailsModal}
+            setShowClosureModal={setShowClosureModal}
+            updateLeadPhase={updateLeadPhase}
+            dropdownRef={dropdownRef}
+            setShowExpectedDateModal={setShowExpectedDateModal}
+            setPendingPhaseChange={setPendingPhaseChange}
+            setLeadBeingUpdated={setLeadBeingUpdated}
+            gridColumns="grid grid-cols-11 gap-4"
+            headerColorMap={{
+              open: "bg-blue-100",
+              inProgress: "bg-yellow-100",
+              closed: "bg-gray-100",
+            }}
+            borderColorMap={{
+              open: "border-blue-400",
+              inProgress: "border-yellow-400",
+              closed: "border-gray-400",
+            }}
+            setShowModal={setShowModal}
+            leads={leads}
+            viewMyLeadsOnly={viewMyLeadsOnly}
+            currentUser={currentUser}
+            onClosedLeadsCountChange={setClosedLeadsCount} // Add this prop
+          />
+        </Suspense>
       </div>
 
-      <AddCollegeModal show={showModal} onClose={() => setShowModal(false)} />
+      <Suspense fallback={<ComponentLoader />}>
+        <AddCollegeModal show={showModal} onClose={() => setShowModal(false)} />
+      </Suspense>
 
-      <LeadDetailsModal
-        show={showDetailsModal}
-        onClose={() => setShowDetailsModal(false)}
-        lead={selectedLead}
-        onSave={handleSaveLead}
-      />
+      <Suspense fallback={<ComponentLoader />}>
+        <LeadDetailsModal
+          show={showDetailsModal}
+          onClose={() => setShowDetailsModal(false)}
+          lead={selectedLead}
+          onSave={handleSaveLead}
+        />
+      </Suspense>
 
       {showClosureModal && selectedLead && (
-        <TrainingForm
-          show={showClosureModal}
-          onClose={() => setShowClosureModal(false)}
-          lead={selectedLead}
-        />
+        <Suspense fallback={<ComponentLoader />}>
+          <TrainingForm
+            show={showClosureModal}
+            onClose={() => setShowClosureModal(false)}
+            lead={selectedLead}
+          />
+        </Suspense>
       )}
       {showFollowUpModal && selectedLead && (
-        <FollowUp
-          onClose={() => setShowFollowUpModal(false)}
-          lead={selectedLead}
-        />
+        <Suspense fallback={<ComponentLoader />}>
+          <FollowUp
+            onClose={() => setShowFollowUpModal(false)}
+            lead={selectedLead}
+          />
+        </Suspense>
       )}
 
-      <FollowupAlerts
-        todayFollowUps={todayFollowUps}
-        showTodayFollowUpAlert={showTodayFollowUpAlert}
-        setShowTodayFollowUpAlert={setShowTodayFollowUpAlert}
-        reminderPopup={reminderPopup}
-        setReminderPopup={setReminderPopup}
-      />
+      <Suspense fallback={<ComponentLoader />}>
+        <FollowupAlerts
+          todayFollowUps={todayFollowUps}
+          showTodayFollowUpAlert={showTodayFollowUpAlert}
+          setShowTodayFollowUpAlert={setShowTodayFollowUpAlert}
+          reminderPopup={reminderPopup}
+          setReminderPopup={setReminderPopup}
+        />
+      </Suspense>
 
-      <ExpectedDateModal
-        show={showExpectedDateModal}
-        onClose={() => {
-          setShowExpectedDateModal(false);
-          setExpectedDate("");
-          setLeadBeingUpdated(null);
-          setPendingPhaseChange(null);
-        }}
-        expectedDate={expectedDate}
-        setExpectedDate={setExpectedDate}
-        leadBeingUpdated={leadBeingUpdated}
-        setLeadBeingUpdated={setLeadBeingUpdated}
-        pendingPhaseChange={pendingPhaseChange}
-        setPendingPhaseChange={setPendingPhaseChange}
-      />
+      <Suspense fallback={<ComponentLoader />}>
+        <ExpectedDateModal
+          show={showExpectedDateModal}
+          onClose={() => {
+            setShowExpectedDateModal(false);
+            setExpectedDate("");
+            setLeadBeingUpdated(null);
+            setPendingPhaseChange(null);
+          }}
+          expectedDate={expectedDate}
+          setExpectedDate={setExpectedDate}
+          leadBeingUpdated={leadBeingUpdated}
+          setLeadBeingUpdated={setLeadBeingUpdated}
+          pendingPhaseChange={pendingPhaseChange}
+          setPendingPhaseChange={setPendingPhaseChange}
+        />
+      </Suspense>
 
-      <SalesTour userId={currentUser?.uid} />
+      <Suspense fallback={<ComponentLoader />}>
+        <SalesTour userId={currentUser?.uid} />
+      </Suspense>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
 import { db } from "../../firebase";
 import AddJD from "./AddJD";
@@ -405,47 +405,49 @@ const fetchStudents = async () => {
     fetchUsers();
   }, []);
 
-  const filteredCompanies = companies
-    .filter((company) => company.status === activeTab)
-    .filter((company) =>
-      company.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      company.jobDesignation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      company.jobLocation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      company.college?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    .filter((company) => {
-      if (!filters || Object.keys(filters).length === 0) return true;
-      
-      return Object.entries(filters).every(([key, value]) => {
-        if (!value || value.length === 0) return true;
+  const filteredCompanies = useMemo(() => {
+    return companies
+      .filter((company) => company.status === activeTab)
+      .filter((company) =>
+        company.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        company.jobDesignation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        company.jobLocation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        company.college?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+      .filter((company) => {
+        if (!filters || Object.keys(filters).length === 0) return true;
         
-        if (key === 'dateRange') {
-          if (!value.start || !value.end) return true;
-          const companyDate = new Date(company.createdAt?.seconds * 1000);
-          const startDate = new Date(value.start);
-          const endDate = new Date(value.end);
-          return companyDate >= startDate && companyDate <= endDate;
-        }
-        
-        if (key === 'assignedTo') {
-          return company.assignedTo === value;
-        }
-        
-        if (key === 'course') {
-          return value.includes(company.course);
-        }
-        
-        if (key === 'specialization') {
-          return value.includes(company.specialization);
-        }
-        
-        if (key === 'passingYear') {
-          return value.includes(company.passingYear);
-        }
-        
-        return company[key]?.toString().toLowerCase() === value.toString().toLowerCase();
+        return Object.entries(filters).every(([key, value]) => {
+          if (!value || value.length === 0) return true;
+          
+          if (key === 'dateRange') {
+            if (!value.start || !value.end) return true;
+            const companyDate = new Date(company.createdAt?.seconds * 1000);
+            const startDate = new Date(value.start);
+            const endDate = new Date(value.end);
+            return companyDate >= startDate && companyDate <= endDate;
+          }
+          
+          if (key === 'assignedTo') {
+            return company.assignedTo === value;
+          }
+          
+          if (key === 'course') {
+            return value.includes(company.course);
+          }
+          
+          if (key === 'specialization') {
+            return value.includes(company.specialization);
+          }
+          
+          if (key === 'passingYear') {
+            return value.includes(company.passingYear);
+          }
+          
+          return company[key]?.toString().toLowerCase() === value.toString().toLowerCase();
+        });
       });
-    });
+  }, [companies, activeTab, searchTerm, filters]);
 
   if (loading) {
     return (

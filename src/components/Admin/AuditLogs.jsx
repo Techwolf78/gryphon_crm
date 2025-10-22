@@ -8,8 +8,13 @@ const AuditLogs = ({ logs, className = "" }) => {
   const logsPerPage = 6;
   const [currentPage, setCurrentPage] = useState(1);
 
+  // Filter out undo actions from the logs
+  const filteredLogs = useMemo(() => {
+    return logs.filter(log => log.action !== 'undo');
+  }, [logs]);
+
   const sortedLogs = useMemo(() => {
-    return [...logs].sort((a, b) => {
+    return [...filteredLogs].sort((a, b) => {
       const dateA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp);
       const dateB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp);
       
@@ -18,7 +23,7 @@ const AuditLogs = ({ logs, className = "" }) => {
       
       return timeB - timeA;
     });
-  }, [logs]);
+  }, [filteredLogs]);
 
   const totalPages = Math.ceil(sortedLogs.length / logsPerPage);
 
@@ -54,13 +59,16 @@ const AuditLogs = ({ logs, className = "" }) => {
   const pageNumbers = getPageNumbers();
 
   const getActionIcon = (action) => {
-    switch (action) {
-      case 'Logged in':
-        return <FiActivity className="text-green-500" />;
-      case 'User created':
-        return <FiUser className="text-blue-500" />;
-      default:
-        return <FiActivity className="text-blue-500" />;
+    if (!action) return <FiActivity className="text-blue-500" />;
+    
+    const actionLower = action.toLowerCase().trim();
+    
+    if (actionLower.startsWith('logged in')) {
+      return <FiActivity className="text-green-500" />;
+    } else if (actionLower.includes('user created') || actionLower.includes('user added')) {
+      return <FiUser className="text-blue-500" />;
+    } else {
+      return <FiActivity className="text-blue-500" />;
     }
   };
 

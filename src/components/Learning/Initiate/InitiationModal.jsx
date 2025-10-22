@@ -579,32 +579,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
         }
 
-        if (phase === "phase-2") phaseDocData.phase2Dates = phase2Dates;
-        if (phase === "phase-2") {
-          phaseDocData.trainingStartDate = phase2Dates.startDate;
-        }
-        if (phase === "phase-2") {
-          phaseDocData.trainingEndDate = phase2Dates.endDate;
-        }
-        if (phase === "phase-3") phaseDocData.phase3Dates = phase3Dates;
-        if (phase === "phase-3") {
-          phaseDocData.trainingStartDate = phase3Dates.startDate;
-        }
-        if (phase === "phase-3") {
-          phaseDocData.trainingEndDate = phase3Dates.endDate;
-        }
-        if (phase2Dates?.startDate && phase === "phase-2") {
-          phaseDocData.trainingStartDate = phase2Dates.startDate;
-        }
-        if (phase2Dates?.endDate && phase === "phase-2") {
-          phaseDocData.trainingEndDate = phase2Dates.endDate;
-        }
-        if (phase3Dates?.startDate && phase === "phase-3") {
-          phaseDocData.trainingStartDate = phase3Dates.startDate;
-        }
-        if (phase3Dates?.endDate && phase === "phase-3") {
-          phaseDocData.trainingEndDate = phase3Dates.endDate;
-        }
+        phaseDocData.excludeDays = excludeDays;
         return setDoc(phaseDocRef, phaseDocData, { merge: true });
       });
 
@@ -1172,6 +1147,28 @@ function InitiationModal({ training, onClose, onConfirm }) {
     };
     fetchPhaseDomains();
   }, [training?.id, currentPhase, courses, getDomainHours]);
+
+  // Load phase-specific data when currentPhase is set
+  useEffect(() => {
+    if (!training?.id || !currentPhase) return;
+    const fetchPhaseData = async () => {
+      const phaseDoc = await getDoc(doc(db, "trainingForms", training.id, "trainings", currentPhase));
+      if (phaseDoc.exists()) {
+        const phaseData = phaseDoc.data();
+        setCommonFields({
+          trainingStartDate: phaseData.trainingStartDate || "",
+          trainingEndDate: phaseData.trainingEndDate || "",
+          collegeStartTime: phaseData.collegeStartTime || "",
+          collegeEndTime: phaseData.collegeEndTime || "",
+          lunchStartTime: phaseData.lunchStartTime || "",
+          lunchEndTime: phaseData.lunchEndTime || "",
+        });
+        setExcludeDays(phaseData.excludeDays || "None");
+        setSelectedDomains(phaseData.domains || []);
+      }
+    };
+    fetchPhaseData();
+  }, [training?.id, currentPhase]);
 
   // Fetch global trainer assignments from other trainingForms documents so we can detect cross-college conflicts
   useEffect(() => {

@@ -1,3 +1,4 @@
+import React, { Suspense } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -7,29 +8,42 @@ import {
 import { AuthProvider } from "./context/AuthContext";
 import MsalProviderWrapper from "./context/MsalProviderWrapper";
 import Navbar from "./components/Navbar";
-import Home from "./pages/Home";
-import Login from "./pages/Login";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import DashboardLayout from "./components/DashboardLayout";
-import Dashboard from "./pages/Dashboard";
-import Admin from "./pages/Admin";
-import Sales from "./pages/Sales";
-import Placement from "./pages/Placement";
-import LearningDevelopment from "./pages/LearningDevelopment";
-import DigitalMarketing from "./pages/Marketing";
-import Footer from "./pages/footer";
-import UpdateProfile from "./components/UpdateProfile";
-import Help from "./pages/Help";
 import SessionManager from "./components/SessionManager";
-import TrainersDashboard from "./components/Learning/TrainersDashboard";
-import HR from "./pages/HR";
-import CA from "./pages/CA";
-import NotFound from "./pages/NotFound"; // Import the new component
-import Roadmap from "./pages/Roadmap";
-import PublicInvoiceDetails from "./pages/PublicInvoiceDetails";
-import Maintenance from "./pages/Maintenance";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+
+// Lazy load all page components
+const Home = React.lazy(() => import("./pages/Home"));
+const Login = React.lazy(() => import("./pages/Login"));
+const Dashboard = React.lazy(() => import("./pages/Dashboard"));
+const Admin = React.lazy(() => import("./pages/Admin"));
+const Sales = React.lazy(() => import("./pages/Sales"));
+const Placement = React.lazy(() => import("./pages/Placement"));
+const LearningDevelopment = React.lazy(() => import("./pages/LearningDevelopment"));
+const DigitalMarketing = React.lazy(() => import("./pages/Marketing"));
+const Footer = React.lazy(() => import("./pages/footer"));
+const UpdateProfile = React.lazy(() => import("./components/UpdateProfile"));
+const Help = React.lazy(() => import("./pages/Help"));
+const TrainersDashboard = React.lazy(() => import("./components/Learning/TrainersDashboard"));
+const HR = React.lazy(() => import("./pages/HR"));
+const CA = React.lazy(() => import("./pages/CA"));
+const NotFound = React.lazy(() => import("./pages/NotFound"));
+const Roadmap = React.lazy(() => import("./pages/Roadmap"));
+const PublicInvoiceDetails = React.lazy(() => import("./pages/PublicInvoiceDetails"));
+const Maintenance = React.lazy(() => import("./pages/Maintenance"));
+
+// Loading component
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="text-center">
+      <div className="w-16 h-16 border-4 border-red-200 border-t-red-600 rounded-full animate-spin mx-auto mb-4"></div>
+      <h2 className="text-xl font-semibold text-gray-700 mb-2">Loading...</h2>
+      <p className="text-gray-500">Please wait while we load the page</p>
+    </div>
+  </div>
+);
  
 const AppContent = () => {
   const location = useLocation();
@@ -38,48 +52,58 @@ const AppContent = () => {
   const isMaintenanceMode = false;
 
   if (isMaintenanceMode) {
-    return <Maintenance />;
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <Maintenance />
+      </Suspense>
+    );
   }
 
   return (
     <>
       {location.pathname !== "/404" && <Navbar />}
       <SessionManager />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/invoice/*" element={<PublicInvoiceDetails />} />
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/invoice/*" element={<PublicInvoiceDetails />} />
 
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <DashboardLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Dashboard />} />
-          <Route path="profile" element={<UpdateProfile />} />
-          <Route path="admin" element={<Admin />} />
-          <Route path="sales" element={<Sales />} />
-          <Route path="placement" element={<Placement />} />
-          <Route path="help" element={<Help />} />
-          <Route path="learning-development">
-            <Route index element={<LearningDevelopment />} />
-            <Route path="trainers" element={<TrainersDashboard />} />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Dashboard />} />
+            <Route path="profile" element={<UpdateProfile />} />
+            <Route path="admin" element={<Admin />} />
+            <Route path="sales" element={<Sales />} />
+            <Route path="placement" element={<Placement />} />
+            <Route path="help" element={<Help />} />
+            <Route path="learning-development">
+              <Route index element={<LearningDevelopment />} />
+              <Route path="trainers" element={<TrainersDashboard />} />
+            </Route>
+            <Route path="marketing">
+              <Route index element={<DigitalMarketing />} />
+              <Route path="roadmap" element={<Roadmap />} />
+            </Route>
+            <Route path="hr" element={<HR />} />
+            <Route path="ca" element={<CA />} />
           </Route>
-          <Route path="marketing">
-            <Route index element={<DigitalMarketing />} />
-            <Route path="roadmap" element={<Roadmap />} />
-          </Route>
-          <Route path="hr" element={<HR />} />
-          <Route path="ca" element={<CA />} />
-        </Route>
-       
-        {/* Add the 404 route - catch all unmatched routes */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-      {location.pathname === "/" && <Footer />}
+
+          {/* Add the 404 route - catch all unmatched routes */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
+      {location.pathname === "/" && (
+        <Suspense fallback={<div>Loading footer...</div>}>
+          <Footer />
+        </Suspense>
+      )}
     </>
   );
 };

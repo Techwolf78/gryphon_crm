@@ -214,7 +214,7 @@ function InitiationTrainingDetails({ training, onBack }) {
       
       setLoading(false);
     } catch (err) {
-
+      console.error("Error deleting batch:", err);
       setError("Failed to delete batch. Please try again.");
       setLoading(false);
     }
@@ -666,7 +666,7 @@ function InitiationTrainingDetails({ training, onBack }) {
                                                             );
                                                           }
                                                           
-                                                          const excludeDays = trainingData?.excludeDays || "None";
+                                                          const excludeDays = phaseData?.excludeDays || "None";
                                                           let current = new Date(startDate);
                                                           
                                                           while (current <= endDate) {
@@ -690,7 +690,7 @@ function InitiationTrainingDetails({ training, onBack }) {
                                                             current.setDate(current.getDate() + 1);
                                                           }
                                                         } catch (e) {
-
+                                                          console.error("Error generating schedule:", e);
                                                           return (
                                                             <tr>
                                                               <td colSpan="6" className="px-0.5 py-0 text-center text-red-500">

@@ -39,7 +39,7 @@ const process1MData = (logs, currentMonthIndex, currentYear) => {
   }, {});
 
   logs.forEach((log) => {
-    if (log.action === "Logged in") {
+    if (log.action && log.action.trim().startsWith("Logged in")) {
       const dateObj = safeParseDate(log.timestamp);
       if (dateObj && 
           dateObj.getMonth() === currentMonthIndex && 
@@ -63,7 +63,7 @@ const processMultiMonthData = (logs, rangeCount, currentMonthIndex) => {
   }, {});
 
   logs.forEach((log) => {
-    if (log.action === "Logged in") {
+    if (log.action && log.action.trim().startsWith("Logged in")) {
       const dateObj = safeParseDate(log.timestamp);
       if (dateObj) {
         const month = dateObj.toLocaleString("en-US", { month: "short" });

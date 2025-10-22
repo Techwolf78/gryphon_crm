@@ -503,7 +503,6 @@ const SalesDashboard = ({ filters }) => {
   const [dashboardData, setDashboardData] = useState({
     revenue: 0,
     revenuePrevQuarter: 0,
-    growth: 0,
     hotLeads: 0,
     hotLeadsPrevQuarter: 0,
     warmLeads: 0,
@@ -1134,20 +1133,40 @@ if (selectedUserId) {
       let leads = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
       // Filter by date range in JS, but include leads with missing createdAt
-      leads = leads.filter(lead => {
+      let currentLeads = leads.filter(lead => {
         if (!lead.createdAt) return true; // Include if missing createdAt
         const created = new Date(lead.createdAt);
         return created >= range.start && created <= range.end;
       });
 
-      const currentData = processLeadsData(leads, range);
-      setDashboardData(currentData);
+      const currentData = processLeadsData(currentLeads, range);
+
+      // Fetch previous period data for growth calculations
+      const prevRange = getPrevDateRange(timePeriod, range.start);
+      let prevLeads = leads.filter(lead => {
+        if (!lead.createdAt) return false; // Exclude missing createdAt for previous
+        const created = new Date(lead.createdAt);
+        return created >= prevRange.start && created <= prevRange.end;
+      });
+
+      const prevData = processLeadsData(prevLeads, prevRange);
+
+      // Merge current and previous data
+      const mergedData = {
+        ...currentData,
+        revenuePrevQuarter: prevData.revenue,
+        hotLeadsPrevQuarter: prevData.hotLeads,
+        warmLeadsPrevQuarter: prevData.warmLeads,
+        coldLeadsPrevQuarter: prevData.coldLeads,
+        projectedTCVPrevQuarter: prevData.projectedTCV,
+      };
+
+      setDashboardData(mergedData);
     } catch (error) {
       console.error("Error fetching data for range:", error);
       setDashboardData({
         revenue: 0,
         revenuePrevQuarter: 0,
-        growth: 0,
         hotLeads: 0,
         hotLeadsPrevQuarter: 0,
         warmLeads: 0,
@@ -1483,7 +1502,7 @@ if (selectedUserId) {
               {
                 title: selectedUserId ? "Your Revenue" : "Team Revenue",
                 value: formatCurrency(dashboardData.revenue),
-                change: dashboardData.growth,
+                change: calculateGrowth(dashboardData.revenue, dashboardData.revenuePrevQuarter),
                 icon: <FaRupeeSign className="text-white" size={16} />, // changed size
                 color: "bg-indigo-600",
               },

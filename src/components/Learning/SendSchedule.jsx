@@ -149,6 +149,16 @@ useEffect(() => {
     if (!selectedTrainer) return;
     const fetchFee = async () => {
       try {
+        // First try to get fee from trainersData (training assignment data)
+        const trainerDetails = trainersData.find(trainer => 
+          trainer.trainerId === selectedTrainer.trainerId || trainer.id === selectedTrainer.id
+        );
+        if (trainerDetails?.perHourCost) {
+          setFeePerHour(trainerDetails.perHourCost);
+          return;
+        }
+
+        // Fallback: fetch from Firestore trainers collection
         const trainerQuery = query(
           collection(db, "trainers"),
           where(
@@ -174,7 +184,7 @@ useEffect(() => {
       }
     };
     fetchFee();
-  }, [selectedTrainer]);
+  }, [selectedTrainer, trainersData]);
 
   // ---------- Fetch trainers assigned to this training ----------
   useEffect(() => {

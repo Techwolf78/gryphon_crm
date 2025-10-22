@@ -33,10 +33,10 @@ function FiltersSection({
   toggleAllColleges
 }) {
   return (
-    <div className="p-2 border-b border-gray-100 bg-gray-50/50">
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-1 mb-2">
+    <div className="py-1 px-2 border-b border-gray-100 bg-gray-50/50">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-1 mb-1">
         {/* Search */}
-        <div className="flex-1 max-w-md">
+        <div className="max-w-sm">
           <div className="relative">
             <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
@@ -55,7 +55,7 @@ function FiltersSection({
         <div className="flex items-center gap-2">
           <button
             onClick={toggleAllColleges}
-            className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border-2 shadow-sm hover:shadow-md ${
+            className={`inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold transition-all border-2 shadow-sm hover:shadow-md ${
               Object.keys(filteredGroupedData).every(college => expandedPhases[college])
                 ? 'bg-gradient-to-r from-red-50 to-orange-50 border-red-200 text-red-700 hover:from-red-100 hover:to-orange-100 hover:border-red-300'
                 : 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 text-green-700 hover:from-green-100 hover:to-emerald-100 hover:border-green-300'
@@ -78,7 +78,7 @@ function FiltersSection({
             <button
               ref={filtersBtnRef}
               onClick={toggleFiltersDropdown}
-              className={`inline-flex items-center px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${
+              className={`inline-flex items-center px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm hover:shadow-md ${
                 isAnyFilterActive ? "ring-2 ring-blue-500/20" : ""
               }`}
               aria-label="Open filters"
@@ -234,7 +234,7 @@ function FiltersSection({
         endDateFilter ||
         projectCodeFilter ||
         businessNameFilter) && (
-        <div className="mt-1 flex flex-wrap items-center text-sm text-gray-500">
+        <div className="mt-0.5 flex flex-wrap items-center text-sm text-gray-500">
           <span className="mr-2">Active filters:</span>
           {searchTerm && (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-2 mb-2">
