@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { db } from "../../../firebase";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import { FiX, FiCheck, FiChevronRight } from "react-icons/fi";
 
 function JDMergeModal({ onClose, onProceed, preSelectedColleges = [] }) {
@@ -8,6 +8,8 @@ function JDMergeModal({ onClose, onProceed, preSelectedColleges = [] }) {
   const [selectedColleges, setSelectedColleges] = useState(preSelectedColleges);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [existingConfig, setExistingConfig] = useState(null);
+  const [checkingExisting, setCheckingExisting] = useState(false);
 
   // Fetch all available colleges from trainingForms collection
   useEffect(() => {
@@ -54,6 +56,110 @@ function JDMergeModal({ onClose, onProceed, preSelectedColleges = [] }) {
     fetchAvailableColleges();
   }, []);
 
+  // Check for existing merged configuration when colleges are selected
+  const checkExistingMergedConfig = async (colleges) => {
+    if (colleges.length < 2) {
+      setExistingConfig(null);
+      return;
+    }
+
+    try {
+      setCheckingExisting(true);
+      setError(null);
+
+      // Sort colleges by ID for consistent comparison
+      const sortedSelectedIds = colleges.map(c => c.id).sort();
+
+      // Check each selected college for merged JD training
+      for (const college of colleges) {
+        try {
+          const jdDocRef = doc(db, "trainingForms", college.id, "trainings", "JD");
+          const jdDocSnap = await getDoc(jdDocRef);
+
+          if (jdDocSnap.exists()) {
+            const jdData = jdDocSnap.data();
+
+            // Check if this is a merged training
+            if (jdData.isMergedTraining && jdData.mergedColleges) {
+              // Sort the merged college IDs for comparison
+              const sortedMergedIds = jdData.mergedColleges.map(c => c.id).sort();
+
+              // Check if the merged colleges match exactly with selected colleges
+              if (sortedMergedIds.length === sortedSelectedIds.length &&
+                  sortedMergedIds.every(id => sortedSelectedIds.includes(id))) {
+                
+                // Found matching merged configuration - now fetch domain data
+                try {
+                  const domainDocRef = doc(db, "trainingForms", college.id, "trainings", "JD", "domains", "JD");
+                  const domainDocSnap = await getDoc(domainDocRef);
+                  const domainData = domainDocSnap.exists() ? domainDocSnap.data() : {};
+
+                  setExistingConfig({
+                    operationsConfig: jdData.operationsConfig,
+                    commonFields: {
+                      trainingStartDate: jdData.trainingStartDate,
+                      trainingEndDate: jdData.trainingEndDate,
+                      collegeStartTime: jdData.collegeStartTime,
+                      collegeEndTime: jdData.collegeEndTime,
+                      lunchStartTime: jdData.lunchStartTime,
+                      lunchEndTime: jdData.lunchEndTime,
+                    },
+                    customPhaseHours: { JD: jdData.customHours || "" },
+                    table1DataByDomain: {
+                      JD: domainData.table1Data || []
+                    },
+                    mergedColleges: jdData.mergedColleges
+                  });
+                  return;
+                } catch (domainErr) {
+                  console.warn(`Error fetching domain data for college ${college.id}:`, domainErr);
+                  // Continue without domain data
+                  setExistingConfig({
+                    operationsConfig: jdData.operationsConfig,
+                    commonFields: {
+                      trainingStartDate: jdData.trainingStartDate,
+                      trainingEndDate: jdData.trainingEndDate,
+                      collegeStartTime: jdData.collegeStartTime,
+                      collegeEndTime: jdData.collegeEndTime,
+                      lunchStartTime: jdData.lunchStartTime,
+                      lunchEndTime: jdData.lunchEndTime,
+                    },
+                    customPhaseHours: { JD: jdData.customHours || "" },
+                    table1DataByDomain: {
+                      JD: []
+                    },
+                    mergedColleges: jdData.mergedColleges
+                  });
+                  return;
+                }
+              }
+            }
+          }
+        } catch (collegeErr) {
+          // Continue checking other colleges
+          console.warn(`Error checking college ${college.id}:`, collegeErr);
+        }
+      }
+
+      // No matching merged configuration found
+      setExistingConfig(null);
+    } catch (err) {
+      console.error("Error checking existing merged config:", err);
+      setError("Failed to check for existing configurations");
+    } finally {
+      setCheckingExisting(false);
+    }
+  };
+
+  // Effect to check for existing config when selection changes
+  useEffect(() => {
+    if (selectedColleges.length > 0 && !loading) {
+      checkExistingMergedConfig(selectedColleges);
+    } else {
+      setExistingConfig(null);
+    }
+  }, [selectedColleges, loading]);
+
   const handleCollegeToggle = (college) => {
     setSelectedColleges((prev) => {
       const isSelected = prev.some((c) => c.id === college.id);
@@ -79,12 +185,12 @@ function JDMergeModal({ onClose, onProceed, preSelectedColleges = [] }) {
       return;
     }
 
-    onProceed(selectedColleges);
+    onProceed(selectedColleges, existingConfig);
   };
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
+      <div className="relative top-20 mx-auto p-5 border w-full shadow-lg rounded-md bg-white">
         <div className="mt-3">
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -106,6 +212,27 @@ function JDMergeModal({ onClose, onProceed, preSelectedColleges = [] }) {
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
               {error}
+            </div>
+          )}
+
+          {existingConfig && !checkingExisting && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded text-green-700 text-sm">
+              <div className="flex items-center">
+                <FiCheck className="w-4 h-4 mr-2" />
+                <span className="font-medium">Existing Configuration Found!</span>
+              </div>
+              <p className="mt-1 text-xs">
+                Previous JD training configuration for these colleges has been loaded and will be pre-filled in the next steps.
+              </p>
+            </div>
+          )}
+
+          {checkingExisting && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-blue-700 text-sm">
+              <div className="flex items-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                <span>Checking for existing configurations...</span>
+              </div>
             </div>
           )}
 

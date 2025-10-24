@@ -12,7 +12,9 @@ const OperationsConfigurationModal = ({
   const [collegeStudentCounts, setCollegeStudentCounts] = useState({});
   const [numBatches, setNumBatches] = useState(1);
   const [batchNames, setBatchNames] = useState({});
+  const [batchStudentCounts, setBatchStudentCounts] = useState({});
   const [errors, setErrors] = useState({});
+  const [hasChanges, setHasChanges] = useState(false);
 
   // Initialize student counts and batch names
   useEffect(() => {
@@ -21,10 +23,13 @@ const OperationsConfigurationModal = ({
       setCollegeStudentCounts(existingConfig.collegeStudentCounts || {});
       setNumBatches(existingConfig.numBatches || 1);
       const batchNamesMap = {};
+      const batchStudentCountsMap = {};
       (existingConfig.batches || []).forEach(batch => {
         batchNamesMap[batch.id] = batch.name;
+        batchStudentCountsMap[batch.id] = batch.studentCount || 0;
       });
       setBatchNames(batchNamesMap);
+      setBatchStudentCounts(batchStudentCountsMap);
     } else {
       // Initialize fresh form
       const initialCounts = {};
@@ -36,9 +41,12 @@ const OperationsConfigurationModal = ({
 
       // Initialize with default 1 batch
       initialBatchNames[`batch_1`] = `Batch 1`;
+      const initialBatchStudentCounts = {};
+      initialBatchStudentCounts[`batch_1`] = "";
 
       setCollegeStudentCounts(initialCounts);
       setBatchNames(initialBatchNames);
+      setBatchStudentCounts(initialBatchStudentCounts);
     }
   }, [selectedColleges, isEditing, existingConfig]);
 
@@ -49,6 +57,7 @@ const OperationsConfigurationModal = ({
         ...prev,
         [collegeId]: value
       }));
+      setHasChanges(true);
       // Clear error for this college
       if (errors[collegeId]) {
         setErrors(prev => {
@@ -65,18 +74,33 @@ const OperationsConfigurationModal = ({
       ...prev,
       [batchKey]: value
     }));
+    setHasChanges(true);
+  };
+
+  const handleBatchStudentCountChange = (batchKey, value) => {
+    if (value === "" || /^\d+$/.test(value)) {
+      setBatchStudentCounts(prev => ({
+        ...prev,
+        [batchKey]: value
+      }));
+      setHasChanges(true);
+    }
   };
 
   const handleNumBatchesChange = (value) => {
     const newNum = parseInt(value) || 1;
     setNumBatches(newNum);
+    setHasChanges(true);
 
-    // Update batch names
+    // Update batch names and student counts
     const newBatchNames = {};
+    const newBatchStudentCounts = {};
     for (let i = 1; i <= newNum; i++) {
       newBatchNames[`batch_${i}`] = batchNames[`batch_${i}`] || `Batch ${i}`;
+      newBatchStudentCounts[`batch_${i}`] = batchStudentCounts[`batch_${i}`] || "";
     }
     setBatchNames(newBatchNames);
+    setBatchStudentCounts(newBatchStudentCounts);
   };
 
   const validateForm = () => {
@@ -94,13 +118,21 @@ const OperationsConfigurationModal = ({
       }
     });
 
-    // Check if batch names are provided
-    Object.entries(batchNames).forEach(([key, name]) => {
-      if (!name || name.trim() === "") {
-        newErrors[key] = "Batch name is required";
+    // Check if batch student counts are provided and sum matches total students
+    let totalBatchStudents = 0;
+    Object.entries(batchStudentCounts).forEach(([key, count]) => {
+      const numCount = parseInt(count || 0);
+      totalBatchStudents += numCount;
+      if (numCount <= 0) {
+        newErrors[key] = "Student count must be greater than 0";
         hasErrors = true;
       }
     });
+
+    if (totalBatchStudents !== totalStudents) {
+      newErrors.batchesTotal = `Total batch students (${totalBatchStudents}) must equal total students (${totalStudents})`;
+      hasErrors = true;
+    }
 
     setErrors(newErrors);
     return !hasErrors;
@@ -118,14 +150,17 @@ const OperationsConfigurationModal = ({
     const batches = Object.entries(batchNames).map(([key, name]) => ({
       id: key,
       name: name.trim(),
-      code: name.trim().toLowerCase().replace(/\s+/g, '_')
+      code: name.trim().toLowerCase().replace(/\s+/g, '_'),
+      studentCount: parseInt(batchStudentCounts[key] || 0)
     }));
 
     const configuration = {
       collegeStudentCounts,
       totalStudents,
       numBatches,
-      batches
+      batchStudentCounts,
+      batches,
+      hasChanges
     };
 
     onProceed(configuration);
@@ -137,7 +172,7 @@ const OperationsConfigurationModal = ({
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto">
+      <div className="relative top-20 mx-auto p-5 border w-full shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto">
         <div className="mt-3">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -256,26 +291,52 @@ const OperationsConfigurationModal = ({
 
             <div className="space-y-3">
               <label className="block text-xs font-medium text-gray-700 mb-2">
-                Batch Names
+                Batch Names & Student Counts
               </label>
-              {Object.entries(batchNames).map(([key, name]) => (
-                <div key={key} className="flex items-center space-x-3">
-                  <div className="flex-1">
-                    <input
-                      type="text"
-                      value={name}
-                      onChange={(e) => handleBatchNameChange(key, e.target.value)}
-                      placeholder={`Enter batch name`}
-                      className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                        errors[key] ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                      }`}
-                    />
-                    {errors[key] && (
-                      <p className="text-xs text-red-600 mt-1">{errors[key]}</p>
-                    )}
-                  </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h5 className="text-xs font-medium text-gray-600 mb-2">Batch Names</h5>
+                  {Object.entries(batchNames).map(([key, name]) => (
+                    <div key={key} className="mb-2">
+                      <input
+                        type="text"
+                        value={name}
+                        onChange={(e) => handleBatchNameChange(key, e.target.value)}
+                        placeholder={`Batch ${key.split('_')[1]}`}
+                        className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                          errors[key] ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
+                        }`}
+                      />
+                      {errors[key] && (
+                        <p className="text-xs text-red-600 mt-1">{errors[key]}</p>
+                      )}
+                    </div>
+                  ))}
                 </div>
-              ))}
+                <div>
+                  <h5 className="text-xs font-medium text-gray-600 mb-2">Std. Count</h5>
+                  {Object.entries(batchStudentCounts).map(([key, count]) => (
+                    <div key={key} className="mb-2">
+                      <input
+                        type="number"
+                        min="0"
+                        value={count || ""}
+                        onChange={(e) => handleBatchStudentCountChange(key, e.target.value)}
+                        placeholder="0"
+                        className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                          errors[key] ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
+                        }`}
+                      />
+                      {errors[key] && (
+                        <p className="text-xs text-red-600 mt-1">{errors[key]}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {errors.batchesTotal && (
+                <p className="text-xs text-red-600 mt-2">{errors.batchesTotal}</p>
+              )}
             </div>
           </div>
 
