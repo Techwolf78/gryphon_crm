@@ -157,70 +157,6 @@ function CollegeSummaryReport({
     });
     yPosition = doc.lastAutoTable.finalY + 8;
 
-    // Batch Table - Hours by Domain
-    const batchCodes = new Set();
-    const batchHoursByDomain = {};
-    const allDomains = new Set();
-
-    // Collect all unique batch codes and domains, and calculate hours by domain
-    domainsData.forEach((domainInfo) => {
-      allDomains.add(domainInfo.domain);
-      
-      if (Array.isArray(domainInfo.table1Data) && domainInfo.table1Data.length > 0) {
-        domainInfo.table1Data.forEach((row) => {
-          if (row.batches && row.batches.length > 0) {
-            row.batches.forEach((batch) => {
-              if (batch.batchCode) {
-                batchCodes.add(batch.batchCode);
-                
-                // Initialize domain hours for this batch if not exists
-                if (!batchHoursByDomain[batch.batchCode]) {
-                  batchHoursByDomain[batch.batchCode] = {};
-                  allDomains.forEach(domain => {
-                    batchHoursByDomain[batch.batchCode][domain] = 0;
-                  });
-                }
-                
-                // Calculate total hours for this batch in this domain
-                if (batch.trainers && Array.isArray(batch.trainers)) {
-                  batch.trainers.forEach((trainer) => {
-                    const hours = Number(trainer.assignedHours || 0);
-                    batchHoursByDomain[batch.batchCode][domainInfo.domain] += hours;
-                  });
-                }
-              }
-            });
-          }
-        });
-      }
-    });
-
-    // Create batch table data with dynamic columns
-    const domainArray = Array.from(allDomains);
-    const batchTableData = Array.from(batchCodes).map(batchCode => {
-      const row = [batchCode];
-      domainArray.forEach(domain => {
-        const hours = batchHoursByDomain[batchCode][domain];
-        row.push(hours > 0 ? hours.toString() : "-");
-      });
-      return row;
-    });
-
-    // Create table headers
-    const tableHeaders = ["Batch Code", ...domainArray];
-
-    if (batchTableData.length > 0) {
-      autoTable(doc, {
-        startY: yPosition,
-        head: [tableHeaders],
-        body: batchTableData,
-        styles: { fontSize: 8, cellPadding: 2 },
-        headStyles: { fillColor: [173, 216, 230], fontSize: 9, textColor: [0, 0, 0] }, // Light blue
-        margin: { left: marginLeft, right: marginRight },
-      });
-      yPosition = doc.lastAutoTable.finalY + 8;
-    }
-
     // Daily Schedule Details Table
     const dailyScheduleData = [];
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -301,6 +237,50 @@ function CollegeSummaryReport({
         });
       }
     });
+
+    // Batch Table - Hours by Domain
+    const batchCodes = new Set();
+    const batchHoursByDomain = {};
+    const allDomains = new Set();
+
+    // Collect hours from daily schedule data
+    dailyScheduleData.forEach(item => {
+      allDomains.add(item.domain);
+      batchCodes.add(item.batchCode);
+      if (!batchHoursByDomain[item.batchCode]) {
+        batchHoursByDomain[item.batchCode] = {};
+      }
+      if (!batchHoursByDomain[item.batchCode][item.domain]) {
+        batchHoursByDomain[item.batchCode][item.domain] = 0;
+      }
+      batchHoursByDomain[item.batchCode][item.domain] += Number(item.hours);
+    });
+
+    // Create batch table data with dynamic columns
+    const domainArray = Array.from(allDomains);
+    const batchTableData = Array.from(batchCodes).map(batchCode => {
+      const row = [batchCode];
+      domainArray.forEach(domain => {
+        const hours = batchHoursByDomain[batchCode][domain] || 0;
+        row.push(hours > 0 ? hours.toString() : "-");
+      });
+      return row;
+    });
+
+    // Create table headers
+    const tableHeaders = ["Batch Code", ...domainArray];
+
+    if (batchTableData.length > 0) {
+      autoTable(doc, {
+        startY: yPosition,
+        head: [tableHeaders],
+        body: batchTableData,
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [173, 216, 230], fontSize: 9, textColor: [0, 0, 0] }, // Light blue
+        margin: { left: marginLeft, right: marginRight },
+      });
+      yPosition = doc.lastAutoTable.finalY + 8;
+    }
 
     // Sort by date
     dailyScheduleData.sort((a, b) => a.date - b.date);
@@ -439,78 +419,13 @@ function CollegeSummaryReport({
     const allDomainsExcel = new Set();
 
     // Collect all unique batch codes and domains, and calculate hours by domain
+    // First, build daily schedule data
+    const dailyScheduleDataExcel = [];
+    const dayNamesExcel = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
     domainsData.forEach((domainInfo) => {
       allDomainsExcel.add(domainInfo.domain);
       
-      if (Array.isArray(domainInfo.table1Data) && domainInfo.table1Data.length > 0) {
-        domainInfo.table1Data.forEach((row) => {
-          if (row.batches && row.batches.length > 0) {
-            row.batches.forEach((batch) => {
-              if (batch.batchCode) {
-                batchCodesExcel.add(batch.batchCode);
-                
-                // Initialize domain hours for this batch if not exists
-                if (!batchHoursByDomainExcel[batch.batchCode]) {
-                  batchHoursByDomainExcel[batch.batchCode] = {};
-                  allDomainsExcel.forEach(domain => {
-                    batchHoursByDomainExcel[batch.batchCode][domain] = 0;
-                  });
-                }
-                
-                // Calculate total hours for this batch in this domain
-                if (batch.trainers && Array.isArray(batch.trainers)) {
-                  batch.trainers.forEach((trainer) => {
-                    const hours = Number(trainer.assignedHours || 0);
-                    batchHoursByDomainExcel[batch.batchCode][domainInfo.domain] += hours;
-                  });
-                }
-              }
-            });
-          }
-        });
-      }
-    });
-
-    // Create Excel headers for batch table
-    const domainArrayExcel = Array.from(allDomainsExcel);
-    const batchTableHeaders = [{ v: "Batch Code", s: tableHeaderStyle }];
-    domainArrayExcel.forEach(domain => {
-      batchTableHeaders.push({ v: domain, s: tableHeaderStyle });
-    });
-    allData.push(batchTableHeaders);
-
-    // Add batch table data to Excel
-    Array.from(batchCodesExcel).forEach(batchCode => {
-      const row = [{ v: batchCode, s: dataStyle }];
-      domainArrayExcel.forEach(domain => {
-        const hours = batchHoursByDomainExcel[batchCode][domain];
-        row.push({ v: hours > 0 ? hours.toString() : "-", s: dataStyle });
-      });
-      allData.push(row);
-    });
-
-    allData.push([""]);
-
-    // Daily Schedule Headers
-    allData.push([
-      { v: "Domain", s: tableHeaderStyle },
-      { v: "Batch", s: tableHeaderStyle },
-      { v: "Batch Code", s: tableHeaderStyle },
-      { v: "Trainer Name", s: tableHeaderStyle },
-      { v: "Trainer ID", s: tableHeaderStyle },
-      { v: "Date", s: tableHeaderStyle },
-      { v: "Day", s: tableHeaderStyle },
-      { v: "Hours", s: tableHeaderStyle },
-      { v: "Slot", s: tableHeaderStyle },
-      { v: "Timing", s: tableHeaderStyle },
-      { v: "Rate/Hour", s: tableHeaderStyle },
-      { v: "Daily Cost", s: tableHeaderStyle }
-    ]);
-
-    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
-    // Add Daily Schedule Data
-    domainsData.forEach((domainInfo) => {
       if (Array.isArray(domainInfo.table1Data) && domainInfo.table1Data.length > 0) {
         domainInfo.table1Data.forEach((row) => {
           if (row.batches && row.batches.length > 0) {
@@ -519,6 +434,8 @@ function CollegeSummaryReport({
             );
 
             filteredBatches.forEach((batch) => {
+              batchCodesExcel.add(batch.batchCode);
+              
               if (batch.trainers && batch.trainers.length > 0) {
                 batch.trainers.forEach((trainer) => {
                   if (trainer.startDate && trainer.endDate) {
@@ -562,20 +479,20 @@ function CollegeSummaryReport({
                       const hoursForDay = hoursArray[index] || 0;
                       const dailyCost = hoursForDay * (trainer.perHourCost || 0);
 
-                      allData.push([
-                        { v: domainInfo.domain, s: dataStyle },
-                        { v: row.batch, s: dataStyle },
-                        { v: batch.batchCode, s: dataStyle },
-                        { v: trainer.trainerName || "Unassigned", s: dataStyle },
-                        { v: trainer.trainerId, s: dataStyle },
-                        { v: formatDate(date), s: dataStyle },
-                        { v: dayNames[date.getDay()], s: dataStyle },
-                        { v: hoursForDay.toFixed(2), s: dataStyle },
-                        { v: trainer.dayDuration || "-", s: dataStyle },
-                        { v: getTimingForSlot(trainer.dayDuration, phaseData), s: dataStyle },
-                        { v: trainer.perHourCost ? `₹${trainer.perHourCost}` : "-", s: costStyle },
-                        { v: dailyCost ? `₹${dailyCost.toFixed(2)}` : "-", s: costStyle }
-                      ]);
+                      dailyScheduleDataExcel.push({
+                        domain: domainInfo.domain,
+                        batch: row.batch,
+                        batchCode: batch.batchCode,
+                        trainerName: trainer.trainerName || "Unassigned",
+                        trainerId: trainer.trainerId,
+                        date: formatDate(date),
+                        day: dayNamesExcel[date.getDay()],
+                        hours: hoursForDay.toFixed(2),
+                        slot: trainer.dayDuration || "-",
+                        timing: getTimingForSlot(trainer.dayDuration, phaseData),
+                        rate: trainer.perHourCost ? `₹${trainer.perHourCost}` : "-",
+                        dailyCost: dailyCost ? `₹${dailyCost.toFixed(2)}` : "-"
+                      });
                     });
                   }
                 });
@@ -584,6 +501,71 @@ function CollegeSummaryReport({
           }
         });
       }
+    });
+
+    // Now collect hours from daily schedule data for batch table
+    dailyScheduleDataExcel.forEach(item => {
+      if (!batchHoursByDomainExcel[item.batchCode]) {
+        batchHoursByDomainExcel[item.batchCode] = {};
+        allDomainsExcel.forEach(domain => {
+          batchHoursByDomainExcel[item.batchCode][domain] = 0;
+        });
+      }
+      batchHoursByDomainExcel[item.batchCode][item.domain] += Number(item.hours);
+    });
+
+    // Create Excel headers for batch table
+    const domainArrayExcel = Array.from(allDomainsExcel);
+    const batchTableHeaders = [{ v: "Batch Code", s: tableHeaderStyle }];
+    domainArrayExcel.forEach(domain => {
+      batchTableHeaders.push({ v: domain, s: tableHeaderStyle });
+    });
+    allData.push(batchTableHeaders);
+
+    // Add batch table data to Excel
+    Array.from(batchCodesExcel).forEach(batchCode => {
+      const row = [{ v: batchCode, s: dataStyle }];
+      domainArrayExcel.forEach(domain => {
+        const hours = batchHoursByDomainExcel[batchCode][domain];
+        row.push({ v: hours > 0 ? hours.toString() : "-", s: dataStyle });
+      });
+      allData.push(row);
+    });
+
+    allData.push([""]);
+
+    // Daily Schedule Headers
+    allData.push([
+      { v: "Domain", s: tableHeaderStyle },
+      { v: "Batch", s: tableHeaderStyle },
+      { v: "Batch Code", s: tableHeaderStyle },
+      { v: "Trainer Name", s: tableHeaderStyle },
+      { v: "Trainer ID", s: tableHeaderStyle },
+      { v: "Date", s: tableHeaderStyle },
+      { v: "Day", s: tableHeaderStyle },
+      { v: "Hours", s: tableHeaderStyle },
+      { v: "Slot", s: tableHeaderStyle },
+      { v: "Timing", s: tableHeaderStyle },
+      { v: "Rate/Hour", s: tableHeaderStyle },
+      { v: "Daily Cost", s: tableHeaderStyle }
+    ]);
+
+    // Add Daily Schedule Data
+    dailyScheduleDataExcel.forEach(item => {
+      allData.push([
+        { v: item.domain, s: dataStyle },
+        { v: item.batch, s: dataStyle },
+        { v: item.batchCode, s: dataStyle },
+        { v: item.trainerName, s: dataStyle },
+        { v: item.trainerId, s: dataStyle },
+        { v: item.date, s: dataStyle },
+        { v: item.day, s: dataStyle },
+        { v: item.hours, s: dataStyle },
+        { v: item.slot, s: dataStyle },
+        { v: item.timing, s: dataStyle },
+        { v: item.rate, s: costStyle },
+        { v: item.dailyCost, s: costStyle }
+      ]);
     });
 
     // Create the single sheet
@@ -647,7 +629,7 @@ function CollegeSummaryReport({
       )}
 
       {showPreview && pdfBlob && (
-        <div className="fixed inset-0 bg-transparent backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-transparent backdrop-blur-md flex items-center justify-center z-54 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] overflow-hidden">
             <div className="flex justify-between items-center p-4 border-b">
               <h3 className="text-lg font-bold text-gray-800">PDF Preview</h3>

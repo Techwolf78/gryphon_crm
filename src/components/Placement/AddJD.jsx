@@ -1,7 +1,47 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { XIcon, EyeIcon } from "@heroicons/react/outline";
 import { db } from "../../firebase";
 import { collection, addDoc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
+
+const specializationOptions = {
+  Engineering: [
+    "CS",
+    "IT",
+    "ENTC",
+    "CS-Cyber Security",
+    "Mechanical",
+    "Civil",
+    "Electrical",
+    "Chemical",
+    "CS-AI-ML",
+    "CS-AI-DS",
+    "Other",
+  ],
+  MBA: [
+    "Marketing",
+    "Finance",
+    "HR",
+    "Operations",
+    "Supply Chain",
+    "Business Analyst",
+    "Other",
+  ],
+  BBA: [
+    "Marketing",
+    "Finance",
+    "HR",
+    "Operations",
+    "Supply Chain",
+    "Business Analyst",
+    "Other",
+  ],
+  BCA: ["Computer Applications", "Other"],
+  MCA: ["Computer Science", "Other"],
+  Diploma: ["Mechanical", "Civil", "Electrical", "Computer", "Other"],
+  BSC: ["Physics", "Chemistry", "Mathematics", "CS", "Other"],
+  MSC: ["Physics", "Chemistry", "Mathematics", "CS", "Other"],
+  Other: ["Other"],
+};
 
 function AddJD({ show, onClose }) {
   const [formData, setFormData] = useState({
@@ -41,47 +81,7 @@ function AddJD({ show, onClose }) {
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
   const [otherCollegesInput, setOtherCollegesInput] = useState("");
   const [showOtherCollegesInput, setShowOtherCollegesInput] = useState(false);
-  const [collegeData, setCollegeData] = useState([]); // Stores college data with TPO emails
-
-  const specializationOptions = {
-    Engineering: [
-      "CS",
-      "IT",
-      "ENTC",
-      "CS-Cyber Security",
-      "Mechanical",
-      "Civil",
-      "Electrical",
-      "Chemical",
-      "CS-AI-ML",
-      "CS-AI-DS",
-      "Other",
-    ],
-    MBA: [
-      "Marketing",
-      "Finance",
-      "HR",
-      "Operations",
-      "Supply Chain",
-      "Business Analyst",
-      "Other",
-    ],
-    BBA: [
-      "Marketing",
-      "Finance",
-      "HR",
-      "Operations",
-      "Supply Chain",
-      "Business Analyst",
-      "Other",
-    ],
-    BCA: ["Computer Applications", "Other"],
-    MCA: ["Computer Science", "Other"],
-    Diploma: ["Mechanical", "Civil", "Electrical", "Computer", "Other"],
-    BSC: ["Physics", "Chemistry", "Mathematics", "CS", "Other"],
-    MSC: ["Physics", "Chemistry", "Mathematics", "CS", "Other"],
-    Other: ["Other"],
-  };
+  const [submissionError, setSubmissionError] = useState(null);
 
   const validateStep1 = () => {
     const errors = {};
@@ -100,10 +100,10 @@ function AddJD({ show, onClose }) {
     return Object.keys(errors).length === 0;
   };
 
-  const handleChange = (e) => {
+  const handleChange = useCallback((e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
-  };
+  }, [formData]);
 
   const handleSpecializationChange = (e) => {
     const { value, checked } = e.target;
@@ -188,7 +188,7 @@ function AddJD({ show, onClose }) {
       
       setStudentsData(prev => ({ ...prev, [college]: students }));
     } catch (error) {
-
+      console.error("Error fetching students for college:", college, error);
       setStudentsData(prev => ({ ...prev, [college]: [] }));
     } finally {
       setIsLoadingStudents(false);
@@ -271,11 +271,12 @@ resumes in a zip folder by 10th July 2025 by 2:00 pm.*
 
   const handleFinalSubmit = async () => {
     if (selectedColleges.length === 0 || (selectedColleges.includes("Other") && otherCollegesInput.trim() === "")) {
-      alert("Please select at least one college");
+      setSubmissionError("Please select at least one college");
       return;
     }
     
     setIsSubmitting(true);
+    setSubmissionError(null);
     try {
       // Filter out the "Other" option and only keep actual college names
       const collegesToSubmit = selectedColleges.filter(c => c !== "Other");
@@ -299,7 +300,7 @@ resumes in a zip folder by 10th July 2025 by 2:00 pm.*
             const tpoEmail = trainingFormSnapshot.docs[0].data().tpoEmail || null;
             return { college, tpoEmail };
           } catch (error) {
-
+            console.error("Error fetching TPO for college:", college, error);
             return { college, tpoEmail: null };
           }
         })
@@ -325,8 +326,8 @@ resumes in a zip folder by 10th July 2025 by 2:00 pm.*
       
       onClose();
     } catch (error) {
-
-      alert("Error submitting JD. Please try again.");
+      console.error("Error submitting JD:", error);
+      setSubmissionError("Error submitting JD. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -361,21 +362,14 @@ resumes in a zip folder by 10th July 2025 by 2:00 pm.*
           ];
 
           const colleges = new Set();
-          const collegeInfo = [];
-          let totalDocs = 0;
-
+          
           for (const q of queries) {
             const querySnapshot = await getDocs(q);
             querySnapshot.forEach((doc) => {
-              totalDocs++;
               const data = doc.data();
               const collegeName = data.collegeName || data.college || doc.id.split("-")[0];
               if (collegeName) {
                 colleges.add(collegeName);
-                collegeInfo.push({
-                  collegeName,
-                  tpoEmail: data.tpoEmail || ''
-                });
               }
             });
           }
@@ -385,16 +379,13 @@ resumes in a zip folder by 10th July 2025 by 2:00 pm.*
             .sort();
           
           setAvailableColleges(finalColleges);
-          setCollegeData(collegeInfo);
 
         } catch (error) {
-
+          console.error("Error fetching colleges:", error);
           setAvailableColleges(["Other"]); // Just show "Other" option if fetch fails
-          setCollegeData([]);
         }
       } else {
         setAvailableColleges(["Other"]); // Just show "Other" option if no course/year selected
-        setCollegeData([]);
       }
     };
 
@@ -1226,6 +1217,11 @@ resumes in a zip folder by 10th July 2025 by 2:00 pm.*
                 >
                   Cancel
                 </button>
+                {submissionError && (
+                  <div className="text-red-600 text-sm mr-4 flex items-center">
+                    {submissionError}
+                  </div>
+                )}
                 <button
                   onClick={handleFinalSubmit}
                   disabled={selectedColleges.length === 0 || (selectedColleges.includes("Other") && otherCollegesInput.trim() === "") || isSubmitting}

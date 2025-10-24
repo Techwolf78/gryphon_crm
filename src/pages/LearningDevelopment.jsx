@@ -18,6 +18,7 @@ import OperationsConfigurationModal from "../components/Learning/JD/OperationsCo
 import JDInitiationModal from "../components/Learning/JD/JDInitiationModal";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { CheckCircle, XCircle, Calendar, PlayCircle } from "lucide-react";
 
 function LearningDevelopment() {
   const [trainings, setTrainings] = useState([]);
@@ -43,7 +44,18 @@ function LearningDevelopment() {
 
   const [isLoading, setIsLoading] = useState(false);
 
-  // JD Training state
+  // Contract sections collapse state
+  const [showActiveContracts, setShowActiveContracts] = useState(true);
+  const [selectedFinancialYear, setSelectedFinancialYear] = useState(() => {
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth() + 1; // getMonth() returns 0-11
+    
+    // If current month is April or later, use current year as start of financial year
+    // Otherwise use previous year
+    const financialYearStart = currentMonth >= 4 ? currentYear : currentYear - 1;
+    return `${financialYearStart}-${(financialYearStart + 1).toString().slice(-2)}`;
+  });
   const [showJDMergeModal, setShowJDMergeModal] = useState(false);
   const [selectedJDColleges, setSelectedJDColleges] = useState([]);
   const [showOperationsConfigModal, setShowOperationsConfigModal] = useState(false);
@@ -51,11 +63,114 @@ function LearningDevelopment() {
   const [showJDInitiationModal, setShowJDInitiationModal] = useState(false);
   const [onRefreshInitiationDashboard, setOnRefreshInitiationDashboard] = useState(null);
 
-  // Function to refresh the initiation dashboard
-  const refreshInitiationDashboard = () => {
-    if (onRefreshInitiationDashboard) {
-      onRefreshInitiationDashboard();
+  // Function to categorize trainings into active and old contracts
+  const categorizeTrainings = (trainings) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset time to start of day for accurate comparison
+
+    const active = [];
+    const old = [];
+
+    trainings.forEach(training => {
+      let isActive = false;
+
+      // Check if contract has start and end dates
+      if (training.contractStartDate && training.contractEndDate) {
+        try {
+          // Handle different date formats
+          let startDate, endDate;
+
+          if (training.contractStartDate.toDate) {
+            // Firestore Timestamp
+            startDate = training.contractStartDate.toDate();
+            endDate = training.contractEndDate.toDate();
+          } else {
+            // String or Date object
+            startDate = new Date(training.contractStartDate);
+            endDate = new Date(training.contractEndDate);
+          }
+
+          // Reset time to start of day for accurate comparison
+          startDate.setHours(0, 0, 0, 0);
+          endDate.setHours(23, 59, 59, 999); // End of day
+
+          // Check if today is within the contract period
+          if (today >= startDate && today <= endDate) {
+            isActive = true;
+          }
+        } catch (error) {
+          console.warn('Error parsing contract dates for training:', training.id, error);
+          // If dates can't be parsed, consider it active by default
+          isActive = true;
+        }
+      } else {
+        // If no dates specified, consider it active
+        isActive = true;
+      }
+
+      if (isActive) {
+        active.push(training);
+      } else {
+        old.push(training);
+      }
+    });
+
+    return { active, old };
+  };
+
+  // Function to generate financial year options dynamically
+  const generateFinancialYearOptions = () => {
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth() + 1; // getMonth() returns 0-11
+    
+    // Determine current financial year start
+    const currentFinancialYearStart = currentMonth >= 4 ? currentYear : currentYear - 1;
+    
+    const options = [];
+    
+    // Add past years (go back to 2024-25 for now, can be adjusted)
+    for (let i = currentFinancialYearStart - 1; i >= 2024; i--) {
+      const yearOption = `${i}-${(i + 1).toString().slice(-2)}`;
+      options.push(yearOption);
     }
+    
+    // Add current and future years (5 years ahead)
+    for (let i = currentFinancialYearStart; i <= currentFinancialYearStart + 5; i++) {
+      const yearOption = `${i}-${(i + 1).toString().slice(-2)}`;
+      options.push(yearOption);
+    }
+    
+    return options.map(year => ({
+      value: year,
+      label: year
+    })); // Show newest first (upside down)
+  };
+
+  // Function to filter trainings by financial year
+  const filterTrainingsByFinancialYear = (trainings, financialYear) => {
+    if (!financialYear) return trainings;
+    
+    const [startYear] = financialYear.split('-');
+    const financialYearStart = new Date(parseInt(startYear), 3, 1); // April 1st of start year
+    const financialYearEnd = new Date(parseInt(startYear) + 1, 2, 31, 23, 59, 59, 999); // March 31st of next year
+    
+    return trainings.filter(training => {
+      // Check if training has creation date or contract dates within the financial year
+      let trainingDate = null;
+      
+      if (training.createdAt) {
+        trainingDate = training.createdAt.toDate ? training.createdAt.toDate() : new Date(training.createdAt);
+      } else if (training.contractStartDate) {
+        trainingDate = training.contractStartDate.toDate ? training.contractStartDate.toDate() : new Date(training.contractStartDate);
+      }
+      
+      if (trainingDate) {
+        return trainingDate >= financialYearStart && trainingDate <= financialYearEnd;
+      }
+      
+      return false; // If no date available, don't include
+    });
   };
 
   // Set the refresh callback when InitiationDashboard mounts
@@ -64,6 +179,13 @@ function LearningDevelopment() {
       setOnRefreshInitiationDashboard(onRefreshInitiationDashboard);
     }
   }, [onRefreshInitiationDashboard]);
+
+  // Function to refresh the initiation dashboard
+  const refreshInitiationDashboard = () => {
+    if (onRefreshInitiationDashboard) {
+      onRefreshInitiationDashboard();
+    }
+  };
 
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -299,14 +421,14 @@ function LearningDevelopment() {
         pauseOnHover
         theme="light"
       />
-      <div className="bg-gray-50 min-h-screen">
-        <div className="flex justify-between items-center mb-3" data-tour="ld-header">
-          <h1 className="text-3xl font-bold text-blue-800">
+      <div className="bg-gray-50 min-h-screen pt-0 -mt-2">
+        <div className="flex justify-between items-center mb-1" data-tour="ld-header">
+          <h1 className="text-2xl font-bold text-blue-800">
             Training Dashboard
           </h1>
           <button
             onClick={handleViewTrainers}
-            className="px-5 py-1.5 bg-black text-white font-medium rounded-full shadow-md hover:bg-gray-800 hover:shadow-lg transform hover:scale-105 transition-all duration-200 border border-gray-300"
+            className="px-2 py-0.5 bg-blue-600 text-white font-medium rounded-full shadow-md hover:bg-blue-700 hover:shadow-lg transform hover:scale-105 transition-all duration-200 border border-gray-300 text-sm"
             data-tour="view-trainers-button"
           >
             View Trainers
@@ -314,10 +436,10 @@ function LearningDevelopment() {
         </div>
 
         {/* Enhanced Tab Navigation with Sliding Indicator */}
-        <div className="relative mb-4">
+        <div className="relative mb-0.5">
           <div className="flex border-b border-gray-200">
             <button
-              className={`flex-1 px-6 py-3 font-medium text-sm transition-all duration-150 ${
+              className={`flex-1 px-6 py-2 font-medium text-sm transition-all duration-150 ${
                 activeTab === "newContact"
                   ? "text-blue-600 bg-blue-50"
                   : "text-gray-500 hover:text-gray-700"
@@ -325,10 +447,10 @@ function LearningDevelopment() {
               onClick={() => setActiveTab("newContact")}
               data-tour="new-contract-tab"
             >
-              New Contract ({trainings.length})
+              All Contracts ({filterTrainingsByFinancialYear(trainings, selectedFinancialYear).length})
             </button>
             <button
-              className={`flex-1 px-6 py-3 font-medium text-sm transition-all duration-150 ${
+              className={`flex-1 px-6 py-2 font-medium text-sm transition-all duration-150 ${
                 activeTab === "initiation"
                   ? "text-blue-600 bg-blue-50"
                   : "text-gray-500 hover:text-gray-700"
@@ -339,7 +461,7 @@ function LearningDevelopment() {
               Trainings
             </button>
             <button
-              className={`flex-1 px-6 py-3 font-medium text-sm transition-all duration-150 ${
+              className={`flex-1 px-6 py-2 font-medium text-sm transition-all duration-150 ${
                 activeTab === "trainerInvoice"
                   ? "text-blue-600 bg-blue-50"
                   : "text-gray-500 hover:text-gray-700"
@@ -350,7 +472,7 @@ function LearningDevelopment() {
               Trainer Invoice
             </button>
             <button
-              className={`flex-1 px-6 py-3 font-medium text-sm transition-all duration-150 ${
+              className={`flex-1 px-6 py-2 font-medium text-sm transition-all duration-150 ${
                 activeTab === "contractInvoices"
                   ? "text-blue-600 bg-blue-50"
                   : "text-gray-500 hover:text-gray-700"
@@ -385,9 +507,8 @@ function LearningDevelopment() {
 
         {/* Tab Content */}
         {activeTab === "newContact" ? (
-          <>
-            {isLoading ? (
-              <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm ring-1 ring-gray-200/60">
+          isLoading ? (
+            <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm ring-1 ring-gray-200/60">
                 {/* Desktop Header Skeleton */}
                 <div className="hidden md:grid grid-cols-12 gap-2 px-5 py-3 text-[11px] font-semibold tracking-wide uppercase text-gray-600 bg-gradient-to-r from-gray-50 via-white to-gray-50 border-b border-gray-200">
                   <div className="col-span-3 flex items-center gap-1.5">
@@ -502,33 +623,106 @@ function LearningDevelopment() {
               </div>
             ) : (
               <>
-                <TrainingTable
-                  trainingData={trainings}
-                  onRowClick={setSelectedTraining}
-                  onViewStudentData={handleViewStudentData}
-                  onViewMouFile={handleViewMouFile}
-                  onInitiate={handleInitiateClick}
-                  onInitiateJD={handleInitiateJD}
-                />
+                {/* Financial Year Filter and Enhanced Toggle Buttons */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-1">
+                  {/* Financial Year Filter */}
+                  <div className="flex items-center gap-2">
+                    <Calendar size={16} className="text-gray-500" />
+                    <label className="text-sm font-medium text-gray-700">Financial Year:</label>
+                    <select
+                      value={selectedFinancialYear}
+                      onChange={(e) => setSelectedFinancialYear(e.target.value)}
+                      className="px-2 py-1 border border-gray-300 rounded text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      {generateFinancialYearOptions().map(option => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </div>
 
-                {selectedTraining && (
-                  <TrainingDetailModal
-                    training={selectedTraining}
-                    onClose={() => setSelectedTraining(null)}
-                  />
-                )}
+                  {/* Enhanced Toggle Buttons */}
+                  <div className="relative bg-gradient-to-r from-gray-100 to-gray-50 rounded-lg p-0.5 shadow-inner border border-gray-200/50">
+                    {/* Background indicator */}
+                    <div
+                      className={`absolute top-0.5 bottom-0.5 rounded-md bg-gradient-to-r transition-all duration-300 ease-out shadow-sm ${
+                        showActiveContracts
+                          ? 'left-0.5 right-1/2 from-green-400 to-green-500'
+                          : 'left-1/2 right-0.5 from-gray-400 to-gray-500'
+                      }`}
+                    ></div>
 
-                {showFileModal && fileType === "mou" && (
-                  <FilePreviewModal
-                    fileUrl={fileUrl}
-                    type={fileType}
-                    trainingId={modalTrainingId}
-                    onClose={() => setShowFileModal(false)}
-                  />
-                )}
+                    <div className="relative flex gap-0">
+                      <button
+                        onClick={() => setShowActiveContracts(true)}
+                        className={`relative px-4 py-1 rounded-md font-semibold text-sm transition-all duration-300 flex items-center gap-2 ${
+                          showActiveContracts
+                            ? 'text-white drop-shadow-sm'
+                            : 'text-gray-600 hover:text-gray-800'
+                        }`}
+                      >
+                        <PlayCircle size={12} className={showActiveContracts ? 'text-white' : 'text-green-500'} />
+                        <span className="relative z-10">Active</span>
+                        <span className={`text-xs font-medium ml-1 px-1.5 py-0.5 rounded-full transition-colors duration-300 ${
+                          showActiveContracts
+                            ? 'bg-white/20 text-white'
+                            : 'bg-green-100 text-green-700'
+                        }`}>
+                          {categorizeTrainings(filterTrainingsByFinancialYear(trainings, selectedFinancialYear)).active.length}
+                        </span>
+                      </button>
+
+                      <button
+                        onClick={() => setShowActiveContracts(false)}
+                        className={`relative px-4 py-1 pl-8 rounded-md font-semibold text-sm transition-all duration-300 flex items-center gap-2 ${
+                          !showActiveContracts
+                            ? 'text-white drop-shadow-sm'
+                            : 'text-gray-600 hover:text-gray-800'
+                        }`}
+                      >
+                        <CheckCircle size={12} className={!showActiveContracts ? 'text-white' : 'text-gray-500'} />
+                        <span className="relative z-10">Completed</span>
+                        <span className={`text-xs font-medium ml-1 px-1.5 py-0.5 rounded-full transition-colors duration-300 ${
+                          !showActiveContracts
+                            ? 'bg-white/20 text-white'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}>
+                          {categorizeTrainings(filterTrainingsByFinancialYear(trainings, selectedFinancialYear)).old.length}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contracts Display */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+                  {showActiveContracts ? (
+                    <>
+             
+                      <TrainingTable
+                        trainingData={categorizeTrainings(filterTrainingsByFinancialYear(trainings, selectedFinancialYear)).active}
+                        onRowClick={setSelectedTraining}
+                        onViewStudentData={handleViewStudentData}
+                        onViewMouFile={handleViewMouFile}
+                        onInitiate={handleInitiateClick}
+                        onInitiateJD={handleInitiateJD}
+                      />
+                    </>
+                  ) : (
+                    <>
+              
+                      <TrainingTable
+                        trainingData={categorizeTrainings(filterTrainingsByFinancialYear(trainings, selectedFinancialYear)).old}
+                        onRowClick={setSelectedTraining}
+                        onViewStudentData={handleViewStudentData}
+                        onViewMouFile={handleViewMouFile}
+                        onInitiate={handleInitiateClick}
+                        onInitiateJD={handleInitiateJD}
+                      />
+                    </>
+                  )}
+                </div>
               </>
-            )}
-          </>
+            )
         ) : activeTab === "initiation" ? (
           selectedInitiationTraining ? (
             <InitiationTrainingDetails
@@ -549,6 +743,22 @@ function LearningDevelopment() {
           <ContractInvoiceTable />
         ) : null}
       </div>
+
+      {selectedTraining && (
+        <TrainingDetailModal
+          training={selectedTraining}
+          onClose={() => setSelectedTraining(null)}
+        />
+      )}
+
+      {showFileModal && fileType === "mou" && (
+        <FilePreviewModal
+          fileUrl={fileUrl}
+          type={fileType}
+          trainingId={modalTrainingId}
+          onClose={() => setShowFileModal(false)}
+        />
+      )}
 
       {/* JD Training Modals */}
       {showJDMergeModal && (
@@ -590,7 +800,7 @@ function LearningDevelopment() {
           }}
           onClose={handleJDInitiationClose}
           onConfirm={handleJDInitiationClose}
-          isMerged={true}
+          isMerged={selectedJDColleges.length > 1}
           selectedColleges={selectedJDColleges}
           operationsConfig={operationsConfig}
           onBack={() => {

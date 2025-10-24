@@ -520,10 +520,11 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
 
   return (
     <div>
-      <div className="fixed inset-0 bg-transparent backdrop-blur-md bg-opacity-50 flex items-center justify-center z-500 p-4 no-print">
+      <div className="fixed inset-0 bg-transparent backdrop-blur-md bg-opacity-50 flex items-center justify-center z-500 p-4 no-print" onClick={onClose}>
         <div
           className="bg-white border-2 border-gray-800 shadow-2xl p-4 w-full max-w-4xl max-h-[90vh] overflow-y-auto invoice-modal-print"
           style={{ fontSize: "14px" }}
+          onClick={(e) => e.stopPropagation()}
         >
           <div className="border border-gray-300 p-2">
             {/* Header - More Compact */}

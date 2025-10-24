@@ -162,7 +162,7 @@ const Admin = () => {
   );
 
   const todayLogins = logs.filter((log) => {
-    if (log.action !== "Logged in") return false;
+    if (!log.action || !log.action.trim().startsWith("Logged in")) return false;
     const today = new Date();
     const logDate = log.timestamp?.toDate ? log.timestamp.toDate() : new Date(log.timestamp);
     

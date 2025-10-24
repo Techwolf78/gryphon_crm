@@ -149,6 +149,16 @@ useEffect(() => {
     if (!selectedTrainer) return;
     const fetchFee = async () => {
       try {
+        // First try to get fee from trainersData (training assignment data)
+        const trainerDetails = trainersData.find(trainer => 
+          trainer.trainerId === selectedTrainer.trainerId || trainer.id === selectedTrainer.id
+        );
+        if (trainerDetails?.perHourCost) {
+          setFeePerHour(trainerDetails.perHourCost);
+          return;
+        }
+
+        // Fallback: fetch from Firestore trainers collection
         const trainerQuery = query(
           collection(db, "trainers"),
           where(
@@ -174,7 +184,7 @@ useEffect(() => {
       }
     };
     fetchFee();
-  }, [selectedTrainer]);
+  }, [selectedTrainer, trainersData]);
 
   // ---------- Fetch trainers assigned to this training ----------
   useEffect(() => {
@@ -226,8 +236,32 @@ useEffect(() => {
       }
     };
 
-    fetchAssignedTrainers();
-  }, [training?.id]);
+    // If trainersData is provided as prop, use it instead of fetching
+    if (trainersData && trainersData.length > 0) {
+      // Extract unique trainers from trainersData
+      const trainerMap = new Map();
+      
+      trainersData.forEach(trainer => {
+        const trainerId = trainer.trainerId || trainer.id;
+        if (!trainerMap.has(trainerId)) {
+          trainerMap.set(trainerId, {
+            id: trainer.id || trainerId,
+            trainerId: trainerId,
+            name: trainer.trainerName || trainer.name,
+            trainerName: trainer.trainerName || trainer.name,
+            email: trainer.email || trainer.trainerEmail,
+            trainerEmail: trainer.email || trainer.trainerEmail,
+            ...trainer
+          });
+        }
+      });
+      
+      setTrainers(Array.from(trainerMap.values()));
+    } else {
+      // Fallback to fetching from Firestore
+      fetchAssignedTrainers();
+    }
+  }, [training?.id, trainersData]);
 
   // ---------- Fetch trainingForms doc and the phase doc ----------
   useEffect(() => {
@@ -371,11 +405,21 @@ useEffect(() => {
         }, 0);
       })();
 
+      // Calculate total training days from assignments
+      const totalDays = new Set(trainerAssignments.map(a => a.date)).size;
+
       // FIXED: Use new calculation logic (matching InvoiceModal)
       const roundToNearestWhole = (num) => Math.round(num);
       
       const trainingFees = roundToNearestWhole(totalHours * (feePerHour || 0));
-      const totalExpenses = roundToNearestWhole(trainerCostDetails.conveyance + trainerCostDetails.food + trainerCostDetails.lodging);
+      
+      // Calculate expenses the same way as InitiationTrainingDetails
+      // Conveyance is one-time, food and lodging are per day
+      const conveyanceTotal = trainerCostDetails.conveyance || 0;
+      const foodTotal = (trainerCostDetails.food || 0) * totalDays;
+      const lodgingTotal = (trainerCostDetails.lodging || 0) * totalDays;
+      const totalExpenses = roundToNearestWhole(conveyanceTotal + foodTotal + lodgingTotal);
+      
       const totalAmount = roundToNearestWhole(trainingFees + totalExpenses);
       
       // TDS applied only on training fees (matching InvoiceModal logic)
@@ -413,25 +457,25 @@ useEffect(() => {
   contact_person: emailData.contactPerson,
   contact_number: emailData.contactNumber,
   
-  conveyance: trainerCostDetails.conveyance,
-  food: trainerCostDetails.food,
-  lodging: trainerCostDetails.lodging,
+  conveyance: conveyanceTotal,
+  food: foodTotal,
+  lodging: lodgingTotal,
   total_expenses: totalExpenses,
 
   schedule_rows: scheduleRows,
-  total_days: new Set(trainerAssignments.map(a => a.date)).size,
+  total_days: totalDays,
   total_hours: totalHours,
   start_date: trainerAssignments[0] ? formatDate(trainerAssignments[0].date) : "",
   fee_per_hour: feePerHour,
         fee_per_day:
           trainerAssignments.length > 0
             ? (() => {
-                // Calculate average fee per day based on assignments
+                // Calculate total fee for all assignments (not average)
                 const totalFee = trainerAssignments.reduce((acc, assignment) => {
                   const hours = calculateHours(assignment.dayDuration);
                   return acc + (hours * (feePerHour || 0));
                 }, 0);
-                return totalFee / trainerAssignments.length;
+                return totalFee;
               })()
             : 0,
         total_cost: totalAmount,
@@ -700,15 +744,21 @@ useEffect(() => {
                   return acc + calculateHours(assignment.dayDuration);
                 }, 0);
 
+                // Calculate total training days from assignments
+                const totalDays = new Set(trainerAssignments.map(a => a.date)).size;
+
                 // Round to nearest whole number (matching InvoiceModal)
                 const roundToNearestWhole = (num) => Math.round(num);
 
                 const trainingFees = roundToNearestWhole((feePerHour || 0) * totalHours);
-                const totalExpenses = roundToNearestWhole(
-                  (trainerCostDetails.conveyance || 0) +
-                  (trainerCostDetails.food || 0) +
-                  (trainerCostDetails.lodging || 0)
-                );
+                
+                // Calculate expenses the same way as InitiationTrainingDetails
+                // Conveyance is one-time, food and lodging are per day
+                const conveyanceTotal = trainerCostDetails.conveyance || 0;
+                const foodTotal = (trainerCostDetails.food || 0) * totalDays;
+                const lodgingTotal = (trainerCostDetails.lodging || 0) * totalDays;
+                const totalExpenses = roundToNearestWhole(conveyanceTotal + foodTotal + lodgingTotal);
+                
                 const totalAmount = roundToNearestWhole(trainingFees + totalExpenses);
                 
                 // TDS applied only on training fees (matching InvoiceModal logic)
@@ -724,7 +774,7 @@ useEffect(() => {
                       <div className="bg-gray-50 p-4 rounded-lg">
                         <h4 className="font-medium text-gray-800 mb-2">Training Details</h4>
                         <div className="space-y-1 text-sm">
-                          <div>Total Days: {new Set(trainerAssignments.map(a => a.date)).size}</div>
+                          <div>Total Days: {totalDays}</div>
                           <div>Total Hours: {totalHours.toFixed(2)}</div>
                           <div>Fee per Hour: ₹{feePerHour.toLocaleString('en-IN')}</div>
                         </div>
@@ -732,9 +782,9 @@ useEffect(() => {
                       <div className="bg-gray-50 p-4 rounded-lg">
                         <h4 className="font-medium text-gray-800 mb-2">Expenses</h4>
                         <div className="space-y-1 text-sm">
-                          <div>Conveyance: ₹{trainerCostDetails.conveyance.toLocaleString('en-IN')}</div>
-                          <div>Food: ₹{trainerCostDetails.food.toLocaleString('en-IN')}</div>
-                          <div>Lodging: ₹{trainerCostDetails.lodging.toLocaleString('en-IN')}</div>
+                          <div>Conveyance: ₹{conveyanceTotal.toLocaleString('en-IN')}</div>
+                          <div>Food: ₹{foodTotal.toLocaleString('en-IN')} (₹{(trainerCostDetails.food || 0).toLocaleString('en-IN')} × {totalDays})</div>
+                          <div>Lodging: ₹{lodgingTotal.toLocaleString('en-IN')} (₹{(trainerCostDetails.lodging || 0).toLocaleString('en-IN')} × {totalDays})</div>
                           <div className="font-medium">Total Expenses: ₹{totalExpenses.toLocaleString('en-IN')}</div>
                         </div>
                       </div>

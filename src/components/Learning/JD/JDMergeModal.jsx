@@ -79,11 +79,6 @@ function JDMergeModal({ onClose, onProceed, preSelectedColleges = [] }) {
       return;
     }
 
-    if (selectedColleges.length === 1) {
-      setError("Please select at least two colleges for JD merge");
-      return;
-    }
-
     onProceed(selectedColleges);
   };
 
@@ -94,10 +89,10 @@ function JDMergeModal({ onClose, onProceed, preSelectedColleges = [] }) {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="text-xl font-semibold text-gray-900">
-                Select Colleges for JD Training Merge
+                Select Colleges for JD Training
               </h3>
               <p className="text-sm text-gray-600 mt-1">
-                Choose multiple colleges to merge for online JD training. Trainer costs will be divided equally among selected colleges.
+                Choose one or more colleges for JD training. {selectedColleges.length > 1 ? 'Trainer costs will be divided equally among selected colleges.' : 'Trainer costs will be assigned to the selected college.'}
               </p>
             </div>
             <button
@@ -224,7 +219,7 @@ function JDMergeModal({ onClose, onProceed, preSelectedColleges = [] }) {
                 ))}
               </div>
               <div className="mt-2 text-xs text-blue-700">
-                💰 Trainer costs will be divided equally among these {selectedColleges.length} colleges
+                💰 Trainer costs will be {selectedColleges.length > 1 ? `divided equally among these ${selectedColleges.length} colleges` : 'assigned to this college'}
               </div>
             </div>
           )}
@@ -240,10 +235,10 @@ function JDMergeModal({ onClose, onProceed, preSelectedColleges = [] }) {
             <button
               type="button"
               onClick={handleProceed}
-              disabled={selectedColleges.length < 2}
+              disabled={selectedColleges.length === 0}
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              Merge and Next
+              {selectedColleges.length > 1 ? 'Merge and Next' : 'Next'}
               <FiChevronRight className="w-4 h-4" />
             </button>
           </div>

@@ -114,6 +114,7 @@ const TrainerRow = React.memo(
     // Local UI state to allow adding new topics per trainer
     const [addedTopics, setAddedTopics] = useState([]);
     const [newTopicInput, setNewTopicInput] = useState("");
+    const [duplicateTopicMessage, setDuplicateTopicMessage] = useState("");
     // ✅ ADD: State for daily hours dropdown
     const [showDailyHoursDropdown, setShowDailyHoursDropdown] = useState(false);
     // ✅ ADD: Ref to track previous dates
@@ -133,6 +134,7 @@ const TrainerRow = React.memo(
     useEffect(() => {
       setAddedTopics([]);
       setNewTopicInput("");
+      setDuplicateTopicMessage("");
     }, [trainer.trainerId]);
 
     // ✅ ADD: Local function to generate date list with exclusions
@@ -277,7 +279,7 @@ const TrainerRow = React.memo(
           }`}
         >
           {/* Trainer Name/Select */}
-          <td className="px-2 py-1 align-top min-w-[180px]">
+          <td className="px-2 py-1 align-top min-w-[160px]">
             {isDuplicate && (
               <div className="text-xs text-red-600 font-medium mb-1 flex items-center">
                 <svg
@@ -308,13 +310,13 @@ const TrainerRow = React.memo(
               options={trainerOptions}
               placeholder="Select Trainer"
               isSearchable={true}
-              className="text-xs"
+              className="text-sm"
               styles={{
                 control: (provided, state) => ({
                   ...provided,
-                  minHeight: '24px',
-                  height: '24px',
-                  fontSize: '11px',
+                  minHeight: '28px',
+                  height: '28px',
+                  fontSize: '14px',
                   borderColor: state.isFocused ? '#6366f1' : '#d1d5db',
                   '&:hover': {
                     borderColor: '#6366f1',
@@ -325,11 +327,11 @@ const TrainerRow = React.memo(
                 valueContainer: (provided) => ({
                   ...provided,
                   padding: '0 4px',
-                  minHeight: '22px',
+                  minHeight: '26px',
                 }),
                 input: (provided) => ({
                   ...provided,
-                  fontSize: '11px',
+                  fontSize: '14px',
                   margin: '0',
                   padding: '0',
                 }),
@@ -343,25 +345,25 @@ const TrainerRow = React.memo(
                 }),
                 option: (provided, state) => ({
                   ...provided,
-                  fontSize: '11px',
-                  padding: '4px 8px',
-                  minHeight: '24px',
+                  fontSize: '14px',
+                  padding: '6px 8px',
+                  minHeight: '28px',
                   backgroundColor: state.isDisabled ? '#f9fafb' : state.isSelected ? '#6366f1' : state.isFocused ? '#eef2ff' : provided.backgroundColor,
                   color: state.isDisabled ? '#9ca3af' : state.isSelected ? 'white' : provided.color,
                   cursor: state.isDisabled ? 'not-allowed' : 'pointer',
                 }),
                 placeholder: (provided) => ({
                   ...provided,
-                  fontSize: '11px',
+                  fontSize: '14px',
                   color: '#6b7280',
                 }),
                 singleValue: (provided) => ({
                   ...provided,
-                  fontSize: '11px',
+                  fontSize: '14px',
                 }),
                 menu: (provided) => ({
                   ...provided,
-                  fontSize: '11px',
+                  fontSize: '14px',
                 }),
               }}
             />
@@ -380,7 +382,7 @@ const TrainerRow = React.memo(
                   e.target.value
                 )
               }
-              className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
+              className="w-24 rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1 px-2"
             >
               <option value="">Select Duration</option>
               {DAY_DURATION_OPTIONS.map((option) => (
@@ -405,7 +407,7 @@ const TrainerRow = React.memo(
                   e.target.value
                 )
               }
-              className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
+              className="w-32 rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1 px-2"
             />
           </td>
 
@@ -423,7 +425,7 @@ const TrainerRow = React.memo(
                   e.target.value
                 )
               }
-              className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
+              className="w-32 rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1 px-2"
             />
           </td>
 
@@ -473,7 +475,7 @@ const TrainerRow = React.memo(
                   e.target.value
                 )
               }
-              className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
+              className="w-20 rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1 px-2"
               placeholder="Hours"
             />
           </td>
@@ -492,7 +494,7 @@ const TrainerRow = React.memo(
                   parseFloat(e.target.value) || 0
                 )
               }
-              className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
+              className="w-20 rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1 px-2"
               placeholder="Cost"
             />
           </td>
@@ -500,7 +502,7 @@ const TrainerRow = React.memo(
           {/* Daily Hours */}
           <td className="px-2 py-1 relative bg-gradient-to-r from-gray-50 to-white rounded-md overflow-visible">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-gray-700">
+              <span className="text-sm font-medium text-gray-700">
                 {trainer.dailyHours && trainer.dailyHours.length > 0
                   ? (
                       trainer.dailyHours.reduce(
@@ -538,7 +540,7 @@ const TrainerRow = React.memo(
                 aria-labelledby="daily-hours-title"
               >
                 <div className="flex items-center justify-between mb-1">
-                  <h4 id="daily-hours-title" className="text-xs font-semibold text-gray-800">
+                  <h4 id="daily-hours-title" className="text-sm font-semibold text-gray-800">
                     Daily Hours Breakdown
                   </h4>
                   <button
@@ -550,13 +552,13 @@ const TrainerRow = React.memo(
                     <FiX className="w-3 h-3 text-gray-500" />
                   </button>
                 </div>
-                <table className="w-full text-xs border-collapse">
+                <table className="w-full text-sm border-collapse">
                   <thead>
                     <tr className="bg-gray-100 border-b border-gray-200">
-                      <th className="text-left py-1 px-0.5 font-medium text-gray-700 text-xs">Date</th>
-                      <th className="text-left py-1 px-0.5 font-medium text-gray-700 text-xs">Day</th>
-                      <th className="text-left py-1 px-0.5 font-medium text-gray-700 text-xs">Hours</th>
-                      <th className="text-left py-1 px-0.5 font-medium text-gray-700 text-xs">Action</th>
+                      <th className="text-left py-1 px-0.5 font-medium text-gray-700 text-sm">Date</th>
+                      <th className="text-left py-1 px-0.5 font-medium text-gray-700 text-sm">Day</th>
+                      <th className="text-left py-1 px-0.5 font-medium text-gray-700 text-sm">Hours</th>
+                      <th className="text-left py-1 px-0.5 font-medium text-gray-700 text-sm">Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -568,13 +570,13 @@ const TrainerRow = React.memo(
                             const hours = trainer.dailyHours[index] || 0;
                             return (
                               <tr key={index} className="hover:bg-gray-50 transition-colors">
-                                <td className="py-0.5 px-0.5 text-gray-600 text-xs">
+                                <td className="py-0.5 px-0.5 text-gray-600 text-sm">
                                   {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                 </td>
-                                <td className="py-0.5 px-0.5 text-gray-600 text-xs">
+                                <td className="py-0.5 px-0.5 text-gray-600 text-sm">
                                   {date.toLocaleDateString('en-US', { weekday: 'short' })}
                                 </td>
-                                <td className="py-0.5 px-0.5 font-medium text-indigo-600 text-xs">
+                                <td className="py-0.5 px-0.5 font-medium text-indigo-600 text-sm">
                                   <input
                                     type="number"
                                     min="0"
@@ -589,7 +591,7 @@ const TrainerRow = React.memo(
                                         e.target.value === "" ? 0 : parseFloat(e.target.value) || 0
                                       )
                                     }
-                                    className="w-12 text-xs border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-400 text-center"
+                                    className="w-12 text-sm border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-400 text-center"
                                     placeholder="0"
                                   />
                                 </td>
@@ -618,8 +620,8 @@ const TrainerRow = React.memo(
                             );
                           })}
                           <tr className="bg-indigo-50 border-t border-indigo-200 font-semibold">
-                            <td className="py-0.5 px-0.5 text-indigo-800 text-xs" colSpan={2}>Total:</td>
-                            <td className="py-0.5 px-0.5 text-indigo-800 text-xs">
+                            <td className="py-0.5 px-0.5 text-indigo-800 text-sm" colSpan={2}>Total:</td>
+                            <td className="py-0.5 px-0.5 text-indigo-800 text-sm">
                               {(trainer.dailyHours || []).reduce((sum, hours) => sum + Number(hours || 0), 0)}h
                             </td>
                             <td></td>
@@ -648,7 +650,7 @@ const TrainerRow = React.memo(
               {trainer.dayDuration === "AM" && (
                 <button
                   type="button"
-                  className="ml-1 px-2 py-1 text-xs bg-black text-white rounded hover:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-black/30"
+                  className="ml-1 px-2 py-1 text-sm bg-black text-white rounded hover:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-black/30"
                   onClick={() => {
                     openSwapModal(rowIndex, batchIndex, trainerIdx);
                   }}
@@ -670,7 +672,7 @@ const TrainerRow = React.memo(
                 <div className="flex flex-row gap-2 self-start">
                   {/* Conveyance */}
                   <div className="flex flex-col bg-white/70 border border-gray-100 rounded-md p-0.5 min-w-[90px]">
-                    <label className="text-[10px] font-semibold text-slate-600 mb-0.5">
+                    <label className="text-sm font-semibold text-slate-600 mb-0.5">
                       Conveyance
                     </label>
                     <div className="relative">
@@ -694,7 +696,7 @@ const TrainerRow = React.memo(
                               : parseFloat(e.target.value) || 0
                           )
                         }
-                        className="w-full pl-6 rounded border border-gray-200 bg-white text-[10px] py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-200"
+                        className="w-full pl-6 rounded border border-gray-200 bg-white text-sm py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-200"
                         placeholder="0"
                       />
                     </div>
@@ -702,7 +704,7 @@ const TrainerRow = React.memo(
                       const perDay = Number(trainer.conveyance) || 0;
                       const total = perDay; // Conveyance is one-time, no multiplication
                       if (perDay > 0) {
-                        return <div className="text-[9px] text-slate-500 mt-0.5">₹{formatIndianNumber(total)}</div>;
+                        return <div className="text-xs text-slate-500 mt-0.5">₹{formatIndianNumber(total)}</div>;
                       }
                       return null;
                     })()}
@@ -710,7 +712,7 @@ const TrainerRow = React.memo(
 
                   {/* Food */}
                   <div className="flex flex-col bg-white/70 border border-gray-100 rounded-md p-0.5 min-w-[90px]">
-                    <label className="text-[10px] font-semibold text-slate-600 mb-0.5">
+                    <label className="text-sm font-semibold text-slate-600 mb-0.5">
                       Food
                     </label>
                     <div className="relative">
@@ -734,7 +736,7 @@ const TrainerRow = React.memo(
                               : parseFloat(e.target.value) || 0
                           )
                         }
-                        className="w-full pl-6 rounded border border-gray-200 bg-white text-[10px] py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-200"
+                        className="w-full pl-6 rounded border border-gray-200 bg-white text-sm py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-200"
                         placeholder="0"
                       />
                     </div>
@@ -743,7 +745,7 @@ const TrainerRow = React.memo(
                       const perDay = Number(trainer.food) || 0;
                       const total = perDay * days;
                       if (days > 0 && perDay > 0) {
-                        return <div className="text-[9px] text-slate-500 mt-0.5">{formatIndianNumber(perDay)}*{days} = {formatIndianNumber(total)}</div>;
+                        return <div className="text-xs text-slate-500 mt-0.5">{formatIndianNumber(perDay)}*{days} = {formatIndianNumber(total)}</div>;
                       }
                       return null;
                     })()}
@@ -751,7 +753,7 @@ const TrainerRow = React.memo(
 
                   {/* Lodging */}
                   <div className="flex flex-col bg-white/70 border border-gray-100 rounded-md p-0.5 min-w-[90px]">
-                    <label className="text-[10px] font-semibold text-slate-600 mb-0.5">
+                    <label className="text-sm font-semibold text-slate-600 mb-0.5">
                       Lodging
                     </label>
                     <div className="relative">
@@ -775,7 +777,7 @@ const TrainerRow = React.memo(
                               : parseFloat(e.target.value) || 0
                           )
                         }
-                        className="w-full pl-6 rounded border border-gray-200 bg-white text-[10px] py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-200"
+                        className="w-full pl-6 rounded border border-gray-200 bg-white text-sm py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-200"
                         placeholder="0"
                       />
                     </div>
@@ -784,7 +786,7 @@ const TrainerRow = React.memo(
                       const perDay = Number(trainer.lodging) || 0;
                       const total = perDay * days;
                       if (days > 0 && perDay > 0) {
-                        return <div className="text-[9px] text-slate-500 mt-0.5">{formatIndianNumber(perDay)}*{days} = {formatIndianNumber(total)}</div>;
+                        return <div className="text-xs text-slate-500 mt-0.5">{formatIndianNumber(perDay)}*{days} = {formatIndianNumber(total)}</div>;
                       }
                       return null;
                     })()}
@@ -809,24 +811,24 @@ const TrainerRow = React.memo(
                       <>
                         <div className={`${boxBase} text-indigo-700 flex flex-col`}>
                           <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-medium">Trainer:</span>
+                            <span className="text-sm font-medium">Trainer:</span>
                             <span className={`${valueCls} text-indigo-900`}>₹{formatIndianNumber(trainerCost)}</span>
                           </div>
                           {perHourCost > 0 && assignedHours > 0 && (
-                            <div className="text-[9px] text-slate-500 mt-1 text-center border-t border-indigo-100 pt-1">
+                            <div className="text-xs text-slate-500 mt-1 text-center border-t border-indigo-100 pt-1">
                               <span className="font-mono">{formatIndianNumber(perHourCost)} × {assignedHours} = {formatIndianNumber(trainerCost)}</span>
                             </div>
                           )}
                         </div>
                         <div className={`${boxBase} text-amber-700 flex flex-col`}>
                           <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-medium">Misc:</span>
+                            <span className="text-sm font-medium">Misc:</span>
                             <span className={`${valueCls} text-amber-900`}>₹{formatIndianNumber(miscCost)}</span>
                           </div>
                         </div>
                         <div className={`${boxBase} text-emerald-700 flex flex-col`}>
                           <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-medium">Total:</span>
+                            <span className="text-sm font-medium">Total:</span>
                             <span className={`${valueCls} text-emerald-900`}>₹{formatIndianNumber(totalCost)}</span>
                           </div>
                         </div>
@@ -839,7 +841,7 @@ const TrainerRow = React.memo(
                 <div className="flex-1 min-w-[200px]">
                   <div className="flex items-center justify-between mb-0.5">
                     <div className="flex items-center space-x-1">
-                      <h4 className="text-[10px] font-semibold text-slate-700">
+                      <h4 className="text-sm font-semibold text-slate-700">
                         Topics
                       </h4>
                       <div className="relative group">
@@ -852,7 +854,7 @@ const TrainerRow = React.memo(
                             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                           </svg>
                         </button>
-                        <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block bg-slate-800 text-white text-[10px] rounded py-2 px-3 shadow-lg z-50 max-w-xs">
+                        <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block bg-slate-800 text-white text-sm rounded py-2 px-3 shadow-lg z-50 max-w-xs">
                           <div className="font-semibold mb-1">How to manage topics:</div>
                           <ul className="space-y-1">
                             <li>• Click topic buttons to select/deselect</li>
@@ -862,11 +864,11 @@ const TrainerRow = React.memo(
                         </div>
                       </div>
                     </div>
-                    <span className="text-[10px] text-slate-500">
+                    <span className="text-sm text-slate-500 whitespace-nowrap">
                       Click to select • Type to add
                     </span>
                   </div>
-                  <div className="bg-white rounded-md border border-gray-100 p-2 shadow-sm">
+                  <div className="bg-white rounded-md border border-gray-100 p-2 shadow-sm min-w-[250px]">
                     {/* Simplified topics selection UI */}
                     {(() => {
                       const trainerDoc = trainers.find(
@@ -917,10 +919,10 @@ const TrainerRow = React.memo(
                           <div
                             role="group"
                             aria-label="Topics"
-                            className="min-h-[20px] max-h-24 overflow-auto rounded border border-dashed border-gray-200 p-0.5 bg-gray-50"
+                            className="min-h-[20px] rounded border border-dashed border-gray-200 p-0.5 bg-gray-50"
                           >
                             {allTopics.length === 0 ? (
-                              <div className="text-[9px] text-slate-400 py-1 text-center">
+                              <div className="text-sm text-slate-400 py-1 text-center">
                                 No topics available. Add one below.
                               </div>
                             ) : (
@@ -934,7 +936,7 @@ const TrainerRow = React.memo(
                                       role="checkbox"
                                       aria-checked={active}
                                       onClick={() => toggleTopic(topic)}
-                                      className={`text-[9px] px-1 py-0.5 rounded-full border transition-all focus:outline-none focus:ring-1 focus:ring-indigo-400 truncate ${
+                                      className={`text-sm px-1 py-0.5 rounded-full border transition-all focus:outline-none focus:ring-1 focus:ring-indigo-400 truncate ${
                                         active
                                           ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
                                           : "bg-white text-slate-700 border-gray-300 hover:border-indigo-400 hover:bg-indigo-50"
@@ -942,14 +944,14 @@ const TrainerRow = React.memo(
                                       title={`${active ? 'Deselect' : 'Select'} topic: ${topic}`}
                                     >
                                       {topic}
-                                      {active && <span className="ml-0.5 text-[9px]">✓</span>}
+                                      {active && <span className="ml-0.5 text-sm">✓</span>}
                                     </button>
                                   );
                                 })}
                               </div>
                             )}
                           </div>
-                          <div className="flex items-center gap-0.5">
+                          <div className="flex items-center gap-0.5 min-w-[200px]">
                             <input
                               aria-label={`Add topic for trainer ${
                                 trainer.trainerName ||
@@ -958,12 +960,24 @@ const TrainerRow = React.memo(
                               }`}
                               type="text"
                               value={newTopicInput}
-                              onChange={(e) => setNewTopicInput(e.target.value)}
+                              onChange={(e) => {
+                                setNewTopicInput(e.target.value);
+                                if (duplicateTopicMessage) setDuplicateTopicMessage(""); // Clear message when user starts typing
+                              }}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") {
                                   e.preventDefault();
                                   const t = (newTopicInput || "").trim();
                                   if (!t) return;
+                                  
+                                  // Check if topic is already selected
+                                  if (selected.includes(t)) {
+                                    // Topic already exists, show message and clear input
+                                    setDuplicateTopicMessage(`"${t}" is already selected`);
+                                    setNewTopicInput("");
+                                    return;
+                                  }
+                                  
                                   if (!addedTopics.includes(t))
                                     setAddedTopics((s) => [...s, t]);
                                   const next = Array.from(
@@ -977,16 +991,26 @@ const TrainerRow = React.memo(
                                     next
                                   );
                                   setNewTopicInput("");
+                                  setDuplicateTopicMessage(""); // Clear any previous message
                                 }
                               }}
                               placeholder="Type new topic here and press Enter"
-                              className="flex-1 rounded border border-gray-200 px-1 py-0.5 text-[9px] focus:outline-none focus:ring-1 focus:ring-indigo-200"
+                              className="flex-1 rounded border border-gray-200 px-1 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-200"
                             />
                             <button
                               type="button"
                               onClick={() => {
                                 const t = (newTopicInput || "").trim();
                                 if (!t) return;
+                                
+                                // Check if topic is already selected
+                                if (selected.includes(t)) {
+                                  // Topic already exists, show message and clear input
+                                  setDuplicateTopicMessage(`"${t}" is already selected`);
+                                  setNewTopicInput("");
+                                  return;
+                                }
+                                
                                 if (!addedTopics.includes(t))
                                   setAddedTopics((s) => [...s, t]);
                                 const next = Array.from(
@@ -1000,14 +1024,20 @@ const TrainerRow = React.memo(
                                   next
                                 );
                                 setNewTopicInput("");
+                                setDuplicateTopicMessage(""); // Clear any previous message
                               }}
-                              className="inline-flex items-center gap-0.5 bg-indigo-600 hover:bg-indigo-700 text-white px-1.5 py-0.5 rounded text-[9px] focus:outline-none focus:ring-1 focus:ring-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="inline-flex items-center gap-0.5 bg-indigo-600 hover:bg-indigo-700 text-white px-1.5 py-0.5 rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed"
                               disabled={!newTopicInput.trim()}
                             >
                               <FiPlus size={10} />
                               <span>Add</span>
                             </button>
                           </div>
+                          {duplicateTopicMessage && (
+                            <div className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-200 mt-1">
+                              {duplicateTopicMessage}
+                            </div>
+                          )}
                         </div>
                       );
                     })()}
@@ -1067,7 +1097,7 @@ const TrainersTable = React.memo(
               ref={buttonRef}
               onClick={handleAddTrainerClick}
               disabled={!isStudentCountValid}
-              className={`text-xs flex items-center font-medium transition-colors ${
+              className={`text-sm flex items-center font-medium transition-colors ${
                 isStudentCountValid
                   ? "text-indigo-600 hover:text-indigo-800 cursor-pointer"
                   : "text-gray-400 cursor-not-allowed"
@@ -1084,7 +1114,7 @@ const TrainersTable = React.memo(
             </button>
             {showTooltip && (
               <div
-                className="absolute top-full mt-1 left-0 z-10 bg-red-50 border border-red-200 text-red-800 text-xs px-3 py-2 rounded shadow-lg max-w-xs"
+                className="absolute top-full mt-1 left-0 z-10 bg-red-50 border border-red-200 text-red-800 text-sm px-3 py-2 rounded shadow-lg max-w-xs"
                 style={{
                   whiteSpace: "nowrap",
                   transform: "translateX(-50%)",
@@ -1194,7 +1224,7 @@ const BatchComponent = React.memo(
         } shadow-xs overflow-visible`}
       >
         <div
-          className={`px-4 py-3 ${
+          className={`px-2 py-2 ${
             memoizedGetColorsForBatch(row.batch).accent
           } border-b ${
             memoizedGetColorsForBatch(row.batch).border
@@ -1221,7 +1251,7 @@ const BatchComponent = React.memo(
           </div>
         </div>
 
-        <div className="p-3 space-y-2">
+        <div className="p-2 space-y-2">
           {/* Batch Details */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             <div>
@@ -1232,7 +1262,7 @@ const BatchComponent = React.memo(
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
-                className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
+                className="w-20 rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1 px-2"
                 value={batch.batchPerStdCount || ""}
                 onChange={(e) =>
                   handleBatchChange(
@@ -1253,7 +1283,7 @@ const BatchComponent = React.memo(
               </label>
               <input
                 type="text"
-                className="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1 px-2"
+                className="w-24 rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1 px-2"
                 value={batch.batchCode || ""}
                 onChange={(e) =>
                   handleBatchChange(
@@ -1269,7 +1299,7 @@ const BatchComponent = React.memo(
               <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-0.5">
                 Assigned Hours
               </label>
-              <div className="w-full rounded border-gray-300 bg-gray-50 text-xs py-1 px-2 text-gray-700 font-medium">
+              <div className="w-20 rounded border-gray-300 bg-gray-50 text-sm py-1 px-2 text-gray-700 font-medium">
                 {batch.trainers.reduce(
                   (sum, t) => sum + Number(t.assignedHours || 0),
                   0
@@ -3392,7 +3422,7 @@ const filteredTrainers = useMemo(() => {
                     <span className="font-medium text-red-800 text-xs truncate">
                       {swapConfirmationModal.sourceTrainerData?.trainerName} ({swapConfirmationModal.sourceTrainerData?.trainerId})
                     </span>
-                    <span className="text-xs bg-red-100 text-red-800 px-1.5 py-0.5 rounded text-xs">
+                    <span className=" bg-red-100 text-red-800 px-1.5 py-0.5 rounded text-xs">
                       Current: {swapConfirmationModal.sourceTrainerData?.dayDuration}
                     </span>
                   </div>
@@ -3409,7 +3439,7 @@ const filteredTrainers = useMemo(() => {
                     <span className="font-medium text-blue-800 text-xs truncate">
                       {swapConfirmationModal.targetTrainerData?.trainerName} ({swapConfirmationModal.targetTrainerData?.trainerId})
                     </span>
-                    <span className="text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded text-xs">
+                    <span className=" bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded text-xs">
                       Current: {swapConfirmationModal.targetTrainerData?.dayDuration}
                     </span>
                   </div>
@@ -3477,7 +3507,7 @@ const filteredTrainers = useMemo(() => {
                           <span className={`font-medium text-xs truncate ${sourceHasDuplicate ? 'text-red-800' : 'text-green-800'}`}>
                             {swapConfirmationModal.sourceTrainerData?.trainerName} ({swapConfirmationModal.sourceTrainerData?.trainerId})
                           </span>
-                          <span className={`text-xs px-1.5 py-0.5 rounded text-xs ${sourceHasDuplicate ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                          <span className={` px-1.5 py-0.5 rounded text-xs ${sourceHasDuplicate ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
                             New: {swapConfirmationModal.sourceNewTimeSlot}
                           </span>
                         </div>
@@ -3520,7 +3550,7 @@ const filteredTrainers = useMemo(() => {
                           <span className={`font-medium text-xs truncate ${targetHasDuplicate ? 'text-red-800' : 'text-green-800'}`}>
                             {swapConfirmationModal.targetTrainerData?.trainerName} ({swapConfirmationModal.targetTrainerData?.trainerId})
                           </span>
-                          <span className={`text-xs px-1.5 py-0.5 rounded text-xs ${targetHasDuplicate ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                          <span className={` px-1.5 py-0.5 rounded text-xs ${targetHasDuplicate ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
                             New: {swapConfirmationModal.targetNewTimeSlot}
                           </span>
                         </div>
@@ -3885,7 +3915,7 @@ const filteredTrainers = useMemo(() => {
 
                   {/* Expanded Batch Content */}
                   {isExpanded && (
-                    <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 space-y-6">
+                    <div className="px-2 py-2 bg-gray-50 border-t border-gray-200 space-y-3">
                       {row.batches.map((batch, batchIndex) => (
                         <BatchComponent
                           key={`batch-${rowIndex}-${batchIndex}`}

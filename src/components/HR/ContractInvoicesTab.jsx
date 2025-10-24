@@ -194,7 +194,7 @@ const StatisticsCards = ({ stats, formatIndianCurrency }) => {
             <div className="flex-1">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Amount</p>
               <p className="text-sm font-bold text-gray-900 mt-0.5">
-                ₹{formatIndianCurrency(stats.totalAmount, true)}
+                {formatIndianCurrency(stats.totalAmount, true)}
               </p>
               <p className="text-xs text-gray-400 mt-0.5">Invoice value</p>
             </div>
@@ -222,7 +222,7 @@ const StatisticsCards = ({ stats, formatIndianCurrency }) => {
             <div className="flex-1">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Received</p>
               <p className="text-sm font-bold text-green-600 mt-0.5">
-                ₹{formatIndianCurrency(stats.receivedAmount, true)}
+                {formatIndianCurrency(stats.receivedAmount, true)}
               </p>
               <p className="text-xs text-gray-400 mt-0.5">Payments collected</p>
               <div className="mt-0.5 bg-gray-200 rounded-full h-1">
@@ -259,7 +259,7 @@ const StatisticsCards = ({ stats, formatIndianCurrency }) => {
             <div className="flex-1">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Due Amount</p>
               <p className="text-sm font-bold text-red-600 mt-0.5">
-                ₹{formatIndianCurrency(stats.dueAmount, true)}
+                {formatIndianCurrency(stats.dueAmount, true)}
               </p>
               <p className="text-xs text-gray-400 mt-0.5">Outstanding</p>
               <div className="mt-0.5 bg-gray-200 rounded-full h-1">
@@ -402,7 +402,7 @@ const ContractInvoicesTab = () => {
         const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
         const tdsBaseType = payment.tdsBaseType || "base";
         const isCashInvoice = invoice.invoiceType === "Cash Invoice";
-        const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? originalAmount * 1.18 : originalAmount);
+        const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? Math.round(originalAmount * 1.18) : originalAmount);
         return sum + billedAmount;
       }, 0) || 0;
 
@@ -524,7 +524,7 @@ const ContractInvoicesTab = () => {
             const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
             const tdsBaseType = payment.tdsBaseType || "base";
             const isCashInvoice = invoice.invoiceType === "Cash Invoice";
-            const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? originalAmount * 1.18 : originalAmount);
+            const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? Math.round(originalAmount * 1.18) : originalAmount);
             return sum + billedAmount;
           }, 0) || 0;
 
@@ -869,7 +869,7 @@ const ContractInvoicesTab = () => {
       const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
       const tdsBaseType = payment.tdsBaseType || "base";
       const isCashInvoice = invoice.invoiceType === "Cash Invoice";
-      const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? originalAmount * 1.18 : originalAmount);
+      const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? Math.round(originalAmount * 1.18) : originalAmount);
       return sum + billedAmount;
     }, 0) || 0;
 
@@ -1078,7 +1078,7 @@ const ContractInvoicesTab = () => {
         (invoice.receivedAmount || 0) + actualReceived;
 
       // Calculate the total billed amount for this payment
-      const totalBilledAmount = tdsBaseType === "base" ? finalOriginalAmount * 1.18 : finalOriginalAmount;
+      const totalBilledAmount = tdsBaseType === "base" ? Math.round(finalOriginalAmount * 1.18) : finalOriginalAmount;
       const newDueAmount = Math.max(0, invoice.dueAmount - totalBilledAmount);
 
       // Create payment record with the combined date and time
@@ -1393,7 +1393,7 @@ const ContractInvoicesTab = () => {
         // TDS calculated on base amount
         // originalAmount here is the base amount (after TDS deduction)
         baseAmount = originalAmount;
-        gstAmount = baseAmount * gstRate;
+        gstAmount = amounts.baseAmount * gstRate;
         totalBilled = baseAmount + gstAmount;
         actualReceivedAmount = receivedAmount + gstAmount; // Add GST back to show total received
       } else {
@@ -1452,7 +1452,7 @@ const ContractInvoicesTab = () => {
         // For tax invoices, apply GST based on TDS base type
         if (tdsBaseType === "base") {
           // TDS calculated on base amount, GST added to remaining base
-          totalBilledAmount = originalAmount * (1 + 0.18); // base * 1.18
+          totalBilledAmount = originalAmount + Math.round(originalAmount * 0.18); // base + GST
         } else {
           // TDS calculated on total amount including GST
           totalBilledAmount = originalAmount;
@@ -1481,15 +1481,15 @@ const ContractInvoicesTab = () => {
       let actualReceivedAmount = receivedAmount;
       if (tdsBaseType === "base" && !isCashInvoice) {
         // For TDS on base, add GST to the typed amount
-        actualReceivedAmount = receivedAmount + (originalAmount * 0.18);
+        actualReceivedAmount = receivedAmount + Math.round(originalAmount * 0.18);
       }
 
       onSubmit(invoice, actualReceivedAmount, paymentDateTime.toISOString(), tdsPercent, originalAmount, tdsAmount, tdsBaseType);
     };
 
     return (
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-54 p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-54 p-4" onClick={onClose}>
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95" onClick={(e) => e.stopPropagation()}>
           {/* Header */}
           <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 px-4 py-3 rounded-t-2xl">
             <div className="flex items-center justify-between">
@@ -1530,11 +1530,11 @@ const ContractInvoicesTab = () => {
                 </div>
                 <div className="space-y-0.5">
                   <label className="text-gray-500 text-xs font-medium uppercase tracking-wide">Total Amount</label>
-                  <p className="font-bold text-blue-600 text-xs">₹{formatIndianCurrency(amounts.totalAmount, false)}</p>
+                  <p className="font-bold text-blue-600 text-xs">{formatIndianCurrency(amounts.totalAmount, false)}</p>
                 </div>
                 <div className="space-y-0.5">
                   <label className="text-gray-500 text-xs font-medium uppercase tracking-wide">Due Amount</label>
-                  <p className="font-bold text-red-600 text-xs">₹{formatIndianCurrency(dueAmount, false)}</p>
+                  <p className="font-bold text-red-600 text-xs">{formatIndianCurrency(dueAmount, false)}</p>
                 </div>
               </div>
             </div>
@@ -1550,7 +1550,7 @@ const ContractInvoicesTab = () => {
                   </div>
                   <div>
                     <p className="text-green-800 font-medium text-xs">Already Received</p>
-                    <p className="text-green-700 text-xs">₹{formatIndianCurrency(invoice.receivedAmount, false)}</p>
+                    <p className="text-green-700 text-xs">{formatIndianCurrency(invoice.receivedAmount, false)}</p>
                   </div>
                 </div>
               </div>
@@ -1582,8 +1582,8 @@ const ContractInvoicesTab = () => {
               <label className="block text-xs font-semibold text-gray-800">
                 TDS Percentage
               </label>
-              <div className="grid grid-cols-3 gap-2">
-                <div className="flex items-center p-2 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+              <div className="grid grid-cols-4 gap-1">
+                <div className="flex items-center p-1.5 bg-gray-50 rounded-md border border-gray-200 hover:bg-gray-100 transition-colors">
                   <input
                     type="radio"
                     id="tds-0"
@@ -1593,12 +1593,25 @@ const ContractInvoicesTab = () => {
                     onChange={(e) => setTdsPercentage(e.target.value)}
                     className="w-3 h-3 text-blue-600 focus:ring-blue-500 border-gray-300"
                   />
-                  <label htmlFor="tds-0" className="ml-2 flex-1">
+                  <label htmlFor="tds-0" className="ml-1 flex-1">
                     <span className="text-xs font-medium text-gray-900">0%</span>
-                    <p className="text-xs text-gray-600">No TDS</p>
                   </label>
                 </div>
-                <div className="flex items-center p-2 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+                <div className="flex items-center p-1.5 bg-gray-50 rounded-md border border-gray-200 hover:bg-gray-100 transition-colors">
+                  <input
+                    type="radio"
+                    id="tds-2"
+                    name="tdsPercentage"
+                    value="2"
+                    checked={tdsPercentage === "2"}
+                    onChange={(e) => setTdsPercentage(e.target.value)}
+                    className="w-3 h-3 text-blue-600 focus:ring-blue-500 border-gray-300"
+                  />
+                  <label htmlFor="tds-2" className="ml-1 flex-1">
+                    <span className="text-xs font-medium text-gray-900">2%</span>
+                  </label>
+                </div>
+                <div className="flex items-center p-1.5 bg-gray-50 rounded-md border border-gray-200 hover:bg-gray-100 transition-colors">
                   <input
                     type="radio"
                     id="tds-5"
@@ -1608,12 +1621,11 @@ const ContractInvoicesTab = () => {
                     onChange={(e) => setTdsPercentage(e.target.value)}
                     className="w-3 h-3 text-blue-600 focus:ring-blue-500 border-gray-300"
                   />
-                  <label htmlFor="tds-5" className="ml-2 flex-1">
+                  <label htmlFor="tds-5" className="ml-1 flex-1">
                     <span className="text-xs font-medium text-gray-900">5%</span>
-                    <p className="text-xs text-gray-600">Standard TDS</p>
                   </label>
                 </div>
-                <div className="flex items-center p-2 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+                <div className="flex items-center p-1.5 bg-gray-50 rounded-md border border-gray-200 hover:bg-gray-100 transition-colors">
                   <input
                     type="radio"
                     id="tds-10"
@@ -1623,9 +1635,8 @@ const ContractInvoicesTab = () => {
                     onChange={(e) => setTdsPercentage(e.target.value)}
                     className="w-3 h-3 text-blue-600 focus:ring-blue-500 border-gray-300"
                   />
-                  <label htmlFor="tds-10" className="ml-2 flex-1">
+                  <label htmlFor="tds-10" className="ml-1 flex-1">
                     <span className="text-xs font-medium text-gray-900">10%</span>
-                    <p className="text-xs text-gray-600">High TDS</p>
                   </label>
                 </div>
               </div>
@@ -1650,7 +1661,7 @@ const ContractInvoicesTab = () => {
                   <label htmlFor="tds-base" className="ml-2 flex-1">
                     <span className="text-xs font-medium text-gray-900">Base Amount</span>
                     <p className="text-xs text-gray-600">TDS calculated on base amount (excluding GST)</p>
-                    <p className="text-xs font-medium text-blue-600">₹{formatIndianCurrency(amounts.baseAmount, false)}</p>
+                    <p className="text-xs font-medium text-blue-600">{formatIndianCurrency(amounts.baseAmount, false)}</p>
                   </label>
                 </div>
                 <div className="flex items-center p-2 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
@@ -1665,8 +1676,17 @@ const ContractInvoicesTab = () => {
                   />
                   <label htmlFor="tds-total" className="ml-2 flex-1">
                     <span className="text-xs font-medium text-gray-900">Total Amount</span>
-                    <p className="text-xs text-gray-600">TDS calculated on total amount (including GST)</p>
-                    <p className="text-xs font-medium text-blue-600">₹{formatIndianCurrency(amounts.totalAmount, false)}</p>
+                    <p className="text-xs text-gray-600">
+                      TDS calculated on total amount (including GST)
+                      {invoice.invoiceType === "Tax Invoice" && amounts.gstAmount > 0 && (
+                        <span className="text-blue-600 font-medium ml-1">
+                          ({formatIndianCurrency(amounts.gstAmount, false)} GST)
+                        </span>
+                      )}
+                    </p>
+                    <div className="text-xs font-medium text-blue-600">
+                      {formatIndianCurrency(amounts.totalAmount, false)}
+                    </div>
                   </label>
                 </div>
               </div>
@@ -1729,7 +1749,7 @@ const ContractInvoicesTab = () => {
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">{tdsBaseType === "base" ? "Base Amount Billed:" : "Total Amount Billed:"}</span>
-                    <span className="font-semibold text-gray-900">₹{(tdsBaseType === "base" ? tdsBreakdown.baseAmount : tdsBreakdown.totalBilled).toFixed(2)}</span>
+                    <span className="font-semibold text-gray-900">₹{(tdsBaseType === "base" ? amounts.baseAmount : tdsBreakdown.totalBilled).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">TDS Deducted ({tdsPercentage}%):</span>
@@ -1743,7 +1763,7 @@ const ContractInvoicesTab = () => {
                   )}
                   <div className="flex justify-between items-center border-t border-blue-200 pt-1 mt-1">
                     <span className="text-gray-600 font-medium">Amount Received:</span>
-                    <span className="font-bold text-gray-900">₹{formatIndianCurrency(tdsBreakdown.receivedAfterTDS, false)}</span>
+                    <span className="font-bold text-gray-900">{formatIndianCurrency(tdsBreakdown.receivedAfterTDS, false)}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 font-medium">Due Amount:</span>
@@ -2247,7 +2267,7 @@ const ContractInvoicesTab = () => {
                   const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
                   const tdsBaseType = payment.tdsBaseType || "base";
                   const isCashInvoice = invoice.invoiceType === "Cash Invoice";
-                  const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? originalAmount * 1.18 : originalAmount);
+                  const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? Math.round(originalAmount * 1.18) : originalAmount);
                   return sum + billedAmount;
                 }, 0) || 0;
 
@@ -2303,19 +2323,19 @@ const ContractInvoicesTab = () => {
                       <div>
                         <label className="text-gray-600 text-xs font-medium">Total Amount</label>
                         <p className="font-bold text-gray-900">
-                          ₹{formatIndianCurrency(totalAmount)}
+                          {formatIndianCurrency(totalAmount)}
                         </p>
                       </div>
                       <div>
                         <label className="text-gray-600 text-xs font-medium">Received</label>
                         <p className="font-bold text-green-600">
-                          ₹{formatIndianCurrency(receivedAmount)}
+                          {formatIndianCurrency(receivedAmount)}
                         </p>
                       </div>
                       <div>
                         <label className="text-gray-600 text-xs font-medium">Due Amount</label>
                         <p className="font-bold text-red-600">
-                          ₹{formatIndianCurrency(dueAmount)}
+                          {formatIndianCurrency(dueAmount)}
                         </p>
                       </div>
                       <div>
@@ -2482,7 +2502,7 @@ const ContractInvoicesTab = () => {
                       const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
                       const tdsBaseType = payment.tdsBaseType || "base";
                       const isCashInvoice = invoice.invoiceType === "Cash Invoice";
-                      const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? originalAmount * 1.18 : originalAmount);
+                      const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? originalAmount + Math.round(originalAmount * 0.18) : originalAmount);
                       return sum + billedAmount;
                     }, 0) || 0;
 
@@ -2538,19 +2558,19 @@ const ContractInvoicesTab = () => {
                             <div className="flex justify-between items-center">
                               <span className="text-xs text-gray-600">Total:</span>
                               <span className="text-xs font-bold text-gray-900">
-                                ₹{formatIndianCurrency(totalAmount)}
+                                {formatIndianCurrency(totalAmount)}
                               </span>
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-xs text-gray-600">Received:</span>
                               <span className="text-xs font-semibold text-green-600">
-                                ₹{formatIndianCurrency(receivedAmount)}
+                                {formatIndianCurrency(receivedAmount)}
                               </span>
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-xs text-gray-600">Due:</span>
                               <span className="text-xs font-semibold text-red-600">
-                                ₹{formatIndianCurrency(dueAmount)}
+                                {formatIndianCurrency(dueAmount)}
                               </span>
                             </div>
                           </div>

@@ -24,6 +24,7 @@ import InvoiceModal from "../../../components/HR/InvoiceModal";
 import RowClickModal from "./RowClickModal";
 import MergeInvoicesModal from "./MergeInvoicesModal ";
 import InvoiceExcelExport from "./InvoiceExcelExport";
+import AuditLogsModal from "./AuditLogsModal";
 
 export default function ContractInvoiceTable() {
   const [invoices, setInvoices] = useState([]);
@@ -56,6 +57,24 @@ export default function ContractInvoiceTable() {
   const [isAllExpanded, setIsAllExpanded] = useState(false);
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [auditLogs, setAuditLogs] = useState([]);
+  const [auditLogsLoading, setAuditLogsLoading] = useState(false);
+  const [auditLogsError, setAuditLogsError] = useState(null);
+  const [auditLogsPagination, setAuditLogsPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalRecords: 0,
+    pageSize: 20
+  });
+  const [auditLogsFilters, setAuditLogsFilters] = useState({
+    searchTerm: '',
+    startDate: '',
+    endDate: '',
+    showFilters: false
+  });
+  const [auditLogsSort, setAuditLogsSort] = useState({
+    field: 'timestamp',
+    direction: 'desc'
+  });
 
   const { user } = useAuth();
 
@@ -1303,19 +1322,118 @@ const handleMergeSubmit = async (formData) => {
     }, 0);
   };
 
-  // Fetch audit logs for undo actions
-  const fetchAuditLogs = async () => {
+  // Export audit logs to CSV
+  const exportAuditLogsToCSV = () => {
+    if (auditLogs.length === 0) {
+      alert('No audit logs to export');
+      return;
+    }
+
+    const headers = ['Entry #', 'Action', 'Invoice Number', 'Invoice ID', 'User', 'Timestamp', 'Details'];
+    const csvData = auditLogs.map((log, index) => [
+      ((auditLogsPagination.currentPage - 1) * auditLogsPagination.pageSize) + index + 1,
+      log.action || 'Invoice Cancelled',
+      log.invoiceNumber || 'N/A',
+      log.invoiceId || 'N/A',
+      log.user || 'Unknown',
+      log.timestamp?.toDate
+        ? log.timestamp.toDate().toLocaleString('en-IN')
+        : new Date(log.timestamp).toLocaleString('en-IN'),
+      log.details || ''
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `audit_logs_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+  const fetchAuditLogs = async (page = 1, filters = auditLogsFilters) => {
     try {
-      const q = query(
+      setAuditLogsLoading(true);
+      setAuditLogsError(null);
+
+      let baseQuery = query(
         collection(db, 'audit_logs'),
-        where('action', '==', 'undo'),
-        orderBy('timestamp', 'desc')
+        where('action', '==', 'undo')
       );
-      const snapshot = await getDocs(q);
-      const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setAuditLogs(logs);
+
+      // Apply date filters if provided
+      if (filters.startDate) {
+        const startTimestamp = new Date(filters.startDate);
+        startTimestamp.setHours(0, 0, 0, 0);
+        baseQuery = query(baseQuery, where('timestamp', '>=', startTimestamp));
+      }
+
+      if (filters.endDate) {
+        const endTimestamp = new Date(filters.endDate);
+        endTimestamp.setHours(23, 59, 59, 999);
+        baseQuery = query(baseQuery, where('timestamp', '<=', endTimestamp));
+      }
+
+      // First, get total count for pagination
+      const countSnapshot = await getDocs(baseQuery);
+      let allLogs = countSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      // Apply sorting
+      allLogs.sort((a, b) => {
+        let aValue, bValue;
+
+        switch (auditLogsSort.field) {
+          case 'timestamp':
+            aValue = a.timestamp?.toDate?.() || new Date(a.timestamp);
+            bValue = b.timestamp?.toDate?.() || new Date(b.timestamp);
+            break;
+          case 'invoiceNumber':
+            aValue = a.invoiceNumber || '';
+            bValue = b.invoiceNumber || '';
+            break;
+          case 'user':
+            aValue = a.user || '';
+            bValue = b.user || '';
+            break;
+          default:
+            aValue = a.timestamp?.toDate?.() || new Date(a.timestamp);
+            bValue = b.timestamp?.toDate?.() || new Date(b.timestamp);
+        }
+
+        if (auditLogsSort.direction === 'asc') {
+          return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+        } else {
+          return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+        }
+      });
+
+      const totalRecords = allLogs.length;
+      const totalPages = Math.ceil(totalRecords / auditLogsPagination.pageSize);
+
+      // Apply pagination
+      const startIndex = (page - 1) * auditLogsPagination.pageSize;
+      const endIndex = startIndex + auditLogsPagination.pageSize;
+      const paginatedLogs = allLogs.slice(startIndex, endIndex);
+
+      setAuditLogs(paginatedLogs);
+      setAuditLogsPagination({
+        ...auditLogsPagination,
+        currentPage: page,
+        totalPages,
+        totalRecords
+      });
     } catch (error) {
       console.error('Error fetching audit logs:', error);
+      setAuditLogsError('Failed to load audit logs. Please try again.');
+      setAuditLogs([]);
+    } finally {
+      setAuditLogsLoading(false);
     }
   };
 
@@ -3016,176 +3134,20 @@ const handleMergeSubmit = async (formData) => {
           />
         )}
 
-        {showAuditModal && (
-          <div className="fixed inset-0 bg-transparent backdrop-blur-lg bg-opacity-60 flex items-center justify-center z-54 p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl max-h-[85vh] overflow-hidden border border-gray-200/60">
-              {/* Compact Header */}
-              <div className="bg-gradient-to-r from-red-600 to-red-700 px-4 py-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 bg-white/20 rounded-lg flex items-center justify-center">
-                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-bold text-white">Audit Logs</h2>
-                      <p className="text-red-100 text-xs">Invoice cancellation history</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="bg-white/20 text-white text-xs px-2 py-1 rounded-md font-medium">
-                      {auditLogs.length} {auditLogs.length === 1 ? 'entry' : 'entries'}
-                    </span>
-                    <button
-                      onClick={() => setShowAuditModal(false)}
-                      className="w-6 h-6 bg-white/20 hover:bg-white/30 rounded-md flex items-center justify-center transition-colors duration-200"
-                    >
-                      <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Compact Content */}
-              <div className="overflow-y-auto max-h-[calc(85vh-80px)]">
-                {auditLogs.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 px-4">
-                    <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mb-3">
-                      <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                    </div>
-                    <h3 className="text-base font-semibold text-gray-900 mb-1">No Audit Logs</h3>
-                    <p className="text-gray-500 text-sm text-center max-w-sm">
-                      Invoice cancellation actions will appear here
-                    </p>
-                  </div>
-                ) : (
-                  <div className="p-4">
-                    {/* Compact Table Header */}
-                    <div className="bg-gray-50 rounded-lg p-3 mb-3">
-                      <div className="grid grid-cols-12 gap-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                        <div className="col-span-1">#</div>
-                        <div className="col-span-2">Action</div>
-                        <div className="col-span-3">Invoice</div>
-                        <div className="col-span-2">User</div>
-                        <div className="col-span-3">Timestamp</div>
-                        <div className="col-span-1">Details</div>
-                      </div>
-                    </div>
-
-                    {/* Compact Log Entries */}
-                    <div className="space-y-1">
-                      {auditLogs.map((log, index) => (
-                        <div
-                          key={log.id}
-                          className="bg-white border border-gray-200 rounded-lg p-3 hover:bg-gray-50 hover:border-gray-300 transition-all duration-150"
-                        >
-                          <div className="grid grid-cols-12 gap-2 items-center text-sm">
-                            {/* Entry Number */}
-                            <div className="col-span-1">
-                              <span className="inline-flex items-center justify-center w-6 h-6 bg-red-100 text-red-700 text-xs font-bold rounded-full">
-                                {auditLogs.length - index}
-                              </span>
-                            </div>
-
-                            {/* Action */}
-                            <div className="col-span-2">
-                              <div className="flex items-center gap-2">
-                                <div className="w-5 h-5 bg-red-100 rounded-md flex items-center justify-center flex-shrink-0">
-                                  <svg className="w-3 h-3 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                  </svg>
-                                </div>
-                                <span className="font-medium text-gray-900 truncate">
-                                  {log.action || 'Invoice Cancelled'}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Invoice Info */}
-                            <div className="col-span-3">
-                              <div className="space-y-0.5">
-                                <div className="font-mono text-xs text-gray-900">
-                                  {log.invoiceNumber || 'N/A'}
-                                </div>
-                                <div className="text-xs text-gray-500 truncate">
-                                  ID: {log.invoiceId || 'N/A'}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* User */}
-                            <div className="col-span-2">
-                              <div className="flex items-center gap-1.5">
-                                <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                                  <svg className="w-2.5 h-2.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                  </svg>
-                                </div>
-                                <span className="text-xs text-gray-900 truncate">
-                                  {log.user || 'Unknown'}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Timestamp */}
-                            <div className="col-span-3">
-                              <div className="text-xs text-gray-600">
-                                {log.timestamp?.toDate
-                                  ? log.timestamp.toDate().toLocaleDateString('en-IN', {
-                                      month: 'short',
-                                      day: 'numeric',
-                                      hour: '2-digit',
-                                      minute: '2-digit'
-                                    })
-                                  : new Date(log.timestamp).toLocaleDateString('en-IN', {
-                                      month: 'short',
-                                      day: 'numeric',
-                                      hour: '2-digit',
-                                      minute: '2-digit'
-                                    })
-                                }
-                              </div>
-                            </div>
-
-                            {/* Details - Now shows content inline */}
-                            <div className="col-span-1">
-                              {log.details ? (
-                                <div className="text-xs text-blue-700 font-medium bg-blue-50 px-2 py-1 rounded border border-blue-200">
-                                  <div className="truncate" title={log.details}>
-                                    {log.details.length > 15 ? `${log.details.substring(0, 15)}...` : log.details}
-                                  </div>
-                                </div>
-                              ) : (
-                                <span className="text-xs text-gray-400">-</span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Full Details Expansion - Only if details are very long */}
-                          {log.details && log.details.length > 50 && (
-                            <div className="col-span-12 mt-2">
-                              <div className="bg-blue-50 border border-blue-200 rounded-md p-2">
-                                <div className="text-xs font-medium text-blue-700 mb-1">Full Details:</div>
-                                <div className="text-xs text-blue-800 leading-relaxed">
-                                  {log.details}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+        <AuditLogsModal
+          showAuditModal={showAuditModal}
+          setShowAuditModal={setShowAuditModal}
+          auditLogs={auditLogs}
+          auditLogsLoading={auditLogsLoading}
+          auditLogsError={auditLogsError}
+          auditLogsPagination={auditLogsPagination}
+          auditLogsFilters={auditLogsFilters}
+          setAuditLogsFilters={setAuditLogsFilters}
+          auditLogsSort={auditLogsSort}
+          setAuditLogsSort={setAuditLogsSort}
+          fetchAuditLogs={fetchAuditLogs}
+          exportAuditLogsToCSV={exportAuditLogsToCSV}
+        />
       </div>
     </div>
   );

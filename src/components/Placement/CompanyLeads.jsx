@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import AddLeads from "./AddLeads";
 import { collection, getDocs, query, orderBy, updateDoc, doc, arrayUnion } from "firebase/firestore";
 import { db } from "../../firebase";
@@ -102,29 +102,31 @@ function CompanyLeads() {
   }, []);
 
   // Filter leads based on active tab and search term
-  const filteredLeads = leads.filter(lead => {
-    // First filter by status if not showing all
-    if (activeTab !== 'all' && lead.status !== activeTab) {
-      return false;
-    }
-    
-    // Then filter by search term if present
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
-      return (
-        (lead.companyName?.toLowerCase().includes(searchLower) || '' ||
-        (lead.pocName?.toLowerCase().includes(searchLower) || '' ||
-        (lead.pocLocation?.toLowerCase().includes(searchLower) || '') ||
-        (lead.pocPhone?.toLowerCase().includes(searchLower) || '') ||
-        (lead.contacts?.some(contact => 
-          contact.name?.toLowerCase().includes(searchLower) ||
-          contact.email?.toLowerCase().includes(searchLower) ||
-          contact.phone?.toLowerCase().includes(searchLower)
-        ))
-        )));
-    }
-    return true;
-  });
+  const filteredLeads = useMemo(() => {
+    return leads.filter(lead => {
+      // First filter by status if not showing all
+      if (activeTab !== 'all' && lead.status !== activeTab) {
+        return false;
+      }
+      
+      // Then filter by search term if present
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        return (
+          lead.companyName?.toLowerCase().includes(searchLower) ||
+          lead.pocName?.toLowerCase().includes(searchLower) ||
+          lead.pocLocation?.toLowerCase().includes(searchLower) ||
+          lead.pocPhone?.toLowerCase().includes(searchLower) ||
+          lead.contacts?.some(contact => 
+            contact.name?.toLowerCase().includes(searchLower) ||
+            contact.email?.toLowerCase().includes(searchLower) ||
+            contact.phone?.toLowerCase().includes(searchLower)
+          )
+        );
+      }
+      return true;
+    });
+  }, [leads, activeTab, searchTerm]);
 
   // Group leads by status for tab counts
   const leadsByStatus = leads.reduce((acc, lead) => {
