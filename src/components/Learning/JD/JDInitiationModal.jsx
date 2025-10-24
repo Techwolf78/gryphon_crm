@@ -171,8 +171,10 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
             });
           });
           // Filter out assignments that belong to the current training to avoid self-conflict
-          // For JD training (merged across colleges), filter by both the merged training ID and selected colleges
-          const jdTrainingId = selectedColleges?.length > 0 ? `${selectedColleges[0].id}-JD-merged` : `${training?.id}-JD-merged`;
+          // For JD training (merged across colleges or single college), filter by both the training ID and selected colleges
+          const jdTrainingId = selectedColleges?.length > 0 
+            ? (selectedColleges.length > 1 ? `${selectedColleges[0].id}-JD-merged` : `${selectedColleges[0].id}-JD`)
+            : (training?.id ? `${training.id}-JD` : null);
           const selectedCollegeNames = selectedColleges?.map(c => c.collegeName) || [];
           const filtered = assignments.filter(
             (a) => a.sourceTrainingId !== jdTrainingId && !selectedCollegeNames.some(collegeName => a.collegeName.includes(collegeName))
@@ -295,7 +297,7 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
       });
       totalMaxHours = totalTrainingHours;
 
-      // Cost division logic - JD training is always merged across multiple colleges
+      // Cost division logic - for merged training, divide costs among colleges; for single college, assign full cost
       const perStudentCost = totalCost / operationsConfig.totalStudents;
       const collegeCosts = {};
       selectedColleges.forEach(college => {
@@ -305,7 +307,7 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
 
       const savePromises = [];
 
-      // Always save to each selected college (JD training is always merged)
+      // Save to each selected college (works for both single and multiple colleges)
       selectedColleges.forEach(college => {
         const phaseDocRef = doc(db, "trainingForms", college.id, "trainings", "JD");
         const phaseDocData = {
@@ -323,15 +325,17 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
           domains: domainsArray,
           customHours: customPhaseHours["JD"] || "",
           updatedAt: serverTimestamp(),
-          isMergedTraining: true,
+          isMergedTraining: selectedColleges.length > 1,
           operationsConfig: operationsConfig,
-          mergedColleges: selectedColleges.map(c => ({
-            id: c.id,
-            collegeName: c.collegeName,
-            projectCode: c.projectCode,
-            studentCount: operationsConfig.collegeStudentCounts[c.id] || 0,
-            costShare: collegeCosts[c.id]
-          })),
+          ...(selectedColleges.length > 1 && {
+            mergedColleges: selectedColleges.map(c => ({
+              id: c.id,
+              collegeName: c.collegeName,
+              projectCode: c.projectCode,
+              studentCount: operationsConfig.collegeStudentCounts[c.id] || 0,
+              costShare: collegeCosts[c.id]
+            }))
+          }),
           batches: operationsConfig.batches
         };
         savePromises.push(setDoc(phaseDocRef, phaseDocData, { merge: true }));
@@ -372,10 +376,10 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
           return isNaN(dt.getTime()) ? null : dt.toISOString().slice(0, 10);
         };
 
-        // For JD training, we need to create a unique training ID that represents the merged training
-        // Use the first college's ID as the base and add "-JD-merged" suffix
+        // For JD training, we need to create a unique training ID that represents the training
+        // Use the first college's ID as the base and add "-JD-merged" suffix for multiple colleges, "-JD" for single college
         const baseTrainingId = selectedColleges[0]?.id || training.id;
-        const jdTrainingId = `${baseTrainingId}-JD-merged`;
+        const jdTrainingId = selectedColleges.length > 1 ? `${baseTrainingId}-JD-merged` : `${baseTrainingId}-JD`;
 
         // 1) delete existing assignments for this JD training
         const prefix = `${jdTrainingId}`;
@@ -514,7 +518,7 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                   )}
                 </h3>
                 <p className="text-sm text-gray-600 mt-1">
-                  Configure training details for merged colleges ({selectedColleges?.length || 0} colleges)
+                  Configure training details for {selectedColleges?.length > 1 ? 'merged colleges' : 'college'} ({selectedColleges?.length || 0} college{selectedColleges?.length !== 1 ? 's' : ''})
                 </p>
               </div>
               <div className="flex items-center space-x-2">
@@ -546,7 +550,7 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                       Selected Colleges for JD Training
                     </h2>
                     <p className="mt-0.5 text-sm text-gray-500">
-                      Configure training details for merged colleges ({selectedColleges?.length || 0} colleges)
+                      Configure training details for {selectedColleges?.length > 1 ? 'merged colleges' : 'college'} ({selectedColleges?.length || 0} college{selectedColleges?.length !== 1 ? 's' : ''})
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2 mb-2 min-h-[32px]">
@@ -577,7 +581,7 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                     ))}
                   </div>
                   <div className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded p-2">
-                    💰 Trainer costs will be divided equally among these {selectedColleges.length} colleges
+                    💰 Trainer costs will be {selectedColleges.length > 1 ? `divided equally among these ${selectedColleges.length} colleges` : 'assigned to this college'}
                   </div>
                 </div>
 

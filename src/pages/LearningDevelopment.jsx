@@ -800,7 +800,7 @@ function LearningDevelopment() {
           }}
           onClose={handleJDInitiationClose}
           onConfirm={handleJDInitiationClose}
-          isMerged={true}
+          isMerged={selectedJDColleges.length > 1}
           selectedColleges={selectedJDColleges}
           operationsConfig={operationsConfig}
           onBack={() => {

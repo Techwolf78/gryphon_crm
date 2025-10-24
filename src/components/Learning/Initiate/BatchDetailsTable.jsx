@@ -114,6 +114,7 @@ const TrainerRow = React.memo(
     // Local UI state to allow adding new topics per trainer
     const [addedTopics, setAddedTopics] = useState([]);
     const [newTopicInput, setNewTopicInput] = useState("");
+    const [duplicateTopicMessage, setDuplicateTopicMessage] = useState("");
     // ✅ ADD: State for daily hours dropdown
     const [showDailyHoursDropdown, setShowDailyHoursDropdown] = useState(false);
     // ✅ ADD: Ref to track previous dates
@@ -133,6 +134,7 @@ const TrainerRow = React.memo(
     useEffect(() => {
       setAddedTopics([]);
       setNewTopicInput("");
+      setDuplicateTopicMessage("");
     }, [trainer.trainerId]);
 
     // ✅ ADD: Local function to generate date list with exclusions
@@ -836,7 +838,7 @@ const TrainerRow = React.memo(
                 </div>
 
                 {/* Topics section */}
-                <div className="flex-1 min-w-[160px]">
+                <div className="flex-1 min-w-[200px]">
                   <div className="flex items-center justify-between mb-0.5">
                     <div className="flex items-center space-x-1">
                       <h4 className="text-sm font-semibold text-slate-700">
@@ -862,11 +864,11 @@ const TrainerRow = React.memo(
                         </div>
                       </div>
                     </div>
-                    <span className="text-sm text-slate-500">
+                    <span className="text-sm text-slate-500 whitespace-nowrap">
                       Click to select • Type to add
                     </span>
                   </div>
-                  <div className="bg-white rounded-md border border-gray-100 p-2 shadow-sm">
+                  <div className="bg-white rounded-md border border-gray-100 p-2 shadow-sm min-w-[250px]">
                     {/* Simplified topics selection UI */}
                     {(() => {
                       const trainerDoc = trainers.find(
@@ -917,7 +919,7 @@ const TrainerRow = React.memo(
                           <div
                             role="group"
                             aria-label="Topics"
-                            className="min-h-[20px] max-h-24 overflow-auto rounded border border-dashed border-gray-200 p-0.5 bg-gray-50"
+                            className="min-h-[20px] rounded border border-dashed border-gray-200 p-0.5 bg-gray-50"
                           >
                             {allTopics.length === 0 ? (
                               <div className="text-sm text-slate-400 py-1 text-center">
@@ -949,7 +951,7 @@ const TrainerRow = React.memo(
                               </div>
                             )}
                           </div>
-                          <div className="flex items-center gap-0.5">
+                          <div className="flex items-center gap-0.5 min-w-[200px]">
                             <input
                               aria-label={`Add topic for trainer ${
                                 trainer.trainerName ||
@@ -958,12 +960,24 @@ const TrainerRow = React.memo(
                               }`}
                               type="text"
                               value={newTopicInput}
-                              onChange={(e) => setNewTopicInput(e.target.value)}
+                              onChange={(e) => {
+                                setNewTopicInput(e.target.value);
+                                if (duplicateTopicMessage) setDuplicateTopicMessage(""); // Clear message when user starts typing
+                              }}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") {
                                   e.preventDefault();
                                   const t = (newTopicInput || "").trim();
                                   if (!t) return;
+                                  
+                                  // Check if topic is already selected
+                                  if (selected.includes(t)) {
+                                    // Topic already exists, show message and clear input
+                                    setDuplicateTopicMessage(`"${t}" is already selected`);
+                                    setNewTopicInput("");
+                                    return;
+                                  }
+                                  
                                   if (!addedTopics.includes(t))
                                     setAddedTopics((s) => [...s, t]);
                                   const next = Array.from(
@@ -977,6 +991,7 @@ const TrainerRow = React.memo(
                                     next
                                   );
                                   setNewTopicInput("");
+                                  setDuplicateTopicMessage(""); // Clear any previous message
                                 }
                               }}
                               placeholder="Type new topic here and press Enter"
@@ -987,6 +1002,15 @@ const TrainerRow = React.memo(
                               onClick={() => {
                                 const t = (newTopicInput || "").trim();
                                 if (!t) return;
+                                
+                                // Check if topic is already selected
+                                if (selected.includes(t)) {
+                                  // Topic already exists, show message and clear input
+                                  setDuplicateTopicMessage(`"${t}" is already selected`);
+                                  setNewTopicInput("");
+                                  return;
+                                }
+                                
                                 if (!addedTopics.includes(t))
                                   setAddedTopics((s) => [...s, t]);
                                 const next = Array.from(
@@ -1000,6 +1024,7 @@ const TrainerRow = React.memo(
                                   next
                                 );
                                 setNewTopicInput("");
+                                setDuplicateTopicMessage(""); // Clear any previous message
                               }}
                               className="inline-flex items-center gap-0.5 bg-indigo-600 hover:bg-indigo-700 text-white px-1.5 py-0.5 rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed"
                               disabled={!newTopicInput.trim()}
@@ -1008,6 +1033,11 @@ const TrainerRow = React.memo(
                               <span>Add</span>
                             </button>
                           </div>
+                          {duplicateTopicMessage && (
+                            <div className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-200 mt-1">
+                              {duplicateTopicMessage}
+                            </div>
+                          )}
                         </div>
                       );
                     })()}
@@ -1194,7 +1224,7 @@ const BatchComponent = React.memo(
         } shadow-xs overflow-visible`}
       >
         <div
-          className={`px-4 py-3 ${
+          className={`px-2 py-2 ${
             memoizedGetColorsForBatch(row.batch).accent
           } border-b ${
             memoizedGetColorsForBatch(row.batch).border
@@ -1221,7 +1251,7 @@ const BatchComponent = React.memo(
           </div>
         </div>
 
-        <div className="p-3 space-y-2">
+        <div className="p-2 space-y-2">
           {/* Batch Details */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             <div>
@@ -3392,7 +3422,7 @@ const filteredTrainers = useMemo(() => {
                     <span className="font-medium text-red-800 text-xs truncate">
                       {swapConfirmationModal.sourceTrainerData?.trainerName} ({swapConfirmationModal.sourceTrainerData?.trainerId})
                     </span>
-                    <span className="text-xs bg-red-100 text-red-800 px-1.5 py-0.5 rounded text-xs">
+                    <span className=" bg-red-100 text-red-800 px-1.5 py-0.5 rounded text-xs">
                       Current: {swapConfirmationModal.sourceTrainerData?.dayDuration}
                     </span>
                   </div>
@@ -3409,7 +3439,7 @@ const filteredTrainers = useMemo(() => {
                     <span className="font-medium text-blue-800 text-xs truncate">
                       {swapConfirmationModal.targetTrainerData?.trainerName} ({swapConfirmationModal.targetTrainerData?.trainerId})
                     </span>
-                    <span className="text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded text-xs">
+                    <span className=" bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded text-xs">
                       Current: {swapConfirmationModal.targetTrainerData?.dayDuration}
                     </span>
                   </div>
@@ -3477,7 +3507,7 @@ const filteredTrainers = useMemo(() => {
                           <span className={`font-medium text-xs truncate ${sourceHasDuplicate ? 'text-red-800' : 'text-green-800'}`}>
                             {swapConfirmationModal.sourceTrainerData?.trainerName} ({swapConfirmationModal.sourceTrainerData?.trainerId})
                           </span>
-                          <span className={`text-xs px-1.5 py-0.5 rounded text-xs ${sourceHasDuplicate ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                          <span className={` px-1.5 py-0.5 rounded text-xs ${sourceHasDuplicate ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
                             New: {swapConfirmationModal.sourceNewTimeSlot}
                           </span>
                         </div>
@@ -3520,7 +3550,7 @@ const filteredTrainers = useMemo(() => {
                           <span className={`font-medium text-xs truncate ${targetHasDuplicate ? 'text-red-800' : 'text-green-800'}`}>
                             {swapConfirmationModal.targetTrainerData?.trainerName} ({swapConfirmationModal.targetTrainerData?.trainerId})
                           </span>
-                          <span className={`text-xs px-1.5 py-0.5 rounded text-xs ${targetHasDuplicate ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                          <span className={` px-1.5 py-0.5 rounded text-xs ${targetHasDuplicate ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
                             New: {swapConfirmationModal.targetNewTimeSlot}
                           </span>
                         </div>
@@ -3885,7 +3915,7 @@ const filteredTrainers = useMemo(() => {
 
                   {/* Expanded Batch Content */}
                   {isExpanded && (
-                    <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 space-y-6">
+                    <div className="px-2 py-2 bg-gray-50 border-t border-gray-200 space-y-3">
                       {row.batches.map((batch, batchIndex) => (
                         <BatchComponent
                           key={`batch-${rowIndex}-${batchIndex}`}

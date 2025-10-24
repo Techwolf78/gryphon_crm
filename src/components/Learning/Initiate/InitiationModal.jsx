@@ -103,6 +103,11 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
   const dropdownRef = useRef(null);
 
+  // Delete confirmation modal state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [domainToDelete, setDomainToDelete] = useState(null);
+  const [domainsToDelete, setDomainsToDelete] = useState([]); // Domains marked for deletion via X button
+
   // Original data state to preserve original values for undo functionality
   const originalTable1DataByDomain = useRef({});
   const originalTopics = useRef([]);
@@ -268,9 +273,10 @@ function InitiationModal({ training, onClose, onConfirm }) {
     const hasTopicsChanged = JSON.stringify(topics) !== JSON.stringify(originalTopics.current);
     const hasCustomHoursChanged = JSON.stringify(customPhaseHours) !== JSON.stringify(originalCustomPhaseHours.current);
     const hasSelectedDomainsChanged = JSON.stringify(selectedDomains) !== JSON.stringify(originalSelectedDomains.current);
+    const hasDomainsToDeleteChanged = domainsToDelete.length > 0;
     
-    setHasChanges(hasTableDataChanged || hasTopicsChanged || hasCustomHoursChanged || hasSelectedDomainsChanged);
-  }, [table1DataByDomain, topics, customPhaseHours, selectedDomains]);
+    setHasChanges(hasTableDataChanged || hasTopicsChanged || hasCustomHoursChanged || hasSelectedDomainsChanged || hasDomainsToDeleteChanged);
+  }, [table1DataByDomain, topics, customPhaseHours, selectedDomains, domainsToDelete]);
 
   // Undo function to revert to original state
   const handleUndo = () => {
@@ -279,6 +285,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
       setTopics(JSON.parse(JSON.stringify(originalTopics.current)));
       setCustomPhaseHours(JSON.parse(JSON.stringify(originalCustomPhaseHours.current)));
       setSelectedDomains([...originalSelectedDomains.current]);
+      setDomainsToDelete([]); // Reset deletion marks
       setHasChanges(false);
       setError(null);
       setSuccess("All changes have been undone. Original state restored.");
@@ -688,7 +695,12 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
       await Promise.all([...phaseLevelPromises, ...batchPromises]);
 
-      // --- centralized trainerAssignments update (create one doc per trainer-date) ---
+      // Delete domains marked for deletion via X button
+      const deletePromises = domainsToDelete.map(async (domain) => {
+        const domainDocRef = doc(db, "trainingForms", training.id, "trainings", currentPhase, "domains", domain);
+        await deleteDoc(domainDocRef);
+      });
+      await Promise.all(deletePromises);
       try {
         const normalizeDate = (d) => {
           if (!d) return null;
@@ -788,10 +800,19 @@ function InitiationModal({ training, onClose, onConfirm }) {
       setSuccess("Training phases initiated successfully!");
       setLoading(false);
       setTimeout(() => {
+        // Clean local state and update originals
+        const cleanedTableData = {};
+        selectedDomains.forEach(domain => {
+          if (table1DataByDomain[domain]) cleanedTableData[domain] = table1DataByDomain[domain];
+        });
+        setTable1DataByDomain(cleanedTableData);
+        originalSelectedDomains.current = selectedDomains;
+        originalTable1DataByDomain.current = cleanedTableData;
+        setDomainsToDelete([]); // Reset deletion list
         const finalDomains = Array.isArray(domainsToSave)
           ? domainsToSave
           : selectedDomains;
-        const finalTableData = tableDataToSave || table1DataByDomain;
+        const finalTableData = tableDataToSave || cleanedTableData;
         if (onConfirm)
           onConfirm({
             phases: selectedPhases,
@@ -850,6 +871,16 @@ function InitiationModal({ training, onClose, onConfirm }) {
       [domain]: validationStatus,
     }));
   }, []);
+
+  // Handle delete confirmation
+  const handleDeleteConfirm = () => {
+    if (!domainToDelete) return;
+    setSelectedDomains(selectedDomains.filter((d) => d !== domainToDelete));
+    setDomainsToDelete(prev => [...prev, domainToDelete]); // Mark for deletion
+    // Keep data in table1DataByDomain for potential recovery
+    setShowDeleteConfirm(false);
+    setDomainToDelete(null);
+  };
 
   // Check if there are any validation errors across all domains
   const hasValidationErrors = () => {
@@ -1659,11 +1690,10 @@ function InitiationModal({ training, onClose, onConfirm }) {
                             <button
                               type="button"
                               className="ml-1 text-blue-500 hover:text-blue-700 focus:outline-none"
-                              onClick={() =>
-                                setSelectedDomains(
-                                  selectedDomains.filter((d) => d !== domain)
-                                )
-                              }
+                              onClick={() => {
+                                setDomainToDelete(domain);
+                                setShowDeleteConfirm(true);
+                              }}
                               aria-label={`Remove ${domain}`}
                             >
                               <FiX className="w-3 h-3" />
@@ -1709,8 +1739,11 @@ function InitiationModal({ training, onClose, onConfirm }) {
                                       ...prev,
                                       [domain]: prev[domain] || [],
                                     }));
+                                    // If re-selecting a domain marked for deletion, remove from deletion list
+                                    setDomainsToDelete(prev => prev.filter(d => d !== domain));
                                   } else {
                                     setSelectedDomains(selectedDomains.filter((d) => d !== domain));
+                                    // Keep data in table1DataByDomain for temporary deselection
                                   }
                                   // clear any previous zero-hour marks for this domain on user action
                                   setZeroHourDomains((prev) =>
@@ -2016,6 +2049,30 @@ function InitiationModal({ training, onClose, onConfirm }) {
         </div>
       </div>
       {/* Trainer Calendar is opened from the Initiation Dashboard now */}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 max-w-sm mx-4 shadow-2xl">
+            <h3 className="text-lg font-semibold mb-2 text-gray-900">Remove Domain</h3>
+            <p className="text-gray-600 mb-6 text-sm">Are you sure you want to remove "{domainToDelete}"? This will permanently delete all its data.</p>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-medium text-sm hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                className="flex-1 bg-red-500 text-white py-3 rounded-xl font-medium text-sm hover:bg-red-600 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -1562,7 +1562,6 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
                     </p>
                     <p className="text-2xl font-bold text-gray-900 mt-1">
                       {trainings
-                        .filter((t) => t.computedStatus !== "Not Started")
                         .reduce((acc, t) => acc + (t.totaltraininghours || 0), 0)}
                     </p>
                   </div>
@@ -1582,7 +1581,6 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
                     <p className="text-2xl font-bold text-gray-900 mt-1">
                       ₹
                       {trainings
-                        .filter((t) => t.computedStatus !== "Not Started")
                         .reduce((acc, t) => acc + (t.totalCost || 0), 0)
                         .toLocaleString('en-IN')}
                     </p>
