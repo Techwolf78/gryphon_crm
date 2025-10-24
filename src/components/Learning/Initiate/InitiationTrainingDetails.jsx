@@ -18,6 +18,7 @@ const PHASE_LABELS = {
   "phase-1": "Phase 1",
   "phase-2": "Phase 2",
   "phase-3": "Phase 3",
+  "JD": "JD",
 };
 
 const DOMAIN_COLORS = {
@@ -25,6 +26,7 @@ const DOMAIN_COLORS = {
   "Soft skills": "bg-green-100 border-green-300 text-green-800",
   Aptitude: "bg-purple-100 border-purple-300 text-purple-800",
   Tools: "bg-yellow-100 border-yellow-300 text-yellow-800",
+  JD: "border-blue-400 bg-blue-50",
 };
 
 // Domain keywords mapping for compact display
@@ -35,6 +37,7 @@ const DOMAIN_KEYWORDS = {
   Tools: "Tools",
   "Tools (Excel - Power BI)": "Excel",
   "Tools (Looker Studio)": "Looker",
+  JD: "JD",
 };
 
 function getTimingForSlot(slot, training) {
