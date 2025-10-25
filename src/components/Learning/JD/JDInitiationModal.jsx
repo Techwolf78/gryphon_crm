@@ -33,7 +33,7 @@ const DOMAIN_COLORS = {
   JD: "border-blue-400 bg-blue-50",
 };
 
-function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, selectedColleges = [], operationsConfig = null, onBack = null }) {
+function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, selectedColleges = [], operationsConfig = null, existingConfig = null, onBack = null }) {
   const [table1DataByDomain, setTable1DataByDomain] = useState({});
   const [commonFields, setCommonFields] = useState({
     trainingStartDate: null,
@@ -53,20 +53,34 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
   const [validationByDomain, setValidationByDomain] = useState({});
 
   const { user } = useAuth();
-
-  const [customPhaseHours, setCustomPhaseHours] = useState({});
-
-  // Add missing state variables that BatchDetailsTable expects
   const [globalTrainerAssignments, setGlobalTrainerAssignments] = useState([]);
   const [excludeDays] = useState("None");
 
   const getDomainHours = useCallback(
     () => {
-      // For JD training, use custom hours or default to 8
-      return customPhaseHours["JD"] && customPhaseHours["JD"] !== "" ? Number(customPhaseHours["JD"]) : 8;
+      // JD training always uses default 8 hours - trainers set their own hours
+      return 8;
     },
-    [customPhaseHours]
+    []
   );
+
+  // Calculate total assigned hours from all trainers in JD domain
+  const getTotalAssignedHours = useCallback(() => {
+    const jdData = table1DataByDomain["JD"] || [];
+    let totalHours = 0;
+    jdData.forEach((row) => {
+      if (row.batches) {
+        row.batches.forEach((batch) => {
+          if (batch.trainers) {
+            batch.trainers.forEach((trainer) => {
+              totalHours += Number(trainer.assignedHours || 0);
+            });
+          }
+        });
+      }
+    });
+    return totalHours;
+  }, [table1DataByDomain]);
 
   // Handle validation changes from JDBatchTable
   const handleValidationChange = useCallback((domain, validationStatus) => {
@@ -82,47 +96,112 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
   };
 
   const _table1DataByDomainMemo = useMemo(() => {
-    if (!operationsConfig) return {};
+    if (!selectedColleges || selectedColleges.length === 0) return {};
     
-    // For JD training, always use operationsConfig.batches
+    // For JD training, use operations config batches
     const domainHours = getDomainHours();
-    const totalStudents = operationsConfig.totalStudents;
-    const numBatches = operationsConfig.batches.length;
-    
-    // Divide students evenly among batches with rounding
-    const baseStudentsPerBatch = Math.floor(totalStudents / numBatches);
-    const remainder = totalStudents % numBatches;
     
     const updated = {};
-    updated["JD"] = operationsConfig.batches.map((batch, index) => {
-      // Add 1 extra student to the first 'remainder' batches for even distribution
-      const studentsForThisBatch = baseStudentsPerBatch + (index < remainder ? 1 : 0);
-      
-      return {
+    if (operationsConfig?.batches) {
+      updated["JD"] = operationsConfig.batches.map((batch) => ({
         batch: batch.name,
-        stdCount: studentsForThisBatch,
+        stdCount: batch.studentCount,
+        hrs: domainHours,
+        assignedHours: 0,
+        batches: [{
+          batchPerStdCount: batch.studentCount,
+          batchCode: batch.code || batch.id,
+          assignedHours: 0,
+          trainers: [],
+        }],
+      }));
+    } else {
+      // Fallback if no operations config
+      updated["JD"] = [{
+        batch: "Batch 1",
+        stdCount: 0,
         hrs: domainHours,
         assignedHours: 0,
         batches: [{
           batchPerStdCount: "",
-          batchCode: batch.code,
+          batchCode: "batch_1",
           assignedHours: 0,
           trainers: [],
         }],
-      };
-    });
+      }];
+    }
     return updated;
-  }, [operationsConfig, getDomainHours]);
+  }, [selectedColleges, operationsConfig, getDomainHours]);
+
+  // Update table1DataByDomain when memoized data changes (only if no existing config or no table data)
+  useEffect(() => {
+    if (!existingConfig || !existingConfig.table1DataByDomain) {
+      setTable1DataByDomain(_table1DataByDomainMemo);
+    }
+  }, [_table1DataByDomainMemo, existingConfig]);
+
+  // Load existing configuration if provided
+  useEffect(() => {
+    if (existingConfig) {
+      if (existingConfig.commonFields) {
+        setCommonFields(existingConfig.commonFields);
+      }
+
+      // Check if operations config has been modified (user changed it in previous modal)
+      const operationsConfigChanged = existingConfig.operationsConfig &&
+        operationsConfig &&
+        (operationsConfig.hasChanges === true || JSON.stringify(existingConfig.operationsConfig) !== JSON.stringify(operationsConfig));
+
+      if (existingConfig.table1DataByDomain && !operationsConfigChanged) {
+        try {
+          // Transform existing config to ensure all required fields are present
+          const transformedTableData = {};
+          Object.keys(existingConfig.table1DataByDomain).forEach(domain => {
+            transformedTableData[domain] = existingConfig.table1DataByDomain[domain].map(row => ({
+              ...row,
+              hrs: row.hrs || getDomainHours(), // Restore hrs field that was deleted during serialization
+              batches: (row.batches || []).map(batch => ({
+                ...batch,
+                batchPerStdCount: batch.batchPerStdCount || batch.stdCount || 0,
+                trainers: (batch.trainers || []).map(trainer => ({
+                  trainerId: trainer.trainerId || "",
+                  trainerName: trainer.trainerName || trainer.trainer || "",
+                  assignedHours: trainer.assignedHours || 0,
+                  dayDuration: trainer.dayDuration || "",
+                  startDate: trainer.startDate || "",
+                  endDate: trainer.endDate || "",
+                  dailyHours: trainer.dailyHours || [],
+                  perHourCost: trainer.perHourCost || 0,
+                  conveyance: trainer.conveyance || "",
+                  food: trainer.food || "",
+                  lodging: trainer.lodging || "",
+                  topics: trainer.topics || [],
+                  showDailyHours: trainer.showDailyHours || false,
+                  activeDates: trainer.activeDates || [],
+                  excludedDates: trainer.excludedDates || [],
+                  ...trainer // Keep any other existing fields
+                }))
+              }))
+            }));
+          });
+          setTable1DataByDomain(transformedTableData);
+        } catch (error) {
+          console.error("Error loading existing config, using default data:", error);
+          // Fallback to memoized data if transformation fails
+          setTable1DataByDomain(_table1DataByDomainMemo);
+        }
+      } else if (operationsConfigChanged) {
+        // Operations config was modified, use recalculated table data based on new operations config
+        setTable1DataByDomain(_table1DataByDomainMemo);
+      }
+
+      // Hours are now always editable by default
+    }
+  }, [existingConfig, operationsConfig, getDomainHours, _table1DataByDomainMemo]);
 
   useEffect(() => {
     // JD training doesn't need to fetch topics/courses - uses operations config
   }, []);
-
-  // Always start fresh - no fetching of existing data
-  useEffect(() => {
-    // Always use operationsConfig for fresh data
-    setTable1DataByDomain(_table1DataByDomainMemo);
-  }, [_table1DataByDomainMemo]);
 
   useEffect(() => {
     if (isMerged) {
@@ -180,11 +259,11 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
             (a) => a.sourceTrainingId !== jdTrainingId && !selectedCollegeNames.some(collegeName => a.collegeName.includes(collegeName))
           );
           if (!cancelled) setGlobalTrainerAssignments(filtered);
-        } catch (err) {
+        } catch {
           // Silent error handling
         }
       },
-      (err) => {
+      () => {
         // Silent error handling
       }
     );
@@ -297,11 +376,14 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
       });
       totalMaxHours = totalTrainingHours;
 
+      // Calculate total students from operations config
+      const totalStudents = operationsConfig?.totalStudents || 0;
+
       // Cost division logic - for merged training, divide costs among colleges; for single college, assign full cost
-      const perStudentCost = totalCost / operationsConfig.totalStudents;
+      const perStudentCost = totalCost / totalStudents;
       const collegeCosts = {};
       selectedColleges.forEach(college => {
-        const collegeStudentCount = operationsConfig.collegeStudentCounts[college.id] || 0;
+        const collegeStudentCount = operationsConfig?.collegeStudentCounts?.[college.id] || 0;
         collegeCosts[college.id] = perStudentCost * collegeStudentCount;
       });
 
@@ -323,7 +405,6 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
           totaltraininghours: totalTrainingHours,
           totalCost: collegeCosts[college.id], // College-specific cost
           domains: domainsArray,
-          customHours: customPhaseHours["JD"] || "",
           updatedAt: serverTimestamp(),
           isMergedTraining: selectedColleges.length > 1,
           operationsConfig: operationsConfig,
@@ -332,7 +413,7 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
               id: c.id,
               collegeName: c.collegeName,
               projectCode: c.projectCode,
-              studentCount: operationsConfig.collegeStudentCounts[c.id] || 0,
+              studentCount: operationsConfig?.collegeStudentCounts?.[c.id] || 0,
               costShare: collegeCosts[c.id]
             }))
           }),
@@ -354,7 +435,6 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
           isMainPhase: true,
           allSelectedPhases: ["JD"],
           status: "Initiated",
-          customHours: customPhaseHours["JD"] || "",
         };
         savePromises.push(setDoc(domainRef, domainData, { merge: true }));
       });
@@ -459,7 +539,7 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
         } else {
           // no assignments to write
         }
-      } catch (assignmentErr) {
+      } catch {
 
         // don't block main save; surface a console warning
       }
@@ -493,8 +573,8 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
 
   return (
     <>
-      <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-        <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-6xl shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto">
+      <div className="fixed inset-0 backdrop-blur-sm overflow-y-auto h-full w-full z-[50]">
+        <div className="relative top-20 mx-auto p-5 border w-full bg-white min-h-screen overflow-y-auto">
           <div className="mt-3">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -565,18 +645,6 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                             ({college.projectCode})
                           </span>
                         )}
-                        <button
-                          type="button"
-                          className="ml-1 text-blue-500 hover:text-blue-700 focus:outline-none"
-                          onClick={() =>
-                            // Note: In a real implementation, you might want to allow removing colleges
-                            // but for now, we'll keep them as read-only
-                            null
-                          }
-                          aria-label={`College ${college.collegeName}`}
-                        >
-                          <FiX className="w-3 h-3" />
-                        </button>
                       </span>
                     ))}
                   </div>
@@ -615,27 +683,6 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                       </span>
                     </span>
                   </div>
-                  
-                  {/* Custom Hours Input for JD Phase */}
-                  <div className="bg-blue-50 border border-blue-200 rounded p-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Custom Hours per Domain (Optional)
-                    </label>
-                    <p className="text-xs text-gray-600 mb-3">
-                      Set custom hours for JD domain. Leave empty to use default 8 hours.
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        min="0"
-                        value={customPhaseHours["JD"] || ""}
-                        onChange={(e) => setCustomPhaseHours({ ...customPhaseHours, "JD": e.target.value })}
-                        placeholder="Enter hours"
-                        className="w-32 h-8 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-sm px-2 appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      />
-                      <span className="text-sm text-gray-600">hours per domain</span>
-                    </div>
-                  </div>
                 </div>
 
                 {/* Batch Details Table for JD */}
@@ -658,23 +705,23 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                       <div className="flex gap-4">
                         <div className="bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
                           <span className="text-xs text-blue-600 font-medium">Domain Total Hours</span>
-                          <span className="text-sm font-semibold text-blue-800 ml-1">{getDomainHours()}</span>
+                          <span className="text-sm font-semibold text-blue-800 ml-1">{getTotalAssignedHours()}</span>
                         </div>
                       </div>
                     </div>
                   </div>
 
                   <JDBatchTable
-                    table1Data={table1DataByDomain["JD"] || []}
+                    table1Data={Array.isArray(table1DataByDomain["JD"]) ? table1DataByDomain["JD"] : []}
                     setTable1Data={(data) =>
                       setTable1DataByDomain((prev) => ({
                         ...prev,
                         "JD": data,
                       }))
                     }
-                    commonFields={commonFields}
-                    globalTrainerAssignments={globalTrainerAssignments}
-                    excludeDays={excludeDays}
+                    commonFields={commonFields || {}}
+                    globalTrainerAssignments={Array.isArray(globalTrainerAssignments) ? globalTrainerAssignments : []}
+                    excludeDays={excludeDays || "None"}
                     onValidationChange={handleValidationChange}
                     selectedDomain="JD"
                   />
@@ -792,16 +839,8 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                 <SubmissionChecklist
                   selectedPhases={["JD"]}
                   selectedDomains={["JD"]}
-                  trainingStartDate={commonFields.trainingStartDate ? 
-                    (commonFields.trainingStartDate instanceof Date ? 
-                      commonFields.trainingStartDate.toISOString().split('T')[0] : 
-                      commonFields.trainingStartDate) : 
-                    ""}
-                  trainingEndDate={commonFields.trainingEndDate ? 
-                    (commonFields.trainingEndDate instanceof Date ? 
-                      commonFields.trainingEndDate.toISOString().split('T')[0] : 
-                      commonFields.trainingEndDate) : 
-                    ""}
+                  trainingStartDate={commonFields.trainingStartDate}
+                  trainingEndDate={commonFields.trainingEndDate}
                   collegeStartTime={commonFields.collegeStartTime}
                   collegeEndTime={commonFields.collegeEndTime}
                   lunchStartTime={commonFields.lunchStartTime}
@@ -809,6 +848,7 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                   table1DataByDomain={table1DataByDomain}
                   hasValidationErrors={hasValidationErrors()}
                   onChecklistComplete={setIsChecklistComplete}
+                  key={`${Object.keys(table1DataByDomain).length}-${table1DataByDomain.JD ? table1DataByDomain.JD.length : 0}-${commonFields.trainingStartDate || ''}-${commonFields.trainingEndDate || ''}`}
                 />
               </div>
             </div>

@@ -16,7 +16,7 @@ import LearningDevelopmentTour from "../components/tours/LearningDevelopmentTour
 import JDMergeModal from "../components/Learning/JD/JDMergeModal";
 import OperationsConfigurationModal from "../components/Learning/JD/OperationsConfigurationModal";
 import JDInitiationModal from "../components/Learning/JD/JDInitiationModal";
-import { ToastContainer, toast } from "react-toastify";
+import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { CheckCircle, XCircle, Calendar, PlayCircle } from "lucide-react";
 
@@ -62,6 +62,7 @@ function LearningDevelopment() {
   const [operationsConfig, setOperationsConfig] = useState(null);
   const [showJDInitiationModal, setShowJDInitiationModal] = useState(false);
   const [onRefreshInitiationDashboard, setOnRefreshInitiationDashboard] = useState(null);
+  const [existingJDConfig, setExistingJDConfig] = useState(null);
 
   // Function to categorize trainings into active and old contracts
   const categorizeTrainings = (trainings) => {
@@ -310,8 +311,9 @@ function LearningDevelopment() {
   };
 
   // Handle JD colleges selected
-  const handleJDCollegesSelected = (colleges) => {
+  const handleJDCollegesSelected = (colleges, existingConfig = null) => {
     setSelectedJDColleges(colleges);
+    setExistingJDConfig(existingConfig);
     setShowJDMergeModal(false);
     setShowOperationsConfigModal(true);
   };
@@ -319,6 +321,7 @@ function LearningDevelopment() {
   // Handle operations configuration
   const handleOperationsConfigured = (config) => {
     setOperationsConfig(config);
+    setExistingJDConfig(prev => prev ? { ...prev, operationsConfig: config } : null);
     setShowOperationsConfigModal(false);
     setShowJDInitiationModal(true);
   };
@@ -364,6 +367,7 @@ function LearningDevelopment() {
     setShowJDInitiationModal(false);
     setSelectedJDColleges([]);
     setOperationsConfig(null);
+    setExistingJDConfig(null);
     // Refresh trainings data
     if (activeTab === "newContact") {
       fetchTrainings();
@@ -776,14 +780,15 @@ function LearningDevelopment() {
             setShowOperationsConfigModal(false);
             setSelectedJDColleges([]);
             setOperationsConfig(null);
+            setExistingJDConfig(null);
           }}
           onProceed={handleOperationsConfigured}
           onBack={() => {
             setShowOperationsConfigModal(false);
             setShowJDMergeModal(true);
           }}
-          existingConfig={operationsConfig}
-          isEditing={!!operationsConfig}
+          existingConfig={existingJDConfig?.operationsConfig || operationsConfig}
+          isEditing={!!(existingJDConfig?.operationsConfig || operationsConfig)}
         />
       )}
 
@@ -803,6 +808,7 @@ function LearningDevelopment() {
           isMerged={selectedJDColleges.length > 1}
           selectedColleges={selectedJDColleges}
           operationsConfig={operationsConfig}
+          existingConfig={existingJDConfig}
           onBack={() => {
             setShowJDInitiationModal(false);
             setShowOperationsConfigModal(true);

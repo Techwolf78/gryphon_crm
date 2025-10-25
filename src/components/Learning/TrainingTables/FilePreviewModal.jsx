@@ -17,13 +17,6 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
 
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    if (type === "student" && trainingId) {
-      fetchStudentData();
-    }
-
-  }, [trainingId, type, fetchStudentData]);
-
   const fetchStudentData = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -52,6 +45,12 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
       setLoading(false);
     }
   }, [trainingId]);
+
+  useEffect(() => {
+    if (type === "student" && trainingId) {
+      fetchStudentData();
+    }
+  }, [trainingId, type, fetchStudentData]);
 
   const startEditing = (rowIndex) => {
     setEditRowIndex(rowIndex);
@@ -138,13 +137,15 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
           </div>
           <div className="flex items-center space-x-3">
             {type === "student" && studentData.length > 0 && (
-              <button
-                onClick={exportToExcel}
-                className="flex items-center px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700"
-              >
-                <FiDownload className="mr-2" />
-                Export
-              </button>
+              <>
+                <button
+                  onClick={exportToExcel}
+                  className="flex items-center px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700"
+                >
+                  <FiDownload className="mr-2" />
+                  Export
+                </button>
+              </>
             )}
             <button
               onClick={onClose}
@@ -199,8 +200,8 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
                           >
                             {editRowIndex === rowIndex ? (
                               <input
-                                type={typeof row[header] === 'string' && row[header].match(/^\d{1,2}\/\d{1,2}\/\d{4}/) ? "date" : "text"}
-                                value={editedRowData[header] || ""}
+                                type={typeof row[header] === 'string' && row[header]?.match(/^\d{1,2}\/\d{1,2}\/\d{4}/) ? "date" : "text"}
+                                value={editedRowData[header] || row[header] || ""}
                                 onChange={(e) => handleEditChange(header, e.target.value)}
                                 className="w-full border rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                               />

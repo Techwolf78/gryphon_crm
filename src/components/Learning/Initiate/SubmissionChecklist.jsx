@@ -35,9 +35,11 @@ const SubmissionChecklist = ({
       description: 'Set start and end dates',
       isComplete: (() => {
         const startDateStr = trainingStartDate ? 
-          (trainingStartDate instanceof Date ? trainingStartDate.toISOString().split('T')[0] : String(trainingStartDate).trim()) : '';
+          (trainingStartDate instanceof Date ? trainingStartDate.toISOString().split('T')[0] : 
+           (trainingStartDate && trainingStartDate.toDate ? trainingStartDate.toDate().toISOString().split('T')[0] : String(trainingStartDate).trim())) : '';
         const endDateStr = trainingEndDate ? 
-          (trainingEndDate instanceof Date ? trainingEndDate.toISOString().split('T')[0] : String(trainingEndDate).trim()) : '';
+          (trainingEndDate instanceof Date ? trainingEndDate.toISOString().split('T')[0] : 
+           (trainingEndDate && trainingEndDate.toDate ? trainingEndDate.toDate().toISOString().split('T')[0] : String(trainingEndDate).trim())) : '';
         
         return startDateStr !== '' && endDateStr !== '' && new Date(startDateStr) <= new Date(endDateStr);
       })()
@@ -54,10 +56,24 @@ const SubmissionChecklist = ({
       id: 'batchCreation',
       label: 'Batch Setup',
       description: 'Create batches for domains',
-      isComplete: selectedDomains && selectedDomains.length > 0 && selectedDomains.every(domain => {
-        const tableData = table1DataByDomain?.[domain];
-        return tableData && tableData.length > 0 && tableData.some(row => row.batches && row.batches.length > 0);
-      })
+      isComplete: (() => {
+        // Special handling for JD domain
+        if (selectedDomains?.includes('JD')) {
+          const jdData = table1DataByDomain?.['JD'];
+          const hasJDBatches = jdData && jdData.length > 0 && jdData.some(row => 
+            row.batches && row.batches.length > 0 && row.batches.some(batch => 
+              batch.trainers && batch.trainers.length > 0
+            )
+          );
+          return hasJDBatches;
+        }
+        
+        // Original logic for other domains
+        return selectedDomains && selectedDomains.length > 0 && selectedDomains.every(domain => {
+          const tableData = table1DataByDomain?.[domain];
+          return tableData && tableData.length > 0 && tableData.some(row => row.batches && row.batches.length > 0);
+        });
+      })()
     },
     {
       id: 'validationErrors',

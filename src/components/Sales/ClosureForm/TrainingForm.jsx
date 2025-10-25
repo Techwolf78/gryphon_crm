@@ -349,7 +349,8 @@ const TrainingForm = ({
         }
       }
 
-  const today = new Date();
+        // Calculate closureType based on contract end date
+        const today = new Date();
         const endDate = new Date(contractEndDate);
         const diffTime = endDate - today;
         const diffDays = diffTime / (1000 * 60 * 60 * 24);
@@ -363,7 +364,7 @@ const TrainingForm = ({
             const leadRef = doc(db, "leads", lead.id);
             await updateDoc(leadRef, {
                 phase: "closed",
-                closureType: closureType, // dynamic
+                closureType: closureType,
                 closedDate: new Date().toISOString(),
                 totalCost: formData.totalCost,
                 perStudentCost: formData.perStudentCost,

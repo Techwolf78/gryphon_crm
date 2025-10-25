@@ -15,11 +15,6 @@ import {
   FiRefreshCw
 } from "react-icons/fi";
 import PropTypes from "prop-types";
-import { db } from "../../../firebase";
-import {
-  doc,
-  getDoc,
-} from "firebase/firestore";
 
 const ClosedLeadsTable = ({
   leads,
@@ -38,7 +33,6 @@ const ClosedLeadsTable = ({
   maxHeight,
 }) => {
   const [openDropdown, setOpenDropdown] = useState(null);
-  const [enrichedLeads, setEnrichedLeads] = useState([]);
 
   // Update the useEffect for click outside handling
   useEffect(() => {
@@ -57,53 +51,6 @@ const ClosedLeadsTable = ({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []); // Remove openDropdown dependency
-
-  // Fetch additional data from trainingForms collection
-  useEffect(() => {
-    const fetchTrainingFormData = async () => {
-      if (!leads || leads.length === 0) {
-        setEnrichedLeads([]);
-        return;
-      }
-
-      const enriched = await Promise.all(
-        leads.map(async ([id, lead]) => {
-          try {
-            const projectCode = lead.projectCode;
-            if (!projectCode) {
-              return [id, lead];
-            }
-
-            const docId = projectCode.replace(/\//g, "-");
-            const docRef = doc(db, "trainingForms", docId);
-            const docSnap = await getDoc(docRef);
-
-            if (docSnap.exists()) {
-              const trainingFormData = docSnap.data();
-              // Merge the training form data with the lead data
-              return [id, {
-                ...lead,
-                studentCount: trainingFormData.studentCount || lead.studentCount,
-                perStudentCost: trainingFormData.perStudentCost || lead.perStudentCost,
-                totalCost: trainingFormData.totalCost || lead.totalCost,
-                gstAmount: trainingFormData.gstAmount || 0,
-                netPayableAmount: trainingFormData.netPayableAmount || lead.totalCost,
-              }];
-            } else {
-              return [id, lead];
-            }
-          } catch (error) {
-            console.error("Error fetching training form data:", error);
-            return [id, lead];
-          }
-        })
-      );
-
-      setEnrichedLeads(enriched);
-    };
-
-    fetchTrainingFormData();
-  }, [leads]);
 
   // Update the toggleDropdown function
   const toggleDropdown = useCallback((id, e) => {
@@ -165,10 +112,10 @@ const ClosedLeadsTable = ({
 
   // Calculate summary statistics
   const calculateSummary = () => {
-    const totalValue = enrichedLeads.reduce((sum, [, lead]) => sum + (lead.totalCost || 0), 0);
-    const totalStudents = enrichedLeads.reduce((sum, [, lead]) => sum + (lead.studentCount || 0), 0);
-    const newLeads = enrichedLeads.filter(([, lead]) => lead.closureType === 'new').length;
-    const renewalLeads = enrichedLeads.filter(([, lead]) => lead.closureType === 'renewal').length;
+    const totalValue = leads.reduce((sum, [, lead]) => sum + (lead.totalCost || 0), 0);
+    const totalStudents = leads.reduce((sum, [, lead]) => sum + (lead.studentCount || 0), 0);
+    const newLeads = leads.filter(([, lead]) => lead.closureType === 'new').length;
+    const renewalLeads = leads.filter(([, lead]) => lead.closureType === 'renewal').length;
 
     return { totalValue, totalStudents, newLeads, renewalLeads };
   };
@@ -179,13 +126,13 @@ const ClosedLeadsTable = ({
     <div className={`w-full ${className}`}>
       {/* Screen reader announcements */}
       <div aria-live="polite" aria-atomic="true" className="sr-only">
-        {isLoading ? "Loading closed leads data..." : `${enrichedLeads.length} closed leads loaded`}
+        {isLoading ? "Loading closed leads data..." : `${leads.length} closed leads loaded`}
       </div>
 
       {/* Main Container */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden">
         {/* Mobile Card Layout */}
-        <div className="block lg:hidden">
+        <div className="block md:hidden">
           {isLoading ? (
             // Loading skeleton for mobile
             Array.from({ length: 3 }).map((_, index) => (
@@ -215,33 +162,13 @@ const ClosedLeadsTable = ({
                 </div>
               </div>
             ))
-          ) : enrichedLeads.length > 0 ? (
-            enrichedLeads.map(([id, lead], index) => (
+          ) : leads.length > 0 ? (
+            leads.map(([id, lead], index) => (
               <div
                 key={id}
                 className={`bg-white border-b border-gray-100 p-4 hover:bg-gray-50/50 transition-colors duration-200 cursor-pointer ${showAnimations ? 'animate-in fade-in slide-in-from-bottom-2' : ''} ${cardClassName}`}
                 style={showAnimations ? { animationDelay: `${index * 0.05}s` } : {}}
-                onClick={async () => {
-                  try {
-                    const projectCode = lead.projectCode;
-                    if (!projectCode) {
-                      return;
-                    }
-
-                    const docId = projectCode.replace(/\//g, "-");
-                    const docRef = doc(db, "trainingForms", docId);
-                    const docSnap = await getDoc(docRef);
-
-                    if (docSnap.exists()) {
-                      onViewDetails({ id: docSnap.id, ...docSnap.data() });
-                    } else {
-                      onViewDetails(lead);
-                    }
-                  } catch (error) {
-                    console.error("Error viewing lead details:", error);
-                    onViewDetails(lead);
-                  }
-                }}
+                onClick={() => onViewDetails(lead)}
               >
                 {/* Header */}
                 <div className="flex items-center justify-between mb-4">
@@ -423,46 +350,46 @@ const ClosedLeadsTable = ({
         </div>
 
         {/* Desktop Table Layout */}
-        <div className="hidden lg:block">
-          <div className={`overflow-x-auto scrollbar-thin scrollbar-thumb-slate-300/60 scrollbar-track-slate-50/50 scrollbar-thumb-rounded-full hover:scrollbar-thumb-slate-400/60 transition-colors ${maxHeight ? 'overflow-y-auto' : ''}`} style={maxHeight ? { maxHeight } : {}}>
+        <div className="hidden md:block">
+          <div className={`overflow-x-auto scrollbar-thin scrollbar-thumb-slate-300/60 scrollbar-track-slate-50/50 scrollbar-thumb-rounded-full hover:scrollbar-thumb-slate-400/60 transition-colors min-w-0 ${maxHeight ? 'overflow-y-auto' : ''}`} style={maxHeight ? { maxHeight } : {}}>
             {/* Table */}
             <table className={`min-w-full divide-y divide-gray-200 ${tableClassName}`}>
               <thead className="bg-gradient-to-r from-blue-600 to-indigo-700">
                 <tr>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
                     <div className="flex items-center space-x-1">
                       <FiTrendingUp className="w-4 h-4" />
                       <span>Deal Details</span>
                     </div>
                   </th>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">
+                  <th scope="col" className="px-2 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
                     <div className="flex items-center space-x-1">
                       <FiUsers className="w-4 h-4" />
-                      <span>Students & Cost</span>
+                      <span>Students & Cost Per Std</span>
                     </div>
                   </th>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
                     <div className="flex items-center space-x-1">
                       <FiDollarSign className="w-4 h-4" />
                       <span>Total Value</span>
                     </div>
                   </th>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
                     <div className="flex items-center space-x-1">
                       <FiCalendar className="w-4 h-4" />
                       <span>Closed Date</span>
                     </div>
                   </th>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider hidden lg:block">
                     <div className="flex items-center space-x-1">
                       <FiCheckCircle className="w-4 h-4" />
                       <span>Type</span>
                     </div>
                   </th>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
                     Deal Owner
                   </th>
-                  <th scope="col" className="px-6 py-4 text-right text-xs font-semibold text-white uppercase tracking-wider">
+                  <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-white uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -506,36 +433,16 @@ const ClosedLeadsTable = ({
                       </td>
                     </tr>
                   ))
-                ) : enrichedLeads.length > 0 ? (
-                  enrichedLeads.map(([id, lead]) => (
+                ) : leads.length > 0 ? (
+                  leads.map(([id, lead]) => (
                     <tr
                       key={id}
                       className="hover:bg-gray-50 transition-all duration-300 align-top cursor-pointer group hover:shadow-sm"
-                      onClick={async () => {
-                        try {
-                          const projectCode = lead.projectCode;
-                          if (!projectCode) {
-                            return;
-                          }
-
-                          const docId = projectCode.replace(/\//g, "-");
-                          const docRef = doc(db, "trainingForms", docId);
-                          const docSnap = await getDoc(docRef);
-
-                          if (docSnap.exists()) {
-                            onViewDetails({ id: docSnap.id, ...docSnap.data() });
-                          } else {
-                            onViewDetails(lead);
-                          }
-                        } catch (error) {
-                          console.error("Error viewing lead details:", error);
-                          onViewDetails(lead);
-                        }
-                      }}
+                      onClick={() => onViewDetails(lead)}
                     >
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center text-blue-700 font-semibold flex-shrink-0 shadow-sm border border-blue-100/50">
+                          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center text-blue-700 font-bold text-sm flex-shrink-0 shadow-sm border border-blue-100/50">
                             {lead.businessName?.charAt(0)?.toUpperCase() || "?"}
                           </div>
                           <div className="ml-4">
@@ -548,7 +455,7 @@ const ClosedLeadsTable = ({
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <div className="text-center">
                           <div className="text-sm font-semibold text-gray-900">{lead.studentCount || "-"}</div>
                           <div className="text-sm text-gray-500 mt-1">
@@ -556,7 +463,7 @@ const ClosedLeadsTable = ({
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <div className="text-lg font-bold text-gray-900">{formatCurrency(lead.totalCost)}</div>
                         {lead.gstAmount > 0 && (
                           <div className="text-xs text-gray-500 mt-1">
@@ -564,10 +471,10 @@ const ClosedLeadsTable = ({
                           </div>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 font-medium">
                         {formatDate(lead.closedDate)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap hidden lg:block">
                         {lead.closureType === "new" ? (
                           <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-emerald-50 to-emerald-100 text-emerald-700 border border-emerald-200">
                             <FiCheckCircle className="mr-1.5 h-3 w-3" />
@@ -580,7 +487,7 @@ const ClosedLeadsTable = ({
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="h-8 w-8 rounded-full bg-gradient-to-br from-slate-100 to-gray-200 flex items-center justify-center text-slate-700 text-xs font-semibold flex-shrink-0 shadow-sm border border-slate-200/50">
                             {lead.assignedTo?.name
@@ -594,7 +501,7 @@ const ClosedLeadsTable = ({
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-right">
                         <div
                           className="flex justify-center items-center h-full relative"
                           data-dropdown-container
@@ -711,12 +618,12 @@ const ClosedLeadsTable = ({
           </div>
 
           {/* Table Footer with Summary */}
-          {enrichedLeads.length > 0 && (
+          {leads.length > 0 && (
             <div className="border-t border-gray-100 bg-gray-50/50 px-6 py-3">
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-4">
                   <span className="text-gray-600">
-                    Total Deals: <span className="font-semibold text-gray-900">{enrichedLeads.length}</span>
+                    Total Deals: <span className="font-semibold text-gray-900">{leads.length}</span>
                   </span>
                   <span className="text-gray-600">
                     New: <span className="font-semibold text-emerald-600">{summary.newLeads}</span>
