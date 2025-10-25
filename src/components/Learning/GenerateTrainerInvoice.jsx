@@ -353,15 +353,23 @@ function GenerateTrainerInvoice() {
           ...trainer,
           topics: Array.from(trainer.allTopics), // Convert Set to Array for topics
           // Calculate total allowances from all batches (per-day rate × number of training days)
-          totalFood: trainer.allBatches.reduce((sum, batch) => {
-            const days = batch.activeDates?.length || getTrainingDays(batch.startDate, batch.endDate);
-            return sum + ((batch.food || 0) * days);
-          }, 0),
-          totalLodging: trainer.allBatches.reduce((sum, batch) => {
-            const days = batch.activeDates?.length || getTrainingDays(batch.startDate, batch.endDate);
-            return sum + ((batch.lodging || 0) * days);
-          }, 0),
-          totalConveyance: trainer.allBatches.reduce((sum, batch) => sum + (batch.conveyance || 0), 0),
+          // For JD domain, take allowances only once (not summed across batches)
+          totalFood: (trainer.domain === "JD") 
+            ? ((trainer.allBatches[0]?.food || 0) * (trainer.allBatches[0]?.activeDates?.length || getTrainingDays(trainer.allBatches[0]?.startDate, trainer.allBatches[0]?.endDate)))
+            : trainer.allBatches.reduce((sum, batch) => {
+                const days = batch.activeDates?.length || getTrainingDays(batch.startDate, batch.endDate);
+                return sum + ((batch.food || 0) * days);
+              }, 0),
+          totalLodging: (trainer.domain === "JD") 
+            ? ((trainer.allBatches[0]?.lodging || 0) * (trainer.allBatches[0]?.activeDates?.length || getTrainingDays(trainer.allBatches[0]?.startDate, trainer.allBatches[0]?.endDate)))
+            : trainer.allBatches.reduce((sum, batch) => {
+                const days = batch.activeDates?.length || getTrainingDays(batch.startDate, batch.endDate);
+                return sum + ((batch.lodging || 0) * days);
+              }, 0),
+          totalConveyance: (trainer.domain === "JD") 
+            ? (trainer.allBatches[0]?.conveyance || 0) 
+            : trainer.allBatches.reduce((sum, batch) => sum + (batch.conveyance || 0), 0),
+          totalStudents: trainer.allBatches.reduce((sum, batch) => sum + (batch.batchPerStdCount || batch.stdCount || 0), 0),
         };
 
         // For merged trainings, update display fields

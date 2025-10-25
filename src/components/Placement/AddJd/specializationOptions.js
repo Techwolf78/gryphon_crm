@@ -1,0 +1,41 @@
+const specializationOptions = {
+  Engineering: [
+    "CS",
+    "IT",
+    "ENTC",
+    "CS-Cyber Security",
+    "Mechanical",
+    "Civil",
+    "Electrical",
+    "Chemical",
+    "CS-AI-ML",
+    "CS-AI-DS",
+    "Other",
+  ],
+  MBA: [
+    "Marketing",
+    "Finance",
+    "HR",
+    "Operations",
+    "Supply Chain",
+    "Business Analyst",
+    "Other",
+  ],
+  BBA: [
+    "Marketing",
+    "Finance",
+    "HR",
+    "Operations",
+    "Supply Chain",
+    "Business Analyst",
+    "Other",
+  ],
+  BCA: ["Computer Applications", "Other"],
+  MCA: ["Computer Science", "Other"],
+  Diploma: ["Mechanical", "Civil", "Electrical", "Computer", "Other"],
+  BSC: ["Physics", "Chemistry", "Mathematics", "CS", "Other"],
+  MSC: ["Physics", "Chemistry", "Mathematics", "CS", "Other"],
+  Other: ["Other"],
+};
+
+export default specializationOptions;

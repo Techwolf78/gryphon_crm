@@ -29,6 +29,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
     perDayLodging: trainer?.lodging || 0,
     food: trainer?.totalFood || 0,
     lodging: trainer?.totalLodging || 0,
+    totalStudents: trainer?.totalStudents || 0,
     businessName: trainer?.businessName || "",
     collegeName: trainer?.collegeName || "",
     gst: "", // GST option: "NA", "0", "18"

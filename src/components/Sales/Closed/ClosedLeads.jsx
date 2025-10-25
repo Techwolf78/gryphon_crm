@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import PropTypes from "prop-types";
 import { FiChevronLeft, FiChevronRight, FiDownload, FiFilter, FiTrendingUp } from "react-icons/fi";
-import { collection, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc, writeBatch } from "firebase/firestore";
 import { db } from "../../../firebase";
 import ClosedLeadsTable from "./ClosedLeadsTable";
 import ClosedLeadsStats from "./ClosedLeadsStats";
@@ -26,6 +26,9 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
 
   // 🆕 Add enriched leads state
   const [enrichedLeads, setEnrichedLeads] = useState({});
+
+  // 🆕 Add cache for training form data to prevent refetching
+  const trainingFormCache = useRef({});
 
   // Modal states for table modals
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -87,7 +90,7 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
     setTargets(data);
   }, []);
 
-  // 🆕 Enrich leads with gstAmount from trainingForms
+  // 🆕 Enrich leads with gstAmount from trainingForms using batch operations and caching
   const enrichLeadsData = useCallback(async () => {
     if (!leads || Object.keys(leads).length === 0) {
       setEnrichedLeads({});
@@ -96,61 +99,140 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
 
     const enriched = {};
 
+    // Collect all projectCodes that need training form data
+    const projectCodes = Object.entries(leads)
+      .filter(([, lead]) => lead.projectCode)
+      .map(([, lead]) => lead.projectCode.replace(/\//g, "-"));
 
-    await Promise.all(
-      Object.entries(leads).map(async ([id, lead]) => {
-        try {
-          const projectCode = lead.projectCode;
+    // Check cache for existing data and identify missing ones
+    const cachedData = {};
+    const missingDocIds = [];
 
+    projectCodes.forEach(docId => {
+      if (trainingFormCache.current[docId]) {
+        cachedData[docId] = trainingFormCache.current[docId];
+      } else {
+        missingDocIds.push(docId);
+      }
+    });
 
-          if (!projectCode) {
+    // Batch fetch only missing training forms (process in smaller batches to avoid overwhelming Firestore)
+    if (missingDocIds.length > 0) {
+      const batchSize = 5;
+      for (let i = 0; i < missingDocIds.length; i += batchSize) {
+        const batch = missingDocIds.slice(i, i + batchSize);
+        await Promise.all(
+          batch.map(async (docId) => {
+            try {
+              const docRef = doc(db, "trainingForms", docId);
+              const docSnap = await getDoc(docRef);
+              if (docSnap.exists()) {
+                const data = docSnap.data();
+                trainingFormCache.current[docId] = data; // Cache the fetched data
+                cachedData[docId] = data;
+              }
+            } catch (err) {
+              console.error(`Error fetching training form ${docId}:`, err);
+            }
+          })
+        );
+      }
+    }
 
-            enriched[id] = lead;
-            return;
-          }
+    // Use cached data for processing
+    const trainingFormData = cachedData;
 
-          const docId = projectCode.replace(/\//g, "-");
+    // Process all leads using the fetched training form data
+    const closureTypeUpdates = [];
+    for (const [id, lead] of Object.entries(leads)) {
+      try {
+        const projectCode = lead.projectCode;
 
+        if (!projectCode) {
+          // For leads without training forms, calculate totalCost from available data
+          const studentCount = parseInt(lead.studentCount) || 0;
+          const perStudentCost = parseFloat(lead.perStudentCost) || 0;
+          const calculatedTotalCost = studentCount * perStudentCost;
 
-          const docRef = doc(db, "trainingForms", docId);
-          const docSnap = await getDoc(docRef);
-
-          if (docSnap.exists()) {
-            const trainingFormData = docSnap.data();
-
-
-            // Merge the training form data with the lead data
-            enriched[id] = {
-              ...lead,
-              studentCount: parseInt(trainingFormData.studentCount) || lead.studentCount,
-              perStudentCost: parseFloat(trainingFormData.perStudentCost) || lead.perStudentCost,
-              totalCost: parseFloat(trainingFormData.totalCost) || lead.totalCost,
-              gstAmount: parseFloat(trainingFormData.gstAmount) || 0,
-              netPayableAmount: parseFloat(trainingFormData.netPayableAmount) || lead.totalCost,
-            };
-          } else {
-            // For leads without training forms, calculate totalCost from available data
-            const studentCount = parseInt(lead.studentCount) || 0;
-            const perStudentCost = parseFloat(lead.perStudentCost) || 0;
-            const calculatedTotalCost = studentCount * perStudentCost;
-
-
-
-            enriched[id] = {
-              ...lead,
-              totalCost: calculatedTotalCost || lead.totalCost || 0,
-              gstAmount: 0,
-            };
-          }
-
-
-        } catch (error) {
-          console.error("Error enriching lead data:", error);
-          enriched[id] = lead;
+          enriched[id] = {
+            ...lead,
+            totalCost: calculatedTotalCost || lead.totalCost || 0,
+            gstAmount: 0,
+          };
+          continue;
         }
-      })
-    );
 
+        const docId = projectCode.replace(/\//g, "-");
+        const trainingFormDataItem = trainingFormData[docId];
+
+        if (trainingFormDataItem) {
+          // Check contract end date and update closureType if needed
+          let updatedClosureType = lead.closureType || "new";
+          if (trainingFormDataItem.contractEndDate) {
+            const endDate = new Date(trainingFormDataItem.contractEndDate);
+            const today = new Date();
+            const diffTime = endDate - today;
+            const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+            if (diffDays <= 90 && diffDays >= 0) {
+              updatedClosureType = "renewal";
+            } else {
+              updatedClosureType = "new";
+            }
+
+            // Collect closureType updates for batch processing
+            if (updatedClosureType !== (lead.closureType || "new")) {
+              closureTypeUpdates.push({
+                leadId: id,
+                closureType: updatedClosureType
+              });
+            }
+          }
+
+          // Merge the training form data with the lead data
+          enriched[id] = {
+            ...lead,
+            studentCount: parseInt(trainingFormDataItem.studentCount) || lead.studentCount,
+            perStudentCost: parseFloat(trainingFormDataItem.perStudentCost) || lead.perStudentCost,
+            totalCost: parseFloat(trainingFormDataItem.totalCost) || lead.totalCost,
+            gstAmount: parseFloat(trainingFormDataItem.gstAmount) || 0,
+            netPayableAmount: parseFloat(trainingFormDataItem.netPayableAmount) || lead.totalCost,
+            closureType: updatedClosureType, // Use the updated closureType
+          };
+        } else {
+          // For leads without training forms, calculate totalCost from available data
+          const studentCount = parseInt(lead.studentCount) || 0;
+          const perStudentCost = parseFloat(lead.perStudentCost) || 0;
+          const calculatedTotalCost = studentCount * perStudentCost;
+
+          enriched[id] = {
+            ...lead,
+            totalCost: calculatedTotalCost || lead.totalCost || 0,
+            gstAmount: 0,
+          };
+        }
+
+      } catch (error) {
+        console.error("Error enriching lead data:", error);
+        enriched[id] = lead;
+      }
+    }
+
+    // Batch update closureType changes
+    if (closureTypeUpdates.length > 0) {
+      const batch = writeBatch(db);
+      closureTypeUpdates.forEach(({ leadId, closureType }) => {
+        const leadRef = doc(db, "leads", leadId);
+        batch.update(leadRef, { closureType });
+      });
+
+      try {
+        await batch.commit();
+        console.log(`Successfully updated closureType for ${closureTypeUpdates.length} leads`);
+      } catch (batchError) {
+        console.error("Error batch updating closureType:", batchError);
+      }
+    }
 
     setEnrichedLeads(enriched);
   }, [leads]);
@@ -177,22 +259,30 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
     return "Q4";
   };
 
-  const today = new Date();
-  const currentQuarter = getQuarter(today);
-  const selectedQuarter =
-    quarterFilter === "current" ? currentQuarter : quarterFilter;
-  const selectedFY = getFinancialYear(today);
-
-  const currentUserObj = Object.values(users).find(
-    (u) => u.uid === currentUser?.uid
+  // 🆕 Memoize date calculations to prevent unnecessary recalculations
+  const today = useMemo(() => new Date(), []);
+  const currentQuarter = useMemo(() => getQuarter(today), [today]);
+  const selectedQuarter = useMemo(() =>
+    quarterFilter === "current" ? currentQuarter : quarterFilter,
+    [quarterFilter, currentQuarter]
   );
+  const selectedFY = useMemo(() => getFinancialYear(today), [today]);
+
+  // 🆕 Memoize current user object lookup
+  const currentUserObj = useMemo(() =>
+    Object.values(users).find((u) => u.uid === currentUser?.uid),
+    [users, currentUser?.uid]
+  );
+
   const currentRole = currentUserObj?.role;
 
   // 🆕 Check if user should see the department toggle
-  const shouldShowDepartmentToggle =
+  const shouldShowDepartmentToggle = useMemo(() =>
     !viewMyLeadsOnly &&
     currentUserObj?.department === "Admin" &&
-    currentRole === "Director";
+    currentRole === "Director",
+    [viewMyLeadsOnly, currentUserObj?.department, currentRole]
+  );
 
   const isUserInTeam = useCallback((uid) => {
     if (!uid) return false;

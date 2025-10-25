@@ -404,7 +404,37 @@ function TrainingConfiguration({
                   }
                   return "";
                 })()}
-                onChange={(e) => setCommonFields({ ...commonFields, trainingStartDate: e.target.value ? new Date(e.target.value) : null })}
+                onChange={(e) => {
+
+                  const value = e.target.value;
+
+                  let date = null;
+
+                  if (value) {
+
+                    // Try YYYY-MM-DD first
+
+                    date = new Date(value);
+
+                    if (isNaN(date.getTime())) {
+
+                      // Try DD-MM-YYYY
+
+                      const parts = value.split('-');
+
+                      if (parts.length === 3) {
+
+                        date = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+
+                      }
+
+                    }
+
+                  }
+
+                  setCommonFields({ ...commonFields, trainingStartDate: date });
+
+                }}
                 className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
               />
             </div>
@@ -429,7 +459,37 @@ function TrainingConfiguration({
                   }
                   return "";
                 })()}
-                onChange={(e) => setCommonFields({ ...commonFields, trainingEndDate: e.target.value ? new Date(e.target.value) : null })}
+                onChange={(e) => {
+
+                  const value = e.target.value;
+
+                  let date = null;
+
+                  if (value) {
+
+                    // Try YYYY-MM-DD first
+
+                    date = new Date(value);
+
+                    if (isNaN(date.getTime())) {
+
+                      // Try DD-MM-YYYY
+
+                      const parts = value.split('-');
+
+                      if (parts.length === 3) {
+
+                        date = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+
+                      }
+
+                    }
+
+                  }
+
+                  setCommonFields({ ...commonFields, trainingEndDate: date });
+
+                }}
                 className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
               />
             </div>

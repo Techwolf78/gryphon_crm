@@ -2,9 +2,9 @@ import React, { useState, useEffect, useCallback } from "react";
 import { db } from "../firebase";
 import { collection, getDocs } from "firebase/firestore";
 import StudentListModal from "../components/Placement/StudentListModal";
-import AddJD from "../components/Placement/AddJD";
-import CompanyOpen from "../components/Placement/CompanyOpen";
-import CompanyLeads from "../components/Placement/CompanyLeads";
+import AddJD from "../components/Placement/AddJd/AddJD";
+import CompanyOpen from "../components/Placement/CompanyOpen/CompanyOpen";
+import CompanyLeads from "../components/Placement/CompanyLeads/CompanyLeads";
 import MouPreviewModal from "../components/Placement/MouPreviewModal";
 import PlacementDetailsModal from "../components/Placement/PlacementDetailsModal";
 
