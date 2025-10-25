@@ -573,8 +573,8 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
 
   return (
     <>
-      <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-[50]">
-        <div className="relative top-20 mx-auto p-5 border w-full shadow-lg rounded-md bg-white min-h-screen overflow-y-auto">
+      <div className="fixed inset-0 backdrop-blur-sm overflow-y-auto h-full w-full z-[50]">
+        <div className="relative top-20 mx-auto p-5 border w-full bg-white min-h-screen overflow-y-auto">
           <div className="mt-3">
             <div className="flex items-center justify-between mb-4">
               <div>

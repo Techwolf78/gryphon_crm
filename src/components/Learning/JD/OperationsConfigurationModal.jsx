@@ -171,8 +171,8 @@ const OperationsConfigurationModal = ({
   }, 0);
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-full shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
+      <div className="relative top-20 mx-auto p-5 border w-full  bg-white max-h-[90vh] overflow-y-auto">
         <div className="mt-3">
           <div className="flex items-center justify-between mb-4">
             <div>

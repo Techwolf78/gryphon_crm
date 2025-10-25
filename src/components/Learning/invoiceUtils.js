@@ -39,6 +39,7 @@ export const generateInvoicePDF = async (invoiceData) => {
       conveyance: invoiceData.conveyance || 0,
       food: invoiceData.food || 0,
       lodging: invoiceData.lodging || 0,
+      totalStudents: invoiceData.totalStudents || 0,
       bankName: invoiceData.bankName || 'N/A',
       accountNumber: invoiceData.accountNumber || 'N/A',
       ifscCode: invoiceData.ifscCode || 'N/A',
@@ -144,6 +145,19 @@ export const generateInvoicePDF = async (invoiceData) => {
     const gstAmount = safeInvoiceData.gst === "18" ? Math.round(amountBeforeGST * 0.18) : 0;
     const netPayable = amountBeforeGST - gstAmount;
 
+    // Calculate number of sessions (training days)
+    const calculateSessions = () => {
+      if (!safeInvoiceData.startDate || !safeInvoiceData.endDate) return '';
+      const start = new Date(safeInvoiceData.startDate);
+      const end = new Date(safeInvoiceData.endDate);
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) return '';
+      const diffTime = Math.abs(end - start);
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 for inclusive
+      return diffDays.toString();
+    };
+
+    const numberOfSessions = calculateSessions();
+
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 6,
       body: [
@@ -177,9 +191,9 @@ export const generateInvoicePDF = async (invoiceData) => {
       startY: doc.lastAutoTable.finalY + 6,
       body: [
         [{ content: 'Summary of Training', colSpan: 2, styles: { halign: 'left', fontSize: 10.5, fonStyle: 'bold', cellPadding: 1.8 } }],
-        ['No of Sessions', ''],
+        ['No of Sessions', numberOfSessions],
         ['No of Hours', `${safeInvoiceData.totalHours}`],
-        ['No of Attendees', ''],
+        ['No of Attendees', `${safeInvoiceData.totalStudents}`],
         ['Average Students/ Batch', '-']
       ],
       theme: 'grid',

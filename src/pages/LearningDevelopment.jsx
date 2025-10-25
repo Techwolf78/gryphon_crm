@@ -16,7 +16,7 @@ import LearningDevelopmentTour from "../components/tours/LearningDevelopmentTour
 import JDMergeModal from "../components/Learning/JD/JDMergeModal";
 import OperationsConfigurationModal from "../components/Learning/JD/OperationsConfigurationModal";
 import JDInitiationModal from "../components/Learning/JD/JDInitiationModal";
-import { ToastContainer, toast } from "react-toastify";
+import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { CheckCircle, XCircle, Calendar, PlayCircle } from "lucide-react";
 

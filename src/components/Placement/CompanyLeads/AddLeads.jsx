@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { auth, db } from "../../firebase";
+import { auth, db } from "../../../firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { XIcon } from "@heroicons/react/outline";
 
