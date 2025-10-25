@@ -116,7 +116,7 @@ function CompanyHeader({
           <ExportData companies={companies} filteredCompanies={filteredCompanies} />
 
           <button
-            onClick={() => setIsFilterOpen(!isFilterOpen)}
+            onClick={() => setIsFilterOpen(prev => !prev)}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
           >
             <svg
@@ -172,7 +172,7 @@ function CompanyHeader({
 
       {/* Filter dropdown */}
       {isFilterOpen && (
-        <div className="bg-white rounded-lg shadow-lg p-4 mb-4 border border-gray-200">
+        <div className="">
           <CompanyFilter
             filters={filters}
             setFilters={setFilters}
