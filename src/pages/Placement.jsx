@@ -7,6 +7,7 @@ import CompanyOpen from "../components/Placement/CompanyOpen/CompanyOpen";
 import CompanyLeads from "../components/Placement/CompanyLeads/CompanyLeads";
 import MouPreviewModal from "../components/Placement/MouPreviewModal";
 import PlacementDetailsModal from "../components/Placement/PlacementDetailsModal";
+import { Eye, User, FileText } from "lucide-react";
 import { doc } from "firebase/firestore";
 
 function Placement() {
@@ -173,7 +174,8 @@ function Placement() {
     setDropdownOpen(null);
   };
 
-  const toggleDropdown = (itemId) => {
+  const toggleDropdown = (itemId, event) => {
+    event.stopPropagation();
     setDropdownOpen(dropdownOpen === itemId ? null : itemId);
   };
 
@@ -193,6 +195,12 @@ function Placement() {
   const formatCellValue = (value) => {
     if (value == null || value === "") return "N/A";
     return String(value);
+  };
+
+  // Function to check if dropdown should open above (for bottom rows)
+  const getDropdownPosition = (index) => {
+    // If it's one of the last 3 rows, open dropdown above
+    return index >= sortedTrainingData.length - 3 ? "above" : "below";
   };
 
   return (
@@ -286,7 +294,7 @@ function Placement() {
                       <tr>
                         <th
                           scope="col"
-                          className="px-4 py-3 text-left text-xs font-medium  uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none border border-gray-300"
+                          className="px-4 py-3 text-left text-xs font-medium  uppercase tracking-wider cursor-pointer  select-none border border-gray-300"
                           onClick={handleProjectCodeSort}
                         >
                           <div className="flex items-center justify-between">
@@ -376,187 +384,156 @@ function Placement() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {sortedTrainingData.map((item) => (
-                        <tr
-                          key={item.id}
-                          className="hover:bg-gray-50 transition-colors border border-gray-300"
-                        >
-                          <td
-                            className="px-4 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
-                            title={formatCellValue(item.projectCode)}
+                      {sortedTrainingData.map((item, index) => {
+                        const dropdownPosition = getDropdownPosition(index);
+
+                        return (
+                          <tr
+                            key={item.id}
+                            className="hover:bg-gray-50 transition-colors border border-gray-300"
                           >
-                            {formatCellValue(item.projectCode)}
-                          </td>
-                          <td
-                            className="px-4 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
-                            title={formatCellValue(item.collegeName)}
-                          >
-                            {formatCellValue(item.collegeName)}
-                          </td>
-                          <td
-                            className="px-4 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
-                            title={formatCellValue(item.course)}
-                          >
-                            {formatCellValue(item.course)}
-                          </td>
-                          <td
-                            className="px-4 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
-                            title={formatCellValue(item.year)}
-                          >
-                            {formatCellValue(item.year)}
-                          </td>
-                          <td
-                            className="px-4 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
-                            title={formatCellValue(item.deliveryType)}
-                          >
-                            {formatCellValue(item.deliveryType)}
-                          </td>
-                          <td
-                            className="px-4 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
-                            title={formatCellValue(item.studentCount)}
-                          >
-                            {formatCellValue(item.studentCount)}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm border border-gray-300 text-gray-500">
-                            {progressData[item.projectCode] ? (
-                              progressData[item.projectCode].length > 0 ? (
-                                <div className="flex flex-wrap gap-1">
-                                  {progressData[item.projectCode].map(
-                                    (phase, idx) => (
-                                      <span
-                                        key={idx}
-                                        className={`px-2 py-1 rounded-full text-white text-xs font-semibold ${
-                                          phase.status === "Done"
-                                            ? "bg-green-500"
-                                            : phase.status === "Initiated"
-                                            ? "bg-amber-500"
-                                            : phase.status === "Ongoing"
-                                            ? "bg-cyan-500"
-                                            : phase.status === "cancel"
-                                            ? "bg-red-500"
-                                            : "bg-gray-400"
-                                        }`}
-                                        title={`${phase.name}: ${phase.status}`}
-                                      >
-                                        {phase.name}
-                                      </span>
-                                    )
-                                  )}
-                                </div>
+                            <td
+                              className="px-4 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
+                              title={formatCellValue(item.projectCode)}
+                            >
+                              {formatCellValue(item.projectCode)}
+                            </td>
+                            <td
+                              className="px-4 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
+                              title={formatCellValue(item.collegeName)}
+                            >
+                              {formatCellValue(item.collegeName)}
+                            </td>
+                            <td
+                              className="px-4 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
+                              title={formatCellValue(item.course)}
+                            >
+                              {formatCellValue(item.course)}
+                            </td>
+                            <td
+                              className="px-4 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
+                              title={formatCellValue(item.year)}
+                            >
+                              {formatCellValue(item.year)}
+                            </td>
+                            <td
+                              className="px-4 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
+                              title={formatCellValue(item.deliveryType)}
+                            >
+                              {formatCellValue(item.deliveryType)}
+                            </td>
+                            <td
+                              className="px-4 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
+                              title={formatCellValue(item.studentCount)}
+                            >
+                              {formatCellValue(item.studentCount)}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm border border-gray-300 text-gray-500">
+                              {progressData[item.projectCode] ? (
+                                progressData[item.projectCode].length > 0 ? (
+                                  <div className="flex flex-wrap gap-1">
+                                    {progressData[item.projectCode].map(
+                                      (phase, idx) => (
+                                        <span
+                                          key={idx}
+                                          className={`px-2 py-1 rounded-full text-white text-xs font-semibold ${
+                                            phase.status === "Done"
+                                              ? "bg-green-500"
+                                              : phase.status === "Initiated"
+                                              ? "bg-amber-500"
+                                              : phase.status === "Ongoing"
+                                              ? "bg-cyan-700"
+                                              : phase.status === "Hold"
+                                              ? "bg-rose-500"
+                                              : "bg-gray-400"
+                                          }`}
+                                          title={`${phase.name}: ${phase.status}`}
+                                        >
+                                          {phase.name}
+                                        </span>
+                                      )
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className=" text-xs italic">
+                                    No phases
+                                  </span>
+                                )
                               ) : (
                                 <span className=" text-xs italic">
-                                  No phases
+                                  Loading...
                                 </span>
-                              )
-                            ) : (
-                              <span className=" text-xs italic">
-                                Loading...
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 relative">
-                            <div className="flex justify-center">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleDropdown(item.id);
-                                }}
-                                className="p-1 rounded hover:bg-gray-200 transition-colors"
-                                title="Actions"
-                              >
-                                <svg
-                                  className="w-5 h-5 text-gray-600"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
-                                  />
-                                </svg>
-                              </button>
-
-                              {dropdownOpen === item.id && (
-                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-10">
-                                  <div className="py-1">
-                                    <button
-                                      onClick={() => handleViewDetails(item)}
-                                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
-                                    >
-                                      <svg
-                                        className="w-4 h-4 mr-2"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth={2}
-                                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                                        />
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth={2}
-                                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                                        />
-                                      </svg>
-                                      View Details
-                                    </button>
-                                    <button
-                                      onClick={() => fetchStudentData(item.id)}
-                                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
-                                    >
-                                      <svg
-                                        className="w-4 h-4 mr-2"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth={2}
-                                          d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"
-                                        />
-                                      </svg>
-                                      Student Data
-                                    </button>
-                                    <button
-                                      onClick={() => handleMouPreview(item)}
-                                      disabled={!item.mouFileUrl}
-                                      className={`flex items-center w-full px-4 py-2 text-sm ${
-                                        item.mouFileUrl
-                                          ? "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
-                                          : "text-gray-400 cursor-not-allowed"
-                                      }`}
-                                    >
-                                      <svg
-                                        className="w-4 h-4 mr-2"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth={2}
-                                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                                        />
-                                      </svg>
-                                      MOU File
-                                    </button>
-                                  </div>
-                                </div>
                               )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 relative">
+                              <div className="flex justify-center">
+                                <button
+                                  onClick={(e) => toggleDropdown(item.id, e)}
+                                  className="p-1 rounded hover:bg-gray-200 transition-colors"
+                                  title="Actions"
+                                >
+                                  <svg
+                                    className="w-5 h-5 text-gray-600"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
+                                    />
+                                  </svg>
+                                </button>
+
+                                {dropdownOpen === item.id && (
+                                  <div
+                                    className={`absolute right-0 w-48 bg-white rounded-md shadow-lg border border-gray-400 z-10 ${
+                                      dropdownPosition === "above"
+                                        ? "bottom-full mb-1"
+                                        : "top-full mt-1"
+                                    }`}
+                                  >
+                                    <div className="py-1">
+                                      <button
+                                        onClick={() => handleViewDetails(item)}
+                                        className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                                      >
+                                        <Eye className="w-4 h-4 mr-2" />
+                                        View Details
+                                      </button>
+
+                                      <button
+                                        onClick={() =>
+                                          fetchStudentData(item.id)
+                                        }
+                                        className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                                      >
+                                        <User className="w-4 h-4 mr-2" />
+                                        Student Data
+                                      </button>
+
+                                      <button
+                                        onClick={() => handleMouPreview(item)}
+                                        disabled={!item.mouFileUrl}
+                                        className={`flex items-center w-full px-4 py-2 text-sm ${
+                                          item.mouFileUrl
+                                            ? "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                                            : "text-gray-400 cursor-not-allowed"
+                                        }`}
+                                      >
+                                        <FileText className="w-4 h-4 mr-2" />
+                                        MOU File
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
