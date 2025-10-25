@@ -1,559 +1,648 @@
-import React, { useState } from "react";
-import { FiFilter, FiMoreVertical, FiUpload, FiX } from "react-icons/fi";
-import PropTypes from "prop-types";
-import * as XLSX from "xlsx";
-import { db } from "../../../firebase";
+import React, { useState, useEffect, useCallback } from "react";
 import {
-  doc,
-  collection,
-  setDoc,
-  getDoc,
-  getDocs,
-  deleteDoc,
-} from "firebase/firestore";
-
-// Project Code Conversion Utilities
-const projectCodeToDocId = (projectCode) =>
-  projectCode ? projectCode.replace(/\//g, "-") : "";
-const docIdToProjectCode = (docId) => (docId ? docId.replace(/-/g, "/") : "");
-const displayProjectCode = (code) => (code ? code.replace(/-/g, "/") : "-");
-const displayYear = (year) => year.replace(/-/g, " ");
+  FiFilter,
+  FiMoreVertical,
+  FiUpload,
+  FiX,
+  FiFileText,
+  FiEdit,
+  FiSearch,
+  FiTrendingUp,
+  FiDollarSign,
+  FiUsers,
+  FiCalendar,
+  FiCheckCircle,
+  FiRefreshCw
+} from "react-icons/fi";
+import PropTypes from "prop-types";
 
 const ClosedLeadsTable = ({
   leads,
   formatDate,
   formatCurrency,
   viewMyLeadsOnly,
+  onEditModal,
+  onViewDetails,
+  onUploadModal,
+  onMOUModal,
+  isLoading = false,
+  className = "",
+  cardClassName = "",
+  tableClassName = "",
+  showAnimations = true,
+  maxHeight,
 }) => {
   const [openDropdown, setOpenDropdown] = useState(null);
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadError, setUploadError] = useState(null);
-  const [uploadSuccess, setUploadSuccess] = useState(false);
 
-  const logAvailableProjectCodes = async () => {
-    try {
-      console.group("Debugging Project Code Mismatch");
+  // Update the useEffect for click outside handling
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Only close if we're clicking outside ALL dropdowns
+      if (!event.target.closest('[data-dropdown-container]')) {
+        setOpenDropdown(null);
+      }
+    };
 
-      // Log the current lead's project code
-      const currentLead = leads.find(([id]) => id === openDropdown)?.[1];
-      console.log("Current Lead:", currentLead);
-      console.log("Lead Project Code:", currentLead?.projectCode);
-      console.log(
-        "Converted Doc ID:",
-        projectCodeToDocId(currentLead?.projectCode || "")
-      );
+    // Add event listener
+    document.addEventListener('mousedown', handleClickOutside);
 
-      // Log all trainingForms documents (just their IDs)
-      console.log("Fetching all trainingForms documents...");
-      const trainingFormsSnapshot = await getDocs(
-        collection(db, "trainingForms")
-      );
-      const allTrainingForms = trainingFormsSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        projectCode: doc.data().projectCode,
-      }));
+    // Cleanup
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []); // Remove openDropdown dependency
 
-      console.log("All Training Forms:", allTrainingForms);
-      console.log(
-        "Matching Document:",
-        allTrainingForms.find(
-          (form) =>
-            form.id === projectCodeToDocId(currentLead?.projectCode || "") ||
-            form.projectCode === currentLead?.projectCode
-        )
-      );
-
-      console.groupEnd();
-    } catch (error) {
-      console.error("Error logging project codes:", error);
-    }
-  };
-
-  const handleUploadClick = async () => {
-    const currentLead = leads.find(([id]) => id === openDropdown)?.[1];
-
-    if (!currentLead) {
-      console.error("No lead found for ID:", openDropdown);
-      setUploadError("No lead selected");
-      return;
-    }
-
-    const projectCode = currentLead.projectCode || "";
-
-    if (projectCode) {
-      await logAvailableProjectCodes();
-      handleUpload(projectCode);
-    } else {
-      console.error("Invalid project code structure:", currentLead.projectCode);
-      await logAvailableProjectCodes();
-      setUploadError("No valid project code found for this lead");
-    }
-  };
-
-  const toggleDropdown = (id) => {
+  // Update the toggleDropdown function
+  const toggleDropdown = useCallback((id, e) => {
+    e.preventDefault();
+    e.stopPropagation();
     setOpenDropdown(openDropdown === id ? null : id);
-  };
+  }, [openDropdown]);
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file && isValidFileType(file)) {
-      if (file.size > 5 * 1024 * 1024) {
-        setUploadError("File size exceeds 5MB limit");
-        return;
-      }
-      setSelectedFile(file);
-      setUploadError(null);
+  // Enhanced keyboard navigation and accessibility
+  const handleKeyDown = useCallback((event, id) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      toggleDropdown(id, event);
+    } else if (event.key === 'Escape') {
+      setOpenDropdown(null);
     }
-  };
+  }, [toggleDropdown]);
 
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
+  // Handle dropdown menu keyboard navigation
+  const handleDropdownKeyDown = (event, id) => {
+    const dropdown = document.getElementById(`dropdown-${id}`) || document.getElementById(`mobile-dropdown-${id}`);
+    if (!dropdown) return;
 
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
+    const buttons = Array.from(dropdown.querySelectorAll('button[role="menuitem"]'));
+    const currentIndex = buttons.findIndex(btn => btn === document.activeElement);
 
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file && isValidFileType(file)) {
-      if (file.size > 5 * 1024 * 1024) {
-        setUploadError("File size exceeds 5MB limit");
-        return;
+    switch (event.key) {
+      case 'ArrowDown': {
+        event.preventDefault();
+        const nextIndex = currentIndex < buttons.length - 1 ? currentIndex + 1 : 0;
+        buttons[nextIndex].focus();
+        break;
       }
-      setSelectedFile(file);
-      setUploadError(null);
-    }
-  };
-
-  const isValidFileType = (file) => {
-    const validTypes = [
-      "application/vnd.ms-excel",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "application/vnd.ms-excel.sheet.macroEnabled.12",
-      "application/vnd.ms-excel.sheet.binary.macroEnabled.12",
-      "text/csv",
-    ];
-    return (
-      validTypes.includes(file.type) ||
-      file.name.endsWith(".xlsx") ||
-      file.name.endsWith(".xls") ||
-      file.name.endsWith(".csv")
-    );
-  };
-
-  const removeFile = () => {
-    setSelectedFile(null);
-    setUploadError(null);
-  };
-
-  const processExcelData = async (data, projectCode) => {
-    try {
-      setUploading(true);
-      setUploadProgress(0);
-      setUploadError(null);
-
-      const docId = projectCodeToDocId(projectCode);
-      const trainingFormRef = doc(db, "trainingForms", docId);
-      const docSnap = await getDoc(trainingFormRef);
-
-      if (!docSnap.exists()) {
-        await setDoc(trainingFormRef, {
-          projectCode,
-          docId,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
+      case 'ArrowUp': {
+        event.preventDefault();
+        const prevIndex = currentIndex > 0 ? currentIndex - 1 : buttons.length - 1;
+        buttons[prevIndex].focus();
+        break;
       }
-
-      const studentsRef = collection(trainingFormRef, "students");
-
-      // DELETE ALL EXISTING STUDENTS FIRST
-      console.log("Deleting existing students...");
-      const existingStudents = await getDocs(studentsRef);
-      const deletePromises = existingStudents.docs.map((studentDoc) =>
-        deleteDoc(doc(studentsRef, studentDoc.id))
-      );
-      await Promise.all(deletePromises);
-      console.log(`Deleted ${existingStudents.size} existing students`);
-
-      // Process new data
-      const totalRows = data.length;
-      let processedRows = 0;
-
-      for (const row of data) {
-        try {
-          const studentData = {};
-          Object.keys(row).forEach((key) => {
-            if (row[key] !== undefined && row[key] !== null) {
-              studentData[key] = row[key];
-            }
-          });
-
-          studentData.uploadedAt = new Date();
-          studentData.projectCode = projectCode;
-
-          const newStudentRef = doc(studentsRef);
-          await setDoc(newStudentRef, studentData);
-
-          processedRows++;
-          setUploadProgress(Math.round((processedRows / totalRows) * 100));
-        } catch (error) {
-          console.error(`Error processing row ${processedRows + 1}:`, error);
-        }
+      case 'Escape': {
+        event.preventDefault();
+        setOpenDropdown(null);
+        // Return focus to the trigger button
+        const triggerBtn = document.getElementById(`dropdown-button-${id}`) || document.getElementById(`mobile-dropdown-button-${id}`);
+        if (triggerBtn) triggerBtn.focus();
+        break;
       }
-
-      // Update the parent document
-      await setDoc(
-        trainingFormRef,
-        {
-          studentCount: data.length,
-          updatedAt: new Date(),
-          studentFileUrl: selectedFile?.name || "uploaded_file",
-        },
-        { merge: true }
-      );
-
-      return true;
-    } catch (error) {
-      console.error("Error processing Excel data:", error);
-      setUploadError("Failed to process the file. Please try again.");
-      return false;
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleUpload = async (projectCode) => {
-    if (!selectedFile) return;
-
-    try {
-      const fileData = await readFile(selectedFile);
-      const workbook = XLSX.read(fileData, { type: "array" });
-      const firstSheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[firstSheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-      if (jsonData.length === 0) {
-        setUploadError("The file contains no data.");
-        return;
-      }
-
-      if (jsonData.length > 1000) {
-        setUploadError("File contains too many rows (max 1000 allowed)");
-        return;
-      }
-
-      const success = await processExcelData(jsonData, projectCode);
-
-      if (success) {
-        setUploadSuccess(true);
+      case 'Tab': {
+        // Allow tab to close dropdown if tabbing out
         setTimeout(() => {
-          setShowUploadModal(false);
-          setSelectedFile(null);
-          setUploadProgress(0);
-          setUploadSuccess(false);
-        }, 2000);
+          if (!dropdown.contains(document.activeElement)) {
+            setOpenDropdown(null);
+          }
+        }, 0);
+        break;
       }
-    } catch (error) {
-      console.error("Error uploading file:", error);
-      setUploadError(
-        "Error reading the file. Please check the format and try again."
-      );
     }
   };
 
-  const readFile = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target.result);
-      reader.onerror = (error) => reject(error);
-      reader.readAsArrayBuffer(file);
-    });
+  // Calculate summary statistics
+  const calculateSummary = () => {
+    const totalValue = leads.reduce((sum, [, lead]) => sum + (lead.totalCost || 0), 0);
+    const totalStudents = leads.reduce((sum, [, lead]) => sum + (lead.studentCount || 0), 0);
+    const newLeads = leads.filter(([, lead]) => lead.closureType === 'new').length;
+    const renewalLeads = leads.filter(([, lead]) => lead.closureType === 'renewal').length;
+
+    return { totalValue, totalStudents, newLeads, renewalLeads };
   };
+
+  const summary = calculateSummary();
 
   return (
-    <div className="overflow-x-auto">
-      {/* Upload Modal */}
-      {showUploadModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-            <div className="flex justify-between items-center border-b px-6 py-4">
-              <h3 className="text-lg font-medium text-gray-900">
-                Upload Student List
-              </h3>
-              <button
-                onClick={() => {
-                  setShowUploadModal(false);
-                  setSelectedFile(null);
-                  setUploadError(null);
-                  setUploadProgress(0);
-                }}
-                className="text-gray-400 hover:text-gray-500"
-                disabled={uploading}
-              >
-                <FiX className="h-6 w-6" />
-              </button>
-            </div>
-            <div className="px-6 py-4">
-              <div
-                className={`border-2 border-dashed rounded-lg p-8 text-center ${
-                  isDragging ? "border-blue-500 bg-blue-50" : "border-gray-300"
-                }`}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-              >
-                <FiUpload className="mx-auto h-12 w-12 text-gray-400" />
-                <div className="mt-4 flex text-sm text-gray-600">
-                  <label
-                    htmlFor="file-upload"
-                    className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none"
-                  >
-                    <span>Browse files</span>
-                    <input
-                      id="file-upload"
-                      name="file-upload"
-                      type="file"
-                      className="sr-only"
-                      accept=".xlsx,.xls,.csv"
-                      onChange={handleFileChange}
-                      disabled={uploading}
-                    />
-                  </label>
-                  <p className="pl-1">or drag and drop</p>
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  Excel (.xlsx, .xls) or CSV files only (max 5MB)
-                </p>
-              </div>
+    <div className={`w-full ${className}`}>
+      {/* Screen reader announcements */}
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        {isLoading ? "Loading closed leads data..." : `${leads.length} closed leads loaded`}
+      </div>
 
-              {selectedFile && (
-                <div className="mt-4 p-3 bg-gray-50 rounded-md flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {selectedFile.name}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                      </p>
+      {/* Main Container */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden">
+        {/* Mobile Card Layout */}
+        <div className="block md:hidden">
+          {isLoading ? (
+            // Loading skeleton for mobile
+            Array.from({ length: 3 }).map((_, index) => (
+              <div key={index} className="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-100/80 p-6 animate-pulse" style={{ animationDelay: `${index * 0.1}s` }}>
+                <div className="flex items-start justify-between mb-4">
+                  <div className="h-12 w-12 rounded-full bg-slate-200 animate-pulse" style={{ animationDelay: `${index * 0.1 + 0.1}s` }}></div>
+                  <div className="ml-4 space-y-2 flex-1">
+                    <div className="h-5 w-32 bg-slate-200 rounded animate-pulse" style={{ animationDelay: `${index * 0.1 + 0.2}s` }}></div>
+                    <div className="h-4 w-24 bg-slate-200 rounded animate-pulse" style={{ animationDelay: `${index * 0.1 + 0.3}s` }}></div>
+                  </div>
+                  <div className="h-8 w-8 rounded-full bg-slate-200 animate-pulse" style={{ animationDelay: `${index * 0.1 + 0.4}s` }}></div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="space-y-2">
+                      <div className="h-3 w-20 bg-slate-200 rounded animate-pulse" style={{ animationDelay: `${index * 0.1 + 0.5 + i * 0.1}s` }}></div>
+                      <div className="h-6 w-16 bg-slate-200 rounded animate-pulse" style={{ animationDelay: `${index * 0.1 + 0.6 + i * 0.1}s` }}></div>
                     </div>
-                  </div>
-                  <button
-                    onClick={removeFile}
-                    className="text-gray-400 hover:text-gray-500"
-                    disabled={uploading}
-                  >
-                    <FiX className="h-5 w-5" />
-                  </button>
+                  ))}
                 </div>
-              )}
-
-              {uploading && (
-                <div className="mt-4">
-                  <div className="flex justify-between text-sm text-gray-600 mb-1">
-                    <span>Uploading...</span>
-                    <span>{uploadProgress}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2.5">
-                    <div
-                      className="bg-blue-600 h-2.5 rounded-full"
-                      style={{ width: `${uploadProgress}%` }}
-                    ></div>
+                <div className="flex items-center pt-4 border-t border-slate-100/60">
+                  <div className="h-8 w-8 rounded-full bg-slate-200 animate-pulse" style={{ animationDelay: `${index * 0.1 + 0.9}s` }}></div>
+                  <div className="ml-3 space-y-1">
+                    <div className="h-4 w-24 bg-slate-200 rounded animate-pulse" style={{ animationDelay: `${index * 0.1 + 1.0}s` }}></div>
+                    <div className="h-3 w-12 bg-slate-200 rounded animate-pulse" style={{ animationDelay: `${index * 0.1 + 1.1}s` }}></div>
                   </div>
                 </div>
-              )}
-
-              {uploadSuccess && (
-                <div className="mt-4 p-3 bg-green-50 rounded-md text-green-600 text-sm">
-                  Student list uploaded successfully!
-                </div>
-              )}
-
-              {uploadError && (
-                <div className="mt-4 p-3 bg-red-50 rounded-md text-red-600 text-sm">
-                  {uploadError}
-                </div>
-              )}
-            </div>
-            <div className="bg-gray-50 px-6 py-3 flex justify-end border-t">
-              <button
-                type="button"
-                className="mr-3 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-                onClick={() => {
-                  setShowUploadModal(false);
-                  setSelectedFile(null);
-                  setUploadError(null);
-                  setUploadProgress(0);
-                }}
-                disabled={uploading}
+              </div>
+            ))
+          ) : leads.length > 0 ? (
+            leads.map(([id, lead], index) => (
+              <div
+                key={id}
+                className={`bg-white border-b border-gray-100 p-4 hover:bg-gray-50/50 transition-colors duration-200 cursor-pointer ${showAnimations ? 'animate-in fade-in slide-in-from-bottom-2' : ''} ${cardClassName}`}
+                style={showAnimations ? { animationDelay: `${index * 0.05}s` } : {}}
+                onClick={() => onViewDetails(lead)}
               >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className={`px-4 py-2 text-sm font-medium text-white rounded-md ${
-                  selectedFile && !uploading
-                    ? "bg-blue-600 hover:bg-blue-700"
-                    : "bg-blue-300 cursor-not-allowed"
-                }`}
-                disabled={!selectedFile || uploading}
-                onClick={handleUploadClick}
-              >
-                {uploading ? "Uploading..." : "Upload"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Table */}
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
-          <tr>
-            {[
-              "Project Code",
-              "Institution",
-              "Location",
-              "Closed Date",
-              "Actual TCV",
-              "Projected TCV",
-              "Owner",
-              "Actions",
-            ].map((h) => (
-              <th
-                key={h}
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-              >
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
-          {leads.length > 0 ? (
-            leads.map(([id, lead]) => (
-              <tr key={id} className="hover:bg-gray-50 transition-colors">
-                <td
-                  className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
-                  title={`DocID: ${projectCodeToDocId(
-                    lead.projectCode || ""
-                  )}, ProjectCode: ${docIdToProjectCode(
-                    projectCodeToDocId(lead.projectCode || "")
-                  )}, Year: ${displayYear(String(lead.closedDate || ""))}`}
-                >
-                  {displayProjectCode(lead.projectCode) || "-"}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-medium flex-shrink-0">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center text-blue-700 font-semibold flex-shrink-0 shadow-sm border border-blue-100/50">
                       {lead.businessName?.charAt(0)?.toUpperCase() || "?"}
                     </div>
-                    <div className="ml-4">
-                      <div className="font-medium text-gray-900 truncate max-w-xs">
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-sm font-semibold text-gray-900 truncate">
                         {lead.businessName || "-"}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {lead.closureType === "new" ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            New
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            Renewal
-                          </span>
-                        )}
-                      </div>
+                      </h4>
+                      <p className="text-xs text-gray-500 truncate">
+                        {lead.projectCode?.replace(/-/g, "/") || "-"}
+                      </p>
                     </div>
                   </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">
-                    {lead.city || "-"}
+                  <div className="flex items-center gap-2">
+                    {lead.closureType === "new" ? (
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-emerald-50 to-emerald-100 text-emerald-700 border border-emerald-200">
+                        <FiCheckCircle className="mr-1 h-3 w-3" />
+                        New
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 border border-blue-200">
+                        <FiRefreshCw className="mr-1 h-3 w-3" />
+                        Renewal
+                      </span>
+                    )}
+                    <div className="relative">
+                      <button
+                        id={`mobile-dropdown-button-${id}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleDropdown(id, e);
+                        }}
+                        onKeyDown={(e) => handleKeyDown(e, id)}
+                        aria-label="Action menu"
+                        aria-expanded={openDropdown === id}
+                        aria-haspopup="menu"
+                        aria-controls={`mobile-dropdown-${id}`}
+                        className={`p-2 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+                          openDropdown === id
+                            ? "bg-indigo-50 text-indigo-700 shadow-sm scale-105"
+                            : "text-slate-500 hover:bg-slate-100/60 hover:text-slate-700 hover:scale-105"
+                        }`}
+                      >
+                        {openDropdown === id ? (
+                          <FiX className="h-5 w-5" aria-hidden="true" />
+                        ) : (
+                          <FiMoreVertical className="h-5 w-5" aria-hidden="true" />
+                        )}
+                      </button>
+
+                      {/* Mobile Dropdown menu */}
+                      {openDropdown === id && (
+                        <div
+                          id={`mobile-dropdown-${id}`}
+                          data-dropdown-id={id}
+                          className="absolute right-0 top-full z-30 mt-2 w-52 origin-top-right rounded-2xl bg-white shadow-xl shadow-slate-200/60 ring-1 ring-slate-200/80 focus:outline-none backdrop-blur-sm"
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => handleDropdownKeyDown(e, id)}
+                          role="menu"
+                          aria-labelledby={`mobile-dropdown-button-${id}`}
+                          style={{
+                            boxShadow:
+                              "0px 20px 40px -10px rgba(0, 0, 0, 0.1), 0px 10px 20px -5px rgba(0, 0, 0, 0.05)",
+                          }}
+                        >
+                          <div className="flex flex-col p-2">
+                            <button
+                              className="flex items-center rounded-xl px-4 py-3 text-sm font-medium text-slate-700 transition-all duration-200 hover:bg-indigo-50/80 hover:text-indigo-700 focus:outline-none focus:bg-indigo-50/80 focus:text-indigo-700 group hover:scale-[1.02] active:scale-[0.98] active:bg-indigo-100/80"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onUploadModal(lead);
+                                setOpenDropdown(null);
+                              }}
+                              role="menuitem"
+                            >
+                              <FiUpload className="mr-3 h-4 w-4 opacity-70 group-hover:opacity-100 transition-opacity" />
+                              <span>Upload Student List</span>
+                            </button>
+
+                            <button
+                              className="flex items-center rounded-xl px-4 py-3 text-sm font-medium text-slate-700 transition-all duration-200 hover:bg-indigo-50/80 hover:text-indigo-700 focus:outline-none focus:bg-indigo-50/80 focus:text-indigo-700 group hover:scale-[1.02] active:scale-[0.98] active:bg-indigo-100/80"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onMOUModal(id);
+                                setOpenDropdown(null);
+                              }}
+                              role="menuitem"
+                            >
+                              <FiFileText className="mr-3 h-4 w-4 opacity-70 group-hover:opacity-100 transition-opacity" />
+                              <span>
+                                {lead.mouFileUrl ? "Update MOU" : "Upload MOU"}
+                              </span>
+                              {lead.mouFileUrl && (
+                                <span className="ml-auto h-2 w-2 rounded-full bg-emerald-400/90 shadow-sm"></span>
+                              )}
+                            </button>
+
+                            <button
+                              className="flex items-center rounded-xl px-4 py-3 text-sm font-medium text-slate-700 transition-all duration-200 hover:bg-indigo-50/80 hover:text-indigo-700 focus:outline-none focus:bg-indigo-50/80 focus:text-indigo-700 group hover:scale-[1.02] active:scale-[0.98] active:bg-indigo-100/80"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onEditModal(lead);
+                                setOpenDropdown(null);
+                              }}
+                              role="menuitem"
+                            >
+                              <FiEdit className="mr-3 h-4 w-4 opacity-70 group-hover:opacity-100 transition-opacity" />
+                              <span>Edit Details</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-500">
-                    {lead.state || ""}
+                </div>
+
+                {/* Details Grid */}
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div className="bg-gray-50/50 rounded-lg p-3">
+                    <p className="text-xs font-bold text-gray-500 mb-1">Students</p>
+                    <p className="text-lg font-semibold text-gray-900">{lead.studentCount || "-"}</p>
                   </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {formatDate(lead.closedDate)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
-                  {formatCurrency(lead.totalCost)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
-                  {formatCurrency(lead.tcv)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-xs font-medium flex-shrink-0">
+                  <div className="bg-gray-50/50 rounded-lg p-3">
+                    <p className="text-xs font-bold text-gray-500 mb-1">Cost per Student</p>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {lead.perStudentCost ? formatCurrency(lead.perStudentCost) : "-"}
+                    </p>
+                  </div>
+                  <div className="bg-gray-50/50 rounded-lg p-3">
+                    <p className="text-xs font-bold text-gray-500 mb-1">Total Value</p>
+                    <p className="text-lg font-bold text-gray-900">{formatCurrency(lead.totalCost)}</p>
+                  </div>
+                  <div className="bg-gray-50/50 rounded-lg p-3">
+                    <p className="text-xs font-bold text-gray-500 mb-1">Closed Date</p>
+                    <p className="text-sm font-medium text-gray-900">{formatDate(lead.closedDate)}</p>
+                  </div>
+                </div>
+
+                {/* Owner Info */}
+                <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-full bg-gradient-to-br from-slate-100 to-gray-200 flex items-center justify-center text-slate-700 text-xs font-semibold flex-shrink-0 shadow-sm border border-slate-200/50">
                       {lead.assignedTo?.name
                         ?.split(" ")
                         .map((n) => n[0])
                         .join("")
                         .toUpperCase() || "?"}
                     </div>
-                    <div className="ml-3 text-sm font-medium text-gray-900 truncate max-w-xs">
-                      {lead.assignedTo?.name || "-"}
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">{lead.assignedTo?.name || "-"}</p>
+                      <p className="text-xs text-slate-500">Deal Owner</p>
                     </div>
                   </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
-                  <button
-                    onClick={() => toggleDropdown(id)}
-                    className="text-gray-400 hover:text-gray-600 focus:outline-none"
-                  >
-                    <FiMoreVertical className="h-5 w-5" />
-                  </button>
-                  {openDropdown === id && (
-                    <div className="origin-top-right absolute right-10 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
-                      <div
-                        className="py-1"
-                        role="menu"
-                        aria-orientation="vertical"
-                        aria-labelledby="options-menu"
-                      >
-                        <button
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 w-full text-left"
-                          role="menuitem"
-                          onClick={() => {
-                            setShowUploadModal(true);
-                            // Don't setOpenDropdown(null) here - we need the ID for upload
-                          }}
-                        >
-                          Upload Student List
-                        </button>
-                      </div>
+                  {lead.mouFileUrl && (
+                    <div className="flex items-center gap-1 text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+                      <FiFileText className="w-3 h-3" />
+                      <span>MOU</span>
                     </div>
                   )}
-                </td>
-              </tr>
+                </div>
+              </div>
             ))
           ) : (
-            <tr>
-              <td colSpan="8" className="py-12 text-center">
-                <FiFilter className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 font-medium text-gray-900">
-                  No closed deals found
-                </h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  {`There are currently no ${
-                    viewMyLeadsOnly ? "your" : "team"
-                  } closed deals.`}
-                </p>
-              </td>
-            </tr>
+            <div className="text-center py-12">
+              <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-2">
+                <FiSearch className="h-6 w-6 text-gray-400" />
+              </div>
+              <h3 className="text-base font-semibold text-gray-900 mb-1">
+                No closed leads found
+              </h3>
+              <p className="text-gray-500 text-xs">
+                {`There are currently no ${viewMyLeadsOnly ? "your" : "team"} closed deals. New deals will appear here once they're marked as closed.`}
+              </p>
+            </div>
           )}
-        </tbody>
-      </table>
+        </div>
+
+        {/* Desktop Table Layout */}
+        <div className="hidden md:block">
+          <div className={`overflow-x-auto scrollbar-thin scrollbar-thumb-slate-300/60 scrollbar-track-slate-50/50 scrollbar-thumb-rounded-full hover:scrollbar-thumb-slate-400/60 transition-colors min-w-0 ${maxHeight ? 'overflow-y-auto' : ''}`} style={maxHeight ? { maxHeight } : {}}>
+            {/* Table */}
+            <table className={`min-w-full divide-y divide-gray-200 ${tableClassName}`}>
+              <thead className="bg-gradient-to-r from-blue-600 to-indigo-700">
+                <tr>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
+                    <div className="flex items-center space-x-1">
+                      <FiTrendingUp className="w-4 h-4" />
+                      <span>Deal Details</span>
+                    </div>
+                  </th>
+                  <th scope="col" className="px-2 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
+                    <div className="flex items-center space-x-1">
+                      <FiUsers className="w-4 h-4" />
+                      <span>Students & Cost Per Std</span>
+                    </div>
+                  </th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
+                    <div className="flex items-center space-x-1">
+                      <FiDollarSign className="w-4 h-4" />
+                      <span>Total Value</span>
+                    </div>
+                  </th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
+                    <div className="flex items-center space-x-1">
+                      <FiCalendar className="w-4 h-4" />
+                      <span>Closed Date</span>
+                    </div>
+                  </th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider hidden lg:block">
+                    <div className="flex items-center space-x-1">
+                      <FiCheckCircle className="w-4 h-4" />
+                      <span>Type</span>
+                    </div>
+                  </th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
+                    Deal Owner
+                  </th>
+                  <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-white uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {isLoading ? (
+                  // Loading skeleton for desktop
+                  Array.from({ length: 5 }).map((_, index) => (
+                    <tr key={index} className="animate-pulse">
+                      <td className="px-6 py-3 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="h-10 w-10 rounded-full bg-slate-200"></div>
+                          <div className="ml-4 space-y-2">
+                            <div className="h-4 w-32 bg-slate-200 rounded"></div>
+                            <div className="h-3 w-12 bg-slate-200 rounded"></div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-3 whitespace-nowrap">
+                        <div className="h-4 w-8 bg-slate-200 rounded mx-auto"></div>
+                      </td>
+                      <td className="px-6 py-3 whitespace-nowrap">
+                        <div className="h-4 w-16 bg-slate-200 rounded"></div>
+                      </td>
+                      <td className="px-6 py-3 whitespace-nowrap">
+                        <div className="h-4 w-20 bg-slate-200 rounded"></div>
+                      </td>
+                      <td className="px-6 py-3 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="h-8 w-8 rounded-full bg-slate-200"></div>
+                          <div className="ml-3">
+                            <div className="h-4 w-24 bg-slate-200 rounded"></div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-3 whitespace-nowrap">
+                        <div className="h-4 w-16 bg-slate-200 rounded"></div>
+                      </td>
+                      <td className="px-2 py-3 whitespace-nowrap">
+                        <div className="h-8 w-8 bg-slate-200 rounded-full mx-auto"></div>
+                      </td>
+                    </tr>
+                  ))
+                ) : leads.length > 0 ? (
+                  leads.map(([id, lead]) => (
+                    <tr
+                      key={id}
+                      className="hover:bg-gray-50 transition-all duration-300 align-top cursor-pointer group hover:shadow-sm"
+                      onClick={() => onViewDetails(lead)}
+                    >
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center text-blue-700 font-bold text-sm flex-shrink-0 shadow-sm border border-blue-100/50">
+                            {lead.businessName?.charAt(0)?.toUpperCase() || "?"}
+                          </div>
+                          <div className="ml-4">
+                            <div className="font-medium text-slate-900 truncate max-w-[200px] overflow-hidden whitespace-nowrap">
+                              {lead.businessName || "-"}
+                            </div>
+                            <div className="text-xs text-slate-500 mt-1">
+                              {lead.projectCode?.replace(/-/g, "/") || "-"}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="text-center">
+                          <div className="text-sm font-semibold text-gray-900">{lead.studentCount || "-"}</div>
+                          <div className="text-sm text-gray-500 mt-1">
+                            {lead.perStudentCost ? formatCurrency(lead.perStudentCost) : "-"}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="text-lg font-bold text-gray-900">{formatCurrency(lead.totalCost)}</div>
+                        {lead.gstAmount > 0 && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            +{formatCurrency(lead.gstAmount)} GST
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 font-medium">
+                        {formatDate(lead.closedDate)}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap hidden lg:block">
+                        {lead.closureType === "new" ? (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-emerald-50 to-emerald-100 text-emerald-700 border border-emerald-200">
+                            <FiCheckCircle className="mr-1.5 h-3 w-3" />
+                            New Deal
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 border border-blue-200">
+                            <FiRefreshCw className="mr-1.5 h-3 w-3" />
+                            Renewal
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-slate-100 to-gray-200 flex items-center justify-center text-slate-700 text-xs font-semibold flex-shrink-0 shadow-sm border border-slate-200/50">
+                            {lead.assignedTo?.name
+                              ?.split(" ")
+                              .map((n) => n[0])
+                              .join("")
+                              .toUpperCase() || "?"}
+                          </div>
+                          <div className="ml-3 text-sm font-medium text-slate-900 truncate max-w-[100px] overflow-hidden whitespace-nowrap">
+                            {lead.assignedTo?.name || "-"}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-right">
+                        <div
+                          className="flex justify-center items-center h-full relative"
+                          data-dropdown-container
+                        >
+                          <button
+                            id={`dropdown-button-${id}`}
+                            onClick={(e) => toggleDropdown(id, e)}
+                            onKeyDown={(e) => handleKeyDown(e, id)}
+                            aria-label="Action menu"
+                            aria-expanded={openDropdown === id}
+                            aria-haspopup="menu"
+                            aria-controls={`dropdown-${id}`}
+                            className={`p-2 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 group-hover:bg-slate-100/60 ${
+                              openDropdown === id
+                                ? "bg-indigo-50 text-indigo-700 shadow-sm scale-105"
+                                : "text-slate-500 hover:bg-slate-100/60 hover:text-slate-700 hover:scale-105"
+                            }`}
+                          >
+                            {openDropdown === id ? (
+                              <FiX className="h-5 w-5" aria-hidden="true" />
+                            ) : (
+                              <FiMoreVertical className="h-5 w-5" aria-hidden="true" />
+                            )}
+                          </button>
+
+                          {/* Dropdown menu */}
+                          {openDropdown === id && (
+                            <div
+                              id={`dropdown-${id}`}
+                              data-dropdown-id={id}
+                              className="absolute right-0 top-full z-30 mt-2 w-52 origin-top-right rounded-2xl bg-white shadow-xl shadow-slate-200/60 ring-1 ring-slate-200/80 focus:outline-none backdrop-blur-sm"
+                              data-dropdown-container
+                              onClick={(e) => e.stopPropagation()}
+                              onKeyDown={(e) => handleDropdownKeyDown(e, id)}
+                              role="menu"
+                              aria-labelledby={`dropdown-button-${id}`}
+                              style={{
+                                boxShadow:
+                                  "0px 20px 40px -10px rgba(0, 0, 0, 0.1), 0px 10px 20px -5px rgba(0, 0, 0, 0.05)",
+                              }}
+                            >
+                              <div className="flex flex-col p-2">
+                                <button
+                                  className="flex items-center rounded-xl px-4 py-3 text-sm font-medium text-slate-700 transition-all duration-200 hover:bg-indigo-50/80 hover:text-indigo-700 focus:outline-none focus:bg-indigo-50/80 focus:text-indigo-700 group hover:scale-[1.02] active:scale-[0.98] active:bg-indigo-100/80"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onUploadModal(lead);
+                                    setOpenDropdown(null);
+                                  }}
+                                  role="menuitem"
+                                >
+                                  <FiUpload className="mr-3 h-4 w-4 opacity-70 group-hover:opacity-100 transition-opacity" />
+                                  <span>Upload Student List</span>
+                                </button>
+
+                                <button
+                                  className="flex items-center rounded-xl px-4 py-3 text-sm font-medium text-slate-700 transition-all duration-200 hover:bg-indigo-50/80 hover:text-indigo-700 focus:outline-none focus:bg-indigo-50/80 focus:text-indigo-700 group hover:scale-[1.02] active:scale-[0.98] active:bg-indigo-100/80"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onMOUModal(id);
+                                    setOpenDropdown(null);
+                                  }}
+                                  role="menuitem"
+                                >
+                                  <FiFileText className="mr-3 h-4 w-4 opacity-70 group-hover:opacity-100 transition-opacity" />
+                                  <span>
+                                    {lead.mouFileUrl ? "Update MOU" : "Upload MOU"}
+                                  </span>
+                                  {lead.mouFileUrl && (
+                                    <span className="ml-auto h-2 w-2 rounded-full bg-emerald-400/90 shadow-sm"></span>
+                                  )}
+                                </button>
+
+                                <button
+                                  className="flex items-center rounded-xl px-4 py-3 text-sm font-medium text-slate-700 transition-all duration-200 hover:bg-indigo-50/80 hover:text-indigo-700 focus:outline-none focus:bg-indigo-50/80 focus:text-indigo-700 group hover:scale-[1.02] active:scale-[0.98] active:bg-indigo-100/80"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onEditModal(lead);
+                                    setOpenDropdown(null);
+                                  }}
+                                  role="menuitem"
+                                >
+                                  <FiEdit className="mr-3 h-4 w-4 opacity-70 group-hover:opacity-100 transition-opacity" />
+                                  <span>Edit Details</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="7" className="py-16 text-center">
+                      <div className="flex flex-col items-center justify-center space-y-4 px-4">
+                        <div className="w-20 h-20 bg-gradient-to-br from-slate-100 to-gray-200 rounded-2xl flex items-center justify-center shadow-sm border border-slate-200/50">
+                          <FiTrendingUp className="w-10 h-10 text-slate-400" />
+                        </div>
+                        <div className="text-center max-w-sm">
+                          <h3 className="text-xl font-semibold text-slate-900 mb-3">
+                            No closed leads found
+                          </h3>
+                          <p className="text-sm text-slate-500 leading-relaxed">
+                            {`There are currently no ${viewMyLeadsOnly ? "your" : "team"} closed deals. New deals will appear here once they're marked as closed.`}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Table Footer with Summary */}
+          {leads.length > 0 && (
+            <div className="border-t border-gray-100 bg-gray-50/50 px-6 py-3">
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-4">
+                  <span className="text-gray-600">
+                    Total Deals: <span className="font-semibold text-gray-900">{leads.length}</span>
+                  </span>
+                  <span className="text-gray-600">
+                    New: <span className="font-semibold text-emerald-600">{summary.newLeads}</span>
+                  </span>
+                  <span className="text-gray-600">
+                    Renewals: <span className="font-semibold text-blue-600">{summary.renewalLeads}</span>
+                  </span>
+                  <span className="text-gray-600">
+                    Students: <span className="font-semibold text-gray-900">{summary.totalStudents.toLocaleString()}</span>
+                  </span>
+                </div>
+                <div className="text-gray-600">
+                  Total Value: <span className="font-bold text-gray-900">{formatCurrency(summary.totalValue)}</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
@@ -563,6 +652,16 @@ ClosedLeadsTable.propTypes = {
   formatDate: PropTypes.func.isRequired,
   formatCurrency: PropTypes.func.isRequired,
   viewMyLeadsOnly: PropTypes.bool.isRequired,
+  onEditModal: PropTypes.func.isRequired,
+  onViewDetails: PropTypes.func.isRequired,
+  onUploadModal: PropTypes.func.isRequired,
+  onMOUModal: PropTypes.func.isRequired,
+  isLoading: PropTypes.bool,
+  className: PropTypes.string,
+  cardClassName: PropTypes.string,
+  tableClassName: PropTypes.string,
+  showAnimations: PropTypes.bool,
+  maxHeight: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
 };
 
-export default ClosedLeadsTable;
+export default React.memo(ClosedLeadsTable);

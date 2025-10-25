@@ -1,14 +1,38 @@
 import React from "react";
+import Select from "react-select";
+import stateCityData from "../stateCityData";
 
-const CollegeInfoSection = ({ formData, setFormData, handleChange, collegeCodeError, pincodeError, gstError }) => {
-  const inputClass = "w-full px-3 py-2  border-gray-300 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white";
+const CollegeInfoSection = ({
+  formData,
+  setFormData,
+  handleChange,
+  collegeCodeError,
+  pincodeError,
+  isEdit,
+}) => {
+  const inputClass =
+    "w-full px-3 py-2 border-gray-300 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white";
+
+  const stateOptions = Object.keys(stateCityData).map((state) => ({
+    value: state,
+    label: state,
+  }));
+
+  const cityOptions =
+    formData.state && stateCityData[formData.state]
+      ? stateCityData[formData.state].map((city) => ({
+          value: city,
+          label: city,
+        }))
+      : [];
 
   return (
-    <section className="p-5  bg-white rounded-xl shadow space-y-6">
-      <h3 className="font-semibold text-2xl text-blue-700 border-b pb-2">College Information</h3>
+    <section className="p-5 bg-white rounded-xl shadow space-y-6">
+      <h3 className="font-semibold text-2xl text-blue-700 border-b pb-2">
+        College Information
+      </h3>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        
         {/* College Name */}
         <div>
           <label className="font-medium block mb-1">
@@ -21,21 +45,23 @@ const CollegeInfoSection = ({ formData, setFormData, handleChange, collegeCodeEr
             value={formData.collegeName}
             onChange={handleChange}
             required
+            disabled={isEdit} // ✅ disable when editing
           />
         </div>
 
-        {/* College Code */}
+        {/* College Name Short Form */}
         <div>
           <label className="font-medium block mb-1">
-            College Code <span className="text-red-500">*</span>
+            College Name Short Form <span className="text-red-500">*</span>
           </label>
           <input
             name="collegeCode"
             className={inputClass}
-            placeholder="Enter College Code (UPPERCASE)"
+            placeholder="ICEM"
             value={formData.collegeCode}
             onChange={handleChange}
             required
+            disabled={isEdit} // ✅ disable when editing
           />
           {collegeCodeError && (
             <p className="text-red-500 text-sm mt-1">{collegeCodeError}</p>
@@ -44,9 +70,7 @@ const CollegeInfoSection = ({ formData, setFormData, handleChange, collegeCodeEr
 
         {/* GST Number */}
         <div>
-          <label className="font-medium block mb-1">
-            GST Number 
-          </label>
+          <label className="font-medium block mb-1">GST Number</label>
           <input
             name="gstNumber"
             className={inputClass}
@@ -54,12 +78,10 @@ const CollegeInfoSection = ({ formData, setFormData, handleChange, collegeCodeEr
             value={formData.gstNumber}
             onChange={handleChange}
           />
-          
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        
         {/* Address */}
         <div>
           <label className="font-medium block mb-1">
@@ -75,39 +97,97 @@ const CollegeInfoSection = ({ formData, setFormData, handleChange, collegeCodeEr
           />
         </div>
 
-        {/* City */}
-        <div>
-          <label className="font-medium block mb-1">
-            City <span className="text-red-500">*</span>
-          </label>
-          <input
-            name="city"
-            className={inputClass}
-            placeholder="Enter City"
-            value={formData.city}
-            onChange={handleChange}
-            required
-          />
-        </div>
-
         {/* State */}
         <div>
           <label className="font-medium block mb-1">
             State <span className="text-red-500">*</span>
           </label>
-          <input
-            name="state"
-            className={inputClass}
-            placeholder="Enter State"
-            value={formData.state}
-            onChange={handleChange}
-            required
+          <Select
+            options={stateOptions}
+            value={stateOptions.find((opt) => opt.value === formData.state)}
+            onChange={(selected) => {
+              setFormData((prev) => ({
+                ...prev,
+                state: selected ? selected.value : "",
+                city: null, // Reset city when state changes
+              }));
+            }}
+            placeholder="Select state"
+            isClearable
+            styles={{
+              control: (provided) => ({
+                ...provided,
+                minHeight: '34px',
+                fontSize: '14px',
+                borderRadius: '6px'
+              }),
+              placeholder: (provided) => ({
+                ...provided,
+                fontSize: '14px'
+              }),
+              option: (provided) => ({
+                ...provided,
+                fontSize: '14px'
+              }),
+              input: (provided) => ({
+                ...provided,
+                fontSize: '14px'
+              }),
+              singleValue: (provided) => ({
+                ...provided,
+                fontSize: '14px'
+              })
+            }}
+          />
+        </div>
+
+        {/* City */}
+        <div>
+          <label className="font-medium block mb-1">
+            City <span className="text-red-500">*</span>
+          </label>
+          <Select
+            options={cityOptions}
+            value={formData.city ? cityOptions.find((opt) => opt.value === formData.city) : null}
+            onChange={(selected) =>
+              setFormData((prev) => ({
+                ...prev,
+                city: selected ? selected.value : null,
+              }))
+            }
+            placeholder="Select city"
+            isClearable
+            isDisabled={!formData.state}
+            styles={{
+              control: (provided, state) => ({
+                ...provided,
+                minHeight: '34px',
+                fontSize: '14px',
+                borderRadius: '6px',
+                backgroundColor: state.isDisabled ? '#f9fafb' : provided.backgroundColor
+              }),
+              placeholder: (provided) => ({
+                ...provided,
+                fontSize: '14px'
+              }),
+              option: (provided) => ({
+                ...provided,
+                fontSize: '14px'
+              }),
+              input: (provided) => ({
+                ...provided,
+                fontSize: '14px'
+              }),
+              singleValue: (provided) => ({
+                ...provided,
+                fontSize: '14px'
+              })
+            }}
           />
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        
         {/* Pincode */}
         <div>
           <label className="font-medium block mb-1">

@@ -14,18 +14,18 @@ import {
 import { db } from "../firebase";
 import { toast } from "react-toastify";
 import { FaUserCircle, FaEdit, FaSpinner, FaArrowLeft } from "react-icons/fa";
-import defaultAvatar from "../../public/home/profile5.jpg";
+const defaultAvatar = '/home/profile5.jpg';
 import ProfilePictureModal from "./ProfilePictureModal";
 import { useNavigate } from "react-router-dom";
 
 const avatars = [
-  "../../public/home/profile1.png",
-  "../../public/home/profile2.jpg",
-  "../../public/home/profile3.jpg",
-  "../../public/home/profile4.jpg",
-  "../../public/home/profile6.png",
-  "../../public/home/profile7.jpg",
-  "../../public/home/profile10.jpg",
+  "/home/profile1.png",
+  "/home/profile2.jpg",
+  "/home/profile3.jpg",
+  "/home/profile4.jpg",
+  "/home/profile6.png",
+  "/home/profile7.jpg",
+  "/home/profile10.jpg",
 ];
 
 export default function UpdateProfile({ onClose }) {
@@ -109,8 +109,8 @@ export default function UpdateProfile({ onClose }) {
           if (!usersSnapshot.empty) {
             setUserDetails(usersSnapshot.docs[0].data());
           }
-        } catch (error) {
-          console.error("Error:", error);
+        } catch {
+          // Error loading profile data - handled through toast
           toast.error("Failed to load profile data");
         } finally {
           setLoading(false);
@@ -137,8 +137,8 @@ export default function UpdateProfile({ onClose }) {
 
       setCurrentImage(imageUrl);
       setPhotoURL(imageUrl);
-    } catch (error) {
-      console.error("Error updating profile:", error);
+    } catch {
+      // Error updating profile - handled through toast
       toast.error("Failed to update profile picture");
     } finally {
       setUploading(false); // End upload

@@ -91,7 +91,7 @@ const ProfilePictureModal = ({
       );
       xhr.send(formData);
     } catch (error) {
-      console.error("Upload error:", error);
+      // Upload error - handled through toast
       toast.error(`Upload failed: ${error.message}`);
     } finally {
       setUploading(false);

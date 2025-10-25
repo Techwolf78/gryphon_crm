@@ -8,13 +8,22 @@ const AuditLogs = ({ logs, className = "" }) => {
   const logsPerPage = 6;
   const [currentPage, setCurrentPage] = useState(1);
 
-  const sortedLogs = useMemo(() => {
-    return [...logs].sort((a, b) => {
-      const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.date);
-      const dateB = b.date?.toDate ? b.date.toDate() : new Date(b.date);
-      return dateB - dateA;
-    });
+  // Filter out undo actions from the logs
+  const filteredLogs = useMemo(() => {
+    return logs.filter(log => log.action !== 'undo');
   }, [logs]);
+
+  const sortedLogs = useMemo(() => {
+    return [...filteredLogs].sort((a, b) => {
+      const dateA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp);
+      const dateB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp);
+      
+      const timeA = dateA && !isNaN(dateA.getTime()) ? dateA.getTime() : 0;
+      const timeB = dateB && !isNaN(dateB.getTime()) ? dateB.getTime() : 0;
+      
+      return timeB - timeA;
+    });
+  }, [filteredLogs]);
 
   const totalPages = Math.ceil(sortedLogs.length / logsPerPage);
 
@@ -50,13 +59,16 @@ const AuditLogs = ({ logs, className = "" }) => {
   const pageNumbers = getPageNumbers();
 
   const getActionIcon = (action) => {
-    switch (action) {
-      case 'Logged in':
-        return <FiActivity className="text-green-500" />;
-      case 'User created':
-        return <FiUser className="text-blue-500" />;
-      default:
-        return <FiActivity className="text-blue-500" />;
+    if (!action) return <FiActivity className="text-blue-500" />;
+    
+    const actionLower = action.toLowerCase().trim();
+    
+    if (actionLower.startsWith('logged in')) {
+      return <FiActivity className="text-green-500" />;
+    } else if (actionLower.includes('user created') || actionLower.includes('user added')) {
+      return <FiUser className="text-blue-500" />;
+    } else {
+      return <FiActivity className="text-blue-500" />;
     }
   };
 
@@ -81,7 +93,54 @@ const AuditLogs = ({ logs, className = "" }) => {
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-lg border border-gray-100">
+        {/* Mobile Card View */}
+        <div className="block lg:hidden">
+          <div className="space-y-4 p-4">
+            {currentLogs.length > 0 ? (
+              currentLogs.map((log) => {
+                const dateObj = log.timestamp?.toDate ? log.timestamp.toDate() : new Date(log.timestamp);
+                const isValidDate = dateObj && !isNaN(dateObj.getTime());
+                const dateFormatted = isValidDate ? format(dateObj, "MMM dd, yyyy") : "Invalid Date";
+                const timeFormatted = isValidDate ? format(dateObj, "hh:mm a") : "—";
+
+                return (
+                  <div key={log.id} className="border border-gray-200 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {getActionIcon(log.action)}
+                        <span className="font-medium text-gray-900">{log.action}</span>
+                      </div>
+                      <span className="text-sm text-gray-500">{timeFormatted}</span>
+                    </div>
+                    <div className="space-y-2 text-sm">
+                      <div>
+                        <span className="text-gray-500">User: </span>
+                        <span className="font-medium">{log.user}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Date: </span>
+                        <span>{dateFormatted}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-gray-500">IP: </span>
+                        <FiGlobe className="w-4 h-4 text-gray-500" />
+                        <span>{log.ip || "—"}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                <FiAlertCircle className="w-8 h-8 mb-2" />
+                <p>No audit logs found</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="hidden lg:block">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
@@ -96,9 +155,10 @@ const AuditLogs = ({ logs, className = "" }) => {
               <tbody className="divide-y divide-gray-100">
                 {currentLogs.length > 0 ? (
                   currentLogs.map((log) => {
-                    const dateObj = log.date?.toDate ? log.date.toDate() : new Date(log.date);
-                    const dateFormatted = format(dateObj, "MMM dd, yyyy");
-                    const timeFormatted = format(dateObj, "hh:mm a");
+                    const dateObj = log.timestamp?.toDate ? log.timestamp.toDate() : new Date(log.timestamp);
+                    const isValidDate = dateObj && !isNaN(dateObj.getTime());
+                    const dateFormatted = isValidDate ? format(dateObj, "MMM dd, yyyy") : "Invalid Date";
+                    const timeFormatted = isValidDate ? format(dateObj, "hh:mm a") : "—";
 
                     return (
                       <tr key={log.id} className="hover:bg-gray-50">
@@ -186,7 +246,7 @@ AuditLogs.propTypes = {
       id: PropTypes.string.isRequired,
       action: PropTypes.string.isRequired,
       user: PropTypes.string.isRequired,
-      date: PropTypes.oneOfType([
+      timestamp: PropTypes.oneOfType([
         PropTypes.instanceOf(Date),
         PropTypes.object, // for Firestore Timestamp
         PropTypes.string

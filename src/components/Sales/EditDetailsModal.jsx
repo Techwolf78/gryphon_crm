@@ -56,9 +56,38 @@ const accreditationOptions = [
   "Other",
 ];
 
-const contactMethodOptions = ["Visit", "Call", "Email", "Reference", "Other"];
+const courseYears = {
+  Engineering: ["1st", "2nd", "3rd", "4th"],
+  MBA: ["1st", "2nd"],
+  BBA: ["1st", "2nd", "3rd"],
+  BCA: ["1st", "2nd", "3rd"],
+  MCA: ["1st", "2nd", "3rd"],
+  Diploma: ["1st", "2nd", "3rd"],
+  BSC: ["1st", "2nd", "3rd"],
+  MSC: ["1st", "2nd"],
+  Others: ["1st", "2nd", "3rd", "4th"],
+};
+
+const contactMethodOptions = ["Visit", "Call", "Other"];
 
 function EditDetailsModal({ show, onClose, lead, onSave }) {
+  // Helper for Indian number formatting
+  const formatIndianNumber = (num, decimals = 2) => {
+    if (num === 0 || num === "0" || !num) return "0.00";
+    const number = parseFloat(num);
+    if (isNaN(number)) return num;
+    
+    const [integerPart, decimalPart] = number.toFixed(decimals).split('.');
+    const lastThree = integerPart.substring(integerPart.length - 3);
+    const otherNumbers = integerPart.substring(0, integerPart.length - 3);
+    
+    let formattedInteger = lastThree;
+    if (otherNumbers !== '') {
+      formattedInteger = otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + "," + lastThree;
+    }
+    
+    return decimalPart ? `${formattedInteger}.${decimalPart}` : formattedInteger;
+  };
   const defaultLeadFields = useMemo(
     () => ({
       businessName: "",
@@ -69,7 +98,6 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
       phoneNo: "",
       email: "",
       contactMethod: "Visit",
-      createdAt: "",
       phase: "",
       expectedClosureDate: "",
       affiliation: "",
@@ -83,9 +111,10 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
           manualSpecialization: "",
           manualCourseType: "",
           passingYear: "",
+          year: "", // Add this line
           studentCount: "",
           perStudentCost: "",
-          courseTCV: 0, // Changed from tcv to courseTCV
+          courseTCV: 0,
         },
       ],
       tcv: 0, // Add this field for the total TCV
@@ -148,15 +177,13 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
   const handleChange = (key, value) => {
     let updatedData = { ...formData };
 
-    if (key === "createdAt" || key === "expectedClosureDate") {
+    if (key === "expectedClosureDate") {
       const date = new Date(value);
       if (!isNaN(date.getTime())) {
         updatedData[key] = date.getTime();
 
         // Update phase automatically when expectedClosureDate changes
-        if (key === "expectedClosureDate") {
-          updatedData.phase = getLeadPhase(date);
-        }
+        updatedData.phase = getLeadPhase(date);
 
         setFormData(updatedData);
         return;
@@ -193,6 +220,8 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
         const count = parseInt(updatedCourse.studentCount) || 0;
         const cost = parseFloat(value) || 0;
         updatedCourse.courseTCV = count * cost;
+      } else if (field === "year") {
+        updatedCourse.year = value;
       }
 
       updatedCourses[index] = updatedCourse;
@@ -283,27 +312,87 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
     });
   };
 
-  // Save handler sends data with timestamps for dates
   const handleSave = () => {
-    const updatedData = {
-      ...formData,
-      createdAt:
-        typeof formData.createdAt === "string"
-          ? new Date(formData.createdAt).getTime()
-          : formData.createdAt,
+    // Prepare base lead data (without courses and id)
+    const baseLeadData = {
+      businessName: formData.businessName,
+      address: formData.address,
+      city: formData.city,
+      state: formData.state,
+      pocName: formData.pocName,
+      phoneNo: formData.phoneNo,
+      email: formData.email,
+      contactMethod: formData.contactMethod,
+      phase: formData.phase,
       expectedClosureDate:
         typeof formData.expectedClosureDate === "string"
           ? new Date(formData.expectedClosureDate).getTime()
           : formData.expectedClosureDate,
+      affiliation: formData.affiliation,
+      accreditation: formData.accreditation,
+      manualAffiliation: formData.manualAffiliation,
+      manualAccreditation: formData.manualAccreditation,
+      assignedTo: formData.assignedTo,
     };
 
-    onSave(updatedData);
-  };
+    // Get the original course (first one in array)
+    const originalCourse = formData.courses[0];
 
-  console.log("Current accreditation value:", formData.accreditation);
-  console.log("Current affiliation value:", formData.affiliation);
-  console.log("Available accreditation options:", accreditationOptions);
-  console.log("Available university options:", universityOptions);
+    // Create array of leads to save:
+    const leadsToSave = [];
+
+    // If original lead exists (has ID), update it with original course
+    if (lead?.id) {
+      leadsToSave.push({
+        id: lead.id, // Only include id for updates
+        ...baseLeadData,
+        courses: [
+          {
+            ...originalCourse,
+            studentCount: parseInt(originalCourse.studentCount) || 0,
+            perStudentCost: parseFloat(originalCourse.perStudentCost) || 0,
+            courseTCV: originalCourse.courseTCV || 0,
+          },
+        ],
+        tcv: originalCourse.courseTCV || 0,
+      });
+    }
+
+    // Create new leads for any additional courses
+    formData.courses.slice(1).forEach((course) => {
+      const finalCourseType =
+        course.courseType === "Others" && course.manualCourseType.trim()
+          ? course.manualCourseType.trim()
+          : course.courseType;
+
+      let finalSpecializations = [...course.specializations];
+      if (
+        course.specializations.includes("Other") &&
+        course.manualSpecialization.trim()
+      ) {
+        finalSpecializations = finalSpecializations
+          .filter((item) => item !== "Other")
+          .concat(course.manualSpecialization.trim());
+      }
+
+      leadsToSave.push({
+        ...baseLeadData,
+        courses: [
+          {
+            courseType: finalCourseType,
+            specializations: finalSpecializations,
+            passingYear: course.passingYear,
+            studentCount: parseInt(course.studentCount) || 0,
+            perStudentCost: parseFloat(course.perStudentCost) || 0,
+            courseTCV: course.courseTCV || 0,
+          },
+        ],
+        tcv: course.courseTCV || 0,
+      });
+    });
+
+    onSave(leadsToSave);
+  };
 
   // Convert timestamp or string to yyyy-mm-dd for date input
   const formatDateForInput = (value) => {
@@ -511,34 +600,21 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
 
             {/* Timeline */}
             <div className="col-span-2 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="border border-gray-100 rounded-lg p-4 hover:shadow transition-shadow">
-                  <label className="block text-xs font-semibold uppercase text-gray-500 tracking-wide mb-1">
-                    Created Date
-                  </label>
-                  <input
-                    type="date"
-                    value={formatDateForInput(formData.createdAt)}
-                    onChange={(e) => handleChange("createdAt", e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-                <div className="border border-gray-100 rounded-lg p-4 hover:shadow transition-shadow">
-                  <label className="block text-xs font-semibold uppercase text-gray-500 tracking-wide mb-1">
-                    Expected Closure Date
-                  </label>
-                  <input
-                    type="date"
-                    value={formatDateForInput(formData.expectedClosureDate)}
-                    onChange={(e) =>
-                      handleChange("expectedClosureDate", e.target.value)
-                    }
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                  <div className="mt-2 text-sm text-gray-600">
-                    Current Phase:{" "}
-                    <span className="font-medium">{formData.phase || "-"}</span>
-                  </div>
+              <div className="border border-gray-100 rounded-lg p-4 hover:shadow transition-shadow">
+                <label className="block text-xs font-semibold uppercase text-gray-500 tracking-wide mb-1">
+                  Expected Closure Date
+                </label>
+                <input
+                  type="date"
+                  value={formatDateForInput(formData.expectedClosureDate)}
+                  onChange={(e) =>
+                    handleChange("expectedClosureDate", e.target.value)
+                  }
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <div className="mt-2 text-sm text-gray-600">
+                  Current Phase:{" "}
+                  <span className="font-medium">{formData.phase || "-"}</span>
                 </div>
               </div>
             </div>
@@ -572,7 +648,7 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
                       <FiTrash2 className="w-5 h-5" />
                     </button>
                   )}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-xs font-semibold uppercase text-gray-500 tracking-wide mb-1">
                         Course Type
@@ -635,6 +711,29 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
                             {year}
                           </option>
                         ))}
+                      </select>
+                    </div>
+
+                    {/* New current year dropdown */}
+                    <div>
+                      <label className="block text-xs font-semibold uppercase text-gray-500 tracking-wide mb-1">
+                        Current Year
+                      </label>
+                      <select
+                        value={course.year || ""}
+                        onChange={(e) =>
+                          handleCourseChange(index, "year", e.target.value)
+                        }
+                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        disabled={!course.courseType} // Disable if no course type selected
+                      >
+                        <option value="">Select Current Year</option>
+                        {course.courseType &&
+                          courseYears[course.courseType]?.map((year) => (
+                            <option key={year} value={year}>
+                              {year}
+                            </option>
+                          ))}
                       </select>
                     </div>
                   </div>
@@ -726,8 +825,8 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
                         type="text"
                         value={
                           course.courseTCV
-                            ? course.courseTCV.toLocaleString()
-                            : "0"
+                            ? formatIndianNumber(course.courseTCV, 2)
+                            : "0.00"
                         }
                         readOnly
                         className="w-full px-3 py-2 border rounded-md bg-gray-50"

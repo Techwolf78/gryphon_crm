@@ -1,5 +1,3 @@
-import React from "react";
-
 const ContactInfoForm = ({
   pocName,
   setPocName,
@@ -17,7 +15,7 @@ const ContactInfoForm = ({
     <>
       {/* POC Name */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-xs font-medium text-gray-700 mb-1">
           POC Name<span className="text-red-500 ml-1">*</span>
         </label>
         <div className="relative">
@@ -26,12 +24,14 @@ const ContactInfoForm = ({
             value={pocName}
             onChange={(e) => setPocName(e.target.value)}
             placeholder="e.g. John Doe"
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+            className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition ${
+              !pocName.trim() && isFormValid ? "border-red-500" : ""
+            }`}
           />
           {!pocName.trim() && isFormValid && (
             <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
               <svg
-                className="h-5 w-5 text-red-500"
+                className="h-4 w-4 text-red-500"
                 fill="currentColor"
                 viewBox="0 0 20 20"
               >
@@ -48,21 +48,23 @@ const ContactInfoForm = ({
 
       {/* Phone Number */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-xs font-medium text-gray-700 mb-1">
           Phone No.<span className="text-red-500 ml-1">*</span>
         </label>
         <div className="relative">
           <input
-            type="text"
+            type="tel"
             value={phoneNo}
             onChange={(e) => setPhoneNo(e.target.value)}
             placeholder="e.g. +91 9876543210"
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+            className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition ${
+              !phoneNo.trim() && isFormValid ? "border-red-500" : ""
+            }`}
           />
           {!phoneNo.trim() && isFormValid && (
             <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
               <svg
-                className="h-5 w-5 text-red-500"
+                className="h-4 w-4 text-red-500"
                 fill="currentColor"
                 viewBox="0 0 20 20"
               >
@@ -77,9 +79,9 @@ const ContactInfoForm = ({
         </div>
       </div>
 
-      {/* Email */}
-      <div className="col-span-2">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+      {/* Email - Full width on mobile, two columns on larger screens */}
+      <div className="col-span-full lg:col-span-2">
+        <label className="block text-xs font-medium text-gray-700 mb-1">
           Email
         </label>
         <input
@@ -87,52 +89,53 @@ const ContactInfoForm = ({
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="e.g. contact@college.com"
-          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
         />
       </div>
 
-      {/* Expected Closure Date */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Expected Closure Date
-        </label>
-        <div className="relative">
+      {/* Expected Closure Date & Contact Method - Side by side on larger screens */}
+      <div className="col-span-full grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Expected Closure Date */}
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">
+            Expected Closure Date
+          </label>
           <input
             type="date"
             value={expectedClosureDate}
             min={new Date().toISOString().split("T")[0]}
             onChange={(e) => setExpectedClosureDate(e.target.value)}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
           />
         </div>
-      </div>
 
-      {/* Contact Method */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Contact Method<span className="text-red-500 ml-1">*</span>
-        </label>
-        <div className="flex items-center space-x-4">
-          <label className="flex items-center">
-            <input
-              type="radio"
-              value="Visit"
-              checked={contactMethod === "Visit"}
-              onChange={(e) => setContactMethod(e.target.value)}
-              className="form-radio text-blue-600"
-            />
-            <span className="ml-2 text-sm text-gray-700">Visit</span>
+        {/* Contact Method */}
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">
+            Contact Method<span className="text-red-500 ml-1">*</span>
           </label>
-          <label className="flex items-center">
-            <input
-              type="radio"
-              value="Call"
-              checked={contactMethod === "Call"}
-              onChange={(e) => setContactMethod(e.target.value)}
-              className="form-radio text-blue-600"
-            />
-            <span className="ml-2 text-sm text-gray-700">Call</span>
-          </label>
+          <div className="flex items-center space-x-4 mt-2">
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="radio"
+                value="Visit"
+                checked={contactMethod === "Visit"}
+                onChange={(e) => setContactMethod(e.target.value)}
+                className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500 focus:ring-2"
+              />
+              <span className="ml-2 text-xs text-gray-700">Visit</span>
+            </label>
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="radio"
+                value="Call"
+                checked={contactMethod === "Call"}
+                onChange={(e) => setContactMethod(e.target.value)}
+                className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500 focus:ring-2"
+              />
+              <span className="ml-2 text-xs text-gray-700">Call</span>
+            </label>
+          </div>
         </div>
       </div>
     </>

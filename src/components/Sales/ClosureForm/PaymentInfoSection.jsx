@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 
 const inputClass =
   "w-full px-3 py-2 border rounded-lg border-gray-300 focus:outline-none focus:ring focus:ring-blue-500 transition";
@@ -12,12 +12,12 @@ const paymentFields = {
 };
 
 const PaymentInfoSection = ({ formData, setFormData }) => {
-  const fields = paymentFields[formData.paymentType] || [];
+  const fields = useMemo(() => paymentFields[formData.paymentType] || [], [formData.paymentType]);
   const [autoEmiSplits, setAutoEmiSplits] = useState([]);
   const [showAllInstallments, setShowAllInstallments] = useState(false);
 
   // Calculate all payment amounts and update form state
-  const calculatePaymentAmounts = () => {
+  const calculatePaymentAmounts = useCallback(() => {
     const baseAmount = formData.totalCost || 0;
     const gstAmount = formData.gstType === "include" ? baseAmount * 0.18 : 0;
     const netPayable = baseAmount + gstAmount;
@@ -62,7 +62,7 @@ const PaymentInfoSection = ({ formData, setFormData }) => {
         ? Array(formData.emiMonths).fill(netPayable / formData.emiMonths)
         : prev.emiSplits
     }));
-  };
+  }, [formData.totalCost, formData.gstType, formData.paymentType, formData.emiMonths, formData.paymentSplits, fields, setFormData]);
 
   const handlePerStudentCostChange = (e) => {
     const perStudentCost = parseFloat(e.target.value) || 0;
@@ -103,8 +103,15 @@ const PaymentInfoSection = ({ formData, setFormData }) => {
 
   useEffect(() => {
     if (formData.paymentType === "EMI" && formData.totalCost && formData.emiMonths > 0) {
-      const percentEach = (100 / formData.emiMonths).toFixed(2);
-      const emiArr = Array.from({ length: formData.emiMonths }, () => percentEach);
+      const percentEach = 100 / formData.emiMonths;
+      const basePercent = Math.floor(percentEach * 100) / 100;
+      const emiArr = Array.from({ length: formData.emiMonths }, (_, i) => {
+        if (i === formData.emiMonths - 1) {
+          // Last installment takes the remainder to ensure sum equals 100%
+          return (100 - basePercent * (formData.emiMonths - 1)).toFixed(2);
+        }
+        return basePercent.toFixed(2);
+      });
       setAutoEmiSplits(emiArr);
     }
   }, [formData.emiMonths, formData.totalCost, formData.paymentType]);
@@ -119,7 +126,8 @@ const PaymentInfoSection = ({ formData, setFormData }) => {
     formData.gstType, 
     formData.paymentType, 
     formData.emiMonths,
-    formData.paymentSplits
+    formData.paymentSplits,
+    calculatePaymentAmounts
   ]);
 
   return (
@@ -369,7 +377,7 @@ const PaymentInfoSection = ({ formData, setFormData }) => {
         </>
       )}
 
-      {formData.paymentType && formData.gstType && !validatePercentageSum() && (
+      {formData.paymentType && formData.gstType && formData.paymentType !== "EMI" && !validatePercentageSum() && (
         <div className="text-red-600 font-semibold">Total percentage must equal 100%.</div>
       )}
     </section>

@@ -26,7 +26,7 @@ const safeParseDate = (date) => {
   if (!date) return null;
   try {
     const parsed = date?.toDate?.() ?? new Date(date);
-    return isNaN(parsed) ? null : parsed;
+    return isNaN(parsed.getTime()) ? null : parsed;
   } catch {
     return null;
   }
@@ -39,8 +39,8 @@ const process1MData = (logs, currentMonthIndex, currentYear) => {
   }, {});
 
   logs.forEach((log) => {
-    if (log.action === "Logged in") {
-      const dateObj = safeParseDate(log.date);
+    if (log.action && log.action.trim().startsWith("Logged in")) {
+      const dateObj = safeParseDate(log.timestamp);
       if (dateObj && 
           dateObj.getMonth() === currentMonthIndex && 
           dateObj.getFullYear() === currentYear) {
@@ -63,8 +63,8 @@ const processMultiMonthData = (logs, rangeCount, currentMonthIndex) => {
   }, {});
 
   logs.forEach((log) => {
-    if (log.action === "Logged in") {
-      const dateObj = safeParseDate(log.date);
+    if (log.action && log.action.trim().startsWith("Logged in")) {
+      const dateObj = safeParseDate(log.timestamp);
       if (dateObj) {
         const month = dateObj.toLocaleString("en-US", { month: "short" });
         counts[month] = (counts[month] || 0) + 1;
@@ -213,7 +213,7 @@ const LoginAnalytics = ({ logs, className = "" }) => {
         setChartData(result);
         setError(null);
       } catch (err) {
-        console.error("Error processing login data:", err);
+
         setError("Failed to process login data");
       } finally {
         setIsLoading(false);
@@ -273,8 +273,8 @@ const LoginAnalytics = ({ logs, className = "" }) => {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="flex items-center bg-gray-50 rounded-lg p-1">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <div className="flex items-center bg-gray-50 rounded-lg p-1 w-full sm:w-auto overflow-x-auto">
               {TIME_RANGES.map((range) => (
                 <TimeRangeButton
                   key={range}
@@ -338,7 +338,7 @@ LoginAnalytics.propTypes = {
   logs: PropTypes.arrayOf(
     PropTypes.shape({
       action: PropTypes.string.isRequired,
-      date: PropTypes.oneOfType([
+      timestamp: PropTypes.oneOfType([
         PropTypes.instanceOf(Date),
         PropTypes.object, // for Firestore Timestamp
         PropTypes.string

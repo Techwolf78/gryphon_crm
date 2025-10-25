@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../context/AuthContext"; // Adjust the path as needed
 import PropTypes from "prop-types";
 import {
   FiTrendingUp,
-  FiDollarSign,
   FiUsers,
   FiFilter,
   FiChevronDown,
@@ -14,6 +13,7 @@ import {
   FiCalendar,
   FiRefreshCw,
 } from "react-icons/fi";
+import { FaRupeeSign } from "react-icons/fa";
 import {
   PieChart,
   Pie,
@@ -28,8 +28,79 @@ import {
 } from "recharts";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "../../firebase";
+import ReactModal from "react-modal"; // Add this import at the top
 
-const TeamPerformance = ({ teamPerformance, isLoading, selectedUserId }) => {
+const formatCurrency = (amount) => {
+  const numAmount = Number(amount);
+  if (numAmount > 10000000) {
+    const crores = numAmount / 10000000;
+    let str = crores.toFixed(4);
+    str = str.replace(/\.?0+$/, '');
+    return `₹${str} cr`;
+  } else {
+    return `₹${numAmount.toLocaleString('en-IN')}`;
+  }
+};
+
+const CustomTooltip = ({ active, payload, label, timePeriod }) => {
+  if (active && payload && payload.length) {
+    const dataPoint = payload[0].payload;
+    let timeLabel = "";
+
+    switch (timePeriod) {
+      case "week":
+        timeLabel = `Day: ${label}`;
+        break;
+      case "month":
+        timeLabel = `Week: ${label}`;
+        break;
+      case "quarter":
+        // Show month and year for clarity
+        timeLabel = `Month: ${label} ${new Date().getFullYear()}`;
+        break;
+      case "year":
+        // Show month and year for clarity
+        timeLabel = `Month: ${label} ${new Date().getFullYear()}`;
+        break;
+      default:
+        timeLabel = `Period: ${label}`;
+    }
+
+    return (
+      <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
+        <p className="font-medium text-gray-900">{timeLabel}</p>
+        <p className="text-sm" style={{ color: payload[0].color }}>
+          Revenue: {formatCurrency(payload[0].value)}
+        </p>
+        <p className="text-xs text-gray-500 mt-1">
+          {dataPoint.dealCount} closed deal(s)
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
+CustomTooltip.propTypes = {
+  active: PropTypes.bool,
+  payload: PropTypes.array,
+  label: PropTypes.string,
+  timePeriod: PropTypes.string,
+};
+
+CustomTooltip.defaultProps = {
+  active: false,
+  payload: [],
+  label: "",
+  timePeriod: "quarter",
+};
+
+const TeamPerformance = ({
+  teamPerformance,
+  isLoading,
+  selectedUserId,
+  onMemberClick,
+}) => {
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -62,8 +133,9 @@ const TeamPerformance = ({ teamPerformance, isLoading, selectedUserId }) => {
     <div className="space-y-4">
       {teamPerformance.map((member) => (
         <div
-          key={member.name}
-          className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors"
+          key={member.id}
+          className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer"
+          onClick={() => onMemberClick && onMemberClick(member)}
         >
           <div className="flex items-center">
             <div className="bg-indigo-100 text-indigo-600 w-8 h-8 rounded-full flex items-center justify-center font-medium">
@@ -140,7 +212,7 @@ const RecentActivity = ({ recentActivity, isLoading }) => {
           className="p-3 hover:bg-gray-50 rounded-lg transition-colors group"
         >
           <div className="flex justify-between items-start">
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-3 flex-1 min-w-0">
               <div className="relative">
                 <div
                   className={`p-2 rounded-lg ${
@@ -150,7 +222,7 @@ const RecentActivity = ({ recentActivity, isLoading }) => {
                   }`}
                 >
                   {activity.amount ? (
-                    <FiDollarSign size={16} />
+                    <FaRupeeSign size={16} />
                   ) : (
                     <FiUsers size={16} />
                   )}
@@ -165,17 +237,21 @@ const RecentActivity = ({ recentActivity, isLoading }) => {
                     {activity.userInitials}
                   </span>
                 </div>
-                <p className="text-xs text-gray-500 mt-0.5 truncate">
+                <p
+                  className="text-xs text-gray-500 mt-0.5 truncate"
+                  style={{ maxWidth: "180px" }} // You can adjust this width as needed
+                  title={activity.company}
+                >
                   {activity.company}
                 </p>
                 {activity.amount && (
                   <p className="text-sm font-medium text-gray-900 mt-1">
-                    ₹{activity.amount.toLocaleString()}
+                    ₹{activity.amount.toLocaleString('en-IN')}
                   </p>
                 )}
               </div>
             </div>
-            <span className="text-xs text-gray-400 whitespace-nowrap ml-2">
+            <span className="text-xs text-gray-400 whitespace-nowrap ml-2 self-start">
               {activity.time}
             </span>
           </div>
@@ -205,7 +281,7 @@ RecentActivity.defaultProps = {
   isLoading: false,
 };
 const EducationDistribution = ({ leadCategories, isLoading }) => {
-  const COLORS = ["#3B82F6", "#10B981", "#F59E0B"]; // Blue, Green, Amber
+  const COLORS = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444"]; // Blue, Green, Amber, Red
 
   const renderCustomizedLabel = ({
     cx,
@@ -235,7 +311,7 @@ const EducationDistribution = ({ leadCategories, isLoading }) => {
 
   if (isLoading) {
     return (
-      <div className="h-60 flex items-center justify-center">
+      <div className="h-48 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500" />
       </div>
     );
@@ -247,7 +323,7 @@ const EducationDistribution = ({ leadCategories, isLoading }) => {
     leadCategories.reduce((sum, cat) => sum + cat.value, 0) === 0
   ) {
     return (
-      <div className="h-60 flex items-center justify-center">
+      <div className="h-48 flex items-center justify-center">
         <p className="text-gray-500">No education data available</p>
       </div>
     );
@@ -255,7 +331,20 @@ const EducationDistribution = ({ leadCategories, isLoading }) => {
 
   return (
     <>
-      <div className="h-60">
+      <div className="mb-2 flex flex-wrap justify-center gap-2">
+        {leadCategories.map((category, index) => (
+          <div key={index} className="flex items-center">
+            <div
+              className="w-3 h-3 rounded-full mr-2"
+              style={{ backgroundColor: COLORS[index % COLORS.length] }}
+            />
+            <span className="text-xs text-gray-600">
+              {category.name}: {category.value}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="h-48">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -279,19 +368,6 @@ const EducationDistribution = ({ leadCategories, isLoading }) => {
           </PieChart>
         </ResponsiveContainer>
       </div>
-      <div className="mt-2 flex flex-wrap justify-center gap-2">
-        {leadCategories.map((category, index) => (
-          <div key={index} className="flex items-center">
-            <div
-              className="w-3 h-3 rounded-full mr-2"
-              style={{ backgroundColor: COLORS[index % COLORS.length] }}
-            />
-            <span className="text-xs text-gray-600">
-              {category.name}: {category.value}
-            </span>
-          </div>
-        ))}
-      </div>
     </>
   );
 };
@@ -311,7 +387,8 @@ EducationDistribution.defaultProps = {
   isLoading: false,
 };
 const LeadDistribution = ({ leadSources, isLoading }) => {
-  const COLORS = ["#4F46E5", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
+  // Set colors: Hot = red, Warm = orange, Cold = blue
+  const COLORS = ["#EF4444", "#F59E0B", "#3B82F6"]; // Red, Orange, Blue
 
   const renderCustomizedLabel = ({
     cx,
@@ -341,7 +418,7 @@ const LeadDistribution = ({ leadSources, isLoading }) => {
 
   if (isLoading) {
     return (
-      <div className="h-80 flex items-center justify-center">
+      <div className="h-56 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500" />
       </div>
     );
@@ -349,7 +426,7 @@ const LeadDistribution = ({ leadSources, isLoading }) => {
 
   if (!leadSources || leadSources.length === 0) {
     return (
-      <div className="h-80 flex items-center justify-center">
+      <div className="h-56 flex items-center justify-center">
         <p className="text-gray-500">No lead data available</p>
       </div>
     );
@@ -357,7 +434,20 @@ const LeadDistribution = ({ leadSources, isLoading }) => {
 
   return (
     <>
-      <div className="h-80">
+      <div className="mb-2 flex flex-wrap justify-center gap-2">
+        {leadSources.map((source, index) => (
+          <div key={index} className="flex items-center">
+            <div
+              className="w-3 h-3 rounded-full mr-2"
+              style={{ backgroundColor: COLORS[index % COLORS.length] }}
+            />
+            <span className="text-xs text-gray-600">
+              {source.name}: {source.value}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="h-48">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -366,7 +456,7 @@ const LeadDistribution = ({ leadSources, isLoading }) => {
               cy="50%"
               labelLine={false}
               label={renderCustomizedLabel}
-              outerRadius={80}
+              outerRadius={70}
               fill="#8884d8"
               dataKey="value"
             >
@@ -380,19 +470,6 @@ const LeadDistribution = ({ leadSources, isLoading }) => {
             <Tooltip />
           </PieChart>
         </ResponsiveContainer>
-      </div>
-      <div className="mt-4 flex flex-wrap justify-center gap-2">
-        {leadSources.map((source, index) => (
-          <div key={index} className="flex items-center">
-            <div
-              className="w-3 h-3 rounded-full mr-2"
-              style={{ backgroundColor: COLORS[index % COLORS.length] }}
-            />
-            <span className="text-xs text-gray-600">
-              {source.name}: {source.value}
-            </span>
-          </div>
-        ))}
       </div>
     </>
   );
@@ -413,67 +490,19 @@ LeadDistribution.defaultProps = {
   isLoading: false,
 };
 
-const CustomTooltip = ({ active, payload, label, timePeriod }) => {
-  if (active && payload && payload.length) {
-    const dataPoint = payload[0].payload;
-    let timeLabel = "";
+const SalesDashboard = ({ filters }) => {
+  const userDropdownRef = useRef(null);
+  const filterDropdownRef = useRef(null);
+  const yearDropdownRef = useRef(null);
 
-    switch (timePeriod) {
-      case "week":
-        timeLabel = `Day: ${label}`;
-        break;
-      case "month":
-        timeLabel = `Week: ${label}`;
-        break;
-      case "quarter":
-        timeLabel = `Month: ${label}`;
-        break;
-      case "year":
-        timeLabel = `Month: ${label}`;
-        break;
-      default:
-        timeLabel = `Period: ${label}`;
-    }
-
-    return (
-      <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
-        <p className="font-medium text-gray-900">{timeLabel}</p>
-        <p className="text-sm" style={{ color: payload[0].color }}>
-          Revenue: ₹{payload[0].value.toLocaleString()}
-        </p>
-        <p className="text-xs text-gray-500 mt-1">
-          {dataPoint.dealCount} closed deal(s)
-        </p>
-      </div>
-    );
-  }
-  return null;
-};
-
-CustomTooltip.propTypes = {
-  active: PropTypes.bool,
-  payload: PropTypes.array,
-  label: PropTypes.string,
-  timePeriod: PropTypes.string,
-};
-
-CustomTooltip.defaultProps = {
-  active: false,
-  payload: [],
-  label: "",
-  timePeriod: "quarter",
-};
-
-const SalesDashboard = () => {
   const [timePeriod, setTimePeriod] = useState("quarter");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isUserFilterOpen, setIsUserFilterOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [dashboardData, setDashboardData] = useState({
     revenue: 0,
     revenuePrevQuarter: 0,
-    growth: 0,
     hotLeads: 0,
     hotLeadsPrevQuarter: 0,
     warmLeads: 0,
@@ -486,6 +515,7 @@ const SalesDashboard = () => {
     leadSources: [],
     teamPerformance: [],
     recentActivity: [],
+    studentCategories: [],
   });
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState("Team");
@@ -496,6 +526,10 @@ const SalesDashboard = () => {
     start: new Date(),
     end: new Date(),
   });
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalLeads, setModalLeads] = useState([]);
+  const [modalMember, setModalMember] = useState(null);
+  const [isYearDropdownOpen, setIsYearDropdownOpen] = useState(false);
 
   const getCurrentQuarter = () => {
     const now = new Date();
@@ -506,9 +540,8 @@ const SalesDashboard = () => {
     return "Q4 (Jan-Mar)";
   };
 
-  const getDateRange = (period) => {
+  const getDateRange = (period, year = selectedYear) => {
     const now = new Date();
-    const year = now.getFullYear();
     const month = now.getMonth();
     const day = now.getDate();
 
@@ -554,7 +587,7 @@ const SalesDashboard = () => {
         break;
 
       default:
-        return getDateRange("quarter");
+        return getDateRange("quarter", year);
     }
 
     return { start, end };
@@ -578,23 +611,25 @@ const SalesDashboard = () => {
         break;
 
       case "quarter":
-        const quarterMonth = start.getMonth();
-        if (quarterMonth >= 0 && quarterMonth <= 2) {
-          // Q4 -> Q1
-          newStart = new Date(start.getFullYear(), 3, 1);
-          newEnd = new Date(start.getFullYear(), 5, 30);
-        } else if (quarterMonth >= 3 && quarterMonth <= 5) {
-          // Q1 -> Q2
-          newStart = new Date(start.getFullYear(), 6, 1);
-          newEnd = new Date(start.getFullYear(), 8, 30);
-        } else if (quarterMonth >= 6 && quarterMonth <= 8) {
-          // Q2 -> Q3
-          newStart = new Date(start.getFullYear(), 9, 1);
-          newEnd = new Date(start.getFullYear(), 11, 31);
-        } else {
-          // Q3 -> Q4
-          newStart = new Date(start.getFullYear() + 1, 0, 1);
-          newEnd = new Date(start.getFullYear() + 1, 2, 31);
+        {
+          const quarterMonth = start.getMonth();
+          if (quarterMonth >= 0 && quarterMonth <= 2) {
+            // Q4 -> Q1
+            newStart = new Date(start.getFullYear(), 3, 1);
+            newEnd = new Date(start.getFullYear(), 5, 30);
+          } else if (quarterMonth >= 3 && quarterMonth <= 5) {
+            // Q1 -> Q2
+            newStart = new Date(start.getFullYear(), 6, 1);
+            newEnd = new Date(start.getFullYear(), 8, 30);
+          } else if (quarterMonth >= 6 && quarterMonth <= 8) {
+            // Q2 -> Q3
+            newStart = new Date(start.getFullYear(), 9, 1);
+            newEnd = new Date(start.getFullYear(), 11, 31);
+          } else {
+            // Q3 -> Q4
+            newStart = new Date(start.getFullYear() + 1, 0, 1);
+            newEnd = new Date(start.getFullYear() + 1, 2, 31);
+          }
         }
         break;
 
@@ -604,7 +639,7 @@ const SalesDashboard = () => {
         break;
 
       default:
-        return getDateRange(period);
+        return getDateRange(period, selectedYear);
     }
 
     return { start: newStart, end: newEnd };
@@ -628,19 +663,21 @@ const SalesDashboard = () => {
         break;
 
       case "quarter":
-        const quarterMonth = start.getMonth();
-        if (quarterMonth >= 0 && quarterMonth <= 2) {
-          newStart = new Date(start.getFullYear() - 1, 9, 1);
-          newEnd = new Date(start.getFullYear() - 1, 11, 31);
-        } else if (quarterMonth >= 3 && quarterMonth <= 5) {
-          newStart = new Date(start.getFullYear(), 0, 1);
-          newEnd = new Date(start.getFullYear(), 2, 31);
-        } else if (quarterMonth >= 6 && quarterMonth <= 8) {
-          newStart = new Date(start.getFullYear(), 3, 1);
-          newEnd = new Date(start.getFullYear(), 5, 30);
-        } else {
-          newStart = new Date(start.getFullYear(), 6, 1);
-          newEnd = new Date(start.getFullYear(), 8, 30);
+        {
+          const quarterMonth = start.getMonth();
+          if (quarterMonth >= 0 && quarterMonth <= 2) {
+            newStart = new Date(start.getFullYear() - 1, 9, 1);
+            newEnd = new Date(start.getFullYear() - 1, 11, 31);
+          } else if (quarterMonth >= 3 && quarterMonth <= 5) {
+            newStart = new Date(start.getFullYear(), 0, 1);
+            newEnd = new Date(start.getFullYear(), 2, 31);
+          } else if (quarterMonth >= 6 && quarterMonth <= 8) {
+            newStart = new Date(start.getFullYear(), 3, 1);
+            newEnd = new Date(start.getFullYear(), 5, 30);
+          } else {
+            newStart = new Date(start.getFullYear(), 6, 1);
+            newEnd = new Date(start.getFullYear(), 8, 30);
+          }
         }
         break;
 
@@ -650,35 +687,12 @@ const SalesDashboard = () => {
         break;
 
       default:
-        return getDateRange(period);
+        return getDateRange(period, selectedYear);
     }
 
     return { start: newStart, end: newEnd };
   };
 
-  const getPreviousQuarterDateRange = () => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-
-    let start, end;
-
-    if (month >= 3 && month <= 5) {
-      start = new Date(year - 1, 0, 1);
-      end = new Date(year - 1, 2, 31);
-    } else if (month >= 6 && month <= 8) {
-      start = new Date(year, 3, 1);
-      end = new Date(year, 5, 30);
-    } else if (month >= 9 && month <= 11) {
-      start = new Date(year, 6, 1);
-      end = new Date(year, 8, 30);
-    } else {
-      start = new Date(year, 9, 1);
-      end = new Date(year, 11, 31);
-    }
-
-    return { start, end };
-  };
   const updatePeriodInfo = (range, isCurrentPeriod = true) => {
     const { start, end } = range;
     let info = "";
@@ -698,43 +712,42 @@ const SalesDashboard = () => {
         )} ${start.getFullYear()}`;
         break;
       case "quarter":
-        const month = start.getMonth();
-        let quarter, quarterMonths;
+        {
+          const month = start.getMonth();
+          let quarter, quarterMonths;
 
-        if (month >= 3 && month <= 5) {
-          quarter = "Q1";
-          quarterMonths = "Apr-Jun";
-        } else if (month >= 6 && month <= 8) {
-          quarter = "Q2";
-          quarterMonths = "Jul-Sep";
-        } else if (month >= 9 && month <= 11) {
-          quarter = "Q3";
-          quarterMonths = "Oct-Dec";
-        } else {
-          quarter = "Q4";
-          quarterMonths = "Jan-Mar";
+          if (month >= 3 && month <= 5) {
+            quarter = "Q1";
+            quarterMonths = "Apr-Jun";
+          } else if (month >= 6 && month <= 8) {
+            quarter = "Q2";
+            quarterMonths = "Jul-Sep";
+          } else if (month >= 9 && month <= 11) {
+            quarter = "Q3";
+            quarterMonths = "Oct-Dec";
+          } else {
+            quarter = "Q4";
+            quarterMonths = "Jan-Mar";
+          }
+
+          info = `${quarter} (${quarterMonths}) ${start.getFullYear()}`;
         }
-
-        info = `${
-          isCurrent ? "Current " : ""
-        }Quarter: ${quarter} (${quarterMonths}) ${start.getFullYear()}`;
         break;
       case "year":
-        info = `${
-          isCurrent ? "Current " : ""
-        }Fiscal Year: ${start.getFullYear()}-${end.getFullYear()}`;
+        info = `Fiscal Year: ${start.getFullYear()}-${end.getFullYear()}`;
         break;
       default:
-        info = `${isCurrent ? "Current " : ""}Quarter: ${getCurrentQuarter()}`;
+        info = `${getCurrentQuarter()}`;
     }
 
     setCurrentPeriodInfo(info);
   };
 
-  const processLeadsData = (input) => {
+  const processLeadsData = (input, dateRange) => {
     const leadCategories = {
       Engineering: 0,
       MBA: 0,
+      MCA: 0,
       Others: 0,
     };
 
@@ -756,7 +769,7 @@ const SalesDashboard = () => {
       };
     } else {
       // Invalid input
-      console.error("Invalid input to processLeadsData:", input);
+
       return {
         revenue: 0,
         hotLeads: 0,
@@ -789,25 +802,49 @@ const SalesDashboard = () => {
         ? 3
         : 12;
 
+    const studentCategories = {
+      Engineering: 0,
+      MBA: 0,
+      MCA: 0,
+      Others: 0,
+    };
+
     forEachFn((doc) => {
       const lead = docs === input ? doc : doc.data();
 
-      if (selectedUserId) {
-        const selectedUserObj = users.find((u) => u.id === selectedUserId);
-        if (lead.assignedTo?.uid !== selectedUserObj?.uid) {
-          return;
-        }
-      }
-      if (lead.courseType) {
-        if (lead.courseType.includes("Engineering")) {
+if (selectedUserId) {
+  const selectedUserObj = users.find((u) => u.id === selectedUserId);
+  if (!selectedUserObj) return; // skip if user not found
+  if (lead.assignedTo?.uid !== selectedUserObj?.uid) {
+    return;
+  }
+}
+      if (lead.courses?.[0]?.courseType) {
+        const courseType = lead.courses[0].courseType;
+        if (courseType.includes("Engineering")) {
           leadCategories.Engineering++;
-        } else if (lead.courseType.includes("MBA")) {
+        } else if (courseType.includes("MBA")) {
           leadCategories.MBA++;
+        } else if (courseType.includes("MCA")) {
+          leadCategories.MCA++;
         } else {
           leadCategories.Others++;
         }
       } else {
         leadCategories.Others++;
+      }
+
+      if (lead.courses?.[0]?.studentCount != null && lead.courses?.[0]?.courseType) {
+        const courseType = lead.courses[0].courseType;
+        if (courseType.includes("Engineering")) {
+          studentCategories.Engineering += Number(lead.courses?.[0]?.studentCount) || 0;
+        } else if (courseType.includes("MBA")) {
+          studentCategories.MBA += Number(lead.courses?.[0]?.studentCount) || 0;
+        } else if (courseType.includes("MCA")) {
+          studentCategories.MCA += Number(lead.courses?.[0]?.studentCount) || 0;
+        } else {
+          studentCategories.Others += Number(lead.courses?.[0]?.studentCount) || 0;
+        }
       }
 
       if (lead.phase === "hot") {
@@ -824,44 +861,51 @@ const SalesDashboard = () => {
       if (lead.phase === "closed" && lead.totalCost) {
         revenue += lead.totalCost;
 
-        if (lead.closedDate) {
+        if (lead.createdAt) {
           try {
-            const closedDate = new Date(lead.closedDate);
-            if (Number.isNaN(closedDate.getTime()))
+            const createdDate = new Date(lead.createdAt);
+            if (Number.isNaN(createdDate.getTime()))
               throw new Error("Invalid date");
 
             let dateKey;
             if (timePeriod === "week") {
               dateKey = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
-                closedDate.getDay()
+                createdDate.getDay()
               ];
             } else if (timePeriod === "month") {
               const firstDay = new Date(
-                closedDate.getFullYear(),
-                closedDate.getMonth(),
+                createdDate.getFullYear(),
+                createdDate.getMonth(),
                 1
               );
-              const pastDaysOfMonth = closedDate.getDate() - 1;
+              const pastDaysOfMonth = createdDate.getDate() - 1;
               dateKey = `Week ${
                 Math.floor((firstDay.getDay() + pastDaysOfMonth) / 7) + 1
               }`;
             } else if (timePeriod === "quarter") {
-              dateKey = [
-                "Jan",
-                "Feb",
-                "Mar",
-                "Apr",
-                "May",
-                "Jun",
-                "Jul",
-                "Aug",
-                "Sep",
-                "Oct",
-                "Nov",
-                "Dec",
-              ][closedDate.getMonth()];
+              const startMonth = dateRange?.start?.getMonth?.() ?? 3; // Default to April
+              let months;
+              if (startMonth === 3) {
+                months = ["Apr", "May", "Jun"];
+              } else if (startMonth === 6) {
+                months = ["Jul", "Aug", "Sep"];
+              } else if (startMonth === 9) {
+                months = ["Oct", "Nov", "Dec"];
+              } else if (startMonth === 0) {
+                months = ["Jan", "Feb", "Mar"];
+              } else {
+                const quarterStart = Math.floor(startMonth / 3) * 3;
+                months = [
+                  new Date(2000, quarterStart, 1).toLocaleString("default", { month: "short" }),
+                  new Date(2000, quarterStart + 1, 1).toLocaleString("default", { month: "short" }),
+                  new Date(2000, quarterStart + 2, 1).toLocaleString("default", { month: "short" }),
+                ];
+              }
+              let monthIdx = createdDate.getMonth() - startMonth;
+              if (isNaN(monthIdx) || monthIdx < 0 || monthIdx > 2) monthIdx = 0; // fallback to first month
+              dateKey = months[monthIdx];
             } else {
-              const month = closedDate.getMonth();
+              const month = createdDate.getMonth();
               dateKey = [
                 "Apr",
                 "May",
@@ -884,29 +928,31 @@ const SalesDashboard = () => {
             revenueByDate[dateKey].revenue += lead.totalCost;
             revenueByDate[dateKey].dealCount += 1;
           } catch (e) {
-            console.error("Error processing closed date:", e);
+            console.error("Error processing lead data:", e);
           }
         }
       }
 
       if (lead.tcv) {
         projectedTCV += lead.tcv;
-      }
-
-      if (lead.assignedTo && lead.assignedTo.uid) {
-        const user = users.find((u) => u.uid === lead.assignedTo.uid);
-        const memberId = user ? user.id : lead.assignedTo.uid;
-        const memberName = lead.assignedTo.name;
+      }if (lead.assignedTo && lead.assignedTo.uid) {
+  const user = users.find((u) => u.uid === lead.assignedTo.uid);
+  const memberId = user ? user.id : lead.assignedTo.uid;
+  const memberName = lead.assignedTo.name || "Unknown";
 
         if (!teamPerformance[memberId]) {
           teamPerformance[memberId] = {
+            id: memberId,
             name: memberName,
             value: 0,
             role: lead.assignedTo.role || "Sales Rep",
           };
         }
-        teamPerformance[memberId].value++;
+        teamPerformance[memberId].value += 1; // Count of leads
       }
+
+      let createdDate = new Date(lead.createdAt);
+      let timeStr = Number.isNaN(createdDate.getTime()) ? "" : createdDate.toLocaleDateString();
 
       recentActivity.push({
         id: doc.id,
@@ -915,34 +961,47 @@ const SalesDashboard = () => {
         company: lead.businessName,
         user: lead.assignedTo?.name || "Unassigned",
         userInitials: lead.assignedTo?.name
-          ? lead.assignedTo.name
-              .split(" ")
-              .map((n) => n[0])
-              .join("")
+          ? lead.assignedTo.name.split(" ").map((n) => n[0]).join("")
           : "NA",
-        time: new Date(lead.createdAt).toLocaleDateString(),
+        time: timeStr,
       });
     });
 
     // Generate chart data
     for (let i = 0; i < timePoints; i++) {
       let dateKey;
+      let months;
       if (timePeriod === "week") {
         dateKey = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][i];
       } else if (timePeriod === "month") {
         dateKey = `Week ${i + 1}`;
       } else if (timePeriod === "quarter") {
-        const now = new Date();
-        const quarterMonth = now.getMonth();
-        if (quarterMonth >= 3 && quarterMonth <= 5) {
-          dateKey = ["Apr", "May", "Jun"][i];
-        } else if (quarterMonth >= 6 && quarterMonth <= 8) {
-          dateKey = ["Jul", "Aug", "Sep"][i];
-        } else if (quarterMonth >= 9 && quarterMonth <= 11) {
-          dateKey = ["Oct", "Nov", "Dec"][i];
+        // Use dateRange.start to determine the quarter months
+        const startMonth = dateRange?.start?.getMonth?.() ?? 3; // Default to April
+        if (startMonth === 3) {
+          months = ["Apr", "May", "Jun"];
+        } else if (startMonth === 6) {
+          months = ["Jul", "Aug", "Sep"];
+        } else if (startMonth === 9) {
+          months = ["Oct", "Nov", "Dec"];
+        } else if (startMonth === 0) {
+          months = ["Jan", "Feb", "Mar"];
         } else {
-          dateKey = ["Jan", "Feb", "Mar"][i];
+          // Fallback: calculate quarter dynamically
+          const quarterStart = Math.floor(startMonth / 3) * 3;
+          months = [
+            new Date(2000, quarterStart, 1).toLocaleString("default", {
+              month: "short",
+            }),
+            new Date(2000, quarterStart + 1, 1).toLocaleString("default", {
+              month: "short",
+            }),
+            new Date(2000, quarterStart + 2, 1).toLocaleString("default", {
+              month: "short",
+            }),
+          ];
         }
+        dateKey = months[i];
       } else {
         const fiscalMonths = [
           "Apr",
@@ -961,17 +1020,20 @@ const SalesDashboard = () => {
         dateKey = fiscalMonths[i];
       }
 
-      const now = new Date();
-      const currentMonth = now.getMonth();
       let isCurrentMonth = false;
 
-      if (timePeriod === "year") {
-        const fiscalMonthIndex =
-          currentMonth < 3 ? currentMonth + 9 : currentMonth - 3;
-        isCurrentMonth = i === fiscalMonthIndex;
-      } else if (timePeriod === "quarter") {
-        const quarterStartMonth = Math.floor(currentMonth / 3) * 3;
-        isCurrentMonth = currentMonth - quarterStartMonth === i;
+      if (timePeriod === "quarter" || timePeriod === "year") {
+        const now = new Date();
+        const currentMonth = now.getMonth();
+
+        if (timePeriod === "year") {
+          const fiscalMonthIndex =
+            currentMonth < 3 ? currentMonth + 9 : currentMonth - 3;
+          isCurrentMonth = i === fiscalMonthIndex;
+        } else if (timePeriod === "quarter") {
+          const quarterStartMonth = Math.floor(currentMonth / 3) * 3;
+          isCurrentMonth = currentMonth - quarterStartMonth === i;
+        }
       }
 
       chartData.push({
@@ -996,12 +1058,19 @@ const SalesDashboard = () => {
       leadCategories: [
         { name: "Engineering", value: leadCategories.Engineering },
         { name: "MBA", value: leadCategories.MBA },
+        { name: "MCA", value: leadCategories.MCA },
         { name: "Others", value: leadCategories.Others },
       ],
       leadSources: [
         { name: "Hot", value: leadSources.hot },
         { name: "Warm", value: leadSources.warm },
         { name: "Cold", value: leadSources.cold },
+      ],
+      studentCategories: [
+        { name: "Engineering", value: studentCategories.Engineering },
+        { name: "MBA", value: studentCategories.MBA },
+        { name: "MCA", value: studentCategories.MCA },
+        { name: "Others", value: studentCategories.Others },
       ],
       teamPerformance: Object.values(teamPerformance).sort(
         (a, b) => b.value - a.value
@@ -1012,220 +1081,92 @@ const SalesDashboard = () => {
     };
   };
 
-  // WITH THIS:
-const fetchAllUsers = async () => {
-  setIsLoadingUsers(true);
-  try {
-    const usersRef = collection(db, "users");
+  const fetchAllUsers = async () => {
+    setIsLoading(true);
+    
+    try {
+      const usersRef = collection(db, "users");
+      
+      let usersQuery;
+      if (currentUser?.department === "sales") {
+        usersQuery = query(usersRef, where("department", "==", "sales"));
+      } else if (currentUser?.department === "Admin") {
+        usersQuery = query(usersRef);
+      } else {
+        usersQuery = query(
+          usersRef,
+          where("department", "==", currentUser?.department || "")
+        );
+      }
 
-    let usersQuery;
-
-    if (currentUser?.department === "admin") {
-      // Admin sees all users
-      usersQuery = query(usersRef);
-    } else if (currentUser?.department === "sales") {
-      // Sales see only sales users
-      usersQuery = query(usersRef, where("department", "==", "sales"));
-    } else {
-      // Others see no users
-      usersQuery = null;
-    }
-
-    let usersData = [];
-
-    if (usersQuery) {
       const usersSnapshot = await getDocs(usersQuery);
-      usersData = usersSnapshot.docs.map((doc) => ({
+      
+      const usersData = usersSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
+
+      const filteredUsers = usersData;
+      setUsers(filteredUsers);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      setUsers([]);
+    } finally {
+      setIsLoading(false);
     }
-
-    setUsers(usersData);
-  } catch (error) {
-    console.error("Error fetching users:", error);
-  } finally {
-    setIsLoadingUsers(false);
-  }
-};
-
+  };
 
   const fetchDataForRange = async (range) => {
     setIsLoading(true);
 
-    // Define calculateGrowth here so it's available in all code paths
-    const calculateGrowth = (current, previous) => {
-      if (previous === 0) return current === 0 ? 0 : 100;
-      return ((current - previous) / previous) * 100;
-    };
-
     try {
-      const { start, end } = range;
-      const currentStart = start.getTime();
-      const currentEnd = end.getTime();
-
-      // Fetch current period data
       const leadsRef = collection(db, "leads");
+      let leadsQuery = leadsRef;
 
-      try {
-        // First try with the composite index query
-        let currentLeadsQuery = query(
-          leadsRef,
-          where("createdAt", ">=", currentStart),
-          where("createdAt", "<=", currentEnd),
-          ...(selectedUserId
-            ? [
-                where(
-                  "assignedTo.uid",
-                  "==",
-                  users.find((u) => u.id === selectedUserId)?.uid
-                ),
-              ]
-            : [])
-        );
-
-        const currentSnapshot = await getDocs(currentLeadsQuery);
-        const currentData = processLeadsData(currentSnapshot);
-
-        // Fetch previous quarter data for comparison
-        const prevQuarterDateRange = getPreviousQuarterDateRange();
-        const prevStart = prevQuarterDateRange.start.getTime();
-        const prevEnd = prevQuarterDateRange.end.getTime();
-
-        let prevLeadsQuery = query(
-          leadsRef,
-          where("createdAt", ">=", prevStart),
-          where("createdAt", "<=", prevEnd),
-          ...(selectedUserId
-            ? [
-                where(
-                  "assignedTo.uid",
-                  "==",
-                  users.find((u) => u.id === selectedUserId)?.uid
-                ),
-              ]
-            : [])
-        );
-
-        const prevSnapshot = await getDocs(prevLeadsQuery);
-        const prevData = processLeadsData(prevSnapshot);
-
-        const growth = {
-          revenue: calculateGrowth(currentData.revenue, prevData.revenue),
-          hotLeads: calculateGrowth(currentData.hotLeads, prevData.hotLeads),
-          warmLeads: calculateGrowth(currentData.warmLeads, prevData.warmLeads),
-          coldLeads: calculateGrowth(currentData.coldLeads, prevData.coldLeads),
-          projectedTCV: calculateGrowth(
-            currentData.projectedTCV,
-            prevData.projectedTCV
-          ),
-        };
-
-        setDashboardData({
-          ...currentData,
-          revenuePrevQuarter: prevData.revenue,
-          hotLeadsPrevQuarter: prevData.hotLeads,
-          warmLeadsPrevQuarter: prevData.warmLeads,
-          coldLeadsPrevQuarter: prevData.coldLeads,
-          projectedTCVPrevQuarter: prevData.projectedTCV,
-          growth: growth.revenue,
-        });
-      } catch (error) {
-        if (error.code === "failed-precondition") {
-          console.warn(
-            "Falling back to client-side filtering due to missing index"
-          );
-
-          // Fallback approach with client-side filtering
-          const allLeadsQuery = query(
-            leadsRef,
-            where("createdAt", ">=", currentStart),
-            where("createdAt", "<=", currentEnd)
-          );
-
-          const snapshot = await getDocs(allLeadsQuery);
-          let filteredDocs = snapshot.docs;
-
-          if (selectedUserId) {
-            const selectedUserObj = users.find((u) => u.id === selectedUserId);
-            filteredDocs = snapshot.docs.filter(
-              (doc) => doc.data().assignedTo?.uid === selectedUserObj?.uid
-            );
-          }
-
-          const currentData = processLeadsData({
-            docs: filteredDocs,
-            forEach: (callback) => filteredDocs.forEach(callback),
-          });
-
-          // Similar fallback for previous quarter data
-          const prevQuarterDateRange = getPreviousQuarterDateRange();
-          const prevStart = prevQuarterDateRange.start.getTime();
-          const prevEnd = prevQuarterDateRange.end.getTime();
-
-          const prevAllLeadsQuery = query(
-            leadsRef,
-            where("createdAt", ">=", prevStart),
-            where("createdAt", "<=", prevEnd)
-          );
-
-          const prevSnapshot = await getDocs(prevAllLeadsQuery);
-          let prevFilteredDocs = prevSnapshot.docs;
-
-          if (selectedUserId) {
-            const selectedUserObj = users.find((u) => u.id === selectedUserId);
-            prevFilteredDocs = prevSnapshot.docs.filter(
-              (doc) => doc.data().assignedTo?.uid === selectedUserObj?.uid
-            );
-          }
-
-          const prevData = processLeadsData({
-            docs: prevFilteredDocs,
-            forEach: (callback) => prevFilteredDocs.forEach(callback),
-          });
-
-          // Calculate growth percentages
-          const growth = {
-            revenue: calculateGrowth(currentData.revenue, prevData.revenue),
-            hotLeads: calculateGrowth(currentData.hotLeads, prevData.hotLeads),
-            warmLeads: calculateGrowth(
-              currentData.warmLeads,
-              prevData.warmLeads
-            ),
-            coldLeads: calculateGrowth(
-              currentData.coldLeads,
-              prevData.coldLeads
-            ),
-            projectedTCV: calculateGrowth(
-              currentData.projectedTCV,
-              prevData.projectedTCV
-            ),
-          };
-
-          setDashboardData({
-            ...currentData,
-            revenuePrevQuarter: prevData.revenue,
-            hotLeadsPrevQuarter: prevData.hotLeads,
-            warmLeadsPrevQuarter: prevData.warmLeads,
-            coldLeadsPrevQuarter: prevData.coldLeads,
-            projectedTCVPrevQuarter: prevData.projectedTCV,
-            growth: growth.revenue,
-          });
-
-          console.error(
-            "Firestore index missing. Please create this index:",
-            error.message
-          );
-        } else {
-          throw error;
-        }
+      // Example: apply city filter
+      if (filters?.city) {
+        leadsQuery = query(leadsRef, where("city", "==", filters.city));
       }
+      // Add more filters as needed...
+
+      const snapshot = await getDocs(leadsQuery);
+      let leads = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      // Filter by date range in JS, but include leads with missing createdAt
+      let currentLeads = leads.filter(lead => {
+        if (!lead.createdAt) return true; // Include if missing createdAt
+        const created = new Date(lead.createdAt);
+        return created >= range.start && created <= range.end;
+      });
+
+      const currentData = processLeadsData(currentLeads, range);
+
+      // Fetch previous period data for growth calculations
+      const prevRange = getPrevDateRange(timePeriod, range.start);
+      let prevLeads = leads.filter(lead => {
+        if (!lead.createdAt) return false; // Exclude missing createdAt for previous
+        const created = new Date(lead.createdAt);
+        return created >= prevRange.start && created <= prevRange.end;
+      });
+
+      const prevData = processLeadsData(prevLeads, prevRange);
+
+      // Merge current and previous data
+      const mergedData = {
+        ...currentData,
+        revenuePrevQuarter: prevData.revenue,
+        hotLeadsPrevQuarter: prevData.hotLeads,
+        warmLeadsPrevQuarter: prevData.warmLeads,
+        coldLeadsPrevQuarter: prevData.coldLeads,
+        projectedTCVPrevQuarter: prevData.projectedTCV,
+      };
+
+      setDashboardData(mergedData);
     } catch (error) {
-      console.error("Error fetching dashboard data:", error);
+      console.error("Error fetching data for range:", error);
       setDashboardData({
         revenue: 0,
         revenuePrevQuarter: 0,
-        growth: 0,
         hotLeads: 0,
         hotLeadsPrevQuarter: 0,
         warmLeads: 0,
@@ -1238,6 +1179,7 @@ const fetchAllUsers = async () => {
         leadSources: [],
         teamPerformance: [],
         recentActivity: [],
+        studentCategories: [],
       });
     } finally {
       setIsLoading(false);
@@ -1268,7 +1210,7 @@ const fetchAllUsers = async () => {
   };
 
   const handleRefresh = () => {
-    const newRange = getDateRange(timePeriod);
+    const newRange = getDateRange(timePeriod, selectedYear);
     setCurrentDateRange(newRange);
     updatePeriodInfo(newRange);
     fetchDataForRange(newRange);
@@ -1277,23 +1219,91 @@ const fetchAllUsers = async () => {
   // WITH THIS:
   useEffect(() => {
     fetchAllUsers(); // Changed function name here
-    const initialRange = getDateRange(timePeriod);
+    const initialRange = getDateRange(timePeriod, selectedYear);
     setCurrentDateRange(initialRange);
     updatePeriodInfo(initialRange);
     fetchDataForRange(initialRange);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    const newRange = getDateRange(timePeriod);
+    if (users.length === 0) return; // wait for users
+    const newRange = getDateRange(timePeriod, selectedYear);
     setCurrentDateRange(newRange);
     updatePeriodInfo(newRange);
     fetchDataForRange(newRange);
-  }, [timePeriod, selectedUserId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timePeriod, selectedUserId, users, filters, selectedYear]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        userDropdownRef.current &&
+        !userDropdownRef.current.contains(event.target)
+      ) {
+        setIsUserFilterOpen(false);
+      }
+
+      if (
+        filterDropdownRef.current &&
+        !filterDropdownRef.current.contains(event.target)
+      ) {
+        setIsFilterOpen(false);
+      }
+
+      if (
+        yearDropdownRef.current &&
+        !yearDropdownRef.current.contains(event.target)
+      ) {
+        setIsYearDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // Define calculateGrowth for metrics grid
+  const calculateGrowth = (current, previous) => {
+    if (previous === 0) return current === 0 ? 0 : 100;
+    return ((current - previous) / previous) * 100;
+  };
+
+  // Handler for clicking a team member
+  const handleMemberClick = async (member) => {
+    setIsModalOpen(true);
+    setModalMember(member);
+    setModalLeads([]); // Clear previous
+
+    try {
+      const leadsRef = collection(db, "leads");
+      const user = users.find((u) => u.name.toLowerCase().trim() === member.name.toLowerCase().trim());
+      if (!user) return;
+      const leadsQuery = query(leadsRef, where("assignedTo.uid", "==", user.uid));
+      const snapshot = await getDocs(leadsQuery);
+      let leads = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
+      // Filter by the current date range (selected year) like the dashboard doe
+      leads = leads.filter(lead => {
+        if (!lead.createdAt) return true; // Include if missing createdAt
+        const created = new Date(lead.createdAt);
+        return created >= currentDateRange.start && created <= currentDateRange.end;
+      });
+
+      setModalLeads(leads);
+    } catch {
+      setModalLeads([]);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="mx-auto max-w-8xl">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+    <div className="min-h-screen bg-gray-50 p-2">
+      <div className="mx-auto max-w-8xl w-full">
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
               Sales Analytics
@@ -1320,13 +1330,59 @@ const fetchAllUsers = async () => {
               >
                 <FiChevronRight className="h-4 w-4" />
               </button>
-              <span className="mx-2">|</span>
-              <span>Today: {new Date().toLocaleDateString()}</span>
             </div>
           </div>
 
           <div className="flex items-center space-x-3 mt-4 md:mt-0">
-            <div className="relative">
+            {/* Year Selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-gray-700">Year:</span>
+              <div className="relative year-dropdown" ref={yearDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsYearDropdownOpen(!isYearDropdownOpen)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500 flex items-center gap-2"
+                >
+                  <span>{selectedYear}</span>
+                  {isYearDropdownOpen ? (
+                    <FiChevronUp className="text-gray-500 h-4 w-4" />
+                  ) : (
+                    <FiChevronDown className="text-gray-500 h-4 w-4" />
+                  )}
+                </button>
+
+                {isYearDropdownOpen && (
+                  <div className="absolute top-full mt-1 w-full bg-white rounded-lg shadow-lg border border-gray-200 z-10 max-h-48 overflow-y-auto">
+                    {Array.from({ length: 10 }, (_, i) => {
+                      const year = new Date().getFullYear() - 5 + i;
+                      const currentYear = new Date().getFullYear();
+                      return (
+                        <button
+                          key={year}
+                          type="button"
+                          onClick={() => {
+                            setSelectedYear(year);
+                            setIsYearDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors flex items-center gap-2 ${
+                            selectedYear === year ? 'text-indigo-600 font-medium' : 'text-gray-700'
+                          }`}
+                        >
+                          {year === currentYear && (
+                            <span className="text-blue-500 text-xs">●</span>
+                          )}
+                          <span className={year === currentYear ? 'ml-0' : 'ml-4'}>
+                            {year}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="relative" ref={userDropdownRef}>
               <button
                 type="button"
                 onClick={() => setIsUserFilterOpen(!isUserFilterOpen)}
@@ -1379,7 +1435,7 @@ const fetchAllUsers = async () => {
                 </div>
               )}
             </div>
-            <div className="relative">
+            <div className="relative" ref={filterDropdownRef}>
               <button
                 type="button"
                 onClick={() => setIsFilterOpen(!isFilterOpen)}
@@ -1439,99 +1495,97 @@ const fetchAllUsers = async () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-          {[
-            {
-              title: selectedUserId ? "Your Revenue" : "Team Revenue",
-              value: `₹${dashboardData.revenue.toLocaleString()}`,
-              change: dashboardData.growth,
-              icon: <FiDollarSign className="text-white" size={20} />,
-              color: "bg-indigo-600",
-            },
-            {
-              title: selectedUserId ? "Your Hot Leads" : "Team Hot Leads",
-              value: dashboardData.hotLeads.toLocaleString(),
-              change:
-                ((dashboardData.hotLeads - dashboardData.hotLeadsPrevQuarter) /
-                  (dashboardData.hotLeadsPrevQuarter || 1)) *
-                100,
-              icon: <FiThermometer className="text-white" size={20} />,
-              color: "bg-red-600",
-            },
-            ,
-            {
-              title: selectedUserId ? "Your Warm Leads" : "Team Warm Leads",
-              value: dashboardData.warmLeads.toLocaleString(),
-              change:
-                ((dashboardData.warmLeads -
-                  dashboardData.warmLeadsPrevQuarter) /
-                  (dashboardData.warmLeadsPrevQuarter || 1)) *
-                100,
-              icon: <FiThermometer className="text-white" size={20} />,
-              color: "bg-amber-500",
-            },
-            {
-              title: selectedUserId ? "Your Cold Leads" : "Team Cold Leads",
-              value: dashboardData.coldLeads.toLocaleString(),
-              change:
-                ((dashboardData.coldLeads -
-                  dashboardData.coldLeadsPrevQuarter) /
-                  (dashboardData.coldLeadsPrevQuarter || 1)) *
-                100,
-              icon: <FiThermometer className="text-white" size={20} />,
-              color: "bg-blue-600",
-            },
-            {
-              title: selectedUserId
-                ? "Your Projected TCV"
-                : "Team Projected TCV",
-              value: `₹${dashboardData.projectedTCV.toLocaleString()}`,
-              change:
-                ((dashboardData.projectedTCV -
-                  dashboardData.projectedTCVPrevQuarter) /
-                  (dashboardData.projectedTCVPrevQuarter || 1)) *
-                100,
-              icon: <FiTrendingUp className="text-white" size={20} />,
-              color: "bg-green-600",
-            },
-          ].map((metric, index) => (
-            <div
-              key={index}
-              className={`${metric.color} rounded-xl p-5 text-white transition-all hover:shadow-lg`}
-            >
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-sm font-medium opacity-80">
-                    {metric.title}
-                  </p>
-                  <h3 className="text-2xl font-bold mt-1">{metric.value}</h3>
+        {/* Metrics Grid */}
+        <div className="w-full overflow-x-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6 min-w-0">
+            {[
+              {
+                title: selectedUserId ? "Your Revenue" : "Team Revenue",
+                value: formatCurrency(dashboardData.revenue),
+                change: calculateGrowth(dashboardData.revenue, dashboardData.revenuePrevQuarter),
+                icon: <FaRupeeSign className="text-white" size={16} />, // changed size
+                color: "bg-indigo-600",
+              },
+              {
+                title: selectedUserId ? "Your Hot Leads" : "Team Hot Leads",
+                value: dashboardData.hotLeads.toLocaleString(),
+                change: calculateGrowth(dashboardData.hotLeads, dashboardData.hotLeadsPrevQuarter),
+                icon: <FiThermometer className="text-white" size={16} />, // changed size
+                color: "bg-red-600",
+              },
+              {
+                title: selectedUserId ? "Your Warm Leads" : "Team Warm Leads",
+                value: dashboardData.warmLeads.toLocaleString(),
+                change: calculateGrowth(dashboardData.warmLeads, dashboardData.warmLeadsPrevQuarter),
+                icon: <FiThermometer className="text-white" size={16} />, // changed size
+                color: "bg-amber-500",
+              },
+              {
+                title: selectedUserId ? "Your Cold Leads" : "Team Cold Leads",
+                value: dashboardData.coldLeads.toLocaleString(),
+                change: calculateGrowth(dashboardData.coldLeads, dashboardData.coldLeadsPrevQuarter),
+                icon: <FiThermometer className="text-white" size={16} />, // changed size
+                color: "bg-blue-600",
+              },
+              {
+                title: selectedUserId
+                  ? "Your Projected TCV"
+                  : "Team Projected TCV",
+                value: formatCurrency(dashboardData.projectedTCV),
+                change:
+                  ((dashboardData.projectedTCV -
+                    dashboardData.projectedTCVPrevQuarter) /
+                    (dashboardData.projectedTCVPrevQuarter || 1)) *
+                  100,
+                icon: <FiTrendingUp className="text-white" size={16} />, // changed size
+                color: "bg-green-600",
+              },
+            ].map((metric, index) => (
+              <div
+                key={index}
+                className={`${metric.color} rounded-xl p-5 text-white transition-all hover:shadow-lg`}
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-sm font-medium opacity-80">
+                      {metric.title}
+                    </p>
+                    <h3
+                      className="text-2xl font-bold mt-1 truncate"
+                      style={{ maxWidth: "140px", display: "block" }} // adjust width as needed
+                      title={metric.value}
+                    >
+                      {metric.value}
+                    </h3>
+                  </div>
+                  <div className="bg-black bg-opacity-20 p-1 rounded-lg"> {/* changed p-2 to p-1 */}
+                    {metric.icon}
+                  </div>
                 </div>
-                <div className="bg-black bg-opacity-20 p-2 rounded-lg">
-                  {metric.icon}
+                <div className="mt-4 flex items-center">
+                  <span
+                    className={`text-xs font-medium px-2 py-1 rounded-full ${
+                      metric.change >= 0 || isNaN(metric.change)
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
+                    }`}
+                  >
+                    {isNaN(metric.change)
+                      ? "↑ 0%"
+                      : metric.change >= 0
+                      ? `↑ ${Math.abs(metric.change).toFixed(1)}%`
+                      : `↓ ${Math.abs(metric.change).toFixed(1)}%`}
+                  </span>
+                  <span className="text-xs opacity-80 ml-2">vs last quarter</span>
                 </div>
               </div>
-              <div className="mt-4 flex items-center">
-                <span
-                  className={`text-xs font-medium px-2 py-1 rounded-full ${
-                    metric.change >= 0 || isNaN(metric.change)
-                      ? "bg-green-100 text-green-800"
-                      : "bg-red-100 text-red-800"
-                  }`}
-                >
-                  {isNaN(metric.change)
-                    ? "↑ 0%"
-                    : metric.change >= 0
-                    ? `↑ ${Math.abs(metric.change).toFixed(1)}%`
-                    : `↓ ${Math.abs(metric.change).toFixed(1)}%`}
-                </span>
-                <span className="text-xs opacity-80 ml-2">vs last quarter</span>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm lg:col-span-2">
+        {/* Charts & Distribution */}
+        <div className="w-full overflow-x-auto">
+          <div className="bg-white p-3 md:p-5 rounded-xl border border-gray-200 shadow-sm mb-6 min-w-0">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold text-gray-900">
                 Revenue Trend
@@ -1562,7 +1616,7 @@ const fetchAllUsers = async () => {
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart
                     data={dashboardData.chartData}
-                    margin={{ top: 10, right: 30, left: 10, bottom: 0 }}
+                    margin={{ top: 10, right: 30, left: 30, bottom: 0 }} // Increased left margin from 10 to 50
                   >
                     <defs>
                       <linearGradient
@@ -1591,12 +1645,21 @@ const fetchAllUsers = async () => {
                     />
                     <XAxis
                       dataKey="name"
-                      tick={{ fill: "#6B7280" }}
+                      tick={{ fill: "#6B7280", fontSize: 8 }}
                       axisLine={false}
                       tickLine={false}
+                      interval={0}
+                      tickFormatter={(value) => {
+                        // For quarter/year, show month and year for clarity
+                        if (timePeriod === "quarter" || timePeriod === "year") {
+                          return `${value} ${currentDateRange.start.getFullYear()}`;
+                        }
+                        return value;
+                      }}
                     />
                     <YAxis
-                      tick={{ fill: "#6B7280" }}
+                      width={30} // Keep width for large numbers
+                      tick={{ fill: "#6B7280", fontSize: 10 }} // Reduce font size for Y-axis numbers
                       axisLine={false}
                       tickLine={false}
                     />
@@ -1615,10 +1678,8 @@ const fetchAllUsers = async () => {
               )}
             </div>
           </div>
-
-          <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm  ">
-            {/* Lead Distribution Box */}
-            <div className="">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 min-w-0">
+            <div className="bg-white p-2 md:p-3 rounded-xl border border-gray-200 shadow-sm min-w-0">
               <h3 className="text-md font-semibold text-gray-800 mb-3">
                 Lead Distribution
               </h3>
@@ -1627,9 +1688,7 @@ const fetchAllUsers = async () => {
                 isLoading={isLoading}
               />
             </div>
-
-            {/* Education Distribution Box */}
-            <div className="">
+            <div className="bg-white p-2 md:p-3 rounded-xl border border-gray-200 shadow-sm min-w-0">
               <h3 className="text-md font-semibold text-gray-800 mb-3">
                 Education Distribution
               </h3>
@@ -1638,30 +1697,185 @@ const fetchAllUsers = async () => {
                 isLoading={isLoading}
               />
             </div>
+            <div className="bg-white p-2 md:p-3 rounded-xl border border-gray-200 shadow-sm min-w-0">
+              <h3 className="text-md font-semibold text-gray-800 mb-3">
+                Student Distribution
+              </h3>
+              <EducationDistribution
+                leadCategories={dashboardData.studentCategories}
+                isLoading={isLoading}
+              />
+            </div>
           </div>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm lg:col-span-2">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              {selectedUserId ? "Your Performance" : "Team Performance"}
-            </h2>
-            <TeamPerformance
-              teamPerformance={dashboardData.teamPerformance}
-              isLoading={isLoading}
-              selectedUserId={selectedUserId}
-            />
-          </div>
 
-          <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Recent Activity
-            </h2>
-            <RecentActivity
-              recentActivity={dashboardData.recentActivity}
-              isLoading={isLoading}
-            />
+        {/* Performance & Activity */}
+        <div className="w-full overflow-x-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 min-w-0">
+            <div className="bg-white p-3 md:p-5 rounded-xl border border-gray-200 shadow-sm lg:col-span-2 min-w-0">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                {selectedUserId ? "Individual Pipeline" : "Sales Team Pipeline"}
+              </h2>
+              <TeamPerformance
+                teamPerformance={dashboardData.teamPerformance}
+                isLoading={isLoading}
+                selectedUserId={selectedUserId}
+                onMemberClick={handleMemberClick} // Pass handler
+              />
+            </div>
+            <div className="bg-white p-3 md:p-5 rounded-xl border border-gray-200 shadow-sm min-w-0">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                Recent Activity
+              </h2>
+              <RecentActivity
+                recentActivity={dashboardData.recentActivity}
+                isLoading={isLoading}
+              />
+            </div>
           </div>
         </div>
+
+
+
+        {/* Modal for showing leads */}
+      <ReactModal
+  isOpen={isModalOpen}
+  onRequestClose={() => setIsModalOpen(false)}
+  ariaHideApp={false}
+  className="fixed inset-0 flex items-center justify-center z-50"
+  overlayClassName="fixed inset-0 bg-gradient-to-br from-gray-900/40 to-indigo-200/30 backdrop-blur-sm transition-all"
+>
+  <div
+    className="relative bg-white rounded-2xl shadow-2xl max-w-3xl w-full mx-4 p-0 flex flex-col overflow-hidden animate-fade-in"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="modal-title"
+    style={{ maxHeight: "600px" }} // Add a fixed max height
+  >
+    {/* Header */}
+    <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-white via-gray-50 to-indigo-50">
+      <div className="flex items-center gap-3">
+        <div className="bg-indigo-100 text-indigo-600 rounded-full w-10 h-10 flex items-center justify-center font-bold text-lg shadow-sm">
+          {modalMember?.name?.[0] || "?"}
+        </div>
+        <div>
+          <h3
+            id="modal-title"
+            className="text-lg md:text-xl font-semibold text-gray-900"
+          >
+            Colleges for {modalMember?.name}
+          </h3>
+          <div className="text-xs text-gray-500 font-medium mt-0.5">
+            Total: <span className="text-indigo-600 font-bold">{modalLeads.length}</span>
+          </div>
+        </div>
+      </div>
+      <button
+        className="p-2 rounded-full hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-400"
+        aria-label="Close"
+        onClick={() => setIsModalOpen(false)}
+      >
+        <svg
+          className="w-5 h-5 text-gray-500"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+
+    {/* Table */}
+    <div className="px-6 py-4 bg-white flex-1 overflow-y-auto" style={{ minHeight: 0 }}>
+      <div className="overflow-x-auto">
+        {modalLeads.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+            <svg className="w-12 h-12 mb-2" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-base font-medium">No leads found.</span>
+          </div>
+        ) : (
+          <table className="min-w-full text-sm md:text-base">
+            <thead>
+              <tr className="bg-gray-50">
+                <th className="text-left px-3 py-2 font-semibold text-gray-700">College</th>
+                <th className="text-left px-3 py-2 font-semibold text-gray-700">Course/Year</th>
+              </tr>
+            </thead>
+            <tbody>
+              {modalLeads.map((lead) => (
+                <tr
+                  key={lead.id}
+                  className="hover:bg-indigo-50 transition-colors group"
+                >
+<td className="px-3 py-2 whitespace-nowrap text-gray-900 font-medium flex items-center gap-2">
+  {/* Symbol for phase */}
+  {lead.phase === "cold" && (
+    <span
+      className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 font-bold text-xs border border-blue-200"
+      title="Cold"
+    >
+      C
+    </span>
+  )}
+  {lead.phase === "warm" && (
+    <span
+      className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-yellow-100 text-yellow-700 font-bold text-xs border border-yellow-200"
+      title="Warm"
+    >
+      W
+    </span>
+  )}
+  {lead.phase === "hot" && (
+    <span
+      className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-700 font-bold text-xs border border-red-200"
+      title="Hot"
+    >
+      H
+    </span>
+  )}
+{lead.phase === "closed" && (
+  <span
+    className="inline-flex items-center justify-center h-6 rounded-full bg-green-100 text-green-700 font-bold text-[10px] border border-green-200"
+    title="Closed"
+    style={{ minWidth: "1.3rem", padding: "0 0.3rem" }}
+  >
+    CL
+  </span>
+)}
+  {lead.businessName || "-"}
+</td>
+                  <td className="px-3 py-2 text-gray-700">
+                    {lead.courses?.[0]?.courseType || "-"}
+                    {lead.courses?.[0]?.year
+                      ? ` (${lead.courses?.[0]?.year})`
+                      : ""}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+
+    {/* Footer */}
+    <div className="px-6 py-3 bg-gradient-to-r from-white via-gray-50 to-indigo-50 border-t border-gray-100 flex justify-end">
+      <button
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold shadow hover:bg-indigo-700 transition focus:outline-none focus:ring-2 focus:ring-indigo-400"
+        onClick={() => setIsModalOpen(false)}
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+        Close
+      </button>
+    </div>
+  </div>
+</ReactModal>
       </div>
     </div>
   );

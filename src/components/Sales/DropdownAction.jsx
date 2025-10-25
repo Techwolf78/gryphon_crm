@@ -1,15 +1,15 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
-  FaPhone,
   FaCalendarCheck,
   FaEdit,
   FaArrowRight,
   FaCheckCircle,
+  FaTrash,
 } from "react-icons/fa";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 
-export default function DropdownActions({
+const DropdownActions = ({
   leadId,
   leadData,
   closeDropdown,
@@ -20,88 +20,94 @@ export default function DropdownActions({
   updateLeadPhase,
   activeTab,
   dropdownRef,
-  users,
-  currentUser,
+  users, // Firestore users collection
+  currentUser, // Firebase Auth user
   setShowExpectedDateModal,
   setPendingPhaseChange,
   setLeadBeingUpdated,
-}) {
+  isMyLead,
+}) => {
   const [assignHovered, setAssignHovered] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [currentUserData, setCurrentUserData] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  // Debug logs for props
-  console.log("DropdownActions props:", { leadId, leadData, currentUser, users });
 
-  // Dummy data for testing, comment this out when using real data
-  /*
-  const dummyUsers = {
-    user1: { uid: "user1", name: "John Doe", role: "Manager", department: "Sales", reportingManager: "Director A" },
-    user2: { uid: "user2", name: "Jane Smith", role: "Executive", department: "Sales", reportingManager: "John Doe" },
-    user3: { uid: "user3", name: "Director A", role: "Director", department: "Sales" }
+
+  // Get complete user data from Firestore
+  useEffect(() => {
+    if (currentUser?.uid && users) {
+      // Find user in Firestore collection
+      const userDoc = Object.values(users).find(
+        (user) => user.uid === currentUser.uid
+      );
+
+      if (userDoc) {
+        setCurrentUserData(userDoc);
+      } else {
+        setCurrentUserData(null);
+      }
+    }
+  }, [currentUser, users]);
+
+  const handleDeleteLead = async () => {
+    setIsDeleting(true);
+    try {
+      await deleteDoc(doc(db, "leads", leadId));
+    } catch {
+      // Handle error silently
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+      closeDropdown();
+    }
   };
-  const dummyCurrentUser = { uid: "user1" };
-  */
-function getAssignableUsers(currentUser, users) {
-  console.log("getAssignableUsers called with:", currentUser, users);
 
-  if (!currentUser?.uid || !users || Object.keys(users).length === 0) {
-    console.warn("currentUser or users data missing");
-    return [];
-  }
+  const getAssignableUsers = () => {
+    if (!currentUserData || !users) return [];
 
-  const userList = Object.values(users);
-  const allSalesUsers = userList.filter(u => u.department === "Sales");
-  const currentUserData = userList.find(u => u.uid === currentUser.uid);
-
-  if (!currentUserData) {
-    console.warn("No currentUserData found for uid:", currentUser.uid);
-    return [];
-  }
-
-  const role = currentUserData.role;
-  console.log("Current user role:", role);
-
-  // Director / Head can see all sales users
-  if (["Director", "Head"].includes(role)) {
-    return allSalesUsers;
-  }
-
-  // Manager can assign to Assistant Managers & Executives reporting to them
-  if (role === "Manager") {
-    return allSalesUsers.filter(
-      u =>
-        u.reportingManager === currentUserData.name &&
-        ["Assistant Manager", "Executive"].includes(u.role)
-    );
-  }
-
-  // Executive / Assistant Manager can assign to their manager and peers (same reportingManager)
-  if (["Executive", "Assistant Manager"].includes(role)) {
-    const manager = userList.find(u => u.name === currentUserData.reportingManager);
-    
-    // Peers with same reportingManager irrespective of Executive or Assistant Manager role (except self)
-    const peers = allSalesUsers.filter(
-      u =>
-        u.reportingManager === currentUserData.reportingManager &&
-        u.uid !== currentUser.uid // exclude self
+    const userList = Object.values(users);
+    const allSalesUsers = userList.filter(
+      (u) =>
+        ["Sales", "Admin"].includes(u.department) && u.uid !== currentUser.uid
     );
 
-    // Return manager + all peers with same reportingManager
-    return [manager, ...peers].filter(Boolean);
-  }
+    if (["Director", "Head"].includes(currentUserData.role)) {
+      return allSalesUsers;
+    }
 
-  return [];
-}
+    if (currentUserData.role === "Manager") {
+      // Get Assistant Managers, Executives, and Managers (excluding self)
+      return allSalesUsers.filter(
+        (u) =>
+          (u.reportingManager === currentUserData.name &&
+            ["Assistant Manager", "Executive"].includes(u.role)) ||
+          (u.role === "Manager" && u.uid !== currentUser.uid)
+      );
+    }
+    if (["Assistant Manager", "Executive"].includes(currentUserData.role)) {
+      const manager = userList.find(
+        (u) => u.name === currentUserData.reportingManager
+      );
+      const peers = allSalesUsers.filter(
+        (u) =>
+          u.reportingManager === currentUserData.reportingManager &&
+          u.uid !== currentUser.uid
+      );
+      return [manager, ...peers].filter(Boolean);
+    }
 
+    return [];
+  };
 
-  // Use real data here:
-  const assignableUsers = getAssignableUsers(currentUser, users);
-  console.log("Assignable Users:", assignableUsers);
+  const assignableUsers = getAssignableUsers();
 
   return (
     <div
       ref={dropdownRef}
       className="absolute z-50 bg-white rounded-xl shadow-xl w-48 overflow-visible -right-4 top-full mt-1 animate-fadeIn"
       onClick={(e) => e.stopPropagation()}
+      data-tour="lead-actions"
     >
       <div className="py-1 relative">
         {/* Meetings */}
@@ -113,24 +119,28 @@ function getAssignableUsers(currentUser, users) {
             setShowFollowUpModal(true);
             closeDropdown();
           }}
+          data-tour="follow-up-action"
         >
           <FaCalendarCheck className="text-purple-500 mr-3" />
           Meetings
         </button>
 
         {/* Edit */}
-        <button
-          className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition"
-          onClick={(e) => {
-            e.stopPropagation();
-            setSelectedLead({ ...leadData, id: leadId });
-            setShowDetailsModal(true);
-            closeDropdown();
-          }}
-        >
-          <FaEdit className="text-indigo-500 mr-3" />
-          Edit
-        </button>
+        {isMyLead && (
+          <button
+            className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedLead({ ...leadData, id: leadId });
+              setShowDetailsModal(true);
+              closeDropdown();
+            }}
+            data-tour="view-details-action"
+          >
+            <FaEdit className="text-indigo-500 mr-3" />
+            Edit
+          </button>
+        )}
 
         {/* Assign Dropdown */}
         <div
@@ -138,13 +148,16 @@ function getAssignableUsers(currentUser, users) {
           onMouseEnter={() => setAssignHovered(true)}
           onMouseLeave={() => setAssignHovered(false)}
           onClick={(e) => e.stopPropagation()}
+          data-tour="assign-action"
         >
           <FaArrowRight className="text-indigo-500 mr-3" />
           Assign
           {assignHovered && (
             <div className="absolute right-full top-0 ml-2 w-48 bg-white border rounded-lg shadow-lg z-50 p-2 animate-fadeIn max-h-60 overflow-y-auto">
               {assignableUsers.length === 0 ? (
-                <div className="text-gray-500 px-3 py-1.5 text-sm">No users available</div>
+                <div className="text-gray-500 px-3 py-1.5 text-sm">
+                  No users available
+                </div>
               ) : (
                 assignableUsers.map((user) => (
                   <button
@@ -159,16 +172,16 @@ function getAssignableUsers(currentUser, users) {
                             email: user.email,
                           },
                         });
-                        console.log("Assigned to:", user.name);
                       } catch (error) {
-                        console.error("Error assigning lead:", error);
+                        // Handle error silently
                       }
                       setAssignHovered(false);
                       closeDropdown();
                     }}
                     className="block w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded"
                   >
-                    {user.name} <span className="text-xs text-gray-400">({user.role})</span>
+                    {user.name}{" "}
+                    <span className="text-xs text-gray-400">({user.role})</span>
                   </button>
                 ))
               )}
@@ -177,7 +190,7 @@ function getAssignableUsers(currentUser, users) {
         </div>
 
         {/* Phase Change Header */}
-        <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+        <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider" data-tour="move-phase-action">
           Move to
         </div>
 
@@ -191,7 +204,8 @@ function getAssignableUsers(currentUser, users) {
               onClick={async (e) => {
                 e.stopPropagation();
                 const isFromHotToWarmOrCold =
-                  leadData.phase === "hot" && (phase === "warm" || phase === "cold");
+                  leadData.phase === "hot" &&
+                  (phase === "warm" || phase === "cold");
 
                 if (isFromHotToWarmOrCold) {
                   setLeadBeingUpdated({ ...leadData, id: leadId });
@@ -227,12 +241,98 @@ function getAssignableUsers(currentUser, users) {
               setShowClosureModal(true);
               closeDropdown();
             }}
+            data-tour="closure-action"
           >
             <FaCheckCircle className="text-green-500 mr-3" />
-            Closure
+            Client Onboarding
           </button>
         )}
+
+        {/* Delete Button (only for Admin) */}
+        {currentUserData?.department === "Admin" && (
+          <>
+            <div className="border-t border-gray-200 my-1"></div>
+            <button
+              className={`flex items-center w-full px-4 py-3 text-sm ${
+                isDeleting ? "text-gray-500" : "text-red-600"
+              } hover:bg-red-50 transition`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowDeleteConfirm(true);
+              }}
+              disabled={isDeleting}
+            >
+              <FaTrash
+                className={`mr-3 ${
+                  isDeleting ? "text-gray-400" : "text-red-500"
+                }`}
+              />
+              {isDeleting ? "Deleting..." : "Delete"}
+            </button>
+          </>
+        )}
       </div>
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 backdrop-blur-lg flex items-center justify-center z-50 p-4">
+          <div className="bg-white bg-opacity-20 backdrop-blur-xl rounded-xl shadow-lg max-w-md w-full p-6 animate-fadeIn border border-white border-opacity-30">
+            <div className="text-center">
+              <FaTrash className="mx-auto text-red-500 text-4xl mb-4" />
+              <h3 className="text-lg font-medium text-gray-800 mb-2">
+                Delete Lead
+              </h3>
+              <p className="text-gray-500 mb-6">
+                Are you sure you want to permanently delete this lead? This
+                action cannot be undone.
+              </p>
+
+              <div className="flex justify-center space-x-4">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteLead}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition flex items-center justify-center"
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    <>
+                      <svg
+                        className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                      Deleting...
+                    </>
+                  ) : (
+                    "Delete Permanently"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
+};
+
+export default DropdownActions;

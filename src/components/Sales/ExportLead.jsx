@@ -73,10 +73,25 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
   const formatCourseDetails = (courses) => {
     if (!courses || !Array.isArray(courses)) return [];
 
+    const currentYear = new Date().getFullYear();
+    const nextYear = currentYear + 1;
+    const currentAcademicYear = `${currentYear}-${nextYear}`;
+
     return courses.map((course) => {
       const courseType = course.courseType || course.manualCourseType || "";
       const specializations = course.specializations?.join(", ") || "";
       const passingYear = course.passingYear || "";
+      const yearOfStudy = course.year || ""; // "2nd", "3rd", etc.
+
+      // Format passing year information
+      let passingYearDisplay = passingYear;
+      if (passingYear) {
+        passingYearDisplay = `${passingYear} (Current: ${currentAcademicYear})`;
+        if (yearOfStudy) {
+          passingYearDisplay += `, ${yearOfStudy} Year`;
+        }
+      }
+
       const studentCount = course.studentCount || "";
       const perStudentCost = course.perStudentCost || "";
       const courseTCV = course.courseTCV || 0;
@@ -84,10 +99,11 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
       return {
         courseType,
         specializations,
-        passingYear,
+        passingYear: passingYearDisplay,
         studentCount,
         perStudentCost,
         courseTCV,
+        yearOfStudy, // Added as separate field if you want it in export
       };
     });
   };
@@ -119,12 +135,12 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
           "Email ID": lead.email || "",
         };
 
-        // Add course details right after basic info
         courseDetails.forEach((course, index) => {
           const prefix = `Course ${index + 1}`;
           leadInfo[`${prefix} - Type`] = course.courseType;
           leadInfo[`${prefix} - Specializations`] = course.specializations;
           leadInfo[`${prefix} - Passing Year`] = course.passingYear;
+          leadInfo[`${prefix} - Year of Study`] = course.yearOfStudy; // Added this line
           leadInfo[`${prefix} - Student Count`] = course.studentCount;
           leadInfo[`${prefix} - Per Student Cost`] = course.perStudentCost;
           leadInfo[`${prefix} - Course TCV`] = course.courseTCV;
@@ -139,6 +155,9 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
         leadInfo["Total TCV"] = lead.tcv || "";
         leadInfo["Expected Closure"] = parseDate(lead.expectedClosureDate);
         leadInfo["Meetings"] = getAllFollowUps(lead.followup);
+        
+        // ✅ NEW: Add "Assigned To" column at the end
+        leadInfo["Assigned To"] = lead.assignedTo?.name || "";
 
         result[phase].push(leadInfo);
       }
@@ -149,9 +168,25 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
   const handleExport = (option) => {
     const leadsToExport =
       option === "all"
-        ? filterOutClosed(allLeads || [])
-        : filterOutClosed(filteredLeads || []);
-    const grouped = groupByPhase(leadsToExport);
+        ? filterOutClosed(allLeads || [])  // ✅ Keep filtering out closed leads for "All Leads"
+        : filterOutClosed(filteredLeads || []); // ✅ Filter for "Current View"
+    
+    // Check if there are any leads to export
+    if (!leadsToExport || leadsToExport.length === 0) {
+      alert("No leads available to export. Please check your data.");
+      setMenuOpen(false);
+      return;
+    }
+
+    const grouped = groupByPhase(leadsToExport); // ✅ Use existing function for both options
+
+    // Check if any phase has data
+    const hasData = Object.values(grouped).some(phaseData => phaseData.length > 0);
+    if (!hasData) {
+      alert("No leads found in Hot, Warm, or Cold phases. Only open leads can be exported.");
+      setMenuOpen(false);
+      return;
+    }
 
     const wb = XLSX.utils.book_new();
 
@@ -161,8 +196,10 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
       cold: "CCECFF",
     };
 
+    let sheetsAdded = 0;
+
     Object.entries(grouped).forEach(([phase, data]) => {
-      if (data.length === 0) return;
+      if (data.length === 0) return; // Skip empty phases
 
       const headers = Object.keys(data[0]);
       const sheetData = [
@@ -185,6 +222,10 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
         }
         if (header.includes("Type") || header.includes("Course")) {
           return { wch: 15 };
+        }
+        // ✅ NEW: Set width for "Assigned To" column
+        if (header === "Assigned To") {
+          return { wch: 18 };
         }
         return { wch: 12 };
       });
@@ -255,18 +296,32 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
         ws,
         `${phase[0].toUpperCase()}${phase.slice(1)} Leads`
       );
+      
+      sheetsAdded++;
     });
+
+    // Final check before writing - this should never happen now, but just in case
+    if (sheetsAdded === 0) {
+      alert("No valid data found to export.");
+      setMenuOpen(false);
+      return;
+    }
 
     const fileName =
       option === "all"
-        ? "All Leads.xlsx"
+        ? "All_Leads.xlsx"
         : Object.keys(grouped)
             .filter((key) => grouped[key].length > 0)
-            .map((key) => `${key[0].toUpperCase()}${key.slice(1)} Leads`)
-            .join(" & ") + ".xlsx";
+            .map((key) => `${key[0].toUpperCase()}${key.slice(1)}_Leads`)
+            .join("_") + ".xlsx";
 
-    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    saveAs(new Blob([wbout], { type: "application/octet-stream" }), fileName);
+    try {
+      const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      saveAs(new Blob([wbout], { type: "application/octet-stream" }), fileName);
+    } catch (error) {
+
+      alert("Export failed. Please try again or contact support.");
+    }
 
     setMenuOpen(false);
   };
@@ -275,7 +330,7 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
     <div className="relative inline-block text-left" ref={dropdownRef}>
       <button
         onClick={() => setMenuOpen((prev) => !prev)}
-        className="flex items-center justify-center px-2 py-2 bg-white border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50  focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 ease-in-out hover:shadow-md"
+        className="flex items-center justify-center px-2 py-1 bg-white border border-gray-300 rounded-lg shadow-sm text-xs font-medium text-gray-700 hover:bg-gray-50  focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 ease-in-out hover:shadow-md"
       >
         <FiDownload className="w-4 h-4 mr-2" />
         Export Data

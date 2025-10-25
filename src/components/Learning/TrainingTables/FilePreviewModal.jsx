@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import * as XLSX from "xlsx-js-style";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
@@ -17,14 +17,7 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
 
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    if (type === "student" && trainingId) {
-      fetchStudentData();
-    }
-
-  }, [trainingId, type]);
-
-  const fetchStudentData = async () => {
+  const fetchStudentData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -47,11 +40,17 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
       }
       setStudentData(students);
     } catch (err) {
-      console.error("Error fetching student subcollection data:", err);
+      console.error("Error fetching student data:", err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [trainingId]);
+
+  useEffect(() => {
+    if (type === "student" && trainingId) {
+      fetchStudentData();
+    }
+  }, [trainingId, type, fetchStudentData]);
 
   const startEditing = (rowIndex) => {
     setEditRowIndex(rowIndex);
@@ -92,17 +91,12 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
       return;
     }
 
-    try {
-      const batchUpdates = data.map(student => {
-        const studentDocRef = doc(db, "trainingForms", trainingId, "students", student.id);
-        return setDoc(studentDocRef, student);
-      });
+    const batchUpdates = data.map(student => {
+      const studentDocRef = doc(db, "trainingForms", trainingId, "students", student.id);
+      return setDoc(studentDocRef, student);
+    });
 
-      await Promise.all(batchUpdates);
-    } catch (err) {
-      console.error("Failed to save student data:", err);
-      throw err;
-    }
+    await Promise.all(batchUpdates);
   };
 
 
@@ -143,13 +137,15 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
           </div>
           <div className="flex items-center space-x-3">
             {type === "student" && studentData.length > 0 && (
-              <button
-                onClick={exportToExcel}
-                className="flex items-center px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700"
-              >
-                <FiDownload className="mr-2" />
-                Export
-              </button>
+              <>
+                <button
+                  onClick={exportToExcel}
+                  className="flex items-center px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700"
+                >
+                  <FiDownload className="mr-2" />
+                  Export
+                </button>
+              </>
             )}
             <button
               onClick={onClose}
@@ -204,8 +200,8 @@ function FilePreviewModal({ fileUrl, type, trainingId, onClose }) {
                           >
                             {editRowIndex === rowIndex ? (
                               <input
-                                type={typeof row[header] === 'string' && row[header].match(/^\d{1,2}\/\d{1,2}\/\d{4}/) ? "date" : "text"}
-                                value={editedRowData[header] || ""}
+                                type={typeof row[header] === 'string' && row[header]?.match(/^\d{1,2}\/\d{1,2}\/\d{4}/) ? "date" : "text"}
+                                value={editedRowData[header] || row[header] || ""}
                                 onChange={(e) => handleEditChange(header, e.target.value)}
                                 className="w-full border rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                               />

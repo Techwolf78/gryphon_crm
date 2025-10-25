@@ -175,7 +175,7 @@ if (viewMyLeadsOnly) {
       onUpdate();
       setIsEditing(false);
     } catch (err) {
-      console.error("Error updating target:", err);
+
       setError("Failed to update target. Please try again.");
     } finally {
       setIsUpdating(false);
@@ -184,7 +184,10 @@ if (viewMyLeadsOnly) {
  
   const handleInputChange = (e) => {
     const val = e.target.value.replace(/[^0-9]/g, "");
-    setEditValue(val.replace(/\B(?=(\d{3})+(?!\d))/g, ","));
+    // Convert to Indian number format (1,00,00,000 instead of 1,000,000)
+    const num = parseInt(val) || 0;
+    const indianFormatted = num.toLocaleString('en-IN');
+    setEditValue(indianFormatted);
   };
  
   const handleKeyDown = (e) => {

@@ -1,8 +1,16 @@
-// firebase.js
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import {
+  getAuth,
+  setPersistence,
+  browserSessionPersistence,
+  browserLocalPersistence
+} from "firebase/auth";
+import {
+  initializeFirestore,
+  persistentLocalCache,
+} from "firebase/firestore";
 
+// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyD9SBw0ZckY3ht0CwH39C5pPRWwkR2zR4M",
   authDomain: "authencation-39485.firebaseapp.com",
@@ -14,17 +22,39 @@ const firebaseConfig = {
   measurementId: "G-0V7B973Q8T"
 };
 
-// Primary Firebase app initialization
+
+// Initialize main app
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+
+// Auth
 const auth = getAuth(app);
-setPersistence(auth, browserLocalPersistence);
 
-// Firestore instance
-const db = getFirestore(app);
+// Auth persistence helper
+export const setAuthPersistence = async (rememberMe) => {
+  try {
+    await setPersistence(
+      auth,
+      rememberMe ? browserLocalPersistence : browserSessionPersistence
+    );
+  } catch (error) {
+    console.error("Error setting auth persistence:", error);
+  }
+};
 
-// Secondary Firebase app (named "Secondary") for creating new users without signing out main user
-const secondaryApp = initializeApp(firebaseConfig, "Secondary");
-const secondaryAuth = getAuth(secondaryApp);
-setPersistence(secondaryAuth, browserLocalPersistence);
+// Default: session persistence
+setPersistence(auth, browserSessionPersistence).catch(() => {});
+
+// Firestore with built-in persistence (recommended way)
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache(), // replaces enableIndexedDbPersistence
+});
+
+// Secondary app for admin operations
+let secondaryApp;
+let secondaryAuth;
+
+secondaryApp = initializeApp(firebaseConfig, "Secondary");
+secondaryAuth = getAuth(secondaryApp);
+setPersistence(secondaryAuth, browserSessionPersistence).catch(() => {});
 
 export { app, auth, db, secondaryApp, secondaryAuth };
