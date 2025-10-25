@@ -1310,7 +1310,6 @@ resumes in a zip folder by 10th July 2025 by 2:00 pm.*
                   </>
                 )}
               </div>
-
               <div className="bg-gray-50 px-6 py-4 flex justify-end">
                 <button
                   onClick={closeStudentView}
