@@ -3,6 +3,7 @@ import React, { useState, useMemo, useCallback } from "react";
 function StudentListModal({ students, onClose }) {
   const [serialSortDirection, setSerialSortDirection] = useState('asc'); // 'asc' or 'desc'
   const [isSerialColumnSorted, setIsSerialColumnSorted] = useState(false);
+  const [showAllColumns, setShowAllColumns] = useState(false);
 
   // Inline CSS for animations
   const modalStyles = `
@@ -66,6 +67,20 @@ function StudentListModal({ students, onClose }) {
       return a.localeCompare(b);
     });
   }, [students]);
+
+  // Define important columns that should be shown by default
+  const importantColumns = [
+    'SR NO', 'FULL NAME OF STUDENT', 'CURRENT COLLEGE NAME', 
+    'EMAIL ID', 'MOBILE NO.', 'COURSE', 'SPECIALIZATION', 'PASSING YEAR'
+  ];
+
+  // Filter headers based on showAllColumns toggle
+  const displayedHeaders = showAllColumns ? headers : headers.filter(header => 
+    importantColumns.some(important => 
+      header.toLowerCase().includes(important.toLowerCase()) || 
+      important.toLowerCase().includes(header.toLowerCase())
+    )
+  );
 
   const handleSerialSort = () => {
     setSerialSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -140,7 +155,23 @@ function StudentListModal({ students, onClose }) {
         <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-7xl max-h-[90vh] flex flex-col overflow-hidden animate-slideUp transform transition-all duration-300">
         {/* Header */}
         <div className="bg-blue-600 px-6 py-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-white">Student Details</h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-xl font-bold text-white">Student Details</h2>
+            <button
+              onClick={() => setShowAllColumns(!showAllColumns)}
+              className="flex items-center gap-1 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg transition-colors border border-white/20 text-sm"
+              title={showAllColumns ? "Show important columns only" : "Show all columns"}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {showAllColumns ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                )}
+              </svg>
+              {showAllColumns ? "Important" : "All"}
+            </button>
+          </div>
           <button 
             onClick={onClose}
             className="text-white hover:text-gray-200 text-2xl focus:outline-none"
@@ -164,9 +195,9 @@ function StudentListModal({ students, onClose }) {
               <table className="min-w-full divide-y divide-gray-200" style={{ tableLayout: 'fixed' }}>
                 <thead className="bg-gray-50 sticky top-0 z-10">
                   <tr>
-                    {headers.map((header) => {
+                    {displayedHeaders.map((header) => {
                       const isSerialColumn = /^(s\.?\s*no\.?\s*|sr\.?\s*no\.?\s*|serial\s*no\.?\s*|sn\s*)$/i.test(header.trim()) || header.trim().toLowerCase() === 'sn';
-                      const columnWidth = isSerialColumn ? '60px' : `${100 / (headers.length - (headers.some(h => /^(s\.?\s*no\.?\s*|sr\.?\s*no\.?\s*|serial\s*no\.?\s*|sn\s*)$/i.test(h.trim()) || h.trim().toLowerCase() === 'sn') ? 1 : 0))}%`;
+                      const columnWidth = isSerialColumn ? '60px' : `${100 / (displayedHeaders.length - (displayedHeaders.some(h => /^(s\.?\s*no\.?\s*|sr\.?\s*no\.?\s*|serial\s*no\.?\s*|sn\s*)$/i.test(h.trim()) || h.trim().toLowerCase() === 'sn') ? 1 : 0))}%`;
                       return (
                         <th 
                           key={header}
@@ -207,7 +238,7 @@ function StudentListModal({ students, onClose }) {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {sortedData.map((student, idx) => (
                     <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                      {headers.map((header) => {
+                      {displayedHeaders.map((header) => {
                         const cellValue = formatCellValue(student[header]);
                         return (
                           <td key={header} className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 truncate" title={cellValue}>
