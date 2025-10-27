@@ -122,7 +122,7 @@ export default function ContractInvoiceTable() {
         setExistingProformas(proformaData);
 
         setInvoices(trainingFormsData);
-      } catch (err) {
+      } catch {
         setError("Failed to load data. Please try again.");
       } finally {
         setLoading(false);
@@ -1835,17 +1835,24 @@ const handleMergeSubmit = async (formData) => {
                                             inv.amountRaised ||
                                             inv.netPayableAmount ||
                                             installment.totalAmount;
-                                          const receivedAmount =
-                                            inv.receivedAmount || 0;
 
-                                          // Calculate total TDS amount from payment history
-                                          const totalTdsAmount = inv.paymentHistory?.reduce((sum, payment) => {
-                                            return sum + (parseFloat(payment.tdsAmount) || 0);
+                                          // Calculate total billed amount from payment history (including GST for tax invoices only)
+                                          const totalBilledAmount = inv.paymentHistory?.reduce((sum, payment) => {
+                                            const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
+                                            const tdsBaseType = payment.tdsBaseType || "base";
+                                            const isCashInvoice = inv.invoiceType === "Cash Invoice";
+                                            const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? Math.round(originalAmount * 1.18) : originalAmount);
+                                            return sum + billedAmount;
                                           }, 0) || 0;
 
-                                          // Due amount should account for TDS: totalAmount - (receivedAmount + totalTdsAmount)
-                                          const dueAmount =
-                                            totalAmount - (receivedAmount + totalTdsAmount);
+                                          // Due amount should account for total billed amounts including GST
+                                          const calculatedDue = totalAmount - totalBilledAmount;
+                                          const dbDueAmount = parseFloat(inv.dueAmount) || 0;
+                                          const isFullyPaidByCalc = Math.abs(calculatedDue) < 0.01;
+                                          const isFullyPaidByDB = Math.abs(dbDueAmount) < 0.01;
+                                          const isFullyPaid = isFullyPaidByCalc || isFullyPaidByDB;
+
+                                          const dueAmount = isFullyPaid ? 0 : dbDueAmount || calculatedDue;
 
                                           return (
                                             <div
@@ -2019,7 +2026,7 @@ const handleMergeSubmit = async (formData) => {
                                         Invoice Type
                                       </th>
                                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                        Received Amount
+                                        Billed Amount
                                       </th>
                                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                                         Due Amount
@@ -2084,17 +2091,24 @@ const handleMergeSubmit = async (formData) => {
                                                   inv.amountRaised ||
                                                   inv.netPayableAmount ||
                                                   installment.totalAmount;
-                                                const receivedAmount =
-                                                  inv.receivedAmount || 0;
 
-                                                // Calculate total TDS amount from payment history
-                                                const totalTdsAmount = inv.paymentHistory?.reduce((sum, payment) => {
-                                                  return sum + (parseFloat(payment.tdsAmount) || 0);
+                                                // Calculate total billed amount from payment history (including GST for tax invoices only)
+                                                const totalBilledAmount = inv.paymentHistory?.reduce((sum, payment) => {
+                                                  const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
+                                                  const tdsBaseType = payment.tdsBaseType || "base";
+                                                  const isCashInvoice = inv.invoiceType === "Cash Invoice";
+                                                  const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? Math.round(originalAmount * 1.18) : originalAmount);
+                                                  return sum + billedAmount;
                                                 }, 0) || 0;
 
-                                                // Due amount should account for TDS: totalAmount - (receivedAmount + totalTdsAmount)
-                                                const dueAmount =
-                                                  totalAmount - (receivedAmount + totalTdsAmount);
+                                                // Due amount should account for total billed amounts including GST
+                                                const calculatedDue = totalAmount - totalBilledAmount;
+                                                const dbDueAmount = parseFloat(inv.dueAmount) || 0;
+                                                const isFullyPaidByCalc = Math.abs(calculatedDue) < 0.01;
+                                                const isFullyPaidByDB = Math.abs(dbDueAmount) < 0.01;
+                                                const isFullyPaid = isFullyPaidByCalc || isFullyPaidByDB;
+
+                                                const dueAmount = isFullyPaid ? 0 : dbDueAmount || calculatedDue;
 
                                                 return (
                                                   <tr
@@ -2164,8 +2178,8 @@ const handleMergeSubmit = async (formData) => {
                                                     </td>
 
                                                     <td className="px-4 py-3 text-sm">
-                                                      <span className={`font-semibold ${receivedAmount > 0 ? "text-green-600" : "text-gray-600"}`}>
-                                                        {formatIndianCurrency(receivedAmount)}
+                                                      <span className={`font-semibold ${totalBilledAmount > 0 ? "text-green-600" : "text-gray-600"}`}>
+                                                        {formatIndianCurrency(totalBilledAmount)}
                                                       </span>
                                                     </td>
                                                     <td className="px-4 py-3 text-sm">
@@ -2576,17 +2590,24 @@ const handleMergeSubmit = async (formData) => {
                                     inv.amountRaised ||
                                     inv.netPayableAmount ||
                                     installment.totalAmount;
-                                  const receivedAmount =
-                                    inv.receivedAmount || 0;
 
-                                  // Calculate total TDS amount from payment history
-                                  const totalTdsAmount = inv.paymentHistory?.reduce((sum, payment) => {
-                                    return sum + (parseFloat(payment.tdsAmount) || 0);
+                                  // Calculate total billed amount from payment history (including GST for tax invoices only)
+                                  const totalBilledAmount = inv.paymentHistory?.reduce((sum, payment) => {
+                                    const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
+                                    const tdsBaseType = payment.tdsBaseType || "base";
+                                    const isCashInvoice = inv.invoiceType === "Cash Invoice";
+                                    const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? Math.round(originalAmount * 1.18) : originalAmount);
+                                    return sum + billedAmount;
                                   }, 0) || 0;
 
-                                  // Due amount should account for TDS: totalAmount - (receivedAmount + totalTdsAmount)
-                                  const dueAmount =
-                                    totalAmount - (receivedAmount + totalTdsAmount);
+                                  // Due amount should account for total billed amounts including GST
+                                  const calculatedDue = totalAmount - totalBilledAmount;
+                                  const dbDueAmount = parseFloat(inv.dueAmount) || 0;
+                                  const isFullyPaidByCalc = Math.abs(calculatedDue) < 0.01;
+                                  const isFullyPaidByDB = Math.abs(dbDueAmount) < 0.01;
+                                  const isFullyPaid = isFullyPaidByCalc || isFullyPaidByDB;
+
+                                  const dueAmount = isFullyPaid ? 0 : dbDueAmount || calculatedDue;
                                   const isCancelled =
                                     inv.status === "cancelled" ||
                                     inv.approvalStatus === "cancelled";
@@ -2760,7 +2781,7 @@ const handleMergeSubmit = async (formData) => {
                                       Invoice Type
                                     </th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                      Received Amount
+                                      Billed Amount
                                     </th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                                       Due Amount
@@ -2843,17 +2864,24 @@ const handleMergeSubmit = async (formData) => {
                                           inv.amountRaised ||
                                           inv.netPayableAmount ||
                                           installment.totalAmount;
-                                        const receivedAmount =
-                                          inv.receivedAmount || 0;
 
-                                        // Calculate total TDS amount from payment history
-                                        const totalTdsAmount = inv.paymentHistory?.reduce((sum, payment) => {
-                                          return sum + (parseFloat(payment.tdsAmount) || 0);
+                                        // Calculate total billed amount from payment history (including GST for tax invoices only)
+                                        const totalBilledAmount = inv.paymentHistory?.reduce((sum, payment) => {
+                                          const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
+                                          const tdsBaseType = payment.tdsBaseType || "base";
+                                          const isCashInvoice = inv.invoiceType === "Cash Invoice";
+                                          const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? Math.round(originalAmount * 1.18) : originalAmount);
+                                          return sum + billedAmount;
                                         }, 0) || 0;
 
-                                        // Due amount should account for TDS: totalAmount - (receivedAmount + totalTdsAmount)
-                                        const dueAmount =
-                                          totalAmount - (receivedAmount + totalTdsAmount);
+                                        // Due amount should account for total billed amounts including GST
+                                        const calculatedDue = totalAmount - totalBilledAmount;
+                                        const dbDueAmount = parseFloat(inv.dueAmount) || 0;
+                                        const isFullyPaidByCalc = Math.abs(calculatedDue) < 0.01;
+                                        const isFullyPaidByDB = Math.abs(dbDueAmount) < 0.01;
+                                        const isFullyPaid = isFullyPaidByCalc || isFullyPaidByDB;
+
+                                        const dueAmount = isFullyPaid ? 0 : dbDueAmount || calculatedDue;
                                         const isCancelled =
                                           inv.status === "cancelled" ||
                                           inv.approvalStatus === "cancelled";
@@ -2920,8 +2948,8 @@ const handleMergeSubmit = async (formData) => {
                                               </div>
                                             </td>
                                             <td className="px-4 py-3 text-sm">
-                                              <span className={`font-semibold ${receivedAmount > 0 ? "text-green-600" : "text-gray-600"}`}>
-                                                {formatIndianCurrency(receivedAmount)}
+                                              <span className={`font-semibold ${totalBilledAmount > 0 ? "text-green-600" : "text-gray-600"}`}>
+                                                {formatIndianCurrency(totalBilledAmount)}
                                               </span>
                                             </td>
                                             <td className="px-4 py-3 text-sm">
