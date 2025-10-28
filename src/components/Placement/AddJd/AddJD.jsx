@@ -6,7 +6,8 @@ import AddJDForm from "./AddJDForm";
 import CollegeSelection from "./CollegeSelection";
 import StudentModal from "./StudentModal";
 
-function AddJD({ show, onClose }) {
+
+function AddJD({ show, onClose , prefillData }) {
   const [formData, setFormData] = useState({
     companyName: "",
     companyWebsite: "",
@@ -32,6 +33,8 @@ function AddJD({ show, onClose }) {
     status: "ongoing",
     createdAt: serverTimestamp(),
   });
+
+  
 
   const [jobFiles, setJobFiles] = useState([]);
   const [currentStep, setCurrentStep] = useState(1);
@@ -246,6 +249,20 @@ resumes in a zip folder by 10th July 2025 by 2:00 pm.*
       setIsSubmitting(false);
     }
   };
+
+  // Prefill company info when opened from "Mark as Onboarded"
+useEffect(() => {
+  if (prefillData) {
+    setFormData((prev) => ({
+      ...prev,
+      companyName: prefillData.companyName || "",
+      companyWebsite: prefillData.companyWebsite || "",
+      source: prefillData.source || "",
+      coordinator: prefillData.assignedTo?.name || "",
+    }));
+  }
+}, [prefillData]);
+
 
   useEffect(() => {
     const fetchColleges = async () => {

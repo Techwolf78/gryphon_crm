@@ -21,8 +21,26 @@ function AddLeads({ show, onClose, onAddLead }) {
   const [pocMail, setPocMail] = useState("");
   const [pocDesignation, setPocDesignation] = useState("");
   const [status, setStatus] = useState("Warm");
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // Update all state setters to track changes
+  const updateField = (setter, value) => {
+    setHasUnsavedChanges(true);
+    setter(value);
+  };
 
   const handleClose = () => {
+    if (
+      hasUnsavedChanges &&
+      !window.confirm("You have unsaved changes. Are you sure you want to close?")
+    ) {
+      return;
+    }
+    resetForm();
+    onClose();
+  };
+
+  const resetForm = () => {
     setCompanyName("");
     setSector("");
     setEmployeeCount("");
@@ -33,7 +51,7 @@ function AddLeads({ show, onClose, onAddLead }) {
     setPocMail("");
     setPocDesignation("");
     setStatus("Warm");
-    onClose();
+    setHasUnsavedChanges(false);
   };
 
   const handleAddCompany = async () => {
@@ -77,7 +95,8 @@ function AddLeads({ show, onClose, onAddLead }) {
           createdAt: new Date().toISOString(),
         });
       }
-      handleClose();
+      resetForm();
+      onClose();
     } catch (error) {
       console.error("Error adding company:", error);
     }
@@ -117,7 +136,7 @@ function AddLeads({ show, onClose, onAddLead }) {
               <input
                 type="text"
                 value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
+                onChange={(e) => updateField(setCompanyName, e.target.value)}
                 placeholder="e.g. Acme Corporation"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 required
@@ -131,7 +150,7 @@ function AddLeads({ show, onClose, onAddLead }) {
               <input
                 type="text"
                 value={sector}
-                onChange={(e) => setSector(e.target.value)}
+                onChange={(e) => updateField(setSector, e.target.value)}
                 placeholder="e.g. IT Services"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 required
@@ -145,7 +164,7 @@ function AddLeads({ show, onClose, onAddLead }) {
               <input
                 type="number"
                 value={employeeCount}
-                onChange={(e) => setEmployeeCount(e.target.value)}
+                onChange={(e) => updateField(setEmployeeCount, e.target.value)}
                 placeholder="e.g. 250"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 required
@@ -159,7 +178,7 @@ function AddLeads({ show, onClose, onAddLead }) {
               <input
                 type="text"
                 value={pocName}
-                onChange={(e) => setPocName(e.target.value)}
+                onChange={(e) => updateField(setPocName, e.target.value)}
                 placeholder="e.g. John Doe"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 required
@@ -173,7 +192,7 @@ function AddLeads({ show, onClose, onAddLead }) {
               <input
                 type="date"
                 value={workingSince}
-                onChange={(e) => setWorkingSince(e.target.value)}
+                onChange={(e) => updateField(setWorkingSince, e.target.value)}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 required
               />
@@ -186,7 +205,7 @@ function AddLeads({ show, onClose, onAddLead }) {
               <input
                 type="text"
                 value={pocLocation}
-                onChange={(e) => setPocLocation(e.target.value)}
+                onChange={(e) => updateField(setPocLocation, e.target.value)}
                 placeholder="e.g. Mumbai"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 required
@@ -200,7 +219,7 @@ function AddLeads({ show, onClose, onAddLead }) {
               <input
                 type="text"
                 value={pocPhone}
-                onChange={(e) => setPocPhone(e.target.value)}
+                onChange={(e) => updateField(setPocPhone, e.target.value)}
                 placeholder="e.g. +91 9876543210"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 required
@@ -214,7 +233,7 @@ function AddLeads({ show, onClose, onAddLead }) {
               <input
                 type="email"
                 value={pocMail}
-                onChange={(e) => setPocMail(e.target.value)}
+                onChange={(e) => updateField(setPocMail, e.target.value)}
                 placeholder="e.g. john@company.com"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
@@ -227,7 +246,7 @@ function AddLeads({ show, onClose, onAddLead }) {
               <input
                 type="text"
                 value={pocDesignation}
-                onChange={(e) => setPocDesignation(e.target.value)}
+                onChange={(e) => updateField(setPocDesignation, e.target.value)}
                 placeholder="e.g. HR Manager"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 required
@@ -240,7 +259,7 @@ function AddLeads({ show, onClose, onAddLead }) {
               </label>
               <select
                 value={status}
-                onChange={(e) => setStatus(e.target.value)}
+                onChange={(e) => updateField(setStatus, e.target.value)}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 {statusOptions.map((option) => (

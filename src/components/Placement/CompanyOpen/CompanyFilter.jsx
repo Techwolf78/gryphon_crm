@@ -125,28 +125,13 @@ function CompanyFilter({
 
   return (
     <div className="relative">
-      <button
-        onClick={() => setIsFilterOpen(!isFilterOpen)}
-        className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-all ${
-          isFilterOpen || hasActiveFilters
-            ? "bg-blue-50 border-blue-200 text-blue-700 shadow-sm"
-            : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50 shadow-sm"
-        }`}
-      >
-        <FiFilter className="w-4 h-4" />
-        <span>Filters</span>
-        {hasActiveFilters && (
-          <span className="bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
-            {Object.values(filters).filter(Boolean).length}
-          </span>
-        )}
-      </button>
+      
 
       {/* Filter Panel */}
       {isFilterOpen && (
         <div
           ref={filterPanelRef}
-          className="absolute top-full right-0 mt-2 bg-white p-5 rounded-xl shadow-lg z-50 border border-gray-200 w-[340px]"
+          className="absolute top-full right-50  bg-white p-5 rounded-xl shadow-lg z-50 border border-gray-200 w-[340px]"
         >
           <div className="flex justify-between items-center mb-4">
             <div className="flex items-center gap-2">
