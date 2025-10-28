@@ -248,7 +248,6 @@ const TrainerRow = React.memo(
 
   const normalizeDomainForFilter = (domain) => {
     const lower = domain.toLowerCase();
-    if (lower.includes("tools")) return "tools";
     return lower;
   };
 
