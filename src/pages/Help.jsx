@@ -561,134 +561,138 @@ const Help = () => {
           </button>
         </div>
 
-        {showRaisedTickets ? (
-          <div className="bg-white rounded-xl shadow-xs border border-gray-100 overflow-hidden">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold text-gray-900">
-                  {isAdmin ? "All Support Tickets" : "My Support Tickets"}
-                </h2>
-                <button
-                  onClick={() => setShowTicketForm(true)}
-                  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <FiPlus className="mr-2" /> New Ticket
-                </button>
-              </div>
 
-              {tickets.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-500">
-                    {isAdmin
-                      ? "No tickets found"
-                      : "You haven't created any tickets yet"}
-                  </p>
-                  {!isAdmin && (
-                    <button
-                      onClick={() => setShowTicketForm(true)}
-                      className="mt-4 flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors mx-auto"
-                    >
-                      <FiPlus className="mr-2" /> Create Your First Ticket
-                    </button>
+{showRaisedTickets ? (
+  <div className="bg-white rounded-xl shadow-xs border border-gray-100 overflow-hidden">
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-semibold text-gray-900">
+          {isAdmin ? "All Support Tickets" : "My Support Tickets"}
+        </h2>
+        <button
+          onClick={() => setShowTicketForm(true)}
+          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          <FiPlus className="mr-2" /> New Ticket
+        </button>
+      </div>
+
+      {tickets.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-gray-500">
+            {isAdmin
+              ? "No tickets found"
+              : "You haven't created any tickets yet"}
+          </p>
+          {!isAdmin && (
+            <button
+              onClick={() => setShowTicketForm(true)}
+              className="mt-4 flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors mx-auto"
+            >
+              <FiPlus className="mr-2" /> Create Your First Ticket
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                  Title
+                </th>
+                {isAdmin && (
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Created By
+                  </th>
+                )}
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                  Priority
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                  Status
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px] max-w-[300px]">
+                  Remark
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {tickets.map((ticket) => (
+                <tr key={ticket.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 max-w-[200px] truncate">
+                    {ticket.title}
+                  </td>
+                  {isAdmin && (
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {ticket.createdBy}
+                    </td>
                   )}
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Title
-                        </th>
-                        {isAdmin && (
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Created By
-                          </th>
-                        )}
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Priority
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Remark
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {tickets.map((ticket) => (
-                        <tr key={ticket.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {ticket.title}
-                          </td>
-                          {isAdmin && (
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {ticket.createdBy}
-                            </td>
-                          )}
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs font-medium ${ticket.priority === "critical"
-                                ? "bg-red-100 text-red-800"
-                                : ticket.priority === "high"
-                                  ? "bg-orange-100 text-orange-800"
-                                  : ticket.priority === "medium"
-                                    ? "bg-yellow-100 text-yellow-800"
-                                    : "bg-green-100 text-green-800"
-                                }`}
-                            >
-                              {ticket.priority}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <div className="flex items-center">
-                              <span
-                                className={`px-2 py-1 rounded-full text-xs font-medium ${ticket.status === "resolved"
-                                  ? "bg-green-100 text-green-800"
-                                  : ticket.status === "can't-resolve"
-                                    ? "bg-gray-100 text-gray-800"
-                                    : "bg-red-100 text-red-800"
-                                  }`}
-                              >
-                                {ticket.status.replace("-", " ")}{" "}
-                                {ticket.status !== "not-resolved" && ticket.resolvedBy
-                                  ? `(by ${ticket.resolvedBy.split("@")[0]})`
-                                  : ""}
-                              </span>
-                            </div>
-                          </td>
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${ticket.priority === "critical"
+                        ? "bg-red-100 text-red-800"
+                        : ticket.priority === "high"
+                          ? "bg-orange-100 text-orange-800"
+                          : ticket.priority === "medium"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : "bg-green-100 text-green-800"
+                        }`}
+                    >
+                      {ticket.priority}
+                    </span>
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <div className="flex items-center">
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${ticket.status === "resolved"
+                          ? "bg-green-100 text-green-800"
+                          : ticket.status === "can't-resolve"
+                            ? "bg-gray-100 text-gray-800"
+                            : "bg-red-100 text-red-800"
+                          }`}
+                      >
+                        {ticket.status.replace("-", " ")}{" "}
+                        {ticket.status !== "not-resolved" && ticket.resolvedBy
+                          ? `(by ${ticket.resolvedBy.split("@")[0]})`
+                          : ""}
+                      </span>
+                    </div>
+                  </td>
 
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {ticket.remark
-                              ? ticket.remark
-                              : ticket.status === "resolved"
-                                ? `Resolved by ${ticket.resolvedBy?.split("@")[0] || "admin"}`
-                                : ticket.status === "can't-resolve"
-                                  ? "Couldn't resolve"
-                                  : "Pending resolution"}
-                          </td>
+                  <td className="px-4 py-4 text-sm text-gray-500 max-w-[300px]">
+                    <div className="break-words">
+                      {ticket.remark
+                        ? ticket.remark
+                        : ticket.status === "resolved"
+                          ? `Resolved by ${ticket.resolvedBy?.split("@")[0] || "admin"}`
+                          : ticket.status === "can't-resolve"
+                            ? "Couldn't resolve"
+                            : "Pending resolution"}
+                    </div>
+                  </td>
 
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <button
-                              onClick={() => setActiveTicket(ticket)}
-                              className="text-blue-600 hover:text-blue-800"
-                            >
-                              View Details
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <button
+                      onClick={() => setActiveTicket(ticket)}
+                      className="text-blue-600 hover:text-blue-800 whitespace-nowrap"
+                    >
+                      View Details
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  </div>
+) : (
+  // ... remaining code remains the same ...
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Left Column - Contact Support */}
             <div className="space-y-6">
