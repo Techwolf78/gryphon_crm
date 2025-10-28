@@ -12,7 +12,7 @@ const PHASE_LABELS = {
 
 const DOMAIN_COLORS = {
   Technical: "bg-blue-100 border-blue-300 text-blue-800",
-  "Soft skills": "bg-green-100 border-green-300 text-green-800",
+  "Soft Skills": "bg-green-100 border-green-300 text-green-800",
   Aptitude: "bg-purple-100 border-purple-300 text-purple-800",
   Tools: "bg-yellow-100 border-yellow-300 text-yellow-800",
 };

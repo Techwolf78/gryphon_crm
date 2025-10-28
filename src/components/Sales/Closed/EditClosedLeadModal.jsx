@@ -485,6 +485,7 @@ const formatIndianNumber = (num, decimals = 2) => {
         businessName: trimmedCollegeName, // Sync both fields
         course: formData.course?.replace(/\s+$/, ''), // Trim trailing spaces from course
         deliveryType: formData.deliveryType?.replace(/\s+$/, ''), // Trim trailing spaces from deliveryType
+        gstNumber: formData.gstNumber || "", // Ensure gstNumber is always a string
         updatedAt: new Date(),
         updatedBy: user?.email || user?.displayName || "Unknown User",
       };
@@ -509,6 +510,7 @@ const formatIndianNumber = (num, decimals = 2) => {
           businessName: trimmedCollegeName, // Sync both fields
           course: formData.course?.replace(/\s+$/, ''), // Trim trailing spaces from course
           deliveryType: formData.deliveryType?.replace(/\s+$/, ''), // Trim trailing spaces from deliveryType
+          gstNumber: formData.gstNumber || "", // Ensure gstNumber is always a string
           updatedBy: user?.email || user?.displayName || "Unknown User",
         };
 
@@ -1387,6 +1389,30 @@ useEffect(() => {
                         : formData.gstType === "exclude"
                         ? "No GST"
                         : "Not selected"}
+                    </p>
+                  </div>
+
+                  {/* GST Number Field */}
+                  <div className="bg-green-50 p-2 rounded-lg">
+                    <label className="block text-xs font-medium text-green-700 mb-0.5">
+                      GST Number
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        name="gstNumber"
+                        value={formData.gstNumber || ""}
+                        onChange={handleChange}
+                        className="block w-full pl-10 pr-3 py-1 border border-green-300 rounded-lg shadow-sm focus:ring-green-500 focus:border-green-500 text-sm"
+                        placeholder="22AAAAA0000A1Z5"
+                        maxLength="15"
+                      />
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <FiHash className="h-3 w-3 text-green-400" />
+                      </div>
+                    </div>
+                    <p className="text-xs text-green-600 mt-0.5">
+                      GSTIN format: 15 characters
                     </p>
                   </div>
 

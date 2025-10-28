@@ -1,14 +1,18 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import specializationOptions from './specializationOptions';
 
-function AddJDForm({ formData, setFormData, formErrors, handleFileChange, placementUsers, isLoadingUsers }) {
+function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClose, placementUsers, isLoadingUsers }) {
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;
+    setHasUnsavedChanges(true);
     setFormData({ ...formData, [name]: value });
   }, [formData, setFormData]);
 
   const handleSpecializationChange = (e) => {
     const { value, checked } = e.target;
+    setHasUnsavedChanges(true);
     setFormData(prev => {
       if (checked) {
         return { ...prev, specialization: [...prev.specialization, value] };
@@ -17,6 +21,16 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, placem
       }
     });
   };
+
+  const handleClose = useCallback(() => {
+    if (
+      hasUnsavedChanges &&
+      !window.confirm("You have unsaved changes. Are you sure you want to close?")
+    ) {
+      return;
+    }
+    onClose();
+  }, [hasUnsavedChanges, onClose]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -84,6 +98,7 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, placem
             name="course"
             value={formData.course}
             onChange={(e) => {
+              setHasUnsavedChanges(true);
               setFormData({ ...formData, course: e.target.value, specialization: [] });
             }}
             className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white ${
@@ -637,7 +652,10 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, placem
         <input
           type="file"
           multiple
-          onChange={handleFileChange}
+          onChange={(e) => {
+            setHasUnsavedChanges(true);
+            handleFileChange(e);
+          }}
           className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
         />
       </div>
@@ -731,6 +749,17 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, placem
             No placement coordinators found. Please add users with 'placement' department.
           </p>
         )}
+      </div>
+
+      {/* Close/Cancel Button */}
+      <div className="col-span-2 flex justify-end pt-4">
+        <button
+          type="button"
+          onClick={handleClose}
+          className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-100"
+        >
+          Cancel
+        </button>
       </div>
     </div>
   );

@@ -92,6 +92,7 @@ const fetchPlacementUsers = async () => {
     setIsLoadingUsers(false);
   }
 };
+
   const [jobFiles, setJobFiles] = useState([]);
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedColleges, setSelectedColleges] = useState([]);
@@ -417,6 +418,7 @@ useEffect(() => {
   }
 }, [show]); // Sirf show change hone par fetch karo
 
+
 // Colleges filter ke liye alag useEffect  
 useEffect(() => {
   fetchFilteredColleges();
@@ -449,6 +451,7 @@ useEffect(() => {
   setFormData={setFormData}
   formErrors={formErrors}
   handleFileChange={handleFileChange}
+  onClose={onClose}
   placementUsers={placementUsers}
   isLoadingUsers={isLoadingUsers}
 />

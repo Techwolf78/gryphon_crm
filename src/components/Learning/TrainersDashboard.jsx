@@ -15,9 +15,9 @@ import { useAuth } from "../../context/AuthContext";
 
 const DOMAIN_COLORS = {
   Technical: "bg-blue-100 border border-blue-300 text-blue-800",
-  "Soft skills": "bg-green-100 border border-green-300 text-green-800",
-  Aptitude: "bg-purple-100 border border-purple-300 text-purple-800",
-  Tools: "bg-yellow-100 border border-yellow-300 text-yellow-800",
+  "Soft Skills": "bg-green-100 border border-green-300 text-green-800",
+  Aptitude: "bg-purple-100 border-purple-300 text-purple-800",
+  Tools: "bg-yellow-100 border-yellow-300 text-yellow-800",
 };
 
 function TrainersDashboard() {
@@ -301,7 +301,7 @@ function TrainersDashboard() {
   const getDomainColor = (domain) => {
     const normalized = (domain || "").toLowerCase();
     if (normalized.includes("technical")) return DOMAIN_COLORS.Technical;
-    if (normalized.includes("soft")) return DOMAIN_COLORS["Soft skills"];
+    if (normalized.includes("soft")) return DOMAIN_COLORS["Soft Skills"];
     if (normalized.includes("aptitude")) return DOMAIN_COLORS.Aptitude;
     if (normalized.includes("tools")) return DOMAIN_COLORS.Tools;
     return "bg-gray-100 border border-gray-300 text-gray-800"; // default with border
