@@ -311,13 +311,13 @@ function Placement() {
                   </p>
                 </div>
               ) : (
-                <div className="overflow-x-auto border border-gray-300 rounded-lg animate-fadeIn">
-                  <table className="min-w-full divide-y divide-gray-200 border border-gray-300">
-                    <thead className="bg-gradient-to-r from-blue-500 via-indigo-600 to-indigo-700 text-white ">
+                <div className="border border-gray-300 rounded-lg animate-fadeIn">
+                  <table className="min-w-full divide-y divide-gray-200 border border-gray-300 rounded-lg">
+                    <thead className="bg-gradient-to-r from-blue-500 via-indigo-600 to-indigo-700 text-white rounded-t-lg">
                       <tr>
                         <th
                           scope="col"
-                          className="px-4 py-3 text-left text-xs font-medium  uppercase tracking-wider cursor-pointer  select-none border border-gray-300"
+                          className="px-4 py-3 text-left text-xs font-medium  uppercase tracking-wider cursor-pointer  select-none border border-gray-300 rounded-t"
                           onClick={handleProjectCodeSort}
                         >
                           <div className="flex items-center justify-between">
@@ -400,7 +400,7 @@ function Placement() {
                         </th>
                         <th
                           scope="col"
-                          className="px-4 py-3 text-left text-xs font-medium border border-gray-300 uppercase tracking-wider"
+                          className="px-4 py-3 text-left text-xs font-medium border border-gray-300 uppercase tracking-wider rounded-tr-lg"
                         >
                           Actions
                         </th>
