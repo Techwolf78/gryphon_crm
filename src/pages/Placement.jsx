@@ -34,6 +34,9 @@ function Placement() {
     useState("asc");
   const [isProjectCodeSorted, setIsProjectCodeSorted] = useState(false);
 
+  // Enhanced Tab Navigation State
+  const [activeTab, setActiveTab] = useState("training");
+
   // Inline CSS for animations
   const tableStyles = `
     @keyframes fadeIn {
@@ -48,6 +51,12 @@ function Placement() {
       animation: fadeIn 0.3s ease-out forwards;
     }
   `;
+
+  // Get active tab index for sliding indicator
+  const getActiveTabIndex = () => {
+    const tabs = ["training", "placement", "leads"];
+    return tabs.indexOf(activeTab);
+  };
 
   const fetchData = useCallback(async () => {
     try {
@@ -230,40 +239,54 @@ function Placement() {
 
       {!loading && !error && (
         <>
-          <div className="flex mb-3 border-b">
-            <button
-              className={`px-4 py-2 font-medium ${
-                viewMode === "training"
-                  ? "border-b-2 border-blue-500 text-blue-600"
-                  : "text-gray-500"
-              }`}
-              onClick={() => setViewMode("training")}
-            >
-              Training Data
-            </button>
-            <button
-              className={`px-4 py-2 font-medium ${
-                viewMode === "placement"
-                  ? "border-b-2 border-blue-500 text-blue-600"
-                  : "text-gray-500"
-              }`}
-              onClick={() => setViewMode("placement")}
-            >
-              Placement Stats
-            </button>
-            <button
-              className={`px-4 py-2 font-medium ${
-                viewMode === "leads"
-                  ? "border-b-2 border-blue-500 text-blue-600"
-                  : "text-gray-500"
-              }`}
-              onClick={() => setViewMode("leads")}
-            >
-              Company Leads
-            </button>
+          {/* Enhanced Tab Navigation with Sliding Indicator */}
+          <div className="relative mb-4">
+            <div className="flex border-b border-gray-200">
+              <button
+                className={`flex-1 px-6 py-2 font-medium text-sm transition-all duration-150 ${
+                  activeTab === "training"
+                    ? "text-blue-600 bg-blue-50"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+                onClick={() => setActiveTab("training")}
+                data-tour="training-tab"
+              >
+                Training Data ({trainingData.length})
+              </button>
+              <button
+                className={`flex-1 px-6 py-2 font-medium text-sm transition-all duration-150 ${
+                  activeTab === "placement"
+                    ? "text-blue-600 bg-blue-50"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+                onClick={() => setActiveTab("placement")}
+                data-tour="placement-tab"
+              >
+                Placement Stats
+              </button>
+              <button
+                className={`flex-1 px-6 py-2 font-medium text-sm transition-all duration-150 ${
+                  activeTab === "leads"
+                    ? "text-blue-600 bg-blue-50"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+                onClick={() => setActiveTab("leads")}
+                data-tour="leads-tab"
+              >
+                Company Leads ({leads.length})
+              </button>
+            </div>
+            {/* Sliding Indicator */}
+            <div
+              className="absolute bottom-0 h-0.5 bg-blue-600 transition-transform duration-150 ease-out"
+              style={{
+                width: "33.333%",
+                transform: `translateX(${getActiveTabIndex() * 100}%)`,
+              }}
+            ></div>
           </div>
 
-          {viewMode === "training" && (
+          {activeTab === "training" && (
             <>
               {sortedTrainingData.length === 0 ? (
                 <div className="text-center py-8">
@@ -288,13 +311,13 @@ function Placement() {
                   </p>
                 </div>
               ) : (
-                <div className="overflow-x-auto border border-gray-300 rounded-lg animate-fadeIn">
-                  <table className="min-w-full divide-y divide-gray-200 border border-gray-300">
-                    <thead className="bg-gradient-to-r from-blue-500 via-indigo-600 to-indigo-700 text-white ">
+                <div className="border border-gray-300 rounded-lg animate-fadeIn">
+                  <table className="min-w-full divide-y divide-gray-200 border border-gray-300 rounded-lg">
+                    <thead className="bg-gradient-to-r from-blue-500 via-indigo-600 to-indigo-700 text-white rounded-t-lg">
                       <tr>
                         <th
                           scope="col"
-                          className="px-4 py-3 text-left text-xs font-medium  uppercase tracking-wider cursor-pointer  select-none border border-gray-300"
+                          className="px-4 py-3 text-left text-xs font-medium  uppercase tracking-wider cursor-pointer  select-none border border-gray-300 rounded-t"
                           onClick={handleProjectCodeSort}
                         >
                           <div className="flex items-center justify-between">
@@ -377,7 +400,7 @@ function Placement() {
                         </th>
                         <th
                           scope="col"
-                          className="px-4 py-3 text-left text-xs font-medium border border-gray-300 uppercase tracking-wider"
+                          className="px-4 py-3 text-left text-xs font-medium border border-gray-300 uppercase tracking-wider rounded-tr-lg"
                         >
                           Actions
                         </th>
@@ -541,13 +564,14 @@ function Placement() {
             </>
           )}
 
-          {viewMode === "placement" && <CompanyOpen />}
-          {viewMode === "leads" && (
+          {activeTab === "placement" && <CompanyOpen />}
+
+          {activeTab === "leads" && (
             <CompanyLeads
               leads={leads}
               onLeadSelect={(lead) => {
                 setSelectedLead(lead);
-                setViewMode("placement");
+                setActiveTab("placement");
               }}
             />
           )}
