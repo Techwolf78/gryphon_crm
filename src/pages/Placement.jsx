@@ -213,7 +213,7 @@ function Placement() {
   };
 
   return (
-    <div className="p-2">
+    <div className="p-0">
       <style>{tableStyles}</style>
       <h2 className="text-2xl font-bold mb-1 text-blue-800">
         Placement Management
@@ -413,45 +413,46 @@ function Placement() {
                         return (
                           <tr
                             key={item.id}
-                            className="hover:bg-gray-50 transition-colors border border-gray-300"
+                            className="hover:bg-gray-50 transition-colors border border-gray-300 cursor-pointer"
+                            onClick={() => handleViewDetails(item)}
                           >
                             <td
-                              className="px-4 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
+                              className="px-1 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
                               title={formatCellValue(item.projectCode)}
                             >
                               {formatCellValue(item.projectCode)}
                             </td>
                             <td
-                              className="px-4 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
+                              className="px-1 py-3 whitespace-nowrap text-sm border border-gray-300 truncate max-w-48"
                               title={formatCellValue(item.collegeName)}
                             >
                               {formatCellValue(item.collegeName)}
                             </td>
                             <td
-                              className="px-4 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
+                              className="px-1 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
                               title={formatCellValue(item.course)}
                             >
                               {formatCellValue(item.course)}
                             </td>
                             <td
-                              className="px-4 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
+                              className="px-1 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
                               title={formatCellValue(item.year)}
                             >
                               {formatCellValue(item.year)}
                             </td>
                             <td
-                              className="px-4 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
+                              className="px-1 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
                               title={formatCellValue(item.deliveryType)}
                             >
                               {formatCellValue(item.deliveryType)}
                             </td>
                             <td
-                              className="px-4 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
+                              className="px-1 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
                               title={formatCellValue(item.studentCount)}
                             >
                               {formatCellValue(item.studentCount)}
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm border border-gray-300 text-gray-500">
+                            <td className="px-1 py-3 whitespace-nowrap text-sm border border-gray-300 text-gray-500">
                               {progressData[item.projectCode] ? (
                                 progressData[item.projectCode].length > 0 ? (
                                   <div className="flex flex-wrap gap-1">
@@ -488,7 +489,7 @@ function Placement() {
                                 </span>
                               )}
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 relative">
+                            <td className="px-1 py-3 whitespace-nowrap text-sm text-gray-500 relative">
                               <div className="flex justify-center">
                                 <button
                                   onClick={(e) => toggleDropdown(item.id, e)}
