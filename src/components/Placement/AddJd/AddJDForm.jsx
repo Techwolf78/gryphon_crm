@@ -1,9 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import specializationOptions from './specializationOptions';
 
-function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClose }) {
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-
+function AddJDForm({ formData, setFormData, formErrors, handleFileChange, placementUsers, isLoadingUsers }) {
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;
     setHasUnsavedChanges(true);
@@ -664,7 +662,7 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
         <h3 className="text-lg font-semibold text-blue-700 mt-4">Internal Use Only<span className="text-red-500 ml-1">*</span></h3>
       </div>
 
-      <div>
+       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Source<span className="text-red-500 ml-1">*</span>
         </label>
@@ -681,16 +679,8 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
           />
           {formErrors.source && (
             <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-              <svg
-                className="h-5 w-5 text-red-500"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                  clipRule="evenodd"
-                />
+              <svg className="h-5 w-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
             </div>
           )}
@@ -705,34 +695,57 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
           Coordinator<span className="text-red-500 ml-1">*</span>
         </label>
         <div className="relative">
-          <input
-            type="text"
-            name="coordinator"
-            value={formData.coordinator}
-            onChange={handleChange}
-            placeholder="e.g. John Doe"
-            className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-              formErrors.coordinator ? "border-red-500" : "border-gray-300"
-            }`}
-          />
-          {formErrors.coordinator && (
-            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-              <svg
-                className="h-5 w-5 text-red-500"
-                fill="currentColor"
-                viewBox="0 0 20 20"
+          {isLoadingUsers ? (
+            <div className="flex items-center justify-center py-2.5 border border-gray-300 rounded-lg bg-gray-100">
+              <span className="text-gray-500 text-sm">Loading coordinators...</span>
+            </div>
+          ) : (
+            <>
+              <select
+                name="coordinator"
+                value={formData.coordinator}
+                onChange={handleChange}
+                className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white ${
+                  formErrors.coordinator ? "border-red-500" : "border-gray-300"
+                }`}
               >
-                <path
-                  fillRule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                  clipRule="evenodd"
-                />
+                <option value="">Select Coordinator</option>
+                {placementUsers.map((user) => (
+                  <option key={user.id} value={user.name }>
+                    {user.name} 
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </div>
+            </>
+          )}
+          {formErrors.coordinator && (
+            <div className="absolute inset-y-0 right-7 pr-3 flex items-center pointer-events-none">
+              <svg className="h-5 w-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
             </div>
           )}
         </div>
         {formErrors.coordinator && (
           <p className="mt-1 text-sm text-red-600">{formErrors.coordinator}</p>
+        )}
+        
+        {/* Available coordinators count */}
+        {!isLoadingUsers && placementUsers.length > 0 && (
+          <p className="mt-1 text-xs text-gray-500">
+            {placementUsers.length} placement coordinator(s) available
+          </p>
+        )}
+        
+        {!isLoadingUsers && placementUsers.length === 0 && (
+          <p className="mt-1 text-xs text-red-500">
+            No placement coordinators found. Please add users with 'placement' department.
+          </p>
         )}
       </div>
 
@@ -749,5 +762,4 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
     </div>
   );
 }
-
 export default AddJDForm;
