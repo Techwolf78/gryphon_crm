@@ -29,7 +29,7 @@ function GenerateTrainerInvoice() {
   const [businessNameFilter, setBusinessNameFilter] = useState("");
   const [downloadingInvoice, setDownloadingInvoice] = useState(null);
   const [pdfStatus, setPdfStatus] = useState({});
-  const [showOnlyActive, setShowOnlyActive] = useState(false);
+  const [invoiceFilter, setInvoiceFilter] = useState('all');
   const [exporting, setExporting] = useState(false);
   const [filtersDropdownOpen, setFiltersDropdownOpen] = useState(false);
   const filtersBtnRef = useRef();
@@ -691,7 +691,10 @@ function GenerateTrainerInvoice() {
             : false;
 
           // when showOnlyActive is true, only include trainers that either already have an invoice or are available
-          if (showOnlyActive && !trainer.hasExistingInvoice && !invoiceAvailable) {
+          if (invoiceFilter === 'active' && !trainer.hasExistingInvoice && !invoiceAvailable) {
+            return false;
+          }
+          if (invoiceFilter === 'generated' && !trainer.hasExistingInvoice) {
             return false;
           }
           const matchesSearch =
@@ -740,7 +743,7 @@ function GenerateTrainerInvoice() {
 
       return acc;
     }, {});
-  }, [groupedData, showOnlyActive, searchTerm, startDateFilter, endDateFilter, projectCodeFilter, businessNameFilter]);
+  }, [groupedData, invoiceFilter, searchTerm, startDateFilter, endDateFilter, projectCodeFilter, businessNameFilter]);
 
   // Get unique project codes for filter - MEMOIZED
   const projectCodes = useMemo(() => [
@@ -1140,8 +1143,8 @@ function GenerateTrainerInvoice() {
             setEndDateFilter={setEndDateFilter}
             clearAllFilters={clearAllFilters}
             applyFilters={applyFilters}
-            showOnlyActive={showOnlyActive}
-            setShowOnlyActive={setShowOnlyActive}
+            showOnlyActive={invoiceFilter}
+            setShowOnlyActive={setInvoiceFilter}
             exporting={exporting}
             setExporting={setExporting}
             filteredGroupedData={filteredGroupedData}
