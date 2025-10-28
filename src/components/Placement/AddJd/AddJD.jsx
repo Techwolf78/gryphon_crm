@@ -2,12 +2,47 @@ import React, { useState, useEffect } from "react";
 import { XIcon } from "@heroicons/react/outline";
 import { db } from "../../../firebase";
 import { collection, addDoc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
+import emailjs from '@emailjs/browser';
 import AddJDForm from "./AddJDForm";
 import CollegeSelection from "./CollegeSelection";
 import StudentModal from "./StudentModal";
 
+// EmailJS configuration
+const EMAILJS_CONFIG = {
+  SERVICE_ID: 'service_pskknsn',
+  TEMPLATE_ID: 'template_p2as3pp', 
+  PUBLIC_KEY: 'zEVWxxT-QvGIrhvTV'
+};
 
-function AddJD({ show, onClose , prefillData }) {
+// Academic year calculation helper
+const getCurrentAcademicYear = () => {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  
+  // August (7) to December (11) - same year, January to July - previous year
+  if (currentMonth >= 7) {
+    return `${currentYear}-${currentYear + 1}`;
+  } else {
+    return `${currentYear - 1}-${currentYear}`;
+  }
+};
+
+// Student's current year calculation
+const getStudentCurrentYear = (passingYear, course = "B.Tech") => {
+  const courseDuration = course.includes("B.Tech") ? 4 : 
+                        course.includes("MBA") ? 2 : 
+                        course.includes("MCA") ? 3 : 4;
+  
+  const currentAcademicYear = getCurrentAcademicYear();
+  const currentEndYear = parseInt(currentAcademicYear.split('-')[1]);
+  const passingYearNum = parseInt(passingYear);
+  const yearsRemaining = passingYearNum - currentEndYear;
+  
+  return courseDuration - yearsRemaining;
+};
+
+function AddJD({ show, onClose }) {
   const [formData, setFormData] = useState({
     companyName: "",
     companyWebsite: "",
@@ -33,8 +68,30 @@ function AddJD({ show, onClose , prefillData }) {
     status: "ongoing",
     createdAt: serverTimestamp(),
   });
+  const [placementUsers, setPlacementUsers] = useState([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
 
-  
+const fetchPlacementUsers = async () => {
+  setIsLoadingUsers(true);
+  try {
+    const usersQuery = query(
+      collection(db, "users"),
+      where("department", "==", "Placement")
+    );
+    
+    const querySnapshot = await getDocs(usersQuery);
+    const users = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    setPlacementUsers(users);
+  } catch (error) {
+    setPlacementUsers([]);
+  } finally {
+    setIsLoadingUsers(false);
+  }
+};
 
   const [jobFiles, setJobFiles] = useState([]);
   const [currentStep, setCurrentStep] = useState(1);
@@ -48,6 +105,10 @@ function AddJD({ show, onClose , prefillData }) {
   const [otherCollegesInput, setOtherCollegesInput] = useState("");
   const [showOtherCollegesInput, setShowOtherCollegesInput] = useState(false);
   const [submissionError, setSubmissionError] = useState(null);
+  const [emailSent, setEmailSent] = useState(false);
+  const [collegeEmails, setCollegeEmails] = useState({});
+  const [manualEmails, setManualEmails] = useState({});
+  const [collegeDetails, setCollegeDetails] = useState({}); // Store complete college data
 
   const validateStep1 = () => {
     const errors = {};
@@ -75,49 +136,120 @@ function AddJD({ show, onClose , prefillData }) {
     setCurrentStep(2);
   };
 
-  const fetchStudentsForCollege = async (college) => {
-    setIsLoadingStudents(true);
-    try {
-      // First, find the training form document ID for this college
-      const trainingFormQuery = query(
-        collection(db, "trainingForms"),
-        where("collegeName", "==", college)
-      );
+const fetchFilteredColleges = async () => {
+  if (!formData.course || !formData.passingYear || !formData.specialization.length) {
+    setAvailableColleges(["Other"]);
+    return;
+  }
+
+  try {
+    const passingYearNum = parseInt(formData.passingYear);
+    // Convert to Firebase passing year format (e.g., 2025 -> "2024-2025")
+    const firebasePassingYear = `${passingYearNum - 1}-${passingYearNum}`;
+
+    const colleges = new Set();
+    const collegeDataMap = {};
+
+    // Query placementData with exact matches
+    const q = query(
+      collection(db, "placementData"),
+      where("course", "==", formData.course),
+      where("passingYear", "==", firebasePassingYear)
+    );
+
+    const querySnapshot = await getDocs(q);
+    
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      const collegeName = data.collegeName || data.college;
       
-      const trainingFormSnapshot = await getDocs(trainingFormQuery);
-      if (trainingFormSnapshot.empty) {
-        setStudentsData(prev => ({ ...prev, [college]: [] }));
-        return;
+      if (!collegeName) return;
+
+      // Check specialization match - koi bhi specialization match ho to show karo
+      const hasMatchingSpecialization = !data.courses || 
+        data.courses.some(courseItem => 
+          formData.specialization.includes(courseItem.specialization)
+        );
+
+      if (hasMatchingSpecialization) {
+        colleges.add(collegeName);
+        // Store complete college data
+        collegeDataMap[collegeName] = {
+          tpoEmail: data.tpoEmail,
+          specializations: data.courses?.map(c => c.specialization) || [],
+          year: data.year, // Firebase ka year field use karo (1st, 2nd, etc.)
+          passingYear: data.passingYear,
+          projectCode: data.projectCode // Pura project code store karo
+        };
       }
+    });
 
-      const trainingFormId = trainingFormSnapshot.docs[0].id;
-      
-      // Now fetch students for this training form
-      const studentsQuery = query(
-        collection(db, "trainingForms", trainingFormId, "students")
-      );
-      
-      const studentsSnapshot = await getDocs(studentsQuery);
-      const students = studentsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      
-      setStudentsData(prev => ({ ...prev, [college]: students }));
-    } catch (error) {
-      console.error("Error fetching students for college:", college, error);
+    const finalColleges = Array.from(colleges).concat(["Other"]).sort();
+    setAvailableColleges(finalColleges);
+    setCollegeDetails(collegeDataMap);
+
+    // Auto-fetch emails
+    const emails = {};
+    Object.keys(collegeDataMap).forEach(college => {
+      if (collegeDataMap[college].tpoEmail) {
+        emails[college] = collegeDataMap[college].tpoEmail;
+      }
+    });
+    setCollegeEmails(prev => ({ ...prev, ...emails }));
+
+  } catch (error) {
+    console.error("Error fetching colleges:", error);
+    setAvailableColleges(["Other"]);
+  }
+};
+
+
+const fetchStudentsForCollege = async (college) => {
+  setIsLoadingStudents(true);
+  try {
+    // Pehle college ka document find karo placementData me
+    const placementQuery = query(
+      collection(db, "placementData"),
+      where("collegeName", "==", college)
+    );
+    
+    const placementSnapshot = await getDocs(placementQuery);
+    
+    if (placementSnapshot.empty) {
       setStudentsData(prev => ({ ...prev, [college]: [] }));
-    } finally {
-      setIsLoadingStudents(false);
+      return;
     }
-  };
 
+    // College ka document ID mil gaya
+    const collegeDoc = placementSnapshot.docs[0];
+    const collegeDocId = collegeDoc.id;
+    
+    // Ab students subcollection se data fetch karo
+    const studentsQuery = query(
+      collection(db, "placementData", collegeDocId, "students")
+    );
+    
+    const studentsSnapshot = await getDocs(studentsQuery);
+    const students = studentsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    console.log(`Fetched ${students.length} students for ${college}:`, students);
+    setStudentsData(prev => ({ ...prev, [college]: students }));
+    
+  } catch (error) {
+    console.error("Error fetching students for college:", college, error);
+    setStudentsData(prev => ({ ...prev, [college]: [] }));
+  } finally {
+    setIsLoadingStudents(false);
+  }
+};
   const viewStudents = (college) => {
     if (college === "Other" || !availableColleges.includes(college)) return;
     
     setViewingCollege(college);
     
-    // Fetch students if not already fetched
     if (!studentsData[college]) {
       fetchStudentsForCollege(college);
     }
@@ -127,63 +259,95 @@ function AddJD({ show, onClose , prefillData }) {
     setViewingCollege(null);
   };
 
-  const generateEmailContent = () => {
-    const emailSubject = `Job Opportunity: ${formData.companyName}`;
-    
-    // Plain text format with Outlook-supported bold syntax
-    const emailBody = `
-Job Opportunity Details
-*Company Name:* ${formData.companyName || 'N/A'}
-*Website:* ${formData.companyWebsite || 'N/A'}
-
-Eligibility Criteria
-*Course:* ${formData.course || 'N/A'}
-*Specialization:* ${formData.specialization.join(', ') || 'N/A'}
-*Passing Year:* ${formData.passingYear || 'N/A'}
-*Marks Criteria:* ${formData.marksCriteria || 'N/A'}
-*Gender:* ${formData.gender || 'N/A'}
-
-Job Details
-*Job Type:* ${formData.jobType || 'N/A'}
-*Designation:* ${formData.jobDesignation || 'N/A'}
-*Location:* ${formData.jobLocation || 'N/A'}
-*Salary:* ${formData.salary || 'N/A'}
-${formData.internshipDuration ? `*Internship Duration:* ${formData.internshipDuration}` : ''}
-${formData.stipend ? `*Stipend:* ${formData.stipend}` : ''}
-
-Additional Information
-*Mode of Interview:* ${formData.modeOfInterview || 'N/A'}
-*Joining Period:* ${formData.joiningPeriod || 'N/A'}
-*Mode of Work:* ${formData.modeOfWork || 'N/A'}
-
-Selection Process ${formData.modeOfInterview}:
-1. Application Form Submission
-2. Online Assessment Test (Communication & Aptitude)
-3. Interview Round - Technical
-4. Interview Round - HR
-5. Result Declaration
-
-${formData.jobDescription ? `
-Job Description
-${formData.jobDescription.replace(/\n/g, '\n')}
-` : ''}
-
-*Please share the detailed list of eligible and interested students 
-as per the attached excel sheet format along with their respective 
-resumes in a zip folder by 10th July 2025 by 2:00 pm.*
-    `;
-
-    return { subject: emailSubject, body: emailBody };
+  // College email getter function
+  const getCollegeEmail = (college) => {
+    if (availableColleges.includes(college) && college !== "Other") {
+      return collegeEmails[college] || '';
+    } else {
+      return manualEmails[college] || '';
+    }
   };
 
-  const openOutlookEmail = (college, tpoEmail) => {
-    const { subject, body } = generateEmailContent();
-    
-    // Create the mailto link with TPO email if available
-    const mailtoLink = `https://outlook.office365.com/mail/deeplink/compose?to=${encodeURIComponent(tpoEmail || '')}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    
-    // Open in a new tab
-    window.open(mailtoLink, '_blank');
+  // College email setter function
+  const handleEmailChange = (college, email) => {
+    if (availableColleges.includes(college) && college !== "Other") {
+      setCollegeEmails(prev => ({
+        ...prev,
+        [college]: email
+      }));
+    } else {
+      setManualEmails(prev => ({
+        ...prev,
+        [college]: email
+      }));
+    }
+  };
+
+  const sendBulkEmail = async (collegesWithTPO) => {
+    try {
+      const validEmails = collegesWithTPO
+        .filter(({ tpoEmail }) => tpoEmail && tpoEmail.trim() !== "")
+        .map(({ tpoEmail }) => tpoEmail);
+
+      console.log('Valid Emails for BCC:', validEmails);
+
+      if (validEmails.length === 0) {
+        console.warn("No valid email addresses found");
+        setSubmissionError("No valid email addresses found for selected colleges");
+        return;
+      }
+
+      const collegeNames = collegesWithTPO
+        .filter(({ tpoEmail }) => tpoEmail && tpoEmail.trim() !== "")
+        .map(({ college }) => college)
+        .join(', ');
+
+      const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
+        try {
+          const date = new Date(dateString);
+          return date.toLocaleDateString('en-IN', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+          });
+        } catch (error) {
+          return dateString;
+        }
+      };
+
+      const templateParams = {
+        to_email: 'deepgryphon@gmail.com',
+        bcc_emails: validEmails.join(','),
+        subject: `Assignment Mail for ${collegeNames} - Gryphon Academy Pvt. Ltd.`,
+        company_name: formData.companyName || 'Company',
+        last_date: formatDate(formData.companyOpenDate),
+        passing_year: formData.passingYear || 'N/A',
+        course: formData.course || 'N/A',
+        job_designation: formData.jobDesignation || 'Job Opening',
+        job_location: formData.jobLocation || 'N/A',
+        salary: formData.salary || 'N/A',
+        college_names: collegeNames,
+        college_count: validEmails.length
+      };
+
+      console.log('BCC Email Params:', templateParams);
+
+      const result = await emailjs.send(
+        EMAILJS_CONFIG.SERVICE_ID,
+        EMAILJS_CONFIG.TEMPLATE_ID,
+        templateParams,
+        EMAILJS_CONFIG.PUBLIC_KEY
+      );
+
+      console.log('BCC Email sent successfully:', result.text);
+      setEmailSent(true);
+      alert(`✅ Email sent successfully to ${validEmails.length} colleges via BCC!`);
+
+    } catch (error) {
+      console.error('Error sending BCC email:', error);
+      throw new Error('Failed to send email');
+    }
   };
 
   const handleFinalSubmit = async () => {
@@ -192,42 +356,39 @@ resumes in a zip folder by 10th July 2025 by 2:00 pm.*
       return;
     }
     
+    const collegesWithoutEmails = selectedColleges
+      .filter(college => college !== "Other")
+      .filter(college => !getCollegeEmail(college));
+    
+    if (collegesWithoutEmails.length > 0) {
+      setSubmissionError(`Please provide emails for: ${collegesWithoutEmails.join(', ')}`);
+      return;
+    }
+
+    console.log('Form Data:', formData);
+    console.log('Selected Colleges:', selectedColleges);
+    console.log('College Emails:', collegeEmails);
+    console.log('Manual Emails:', manualEmails);
+
     setIsSubmitting(true);
     setSubmissionError(null);
+    setEmailSent(false);
+    
     try {
-      // Filter out the "Other" option and only keep actual college names
       const collegesToSubmit = selectedColleges.filter(c => c !== "Other");
       
-      // First, fetch TPO emails for all selected colleges
-      const collegesWithTPO = await Promise.all(
-        collegesToSubmit.map(async (college) => {
-          try {
-            // Query the trainingForms collection to find the college
-            const trainingFormQuery = query(
-              collection(db, "trainingForms"),
-              where("collegeName", "==", college)
-            );
-            
-            const trainingFormSnapshot = await getDocs(trainingFormQuery);
-            if (trainingFormSnapshot.empty) {
-              return { college, tpoEmail: null };
-            }
-            
-            // Get the TPO email from the first matching document
-            const tpoEmail = trainingFormSnapshot.docs[0].data().tpoEmail || null;
-            return { college, tpoEmail };
-          } catch (error) {
-            console.error("Error fetching TPO for college:", college, error);
-            return { college, tpoEmail: null };
-          }
-        })
-      );
+      const collegesWithTPO = collegesToSubmit.map(college => ({
+        college,
+        tpoEmail: getCollegeEmail(college)
+      }));
 
-      // Submit company data to Firestore
+      console.log('Colleges with TPO:', collegesWithTPO);
+
       const promises = collegesToSubmit.map(college => {
         const companyData = {
           ...formData,
           college,
+          tpoEmail: getCollegeEmail(college),
           jobFiles: jobFiles.map(file => file.name),
           updatedAt: serverTimestamp()
         };
@@ -236,12 +397,12 @@ resumes in a zip folder by 10th July 2025 by 2:00 pm.*
 
       await Promise.all(promises);
       
-      // Open Outlook email for each selected college in new tabs
-      collegesWithTPO.forEach(({ college, tpoEmail }) => {
-        openOutlookEmail(college, tpoEmail);
-      });
+      await sendBulkEmail(collegesWithTPO);
       
-      onClose();
+      setTimeout(() => {
+        onClose();
+      }, 2000);
+      
     } catch (error) {
       console.error("Error submitting JD:", error);
       setSubmissionError("Error submitting JD. Please try again.");
@@ -250,78 +411,18 @@ resumes in a zip folder by 10th July 2025 by 2:00 pm.*
     }
   };
 
-  // Prefill company info when opened from "Mark as Onboarded"
+// Placement users ke liye alag useEffect
 useEffect(() => {
-  if (prefillData) {
-    setFormData((prev) => ({
-      ...prev,
-      companyName: prefillData.companyName || "",
-      companyWebsite: prefillData.companyWebsite || "",
-      source: prefillData.source || "",
-      coordinator: prefillData.assignedTo?.name || "",
-    }));
+  if (show) {
+    fetchPlacementUsers();
   }
-}, [prefillData]);
+}, [show]); // Sirf show change hone par fetch karo
 
 
-  useEffect(() => {
-    const fetchColleges = async () => {
-      if (formData.course && formData.passingYear) {
-        try {
-          const passingYearNum = parseInt(formData.passingYear);
-          if (isNaN(passingYearNum)) {
-
-            return;
-          }
-          
-          const yearStart = (passingYearNum - 1).toString().slice(-2);
-          const yearEnd = passingYearNum.toString().slice(-2);
-          const passingYearFormat1 = `${yearStart}-${yearEnd}`;
-          const passingYearFormat2 = `20${yearStart}-20${yearEnd}`;
-
-          const queries = [
-            query(
-              collection(db, "trainingForms"),
-              where("course", "==", formData.course),
-              where("passingYear", "==", passingYearFormat1)
-            ),
-            query(
-              collection(db, "trainingForms"),
-              where("course", "==", formData.course),
-              where("passingYear", "==", passingYearFormat2)
-            )
-          ];
-
-          const colleges = new Set();
-          
-          for (const q of queries) {
-            const querySnapshot = await getDocs(q);
-            querySnapshot.forEach((doc) => {
-              const data = doc.data();
-              const collegeName = data.collegeName || data.college || doc.id.split("-")[0];
-              if (collegeName) {
-                colleges.add(collegeName);
-              }
-            });
-          }
-
-          const finalColleges = Array.from(colleges)
-            .concat(["Other"]) // Add "Other" option
-            .sort();
-          
-          setAvailableColleges(finalColleges);
-
-        } catch (error) {
-          console.error("Error fetching colleges:", error);
-          setAvailableColleges(["Other"]); // Just show "Other" option if fetch fails
-        }
-      } else {
-        setAvailableColleges(["Other"]); // Just show "Other" option if no course/year selected
-      }
-    };
-
-    fetchColleges();
-  }, [formData.course, formData.passingYear]);
+// Colleges filter ke liye alag useEffect  
+useEffect(() => {
+  fetchFilteredColleges();
+}, [formData.course, formData.passingYear, formData.specialization]);
 
   if (!show) return null;
 
@@ -345,12 +446,15 @@ useEffect(() => {
           <>
             {/* Modal Body */}
             <div className="p-6 overflow-y-auto max-h-[calc(100vh-180px)]">
-              <AddJDForm
-                formData={formData}
-                setFormData={setFormData}
-                formErrors={formErrors}
-                handleFileChange={handleFileChange}
-              />
+             <AddJDForm
+  formData={formData}
+  setFormData={setFormData}
+  formErrors={formErrors}
+  handleFileChange={handleFileChange}
+  onClose={onClose}
+  placementUsers={placementUsers}
+  isLoadingUsers={isLoadingUsers}
+/>
             </div>
 
             {/* Modal Footer */}
@@ -385,7 +489,22 @@ useEffect(() => {
                 showOtherCollegesInput={showOtherCollegesInput}
                 setShowOtherCollegesInput={setShowOtherCollegesInput}
                 viewStudents={viewStudents}
+                collegeEmails={collegeEmails}
+                manualEmails={manualEmails}
+                handleEmailChange={handleEmailChange}
+                getCollegeEmail={getCollegeEmail}
+                collegeDetails={collegeDetails}
+                getStudentCurrentYear={getStudentCurrentYear}
               />
+              
+              {/* Email Status */}
+              {emailSent && (
+                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-green-700 text-sm">
+                    ✅ Email sent successfully to all selected colleges!
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Modal Footer */}
@@ -414,10 +533,10 @@ useEffect(() => {
                   className={`px-6 py-2.5 rounded-lg text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition ${
                     selectedColleges.length === 0 || (selectedColleges.includes("Other") && otherCollegesInput.trim() === "") || isSubmitting
                       ? "bg-gray-400 cursor-not-allowed"
-                      : "bg-blue-600 hover:bg-blue-700"
+                      : "bg-green-600 hover:bg-green-700"
                   }`}
                 >
-                  {isSubmitting ? 'Submitting...' : `Submit to ${selectedColleges.filter(c => c !== "Other").length} college(s)`}
+                  {isSubmitting ? 'Submitting...' : `Send to ${selectedColleges.filter(c => c !== "Other").length} college(s)`}
                 </button>
               </div>
             </div>

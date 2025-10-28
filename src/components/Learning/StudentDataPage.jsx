@@ -9,11 +9,14 @@ function StudentDataPage({ trainingId, onBack }) {
   const [studentData, setStudentData] = useState([]);
   const [headers, setHeaders] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [cancelUpload, setCancelUpload] = useState(false);
   const [showImportOptions, setShowImportOptions] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [error, setError] = useState(null);
   const [serialSortDirection, setSerialSortDirection] = useState('asc'); // 'asc' or 'desc'
   const [isSerialColumnSorted, setIsSerialColumnSorted] = useState(false);
+  const [showAllColumns, setShowAllColumns] = useState(false);
   const tableContainerRef = useRef(null);
   const importOptionsRef = useRef(null);
 
@@ -163,31 +166,61 @@ function StudentDataPage({ trainingId, onBack }) {
     // For dynamic columns, we just need to ensure there's data
     // No specific header validation needed
   };
-  const handleFileImport = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
 
-    setLoading(true);
-    setError(null);
+  // Helper function to format values for display
+  const formatDisplayValue = (value) => {
+    if (value === null || value === undefined) {
+      return '-';
+    }
 
-    const reader = new FileReader();
+    // Handle Firebase Timestamp objects
+    if (value && typeof value === 'object' && 'seconds' in value && 'nanoseconds' in value) {
+      const date = new Date(value.seconds * 1000);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
 
-    // Add async here
-    reader.onload = async (e) => {  // <-- Add async here
-      try {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: "array" });
-        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonDataRaw = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    // Handle other objects that might not be renderable
+    if (typeof value === 'object') {
+      return JSON.stringify(value);
+    }
 
-        if (jsonDataRaw.length < 2) {
-          throw new Error("File must contain at least one data row");
-        }
+    // Convert to string for display
+    return String(value) || '-';
+  };
 
-        validateImportedFile(jsonDataRaw);
+  // Function to filter out completely empty rows
+  const filterValidRows = (students) => {
+    return students.filter(student => {
+      // Check if at least one column has a non-empty value
+      return Object.values(student).some(value =>
+        value !== undefined && value !== null && String(value).trim() !== ''
+      );
+    });
+  };
 
-        const headersRow = jsonDataRaw[0];
-        const newData = jsonDataRaw.slice(1).map((row, index) => {
+  // Process Excel data in chunks to prevent memory issues
+  const processExcelDataChunked = async (jsonData, headersRow, onProgress) => {
+    const errors = [];
+
+    try {
+      // Process data rows in chunks to prevent memory issues
+      const dataRows = jsonData.slice(1);
+      const CHUNK_SIZE = 100; // Process 100 rows at a time
+      const processedData = [];
+      const totalRows = dataRows.length;
+
+      for (let i = 0; i < totalRows; i += CHUNK_SIZE) {
+        const chunk = dataRows.slice(i, i + CHUNK_SIZE);
+
+        // Process this chunk
+        const chunkProcessed = chunk.map((row, chunkIndex) => {
+          const globalIndex = i + chunkIndex;
           const obj = {};
           headersRow.forEach((header, idx) => {
             let value = row[idx] ?? "";
@@ -201,11 +234,160 @@ function StudentDataPage({ trainingId, onBack }) {
             }
             obj[header] = value;
           });
-          obj.__rowId = `${file.name}-${index}`;
+
+          // Check for required fields (SR NO and FULL NAME OF STUDENT are required, others can be empty)
+          const requiredFields = ['SR NO', 'FULL NAME OF STUDENT'];
+          const missingRequiredFields = requiredFields.filter(field =>
+            !obj[field] || String(obj[field]).trim() === ''
+          );
+
+          if (missingRequiredFields.length > 0) {
+            errors.push(`Row ${globalIndex + 2}: Required fields missing: ${missingRequiredFields.join(', ')}`);
+          }
+
+          obj.__rowId = `${Date.now()}-${globalIndex}`;
           return obj;
         });
 
-        const { uniqueData, duplicateCount, duplicateRows } = filterDuplicates(newData);
+        processedData.push(...chunkProcessed);
+
+        // Update progress for this chunk
+        if (onProgress) {
+          const progressPercent = Math.floor(((i + chunk.length) / totalRows) * 100);
+          onProgress(progressPercent);
+        }
+      }
+
+      // Filter out completely empty rows
+      const validRowsOnly = filterValidRows(processedData);
+
+      if (errors.length > 0) {
+        throw new Error(`Validation failed with ${errors.length} error(s)`);
+      }
+
+      return validRowsOnly;
+    } catch (error) {
+      // If we have detailed errors, throw them all
+      if (errors.length > 0) {
+        error.details = errors;
+      }
+      throw error;
+    }
+  };
+
+  const handleFileImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setLoading(true);
+    setError(null);
+
+    // Basic file validation
+    const maxFileSize = 10 * 1024 * 1024; // 10MB limit
+    if (file.size > maxFileSize) {
+      setError(`File too large. Maximum size allowed: 10MB. Your file is ${(file.size / (1024 * 1024)).toFixed(1)}MB.`);
+      setLoading(false);
+      e.target.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+
+    // Add async here
+    reader.onload = async (e) => {  // <-- Add async here
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: "array" });
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonDataRaw = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+        if (jsonDataRaw.length < 2) {
+          throw new Error("The file appears to be empty or contains no data rows. Please ensure your file has headers and at least one data row.");
+        }
+
+        // Extract headers and validate required fields
+        const fileHeaders = jsonDataRaw[0].map(h => String(h || '').trim());
+        const expectedHeaders = [
+          "SR NO", "FULL NAME OF STUDENT", "CURRENT COLLEGE NAME", "EMAIL ID", "MOBILE NO.",
+          "BIRTH DATE", "GENDER", "HOMETOWN", "10th PASSING YR", "10th MARKS %",
+          "12th PASSING YR", "12th MARKS %", "DIPLOMA COURSE", "DIPLOMA SPECIALIZATION",
+          "DIPLOMA PASSING YR", "DIPLOMA MARKS %", "GRADUATION COURSE", "GRADUATION SPECIALIZATION",
+          "GRADUATION PASSING YR", "GRADUATION MARKS %", "COURSE", "SPECIALIZATION",
+          "PASSING YEAR", "OVERALL MARKS %"
+        ];
+
+        // Check if headers exactly match the template
+        const headersMatch = fileHeaders.length === expectedHeaders.length &&
+          fileHeaders.every((header, index) => header === expectedHeaders[index]);
+
+        if (!headersMatch) {
+          // Find missing columns
+          const missingColumns = expectedHeaders.filter(expected =>
+            !fileHeaders.some(header => header === expected)
+          );
+
+          // Find extra columns
+          const extraColumns = fileHeaders.filter(header =>
+            !expectedHeaders.some(expected => expected === header)
+          );
+
+          // Find modified columns (same position but different name)
+          const modifiedColumns = [];
+          for (let i = 0; i < Math.min(fileHeaders.length, expectedHeaders.length); i++) {
+            if (fileHeaders[i] !== expectedHeaders[i]) {
+              modifiedColumns.push({
+                position: i + 1,
+                expected: expectedHeaders[i],
+                found: fileHeaders[i] || '(empty)'
+              });
+            }
+          }
+
+          let errorMessage = "Column headers do not match the template. ";
+
+          if (missingColumns.length > 0) {
+            errorMessage += `Missing columns: ${missingColumns.join(', ')}. `;
+          }
+
+          if (extraColumns.length > 0) {
+            errorMessage += `Extra columns found: ${extraColumns.join(', ')}. `;
+          }
+
+          if (modifiedColumns.length > 0) {
+            const modifiedDetails = modifiedColumns.map(mod =>
+              `Column ${mod.position} should be '${mod.expected}' but found '${mod.found}'`
+            ).join('; ');
+            errorMessage += `Modified columns: ${modifiedDetails}. `;
+          }
+
+          errorMessage += "Please download the template and do not modify the column structure.";
+          setError(errorMessage);
+          setLoading(false);
+          e.target.value = "";
+          return;
+        }
+
+        validateImportedFile(jsonDataRaw);
+
+        const headersRow = jsonDataRaw[0];
+
+        // Process Excel data in chunks with progress updates
+        const processedData = await processExcelDataChunked(jsonDataRaw, headersRow, (progress) => {
+          // Could add progress feedback here if needed
+          console.log(`Processing progress: ${progress}%`);
+        });
+
+        // Filter out completely empty rows before uploading to Firestore
+        const validData = filterValidRows(processedData);
+
+        if (validData.length === 0) {
+          setError("No valid data rows found. Please ensure your file contains student information.");
+          setLoading(false);
+          e.target.value = "";
+          return;
+        }
+
+        const { uniqueData, duplicateCount, duplicateRows } = filterDuplicates(validData);
 
         if (duplicateRows.length > 0) {
           const duplicateDetails = duplicateRows.map(d =>
@@ -215,26 +397,78 @@ function StudentDataPage({ trainingId, onBack }) {
         }
 
         if (uniqueData.length > 0) {
-          const batchWrites = [];
+          // Stream upload students in chunks to prevent memory issues
+          const UPLOAD_CHUNK_SIZE = 50; // Upload 50 students at a time
+          let uploadedCount = 0;
+          let failedUploads = 0;
+          const totalStudents = uniqueData.length;
 
-          for (const row of uniqueData) {
-            const studentRef = doc(collection(db, "trainingForms", trainingId, "students"));
+          setUploadProgress(0); // Reset progress
+          setCancelUpload(false); // Reset cancellation flag
 
-            // Save the data as-is with dynamic fields
-            const studentData = {
-              ...row,
-              trainingId: trainingId,
-              createdAt: new Date()
-            };
+          for (let i = 0; i < totalStudents; i += UPLOAD_CHUNK_SIZE) {
+            // Check if upload was cancelled
+            if (cancelUpload) {
+              setError(`Upload cancelled. ${uploadedCount} students were imported successfully.`);
+              setLoading(false);
+              setUploadProgress(0);
+              e.target.value = "";
+              return;
+            }
 
-            // Remove the temporary __rowId field
-            delete studentData.__rowId;
+            const chunk = uniqueData.slice(i, i + UPLOAD_CHUNK_SIZE);
 
-            batchWrites.push(setDoc(studentRef, studentData));
+            try {
+              // Create upload operations for this chunk
+              const uploadPromises = [];
+              for (const row of chunk) {
+                const studentRef = doc(collection(db, "trainingForms", trainingId, "students"));
+
+                // Save the data as-is with dynamic fields
+                const studentData = {
+                  ...row,
+                  trainingId: trainingId,
+                  createdAt: new Date()
+                };
+
+                // Remove the temporary __rowId field
+                delete studentData.__rowId;
+
+                uploadPromises.push(setDoc(studentRef, studentData));
+              }
+
+              // Upload this chunk
+              await Promise.all(uploadPromises);
+              uploadedCount += chunk.length;
+
+              // Update progress (40% processing + 60% uploading)
+              const progressPercent = Math.round(40 + (uploadedCount / totalStudents) * 60);
+              setUploadProgress(progressPercent);
+
+            } catch (chunkError) {
+              console.error(`Failed to upload chunk ${Math.floor(i / UPLOAD_CHUNK_SIZE) + 1}:`, chunkError);
+              failedUploads += chunk.length;
+              // Continue with next chunk instead of failing completely
+            }
           }
 
-          await Promise.all(batchWrites);
-          fetchStudentData(); // Refresh the displayed data
+          setUploadProgress(100); // Complete progress
+
+          // Memory cleanup
+          setTimeout(() => {
+            setUploadProgress(0);
+          }, 2000);
+
+          // Check if upload was partially successful
+          if (failedUploads > 0 && uploadedCount > 0) {
+            setError(`Partial import completed. ${uploadedCount} students imported successfully, ${failedUploads} failed. Please check your data and try again for failed records.`);
+          } else if (failedUploads > 0 && uploadedCount === 0) {
+            throw new Error(`Import failed. All ${failedUploads} student imports failed. Please check your data and try again.`);
+          }
+
+          if (uploadedCount > 0) {
+            fetchStudentData(); // Refresh the displayed data only if we uploaded something
+          }
         }
       } catch (err) {
         console.error("Error importing file:", err);
@@ -317,8 +551,8 @@ function StudentDataPage({ trainingId, onBack }) {
 
     const headerStyle = {
       fill: { fgColor: { rgb: "7C3AED" } },
-      font: { bold: true, color: { rgb: "FFFFFF" } },
-      alignment: { horizontal: "center" },
+      font: { bold: true, color: { rgb: "FFFFFF" }, sz: 10 },
+      alignment: { horizontal: "center", vertical: "center", wrapText: true },
       border: {
         top: { style: "thin", color: { rgb: "4B5563" } },
         bottom: { style: "thin", color: { rgb: "4B5563" } },
@@ -332,41 +566,58 @@ function StudentDataPage({ trainingId, onBack }) {
       ws[cellRef].s = headerStyle;
     }
 
-    ws['!cols'] = headers.map(() => ({ wch: 20 }));
+    // Set appropriate column widths based on content (same as template)
+    ws['!cols'] = headers.map((header, index) => {
+      // Use the same column widths as the template for consistency
+      const templateWidths = [
+        { wch: 6 },   // SR NO
+        { wch: 20 },  // FULL NAME OF STUDENT
+        { wch: 22 },  // CURRENT COLLEGE NAME
+        { wch: 18 },  // EMAIL ID
+        { wch: 15 },  // MOBILE NO.
+        { wch: 12 },  // BIRTH DATE
+        { wch: 8 },   // GENDER
+        { wch: 12 },  // HOMETOWN
+        { wch: 12 },  // 10th PASSING YR
+        { wch: 12 },  // 10th MARKS %
+        { wch: 12 },  // 12th PASSING YR
+        { wch: 12 },  // 12th MARKS %
+        { wch: 15 },  // DIPLOMA COURSE
+        { wch: 20 },  // DIPLOMA SPECIALIZATION
+        { wch: 15 },  // DIPLOMA PASSING YR
+        { wch: 15 },  // DIPLOMA MARKS %
+        { wch: 18 },  // GRADUATION COURSE
+        { wch: 22 },  // GRADUATION SPECIALIZATION
+        { wch: 18 },  // GRADUATION PASSING YR
+        { wch: 18 },  // GRADUATION MARKS %
+        { wch: 12 },  // COURSE
+        { wch: 18 },  // SPECIALIZATION
+        { wch: 12 },  // PASSING YEAR
+        { wch: 15 }   // OVERALL MARKS %
+      ];
+      return templateWidths[index] || { wch: 15 }; // Default width for any additional columns
+    });
+
+    // Set row height for header
+    ws['!rows'] = [{ hpt: 30 }]; // Header row height
+
     XLSX.utils.book_append_sheet(wb, ws, "Student Data");
     XLSX.writeFile(wb, `student_data_${trainingId || new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   const downloadSampleFile = () => {
-    // Create a sample with common student data fields
+    // Create template with headers only (no example data)
     const sampleHeaders = [
-      "SN", "FULL NAME OF STUDENT", "CURRENT COLLEGE NAME", "EMAIL ID", "MOBILE NO.",
+      "SR NO", "FULL NAME OF STUDENT", "CURRENT COLLEGE NAME", "EMAIL ID", "MOBILE NO.",
       "BIRTH DATE", "GENDER", "HOMETOWN", "10th PASSING YR", "10th MARKS %",
       "12th PASSING YR", "12th MARKS %", "DIPLOMA COURSE", "DIPLOMA SPECIALIZATION",
       "DIPLOMA PASSING YR", "DIPLOMA MARKS %", "GRADUATION COURSE", "GRADUATION SPECIALIZATION",
       "GRADUATION PASSING YR", "GRADUATION MARKS %", "COURSE", "SPECIALIZATION",
       "PASSING YEAR", "OVERALL MARKS %"
     ];
-    const sampleData = [
-      [
-        1, "Ajay Pawar", "MIT", "XYZ@GMAIL.COM", "9999999999", "24-May-02", "MALE", "PUNE",
-        2018, 76, 2020, 87, "", "", "", "", "", "", "", "", "BE", "COMPUTER SCIENCE", 2024, 77,
-        "MBA", "BUSINESS ANALYTICS", 2026, 85
-      ],
-      [
-        2, "Deep Mahire", "Symbiosis", "ABC@GMAIL.COM", "8888888888", "26-Jun-04", "MALE",
-        "SHIRDI", 2020, 57, 2020, 87, "", "", "", "", "", "", "", "", "BTECH", "MECHANICAL", 2026, 66,
-        "MBA", "IT", 2027, 75
-      ],
-      [
-        3, "Sakshi Patil", "COEP", "LMN@GMAIL.COM", "7777777777", "30-Mar-04", "FEMALE",
-        "PUNE", 2020, 57, "", "", "DIPLOMA", "CS", 2023, 73, "BTECH", "MECHANICAL", 2026, 66,
-        "MBA", "IT", 2027, 75
-      ]
-    ];
 
     const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet([sampleHeaders, ...sampleData]);
+    const ws = XLSX.utils.aoa_to_sheet([sampleHeaders]); // Only headers, no sample data
 
     const headerStyle = {
       fill: { fgColor: { rgb: "7C3AED" } },
@@ -387,7 +638,7 @@ function StudentDataPage({ trainingId, onBack }) {
 
     // Set appropriate column widths based on content
     ws['!cols'] = [
-      { wch: 5 },   // SN
+      { wch: 6 },   // SR NO
       { wch: 20 },  // FULL NAME OF STUDENT
       { wch: 22 },  // CURRENT COLLEGE NAME
       { wch: 18 },  // EMAIL ID
@@ -416,14 +667,14 @@ function StudentDataPage({ trainingId, onBack }) {
     // Set row height for header
     ws['!rows'] = [{ hpt: 30 }]; // Header row height
 
-    XLSX.utils.book_append_sheet(wb, ws, "Sample Student Data");
-    XLSX.writeFile(wb, "student_data_sample_template.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, "Student Data Template");
+    XLSX.writeFile(wb, "student_data_template.xlsx");
     setShowImportOptions(false);
   };
 
   const filteredData = studentData.filter(row => {
     return Object.values(row).some(
-      value => String(value).toLowerCase().includes(searchTerm.toLowerCase())
+      value => formatDisplayValue(value).toLowerCase().includes(searchTerm.toLowerCase())
     );
   });
 
@@ -464,6 +715,20 @@ function StudentDataPage({ trainingId, onBack }) {
       }
     });
   }, [filteredData, serialSortDirection, isSerialColumnSorted, getSerialHeader]);
+
+  // Define important columns that should be shown by default
+  const importantColumns = [
+    'SR NO', 'FULL NAME OF STUDENT', 'CURRENT COLLEGE NAME', 
+    'EMAIL ID', 'MOBILE NO.', 'COURSE', 'SPECIALIZATION', 'PASSING YEAR'
+  ];
+
+  // Filter headers based on showAllColumns toggle
+  const displayedHeaders = showAllColumns ? headers : headers.filter(header => 
+    importantColumns.some(important => 
+      header.toLowerCase().includes(important.toLowerCase()) || 
+      important.toLowerCase().includes(header.toLowerCase())
+    )
+  );
 
   // Handle mouse wheel scrolling for horizontal scroll
   useEffect(() => {
@@ -577,7 +842,25 @@ function StudentDataPage({ trainingId, onBack }) {
           {loading ? (
             <div className="flex flex-col items-center justify-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500 mb-4"></div>
-              <p className="text-gray-600">Loading student data...</p>
+              <p className="text-gray-600 mb-2">
+                {uploadProgress > 0 ? `Importing students... ${uploadProgress}%` : "Loading student data..."}
+              </p>
+              {uploadProgress > 0 && (
+                <div className="w-64 bg-gray-200 rounded-full h-2 mb-4">
+                  <div
+                    className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${uploadProgress}%` }}
+                  ></div>
+                </div>
+              )}
+              {uploadProgress > 0 && uploadProgress < 100 && (
+                <button
+                  onClick={() => setCancelUpload(true)}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+                >
+                  Cancel Import
+                </button>
+              )}
             </div>
           ) : studentData.length > 0 ? (
             <>
@@ -599,6 +882,20 @@ function StudentDataPage({ trainingId, onBack }) {
 
                 <div className="flex items-center gap-1 text-xs text-gray-600">
                   <span>{sortedData.length} students found</span>
+                  <button
+                    onClick={() => setShowAllColumns(!showAllColumns)}
+                    className="ml-2 flex items-center gap-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs transition-colors"
+                    title={showAllColumns ? "Show important columns only" : "Show all columns"}
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      {showAllColumns ? (
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      ) : (
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                      )}
+                    </svg>
+                    {showAllColumns ? "Important" : "All"}
+                  </button>
                 </div>
               </div>
 
@@ -614,9 +911,9 @@ function StudentDataPage({ trainingId, onBack }) {
                 <table className="w-full divide-y divide-gray-200" style={{ tableLayout: 'fixed' }}>
                   <thead className="bg-gray-50 sticky top-0 z-10">
                     <tr>
-                      {headers.map((header, idx) => {
+                      {displayedHeaders.map((header, idx) => {
                         const isSerialColumn = /^(s\.?\s*no\.?\s*|sr\.?\s*no\.?\s*|serial\s*no\.?\s*)$/i.test(header.trim());
-                        const columnWidth = isSerialColumn ? '60px' : `${100 / (headers.length - (headers.some(h => /^(s\.?\s*no\.?\s*|sr\.?\s*no\.?\s*|serial\s*no\.?\s*)$/i.test(h.trim())) ? 1 : 0))}%`;
+                        const columnWidth = isSerialColumn ? '60px' : `${100 / (displayedHeaders.length - (displayedHeaders.some(h => /^(s\.?\s*no\.?\s*|sr\.?\s*no\.?\s*|serial\s*no\.?\s*)$/i.test(h.trim())) ? 1 : 0))}%`;
                         return (
                           <th 
                             key={idx} 
@@ -657,9 +954,9 @@ function StudentDataPage({ trainingId, onBack }) {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {sortedData.map((row, rowIndex) => (
                       <tr key={rowIndex} className="hover:bg-gray-50 transition-colors">
-                        {headers.map((header, idx) => (
-                          <td key={idx} className="px-3 py-2 text-sm text-gray-900 truncate" title={row[header] || '-'}>
-                            {row[header] || '-'}
+                        {displayedHeaders.map((header, idx) => (
+                          <td key={idx} className="px-3 py-2 text-sm text-gray-900 truncate" title={formatDisplayValue(row[header])}>
+                            {formatDisplayValue(row[header])}
                           </td>
                         ))}
                       </tr>

@@ -33,9 +33,9 @@ import { db } from "../firebase";
 import emailjs from "@emailjs/browser";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-
+ 
 emailjs.init("CXYkFqg_8EWTsrN8M");
-
+ 
 const Help = () => {
   const { user } = useContext(AuthContext);
   const [showPopup, setShowPopup] = useState(false);
@@ -47,22 +47,22 @@ const Help = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [remark, setRemark] = useState("");
-
-
-
+ 
+ 
+ 
   const [ticketForm, setTicketForm] = useState({
     title: "",
     description: "",
     priority: "medium",
   });
-
+ 
   const isAdmin = user?.department === "Admin";
-
+ 
   const handleKnowledgeItemClick = (title) => {
     setPopupTitle(title);
     setShowPopup(true);
   };
-
+ 
   const handleTicketFormChange = (e) => {
     const { name, value } = e.target;
     setTicketForm((prev) => ({
@@ -74,7 +74,7 @@ const Help = () => {
       setFormErrors((prev) => ({ ...prev, [name]: "" }));
     }
   };
-
+ 
   const validateForm = () => {
     const errors = {};
     if (!ticketForm.title.trim()) errors.title = "Title is required";
@@ -87,11 +87,11 @@ const Help = () => {
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
-
+ 
   const submitTicket = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
-
+ 
     setIsSubmitting(true);
     try {
       // Add ticket to Firestore
@@ -103,7 +103,7 @@ const Help = () => {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-
+ 
       // Send email using EmailJS
       try {
         await emailjs.send(
@@ -136,19 +136,19 @@ const Help = () => {
           "Ticket submitted successfully! Our team will contact you soon."
         );
       } catch (emailError) {
-
+ 
         let errorMessage = "Ticket submitted but email notification failed";
-
+ 
         if (emailError.status === 422) {
           errorMessage =
             "Email configuration error - recipient address may be invalid";
         } else if (emailError.status === 400) {
           errorMessage = "Invalid email parameters";
         }
-
+ 
         toast.warning(errorMessage);
       }
-
+ 
       // Reset form
       setTicketForm({
         title: "",
@@ -158,13 +158,13 @@ const Help = () => {
       setShowTicketForm(false);
       fetchTickets();
     } catch (error) {
-
+ 
       toast.error("Failed to submit ticket. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
-
+ 
   const fetchTickets = useCallback(async () => {
     try {
       let q;
@@ -177,15 +177,15 @@ const Help = () => {
           orderBy("createdAt", "desc")
         );
       }
-
+ 
       const querySnapshot = await getDocs(q);
-
+ 
       // This is a valid empty state - no need to show error
       if (querySnapshot.empty) {
         setTickets([]);
         return;
       }
-
+ 
       const ticketsData = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
@@ -194,7 +194,7 @@ const Help = () => {
       }));
       setTickets(ticketsData);
     } catch (error) {
-
+ 
       // Only show toast for actual errors, not empty collections
       if (error.code !== "permission-denied") {
         // You might want to handle permission errors differently
@@ -202,7 +202,7 @@ const Help = () => {
       }
     }
   }, [isAdmin, user?.email]);
-
+ 
   const updateTicketStatus = async (ticketId, status) => {
     try {
       const ticketRef = doc(db, "tickets", ticketId);
@@ -212,8 +212,8 @@ const Help = () => {
         resolvedBy: isAdmin ? user.email : null,
         remark: isAdmin ? remark : "",
       });
-
-
+ 
+ 
       setTickets((prev) =>
         prev.map((ticket) =>
           ticket.id === ticketId
@@ -226,12 +226,12 @@ const Help = () => {
             : ticket
         )
       );
-
+ 
       toast.success(`Ticket marked as ${status.replace("-", " ")}`);
       setActiveTicket(null);
       setRemark("");
     } catch (error) {
-
+ 
       toast.error("Failed to update ticket status");
     }
   };
@@ -240,7 +240,7 @@ const Help = () => {
       fetchTickets();
     }
   }, [user, fetchTickets]);
-
+ 
   const knowledgeBaseItems = [
     {
       icon: <FiSettings className="w-5 h-5" />,
@@ -267,7 +267,7 @@ const Help = () => {
       category: "Guides",
     },
   ];
-
+ 
   return (
     <div className="min-h-screen bg-gray-50/50">
       {/* Under Development Popup */}
@@ -282,7 +282,7 @@ const Help = () => {
             >
               <FiX className="w-5 h-5" />
             </button>
-
+ 
             <div className="text-center pt-2">
               <div className="w-16 h-16 mx-auto mb-4 relative flex items-center justify-center">
                 <div className="absolute inset-0 bg-blue-100 rounded-full animate-pulse"></div>
@@ -291,7 +291,7 @@ const Help = () => {
                   <FiSettings className="w-6 h-6" />
                 </div>
               </div>
-
+ 
               <h3 className="text-xl font-semibold text-gray-900 mb-2">
                 {popupTitle}
               </h3>
@@ -302,7 +302,7 @@ const Help = () => {
                 Our engineering team is working hard to deliver this
                 functionality. We'll notify you as soon as it's available.
               </p>
-
+ 
               <button
                 onClick={() => setShowPopup(false)}
                 className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
@@ -313,7 +313,7 @@ const Help = () => {
           </div>
         </div>
       )}
-
+ 
       {/* Ticket Form Popup */}
       {showTicketForm && (
         <div className="fixed inset-0 bg-gray-900/70 backdrop-blur-sm flex items-center justify-center z-54 p-4 animate-fadeIn">
@@ -326,12 +326,12 @@ const Help = () => {
             >
               <FiX className="w-5 h-5" />
             </button>
-
+ 
             <div className="pt-2">
               <h3 className="text-xl font-semibold text-gray-900 mb-6">
                 Raise a New Ticket
               </h3>
-
+ 
               <form onSubmit={submitTicket}>
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -367,7 +367,7 @@ const Help = () => {
                     </p>
                   )}
                 </div>
-
+ 
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Description
@@ -381,7 +381,7 @@ const Help = () => {
                     required
                   ></textarea>
                 </div>
-
+ 
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Priority
@@ -398,7 +398,7 @@ const Help = () => {
                     <option value="critical">Critical</option>
                   </select>
                 </div>
-
+ 
                 <button
                   type="submit"
                   disabled={isSubmitting}
@@ -422,7 +422,7 @@ const Help = () => {
           </div>
         </div>
       )}
-
+ 
       {/* Ticket Details Popup */}
       {activeTicket && (
         <div className="fixed inset-0 bg-gray-900/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
@@ -435,7 +435,7 @@ const Help = () => {
             >
               <FiX className="w-5 h-5" />
             </button>
-
+ 
             <div className="pt-2">
               <div className="flex justify-between items-start mb-2">
                 <h3 className="text-xl font-semibold text-gray-900">
@@ -454,7 +454,7 @@ const Help = () => {
                   {activeTicket.priority}
                 </span>
               </div>
-
+ 
               <div className="flex items-center text-sm text-gray-500 mb-4">
                 <span>Created by: {activeTicket.createdBy}</span>
                 <span className="mx-2">•</span>
@@ -472,7 +472,7 @@ const Help = () => {
                   </span>
                 </span>
               </div>
-
+ 
               <div className="bg-gray-50 p-4 rounded-lg mb-6">
                 <h4 className="text-sm font-medium text-gray-700 mb-2">
                   Description:
@@ -494,7 +494,7 @@ const Help = () => {
                     ></textarea>
                   </div>
                 )}
-
+ 
               </div>
               {isAdmin && activeTicket.status === "not-resolved" && (
                 <div className="flex space-x-3">
@@ -518,12 +518,12 @@ const Help = () => {
                   </button>
                 </div>
               )}
-
+ 
             </div>
           </div>
         </div>
       )}
-
+ 
       <div className="">
         {/* Header aligned left */}
         <div className="mb-12">
@@ -538,7 +538,7 @@ const Help = () => {
             our platform.
           </p>
         </div>
-
+ 
         {/* Modified Tabs Section */}
         <div className="flex border-b border-gray-200 mb-8">
           <button
@@ -560,135 +560,139 @@ const Help = () => {
             {isAdmin ? "All Tickets" : "My Tickets"}
           </button>
         </div>
-
-        {showRaisedTickets ? (
-          <div className="bg-white rounded-xl shadow-xs border border-gray-100 overflow-hidden">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold text-gray-900">
-                  {isAdmin ? "All Support Tickets" : "My Support Tickets"}
-                </h2>
-                <button
-                  onClick={() => setShowTicketForm(true)}
-                  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <FiPlus className="mr-2" /> New Ticket
-                </button>
-              </div>
-
-              {tickets.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-500">
-                    {isAdmin
-                      ? "No tickets found"
-                      : "You haven't created any tickets yet"}
-                  </p>
-                  {!isAdmin && (
-                    <button
-                      onClick={() => setShowTicketForm(true)}
-                      className="mt-4 flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors mx-auto"
-                    >
-                      <FiPlus className="mr-2" /> Create Your First Ticket
-                    </button>
+ 
+ 
+{showRaisedTickets ? (
+  <div className="bg-white rounded-xl shadow-xs border border-gray-100 overflow-hidden">
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-semibold text-gray-900">
+          {isAdmin ? "All Support Tickets" : "My Support Tickets"}
+        </h2>
+        <button
+          onClick={() => setShowTicketForm(true)}
+          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          <FiPlus className="mr-2" /> New Ticket
+        </button>
+      </div>
+ 
+      {tickets.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-gray-500">
+            {isAdmin
+              ? "No tickets found"
+              : "You haven't created any tickets yet"}
+          </p>
+          {!isAdmin && (
+            <button
+              onClick={() => setShowTicketForm(true)}
+              className="mt-4 flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors mx-auto"
+            >
+              <FiPlus className="mr-2" /> Create Your First Ticket
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                  Title
+                </th>
+                {isAdmin && (
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Created By
+                  </th>
+                )}
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                  Priority
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                  Status
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px] max-w-[300px]">
+                  Remark
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {tickets.map((ticket) => (
+                <tr key={ticket.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 max-w-[200px] truncate">
+                    {ticket.title}
+                  </td>
+                  {isAdmin && (
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {ticket.createdBy}
+                    </td>
                   )}
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Title
-                        </th>
-                        {isAdmin && (
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Created By
-                          </th>
-                        )}
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Priority
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Remark
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {tickets.map((ticket) => (
-                        <tr key={ticket.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {ticket.title}
-                          </td>
-                          {isAdmin && (
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {ticket.createdBy}
-                            </td>
-                          )}
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs font-medium ${ticket.priority === "critical"
-                                ? "bg-red-100 text-red-800"
-                                : ticket.priority === "high"
-                                  ? "bg-orange-100 text-orange-800"
-                                  : ticket.priority === "medium"
-                                    ? "bg-yellow-100 text-yellow-800"
-                                    : "bg-green-100 text-green-800"
-                                }`}
-                            >
-                              {ticket.priority}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <div className="flex items-center">
-                              <span
-                                className={`px-2 py-1 rounded-full text-xs font-medium ${ticket.status === "resolved"
-                                  ? "bg-green-100 text-green-800"
-                                  : ticket.status === "can't-resolve"
-                                    ? "bg-gray-100 text-gray-800"
-                                    : "bg-red-100 text-red-800"
-                                  }`}
-                              >
-                                {ticket.status.replace("-", " ")}{" "}
-                                {ticket.status !== "not-resolved" && ticket.resolvedBy
-                                  ? `(by ${ticket.resolvedBy.split("@")[0]})`
-                                  : ""}
-                              </span>
-                            </div>
-                          </td>
-
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {ticket.remark
-                              ? ticket.remark
-                              : ticket.status === "resolved"
-                                ? `Resolved by ${ticket.resolvedBy?.split("@")[0] || "admin"}`
-                                : ticket.status === "can't-resolve"
-                                  ? "Couldn't resolve"
-                                  : "Pending resolution"}
-                          </td>
-
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <button
-                              onClick={() => setActiveTicket(ticket)}
-                              className="text-blue-600 hover:text-blue-800"
-                            >
-                              View Details
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${ticket.priority === "critical"
+                        ? "bg-red-100 text-red-800"
+                        : ticket.priority === "high"
+                          ? "bg-orange-100 text-orange-800"
+                          : ticket.priority === "medium"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : "bg-green-100 text-green-800"
+                        }`}
+                    >
+                      {ticket.priority}
+                    </span>
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <div className="flex items-center">
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${ticket.status === "resolved"
+                          ? "bg-green-100 text-green-800"
+                          : ticket.status === "can't-resolve"
+                            ? "bg-gray-100 text-gray-800"
+                            : "bg-red-100 text-red-800"
+                          }`}
+                      >
+                        {ticket.status.replace("-", " ")}{" "}
+                        {ticket.status !== "not-resolved" && ticket.resolvedBy
+                          ? `(by ${ticket.resolvedBy.split("@")[0]})`
+                          : ""}
+                      </span>
+                    </div>
+                  </td>
+ 
+                  <td className="px-4 py-4 text-sm text-gray-500 max-w-[300px]">
+                    <div className="break-words">
+                      {ticket.remark
+                        ? ticket.remark
+                        : ticket.status === "resolved"
+                          ? `Resolved by ${ticket.resolvedBy?.split("@")[0] || "admin"}`
+                          : ticket.status === "can't-resolve"
+                            ? "Couldn't resolve"
+                            : "Pending resolution"}
+                    </div>
+                  </td>
+ 
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <button
+                      onClick={() => setActiveTicket(ticket)}
+                      className="text-blue-600 hover:text-blue-800 whitespace-nowrap"
+                    >
+                      View Details
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  </div>
+) : (
+  // ... remaining code remains the same ...
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Left Column - Contact Support */}
             <div className="space-y-6">
@@ -703,7 +707,7 @@ const Help = () => {
                       Contact Support
                     </h2>
                   </div>
-
+ 
                   <div className="space-y-5">
                     {/* Email */}
                     <div className="flex items-start">
@@ -723,7 +727,7 @@ const Help = () => {
                         </a>
                       </div>
                     </div>
-
+ 
                     {/* Phone */}
                     <div className="flex items-start">
                       <div className="p-2.5 bg-blue-50 rounded-xl mr-3 shadow-inner border border-white/50">
@@ -741,7 +745,7 @@ const Help = () => {
                         </a>
                       </div>
                     </div>
-
+ 
                     {/* Support Hours */}
                     <div className="flex items-start">
                       <div className="p-2.5 bg-blue-50 rounded-xl mr-3 shadow-inner border border-white/50">
@@ -759,7 +763,7 @@ const Help = () => {
                         </p>
                       </div>
                     </div>
-
+ 
                     {/* Raise Ticket Button */}
                     <div className="pt-4">
                       <button
@@ -773,7 +777,7 @@ const Help = () => {
                 </div>
               </div>
             </div>
-
+ 
             {/* Right Column - Knowledge Base and Status */}
             <div className="lg:col-span-2 space-y-6">
               {/* Knowledge Base Cards */}
@@ -799,7 +803,7 @@ const Help = () => {
                   </div>
                 ))}
               </div>
-
+ 
               {/* Status Card */}
               <div className="bg-white rounded-xl border border-gray-100 shadow-xs overflow-hidden">
                 <div className="p-5">
@@ -817,7 +821,7 @@ const Help = () => {
                       </p>
                     </div>
                   </div>
-
+ 
                   <div className="flex items-center text-xs text-gray-400 mt-4 pt-4 border-t border-gray-100">
                     <span className="inline-flex items-center">
                       <FiCheckCircle className="w-3.5 h-3.5 text-emerald-500 mr-1.5" />
@@ -851,5 +855,7 @@ const Help = () => {
     </div>
   );
 };
-
+ 
 export default Help;
+ 
+ 
