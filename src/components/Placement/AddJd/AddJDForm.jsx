@@ -1,7 +1,9 @@
 import React, { useCallback, useState } from 'react';
 import specializationOptions from './specializationOptions';
 
-function AddJDForm({ formData, setFormData, formErrors, handleFileChange, placementUsers, isLoadingUsers }) {
+function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClose, placementUsers, isLoadingUsers }) {
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;
     setHasUnsavedChanges(true);

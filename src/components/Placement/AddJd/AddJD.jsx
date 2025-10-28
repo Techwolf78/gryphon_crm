@@ -451,6 +451,7 @@ useEffect(() => {
   setFormData={setFormData}
   formErrors={formErrors}
   handleFileChange={handleFileChange}
+  onClose={onClose}
   placementUsers={placementUsers}
   isLoadingUsers={isLoadingUsers}
 />
