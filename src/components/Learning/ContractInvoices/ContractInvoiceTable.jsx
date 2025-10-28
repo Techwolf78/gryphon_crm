@@ -76,7 +76,11 @@ export default function ContractInvoiceTable() {
     direction: 'desc'
   });
 
+  // Dynamic Installment Recalculation State - REMOVED FOR SIMPLICITY
+
   const { user } = useAuth();
+
+  // Core Functions - Simplified
 
   useEffect(() => {
     const fetchData = async () => {
@@ -549,30 +553,47 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
     }
 
     try {
-      // If this is a converted Tax invoice, also delete the original Proforma
-      if (invoice.convertedFromProforma) {
-        // Search for original proforma in both collections
-        const original = [...existingInvoices, ...existingProformas].find(
-          (inv) => inv.invoiceNumber === invoice.originalProformaNumber
-        );
-        if (original) {
-          const originalCollection = original.isMergedInvoice ? "ContractInvoices" : "ProformaInvoices";
-          await deleteDoc(doc(db, originalCollection, original.id));
-          
-          // Update local state - remove from both arrays to be safe
-          setExistingInvoices((prev) => prev.filter((inv) => inv.id !== original.id));
-          setExistingProformas((prev) => prev.filter((inv) => inv.id !== original.id));
-        }
-      }
+      console.log("Starting invoice cancellation for:", invoice.id, invoice.invoiceNumber, invoice.invoiceType);
 
-      // Delete the invoice from database - use correct collection based on invoice type and merged status
+      // First, delete the current invoice from Firestore
       let collectionName = "ContractInvoices"; // Default for merged invoices and Tax/Cash invoices
       if (!invoice.isMergedInvoice && invoice.invoiceType === "Proforma Invoice") {
         collectionName = "ProformaInvoices"; // Only non-merged Proforma invoices are in ProformaInvoices
       }
+
+      console.log("Deleting from collection:", collectionName, "Document ID:", invoice.id);
+
       await deleteDoc(doc(db, collectionName, invoice.id));
 
+      console.log("Successfully deleted invoice from Firestore");
+
+      // If this is a converted Tax invoice, also delete the original Proforma
+      if (invoice.convertedFromProforma) {
+        console.log("This is a converted Tax invoice, checking for original Proforma");
+
+        // Search for original proforma in both collections
+        const original = [...existingInvoices, ...existingProformas].find(
+          (inv) => inv.invoiceNumber === invoice.originalProformaNumber
+        );
+
+        console.log("Found original Proforma:", original ? original.id : "Not found");
+
+        if (original) {
+          const originalCollection = original.isMergedInvoice ? "ContractInvoices" : "ProformaInvoices";
+          console.log("Deleting original Proforma from collection:", originalCollection, "Document ID:", original.id);
+
+          try {
+            await deleteDoc(doc(db, originalCollection, original.id));
+            console.log("Successfully deleted original Proforma from Firestore");
+          } catch (originalError) {
+            console.warn("Could not delete original Proforma invoice:", originalError);
+            // Continue with the main invoice deletion even if original deletion fails
+          }
+        }
+      }
+
       // Log the undo action
+      console.log("Logging audit action");
       await addDoc(collection(db, 'audit_logs'), {
         action: 'undo',
         invoiceId: invoice.id,
@@ -582,21 +603,53 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
         details: `Invoice ${invoice.invoiceNumber} cancelled`
       });
 
+      console.log("Audit log created successfully");
+
       // Update local state by removing the invoice from the correct array
       if (invoice.isMergedInvoice || invoice.invoiceType !== "Proforma Invoice") {
         // Merged invoices (any type) and non-Proforma invoices are in existingInvoices
-        setExistingInvoices((prev) =>
-          prev.filter((inv) => inv.id !== invoice.id)
-        );
+        console.log("Removing from existingInvoices array");
+        console.log("Before filter - existingInvoices length:", existingInvoices.length);
+        console.log("Invoice to remove ID:", invoice.id);
+        const invoiceExists = existingInvoices.some(inv => inv.id === invoice.id);
+        console.log("Invoice exists in existingInvoices:", invoiceExists);
+
+        setExistingInvoices((prev) => {
+          const filtered = prev.filter((inv) => inv.id !== invoice.id);
+          console.log("After filter - existingInvoices length:", filtered.length);
+          return filtered;
+        });
       } else {
         // Non-merged Proforma invoices are in existingProformas
-        setExistingProformas((prev) =>
-          prev.filter((inv) => inv.id !== invoice.id)
-        );
+        console.log("Removing from existingProformas array");
+        console.log("Before filter - existingProformas length:", existingProformas.length);
+        console.log("Invoice to remove ID:", invoice.id);
+        const invoiceExists = existingProformas.some(inv => inv.id === invoice.id);
+        console.log("Invoice exists in existingProformas:", invoiceExists);
+
+        setExistingProformas((prev) => {
+          const filtered = prev.filter((inv) => inv.id !== invoice.id);
+          console.log("After filter - existingProformas length:", filtered.length);
+          return filtered;
+        });
       }
 
+      // Also remove the original Proforma from local state if it exists
+      if (invoice.convertedFromProforma) {
+        const original = [...existingInvoices, ...existingProformas].find(
+          (inv) => inv.invoiceNumber === invoice.originalProformaNumber
+        );
+        if (original) {
+          console.log("Removing original Proforma from local state");
+          setExistingInvoices((prev) => prev.filter((inv) => inv.id !== original.id));
+          setExistingProformas((prev) => prev.filter((inv) => inv.id !== original.id));
+        }
+      }
+
+      console.log("Invoice cancellation completed successfully");
       alert("Invoice generation undone successfully!");
     } catch (error) {
+      console.error("Error in handleCancelInvoice:", error);
       alert("Error undoing invoice generation: " + error.message);
     }
   };
@@ -804,6 +857,21 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
     }
   }
 
+  // Calculate amounts based on invoice type
+  // ✅ VERY SIMPLE RULE: Always use current installment amount from contract
+  // If invoice was generated before amount change, it keeps old amount
+  // If invoice is new, it uses current amount - NO CALCULATIONS OR PRORATION
+  // ✅ NEW RULE: If amounts changed, add difference to next available installment
+  
+  // Use the adjusted amount from getAdjustedInstallmentAmount function
+  const installmentIndex = contract.paymentDetails.findIndex(p => p === installment);
+  const adjustedTotalAmount = getAdjustedInstallmentAmount(contract, installment, installmentIndex);
+  
+  // Use the adjusted amount
+  totalAmount = adjustedTotalAmount;
+  baseAmount = formData.invoiceType === "Cash Invoice" ? totalAmount : Math.round(totalAmount / 1.18);
+  gstAmount = formData.invoiceType === "Cash Invoice" ? 0 : totalAmount - baseAmount;
+
   const invoiceData = {
     ...formData,
     invoiceNumber,
@@ -929,6 +997,54 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
         Pending
       </span>
     );
+  };
+
+  // Helper function to calculate adjusted amount for display
+  const getAdjustedInstallmentAmount = (contract, installment, index) => {
+    // Check if amounts have changed by looking at existing invoices
+    const existingInvoicesForContract = existingInvoices.filter(
+      inv => inv.originalInvoiceId === contract.id
+    );
+
+    if (existingInvoicesForContract.length > 0) {
+      // Calculate total amount already generated
+      const totalGeneratedAmount = existingInvoicesForContract.reduce(
+        (sum, inv) => sum + (inv.amountRaised || inv.netPayableAmount || 0), 0
+      );
+
+      // Get total installments
+      const totalInstallments = getPaymentInstallmentCount(contract.paymentType, contract.paymentDetails);
+      const remainingCount = totalInstallments - existingInvoicesForContract.length;
+
+      // Find which installments have been generated
+      const generatedIndices = new Set(
+        existingInvoicesForContract.map(inv => inv.installmentIndex).filter(idx => idx !== undefined)
+      );
+
+      // If this installment hasn't been generated yet
+      if (!generatedIndices.has(index) && remainingCount > 0) {
+        // Calculate remaining amount and divide equally among remaining installments
+        const remainingAmount = (contract.netPayableAmount || contract.totalCost) - totalGeneratedAmount;
+        return remainingAmount / remainingCount;
+      }
+    }
+
+    // Default: use current installment amount
+    return installment.totalAmount;
+  };
+
+  // Helper function to get undo button text based on invoice type
+  const getUndoButtonText = (invoiceType) => {
+    switch (invoiceType) {
+      case "Proforma Invoice":
+        return "Undo PI";
+      case "Tax Invoice":
+        return "Undo TI";
+      case "Cash Invoice":
+        return "Undo CI";
+      default:
+        return "Undo";
+    }
   };
 
 const getMergedContracts = () => {
@@ -1683,6 +1799,7 @@ const handleMergeSubmit = async (formData) => {
                                 />
                               </button>
                             </div>
+                            {/* Recalculation Button - REMOVED FOR SIMPLICITY */}
                           </div>
                         </div>
 
@@ -1825,97 +1942,160 @@ const handleMergeSubmit = async (formData) => {
                                     });
 
                                     if (invoicesForInstallment.length > 0) {
-                                      return invoicesForInstallment.map(
-                                        (inv, invIndex) => {
-                                          const isCancelled =
-                                            inv.status === "cancelled" ||
-                                            inv.approvalStatus ===
-                                              "cancelled";
-                                          const totalAmount =
-                                            inv.amountRaised ||
-                                            inv.netPayableAmount ||
-                                            installment.totalAmount;
+                                      // Group related invoices (Proforma + converted Tax invoice)
+                                      const groupedInvoices = [];
+                                      const processedIds = new Set();
 
-                                          // Calculate total billed amount from payment history (including GST for tax invoices only)
-                                          const totalBilledAmount = inv.paymentHistory?.reduce((sum, payment) => {
-                                            const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
-                                            const tdsBaseType = payment.tdsBaseType || "base";
-                                            const isCashInvoice = inv.invoiceType === "Cash Invoice";
-                                            const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? Math.round(originalAmount * 1.18) : originalAmount);
-                                            return sum + billedAmount;
-                                          }, 0) || 0;
+                                      invoicesForInstallment.forEach(inv => {
+                                        if (processedIds.has(inv.id)) return;
 
-                                          // Due amount should account for total billed amounts including GST
-                                          const calculatedDue = totalAmount - totalBilledAmount;
-                                          const dbDueAmount = parseFloat(inv.dueAmount) || 0;
-                                          const isFullyPaidByCalc = Math.abs(calculatedDue) < 0.01;
-                                          const isFullyPaidByDB = Math.abs(dbDueAmount) < 0.01;
-                                          const isFullyPaid = isFullyPaidByCalc || isFullyPaidByDB;
+                                        if (inv.invoiceType === "Tax Invoice" && inv.convertedFromProforma) {
+                                          // Find the original Proforma invoice
+                                          const proformaInvoice = invoicesForInstallment.find(p =>
+                                            p.invoiceType === "Proforma Invoice" &&
+                                            p.invoiceNumber === inv.originalProformaNumber
+                                          );
 
-                                          const dueAmount = isFullyPaid ? 0 : dbDueAmount || calculatedDue;
+                                          if (proformaInvoice) {
+                                            groupedInvoices.push({
+                                              proforma: proformaInvoice,
+                                              tax: inv
+                                            });
+                                            processedIds.add(proformaInvoice.id);
+                                            processedIds.add(inv.id);
+                                          } else {
+                                            // Tax invoice without matching Proforma
+                                            groupedInvoices.push({ tax: inv });
+                                            processedIds.add(inv.id);
+                                          }
+                                        } else if (inv.invoiceType === "Proforma Invoice" && !inv.convertedToTax) {
+                                          // Proforma invoice that hasn't been converted
+                                          groupedInvoices.push({ proforma: inv });
+                                          processedIds.add(inv.id);
+                                        } else if (inv.invoiceType !== "Proforma Invoice") {
+                                          // Other invoice types (Cash, etc.)
+                                          groupedInvoices.push({ other: inv });
+                                          processedIds.add(inv.id);
+                                        }
+                                      });
 
-                                          return (
-                                            <div
-                                              key={`${index}-${invIndex}`}
-                                              className={`bg-gradient-to-r ${isCancelled ? 'from-red-50 to-red-100/50' : 'from-gray-50 to-gray-100/50'} rounded-xl p-4 border ${isCancelled ? 'border-red-200' : 'border-gray-200'} cursor-pointer hover:shadow-md transition-all duration-200`}
-                                              onClick={() =>
-                                                setSelectedInvoice(inv)
-                                              }
-                                            >
-                                              <div className="flex items-center justify-between mb-3">
-                                                <div className="flex items-center gap-2">
-                                                  <h4 className="text-sm font-semibold text-gray-900">
-                                                    {installment.name}
-                                                  </h4>
-                                                  {isCancelled && (
-                                                    <span className="bg-red-100 text-red-700 text-xs font-medium py-0.5 px-2 rounded-full border border-red-300">
-                                                      Cancelled
-                                                    </span>
+                                      return groupedInvoices.map((group, groupIndex) => {
+                                        const hasProforma = group.proforma;
+                                        const hasTax = group.tax;
+                                        const hasOther = group.other;
+
+                                        const inv = hasOther ? group.other : (hasTax ? group.tax : group.proforma);
+                                        const isCancelled = inv.status === "cancelled" || inv.approvalStatus === "cancelled";
+                                        const totalAmount = inv.amountRaised || inv.netPayableAmount || installment.totalAmount;
+                                        const receivedAmount = inv.receivedAmount || 0;
+
+                                        // Calculate total TDS amount from payment history
+                                        const totalTdsAmount = inv.paymentHistory?.reduce((sum, payment) => {
+                                          return sum + (parseFloat(payment.tdsAmount) || 0);
+                                        }, 0) || 0;
+
+                                        // Due amount should account for TDS: totalAmount - (receivedAmount + totalTdsAmount)
+                                        const dueAmount = totalAmount - (receivedAmount + totalTdsAmount);
+
+                                        return (
+                                          <div
+                                            key={`${index}-${groupIndex}`}
+                                            className={`bg-gradient-to-r ${isCancelled ? 'from-red-50 to-red-100/50' : 'from-gray-50 to-gray-100/50'} rounded-xl p-4 border ${isCancelled ? 'border-red-200' : 'border-gray-200'} cursor-pointer hover:shadow-md transition-all duration-200`}
+                                            onClick={() => setSelectedInvoice(inv)}
+                                          >
+                                            <div className="flex items-center justify-between mb-3">
+                                              <div className="flex items-center gap-2">
+                                                <h4 className="text-sm font-semibold text-gray-900">
+                                                  {installment.name}
+                                                </h4>
+                                                {isCancelled && (
+                                                  <span className="bg-red-100 text-red-700 text-xs font-medium py-0.5 px-2 rounded-full border border-red-300">
+                                                    Cancelled
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <div className="text-right">
+                                                <div className={`text-sm font-bold ${dueAmount > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                  {dueAmount === 0 ? "Paid" : formatIndianCurrency(dueAmount) + " Due"}
+                                                </div>
+                                              </div>
+                                            </div>
+
+                                      <div className="grid grid-cols-2 gap-3 mb-3">
+                                        <div>
+                                          <p className="text-xs text-gray-500 mb-1">Percentage</p>
+                                          <p className="text-sm font-medium text-gray-900">{installment.percentage}%</p>
+                                        </div>
+                                        <div>
+                                          <p className="text-xs text-gray-500 mb-1">Amount</p>
+                                          <p className="text-sm font-semibold text-gray-900">{formatIndianCurrency(getAdjustedInstallmentAmount(invoice, installment, index))}</p>
+                                        </div>
+                                      </div>                                            {/* Show invoices side by side */}
+                                            <div className="flex items-center justify-between">
+                                              <div className="flex-1">
+                                                <div className="flex gap-3 mb-2">
+                                                  {hasProforma && (
+                                                    <div className="flex items-center gap-2">
+                                                      <span className={`text-xs font-semibold py-1 px-2 rounded-full bg-blue-100 text-blue-800 border border-blue-300`}>
+                                                        Proforma
+                                                      </span>
+                                                      <span className="text-xs text-gray-500">
+                                                        {group.proforma.invoiceNumber || "N/A"}
+                                                      </span>
+                                                    </div>
+                                                  )}
+                                                  {hasTax && (
+                                                    <div className="flex items-center gap-2">
+                                                      <span className={`text-xs font-semibold py-1 px-2 rounded-full bg-green-100 text-green-800 border border-green-300`}>
+                                                        Tax
+                                                      </span>
+                                                      {group.tax.invoiceType === "Tax Invoice" && getApprovalStatusBadge(group.tax)}
+                                                      <span className="text-xs text-gray-500">
+                                                        {group.tax.invoiceNumber || "N/A"}
+                                                      </span>
+                                                    </div>
+                                                  )}
+                                                  {hasOther && (
+                                                    <div className="flex items-center gap-2">
+                                                      <span className={`text-xs font-semibold py-1 px-2 rounded-full ${
+                                                        inv.invoiceType === "Cash Invoice"
+                                                          ? "bg-orange-100 text-orange-800 border border-orange-300"
+                                                          : "bg-gray-100 text-gray-800 border border-gray-300"
+                                                      }`}>
+                                                        {inv.invoiceType === "Cash Invoice" ? "Cash" : inv.invoiceType}
+                                                      </span>
+                                                      {inv.invoiceType === "Tax Invoice" && getApprovalStatusBadge(inv)}
+                                                      <span className="text-xs text-gray-500">
+                                                        {inv.invoiceNumber || "N/A"}
+                                                      </span>
+                                                    </div>
                                                   )}
                                                 </div>
-                                                <div className="text-right">
-                                                  <div className={`text-sm font-bold ${dueAmount > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                                    {dueAmount === 0 ? "Paid" : formatIndianCurrency(dueAmount) + " Due"}
-                                                  </div>
-                                                </div>
                                               </div>
-
-                                              <div className="grid grid-cols-2 gap-3 mb-3">
-                                                <div>
-                                                  <p className="text-xs text-gray-500 mb-1">Percentage</p>
-                                                  <p className="text-sm font-medium text-gray-900">{installment.percentage}%</p>
-                                                </div>
-                                                <div>
-                                                  <p className="text-xs text-gray-500 mb-1">Amount</p>
-                                                  <p className="text-sm font-semibold text-gray-900">{formatIndianCurrency(installment.totalAmount)}</p>
-                                                </div>
-                                              </div>
-
-                                              <div className="flex items-center justify-between">
-                                                <div className="flex-1">
-                                                  <div className="flex items-center gap-2 mb-2">
-                                                    <span className={`text-xs font-semibold py-1 px-2 rounded-full ${
-                                                      inv.invoiceType === "Tax Invoice"
-                                                        ? "bg-green-100 text-green-800 border border-green-300"
-                                                        : inv.invoiceType === "Cash Invoice"
-                                                        ? "bg-orange-100 text-orange-800 border border-orange-300"
-                                                        : "bg-blue-100 text-blue-800 border border-blue-300"
-                                                    }`}>
-                                                      {inv.invoiceType === "Proforma Invoice" ? "Proforma" :
-                                                       inv.invoiceType === "Cash Invoice" ? "Cash" : "Tax"}
-                                                    </span>
-                                                    {inv.invoiceType === "Tax Invoice" && getApprovalStatusBadge(inv)}
-                                                  </div>
-                                                  <div className="text-xs text-gray-500">
-                                                    {inv.invoiceNumber || "N/A"}
-                                                    {inv.convertedFromProforma && (
-                                                      <span className="text-purple-600 block">
-                                                        From: {inv.originalProformaNumber}
-                                                      </span>
-                                                    )}
-                                                  </div>
-                                                </div>
-                                                <div className="flex gap-2">
+                                              <div className="flex gap-2">
+                                                {hasProforma && (
+                                                  <button
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      setSelectedInvoice(group.proforma);
+                                                    }}
+                                                    className="bg-blue-600 hover:bg-blue-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                  >
+                                                    View PI
+                                                  </button>
+                                                )}
+                                                {hasTax && (
+                                                  <button
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      setSelectedInvoice(group.tax);
+                                                    }}
+                                                    className="bg-green-600 hover:bg-green-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                  >
+                                                    View TI
+                                                  </button>
+                                                )}
+                                                {hasOther && (
                                                   <button
                                                     onClick={(e) => {
                                                       e.stopPropagation();
@@ -1925,34 +2105,56 @@ const handleMergeSubmit = async (formData) => {
                                                   >
                                                     View
                                                   </button>
-                                                  {!isCancelled && !inv.regeneratedFrom && (
-                                                    <button
-                                                      onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleCancelInvoice(inv);
-                                                      }}
-                                                      className="bg-red-600 hover:bg-red-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
-                                                    >
-                                                      Undo
-                                                    </button>
-                                                  )}
-                                                  {!isCancelled && inv.invoiceType === "Proforma Invoice" && (
-                                                    <button
-                                                      onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleConvertToTax(inv);
-                                                      }}
-                                                      className="bg-purple-600 hover:bg-purple-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
-                                                    >
-                                                      Generate TI
-                                                    </button>
-                                                  )}
-                                                </div>
+                                                )}
+                                                {!isCancelled && hasProforma && !group.proforma.regeneratedFrom && (
+                                                  <button
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      handleCancelInvoice(group.proforma);
+                                                    }}
+                                                    className="bg-red-600 hover:bg-red-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                  >
+                                                    {getUndoButtonText(group.proforma.invoiceType)}
+                                                  </button>
+                                                )}
+                                                {!isCancelled && hasTax && !group.tax.regeneratedFrom && (
+                                                  <button
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      handleCancelInvoice(group.tax);
+                                                    }}
+                                                    className="bg-red-600 hover:bg-red-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                  >
+                                                    {getUndoButtonText(group.tax.invoiceType)}
+                                                  </button>
+                                                )}
+                                                {!isCancelled && hasOther && !inv.regeneratedFrom && (
+                                                  <button
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      handleCancelInvoice(inv);
+                                                    }}
+                                                    className="bg-red-600 hover:bg-red-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                  >
+                                                    {getUndoButtonText(inv.invoiceType)}
+                                                  </button>
+                                                )}
+                                                {!isCancelled && hasProforma && group.proforma.invoiceType === "Proforma Invoice" && !group.proforma.convertedToTax && (
+                                                  <button
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      handleConvertToTax(group.proforma);
+                                                    }}
+                                                    className="bg-purple-600 hover:bg-purple-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                  >
+                                                    Generate TI
+                                                  </button>
+                                                )}
                                               </div>
                                             </div>
-                                          );
-                                        }
-                                      );
+                                          </div>
+                                        );
+                                      });
                                     } else {
                                       // No invoices for this installment - mobile card
                                       return (
@@ -1968,23 +2170,23 @@ const handleMergeSubmit = async (formData) => {
                                             })
                                           }
                                         >
-                                          <div className="flex items-center justify-between mb-3">
-                                            <h4 className="text-sm font-semibold text-gray-900">
-                                              {installment.name}
-                                            </h4>
-                                            <span className="bg-yellow-100 text-yellow-800 text-xs font-medium py-1 px-2 rounded-full border border-yellow-300">
-                                              Not Generated
-                                            </span>
-                                          </div>
-
-                                          <div className="grid grid-cols-2 gap-3 mb-3">
+                                      <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-2">
+                                          <h4 className="text-sm font-semibold text-gray-900">
+                                            {installment.name}
+                                          </h4>
+                                          <span className="bg-yellow-100 text-yellow-800 text-xs font-medium py-1 px-2 rounded-full border border-yellow-300">
+                                            Not Generated
+                                          </span>
+                                        </div>
+                                      </div>                                          <div className="grid grid-cols-2 gap-3 mb-3">
                                             <div>
                                               <p className="text-xs text-gray-500 mb-1">Percentage</p>
                                               <p className="text-sm font-medium text-gray-900">{installment.percentage}%</p>
                                             </div>
                                             <div>
                                               <p className="text-xs text-gray-500 mb-1">Amount</p>
-                                              <p className="text-sm font-semibold text-gray-900">{formatIndianCurrency(installment.totalAmount)}</p>
+                                              <p className="text-sm font-semibold text-gray-900">{formatIndianCurrency(getAdjustedInstallmentAmount(invoice, installment, index))}</p>
                                             </div>
                                           </div>
 
@@ -2026,7 +2228,7 @@ const handleMergeSubmit = async (formData) => {
                                         Invoice Type
                                       </th>
                                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                        Billed Amount
+                                        Received Amount
                                       </th>
                                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                                         Due Amount
@@ -2048,8 +2250,7 @@ const handleMergeSubmit = async (formData) => {
                                             existingProformas.filter(
                                               (inv) =>
                                                 inv.originalInvoiceId ===
-                                                  invoice.id &&
-                                                !inv.convertedToTax
+                                                  invoice.id
                                             )
                                           );
 
@@ -2081,114 +2282,178 @@ const handleMergeSubmit = async (formData) => {
                                           });
 
                                           if (invoicesForInstallment.length > 0) {
-                                            return invoicesForInstallment.map(
-                                              (inv, invIndex) => {
-                                                const isCancelled =
-                                                  inv.status === "cancelled" ||
-                                                  inv.approvalStatus ===
-                                                    "cancelled";
-                                                const totalAmount =
-                                                  inv.amountRaised ||
-                                                  inv.netPayableAmount ||
-                                                  installment.totalAmount;
+                                            // Group related invoices (Proforma + converted Tax invoice)
+                                            const groupedInvoices = [];
+                                            const processedIds = new Set();
 
-                                                // Calculate total billed amount from payment history (including GST for tax invoices only)
-                                                const totalBilledAmount = inv.paymentHistory?.reduce((sum, payment) => {
-                                                  const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
-                                                  const tdsBaseType = payment.tdsBaseType || "base";
-                                                  const isCashInvoice = inv.invoiceType === "Cash Invoice";
-                                                  const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? Math.round(originalAmount * 1.18) : originalAmount);
-                                                  return sum + billedAmount;
-                                                }, 0) || 0;
+                                            invoicesForInstallment.forEach(inv => {
+                                              if (processedIds.has(inv.id)) return;
 
-                                                // Due amount should account for total billed amounts including GST
-                                                const calculatedDue = totalAmount - totalBilledAmount;
-                                                const dbDueAmount = parseFloat(inv.dueAmount) || 0;
-                                                const isFullyPaidByCalc = Math.abs(calculatedDue) < 0.01;
-                                                const isFullyPaidByDB = Math.abs(dbDueAmount) < 0.01;
-                                                const isFullyPaid = isFullyPaidByCalc || isFullyPaidByDB;
+                                              if (inv.invoiceType === "Tax Invoice" && inv.convertedFromProforma) {
+                                                // Find the original Proforma invoice
+                                                const proformaInvoice = invoicesForInstallment.find(p =>
+                                                  p.invoiceType === "Proforma Invoice" &&
+                                                  p.invoiceNumber === inv.originalProformaNumber
+                                                );
 
-                                                const dueAmount = isFullyPaid ? 0 : dbDueAmount || calculatedDue;
+                                                if (proformaInvoice) {
+                                                  groupedInvoices.push({
+                                                    proforma: proformaInvoice,
+                                                    tax: inv
+                                                  });
+                                                  processedIds.add(proformaInvoice.id);
+                                                  processedIds.add(inv.id);
+                                                } else {
+                                                  // Tax invoice without matching Proforma
+                                                  groupedInvoices.push({ tax: inv });
+                                                  processedIds.add(inv.id);
+                                                }
+                                              } else if (inv.invoiceType === "Proforma Invoice" && !inv.convertedToTax) {
+                                                // Proforma invoice that hasn't been converted
+                                                groupedInvoices.push({ proforma: inv });
+                                                processedIds.add(inv.id);
+                                              } else if (inv.invoiceType !== "Proforma Invoice") {
+                                                // Other invoice types (Cash, etc.)
+                                                groupedInvoices.push({ other: inv });
+                                                processedIds.add(inv.id);
+                                              }
+                                            });
 
-                                                return (
-                                                  <tr
-                                                    key={`${index}-${invIndex}`}
-                                                    className={`hover:bg-gray-50 cursor-pointer transition-colors duration-200 ${isCancelled ? "bg-red-50" : ""}`}
-                                                    onClick={() =>
-                                                      setSelectedInvoice(inv)
-                                                    }
-                                                  >
-                                                    <td className="px-4 py-3 text-sm text-gray-900 font-medium">
-                                                      {installment.name}
+                                            return groupedInvoices.map((group, groupIndex) => {
+                                              const hasProforma = group.proforma;
+                                              const hasTax = group.tax;
+                                              const hasOther = group.other;
+
+                                              const inv = hasOther ? group.other : (hasTax ? group.tax : group.proforma);
+                                              const isCancelled = inv.status === "cancelled" || inv.approvalStatus === "cancelled";
+                                              const totalAmount = inv.amountRaised || inv.netPayableAmount || installment.totalAmount;
+                                              const receivedAmount = inv.receivedAmount || 0;
+
+                                              // Calculate total TDS amount from payment history
+                                              const totalTdsAmount = inv.paymentHistory?.reduce((sum, payment) => {
+                                                return sum + (parseFloat(payment.tdsAmount) || 0);
+                                              }, 0) || 0;
+
+                                              // Due amount should account for TDS: totalAmount - (receivedAmount + totalTdsAmount)
+                                              const dueAmount = totalAmount - (receivedAmount + totalTdsAmount);
+
+                                              return (
+                                                <tr
+                                                  key={`${index}-${groupIndex}`}
+                                                  className={`hover:bg-gray-50 cursor-pointer transition-colors duration-200 ${isCancelled ? "bg-red-50" : ""}`}
+                                                  onClick={() => setSelectedInvoice(inv)}
+                                                >
+                                                  <td className="px-4 py-3 text-sm text-gray-900 font-medium">
+                                                    <div className="flex items-center gap-2">
+                                                      <span>{installment.name}</span>
                                                       {isCancelled && (
-                                                        <span className="ml-2 text-xs text-red-500 font-medium">
+                                                        <span className="text-xs text-red-500 font-medium">
                                                           (Cancelled)
                                                         </span>
                                                       )}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-sm text-gray-500">
-                                                      {installment.percentage}%
-                                                    </td>
-                                                    <td className="px-4 py-3 text-sm text-gray-900 font-semibold">
-                                                      {formatIndianCurrency(
-                                                        installment.totalAmount
-                                                      )}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-sm text-gray-500">
-                                                      <div className="text-center">
-                                                        {/* Invoice type (Tax / Cash / Proforma) */}
-                                                        <div
-                                                          className={`font-semibold ${inv.invoiceType === "Tax Invoice" ? "text-green-600" : inv.invoiceType === "Cash Invoice" ? "text-orange-600" : "text-blue-600"}`}
-                                                        >
-                                                          {inv.invoiceType === "Proforma Invoice" ? "Proforma" : inv.invoiceType === "Cash Invoice" ? "Cash" : "Tax"}
-                                                          {isCancelled && inv.regenerated && " (Cancelled - Regenerated)"}
-                                                          {!isCancelled && inv.regeneratedFrom && ` (Regenerated from ${inv.regeneratedFrom})`}
-                                                        </div>
-
-                                                        {/* Approval status sirf Tax Invoice ke liye, Cash aur Proforma ke liye nahi */}
-                                                        {inv.invoiceType === "Tax Invoice" && getApprovalStatusBadge(inv)}
-
-                                                        {/* Cash Invoice ke liye special badge */}
-                                                        {inv.invoiceType === "Cash Invoice" && (
-                                                          <span className="ml-1 px-1.5 py-0.5 rounded text-xs bg-orange-100 text-orange-800 border border-orange-300">
-                                                            Cash
-                                                          </span>
-                                                        )}
-
-                                                        {/* Proforma Invoice ke liye badge */}
-                                                        {inv.invoiceType === "Proforma Invoice" && (
+                                                    </div>
+                                                  </td>
+                                                  <td className="px-4 py-3 text-sm text-gray-500">
+                                                    {installment.percentage}%
+                                                  </td>
+                                                  <td className="px-4 py-3 text-sm text-gray-900 font-semibold">
+                                                    {formatIndianCurrency(totalAmount)}
+                                                  </td>
+                                                  <td className="px-4 py-3 text-sm text-gray-500">
+                                                    <div className="flex gap-2">
+                                                      {hasProforma && (
+                                                        <div className="text-center">
+                                                          <div className="font-semibold text-blue-600">Proforma</div>
                                                           <span className="ml-1 px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 border border-blue-300">
                                                             Proforma
                                                           </span>
-                                                        )}
-
-                                                        {/* Invoice number */}
-                                                        <div className="text-xs text-gray-400 mt-0.5">
-                                                          {inv.invoiceNumber || "N/A"}
-                                                        </div>
-
-                                                        {/* From: Proforma number niche dikhana hai */}
-                                                        {inv.convertedFromProforma && (
-                                                          <div className="text-xs text-purple-600 mt-0.5">
-                                                            From:{" "}
-                                                            {inv.originalProformaNumber}
+                                                          <div className="text-xs text-gray-400 mt-0.5">
+                                                            {group.proforma.invoiceNumber || "N/A"}
                                                           </div>
-                                                        )}
-                                                      </div>
-                                                    </td>
-
-                                                    <td className="px-4 py-3 text-sm">
-                                                      <span className={`font-semibold ${totalBilledAmount > 0 ? "text-green-600" : "text-gray-600"}`}>
-                                                        {formatIndianCurrency(totalBilledAmount)}
-                                                      </span>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-sm">
-                                                      <span className={`font-semibold ${dueAmount > 0 ? "text-red-600" : "text-green-600"}`}>
-                                                        {dueAmount === 0 ? "0" : formatIndianCurrency(dueAmount)}
-                                                      </span>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-sm">
-                                                      <div className="flex gap-2">
+                                                        </div>
+                                                      )}
+                                                      {hasTax && (
+                                                        <div className="text-center">
+                                                          <div className="font-semibold text-green-600">Tax</div>
+                                                          {group.tax.invoiceType === "Tax Invoice" && getApprovalStatusBadge(group.tax)}
+                                                          <span className="ml-1 px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-800 border border-green-300">
+                                                            Tax
+                                                          </span>
+                                                          <div className="text-xs text-gray-400 mt-0.5">
+                                                            {group.tax.invoiceNumber || "N/A"}
+                                                          </div>
+                                                          {group.tax.convertedFromProforma && (
+                                                            <div className="text-xs text-purple-600 mt-0.5">
+                                                              From: {group.tax.originalProformaNumber}
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      )}
+                                                      {hasOther && (
+                                                        <div className="text-center">
+                                                          <div className={`font-semibold ${inv.invoiceType === "Tax Invoice" ? "text-green-600" : inv.invoiceType === "Cash Invoice" ? "text-orange-600" : "text-blue-600"}`}>
+                                                            {inv.invoiceType === "Proforma Invoice" ? "Proforma" : inv.invoiceType === "Cash Invoice" ? "Cash" : "Tax"}
+                                                            {isCancelled && inv.regenerated && " (Cancelled - Regenerated)"}
+                                                            {!isCancelled && inv.regeneratedFrom && ` (Regenerated from ${inv.regeneratedFrom})`}
+                                                          </div>
+                                                          {inv.invoiceType === "Tax Invoice" && getApprovalStatusBadge(inv)}
+                                                          {inv.invoiceType === "Cash Invoice" && (
+                                                            <span className="ml-1 px-1.5 py-0.5 rounded text-xs bg-orange-100 text-orange-800 border border-orange-300">
+                                                              Cash
+                                                            </span>
+                                                          )}
+                                                          {inv.invoiceType === "Proforma Invoice" && (
+                                                            <span className="ml-1 px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 border border-blue-300">
+                                                              Proforma
+                                                            </span>
+                                                          )}
+                                                          <div className="text-xs text-gray-400 mt-0.5">
+                                                            {inv.invoiceNumber || "N/A"}
+                                                          </div>
+                                                          {inv.convertedFromProforma && (
+                                                            <div className="text-xs text-purple-600 mt-0.5">
+                                                              From: {inv.originalProformaNumber}
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      )}
+                                                    </div>
+                                                  </td>
+                                                  <td className="px-4 py-3 text-sm">
+                                                    <span className={`font-semibold ${receivedAmount > 0 ? "text-green-600" : "text-gray-600"}`}>
+                                                      {formatIndianCurrency(receivedAmount)}
+                                                    </span>
+                                                  </td>
+                                                  <td className="px-4 py-3 text-sm">
+                                                    <span className={`font-semibold ${dueAmount > 0 ? "text-red-600" : "text-green-600"}`}>
+                                                      {dueAmount === 0 ? "0" : formatIndianCurrency(dueAmount)}
+                                                    </span>
+                                                  </td>
+                                                  <td className="px-4 py-3 text-sm">
+                                                    <div className="flex gap-2">
+                                                      {hasProforma && (
+                                                        <button
+                                                          onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedInvoice(group.proforma);
+                                                          }}
+                                                          className="bg-blue-600 hover:bg-blue-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                        >
+                                                          View PI
+                                                        </button>
+                                                      )}
+                                                      {hasTax && (
+                                                        <button
+                                                          onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedInvoice(group.tax);
+                                                          }}
+                                                          className="bg-green-600 hover:bg-green-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                        >
+                                                          View TI
+                                                        </button>
+                                                      )}
+                                                      {hasOther && (
                                                         <button
                                                           onClick={(e) => {
                                                             e.stopPropagation();
@@ -2198,47 +2463,71 @@ const handleMergeSubmit = async (formData) => {
                                                         >
                                                           View
                                                         </button>
-                                                        {!isCancelled && !inv.regeneratedFrom && (
-                                                          <button
-                                                            onClick={(e) => {
-                                                              e.stopPropagation();
-                                                              handleCancelInvoice(inv);
-                                                            }}
-                                                            className="bg-red-600 hover:bg-red-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
-                                                            title="Cancel this invoice"
-                                                          >
-                                                            Undo
-                                                          </button>
-                                                        )}
-                                                        {isCancelled && !inv.regenerated && (
-                                                          <button
-                                                            onClick={(e) => {
-                                                              e.stopPropagation();
-                                                              handleGenerateInvoice(invoice, installment, true, inv);
-                                                            }}
-                                                            className="bg-orange-600 hover:bg-orange-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
-                                                            title="Regenerate cancelled invoice"
-                                                          >
-                                                            Regenerate
-                                                          </button>
-                                                        )}
-                                                        {!isCancelled && inv.invoiceType === "Proforma Invoice" && (
-                                                          <button
-                                                            onClick={(e) => {
-                                                              e.stopPropagation();
-                                                              handleConvertToTax(inv);
-                                                            }}
-                                                            className="bg-purple-600 hover:bg-purple-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
-                                                          >
-                                                            Generate TI
-                                                          </button>
-                                                        )}
-                                                      </div>
-                                                    </td>
-                                                  </tr>
-                                                );
-                                              }
-                                            );
+                                                      )}
+                                                      {!isCancelled && hasProforma && !group.proforma.regeneratedFrom && (
+                                                        <button
+                                                          onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleCancelInvoice(group.proforma);
+                                                          }}
+                                                          className="bg-red-600 hover:bg-red-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                          title="Cancel this invoice"
+                                                        >
+                                                          {getUndoButtonText(group.proforma.invoiceType)}
+                                                        </button>
+                                                      )}
+                                                      {!isCancelled && hasTax && !group.tax.regeneratedFrom && (
+                                                        <button
+                                                          onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleCancelInvoice(group.tax);
+                                                          }}
+                                                          className="bg-red-600 hover:bg-red-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                          title="Cancel this invoice"
+                                                        >
+                                                          {getUndoButtonText(group.tax.invoiceType)}
+                                                        </button>
+                                                      )}
+                                                      {!isCancelled && hasOther && !inv.regeneratedFrom && (
+                                                        <button
+                                                          onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleCancelInvoice(inv);
+                                                          }}
+                                                          className="bg-red-600 hover:bg-red-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                          title="Cancel this invoice"
+                                                        >
+                                                          {getUndoButtonText(inv.invoiceType)}
+                                                        </button>
+                                                      )}
+                                                      {isCancelled && !inv.regenerated && (
+                                                        <button
+                                                          onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleGenerateInvoice(invoice, installment, true, inv);
+                                                          }}
+                                                          className="bg-orange-600 hover:bg-orange-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                          title="Regenerate cancelled invoice"
+                                                        >
+                                                          Regenerate
+                                                        </button>
+                                                      )}
+                                                      {!isCancelled && hasProforma && group.proforma.invoiceType === "Proforma Invoice" && !group.proforma.convertedToTax && (
+                                                        <button
+                                                          onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleConvertToTax(group.proforma);
+                                                          }}
+                                                          className="bg-purple-600 hover:bg-purple-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                        >
+                                                          Generate TI
+                                                        </button>
+                                                      )}
+                                                    </div>
+                                                  </td>
+                                                </tr>
+                                              );
+                                            });
                                           } else {
                                             // No invoices for this installment
                                             return (
@@ -2255,13 +2544,15 @@ const handleMergeSubmit = async (formData) => {
                                                 }
                                               >
                                                 <td className="px-4 py-3 text-sm text-gray-900 font-medium">
-                                                  {installment.name}
+                                                  <div className="flex items-center gap-2">
+                                                    <span>{installment.name}</span>
+                                                  </div>
                                                 </td>
                                                 <td className="px-4 py-3 text-sm text-gray-500">
                                                   {installment.percentage}%
                                                 </td>
                                                 <td className="px-4 py-3 text-sm text-gray-900 font-semibold">
-                                                  {formatIndianCurrency(installment.totalAmount)}
+                                                  {formatIndianCurrency(getAdjustedInstallmentAmount(invoice, installment, index))}
                                                 </td>
                                                 <td className="px-4 py-3 text-sm text-gray-500">
                                                   -
@@ -2270,7 +2561,7 @@ const handleMergeSubmit = async (formData) => {
                                                   ₹0
                                                 </td>
                                                 <td className="px-4 py-3 text-sm">
-                                                  {formatIndianCurrency(installment.totalAmount)}
+                                                  {formatIndianCurrency(getAdjustedInstallmentAmount(invoice, installment, index))}
                                                 </td>
                                                 <td className="px-4 py-3 text-sm">
                                                   <button
@@ -2374,6 +2665,7 @@ const handleMergeSubmit = async (formData) => {
                               />
                             </button>
                           </div>
+                          {/* Recalculation Button - REMOVED FOR SIMPLICITY */}
                         </div>
                       </div>
 
@@ -2566,149 +2858,222 @@ const handleMergeSubmit = async (formData) => {
                                       )
                                   );
 
-                                // Filter out Proforma invoices that have been converted to Tax
-                                const activeInvoices = existingMergedInvoices.filter(inv => 
-                                  !(inv.invoiceType === "Proforma Invoice" && inv.convertedToTax)
-                                );
+                                // Group related invoices (Proforma + converted Tax invoice)
+                                const groupedInvoices = [];
+                                const processedIds = new Set();
 
-                                // Sort by creation date (most recent first) and take the first one
-                                activeInvoices.sort((a, b) => {
-                                  const aCancelled = a.status === "cancelled" || a.approvalStatus === "cancelled";
-                                  const bCancelled = b.status === "cancelled" || b.approvalStatus === "cancelled";
-                                  if (aCancelled && !bCancelled) return 1;
-                                  if (bCancelled && !aCancelled) return -1;
-                                  return new Date(b.raisedDate || 0) - new Date(a.raisedDate || 0);
+                                existingMergedInvoices.forEach(inv => {
+                                  if (processedIds.has(inv.id)) return;
+
+                                  if (inv.invoiceType === "Tax Invoice" && inv.convertedFromProforma) {
+                                    // Find the original Proforma invoice
+                                    const proformaInvoice = existingMergedInvoices.find(p =>
+                                      p.invoiceType === "Proforma Invoice" &&
+                                      p.invoiceNumber === inv.originalProformaNumber
+                                    );
+
+                                    if (proformaInvoice) {
+                                      groupedInvoices.push({
+                                        proforma: proformaInvoice,
+                                        tax: inv
+                                      });
+                                      processedIds.add(proformaInvoice.id);
+                                      processedIds.add(inv.id);
+                                    } else {
+                                      // Tax invoice without matching Proforma
+                                      groupedInvoices.push({ tax: inv });
+                                      processedIds.add(inv.id);
+                                    }
+                                  } else if (inv.invoiceType === "Proforma Invoice" && !inv.convertedToTax) {
+                                    // Proforma invoice that hasn't been converted
+                                    groupedInvoices.push({ proforma: inv });
+                                    processedIds.add(inv.id);
+                                  } else if (inv.invoiceType !== "Proforma Invoice") {
+                                    // Other invoice types (Cash, etc.)
+                                    groupedInvoices.push({ other: inv });
+                                    processedIds.add(inv.id);
+                                  }
                                 });
 
-                                // Take only the most recent active invoice
-                                const invoiceToShow = activeInvoices[0];
+                                if (groupedInvoices.length > 0) {
+                                  return groupedInvoices.map((group, groupIndex) => {
+                                    const hasProforma = group.proforma;
+                                    const hasTax = group.tax;
+                                    const hasOther = group.other;
 
-                                // For merged view, show each installment with its status
-                                if (invoiceToShow) {
-                                  const inv = invoiceToShow;
-                                  const totalAmount =
-                                    inv.amountRaised ||
-                                    inv.netPayableAmount ||
-                                    installment.totalAmount;
+                                    const inv = hasOther ? group.other : (hasTax ? group.tax : group.proforma);
+                                    const isCancelled = inv.status === "cancelled" || inv.approvalStatus === "cancelled";
+                                    const totalAmount = inv.amountRaised || inv.netPayableAmount || installment.totalAmount;
+                                    const receivedAmount = inv.receivedAmount || 0;
 
-                                  // Calculate total billed amount from payment history (including GST for tax invoices only)
-                                  const totalBilledAmount = inv.paymentHistory?.reduce((sum, payment) => {
-                                    const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
-                                    const tdsBaseType = payment.tdsBaseType || "base";
-                                    const isCashInvoice = inv.invoiceType === "Cash Invoice";
-                                    const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? Math.round(originalAmount * 1.18) : originalAmount);
-                                    return sum + billedAmount;
-                                  }, 0) || 0;
+                                    // Calculate total TDS amount from payment history
+                                    const totalTdsAmount = inv.paymentHistory?.reduce((sum, payment) => {
+                                      return sum + (parseFloat(payment.tdsAmount) || 0);
+                                    }, 0) || 0;
 
-                                  // Due amount should account for total billed amounts including GST
-                                  const calculatedDue = totalAmount - totalBilledAmount;
-                                  const dbDueAmount = parseFloat(inv.dueAmount) || 0;
-                                  const isFullyPaidByCalc = Math.abs(calculatedDue) < 0.01;
-                                  const isFullyPaidByDB = Math.abs(dbDueAmount) < 0.01;
-                                  const isFullyPaid = isFullyPaidByCalc || isFullyPaidByDB;
+                                    // Due amount should account for TDS: totalAmount - (receivedAmount + totalTdsAmount)
+                                    const dueAmount = totalAmount - (receivedAmount + totalTdsAmount);
 
-                                  const dueAmount = isFullyPaid ? 0 : dbDueAmount || calculatedDue;
-                                  const isCancelled =
-                                    inv.status === "cancelled" ||
-                                    inv.approvalStatus === "cancelled";
-
-                                  return (
-                                    <div
-                                      key={idx}
-                                      className={`bg-gradient-to-r ${isCancelled ? 'from-red-50 to-red-100/50' : 'from-gray-50 to-gray-100/50'} rounded-xl p-4 border ${isCancelled ? 'border-red-200' : 'border-gray-200'} cursor-pointer hover:shadow-md transition-all duration-200`}
-                                      onClick={() =>
-                                        setSelectedInvoice(inv)
-                                      }
-                                    >
-                                      <div className="flex items-center justify-between mb-3">
-                                        <div className="flex items-center gap-2">
-                                          <h4 className="text-sm font-semibold text-gray-900">
-                                            {installment.name}
-                                          </h4>
-                                          {isCancelled && (
-                                            <span className="bg-red-100 text-red-700 text-xs font-medium py-0.5 px-2 rounded-full border border-red-300">
-                                              Cancelled
-                                            </span>
-                                          )}
-                                        </div>
-                                        <div className="text-right">
-                                          <div className={`text-sm font-bold ${dueAmount > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                            {dueAmount === 0 ? "Paid" : formatIndianCurrency(dueAmount) + " Due"}
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      <div className="grid grid-cols-2 gap-3 mb-3">
-                                        <div>
-                                          <p className="text-xs text-gray-500 mb-1">Percentage</p>
-                                          <p className="text-sm font-medium text-gray-900">{installment.percentage}%</p>
-                                        </div>
-                                        <div>
-                                          <p className="text-xs text-gray-500 mb-1">Amount</p>
-                                          <p className="text-sm font-semibold text-gray-900">{formatIndianCurrency(installment.totalAmount)}</p>
-                                        </div>
-                                      </div>
-
-                                      <div className="flex items-center justify-between">
-                                        <div className="flex-1">
-                                          <div className="flex items-center gap-2 mb-2">
-                                            <span className={`text-xs font-semibold py-1 px-2 rounded-full ${
-                                              inv.invoiceType === "Tax Invoice"
-                                                ? "bg-green-100 text-green-800 border border-green-300"
-                                                : inv.invoiceType === "Cash Invoice"
-                                                ? "bg-orange-100 text-orange-800 border border-orange-300"
-                                                : "bg-blue-100 text-blue-800 border border-blue-300"
-                                            }`}>
-                                              {inv.invoiceType === "Proforma Invoice" ? "Proforma" :
-                                               inv.invoiceType === "Cash Invoice" ? "Cash" : "Tax"}
-                                            </span>
-                                            {inv.invoiceType === "Tax Invoice" && getApprovalStatusBadge(inv)}
-                                          </div>
-                                          <div className="text-xs text-gray-500">
-                                            {inv.invoiceNumber || "N/A"}
-                                            {inv.convertedFromProforma && (
-                                              <span className="text-purple-600 block">
-                                                From: {inv.originalProformaNumber}
+                                    return (
+                                      <div
+                                        key={`${idx}-${groupIndex}`}
+                                        className={`bg-gradient-to-r ${isCancelled ? 'from-red-50 to-red-100/50' : 'from-gray-50 to-gray-100/50'} rounded-xl p-4 border ${isCancelled ? 'border-red-200' : 'border-gray-200'} cursor-pointer hover:shadow-md transition-all duration-200`}
+                                        onClick={() => setSelectedInvoice(inv)}
+                                      >
+                                        <div className="flex items-center justify-between mb-3">
+                                          <div className="flex items-center gap-2">
+                                            <h4 className="text-sm font-semibold text-gray-900">
+                                              {installment.name}
+                                            </h4>
+                                            {isCancelled && (
+                                              <span className="bg-red-100 text-red-700 text-xs font-medium py-0.5 px-2 rounded-full border border-red-300">
+                                                Cancelled
                                               </span>
                                             )}
                                           </div>
+                                          <div className="text-right">
+                                            <div className={`text-sm font-bold ${dueAmount > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                              {dueAmount === 0 ? "Paid" : formatIndianCurrency(dueAmount) + " Due"}
+                                            </div>
+                                          </div>
                                         </div>
-                                        <div className="flex gap-2">
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setSelectedInvoice(inv);
-                                            }}
-                                            className="bg-blue-600 hover:bg-blue-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
-                                          >
-                                            View
-                                          </button>
-                                          {!isCancelled && !inv.regeneratedFrom && (
-                                            <button
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleCancelInvoice(inv);
-                                              }}
-                                              className="bg-red-600 hover:bg-red-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
-                                            >
-                                              Undo
-                                            </button>
-                                          )}
-                                          {!isCancelled && inv.invoiceType === "Proforma Invoice" && (
-                                            <button
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleConvertToTax(inv);
-                                              }}
-                                              className="bg-purple-600 hover:bg-purple-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
-                                            >
-                                              Generate TI
-                                            </button>
-                                          )}
+
+                                        <div className="grid grid-cols-2 gap-3 mb-3">
+                                          <div>
+                                            <p className="text-xs text-gray-500 mb-1">Percentage</p>
+                                            <p className="text-sm font-medium text-gray-900">{installment.percentage}%</p>
+                                          </div>
+                                          <div>
+                                            <p className="text-xs text-gray-500 mb-1">Amount</p>
+                                            <p className="text-sm font-semibold text-gray-900">{formatIndianCurrency(totalAmount)}</p>
+                                          </div>
+                                        </div>
+
+                                        {/* Show invoices side by side */}
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex-1">
+                                            <div className="flex gap-3 mb-2">
+                                              {hasProforma && (
+                                                <div className="flex items-center gap-2">
+                                                  <span className={`text-xs font-semibold py-1 px-2 rounded-full bg-blue-100 text-blue-800 border border-blue-300`}>
+                                                    Proforma
+                                                  </span>
+                                                  <span className="text-xs text-gray-500">
+                                                    {group.proforma.invoiceNumber || "N/A"}
+                                                  </span>
+                                                </div>
+                                              )}
+                                              {hasTax && (
+                                                <div className="flex items-center gap-2">
+                                                  <span className={`text-xs font-semibold py-1 px-2 rounded-full bg-green-100 text-green-800 border border-green-300`}>
+                                                    Tax
+                                                  </span>
+                                                  {group.tax.invoiceType === "Tax Invoice" && getApprovalStatusBadge(group.tax)}
+                                                  <span className="text-xs text-gray-500">
+                                                    {group.tax.invoiceNumber || "N/A"}
+                                                  </span>
+                                                </div>
+                                              )}
+                                              {hasOther && (
+                                                <div className="flex items-center gap-2">
+                                                  <span className={`text-xs font-semibold py-1 px-2 rounded-full ${
+                                                    inv.invoiceType === "Cash Invoice"
+                                                      ? "bg-orange-100 text-orange-800 border border-orange-300"
+                                                      : "bg-gray-100 text-gray-800 border border-gray-300"
+                                                  }`}>
+                                                    {inv.invoiceType === "Cash Invoice" ? "Cash" : inv.invoiceType}
+                                                  </span>
+                                                  {inv.invoiceType === "Tax Invoice" && getApprovalStatusBadge(inv)}
+                                                  <span className="text-xs text-gray-500">
+                                                    {inv.invoiceNumber || "N/A"}
+                                                  </span>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                          <div className="flex gap-2">
+                                            {hasProforma && (
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setSelectedInvoice(group.proforma);
+                                                }}
+                                                className="bg-blue-600 hover:bg-blue-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                              >
+                                                View PI
+                                              </button>
+                                            )}
+                                            {hasTax && (
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setSelectedInvoice(group.tax);
+                                                }}
+                                                className="bg-green-600 hover:bg-green-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                              >
+                                                View TI
+                                              </button>
+                                            )}
+                                            {hasOther && (
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setSelectedInvoice(inv);
+                                                }}
+                                                className="bg-blue-600 hover:bg-blue-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                              >
+                                                View
+                                              </button>
+                                            )}
+                                            {!isCancelled && hasProforma && !group.proforma.regeneratedFrom && (
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleCancelInvoice(group.proforma);
+                                                }}
+                                                className="bg-red-600 hover:bg-red-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                              >
+                                                {getUndoButtonText(group.proforma.invoiceType)}
+                                              </button>
+                                            )}
+                                            {!isCancelled && hasTax && !group.tax.regeneratedFrom && (
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleCancelInvoice(group.tax);
+                                                }}
+                                                className="bg-red-600 hover:bg-red-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                              >
+                                                {getUndoButtonText(group.tax.invoiceType)}
+                                              </button>
+                                            )}
+                                            {!isCancelled && hasOther && !inv.regeneratedFrom && (
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleCancelInvoice(inv);
+                                                }}
+                                                className="bg-red-600 hover:bg-red-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                              >
+                                                {getUndoButtonText(inv.invoiceType)}
+                                              </button>
+                                            )}
+                                            {!isCancelled && hasProforma && group.proforma.invoiceType === "Proforma Invoice" && !group.proforma.convertedToTax && (
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleConvertToTax(group.proforma);
+                                                }}
+                                                className="bg-purple-600 hover:bg-purple-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                              >
+                                                Generate TI
+                                              </button>
+                                            )}
+                                          </div>
                                         </div>
                                       </div>
-                                    </div>
-                                  );
+                                    );
+                                  });
                                 } else {
                                   // No invoice generated yet for this merged installment
                                   return (
@@ -2740,7 +3105,7 @@ const handleMergeSubmit = async (formData) => {
                                         </div>
                                         <div>
                                           <p className="text-xs text-gray-500 mb-1">Amount</p>
-                                          <p className="text-sm font-semibold text-gray-900">{formatIndianCurrency(installment.totalAmount)}</p>
+                                          <p className="text-sm font-semibold text-gray-900">{formatIndianCurrency(getAdjustedInstallmentAmount(mergedItem.contracts[0], {totalAmount: installment.totalAmount}, installment.idx))}</p>
                                         </div>
                                       </div>
 
@@ -2781,7 +3146,7 @@ const handleMergeSubmit = async (formData) => {
                                       Invoice Type
                                     </th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                      Billed Amount
+                                      Received Amount
                                     </th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                                       Due Amount
@@ -2840,161 +3205,253 @@ const handleMergeSubmit = async (formData) => {
                                             )
                                         );
 
-                                      // Filter out Proforma invoices that have been converted to Tax
-                                      const activeInvoices = existingMergedInvoices.filter(inv => 
-                                        !(inv.invoiceType === "Proforma Invoice" && inv.convertedToTax)
-                                      );
+                                      // Group related invoices (Proforma + converted Tax invoice)
+                                      const groupedInvoices = [];
+                                      const processedIds = new Set();
 
-                                      // Sort by creation date (most recent first) and take the first one
-                                      activeInvoices.sort((a, b) => {
-                                        const aCancelled = a.status === "cancelled" || a.approvalStatus === "cancelled";
-                                        const bCancelled = b.status === "cancelled" || b.approvalStatus === "cancelled";
-                                        if (aCancelled && !bCancelled) return 1;
-                                        if (bCancelled && !aCancelled) return -1;
-                                        return new Date(b.raisedDate || 0) - new Date(a.raisedDate || 0);
+                                      existingMergedInvoices.forEach(inv => {
+                                        if (processedIds.has(inv.id)) return;
+
+                                        if (inv.invoiceType === "Tax Invoice" && inv.convertedFromProforma) {
+                                          // Find the original Proforma invoice
+                                          const proformaInvoice = existingMergedInvoices.find(p =>
+                                            p.invoiceType === "Proforma Invoice" &&
+                                            p.invoiceNumber === inv.originalProformaNumber
+                                          );
+
+                                          if (proformaInvoice) {
+                                            groupedInvoices.push({
+                                              proforma: proformaInvoice,
+                                              tax: inv
+                                            });
+                                            processedIds.add(proformaInvoice.id);
+                                            processedIds.add(inv.id);
+                                          } else {
+                                            // Tax invoice without matching Proforma
+                                            groupedInvoices.push({ tax: inv });
+                                            processedIds.add(inv.id);
+                                          }
+                                        } else if (inv.invoiceType === "Proforma Invoice" && !inv.convertedToTax) {
+                                          // Proforma invoice that hasn't been converted
+                                          groupedInvoices.push({ proforma: inv });
+                                          processedIds.add(inv.id);
+                                        } else if (inv.invoiceType !== "Proforma Invoice") {
+                                          // Other invoice types (Cash, etc.)
+                                          groupedInvoices.push({ other: inv });
+                                          processedIds.add(inv.id);
+                                        }
                                       });
 
-                                      // Take only the most recent active invoice
-                                      const invoiceToShow = activeInvoices[0];
+                                      if (groupedInvoices.length > 0) {
+                                        return groupedInvoices.map((group, groupIndex) => {
+                                          const hasProforma = group.proforma;
+                                          const hasTax = group.tax;
+                                          const hasOther = group.other;
 
-                                      // For merged view, show each installment with its status
-                                      if (invoiceToShow) {
-                                        const inv = invoiceToShow;
-                                        const totalAmount =
-                                          inv.amountRaised ||
-                                          inv.netPayableAmount ||
-                                          installment.totalAmount;
+                                          const inv = hasOther ? group.other : (hasTax ? group.tax : group.proforma);
+                                          const isCancelled = inv.status === "cancelled" || inv.approvalStatus === "cancelled";
+                                          const totalAmount = inv.amountRaised || inv.netPayableAmount || installment.totalAmount;
+                                          const receivedAmount = inv.receivedAmount || 0;
 
-                                        // Calculate total billed amount from payment history (including GST for tax invoices only)
-                                        const totalBilledAmount = inv.paymentHistory?.reduce((sum, payment) => {
-                                          const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
-                                          const tdsBaseType = payment.tdsBaseType || "base";
-                                          const isCashInvoice = inv.invoiceType === "Cash Invoice";
-                                          const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? Math.round(originalAmount * 1.18) : originalAmount);
-                                          return sum + billedAmount;
-                                        }, 0) || 0;
+                                          // Calculate total TDS amount from payment history
+                                          const totalTdsAmount = inv.paymentHistory?.reduce((sum, payment) => {
+                                            return sum + (parseFloat(payment.tdsAmount) || 0);
+                                          }, 0) || 0;
 
-                                        // Due amount should account for total billed amounts including GST
-                                        const calculatedDue = totalAmount - totalBilledAmount;
-                                        const dbDueAmount = parseFloat(inv.dueAmount) || 0;
-                                        const isFullyPaidByCalc = Math.abs(calculatedDue) < 0.01;
-                                        const isFullyPaidByDB = Math.abs(dbDueAmount) < 0.01;
-                                        const isFullyPaid = isFullyPaidByCalc || isFullyPaidByDB;
+                                          // Due amount should account for TDS: totalAmount - (receivedAmount + totalTdsAmount)
+                                          const dueAmount = totalAmount - (receivedAmount + totalTdsAmount);
 
-                                        const dueAmount = isFullyPaid ? 0 : dbDueAmount || calculatedDue;
-                                        const isCancelled =
-                                          inv.status === "cancelled" ||
-                                          inv.approvalStatus === "cancelled";
-
-                                        return (
-                                          <tr
-                                            key={idx}
-                                            className={`hover:bg-gray-50 cursor-pointer transition-colors duration-200 ${isCancelled ? "bg-red-50" : ""}`}
-                                            onClick={() =>
-                                              setSelectedInvoice(inv)
-                                            }
-                                          >
-                                            <td className="px-4 py-3 text-sm text-gray-900 font-medium">
-                                              {installment.name}
-                                              {isCancelled && (
-                                                <span className="ml-2 text-xs text-red-500 font-medium">
-                                                  (Cancelled)
+                                          return (
+                                            <tr
+                                              key={`${idx}-${groupIndex}`}
+                                              className={`hover:bg-gray-50 cursor-pointer transition-colors duration-200 ${isCancelled ? "bg-red-50" : ""}`}
+                                              onClick={() => setSelectedInvoice(inv)}
+                                            >
+                                              <td className="px-4 py-3 text-sm text-gray-900 font-medium">
+                                                <div className="flex items-center gap-2">
+                                                  <span>{installment.name}</span>
+                                                  {isCancelled && (
+                                                    <span className="text-xs text-red-500 font-medium">
+                                                      (Cancelled)
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              </td>
+                                              <td className="px-4 py-3 text-sm text-gray-500">
+                                                {installment.percentage}%
+                                              </td>
+                                              <td className="px-4 py-3 text-sm text-gray-900 font-semibold">
+                                                {formatIndianCurrency(getAdjustedInstallmentAmount(mergedItem.contracts[0], {totalAmount: installment.totalAmount}, installment.idx))}
+                                              </td>
+                                              <td className="px-4 py-3 text-sm text-gray-500">
+                                                <div className="flex gap-2">
+                                                  {hasProforma && (
+                                                    <div className="text-center">
+                                                      <div className="font-semibold text-blue-600">Proforma</div>
+                                                      <span className="ml-1 px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 border border-blue-300">
+                                                        Proforma
+                                                      </span>
+                                                      <div className="text-xs text-gray-400 mt-0.5">
+                                                        {group.proforma.invoiceNumber || "N/A"}
+                                                      </div>
+                                                    </div>
+                                                  )}
+                                                  {hasTax && (
+                                                    <div className="text-center">
+                                                      <div className="font-semibold text-green-600">Tax</div>
+                                                      {group.tax.invoiceType === "Tax Invoice" && getApprovalStatusBadge(group.tax)}
+                                                      <span className="ml-1 px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-800 border border-green-300">
+                                                        Tax
+                                                      </span>
+                                                      <div className="text-xs text-gray-400 mt-0.5">
+                                                        {group.tax.invoiceNumber || "N/A"}
+                                                      </div>
+                                                      {group.tax.convertedFromProforma && (
+                                                        <div className="text-xs text-purple-600 mt-0.5">
+                                                          From: {group.tax.originalProformaNumber}
+                                                        </div>
+                                                      )}
+                                                    </div>
+                                                  )}
+                                                  {hasOther && (
+                                                    <div className="text-center">
+                                                      <div className={`font-semibold ${inv.invoiceType === "Tax Invoice" ? "text-green-600" : inv.invoiceType === "Cash Invoice" ? "text-orange-600" : "text-blue-600"}`}>
+                                                        {inv.invoiceType === "Proforma Invoice" ? "Proforma" : inv.invoiceType === "Cash Invoice" ? "Cash" : "Tax"}
+                                                        {isCancelled && inv.regenerated && " (Cancelled - Regenerated)"}
+                                                        {!isCancelled && inv.regeneratedFrom && ` (Regenerated from ${inv.regeneratedFrom})`}
+                                                      </div>
+                                                      {inv.invoiceType === "Tax Invoice" && getApprovalStatusBadge(inv)}
+                                                      {inv.invoiceType === "Cash Invoice" && (
+                                                        <span className="ml-1 px-1.5 py-0.5 rounded text-xs bg-orange-100 text-orange-800 border border-orange-300">
+                                                          Cash
+                                                        </span>
+                                                      )}
+                                                      {inv.invoiceType === "Proforma Invoice" && (
+                                                        <span className="ml-1 px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 border border-blue-300">
+                                                          Proforma
+                                                        </span>
+                                                      )}
+                                                      <div className="text-xs text-gray-400 mt-0.5">
+                                                        {inv.invoiceNumber || "N/A"}
+                                                      </div>
+                                                      {inv.convertedFromProforma && (
+                                                        <div className="text-xs text-purple-600 mt-0.5">
+                                                          From: {inv.originalProformaNumber}
+                                                        </div>
+                                                      )}
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              </td>
+                                              <td className="px-4 py-3 text-sm">
+                                                <span className={`font-semibold ${receivedAmount > 0 ? "text-green-600" : "text-gray-600"}`}>
+                                                  {formatIndianCurrency(receivedAmount)}
                                                 </span>
-                                              )}
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-gray-500">
-                                              {installment.percentage}%
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-gray-900 font-semibold">
-                                              {formatIndianCurrency(installment.totalAmount)}
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-gray-500">
-                                              <div className="text-center">
-                                                <div
-                                                  className={`font-semibold ${inv.invoiceType === "Tax Invoice" ? "text-green-600" : inv.invoiceType === "Cash Invoice" ? "text-orange-600" : "text-blue-600"}`}
-                                                >
-                                                  {inv.invoiceType === "Proforma Invoice" ? "Proforma" : inv.invoiceType === "Cash Invoice" ? "Cash" : "Tax"}
-                                                  {isCancelled && inv.regenerated && " (Cancelled - Regenerated)"}
-                                                  {!isCancelled && inv.regeneratedFrom && ` (Regenerated from ${inv.regeneratedFrom})`}
+                                              </td>
+                                              <td className="px-4 py-3 text-sm">
+                                                <span className={`font-semibold ${dueAmount > 0 ? "text-red-600" : "text-green-600"}`}>
+                                                  {dueAmount === 0 ? "0" : formatIndianCurrency(dueAmount)}
+                                                </span>
+                                              </td>
+                                              <td className="px-4 py-3 text-sm">
+                                                <div className="flex gap-2">
+                                                  {hasProforma && (
+                                                    <button
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedInvoice(group.proforma);
+                                                      }}
+                                                      className="bg-blue-600 hover:bg-blue-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                    >
+                                                      View PI
+                                                    </button>
+                                                  )}
+                                                  {hasTax && (
+                                                    <button
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedInvoice(group.tax);
+                                                      }}
+                                                      className="bg-green-600 hover:bg-green-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                    >
+                                                      View TI
+                                                    </button>
+                                                  )}
+                                                  {hasOther && (
+                                                    <button
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedInvoice(inv);
+                                                      }}
+                                                      className="bg-blue-600 hover:bg-blue-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                    >
+                                                      View
+                                                    </button>
+                                                  )}
+                                                  {!isCancelled && hasProforma && !group.proforma.regeneratedFrom && (
+                                                    <button
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleCancelInvoice(group.proforma);
+                                                      }}
+                                                      className="bg-red-600 hover:bg-red-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                      title="Cancel this invoice"
+                                                    >
+                                                      {getUndoButtonText(group.proforma.invoiceType)}
+                                                    </button>
+                                                  )}
+                                                  {!isCancelled && hasTax && !group.tax.regeneratedFrom && (
+                                                    <button
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleCancelInvoice(group.tax);
+                                                      }}
+                                                      className="bg-red-600 hover:bg-red-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                      title="Cancel this invoice"
+                                                    >
+                                                      {getUndoButtonText(group.tax.invoiceType)}
+                                                    </button>
+                                                  )}
+                                                  {!isCancelled && hasOther && !inv.regeneratedFrom && (
+                                                    <button
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleCancelInvoice(inv);
+                                                      }}
+                                                      className="bg-red-600 hover:bg-red-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                      title="Cancel this invoice"
+                                                    >
+                                                      {getUndoButtonText(inv.invoiceType)}
+                                                    </button>
+                                                  )}
+                                                  {isCancelled && !inv.regenerated && (
+                                                    <button
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleGenerateInvoice(mergedItem.contracts[0], installment, true, inv);
+                                                      }}
+                                                      className="bg-orange-600 hover:bg-orange-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                      title="Regenerate cancelled invoice"
+                                                    >
+                                                      Regenerate
+                                                    </button>
+                                                  )}
+                                                  {!isCancelled && hasProforma && group.proforma.invoiceType === "Proforma Invoice" && !group.proforma.convertedToTax && (
+                                                    <button
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleConvertToTax(group.proforma);
+                                                      }}
+                                                      className="bg-purple-600 hover:bg-purple-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
+                                                    >
+                                                      Generate TI
+                                                    </button>
+                                                  )}
                                                 </div>
-
-                                                {/* Approval status sirf Tax Invoice ke liye, Cash aur Proforma ke liye nahi */}
-                                                {inv.invoiceType === "Tax Invoice" && getApprovalStatusBadge(inv)}
-
-                                                {/* Cash Invoice ke liye special badge */}
-                                                {inv.invoiceType === "Cash Invoice" && (
-                                                  <span className="ml-1 px-1.5 py-0.5 rounded text-xs bg-orange-100 text-orange-800 border border-orange-300">
-                                                    Cash
-                                                  </span>
-                                                )}
-
-                                                {/* Proforma Invoice ke liye badge */}
-                                                {inv.invoiceType === "Proforma Invoice" && (
-                                                  <span className="ml-1 px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 border border-blue-300">
-                                                    Proforma
-                                                  </span>
-                                                )}
-
-                                                <div className="text-xs text-gray-400 mt-0.5">
-                                                  {inv.invoiceNumber || "N/A"}
-                                                </div>
-
-                                                {/* From: Proforma number niche dikhana hai agar converted hai */}
-                                                {inv.convertedFromProforma && (
-                                                  <div className="text-xs text-purple-600 mt-0.5">
-                                                    From: {inv.originalProformaNumber}
-                                                  </div>
-                                                )}
-                                              </div>
-                                            </td>
-                                            <td className="px-4 py-3 text-sm">
-                                              <span className={`font-semibold ${totalBilledAmount > 0 ? "text-green-600" : "text-gray-600"}`}>
-                                                {formatIndianCurrency(totalBilledAmount)}
-                                              </span>
-                                            </td>
-                                            <td className="px-4 py-3 text-sm">
-                                              <span className={`font-semibold ${dueAmount > 0 ? "text-red-600" : "text-green-600"}`}>
-                                                {dueAmount === 0 ? "0" : formatIndianCurrency(dueAmount)}
-                                              </span>
-                                            </td>
-                                            <td className="px-4 py-3 text-sm">
-                                              <div className="flex gap-2">
-                                                <button
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setSelectedInvoice(inv);
-                                                  }}
-                                                  className="bg-blue-600 hover:bg-blue-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
-                                                >
-                                                  View
-                                                </button>
-                                                {!isCancelled && !inv.regeneratedFrom && (
-                                                  <button
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      handleCancelInvoice(inv);
-                                                    }}
-                                                    className="bg-red-600 hover:bg-red-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
-                                                    title="Cancel this invoice"
-                                                  >
-                                                    Undo
-                                                  </button>
-                                                )}
-                                                {!isCancelled && inv.invoiceType === "Proforma Invoice" && (
-                                                  <button
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      handleConvertToTax(inv);
-                                                    }}
-                                                    className="bg-purple-600 hover:bg-purple-700 text-white py-1.5 px-3 rounded-lg text-xs font-medium transition-colors duration-200"
-                                                  >
-                                                    Generate TI
-                                                  </button>
-                                                )}
-                                              </div>
-                                            </td>
-                                          </tr>
-                                        );
+                                              </td>
+                                            </tr>
+                                          );
+                                        });
                                       } else {
                                         // No invoice generated yet for this merged installment
                                         return (
@@ -3011,13 +3468,15 @@ const handleMergeSubmit = async (formData) => {
                                             }
                                           >
                                             <td className="px-4 py-3 text-sm text-gray-900 font-medium">
-                                              {installment.name}
+                                              <div className="flex items-center gap-2">
+                                                <span>{installment.name}</span>
+                                              </div>
                                             </td>
                                             <td className="px-4 py-3 text-sm text-gray-500">
                                               {installment.percentage}%
                                             </td>
                                             <td className="px-4 py-3 text-sm text-gray-900 font-semibold">
-                                              {formatIndianCurrency(installment.totalAmount)}
+                                              {formatIndianCurrency(installment.amount || installment.totalAmount)}
                                             </td>
                                             <td className="px-4 py-3 text-sm text-gray-500">
                                               -
@@ -3026,7 +3485,7 @@ const handleMergeSubmit = async (formData) => {
                                               ₹0
                                             </td>
                                             <td className="px-4 py-3 text-sm">
-                                              {formatIndianCurrency(installment.totalAmount)}
+                                              {formatIndianCurrency(getAdjustedInstallmentAmount(mergedItem.contracts[0], {totalAmount: installment.totalAmount}, installment.idx))}
                                             </td>
                                             <td className="px-4 py-3 text-sm">
                                               <button
