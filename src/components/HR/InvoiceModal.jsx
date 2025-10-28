@@ -2,13 +2,16 @@ import React, { useState, useEffect } from "react";
 import gryphonLogo from "../../assets/gryphon_logo.png";
 import signature from "../../assets/sign.png";
 
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "../../firebase";
 
 const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
   const [editableInvoice, setEditableInvoice] = useState(invoice);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  // Invoice number conflict state
+  const [invoiceNumberConflict, setInvoiceNumberConflict] = useState(false);
+  const [checkingInvoiceNumber, setCheckingInvoiceNumber] = useState(false);
 
   // Custom toast state
   const [toast, setToast] = useState(null);
@@ -131,6 +134,30 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
         raisedDate: parsedDate
       };
 
+      // ✅ Extra validation: check if invoice number already exists in collection
+      const checkConflict = async (invoiceNumber) => {
+        if (!invoiceNumber) return false;
+        try {
+          const collRef = collection(db, collectionName);
+          const q = query(collRef, where('invoiceNumber', '==', invoiceNumber));
+          const snap = await getDocs(q);
+          if (snap.empty) return false;
+          // If there's any doc with same invoiceNumber but different id -> conflict
+          const conflict = snap.docs.some(d => d.id !== invoice.id);
+          return conflict;
+        } catch (err) {
+          console.error('Error checking invoice number conflict', err);
+          return false; // fail open - don't block save on check errors
+        }
+      };
+
+      const conflictExists = await checkConflict(updateData.invoiceNumber);
+      if (conflictExists) {
+        setToast({ type: 'error', message: 'This invoice number is already generated for another invoice.' });
+        setInvoiceNumberConflict(true);
+        return;
+      }
+
       if (invoice.installment?.toLowerCase().includes('installment')) {
         updateData.emiMonth = editableMonth;
       }
@@ -165,6 +192,39 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
       ...prev,
       [field]: value
     }));
+
+    // If user is editing invoiceNumber, reset conflict warning until we re-check on blur/save
+    if (field === 'invoiceNumber') {
+      setInvoiceNumberConflict(false);
+    }
+  };
+
+  // Check invoice number uniqueness on blur (so user gets immediate feedback)
+  const handleInvoiceNumberBlur = async () => {
+    const invoiceNumber = (editableInvoice.invoiceNumber || '').trim();
+    if (!invoiceNumber) return;
+    setCheckingInvoiceNumber(true);
+    try {
+      const collectionName = invoice.invoiceType === "Proforma Invoice" 
+        ? "ProformaInvoices" 
+        : "ContractInvoices";
+      const collRef = collection(db, collectionName);
+      const q = query(collRef, where('invoiceNumber', '==', invoiceNumber));
+      const snap = await getDocs(q);
+      if (snap.empty) {
+        setInvoiceNumberConflict(false);
+      } else {
+        const conflict = snap.docs.some(d => d.id !== invoice.id);
+        setInvoiceNumberConflict(conflict);
+        if (conflict) {
+          setToast({ type: 'warning', message: 'Invoice number already used by another invoice.' });
+        }
+      }
+    } catch (err) {
+      console.error('Error checking invoice number on blur', err);
+    } finally {
+      setCheckingInvoiceNumber(false);
+    }
   };
 
   // Date formatting helper
@@ -544,10 +604,17 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
                         type="text"
                         value={editableInvoice.invoiceNumber || ''}
                         onChange={(e) => handleInputChange('invoiceNumber', e.target.value)}
+                        onBlur={handleInvoiceNumberBlur}
                         className="text-sm text-blue-800 font-bold border border-blue-300 px-2 py-1 rounded w-48 mb-1"
                         placeholder="Enter invoice number"
                       />
                       <p className="text-xs text-gray-600">Current: {invoice.invoiceNumber}</p>
+                      {checkingInvoiceNumber && (
+                        <p className="text-xs text-gray-500">Checking invoice number...</p>
+                      )}
+                      {invoiceNumberConflict && (
+                        <p className="text-xs text-red-600 mt-1">This invoice number is already generated for another invoice.</p>
+                      )}
                     </div>
                   ) : (
                     <p className="text-sm text-blue-800 font-bold">
@@ -871,7 +938,7 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
                   <>
                     <button
                       onClick={handleSave}
-                      disabled={isSaving}
+                      disabled={isSaving || invoiceNumberConflict}
                       className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-700 font-semibold transition-colors text-sm mr-2 disabled:bg-green-400"
                     >
                       {isSaving ? "Saving..." : "Save Changes"}
