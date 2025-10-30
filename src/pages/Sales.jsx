@@ -329,7 +329,7 @@ function Sales() {
     const numAmount = Number(amount);
     if (numAmount > 10000000) {
       const crores = numAmount / 10000000;
-      let str = crores.toFixed(4);
+      let str = crores.toFixed(2);
       str = str.replace(/\.?0+$/, '');
       return `₹${str} cr`;
     } else {
@@ -763,16 +763,16 @@ function Sales() {
 
             {showTCV && (
               <div className="flex gap-2 flex-wrap">
-                <div className="text-xs font-medium text-red-700 bg-red-50 px-2 py-1 rounded-lg border border-red-200">
+                <div className="text-[10px] font-medium text-red-700 bg-red-50 px-2 py-1 rounded-lg border border-red-200">
                   Hot TCV: {formatCurrency(hotTCV)}
                 </div>
-                <div className="text-xs font-medium text-amber-700 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200">
+                <div className="text-[10px] font-medium text-amber-700 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200">
                   Warm TCV: {formatCurrency(warmTCV)}
                 </div>
-                <div className="text-xs font-medium text-cyan-700 bg-cyan-50 px-2 py-1 rounded-lg border border-cyan-200">
+                <div className="text-[10px] font-medium text-cyan-700 bg-cyan-50 px-2 py-1 rounded-lg border border-cyan-200">
                   Cold TCV: {formatCurrency(coldTCV)}
                 </div>
-                <div className="text-xs font-medium text-gray-700 bg-white px-2 py-1 rounded-lg border border-gray-200">
+                <div className="text-[10px] font-medium text-gray-700 bg-white px-2 py-1 rounded-lg border border-gray-200">
                   Total TCV: {formatCurrency(totalTCV)}
                 </div>
               </div>

@@ -190,7 +190,7 @@ function FiltersSection({
 
         {/* Invoice filter toggle buttons */}
         <div className="flex items-center gap-1">
-          <span className="text-xs text-gray-700 mr-1">Filter:</span>
+          <span className="text-xs text-gray-700 mr-1">Invoice Status:</span>
           <div className="flex rounded-lg border border-gray-200 overflow-hidden">
             <button
               onClick={() => setShowOnlyActive('all')}

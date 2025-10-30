@@ -29,23 +29,29 @@ function TrainerRow({
   countdownTimers
 }) {
   const [invoiceData, setInvoiceData] = useState(null);
-  const [loading, setLoading] = useState(true);
 
   // Fetch current invoice data from Firebase
   useEffect(() => {
     const fetchInvoiceData = async () => {
       if (!item.hasExistingInvoice) {
-        setLoading(false);
         return;
       }
       
       try {
-        const q = query(
-          collection(db, "invoices"),
-          where("trainerId", "==", item.trainerId),
-          where("collegeName", "==", item.collegeName),
-          where("phase", "==", item.phase)
-        );
+        const q = item.isMerged
+          ? query(
+              collection(db, "invoices"),
+              where("trainerId", "==", item.trainerId),
+              where("collegeName", "==", item.collegeName),
+              where("phase", "==", item.phase)
+            )
+          : query(
+              collection(db, "invoices"),
+              where("trainerId", "==", item.trainerId),
+              where("collegeName", "==", item.collegeName),
+              where("phase", "==", item.phase),
+              where("projectCode", "==", item.projectCode)
+            );
 
         const querySnapshot = await getDocs(q);
 
@@ -62,8 +68,6 @@ function TrainerRow({
         }
       } catch (fetchError) {
         console.error(`🚨 TrainerRow invoice fetch failed for ${item.trainerName}:`, fetchError);
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -124,17 +128,6 @@ function TrainerRow({
     ? Date.now() >=
       new Date(item.latestEndDate).getTime() + 24 * 60 * 60 * 1000
     : false;
-
-  if (loading) {
-    return (
-      <tr>
-        <td colSpan="5" className="px-2 sm:px-4 py-2 text-center">
-          <FiRefreshCw className="animate-spin inline mr-2" />
-          Loading invoice data...
-        </td>
-      </tr>
-    );
-  }
 
   return (
     <tr className="hover:bg-gray-50/50 transition-colors">

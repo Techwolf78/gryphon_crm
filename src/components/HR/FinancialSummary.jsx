@@ -37,7 +37,7 @@ const FinancialSummary = ({ totalAmount, approvedAmount, pendingAmount, rejected
 
   return (
     <div className="mt-4">
-      <div className="bg-white rounded-lg shadow-sm border border-slate-200/60 overflow-hidden">
+      <div className="bg-white rounded-lg shadow-sm border border-slate-200/60 overflow-hidden" data-tour="financial-summary-card">
         <div className="px-3 py-2 border-b border-slate-200/60">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 bg-gradient-to-r from-green-500 to-emerald-500 rounded flex items-center justify-center">

@@ -172,6 +172,7 @@ const BillsTable = ({
                           onClick={() => onViewDetails(bill)}
                           className="inline-flex items-center px-2 py-1 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded transition-all duration-200 hover:shadow-sm"
                           title="View Details"
+                          data-tour="view-details"
                         >
                           <FiEye className="mr-1 h-3 w-3" />
                           View
@@ -202,6 +203,7 @@ const BillsTable = ({
                               onClick={() => onAction(bill, 'approved')}
                               className="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 rounded transition-all duration-200 shadow-sm hover:shadow-md"
                               title="Approve Bill"
+                              data-tour="approve-bill"
                             >
                               <FiCheckCircle className="mr-1 h-3 w-3" />
                               Approve
@@ -210,6 +212,7 @@ const BillsTable = ({
                               onClick={() => handleRejectClick(bill)}
                               className="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 rounded transition-all duration-200 shadow-sm hover:shadow-md"
                               title="Reject Bill"
+                              data-tour="reject-bill"
                             >
                               <FiXCircle className="mr-1 h-3 w-3" />
                               Reject

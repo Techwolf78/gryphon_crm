@@ -418,6 +418,14 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
     return value;
   }, [filteredLeads]);
 
+  const achievedGST = useMemo(() => {
+    const gst = filteredLeads.reduce(
+      (sum, [, lead]) => sum + (Number(lead.gstAmount) || 0),
+      0
+    );
+    return gst;
+  }, [filteredLeads]);
+
   const formatCurrency = (amt) =>
     typeof amt === "number"
       ? new Intl.NumberFormat("en-IN", {
@@ -634,6 +642,7 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
                 formatCurrency={formatCurrency}
                 viewMyLeadsOnly={viewMyLeadsOnly}
                 achievedValue={achievedValue}
+                achievedGST={achievedGST}
                 handleTargetUpdate={handleTargetUpdate}
                 selectedTeamUserId={selectedTeamUserId}
                 setSelectedTeamUserId={setSelectedTeamUserId}

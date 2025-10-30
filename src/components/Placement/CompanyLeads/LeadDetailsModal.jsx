@@ -15,7 +15,8 @@ const LeadDetailsModal = ({
     email: '',
     phone: '',
     location: '',
-    designation: ''
+    designation: '',
+    linkedin: ''
   });
 
   if (!lead) return null;
@@ -41,6 +42,7 @@ const LeadDetailsModal = ({
         phone: newContact.phone,
         location: newContact.location,
         designation: newContact.designation,
+        linkedin: newContact.linkedin,
         addedAt: new Date().toISOString()
       };
 
@@ -56,7 +58,8 @@ const LeadDetailsModal = ({
         email: '',
         phone: '',
         location: '',
-        designation: ''
+        designation: '',
+        linkedin: ''
       });
       setShowAddContactForm(false);
 
@@ -163,6 +166,21 @@ const LeadDetailsModal = ({
                   <label className="block text-sm font-medium text-blue-600 mb-1">Location</label>
                   <p className="text-gray-900">{lead.pocLocation || "-"}</p>
                 </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-blue-600 mb-1">LinkedIn</label>
+                  {lead.pocLinkedin ? (
+                    <a
+                      href={lead.pocLinkedin}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 hover:underline"
+                    >
+                      {lead.pocLinkedin}
+                    </a>
+                  ) : (
+                    <p className="text-gray-900">-</p>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -209,6 +227,21 @@ const LeadDetailsModal = ({
                       <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-gray-600 mb-1">Location</label>
                         <p className="text-gray-900">{contact.location || "-"}</p>
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-600 mb-1">LinkedIn</label>
+                        {contact.linkedin ? (
+                          <a
+                            href={contact.linkedin}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 hover:underline"
+                          >
+                            {contact.linkedin}
+                          </a>
+                        ) : (
+                          <p className="text-gray-900">-</p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-600 mb-1">Added On</label>
@@ -290,6 +323,17 @@ const LeadDetailsModal = ({
                       placeholder="Location"
                     />
                   </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-600 mb-1">LinkedIn</label>
+                    <input
+                      type="url"
+                      name="linkedin"
+                      value={newContact.linkedin}
+                      onChange={handleContactChange}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="LinkedIn profile URL"
+                    />
+                  </div>
                 </div>
                 <div className="mt-4 flex justify-end space-x-3">
                   <button
@@ -300,7 +344,8 @@ const LeadDetailsModal = ({
                         email: '',
                         phone: '',
                         location: '',
-                        designation: ''
+                        designation: '',
+                        linkedin: ''
                       });
                     }}
                     className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100"

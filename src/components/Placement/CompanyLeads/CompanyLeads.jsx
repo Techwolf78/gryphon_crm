@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import AddLeads from "./AddLeads";
+import EditLeadModal from "./EditLeadModal";
+import BulkUploadModal from "./BulkUploadModal";
 import AddJD from "../AddJd/AddJD"; // ✅ adjust the relative path
 
 import {
@@ -9,6 +11,8 @@ import {
   orderBy,
   updateDoc,
   doc,
+  getDoc,
+  setDoc,
 } from "firebase/firestore";
 import { db } from "../../../firebase";
 import LeadsHeader from "./LeadsHeader";
@@ -22,9 +26,12 @@ function CompanyLeads() {
   const [showAddLeadForm, setShowAddLeadForm] = useState(false);
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isBulkMode, setIsBulkMode] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
-  const [showActionMenu, setShowActionMenu] = useState(null);
   const [showLeadDetails, setShowLeadDetails] = useState(false);
+  const [showEditLeadForm, setShowEditLeadForm] = useState(false);
+  const [leadToEdit, setLeadToEdit] = useState(null);
+  const [showBulkUploadForm, setShowBulkUploadForm] = useState(false);
 
   // AddJD modal state
 const [showAddJDForm, setShowAddJDForm] = useState(false);
@@ -36,23 +43,44 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     const fetchLeads = async () => {
       try {
         setLoading(true);
-        const q = query(
-          collection(db, "CompanyLeads"),
-          orderBy("createdAt", "desc")
-        );
-        const querySnapshot = await getDocs(q);
-        const leadsData = querySnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-          createdAt: doc.data().createdAt?.toDate
-            ? doc.data().createdAt.toDate().toISOString()
-            : new Date().toISOString(),
-          updatedAt: doc.data().updatedAt?.toDate
-            ? doc.data().updatedAt.toDate().toISOString()
-            : new Date().toISOString(),
-          contacts: doc.data().contacts || [],
-        }));
-        setLeads(leadsData);
+
+        // First, check if there's a bulk document with all companies
+        const bulkDocRef = doc(db, "CompanyLeads", "bulk");
+        const bulkDocSnap = await getDoc(bulkDocRef);
+
+        if (bulkDocSnap.exists() && bulkDocSnap.data().companies) {
+          // Use data from bulk document
+          const companies = bulkDocSnap.data().companies;
+          const leadsData = companies.map((company, index) => ({
+            id: `bulk_${index}`, // Use bulk_ prefix for IDs from bulk document
+            ...company,
+            createdAt: company.createdAt || new Date().toISOString(),
+            updatedAt: company.updatedAt || new Date().toISOString(),
+            contacts: company.contacts || [],
+          }));
+          setLeads(leadsData);
+          setIsBulkMode(true);
+        } else {
+          // Fall back to individual documents
+          const q = query(
+            collection(db, "CompanyLeads"),
+            orderBy("createdAt", "desc")
+          );
+          const querySnapshot = await getDocs(q);
+          const leadsData = querySnapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+            createdAt: doc.data().createdAt?.toDate
+              ? doc.data().createdAt.toDate().toISOString()
+              : new Date().toISOString(),
+            updatedAt: doc.data().updatedAt?.toDate
+              ? doc.data().updatedAt.toDate().toISOString()
+              : new Date().toISOString(),
+            contacts: doc.data().contacts || [],
+          }));
+          setLeads(leadsData);
+          setIsBulkMode(false);
+        }
       } catch (error) {
         console.error("Error fetching leads:", error);
       } finally {
@@ -114,11 +142,32 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     const lead = leads.find((l) => l.id === leadId);
     if (!lead) return;
 
-    // Update Firestore document
-    await updateDoc(doc(db, "CompanyLeads", leadId), {
-      status: newStatus,
-      updatedAt: new Date().toISOString(),
-    });
+    if (isBulkMode) {
+      // Update the bulk document
+      const bulkDocRef = doc(db, "CompanyLeads", "bulk");
+      const bulkDocSnap = await getDoc(bulkDocRef);
+
+      if (bulkDocSnap.exists()) {
+        const companies = bulkDocSnap.data().companies;
+        const leadIndex = parseInt(leadId.replace('bulk_', ''));
+
+        if (leadIndex >= 0 && leadIndex < companies.length) {
+          companies[leadIndex] = {
+            ...companies[leadIndex],
+            status: newStatus,
+            updatedAt: new Date().toISOString(),
+          };
+
+          await setDoc(bulkDocRef, { companies });
+        }
+      }
+    } else {
+      // Update individual document
+      await updateDoc(doc(db, "CompanyLeads", leadId), {
+        status: newStatus,
+        updatedAt: new Date().toISOString(),
+      });
+    }
 
     // Update local state
     setLeads((prevLeads) =>
@@ -128,9 +177,6 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           : l
       )
     );
-
-    // Close the dropdown
-    setShowActionMenu(null);
 
     // ✅ If marked as onboarded → open AddJD modal
     if (newStatus === "onboarded") {
@@ -142,11 +188,74 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   }
 };
 
-
-  const toggleActionMenu = (leadId, e) => {
-    e.stopPropagation();
-    setShowActionMenu(showActionMenu === leadId ? null : leadId);
+  const handleEditLead = (lead) => {
+    setLeadToEdit(lead);
+    setShowEditLeadForm(true);
   };
+
+  const handleUpdateLead = (leadId, updatedData) => {
+    if (isBulkMode) {
+      // Update the bulk document
+      const updateBulkDocument = async () => {
+        try {
+          const bulkDocRef = doc(db, "CompanyLeads", "bulk");
+          const bulkDocSnap = await getDoc(bulkDocRef);
+
+          if (bulkDocSnap.exists()) {
+            const companies = bulkDocSnap.data().companies;
+            const leadIndex = parseInt(leadId.replace('bulk_', ''));
+
+            if (leadIndex >= 0 && leadIndex < companies.length) {
+              companies[leadIndex] = {
+                ...companies[leadIndex],
+                ...updatedData,
+                updatedAt: new Date().toISOString(),
+              };
+
+              await setDoc(bulkDocRef, { companies });
+            }
+          }
+        } catch (error) {
+          console.error("Error updating bulk document:", error);
+        }
+      };
+      updateBulkDocument();
+    } else {
+      // Update individual document
+      const updateIndividualDocument = async () => {
+        try {
+          await updateDoc(doc(db, "CompanyLeads", leadId), {
+            ...updatedData,
+            updatedAt: new Date().toISOString(),
+          });
+        } catch (error) {
+          console.error("Error updating individual document:", error);
+        }
+      };
+      updateIndividualDocument();
+    }
+
+    // Update local state
+    setLeads((prevLeads) =>
+      prevLeads.map((l) =>
+        l.id === leadId
+          ? { ...l, ...updatedData, updatedAt: new Date().toISOString() }
+          : l
+      )
+    );
+  };
+
+  const handleBulkAddLeads = (newLeads) => {
+    setLeads((prevLeads) => [
+      ...newLeads.map(lead => ({
+        ...lead,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })),
+      ...prevLeads,
+    ]);
+  };
+
 
   const formatDate = useCallback((dateString) => {
     try {
@@ -178,6 +287,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
         onAddLead={() => setShowAddLeadForm(true)}
+        onBulkUpload={() => setShowBulkUploadForm(true)}
       />
 
       <LeadsFilters
@@ -189,15 +299,12 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
       <LeadsTable
         leads={filteredLeads}
-        activeTab={activeTab}
-        searchTerm={searchTerm}
-        showActionMenu={showActionMenu}
-        onToggleActionMenu={toggleActionMenu}
-        onStatusChange={handleStatusChange}
         onLeadClick={(lead) => {
           setSelectedLead(lead);
           setShowLeadDetails(true);
         }}
+        onStatusChange={handleStatusChange}
+        onEditLead={handleEditLead}
       />
 
       {/* Lead Details Modal */}
@@ -206,6 +313,35 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           lead={selectedLead}
           onClose={() => setShowLeadDetails(false)}
           onAddContact={(leadId, contactData) => {
+            if (isBulkMode) {
+              // Update the bulk document
+              const updateBulkContacts = async () => {
+                try {
+                  const bulkDocRef = doc(db, "CompanyLeads", "bulk");
+                  const bulkDocSnap = await getDoc(bulkDocRef);
+
+                  if (bulkDocSnap.exists()) {
+                    const companies = bulkDocSnap.data().companies;
+                    const leadIndex = parseInt(leadId.replace('bulk_', ''));
+
+                    if (leadIndex >= 0 && leadIndex < companies.length) {
+                      const existingContacts = companies[leadIndex].contacts || [];
+                      companies[leadIndex] = {
+                        ...companies[leadIndex],
+                        contacts: [...existingContacts, contactData],
+                        updatedAt: new Date().toISOString(),
+                      };
+
+                      await setDoc(bulkDocRef, { companies });
+                    }
+                  }
+                } catch (error) {
+                  console.error("Error updating bulk contacts:", error);
+                }
+              };
+              updateBulkContacts();
+            }
+
             setLeads(
               leads.map((lead) =>
                 lead.id === leadId
@@ -238,6 +374,20 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   />
 )}
 
+      {/* Edit Lead Modal */}
+      <EditLeadModal
+        show={showEditLeadForm}
+        onClose={() => setShowEditLeadForm(false)}
+        lead={leadToEdit}
+        onUpdateLead={handleUpdateLead}
+      />
+
+      {/* Bulk Upload Modal */}
+      <BulkUploadModal
+        show={showBulkUploadForm}
+        onClose={() => setShowBulkUploadForm(false)}
+        onBulkAddLeads={handleBulkAddLeads}
+      />
 
     </div>
 

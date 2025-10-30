@@ -861,24 +861,24 @@ if (selectedUserId) {
       if (lead.phase === "closed" && lead.totalCost) {
         revenue += lead.totalCost;
 
-        if (lead.createdAt) {
+        if (lead.closedDate) {
           try {
-            const createdDate = new Date(lead.createdAt);
-            if (Number.isNaN(createdDate.getTime()))
+            const closedDate = new Date(lead.closedDate);
+            if (Number.isNaN(closedDate.getTime()))
               throw new Error("Invalid date");
 
             let dateKey;
             if (timePeriod === "week") {
               dateKey = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
-                createdDate.getDay()
+                closedDate.getDay()
               ];
             } else if (timePeriod === "month") {
               const firstDay = new Date(
-                createdDate.getFullYear(),
-                createdDate.getMonth(),
+                closedDate.getFullYear(),
+                closedDate.getMonth(),
                 1
               );
-              const pastDaysOfMonth = createdDate.getDate() - 1;
+              const pastDaysOfMonth = closedDate.getDate() - 1;
               dateKey = `Week ${
                 Math.floor((firstDay.getDay() + pastDaysOfMonth) / 7) + 1
               }`;
@@ -901,11 +901,11 @@ if (selectedUserId) {
                   new Date(2000, quarterStart + 2, 1).toLocaleString("default", { month: "short" }),
                 ];
               }
-              let monthIdx = createdDate.getMonth() - startMonth;
+              let monthIdx = closedDate.getMonth() - startMonth;
               if (isNaN(monthIdx) || monthIdx < 0 || monthIdx > 2) monthIdx = 0; // fallback to first month
               dateKey = months[monthIdx];
             } else {
-              const month = createdDate.getMonth();
+              const month = closedDate.getMonth();
               dateKey = [
                 "Apr",
                 "May",
@@ -1133,10 +1133,19 @@ if (selectedUserId) {
       let leads = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
       // Filter by date range in JS, but include leads with missing createdAt
+      // For closed leads, also include if closedDate is in range
       let currentLeads = leads.filter(lead => {
-        if (!lead.createdAt) return true; // Include if missing createdAt
-        const created = new Date(lead.createdAt);
-        return created >= range.start && created <= range.end;
+        if (!lead.createdAt && !lead.closedDate) return true; // Include if missing both dates
+        if (lead.phase === "closed" && lead.closedDate) {
+          // For closed leads, check closedDate
+          const closed = new Date(lead.closedDate);
+          return closed >= range.start && closed <= range.end;
+        } else if (lead.createdAt) {
+          // For other leads, check createdAt
+          const created = new Date(lead.createdAt);
+          return created >= range.start && created <= range.end;
+        }
+        return false;
       });
 
       const currentData = processLeadsData(currentLeads, range);
@@ -1144,9 +1153,17 @@ if (selectedUserId) {
       // Fetch previous period data for growth calculations
       const prevRange = getPrevDateRange(timePeriod, range.start);
       let prevLeads = leads.filter(lead => {
-        if (!lead.createdAt) return false; // Exclude missing createdAt for previous
-        const created = new Date(lead.createdAt);
-        return created >= prevRange.start && created <= prevRange.end;
+        if (!lead.createdAt && !lead.closedDate) return false; // Exclude missing dates for previous
+        if (lead.phase === "closed" && lead.closedDate) {
+          // For closed leads, check closedDate
+          const closed = new Date(lead.closedDate);
+          return closed >= prevRange.start && closed <= prevRange.end;
+        } else if (lead.createdAt) {
+          // For other leads, check createdAt
+          const created = new Date(lead.createdAt);
+          return created >= prevRange.start && created <= prevRange.end;
+        }
+        return false;
       });
 
       const prevData = processLeadsData(prevLeads, prevRange);
@@ -1288,9 +1305,17 @@ if (selectedUserId) {
 
       // Filter by the current date range (selected year) like the dashboard doe
       leads = leads.filter(lead => {
-        if (!lead.createdAt) return true; // Include if missing createdAt
-        const created = new Date(lead.createdAt);
-        return created >= currentDateRange.start && created <= currentDateRange.end;
+        if (!lead.createdAt && !lead.closedDate) return true; // Include if missing both dates
+        if (lead.phase === "closed" && lead.closedDate) {
+          // For closed leads, check closedDate
+          const closed = new Date(lead.closedDate);
+          return closed >= currentDateRange.start && closed <= currentDateRange.end;
+        } else if (lead.createdAt) {
+          // For other leads, check createdAt
+          const created = new Date(lead.createdAt);
+          return created >= currentDateRange.start && created <= currentDateRange.end;
+        }
+        return false;
       });
 
       setModalLeads(leads);
@@ -1741,19 +1766,19 @@ if (selectedUserId) {
       <ReactModal
   isOpen={isModalOpen}
   onRequestClose={() => setIsModalOpen(false)}
+  shouldCloseOnOverlayClick={true}
   ariaHideApp={false}
-  className="fixed inset-0 flex items-center justify-center z-50"
-  overlayClassName="fixed inset-0 bg-gradient-to-br from-gray-900/40 to-indigo-200/30 backdrop-blur-sm transition-all"
+  className="fixed inset-0 flex items-center justify-center z-56"
+  overlayClassName="fixed inset-0 bg-gradient-to-br from-gray-900/40 to-indigo-200/30 backdrop-blur-sm z-56 transition-all"
 >
   <div
-    className="relative bg-white rounded-2xl shadow-2xl max-w-3xl w-full mx-4 p-0 flex flex-col overflow-hidden animate-fade-in"
+    className="relative bg-white rounded-2xl shadow-2xl w-[80vw] h-[95vh] mx-4 p-0 flex flex-col overflow-hidden animate-fade-in"
     role="dialog"
     aria-modal="true"
     aria-labelledby="modal-title"
-    style={{ maxHeight: "600px" }} // Add a fixed max height
   >
     {/* Header */}
-    <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-white via-gray-50 to-indigo-50">
+    <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 bg-gradient-to-r from-white via-gray-50 to-indigo-50">
       <div className="flex items-center gap-3">
         <div className="bg-indigo-100 text-indigo-600 rounded-full w-10 h-10 flex items-center justify-center font-bold text-lg shadow-sm">
           {modalMember?.name?.[0] || "?"}
@@ -1811,11 +1836,11 @@ if (selectedUserId) {
                   key={lead.id}
                   className="hover:bg-indigo-50 transition-colors group"
                 >
-<td className="px-3 py-2 whitespace-nowrap text-gray-900 font-medium flex items-center gap-2">
+<td className="px-3 py-2 text-gray-900 font-medium flex items-center gap-2">
   {/* Symbol for phase */}
   {lead.phase === "cold" && (
     <span
-      className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 font-bold text-xs border border-blue-200"
+      className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 font-bold text-xs border border-blue-200 flex-shrink-0"
       title="Cold"
     >
       C
@@ -1823,7 +1848,7 @@ if (selectedUserId) {
   )}
   {lead.phase === "warm" && (
     <span
-      className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-yellow-100 text-yellow-700 font-bold text-xs border border-yellow-200"
+      className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-yellow-100 text-yellow-700 font-bold text-xs border border-yellow-200 flex-shrink-0"
       title="Warm"
     >
       W
@@ -1831,7 +1856,7 @@ if (selectedUserId) {
   )}
   {lead.phase === "hot" && (
     <span
-      className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-700 font-bold text-xs border border-red-200"
+      className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-700 font-bold text-xs border border-red-200 flex-shrink-0"
       title="Hot"
     >
       H
@@ -1839,14 +1864,16 @@ if (selectedUserId) {
   )}
 {lead.phase === "closed" && (
   <span
-    className="inline-flex items-center justify-center h-6 rounded-full bg-green-100 text-green-700 font-bold text-[10px] border border-green-200"
+    className="inline-flex items-center justify-center h-6 rounded-full bg-green-100 text-green-700 font-bold text-[10px] border border-green-200 flex-shrink-0"
     title="Closed"
     style={{ minWidth: "1.3rem", padding: "0 0.3rem" }}
   >
     CL
   </span>
 )}
-  {lead.businessName || "-"}
+  <span className="min-w-0 flex-1">
+    {lead.businessName || "-"}
+  </span>
 </td>
                   <td className="px-3 py-2 text-gray-700">
                     {lead.courses?.[0]?.courseType || "-"}
@@ -1863,7 +1890,7 @@ if (selectedUserId) {
     </div>
 
     {/* Footer */}
-    <div className="px-6 py-3 bg-gradient-to-r from-white via-gray-50 to-indigo-50 border-t border-gray-100 flex justify-end">
+    <div className="px-4 py-2 bg-gradient-to-r from-white via-gray-50 to-indigo-50 border-t border-gray-100 flex justify-end">
       <button
         className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold shadow hover:bg-indigo-700 transition focus:outline-none focus:ring-2 focus:ring-indigo-400"
         onClick={() => setIsModalOpen(false)}

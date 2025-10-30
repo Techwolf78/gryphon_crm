@@ -465,7 +465,7 @@ const ClosedLeadsTable = ({
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="text-lg font-bold text-gray-900">{formatCurrency(lead.totalCost)}</div>
-                        {lead.gstAmount > 0 && (
+                        {lead.gstAmount && Number(lead.gstAmount) > 0 && (
                           <div className="text-xs text-gray-500 mt-1">
                             +{formatCurrency(lead.gstAmount)} GST
                           </div>
