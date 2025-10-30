@@ -1533,6 +1533,23 @@ useEffect(() => {
                       let newPaymentDetails = [];
 
                       if (newPaymentType === "EMI") {
+                        // Penny-perfect distribution function
+                        const distributeAmount = (totalAmount, numInstallments) => {
+                          const baseAmount = Math.floor((totalAmount * 100) / numInstallments) / 100;
+                          const remainder = Math.round((totalAmount - (baseAmount * numInstallments)) * 100) / 100;
+
+                          const installments = [];
+                          for (let i = 0; i < numInstallments; i++) {
+                            if (i === numInstallments - 1) {
+                              // Last installment gets the remainder to ensure total adds up perfectly
+                              installments.push(baseAmount + remainder);
+                            } else {
+                              installments.push(baseAmount);
+                            }
+                          }
+                          return installments;
+                        };
+
                         // For EMI, ask for number of installments
                         const emiCount = prompt("Enter number of EMI installments:", "3");
                         const emiMonths = parseInt(emiCount) || 3;
@@ -1541,31 +1558,17 @@ useEffect(() => {
                         const baseTotal = parseFloat(formData.totalCost) || 0;
                         const gstTotal = parseFloat(formData.gstAmount) || 0;
                         
-                        const baseInstallment = baseTotal / emiMonths;
-                        const gstInstallment = gstTotal / emiMonths;
-                        const totalInstallment = totalAmount / emiMonths;
+                        const baseInstallments = distributeAmount(baseTotal, emiMonths);
+                        const gstInstallments = distributeAmount(gstTotal, emiMonths);
+                        const totalInstallments = distributeAmount(totalAmount, emiMonths);
                         
-                        newPaymentDetails = Array.from({length: emiMonths}, (_, i) => {
-                          let percentage = 100 / emiMonths;
-                          let baseAmt = baseInstallment;
-                          let gstAmt = gstInstallment;
-                          let totalAmt = totalInstallment;
-                          
-                          if (i === emiMonths - 1) {
-                            percentage = 100 - (100 / emiMonths) * (emiMonths - 1);
-                            baseAmt = baseTotal - baseInstallment * (emiMonths - 1);
-                            gstAmt = gstTotal - gstInstallment * (emiMonths - 1);
-                            totalAmt = totalAmount - totalInstallment * (emiMonths - 1);
-                          }
-                          
-                          return {
-                            name: `Installment ${i + 1}`,
-                            percentage: percentage.toFixed(2),
-                            baseAmount: baseAmt.toFixed(2),
-                            gstAmount: gstAmt.toFixed(2),
-                            totalAmount: totalAmt.toFixed(2)
-                          };
-                        });
+                        newPaymentDetails = Array.from({length: emiMonths}, (_, i) => ({
+                          name: `Installment ${i + 1}`,
+                          percentage: ((totalInstallments[i] / totalAmount) * 100).toFixed(2),
+                          baseAmount: baseInstallments[i].toFixed(2),
+                          gstAmount: gstInstallments[i].toFixed(2),
+                          totalAmount: totalInstallments[i].toFixed(2)
+                        }));
                       } else {
                         // For other payment types, create equal splits
                         const basePercentage = Math.floor((100 / fields.length) * 100) / 100;
