@@ -225,12 +225,7 @@ return (
               <div>
                 <span className="font-medium">Company:</span> {companyName}
               </div>
-              <div className="col-span-2">
-                <span className="font-medium">Collection:</span>{' '}
-                <code className="bg-blue-100 px-2 py-1 rounded text-blue-800">
-                  studentList/{college ? college.replace(/\s+/g, '_').toUpperCase() : 'N/A'}
-                </code>
-              </div>
+             
             </div>
           </div>
 
