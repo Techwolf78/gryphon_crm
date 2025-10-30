@@ -9,10 +9,11 @@ import {
   getDocs,
   query,
   orderBy,
-  updateDoc,
   doc,
   getDoc,
   setDoc,
+  limit,
+  startAfter,
 } from "firebase/firestore";
 import { db } from "../../../firebase";
 import LeadsHeader from "./LeadsHeader";
@@ -20,13 +21,50 @@ import LeadsFilters from "./LeadsFilters";
 import LeadsTable from "./LeadsTable";
 import LeadDetailsModal from "./LeadDetailsModal";
 
+  // Utility function to handle Firestore index errors
+  const handleFirestoreIndexError = (error, operation = "operation") => {
+    console.error(`❌ Firestore Index Error in ${operation}:`, error);
+
+    if (error.message && error.message.includes('index')) {
+      console.error("🔍 Firestore Index Error Detected!");
+      console.error("💡 To fix this, create the required index:");
+
+      // Try to extract index URL from error message
+      const indexUrlMatch = error.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
+      if (indexUrlMatch) {
+        console.log("🔗 %cClick here to create index", "color: blue; text-decoration: underline; cursor: pointer; font-weight: bold;", indexUrlMatch[0]);
+        console.log("📋 Or copy this URL: " + indexUrlMatch[0]);
+
+        // Make the link clickable in some browsers
+        console.log("🚨 After creating the index, refresh the page to retry the " + operation + ".");
+      } else {
+        console.error("❓ Could not extract index URL from error.");
+        console.log("🔗 Go to: https://console.firebase.google.com/project/YOUR_PROJECT_ID/firestore/indexes");
+        console.log("📝 Replace YOUR_PROJECT_ID with your actual Firebase project ID");
+      }
+    }
+  };
+
+  // Test function to simulate index error (for development/testing)
+  const testIndexError = () => {
+    const mockError = {
+      message: "The query requires an index. You can create it here: https://console.firebase.google.com/project/test-project/firestore/indexes?create_composite_index=1"
+    };
+    handleFirestoreIndexError(mockError, "test query");
+  };
+
+  // Expose test function to window for console testing
+  // Usage: Open browser console and run: testFirestoreIndexError()
+  if (typeof window !== 'undefined') {
+    window.testFirestoreIndexError = testIndexError;
+  }
+
 function CompanyLeads() {
   const [activeTab, setActiveTab] = useState("hot");
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddLeadForm, setShowAddLeadForm] = useState(false);
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isBulkMode, setIsBulkMode] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
   const [showLeadDetails, setShowLeadDetails] = useState(false);
   const [showEditLeadForm, setShowEditLeadForm] = useState(false);
@@ -37,59 +75,138 @@ function CompanyLeads() {
 const [showAddJDForm, setShowAddJDForm] = useState(false);
 const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(1000); // Fixed page size of 1000 companies
+  const [sortOrder, setSortOrder] = useState("desc"); // "asc" or "desc"
+  const [lastDoc, setLastDoc] = useState(null);
+  const [hasMore, setHasMore] = useState(true);
 
-  // Fetch all leads from Firestore
-  useEffect(() => {
-    const fetchLeads = async () => {
-      try {
-        setLoading(true);
 
-        // First, check if there's a bulk document with all companies
-        const bulkDocRef = doc(db, "CompanyLeads", "bulk");
-        const bulkDocSnap = await getDoc(bulkDocRef);
+  // Fetch leads with pagination from Firestore
+  const fetchLeads = useCallback(async (page = 1, sort = "desc", startDoc = null) => {
+    try {
+      setLoading(true);
 
-        if (bulkDocSnap.exists() && bulkDocSnap.data().companies) {
-          // Use data from bulk document
-          const companies = bulkDocSnap.data().companies;
-          const leadsData = companies.map((company, index) => ({
-            id: `bulk_${index}`, // Use bulk_ prefix for IDs from bulk document
-            ...company,
-            createdAt: company.createdAt || new Date().toISOString(),
-            updatedAt: company.updatedAt || new Date().toISOString(),
-            contacts: company.contacts || [],
-          }));
-          setLeads(leadsData);
-          setIsBulkMode(true);
-        } else {
-          // Fall back to individual documents
-          const q = query(
-            collection(db, "CompanyLeads"),
-            orderBy("createdAt", "desc")
-          );
-          const querySnapshot = await getDocs(q);
-          const leadsData = querySnapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-            createdAt: doc.data().createdAt?.toDate
-              ? doc.data().createdAt.toDate().toISOString()
-              : new Date().toISOString(),
-            updatedAt: doc.data().updatedAt?.toDate
-              ? doc.data().updatedAt.toDate().toISOString()
-              : new Date().toISOString(),
-            contacts: doc.data().contacts || [],
-          }));
-          setLeads(leadsData);
-          setIsBulkMode(false);
-        }
-      } catch (error) {
-        console.error("Error fetching leads:", error);
-      } finally {
-        setLoading(false);
+      // Fetch from companyleads collection (batches uploaded via Excel)
+      let q;
+      if (startDoc && page > 1) {
+        q = query(
+          collection(db, "companyleads"),
+          orderBy("__name__", sort), // Order by document ID
+          startAfter(startDoc),
+          limit(5) // Fetch 5 batches at a time to get ~10,000 companies
+        );
+      } else {
+        q = query(
+          collection(db, "companyleads"),
+          orderBy("__name__", sort),
+          limit(5)
+        );
       }
-    };
 
-    fetchLeads();
-  }, []);
+      const querySnapshot = await getDocs(q);
+
+      const allCompanies = [];
+      let lastDocument = null;
+
+      querySnapshot.docs.forEach((batchDoc) => {
+        const batchData = batchDoc.data();
+        const encodedCompanies = batchData.companies || [];
+
+        // Decode Base64 companies and add batch info
+        encodedCompanies.forEach((encodedCompany, index) => {
+          try {
+            const decodedCompany = JSON.parse(atob(encodedCompany));
+            allCompanies.push({
+              id: `${batchDoc.id}_${index}`, // Unique ID combining batchId and index
+              batchId: batchDoc.id,
+              ...decodedCompany,
+              // Map the fields to match existing UI component expectations
+              companyName: decodedCompany.name || decodedCompany.companyName || '',
+              pocName: decodedCompany.contactPerson || decodedCompany.pocName || '',
+              pocDesignation: decodedCompany.designation || decodedCompany.pocDesignation || '',
+              pocPhone: decodedCompany.phone || decodedCompany.pocPhone || '',
+              companyUrl: decodedCompany.companyUrl || '',
+              companyWebsite: decodedCompany.companyWebsite || decodedCompany.companyUrl || '',
+              linkedinUrl: decodedCompany.linkedinUrl || '',
+              pocLinkedin: decodedCompany.pocLinkedin || decodedCompany.linkedinUrl || '',
+              // Handle email field mapping (Excel might put email in companyUrl)
+              pocMail: decodedCompany.email || decodedCompany.pocMail || 
+                      (decodedCompany.companyUrl && decodedCompany.companyUrl.includes('@') ? decodedCompany.companyUrl : ''),
+              pocLocation: decodedCompany.location || decodedCompany.pocLocation || '',
+              industry: decodedCompany.industry || decodedCompany.sector || '',
+              companySize: decodedCompany.companySize || decodedCompany.employeeCount || '',
+              source: decodedCompany.source || 'Excel Upload',
+              notes: decodedCompany.notes || '',
+              status: decodedCompany.status || "hot",
+              workingSince: decodedCompany.workingSince || '',
+              createdAt: decodedCompany.createdAt || new Date().toISOString(),
+              updatedAt: decodedCompany.updatedAt || new Date().toISOString(),
+              contacts: decodedCompany.contacts || [],
+            });
+          } catch (error) {
+            console.error(`❌ Error decoding company ${index} in batch ${batchDoc.id}:`, error);
+          }
+        });
+
+        lastDocument = batchDoc;
+      });
+
+      // Check if we have more pages
+      const hasMorePages = querySnapshot.docs.length === 5;
+
+      setLeads(allCompanies);
+      setLastDoc(lastDocument);
+      setHasMore(hasMorePages);
+      setCurrentPage(page);
+      setSortOrder(sort);
+
+    } catch (error) {
+      handleFirestoreIndexError(error, "fetching leads");
+
+      // Fallback to old CompanyLeads collection if new structure fails
+      try {
+        console.log("🔄 Falling back to old CompanyLeads collection...");
+        const q = query(
+          collection(db, "CompanyLeads"),
+          orderBy("createdAt", sort === "desc" ? "desc" : "asc"),
+          limit(pageSize)
+        );
+        const querySnapshot = await getDocs(q);
+        const leadsData = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+          createdAt: doc.data().createdAt?.toDate
+            ? doc.data().createdAt.toDate().toISOString()
+            : new Date().toISOString(),
+          updatedAt: doc.data().updatedAt?.toDate
+            ? doc.data().updatedAt.toDate().toISOString()
+            : new Date().toISOString(),
+          contacts: doc.data().contacts || [],
+        }));
+        setLeads(leadsData);
+        setHasMore(querySnapshot.docs.length === pageSize);
+        console.log("✅ Successfully loaded data from fallback collection");
+      } catch (fallbackError) {
+        handleFirestoreIndexError(fallbackError, "fallback fetch");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [pageSize]);
+
+  // Initial fetch on component mount
+  useEffect(() => {
+    fetchLeads(1, "desc", null);
+  }, [fetchLeads]);
+
+  // Refetch when pagination or sort changes
+  useEffect(() => {
+    if (currentPage > 1 || sortOrder !== "desc") {
+      fetchLeads(currentPage, sortOrder, currentPage === 1 ? null : lastDoc);
+    }
+  }, [currentPage, sortOrder, lastDoc, fetchLeads]);
 
   // Filter leads based on active tab and search term
   const filteredLeads = useMemo(() => {
@@ -138,55 +255,56 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   };
 
   const handleStatusChange = async (leadId, newStatus) => {
-  try {
-    const lead = leads.find((l) => l.id === leadId);
-    if (!lead) return;
+    try {
+      const lead = leads.find((l) => l.id === leadId);
+      if (!lead || !lead.batchId) return;
 
-    if (isBulkMode) {
-      // Update the bulk document
-      const bulkDocRef = doc(db, "CompanyLeads", "bulk");
-      const bulkDocSnap = await getDoc(bulkDocRef);
+      // Fetch the batch document
+      const batchDocRef = doc(db, "companyleads", lead.batchId);
+      const batchDocSnap = await getDoc(batchDocRef);
 
-      if (bulkDocSnap.exists()) {
-        const companies = bulkDocSnap.data().companies;
-        const leadIndex = parseInt(leadId.replace('bulk_', ''));
+      if (batchDocSnap.exists()) {
+        const batchData = batchDocSnap.data();
+        const encodedCompanies = batchData.companies || [];
 
-        if (leadIndex >= 0 && leadIndex < companies.length) {
-          companies[leadIndex] = {
-            ...companies[leadIndex],
+        // Find the company index in the array
+        const companyIndex = parseInt(leadId.split('_')[1]); // Extract index from "batch_1_5" -> 5
+
+        if (companyIndex >= 0 && companyIndex < encodedCompanies.length) {
+          // Decode, update, and re-encode the company
+          const decodedCompany = JSON.parse(atob(encodedCompanies[companyIndex]));
+          const updatedCompany = {
+            ...decodedCompany,
             status: newStatus,
-            updatedAt: new Date().toISOString(),
           };
+          encodedCompanies[companyIndex] = btoa(JSON.stringify(updatedCompany));
 
-          await setDoc(bulkDocRef, { companies });
+          // Save back to Firestore
+          await setDoc(batchDocRef, {
+            ...batchData,
+            companies: encodedCompanies,
+          });
         }
       }
-    } else {
-      // Update individual document
-      await updateDoc(doc(db, "CompanyLeads", leadId), {
-        status: newStatus,
-        updatedAt: new Date().toISOString(),
-      });
-    }
 
-    // Update local state
-    setLeads((prevLeads) =>
-      prevLeads.map((l) =>
-        l.id === leadId
-          ? { ...l, status: newStatus, updatedAt: new Date().toISOString() }
-          : l
-      )
-    );
+      // Update local state
+      setLeads((prevLeads) =>
+        prevLeads.map((l) =>
+          l.id === leadId
+            ? { ...l, status: newStatus, updatedAt: new Date().toISOString() }
+            : l
+        )
+      );
 
-    // ✅ If marked as onboarded → open AddJD modal
-    if (newStatus === "onboarded") {
-      setSelectedCompanyForJD(lead);  // send company info to AddJD
-      setShowAddJDForm(true);
+      // ✅ If marked as onboarded → open AddJD modal
+      if (newStatus === "onboarded") {
+        setSelectedCompanyForJD(lead);  // send company info to AddJD
+        setShowAddJDForm(true);
+      }
+    } catch (error) {
+      handleFirestoreIndexError(error, "lead status update");
     }
-  } catch (error) {
-    console.error("Error updating lead status:", error);
-  }
-};
+  };
 
   const handleEditLead = (lead) => {
     setLeadToEdit(lead);
@@ -194,46 +312,43 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   };
 
   const handleUpdateLead = (leadId, updatedData) => {
-    if (isBulkMode) {
-      // Update the bulk document
-      const updateBulkDocument = async () => {
-        try {
-          const bulkDocRef = doc(db, "CompanyLeads", "bulk");
-          const bulkDocSnap = await getDoc(bulkDocRef);
+    const updateCompany = async () => {
+      try {
+        const lead = leads.find((l) => l.id === leadId);
+        if (!lead || !lead.batchId) return;
 
-          if (bulkDocSnap.exists()) {
-            const companies = bulkDocSnap.data().companies;
-            const leadIndex = parseInt(leadId.replace('bulk_', ''));
+        // Fetch the batch document
+        const batchDocRef = doc(db, "companyleads", lead.batchId);
+        const batchDocSnap = await getDoc(batchDocRef);
 
-            if (leadIndex >= 0 && leadIndex < companies.length) {
-              companies[leadIndex] = {
-                ...companies[leadIndex],
-                ...updatedData,
-                updatedAt: new Date().toISOString(),
-              };
+        if (batchDocSnap.exists()) {
+          const batchData = batchDocSnap.data();
+          const encodedCompanies = batchData.companies || [];
 
-              await setDoc(bulkDocRef, { companies });
-            }
+          // Find the company index in the array
+          const companyIndex = parseInt(leadId.split('_')[1]); // Extract index from "batch_1_5" -> 5
+
+          if (companyIndex >= 0 && companyIndex < encodedCompanies.length) {
+            // Decode, update, and re-encode the company
+            const decodedCompany = JSON.parse(atob(encodedCompanies[companyIndex]));
+            const updatedCompany = {
+              ...decodedCompany,
+              ...updatedData,
+            };
+            encodedCompanies[companyIndex] = btoa(JSON.stringify(updatedCompany));
+
+            // Save back to Firestore
+            await setDoc(batchDocRef, {
+              ...batchData,
+              companies: encodedCompanies,
+            });
           }
-        } catch (error) {
-          console.error("Error updating bulk document:", error);
         }
-      };
-      updateBulkDocument();
-    } else {
-      // Update individual document
-      const updateIndividualDocument = async () => {
-        try {
-          await updateDoc(doc(db, "CompanyLeads", leadId), {
-            ...updatedData,
-            updatedAt: new Date().toISOString(),
-          });
-        } catch (error) {
-          console.error("Error updating individual document:", error);
-        }
-      };
-      updateIndividualDocument();
-    }
+      } catch (error) {
+        handleFirestoreIndexError(error, "company update");
+      }
+    };
+    updateCompany();
 
     // Update local state
     setLeads((prevLeads) =>
@@ -243,17 +358,6 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           : l
       )
     );
-  };
-
-  const handleBulkAddLeads = (newLeads) => {
-    setLeads((prevLeads) => [
-      ...newLeads.map(lead => ({
-        ...lead,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      })),
-      ...prevLeads,
-    ]);
   };
 
 
@@ -288,6 +392,8 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         onSearchChange={setSearchTerm}
         onAddLead={() => setShowAddLeadForm(true)}
         onBulkUpload={() => setShowBulkUploadForm(true)}
+        sortOrder={sortOrder}
+        onSortChange={setSortOrder}
       />
 
       <LeadsFilters
@@ -307,40 +413,73 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         onEditLead={handleEditLead}
       />
 
+      {/* Pagination Controls */}
+      <div className="flex justify-between items-center mt-4 px-4 py-3 bg-gray-50 rounded-lg">
+        <div className="text-sm text-gray-700">
+          Showing {leads.length} companies (Page {currentPage})
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1 || loading}
+            className="px-3 py-1 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Previous
+          </button>
+          <button
+            onClick={() => setCurrentPage(prev => prev + 1)}
+            disabled={!hasMore || loading}
+            className="px-3 py-1 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+
       {/* Lead Details Modal */}
       {showLeadDetails && (
         <LeadDetailsModal
           lead={selectedLead}
           onClose={() => setShowLeadDetails(false)}
           onAddContact={(leadId, contactData) => {
-            if (isBulkMode) {
-              // Update the bulk document
-              const updateBulkContacts = async () => {
-                try {
-                  const bulkDocRef = doc(db, "CompanyLeads", "bulk");
-                  const bulkDocSnap = await getDoc(bulkDocRef);
+            const updateContacts = async () => {
+              try {
+                const lead = leads.find((l) => l.id === leadId);
+                if (!lead || !lead.batchId) return;
 
-                  if (bulkDocSnap.exists()) {
-                    const companies = bulkDocSnap.data().companies;
-                    const leadIndex = parseInt(leadId.replace('bulk_', ''));
+                // Fetch the batch document
+                const batchDocRef = doc(db, "companyleads", lead.batchId);
+                const batchDocSnap = await getDoc(batchDocRef);
 
-                    if (leadIndex >= 0 && leadIndex < companies.length) {
-                      const existingContacts = companies[leadIndex].contacts || [];
-                      companies[leadIndex] = {
-                        ...companies[leadIndex],
-                        contacts: [...existingContacts, contactData],
-                        updatedAt: new Date().toISOString(),
-                      };
+                if (batchDocSnap.exists()) {
+                  const batchData = batchDocSnap.data();
+                  const encodedCompanies = batchData.companies || [];
 
-                      await setDoc(bulkDocRef, { companies });
-                    }
+                  // Find the company index in the array
+                  const companyIndex = parseInt(leadId.split('_')[1]); // Extract index from "batch_1_5" -> 5
+
+                  if (companyIndex >= 0 && companyIndex < encodedCompanies.length) {
+                    // Decode, update contacts, and re-encode the company
+                    const decodedCompany = JSON.parse(atob(encodedCompanies[companyIndex]));
+                    const existingContacts = decodedCompany.contacts || [];
+                    const updatedCompany = {
+                      ...decodedCompany,
+                      contacts: [...existingContacts, contactData],
+                    };
+                    encodedCompanies[companyIndex] = btoa(JSON.stringify(updatedCompany));
+
+                    // Save back to Firestore
+                    await setDoc(batchDocRef, {
+                      ...batchData,
+                      companies: encodedCompanies,
+                    });
                   }
-                } catch (error) {
-                  console.error("Error updating bulk contacts:", error);
                 }
-              };
-              updateBulkContacts();
-            }
+              } catch (error) {
+                handleFirestoreIndexError(error, "contact update");
+              }
+            };
+            updateContacts();
 
             setLeads(
               leads.map((lead) =>
@@ -386,7 +525,6 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       <BulkUploadModal
         show={showBulkUploadForm}
         onClose={() => setShowBulkUploadForm(false)}
-        onBulkAddLeads={handleBulkAddLeads}
       />
 
     </div>

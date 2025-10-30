@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { auth, db } from "../../../firebase";
-import { updateDoc, doc, serverTimestamp } from "firebase/firestore";
 import { XIcon } from "@heroicons/react/outline";
 
 const statusOptions = [
@@ -27,17 +25,17 @@ function EditLeadModal({ show, onClose, lead, onUpdateLead }) {
 
   useEffect(() => {
     if (lead && show) {
-      setCompanyName(lead.companyName || "");
+      setCompanyName(lead.companyName || lead.name || "");
       setIndustry(lead.industry || lead.sector || "");
-      setCompanySize((lead.companySize || lead.employeeCount || "").toString());
-      setCompanyWebsite(lead.companyWebsite || "");
-      setPocName(lead.pocName || "");
+      setCompanySize(String(lead.companySize || lead.employeeCount || ""));
+      setCompanyWebsite(lead.companyWebsite || lead.companyUrl || "");
+      setPocName(lead.pocName || lead.contactPerson || "");
       setWorkingSince(lead.workingSince || "");
-      setPocLocation(lead.pocLocation || "");
-      setPocPhone(lead.pocPhone || "");
-      setPocMail(lead.pocMail || "");
-      setPocDesignation(lead.pocDesignation || "");
-      setPocLinkedin(lead.pocLinkedin || "");
+      setPocLocation(lead.pocLocation || lead.location || "");
+      setPocPhone(String(lead.pocPhone || lead.phone || ""));
+      setPocMail(lead.pocMail || lead.email || "");
+      setPocDesignation(lead.pocDesignation || lead.designation || "");
+      setPocLinkedin(lead.pocLinkedin || lead.linkedinUrl || "");
       setStatus(lead.status ? lead.status.charAt(0).toUpperCase() + lead.status.slice(1) : "Warm");
       setHasUnsavedChanges(false);
     }
@@ -59,12 +57,6 @@ function EditLeadModal({ show, onClose, lead, onUpdateLead }) {
   };
 
   const handleUpdateCompany = async () => {
-    const user = auth.currentUser;
-    if (!user) {
-      alert("You must be logged in to update a company.");
-      return;
-    }
-
     if (!isFormValid) {
       alert("Please fill all required fields");
       return;
@@ -83,29 +75,20 @@ function EditLeadModal({ show, onClose, lead, onUpdateLead }) {
       pocDesignation,
       pocLinkedin,
       status: status.toLowerCase() || "warm",
-      updatedAt: serverTimestamp(),
+      updatedAt: new Date().toISOString(),
     };
 
-    try {
-      await updateDoc(doc(db, "CompanyLeads", lead.id), updatedCompany);
-      if (onUpdateLead) {
-        onUpdateLead(lead.id, updatedCompany);
-      }
-      onClose();
-    } catch (error) {
-      console.error("Error updating company:", error);
+    // Pass the updated data to the parent component for batch processing
+    if (onUpdateLead) {
+      onUpdateLead(lead.id, updatedCompany);
     }
+
+    onClose();
   };
 
   const isFormValid =
-    companyName.trim() &&
-    industry.trim() &&
-    companySize.trim() &&
-    pocName.trim() &&
-    workingSince.trim() &&
-    pocLocation.trim() &&
-    pocPhone.trim() &&
-    pocDesignation.trim();
+    (companyName || "").toString().trim() &&
+    (pocName || "").toString().trim();
 
   if (!show || !lead) return null;
 
@@ -140,7 +123,7 @@ function EditLeadModal({ show, onClose, lead, onUpdateLead }) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Industry <span className="text-red-500">*</span>
+                Industry
               </label>
               <input
                 type="text"
@@ -148,13 +131,12 @@ function EditLeadModal({ show, onClose, lead, onUpdateLead }) {
                 onChange={(e) => updateField(setIndustry, e.target.value)}
                 placeholder="e.g. IT Services"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                required
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Company Size <span className="text-red-500">*</span>
+                Company Size
               </label>
               <input
                 type="number"
@@ -162,7 +144,6 @@ function EditLeadModal({ show, onClose, lead, onUpdateLead }) {
                 onChange={(e) => updateField(setCompanySize, e.target.value)}
                 placeholder="e.g. 250"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                required
               />
             </div>
 
@@ -195,20 +176,19 @@ function EditLeadModal({ show, onClose, lead, onUpdateLead }) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Working Since <span className="text-red-500">*</span>
+                Working Since
               </label>
               <input
                 type="date"
                 value={workingSince}
                 onChange={(e) => updateField(setWorkingSince, e.target.value)}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                required
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                POC Location <span className="text-red-500">*</span>
+                POC Location
               </label>
               <input
                 type="text"
@@ -216,13 +196,12 @@ function EditLeadModal({ show, onClose, lead, onUpdateLead }) {
                 onChange={(e) => updateField(setPocLocation, e.target.value)}
                 placeholder="e.g. Mumbai"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                required
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                POC Phone <span className="text-red-500">*</span>
+                POC Phone
               </label>
               <input
                 type="text"
@@ -230,7 +209,6 @@ function EditLeadModal({ show, onClose, lead, onUpdateLead }) {
                 onChange={(e) => updateField(setPocPhone, e.target.value)}
                 placeholder="e.g. +91 9876543210"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                required
               />
             </div>
 
@@ -249,7 +227,7 @@ function EditLeadModal({ show, onClose, lead, onUpdateLead }) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                POC Designation <span className="text-red-500">*</span>
+                POC Designation
               </label>
               <input
                 type="text"
@@ -257,7 +235,6 @@ function EditLeadModal({ show, onClose, lead, onUpdateLead }) {
                 onChange={(e) => updateField(setPocDesignation, e.target.value)}
                 placeholder="e.g. HR Manager"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                required
               />
             </div>
 

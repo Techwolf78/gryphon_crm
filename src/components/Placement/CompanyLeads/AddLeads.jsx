@@ -70,41 +70,71 @@ function AddLeads({ show, onClose, onAddLead }) {
       return;
     }
 
-    const newCompany = {
-      companyName,
+    // Convert to the format expected by the batch system
+    const companyData = {
+      name: companyName,
+      contactPerson: pocName,
+      designation: pocDesignation,
+      phone: pocPhone,
+      companyUrl: companyWebsite,
+      linkedinUrl: pocLinkedin,
+      email: pocMail,
+      location: pocLocation,
       industry: sector,
-      companySize: employeeCount ? parseInt(employeeCount) : 0,
-      companyWebsite,
-      pocName,
-      workingSince,
-      pocLocation,
-      pocPhone,
-      pocMail,
-      pocDesignation,
-      pocLinkedin,
+      companySize: employeeCount,
+      source: "Manual Add",
+      notes: "",
       status: status.toLowerCase() || "warm",
-      assignedTo: {
-        uid: user.uid,
-        name: user.displayName?.trim() || "No Name Provided",
-        email: user.email || "No Email Provided",
-      },
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+      contacts: []
     };
 
     try {
-      const docRef = await addDoc(collection(db, "CompanyLeads"), newCompany);
+      // Create a new batch document with this single company
+      const batchData = {
+        companies: [btoa(JSON.stringify(companyData))],
+        uploadedBy: user.uid,
+        uploadedAt: serverTimestamp(),
+        batchSize: 1,
+        source: "manual_add"
+      };
+
+      // Add to companyleads collection
+      const docRef = await addDoc(collection(db, "companyleads"), batchData);
+
+      // Create the lead object for local state update
+      const newLead = {
+        id: `${docRef.id}_0`, // First (and only) company in this batch
+        batchId: docRef.id,
+        ...companyData,
+        // Map fields for UI compatibility
+        companyName: companyData.name,
+        pocName: companyData.contactPerson,
+        pocDesignation: companyData.designation,
+        pocPhone: companyData.phone,
+        companyUrl: companyData.companyUrl,
+        companyWebsite: companyData.companyUrl,
+        linkedinUrl: companyData.linkedinUrl,
+        pocLinkedin: companyData.linkedinUrl,
+        pocMail: companyData.email || '',
+        pocLocation: companyData.location || '',
+        industry: companyData.industry,
+        companySize: companyData.companySize,
+        source: companyData.source,
+        notes: companyData.notes,
+        status: companyData.status,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        contacts: []
+      };
+
       if (onAddLead) {
-        onAddLead({
-          id: docRef.id,
-          ...newCompany,
-          createdAt: new Date().toISOString(),
-        });
+        onAddLead(newLead);
       }
       resetForm();
       onClose();
     } catch (error) {
       console.error("Error adding company:", error);
+      alert("Failed to add company. Please try again.");
     }
   };
 

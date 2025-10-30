@@ -49,25 +49,25 @@ function LeadsTable({
       <table className="min-w-full divide-y divide-gray-200 border border-gray-300">
         <thead className="bg-gradient-to-r from-blue-500 via-indigo-600 to-indigo-700 text-white">
           <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider border border-gray-300">
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 min-w-[150px]">
               Company Name
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider border border-gray-300">
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 min-w-[120px]">
               Contact Person
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider border border-gray-300">
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 min-w-[120px]">
               Designation
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider border border-gray-300">
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 min-w-[120px]">
               Contact Details
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider border border-gray-300">
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 min-w-[150px]">
               email ID
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider border border-gray-300">
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 min-w-[120px]">
               LinkedIn Profile
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider border border-gray-300">
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-20">
               Actions
             </th>
           </tr>
@@ -80,7 +80,7 @@ function LeadsTable({
                 className="hover:bg-gray-50 cursor-pointer"
                 onClick={() => onLeadClick(lead)}
               >
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 border border-gray-300">
+                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[150px]">
                   {lead.companyWebsite ? (
                     <a
                       href={lead.companyWebsite.startsWith('http') ? lead.companyWebsite : `https://${lead.companyWebsite}`}
@@ -95,19 +95,19 @@ function LeadsTable({
                     lead.companyName || "N/A"
                   )}
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 border border-gray-300">
+                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[120px]">
                   {lead.pocName || "N/A"}
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 border border-gray-300">
+                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[120px]">
                   {lead.pocDesignation || "N/A"}
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 border border-gray-300">
+                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[120px]">
                   {lead.pocPhone || "N/A"}
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 border border-gray-300">
+                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[150px]">
                   {lead.pocMail || "N/A"}
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 border border-gray-300">
+                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[120px]">
                   {lead.pocLinkedin ? (
                     <a
                       href={lead.pocLinkedin}

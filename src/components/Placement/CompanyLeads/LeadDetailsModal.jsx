@@ -1,6 +1,10 @@
 import React, { useState } from "react";
 import { XIcon, PlusIcon } from "@heroicons/react/outline";
-import { updateDoc, doc, arrayUnion } from "firebase/firestore";
+import {
+  getDoc,
+  doc,
+  setDoc,
+} from "firebase/firestore";
 import { db } from "../../../firebase";
 
 const LeadDetailsModal = ({
@@ -46,22 +50,56 @@ const LeadDetailsModal = ({
         addedAt: new Date().toISOString()
       };
 
-      await updateDoc(doc(db, "CompanyLeads", lead.id), {
-        contacts: arrayUnion(contactData),
-        updatedAt: new Date().toISOString()
-      });
+      if (!lead.groupId) {
+        console.error("Lead does not have groupId");
+        return;
+      }
 
-      onAddContact(lead.id, contactData);
+      // Fetch the group document
+      const groupDocRef = doc(db, "companyGroups", lead.groupId);
+      const groupDocSnap = await getDoc(groupDocRef);
 
-      setNewContact({
-        name: '',
-        email: '',
-        phone: '',
-        location: '',
-        designation: '',
-        linkedin: ''
-      });
-      setShowAddContactForm(false);
+      if (groupDocSnap.exists()) {
+        const groupData = groupDocSnap.data();
+        const companies = groupData.companies || [];
+        
+        // Find the company index in the array
+        const companyIndex = companies.findIndex((company, index) => 
+          `${lead.groupId}_${index}` === lead.id
+        );
+
+        if (companyIndex >= 0) {
+          // Update the company contacts
+          const existingContacts = companies[companyIndex].contacts || [];
+          companies[companyIndex] = {
+            ...companies[companyIndex],
+            contacts: [...existingContacts, contactData],
+            updatedAt: new Date().toISOString(),
+          };
+
+          // Save back to Firestore
+          await setDoc(groupDocRef, {
+            ...groupData,
+            companies,
+          });
+
+          onAddContact(lead.id, contactData);
+
+          setNewContact({
+            name: '',
+            email: '',
+            phone: '',
+            location: '',
+            designation: '',
+            linkedin: ''
+          });
+          setShowAddContactForm(false);
+        } else {
+          console.error("Company not found in group");
+        }
+      } else {
+        console.error("Group document not found");
+      }
 
     } catch (error) {
       console.error("Error adding contact:", error);

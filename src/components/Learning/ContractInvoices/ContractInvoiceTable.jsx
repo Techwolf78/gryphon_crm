@@ -196,31 +196,8 @@ export default function ContractInvoiceTable() {
     let numAmount = Number(amount);
     if (isNaN(numAmount)) return "₹0";
 
-    // For amounts less than 1 lakh, show regular formatting
-    if (numAmount < 100000) {
-      return "₹" + new Intl.NumberFormat('en-IN').format(numAmount);
-    }
-
-    // For amounts >= 1 lakh, use abbreviations with 2 decimal places for precision
-    if (numAmount >= 10000000000) { // 1000 Cr and above
-      const value = Math.round((numAmount / 10000000) * 100) / 100;
-      return `₹${value.toFixed(2)}K Cr`;
-    } else if (numAmount >= 1000000000) { // 100 Cr to 999 Cr
-      const value = Math.round((numAmount / 10000000) * 100) / 100;
-      return `₹${value.toFixed(2)} Cr`;
-    } else if (numAmount >= 100000000) { // 10 Cr to 99 Cr
-      const value = Math.round((numAmount / 10000000) * 100) / 100;
-      return `₹${value.toFixed(2)} Cr`;
-    } else if (numAmount >= 10000000) { // 1 Cr to 9.9 Cr
-      const value = Math.round((numAmount / 10000000) * 100) / 100;
-      return `₹${value.toFixed(2)} Cr`;
-    } else if (numAmount >= 1000000) { // 10 Lakh to 99 Lakh
-      const value = Math.round((numAmount / 100000) * 100) / 100;
-      return `₹${value.toFixed(2)} Lakh`;
-    } else { // 1 Lakh to 9.9 Lakh
-      const value = Math.round((numAmount / 100000) * 100) / 100;
-      return `₹${value.toFixed(2)} Lakh`;
-    }
+    // Always show exact amount with Indian number formatting, no abbreviations
+    return "₹" + new Intl.NumberFormat('en-IN').format(numAmount);
   };
 
   const toggleExpand = (id) => {
@@ -873,12 +850,8 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
   const installmentIndex = contract.paymentDetails.findIndex(p => p === installment);
   const adjustedTotalAmount = getAdjustedInstallmentAmount(contract, installment, installmentIndex);
   
-  // ✅ USE ROUNDED AMOUNT THAT MATCHES DASHBOARD DISPLAY
-  // Round the total amount to match the "round figured" display
-  const roundedTotalAmount = Math.round(adjustedTotalAmount / 1000) * 1000; // Round to nearest 1000
-  
-  // Use the rounded amount
-  totalAmount = roundedTotalAmount;
+  // Use the exact amount without rounding
+  totalAmount = adjustedTotalAmount;
   baseAmount = formData.invoiceType === "Cash Invoice" ? totalAmount : Math.round(totalAmount / 1.18);
   gstAmount = formData.invoiceType === "Cash Invoice" ? 0 : totalAmount - baseAmount;
 
@@ -1200,14 +1173,10 @@ const handleMergeSubmit = async (formData) => {
     // Use first contract for common details
     const firstContract = selectedContractsForMerge[0];
 
-    // ✅ USE ROUNDED AMOUNT THAT MATCHES DASHBOARD DISPLAY
-    // Round the total amount to match the "round figured" display
-    const roundedTotalAmount = Math.round(totalInstallmentAmount / 1000) * 1000; // Round to nearest 1000
-    
-    // Calculate base amount from rounded total
+    // Use exact amounts without rounding
     const totalBaseAmount = formData.invoiceType === "Cash Invoice" 
-      ? roundedTotalAmount 
-      : Math.round(roundedTotalAmount / 1.18);
+      ? totalInstallmentAmount 
+      : Math.round(totalInstallmentAmount / 1.18);
     
     // ✅ Cash aur Tax ke liye alag GST calculation
     let gstAmount = 0;
@@ -1224,8 +1193,8 @@ const handleMergeSubmit = async (formData) => {
       netPayableAmount = totalBaseAmount + gstAmount;
     }
 
-    // Final amount ko bhi round karo to match dashboard display
-    const finalNetPayableAmount = Math.round(netPayableAmount / 1000) * 1000; // Round to nearest 1000
+    // Use exact final amount without rounding
+    const finalNetPayableAmount = netPayableAmount;
 
     const mergedInvoiceData = {
       ...formData,

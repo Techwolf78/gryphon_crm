@@ -1,15 +1,12 @@
 import React, { useState } from "react";
 import { XIcon, CloudUploadIcon } from "@heroicons/react/outline";
 import * as XLSX from 'xlsx';
-import { auth, db } from "../../../firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { uploadCompaniesFromExcel } from '../../../utils/excelUpload';
 
 function BulkUploadModal({ show, onClose }) {
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [currentGroup, setCurrentGroup] = useState(0);
-  const [totalGroups, setTotalGroups] = useState(0);
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
@@ -17,12 +14,19 @@ function BulkUploadModal({ show, onClose }) {
 
   const handleDownloadTemplate = () => {
     const headers = [
-      'Company Name',
-      'Contact Person', 
+      'CompanyName',
+      'ContactPerson',
       'Designation',
-      'Contact Details',
-      'email ID',
-      'LinkedIn Profile'
+      'Phone',
+      'CompanyUrl',
+      'LinkedinUrl',
+      'Email', // Optional
+      'Location', // Optional
+      'Industry', // Optional
+      'CompanySize', // Optional
+      'Source', // Optional
+      'Notes', // Optional
+      'Status' // Optional (hot, warm, cold, onboarded)
     ];
 
     const worksheet = XLSX.utils.aoa_to_sheet([headers]);
@@ -37,118 +41,30 @@ function BulkUploadModal({ show, onClose }) {
 
     setUploading(true);
     setProgress(0);
-    setCurrentGroup(0);
 
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const data = new Uint8Array(e.target.result);
-      const workbook = XLSX.read(data, { type: 'array' });
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet).filter(row => 
-        row['Company Name'] && row['Company Name'].toString().trim() !== ''
-      );
+    try {
+      console.log("🚀 Starting Excel upload process...");
 
-      const chunkSize = 2000; // Modify this value to change chunk size
-      const chunks = [];
-      for (let i = 0; i < jsonData.length; i += chunkSize) {
-        chunks.push(jsonData.slice(i, i + chunkSize));
-      }
+      // Use the new uploadCompaniesFromExcel function
+      const result = await uploadCompaniesFromExcel(file, (progressPercent) => {
+        setProgress(progressPercent);
+      });
 
-      setTotalGroups(chunks.length);
+      console.log("🎊 Upload completed successfully!");
+      console.log(`📈 Summary: ${result.totalCompanies} companies uploaded in ${result.totalBatches} batches`);
 
-      // Calculate total writes: 1 per group document + 1 per company for index
-      const totalWrites = chunks.length + jsonData.length;
-      const dailyLimit = 20000; // Firestore free tier daily write limit
+      setProgress(100);
+      alert(`Successfully uploaded ${result.totalCompanies} companies in ${result.totalBatches} batches!`);
 
-      if (totalWrites > dailyLimit) {
-        const confirmed = window.confirm(
-          `⚠️ WARNING: This upload will create ${totalWrites.toLocaleString()} writes, which exceeds the Firestore daily limit of ${dailyLimit.toLocaleString()} writes.\n\n` +
-          `Details:\n` +
-          `- ${chunks.length} group documents (${chunks.length} writes)\n` +
-          `- ${jsonData.length} index entries (${jsonData.length.toLocaleString()} writes)\n\n` +
-          `Free tier: 20,000 writes/day. Consider upgrading to Blaze plan.\n\n` +
-          `Are you sure you want to proceed? This may cause quota exhaustion.`
-        );
-        if (!confirmed) {
-          setUploading(false);
-          return;
-        }
-      }
-
-      const user = auth.currentUser;
-      if (!user) {
-        alert("You must be logged in to upload companies.");
-        setUploading(false);
-        return;
-      }
-
-      let uploadedGroups = 0;
-
-      for (let i = 0; i < chunks.length; i++) {
-        setCurrentGroup(i + 1);
-        const chunk = chunks[i];
-
-        const companies = chunk.map(row => ({
-          companyName: row['Company Name'] || '',
-          industry: '', // Not provided
-          companySize: 0, // Not provided
-          companyWebsite: '', // Not provided
-          pocName: row['Contact Person'] || '',
-          workingSince: '', // Not provided
-          pocLocation: '', // Not provided
-          pocPhone: row['Contact Details'] || '',
-          pocMail: row['email ID'] || '',
-          pocDesignation: row['Designation'] || '',
-          pocLinkedin: row['LinkedIn Profile'] || '',
-          status: 'warm', // Default
-          assignedTo: {
-            uid: user.uid,
-            name: user.displayName?.trim() || "No Name Provided",
-            email: user.email || "No Email Provided",
-          },
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          contacts: [],
-        }));
-
-        try {
-          // Upload chunk as one document in "companyGroups" collection
-          const docRef = await addDoc(collection(db, "companyGroups"), {
-            companies,
-            uploadedBy: user.uid,
-            uploadedAt: serverTimestamp(),
-          });
-
-          // Optional: Create index entries for queryability
-          for (const company of companies) {
-            await addDoc(collection(db, "companyIndex"), {
-              companyName: company.companyName,
-              groupId: docRef.id,
-            });
-          }
-
-          uploadedGroups++;
-          setProgress(Math.round((uploadedGroups / chunks.length) * 100));
-
-          // Add delay between uploads to avoid rate limits
-          if (i < chunks.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 200));
-          }
-        } catch (error) {
-          console.error("Error uploading chunk:", error);
-          alert(`Upload failed for group ${i + 1}: ${error.message}`);
-          setUploading(false);
-          return;
-        }
-      }
-
-      alert(`Successfully uploaded ${jsonData.length} companies in ${chunks.length} groups!`);
       setUploading(false);
       setFile(null);
       onClose();
-    };
-    reader.readAsArrayBuffer(file);
+
+    } catch (error) {
+      console.error("❌ Upload failed:", error);
+      alert(`Upload failed: ${error.message}`);
+      setUploading(false);
+    }
   };
 
   if (!show) return null;
@@ -196,30 +112,44 @@ function BulkUploadModal({ show, onClose }) {
                 ></div>
               </div>
               <p className="text-sm text-gray-600 mt-1">
-                Uploading group {currentGroup} of {totalGroups} ({progress}%)
+                Processing Excel file... ({progress}%)
               </p>
             </div>
           )}
 
           <div className="text-sm text-gray-600 mb-4">
             <p><strong>Expected columns:</strong></p>
-            <ul className="list-disc list-inside">
-              <li>Company Name</li>
-              <li>Contact Person</li>
-              <li>Designation</li>
-              <li>Contact Details</li>
-              <li>email ID</li>
-              <li>LinkedIn Profile</li>
-            </ul>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+              <div>
+                <p className="font-medium text-green-700">Required:</p>
+                <ul className="list-disc list-inside text-xs">
+                  <li>CompanyName</li>
+                  <li>ContactPerson</li>
+                  <li>Designation</li>
+                  <li>Phone</li>
+                  <li>CompanyUrl</li>
+                  <li>LinkedinUrl</li>
+                </ul>
+              </div>
+              <div>
+                <p className="font-medium text-blue-700">Optional:</p>
+                <ul className="list-disc list-inside text-xs">
+                  <li>Email</li>
+                  <li>Location</li>
+                  <li>Industry</li>
+                  <li>CompanySize</li>
+                  <li>Source</li>
+                  <li>Notes</li>
+                  <li>Status (hot/warm/cold/onboarded)</li>
+                </ul>
+              </div>
+            </div>
             <p className="mt-2 text-xs text-red-600 font-medium">
-              ⚠️ Each group of ~2000 companies creates:<br/>
-              - 1 write for the group document<br/>
-              - 2000 writes for index entries<br/>
-              = ~2001 writes per group<br/><br/>
-              For 58,000 companies: ~29 groups × 2001 = ~58,029 writes<br/><br/>
-              Free tier: 20,000 writes/day. System will warn if exceeded.<br/>
-              Consider upgrading to Blaze plan for large uploads.<br/><br/>
-              💡 Modify chunkSize in code to change group size.
+              ⚠️ Each batch of ~2000 companies creates:<br/>
+              - 1 write per batch document<br/><br/>
+              For 58,000 companies: ~29 batches × 1 = 29 writes<br/><br/>
+              Free tier: 20,000 writes/day. This upload is well within limits.<br/><br/>
+              💡 Uses Base64 encoding for efficient storage.
             </p>
             
             <p className="mt-2 text-xs text-gray-500">

@@ -36,12 +36,10 @@ useEffect(() => {
       return sum + students;
     }, 0);
 
-    // ✅ Calculate amounts that will actually be stored in Firebase (with rounding)
-    // This matches the logic in handleMergeSubmit
-    const roundedTotalAmount = Math.round(calculatedTotal / 1000) * 1000; // Round to nearest 1000
-    
-    // Calculate base amount from rounded total
-    const totalBaseAmount = Math.round(roundedTotalAmount / 1.18);
+    // ✅ Calculate exact amounts without rounding
+    const totalBaseAmount = invoiceType === 'Cash Invoice' 
+      ? calculatedTotal 
+      : Math.round(calculatedTotal / 1.18);
     
     // ✅ Cash aur Tax ke liye alag GST calculation
     let gstAmount = 0;
@@ -50,7 +48,7 @@ useEffect(() => {
     if (invoiceType === 'Cash Invoice') {
       // ✅ Cash Invoice: Base Amount same, GST = 0, Total = Base Amount
       gstAmount = 0;
-      netPayableAmount = roundedTotalAmount;
+      netPayableAmount = calculatedTotal;
     } else {
       // ✅ Tax Invoice: Base Amount calculated, GST calculate karo
       const gstRate = 0.18;
@@ -58,14 +56,14 @@ useEffect(() => {
       netPayableAmount = totalBaseAmount + gstAmount;
     }
 
-    // Final amount ko bhi round karo to match dashboard display
-    const finalNetPayableAmount = Math.round(netPayableAmount / 1000) * 1000; // Round to nearest 1000
+    // Use exact final amount without rounding
+    const finalNetPayableAmount = netPayableAmount;
 
     // ✅ Store the actual amounts that will be saved in Firebase
     setTotalAmount(finalNetPayableAmount);
     setTotalStudents(calculatedStudents);
     
-    // ✅ BASE AMOUNT calculation - use the rounded amounts that will be stored
+    // ✅ BASE AMOUNT calculation - use the exact amounts that will be stored
     const calculatedBaseAmount = invoiceType === 'Cash Invoice' ? finalNetPayableAmount : totalBaseAmount;
     const calculatedGstAmount = invoiceType === 'Cash Invoice' ? 0 : gstAmount;
     

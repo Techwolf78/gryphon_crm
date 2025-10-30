@@ -1,6 +1,6 @@
-import { PlusIcon, CloudUploadIcon } from "@heroicons/react/outline";
+import { PlusIcon, CloudUploadIcon, SortAscendingIcon, SortDescendingIcon } from "@heroicons/react/outline";
 
-const LeadsHeader = ({ searchTerm, setSearchTerm, onAddLead, onBulkUpload }) => {
+const LeadsHeader = ({ searchTerm, setSearchTerm, onAddLead, onBulkUpload, sortOrder, onSortChange }) => {
   return (
     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
       <div className="w-full md:max-w-xs">
@@ -13,6 +13,17 @@ const LeadsHeader = ({ searchTerm, setSearchTerm, onAddLead, onBulkUpload }) => 
         />
       </div>
       <div className="flex gap-2 w-full md:w-auto">
+        <button
+          onClick={() => onSortChange(sortOrder === "asc" ? "desc" : "asc")}
+          className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg font-semibold flex items-center justify-center hover:bg-gray-200 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+          title={`Sort ${sortOrder === "asc" ? "Descending" : "Ascending"}`}
+        >
+          {sortOrder === "asc" ? (
+            <SortAscendingIcon className="h-5 w-5" />
+          ) : (
+            <SortDescendingIcon className="h-5 w-5" />
+          )}
+        </button>
         <button
           onClick={onAddLead}
           className="flex-1 md:flex-none px-4 py-2 text-white rounded-lg font-semibold flex items-center justify-center focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md relative overflow-hidden"
