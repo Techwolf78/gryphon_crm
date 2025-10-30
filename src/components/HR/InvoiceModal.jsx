@@ -765,7 +765,7 @@ const handleCancelEdit = () => {
         >
           <option value="Training Services">Training Services</option>
           <option value="Placement Services">Placement Services</option>
-        
+          <option value="Digital Marketing Services">Digital Marketing Services</option>
         </select>
         <span className="ml-2">
           - {invoice.installment || ""}
