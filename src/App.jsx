@@ -33,6 +33,7 @@ const NotFound = React.lazy(() => import("./pages/NotFound"));
 const Roadmap = React.lazy(() => import("./pages/Roadmap"));
 const PublicInvoiceDetails = React.lazy(() => import("./pages/PublicInvoiceDetails"));
 const Maintenance = React.lazy(() => import("./pages/Maintenance"));
+const UploadStudentData = React.lazy(() => import("./components/Placement/AddJd/UploadStudentData")); // ✅ Space removed
 
 // Loading component
 const PageLoader = () => (
@@ -51,6 +52,9 @@ const AppContent = () => {
   // Maintenance mode - show maintenance page for all routes
   const isMaintenanceMode = false;
 
+  // Routes where navbar should not appear
+  const hideNavbarRoutes = ['/404', '/upload-student-data'];
+
   if (isMaintenanceMode) {
     return (
       <Suspense fallback={<PageLoader />}>
@@ -61,13 +65,16 @@ const AppContent = () => {
 
   return (
     <>
-      {location.pathname !== "/404" && <Navbar />}
+      {!hideNavbarRoutes.includes(location.pathname) && <Navbar />}
       <SessionManager />
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/invoice/*" element={<PublicInvoiceDetails />} />
+          
+          {/* Public route for college data upload */}
+          <Route path="/upload-student-data" element={<UploadStudentData />} />
 
           <Route
             path="/dashboard"
@@ -99,7 +106,9 @@ const AppContent = () => {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
-      {location.pathname === "/" && (
+      
+      {/* Show footer only on home page and upload page */}
+      {(location.pathname === "/" || location.pathname === "/upload-student-data") && (
         <Suspense fallback={<div>Loading footer...</div>}>
           <Footer />
         </Suspense>
@@ -131,4 +140,3 @@ const App = () => (
 );
  
 export default App;
- 
