@@ -26,7 +26,8 @@ function CompanyTable({
   setSelectedCompany,
   dropdownOpen,
   setDropdownOpen,
-  setShowJDForm
+  setShowJDForm,
+  updateCompanyStatus
 }) {
   return (
     <div className="mt-2 space-y-2">
@@ -117,7 +118,7 @@ function CompanyTable({
                 companyData={company}
                 closeDropdown={() => setDropdownOpen(null)}
                 setSelectedCompany={setSelectedCompany}
-                updateCompanyStatus={() => {}}
+                updateCompanyStatus={updateCompanyStatus}
                 activeTab={activeTab}
               />
             )}
