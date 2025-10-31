@@ -188,35 +188,41 @@ function FiltersSection({
           </div>
         </div>
 
-        {/* Active-only toggle (label - switch - status) and Refresh Button */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-700">
-            Only active invoices
-          </span>
-
-          <button
-            role="switch"
-            aria-checked={showOnlyActive}
-            onClick={() => setShowOnlyActive((s) => !s)}
-            className={`relative inline-flex items-center h-5 w-9 rounded-full transition-colors focus:outline-none ${
-              showOnlyActive ? "bg-blue-600" : "bg-gray-300"
-            }`}
-            aria-label="Toggle show only active invoices"
-          >
-            <span
-              className={`inline-block h-4 w-4 transform bg-white rounded-full transition-transform ${
-                showOnlyActive ? "translate-x-4" : "translate-x-0.5"
+        {/* Invoice filter toggle buttons */}
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-gray-700 mr-1">Invoice Status:</span>
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+            <button
+              onClick={() => setShowOnlyActive('all')}
+              className={`px-2 py-1 text-xs font-medium transition-all ${
+                showOnlyActive === 'all'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-50'
               }`}
-            />
-          </button>
-
-          <span
-            className={`text-xs font-medium ${
-              showOnlyActive ? "text-blue-600" : "text-gray-500"
-            }`}
-          >
-            {showOnlyActive ? "ON" : "OFF"}
-          </span>
+            >
+              All
+            </button>
+            <button
+              onClick={() => setShowOnlyActive('active')}
+              className={`px-2 py-1 text-xs font-medium transition-all ${
+                showOnlyActive === 'active'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              Active
+            </button>
+            <button
+              onClick={() => setShowOnlyActive('generated')}
+              className={`px-2 py-1 text-xs font-medium transition-all ${
+                showOnlyActive === 'generated'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              Generated
+            </button>
+          </div>
 
           <InvoiceExcelExporter 
             db={db} 

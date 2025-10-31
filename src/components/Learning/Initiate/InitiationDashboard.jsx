@@ -309,9 +309,9 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
   // Filter L&D users for assignment (include Admin users if current user is Admin)
   const ldUsers = useMemo(() => {
     // If current user is Admin, show both L&D and Admin users
-    if ((user?.department || "").toLowerCase() === "admin") {
+    if (String(user?.department || "").toLowerCase() === "admin") {
       return availableUsers.filter((u) => {
-        const departmentFilter = (u.department || "").toLowerCase();
+        const departmentFilter = String(u.department || "").toLowerCase();
         const isLdUser =
           departmentFilter === "l & d" || departmentFilter.includes("learning");
         const isAdminUser = departmentFilter === "admin";
@@ -321,7 +321,7 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
 
     // Otherwise, show only L&D users
     return availableUsers.filter((u) => {
-      const departmentFilter = (u.department || "").toLowerCase();
+      const departmentFilter = String(u.department || "").toLowerCase();
       return (
         departmentFilter === "l & d" || departmentFilter.includes("learning")
       );
@@ -620,9 +620,9 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
   const filteredTrainings = trainings.filter((training) => {
     const matchesSearch =
       searchTerm === "" ||
-      training.collegeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ( (training.projectCode || training.collegeCode || "").toLowerCase().includes(searchTerm.toLowerCase()) ) ||
-      training.domain.toLowerCase().includes(searchTerm.toLowerCase());
+      String(training.collegeName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String((training.projectCode || training.collegeCode || "")).toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(training.domain || "").toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesPhase =
       filterPhase === "all" || training.phaseId === filterPhase;
@@ -1920,7 +1920,7 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
                                                 style={{ minWidth: 200 }}
                                               >
                                                 <div className="px-3 py-1 text-xs text-gray-500">
-                                                  {(
+                                                  {String(
                                                     user?.department || ""
                                                   ).toLowerCase() === "admin"
                                                     ? "L&D & Admin Users"

@@ -166,7 +166,8 @@ export default function HRBillsTour({ userId, enabled = true }) {
 
     // If a target is missing (e.g., conditional UI), continue gracefully
     if (type === EVENTS.TARGET_NOT_FOUND) {
-      // continue to next step
+      // Force next step to skip missing targets
+      return { action: 'next' };
     }
   };
 

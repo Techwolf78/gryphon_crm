@@ -21,13 +21,20 @@ const RowClickModal = ({ installment, invoice, contract, onClose }) => {
 
   const getPaymentAmounts = () => {
     const totalAmount = installment.totalAmount || 0;
-    const baseAmount = totalAmount / 1.18;
-    const gstAmount = totalAmount - baseAmount;
+
+    // ✅ USE ROUNDED AMOUNT THAT MATCHES WHAT WILL BE STORED IN FIREBASE
+    // Round the total amount to nearest 1000 (same as invoice generation logic)
+    const roundedTotalAmount = Math.round(totalAmount / 1000) * 1000;
+
+    // Calculate base amount from rounded total (same as invoice generation)
+    const baseAmount = Math.round(roundedTotalAmount / 1.18);
+    const gstAmount = roundedTotalAmount - baseAmount;
 
     return {
-      baseAmount: Math.round(baseAmount),
-      gstAmount: Math.round(gstAmount),
-      totalAmount: totalAmount,
+      baseAmount: baseAmount,
+      gstAmount: gstAmount,
+      totalAmount: roundedTotalAmount,
+      originalTotalAmount: totalAmount, // Keep original for reference
     };
   };
 
@@ -68,8 +75,7 @@ const RowClickModal = ({ installment, invoice, contract, onClose }) => {
         month: "2-digit",
         year: "numeric",
       });
-    } catch (error) {
-
+    } catch {
       return "Invalid Date";
     }
   };
@@ -335,6 +341,11 @@ const RowClickModal = ({ installment, invoice, contract, onClose }) => {
                                       {studentCount && ` for ${studentCount} students`}
                                       {perStudentCost && ` @${perStudentCost} per student`}
                                       {amounts.gstAmount > 0 && ` + 18% GST`}
+                                      {amounts.originalTotalAmount !== amounts.totalAmount && (
+                                        <span className="block mt-1 text-amber-600 font-medium">
+                                          Note: Amount will be rounded to nearest ₹1000 for invoice generation
+                                        </span>
+                                      )}
                                     </>
                                   );
                                 } else {
@@ -345,6 +356,11 @@ const RowClickModal = ({ installment, invoice, contract, onClose }) => {
                                       {studentCount && ` for ${studentCount} students`}
                                       {perStudentCost && ` @${perStudentCost} per student`}
                                       {amounts.gstAmount > 0 && ` + 18% GST`}
+                                      {amounts.originalTotalAmount !== amounts.totalAmount && (
+                                        <span className="block mt-1 text-amber-600 font-medium">
+                                          Note: Amount will be rounded to nearest ₹1000 for invoice generation
+                                        </span>
+                                      )}
                                     </>
                                   );
                                 }
@@ -374,6 +390,11 @@ const RowClickModal = ({ installment, invoice, contract, onClose }) => {
                               minimumFractionDigits: 2,
                             })}
                           </span>
+                          {amounts.originalTotalAmount !== amounts.totalAmount && (
+                            <div className="text-xs text-slate-500 mt-1">
+                              (Will be rounded to ₹{amounts.totalAmount.toLocaleString("en-IN")})
+                            </div>
+                          )}
                         </td>
                       </tr>
                     </tbody>

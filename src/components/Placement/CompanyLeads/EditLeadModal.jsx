@@ -1,6 +1,4 @@
-import React, { useState } from "react";
-import { auth, db } from "../../../firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import React, { useState, useEffect } from "react";
 import { XIcon } from "@heroicons/react/outline";
 
 const statusOptions = [
@@ -10,10 +8,10 @@ const statusOptions = [
   "Onboarded",
 ];
 
-function AddLeads({ show, onClose, onAddLead }) {
+function EditLeadModal({ show, onClose, lead, onUpdateLead }) {
   const [companyName, setCompanyName] = useState("");
-  const [sector, setSector] = useState("");
-  const [employeeCount, setEmployeeCount] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [companySize, setCompanySize] = useState("");
   const [companyWebsite, setCompanyWebsite] = useState("");
   const [pocName, setPocName] = useState("");
   const [workingSince, setWorkingSince] = useState("");
@@ -25,7 +23,24 @@ function AddLeads({ show, onClose, onAddLead }) {
   const [status, setStatus] = useState("Warm");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // Update all state setters to track changes
+  useEffect(() => {
+    if (lead && show) {
+      setCompanyName(lead.companyName || lead.name || "");
+      setIndustry(lead.industry || lead.sector || "");
+      setCompanySize(String(lead.companySize || lead.employeeCount || ""));
+      setCompanyWebsite(lead.companyWebsite || lead.companyUrl || "");
+      setPocName(lead.pocName || lead.contactPerson || "");
+      setWorkingSince(lead.workingSince || "");
+      setPocLocation(lead.pocLocation || lead.location || "");
+      setPocPhone(String(lead.pocPhone || lead.phone || ""));
+      setPocMail(lead.pocMail || lead.email || "");
+      setPocDesignation(lead.pocDesignation || lead.designation || "");
+      setPocLinkedin(lead.pocLinkedin || lead.linkedinUrl || "");
+      setStatus(lead.status ? lead.status.charAt(0).toUpperCase() + lead.status.slice(1) : "Warm");
+      setHasUnsavedChanges(false);
+    }
+  }, [lead, show]);
+
   const updateField = (setter, value) => {
     setHasUnsavedChanges(true);
     setter(value);
@@ -38,123 +53,50 @@ function AddLeads({ show, onClose, onAddLead }) {
     ) {
       return;
     }
-    resetForm();
     onClose();
   };
 
-  const resetForm = () => {
-    setCompanyName("");
-    setSector("");
-    setEmployeeCount("");
-    setCompanyWebsite("");
-    setPocName("");
-    setWorkingSince("");
-    setPocLocation("");
-    setPocPhone("");
-    setPocMail("");
-    setPocDesignation("");
-    setPocLinkedin("");
-    setStatus("Warm");
-    setHasUnsavedChanges(false);
-  };
-
-  const handleAddCompany = async () => {
-    const user = auth.currentUser;
-    if (!user) {
-      alert("You must be logged in to add a company.");
-      return;
-    }
-
+  const handleUpdateCompany = async () => {
     if (!isFormValid) {
       alert("Please fill all required fields");
       return;
     }
 
-    // Convert to the format expected by the batch system
-    const companyData = {
-      name: companyName,
-      contactPerson: pocName,
-      designation: pocDesignation,
-      phone: pocPhone,
-      companyUrl: companyWebsite,
-      linkedinUrl: pocLinkedin,
-      email: pocMail,
-      location: pocLocation,
-      industry: sector,
-      companySize: employeeCount,
-      source: "Manual Add",
-      notes: "",
+    const updatedCompany = {
+      companyName,
+      industry,
+      companySize: companySize ? parseInt(companySize) : 0,
+      companyWebsite,
+      pocName,
+      workingSince,
+      pocLocation,
+      pocPhone,
+      pocMail,
+      pocDesignation,
+      pocLinkedin,
       status: status.toLowerCase() || "warm",
-      contacts: []
+      updatedAt: new Date().toISOString(),
     };
 
-    try {
-      // Create a new batch document with this single company
-      const batchData = {
-        companies: [btoa(JSON.stringify(companyData))],
-        uploadedBy: user.uid,
-        uploadedAt: serverTimestamp(),
-        batchSize: 1,
-        source: "manual_add"
-      };
-
-      // Add to companyleads collection
-      const docRef = await addDoc(collection(db, "companyleads"), batchData);
-
-      // Create the lead object for local state update
-      const newLead = {
-        id: `${docRef.id}_0`, // First (and only) company in this batch
-        batchId: docRef.id,
-        ...companyData,
-        // Map fields for UI compatibility
-        companyName: companyData.name,
-        pocName: companyData.contactPerson,
-        pocDesignation: companyData.designation,
-        pocPhone: companyData.phone,
-        companyUrl: companyData.companyUrl,
-        companyWebsite: companyData.companyUrl,
-        linkedinUrl: companyData.linkedinUrl,
-        pocLinkedin: companyData.linkedinUrl,
-        pocMail: companyData.email || '',
-        pocLocation: companyData.location || '',
-        industry: companyData.industry,
-        companySize: companyData.companySize,
-        source: companyData.source,
-        notes: companyData.notes,
-        status: companyData.status,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        contacts: []
-      };
-
-      if (onAddLead) {
-        onAddLead(newLead);
-      }
-      resetForm();
-      onClose();
-    } catch (error) {
-      console.error("Error adding company:", error);
-      alert("Failed to add company. Please try again.");
+    // Pass the updated data to the parent component for batch processing
+    if (onUpdateLead) {
+      onUpdateLead(lead.id, updatedCompany);
     }
+
+    onClose();
   };
 
-  const isFormValid = 
-    companyName.trim() && 
-    sector.trim() &&
-    employeeCount.trim() && 
-    pocName.trim() && 
-    workingSince.trim() &&
-    pocLocation.trim() && 
-    pocPhone.trim() &&
-    pocDesignation.trim();
+  const isFormValid =
+    (companyName || "").toString().trim() &&
+    (pocName || "").toString().trim();
 
-  if (!show) return null;
+  if (!show || !lead) return null;
 
   return (
     <div className="fixed inset-0 z-54 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-3xl rounded-xl shadow-2xl overflow-hidden">
         <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center">
-          <h2 className="text-xl font-semibold text-white">Add New Company</h2>
+          <h2 className="text-xl font-semibold text-white">Edit Company</h2>
           <button
             onClick={handleClose}
             className="text-white hover:text-gray-200 focus:outline-none"
@@ -181,29 +123,27 @@ function AddLeads({ show, onClose, onAddLead }) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Industry <span className="text-red-500">*</span>
+                Industry
               </label>
               <input
                 type="text"
-                value={sector}
-                onChange={(e) => updateField(setSector, e.target.value)}
+                value={industry}
+                onChange={(e) => updateField(setIndustry, e.target.value)}
                 placeholder="e.g. IT Services"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                required
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Company Size <span className="text-red-500">*</span>
+                Company Size
               </label>
               <input
                 type="number"
-                value={employeeCount}
-                onChange={(e) => updateField(setEmployeeCount, e.target.value)}
+                value={companySize}
+                onChange={(e) => updateField(setCompanySize, e.target.value)}
                 placeholder="e.g. 250"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                required
               />
             </div>
 
@@ -236,20 +176,19 @@ function AddLeads({ show, onClose, onAddLead }) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Working Since <span className="text-red-500">*</span>
+                Working Since
               </label>
               <input
                 type="date"
                 value={workingSince}
                 onChange={(e) => updateField(setWorkingSince, e.target.value)}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                required
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                POC Location <span className="text-red-500">*</span>
+                POC Location
               </label>
               <input
                 type="text"
@@ -257,13 +196,12 @@ function AddLeads({ show, onClose, onAddLead }) {
                 onChange={(e) => updateField(setPocLocation, e.target.value)}
                 placeholder="e.g. Mumbai"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                required
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                POC Phone <span className="text-red-500">*</span>
+                POC Phone
               </label>
               <input
                 type="text"
@@ -271,7 +209,6 @@ function AddLeads({ show, onClose, onAddLead }) {
                 onChange={(e) => updateField(setPocPhone, e.target.value)}
                 placeholder="e.g. +91 9876543210"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                required
               />
             </div>
 
@@ -290,7 +227,7 @@ function AddLeads({ show, onClose, onAddLead }) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                POC Designation <span className="text-red-500">*</span>
+                POC Designation
               </label>
               <input
                 type="text"
@@ -298,7 +235,6 @@ function AddLeads({ show, onClose, onAddLead }) {
                 onChange={(e) => updateField(setPocDesignation, e.target.value)}
                 placeholder="e.g. HR Manager"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                required
               />
             </div>
 
@@ -343,7 +279,7 @@ function AddLeads({ show, onClose, onAddLead }) {
               Cancel
             </button>
             <button
-              onClick={handleAddCompany}
+              onClick={handleUpdateCompany}
               disabled={!isFormValid}
               className={`px-6 py-2.5 rounded-lg text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
                 isFormValid
@@ -351,7 +287,7 @@ function AddLeads({ show, onClose, onAddLead }) {
                   : "bg-gray-400 cursor-not-allowed"
               }`}
             >
-              Add Company
+              Update Company
             </button>
           </div>
         </div>
@@ -360,4 +296,4 @@ function AddLeads({ show, onClose, onAddLead }) {
   );
 }
 
-export default AddLeads;
+export default EditLeadModal;

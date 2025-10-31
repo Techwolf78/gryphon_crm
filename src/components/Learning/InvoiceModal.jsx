@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { db } from "../../firebase";
 import { doc, getDoc, collection, addDoc, updateDoc } from "firebase/firestore";
 import { query, where, getDocs } from "firebase/firestore";
@@ -39,12 +39,22 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
   const [editMode, setEditMode] = useState(false);
   const [viewMode, setViewMode] = useState(false);
 
+  // Memoize query dependencies to prevent useEffect dependency array size changes
+  const queryDeps = useMemo(() => ({
+    trainerId: trainer?.trainerId,
+    collegeName: trainer?.collegeName,
+    phase: trainer?.phase,
+    gst: trainer?.gst,
+    isMerged: trainer?.isMerged,
+    projectCode: trainer?.projectCode,
+  }), [trainer?.trainerId, trainer?.collegeName, trainer?.phase, trainer?.gst, trainer?.isMerged, trainer?.projectCode]);
+
   useEffect(() => {
     const fetchTrainerBankDetails = async () => {
-      if (!trainer?.trainerId) return;
+      if (!queryDeps.trainerId) return;
 
       try {
-        const trainerRef = doc(db, "trainers", trainer.trainerId);
+        const trainerRef = doc(db, "trainers", queryDeps.trainerId);
         const trainerSnap = await getDoc(trainerRef);
 
         if (trainerSnap.exists()) {
@@ -62,7 +72,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
           }));
         } else {
           // Trainer document doesn't exist - this is expected for new trainers
-          console.warn(`Trainer document not found for trainerId: ${trainer?.trainerId}`);
+          console.warn(`Trainer document not found for trainerId: ${queryDeps.trainerId}`);
           setInvoiceData((prev) => ({
             ...prev,
             gst: "NA", // Default to NA if trainer not found
@@ -75,15 +85,23 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
     };
 
     const checkExistingInvoice = async () => {
-      if (!trainer?.trainerId || !trainer?.collegeName) return;
+      if (!queryDeps.trainerId || !queryDeps.collegeName) return;
 
       try {
-        const q = query(
-          collection(db, "invoices"),
-          where("trainerId", "==", trainer.trainerId),
-          where("collegeName", "==", trainer.collegeName),
-          where("phase", "==", trainer.phase)
-        );
+        const q = queryDeps.isMerged
+          ? query(
+              collection(db, "invoices"),
+              where("trainerId", "==", queryDeps.trainerId),
+              where("collegeName", "==", queryDeps.collegeName),
+              where("phase", "==", queryDeps.phase)
+            )
+          : query(
+              collection(db, "invoices"),
+              where("trainerId", "==", queryDeps.trainerId),
+              where("collegeName", "==", queryDeps.collegeName),
+              where("phase", "==", queryDeps.phase),
+              where("projectCode", "==", queryDeps.projectCode)
+            );
 
         const querySnapshot = await getDocs(q);
         if (!querySnapshot.empty) {
@@ -101,7 +119,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
             ...prev,
             ...latestInvoice,
             billingDate: latestInvoice.billingDate || new Date().toISOString().split("T")[0],
-            gst: latestInvoice.gst !== undefined ? latestInvoice.gst : (trainer?.gst ? "0" : "NA"),
+            gst: latestInvoice.gst !== undefined ? latestInvoice.gst : (queryDeps.gst ? "0" : "NA"),
           }));
         }
       } catch (error) {
@@ -112,7 +130,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
 
     checkExistingInvoice();
     fetchTrainerBankDetails();
-  }, [trainer?.trainerId, trainer?.collegeName, trainer?.phase, trainer?.gst, existingInvoice]);
+  }, [queryDeps, existingInvoice]);
 
 const handleSubmit = async (e) => {
   e.preventDefault();

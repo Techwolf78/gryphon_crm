@@ -1,7 +1,6 @@
-import React from "react";
-import { PlusIcon } from "@heroicons/react/outline";
+import { PlusIcon, CloudUploadIcon, SortAscendingIcon, SortDescendingIcon } from "@heroicons/react/outline";
 
-const LeadsHeader = ({ searchTerm, setSearchTerm, onAddLead }) => {
+const LeadsHeader = ({ searchTerm, setSearchTerm, onAddLead, onBulkUpload, sortOrder, onSortChange }) => {
   return (
     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
       <div className="w-full md:max-w-xs">
@@ -13,16 +12,36 @@ const LeadsHeader = ({ searchTerm, setSearchTerm, onAddLead }) => {
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
-      <button
-        onClick={onAddLead}
-        className="w-full md:w-auto px-4 py-2 text-white rounded-lg font-semibold flex items-center justify-center focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md relative overflow-hidden"
-      >
-        <span className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-700 opacity-100 hover:opacity-90 transition-opacity duration-200 z-0"></span>
-        <span className="relative z-10 flex items-center">
-          <PlusIcon className="h-5 w-5 mr-2" />
-          Add Company
-        </span>
-      </button>
+      <div className="flex gap-2 w-full md:w-auto">
+        <button
+          onClick={() => onSortChange(sortOrder === "asc" ? "desc" : "asc")}
+          className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg font-semibold flex items-center justify-center hover:bg-gray-200 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+          title={`Sort ${sortOrder === "asc" ? "Descending" : "Ascending"}`}
+        >
+          {sortOrder === "asc" ? (
+            <SortAscendingIcon className="h-5 w-5" />
+          ) : (
+            <SortDescendingIcon className="h-5 w-5" />
+          )}
+        </button>
+        <button
+          onClick={onAddLead}
+          className="flex-1 md:flex-none px-4 py-2 text-white rounded-lg font-semibold flex items-center justify-center focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md relative overflow-hidden"
+        >
+          <span className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-700 opacity-100 hover:opacity-90 transition-opacity duration-200 z-0"></span>
+          <span className="relative z-10 flex items-center">
+            <PlusIcon className="h-5 w-5 mr-2" />
+            Add Company
+          </span>
+        </button>
+        <button
+          onClick={onBulkUpload}
+          className="flex-1 md:flex-none px-4 py-2 bg-green-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-md"
+        >
+          <CloudUploadIcon className="h-5 w-5 mr-2" />
+          Bulk Upload
+        </button>
+      </div>
     </div>
   );
 };

@@ -39,10 +39,10 @@ const PlacementDetailsModal = ({ training, onClose }) => {
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex justify-center items-center z-54 p-4 animate-fadeIn">
       <div
         ref={modalRef}
-        className="bg-white rounded-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden shadow-2xl border border-gray-100 animate-slideUp transform transition-all duration-300"
+        className="bg-white rounded-2xl w-[98%] max-w-none max-h-[95vh] overflow-hidden shadow-2xl border border-gray-100 animate-slideUp transform transition-all duration-300"
       >
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-5 flex justify-between items-center sticky top-0 z-10">
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3 flex justify-between items-center sticky top-0 z-10">
           <div className="flex items-center space-x-3">
             <div className="p-2 rounded-lg bg-white/10 backdrop-blur-sm">
               <IoIosSchool className="text-white text-2xl" />
@@ -72,7 +72,7 @@ const PlacementDetailsModal = ({ training, onClose }) => {
         </div>
 
         {/* Content */}
-        <div className="overflow-y-auto h-[calc(95vh-72px)] p-6 space-y-6">
+        <div className="overflow-y-auto h-[calc(95vh-60px)] p-4 space-y-4">
           {/* 1. Institution Section */}
           <ModernSection
             title="Institution Details"
@@ -80,7 +80,7 @@ const PlacementDetailsModal = ({ training, onClose }) => {
             badge={`${training?.collegeCode || 'No Code'}`}
             className="bg-gradient-to-br from-blue-50 to-blue-50/70"
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               <DetailCard label="College Name" value={training?.collegeName} iconColor="text-blue-400" />
               <DetailCard label="College Code" value={training?.collegeCode} iconColor="text-blue-400" />
               <DetailCard label="GST Number" value={training?.gstNumber} iconColor="text-blue-400" />
@@ -97,7 +97,7 @@ const PlacementDetailsModal = ({ training, onClose }) => {
             icon={<MdPeople className="text-purple-500" />}
             className="bg-gradient-to-br from-purple-50 to-purple-50/70"
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               <ContactCard
                 type="TPO"
                 name={training?.tpoName}
@@ -132,7 +132,7 @@ const PlacementDetailsModal = ({ training, onClose }) => {
             badge={`${training?.studentCount || '0'} Students`}
             className="bg-gradient-to-br from-green-50 to-green-50/70"
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               <DetailCard label="Course" value={training?.course} iconColor="text-green-400" />
               <DetailCard label="Year" value={training?.year} iconColor="text-green-400" />
               <DetailCard label="Delivery Type" value={training?.deliveryType} iconColor="text-green-400" />
@@ -177,8 +177,8 @@ const PlacementDetailsModal = ({ training, onClose }) => {
             </div>
 
             {training?.topics?.length > 0 && (
-              <div className="mt-6">
-                <h4 className="font-medium text-gray-700 mb-3 flex items-center gap-2">
+              <div className="mt-4">
+                <h4 className="font-medium text-gray-700 mb-2 flex items-center gap-2">
                   <FaCalendarAlt className="text-amber-500" />
                   Topics Breakdown
                 </h4>
@@ -211,7 +211,7 @@ const PlacementDetailsModal = ({ training, onClose }) => {
             badge={formatCurrency(training?.netPayableAmount || training?.totalCost)}
             className="bg-gradient-to-br from-amber-50 to-amber-50/70"
           >
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               <DetailCard
                 label="Total Students"
                 value={training?.studentCount}
@@ -259,7 +259,7 @@ const PlacementDetailsModal = ({ training, onClose }) => {
             badge={training?.mouFileUrl ? "MOU Uploaded" : "No MOU"}
             className="bg-gradient-to-br from-red-50 to-red-50/70"
           >
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               <DetailCard
                 label="MOU Status"
                 value={training?.mouFileUrl ? "Uploaded" : "Not uploaded"}
@@ -289,7 +289,7 @@ const PlacementDetailsModal = ({ training, onClose }) => {
 // Modern Section Component with enhanced design
 const ModernSection = ({ title, icon, children, className = "", badge }) => (
   <div className={`rounded-xl overflow-hidden border border-gray-200 shadow-sm ${className}`}>
-    <div className="px-5 py-4 flex items-center justify-between border-b border-gray-200 bg-white/50 backdrop-blur-sm">
+    <div className="px-4 py-3 flex items-center justify-between border-b border-gray-200 bg-white/50 backdrop-blur-sm">
       <div className="flex items-center">
         <span className="text-xl mr-3 p-2 rounded-lg bg-white shadow-sm">{icon}</span>
         <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
@@ -300,7 +300,7 @@ const ModernSection = ({ title, icon, children, className = "", badge }) => (
         </span>
       )}
     </div>
-    <div className="p-5">
+    <div className="p-4">
       {children}
     </div>
   </div>
@@ -323,8 +323,8 @@ const DetailCard = ({ label, value, icon, fullWidth = false, highlight = false, 
         )}
         <div className="flex-1">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">{label}</p>
-          <div className={`mt-1 text-sm font-medium ${highlight ? "text-blue-600 font-semibold" : "text-gray-800"} 
-            ${status && status !== "neutral" ? `${statusClasses} px-3 py-1.5 rounded-lg border text-sm` : ""}`}>
+          <div className={`mt-0.5 text-sm font-medium ${highlight ? "text-blue-600 font-semibold" : "text-gray-800"} 
+            ${status && status !== "neutral" ? `${statusClasses} px-2 py-1 rounded-lg border text-sm` : ""}`}>
             {value || 'Not specified'}
           </div>
         </div>
@@ -335,8 +335,8 @@ const DetailCard = ({ label, value, icon, fullWidth = false, highlight = false, 
 
 // New Contact Card component for better contact display
 const ContactCard = ({ type, name, email, phone, color, iconColor }) => (
-  <div className={`rounded-lg border border-gray-200 p-4 ${color}/20 backdrop-blur-sm`}>
-    <div className="flex items-center space-x-3 mb-3">
+  <div className={`rounded-lg border border-gray-200 p-3 ${color}/20 backdrop-blur-sm`}>
+    <div className="flex items-center space-x-2 mb-2">
       <div className={`p-2 rounded-lg ${color} ${iconColor}`}>
         {type === 'TPO' && <MdPeople size={18} />}
         {type === 'Training Coordinator' && <IoIosSchool size={18} />}
@@ -344,7 +344,7 @@ const ContactCard = ({ type, name, email, phone, color, iconColor }) => (
       </div>
       <h4 className="font-medium text-gray-800">{type}</h4>
     </div>
-    <div className="space-y-2">
+    <div className="space-y-1">
       <div className="flex items-center text-sm">
         <span className="text-gray-500 w-20">Name:</span>
         <span className="font-medium">{name || 'Not specified'}</span>

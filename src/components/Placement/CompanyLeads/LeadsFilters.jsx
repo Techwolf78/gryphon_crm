@@ -50,7 +50,7 @@ const tabLabels = {
   onboarded: "Onboarded"
 };
 
-const LeadsFilters = ({ activeTab, setActiveTab, leadsByStatus }) => {
+const LeadsFilters = ({ activeTab, setActiveTab, leadsByStatus = {} }) => {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2 mb-6 pt-4 w-full">
       {Object.keys(tabLabels).map((key) => (
