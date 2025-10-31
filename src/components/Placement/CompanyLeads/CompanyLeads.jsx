@@ -41,17 +41,25 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           orderBy("createdAt", "desc")
         );
         const querySnapshot = await getDocs(q);
-        const leadsData = querySnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-          createdAt: doc.data().createdAt?.toDate
-            ? doc.data().createdAt.toDate().toISOString()
-            : new Date().toISOString(),
-          updatedAt: doc.data().updatedAt?.toDate
-            ? doc.data().updatedAt.toDate().toISOString()
-            : new Date().toISOString(),
-          contacts: doc.data().contacts || [],
-        }));
+        const leadsData = querySnapshot.docs.map((doc) => {
+          const data = doc.data() || {};
+          // Normalize status to expected keys (hot, warm, cold, onboarded)
+          const rawStatus = data.status || "warm";
+          const status = String(rawStatus).toLowerCase();
+
+          return {
+            id: doc.id,
+            ...data,
+            status,
+            createdAt: data.createdAt?.toDate
+              ? data.createdAt.toDate().toISOString()
+              : new Date().toISOString(),
+            updatedAt: data.updatedAt?.toDate
+              ? data.updatedAt.toDate().toISOString()
+              : new Date().toISOString(),
+            contacts: data.contacts || [],
+          };
+        });
         setLeads(leadsData);
       } catch (error) {
         console.error("Error fetching leads:", error);
@@ -92,8 +100,12 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   }, [leads, activeTab, searchTerm]);
 
   // Group leads by status for tab counts
+  // Ensure we only count known statuses and normalize keys
   const leadsByStatus = leads.reduce((acc, lead) => {
-    acc[lead.status] = (acc[lead.status] || 0) + 1;
+    const allowed = ["hot", "warm", "cold", "onboarded"];
+    const s = (lead.status || "warm").toLowerCase();
+    const key = allowed.includes(s) ? s : "warm";
+    acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {});
 
@@ -101,6 +113,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     setLeads((prevLeads) => [
       {
         ...newLead,
+        status: (newLead.status || "warm").toLowerCase(),
         contacts: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),

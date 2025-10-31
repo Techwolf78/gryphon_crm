@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { db } from "../firebase";
-import { collection, getDocs, getDoc } from "firebase/firestore";
+import { collection, getDocs, getDoc, onSnapshot, query, orderBy } from "firebase/firestore";
 import StudentListModal from "../components/Placement/StudentListModal";
 import AddJD from "../components/Placement/AddJd/AddJD";
 import CompanyOpen from "../components/Placement/CompanyOpen/CompanyOpen";
@@ -71,13 +71,8 @@ function Placement() {
       }));
       setTrainingData(trainingData);
 
-      // Fetch leads
-      const leadsSnapshot = await getDocs(collection(db, "leads"));
-      const leadsData = leadsSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setLeads(leadsData);
+      // Note: company leads are loaded via a real-time listener (see useEffect below)
+      // leaving this space intentionally empty so fetchData focuses on training data
 
       // Fetch progress for each trainingData
       const progressPromises = trainingData.map(async (item) => {
@@ -128,6 +123,25 @@ function Placement() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Real-time listener for CompanyLeads so UI updates without manual refresh
+  useEffect(() => {
+    try {
+      const q = query(collection(db, "CompanyLeads"), orderBy("createdAt", "desc"));
+      const unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          const leadsData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+          setLeads(leadsData);
+        },
+        (err) => console.error("Error listening to CompanyLeads:", err)
+      );
+
+      return () => unsubscribe();
+    } catch (err) {
+      console.error("Failed to set up CompanyLeads listener:", err);
+    }
+  }, []);
 
   const fetchStudentData = useCallback(async (trainingDocId) => {
     try {
