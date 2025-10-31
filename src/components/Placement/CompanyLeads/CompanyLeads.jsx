@@ -1,27 +1,18 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import AddLeads from "./AddLeads";
 import AddJD from "../AddJd/AddJD"; // ✅ adjust the relative path
 
-import {
-  collection,
-  getDocs,
-  query,
-  orderBy,
-  updateDoc,
-  doc,
-} from "firebase/firestore";
+import { updateDoc, doc } from "firebase/firestore";
 import { db } from "../../../firebase";
 import LeadsHeader from "./LeadsHeader";
 import LeadsFilters from "./LeadsFilters";
 import LeadsTable from "./LeadsTable";
 import LeadDetailsModal from "./LeadDetailsModal";
 
-function CompanyLeads() {
+function CompanyLeads({ leads = [], onLeadSelect }) {
   const [activeTab, setActiveTab] = useState("hot");
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddLeadForm, setShowAddLeadForm] = useState(false);
-  const [leads, setLeads] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [selectedLead, setSelectedLead] = useState(null);
   const [showActionMenu, setShowActionMenu] = useState(null);
   const [showLeadDetails, setShowLeadDetails] = useState(false);
@@ -31,45 +22,7 @@ const [showAddJDForm, setShowAddJDForm] = useState(false);
 const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
 
-  // Fetch all leads from Firestore
-  useEffect(() => {
-    const fetchLeads = async () => {
-      try {
-        setLoading(true);
-        const q = query(
-          collection(db, "CompanyLeads"),
-          orderBy("createdAt", "desc")
-        );
-        const querySnapshot = await getDocs(q);
-        const leadsData = querySnapshot.docs.map((doc) => {
-          const data = doc.data() || {};
-          // Normalize status to expected keys (hot, warm, cold, onboarded)
-          const rawStatus = data.status || "warm";
-          const status = String(rawStatus).toLowerCase();
-
-          return {
-            id: doc.id,
-            ...data,
-            status,
-            createdAt: data.createdAt?.toDate
-              ? data.createdAt.toDate().toISOString()
-              : new Date().toISOString(),
-            updatedAt: data.updatedAt?.toDate
-              ? data.updatedAt.toDate().toISOString()
-              : new Date().toISOString(),
-            contacts: data.contacts || [],
-          };
-        });
-        setLeads(leadsData);
-      } catch (error) {
-        console.error("Error fetching leads:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchLeads();
-  }, []);
+  // `leads` are provided via props (Placement page sets up a real-time listener)
 
   // Filter leads based on active tab and search term
   const filteredLeads = useMemo(() => {
@@ -99,9 +52,8 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     });
   }, [leads, activeTab, searchTerm]);
 
-  // Group leads by status for tab counts
-  // Ensure we only count known statuses and normalize keys
-  const leadsByStatus = leads.reduce((acc, lead) => {
+  // Group leads by status for tab counts (normalize keys)
+  const leadsByStatus = (leads || []).reduce((acc, lead) => {
     const allowed = ["hot", "warm", "cold", "onboarded"];
     const s = (lead.status || "warm").toLowerCase();
     const key = allowed.includes(s) ? s : "warm";
@@ -109,51 +61,32 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     return acc;
   }, {});
 
-  const handleAddLead = (newLead) => {
-    setLeads((prevLeads) => [
-      {
-        ...newLead,
-        status: (newLead.status || "warm").toLowerCase(),
-        contacts: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-      ...prevLeads,
-    ]);
-  };
+  // Add lead handling is done by AddLeads (writes to Firestore).
+  // The Placement page supplies `leads` via onSnapshot so we don't manage it locally here.
 
   const handleStatusChange = async (leadId, newStatus) => {
-  try {
-    const lead = leads.find((l) => l.id === leadId);
-    if (!lead) return;
+    try {
+      const lead = (leads || []).find((l) => l.id === leadId);
+      if (!lead) return;
 
-    // Update Firestore document
-    await updateDoc(doc(db, "CompanyLeads", leadId), {
-      status: newStatus,
-      updatedAt: new Date().toISOString(),
-    });
+      // Update Firestore document — onSnapshot in the parent will update the UI
+      await updateDoc(doc(db, "CompanyLeads", leadId), {
+        status: newStatus,
+        updatedAt: new Date().toISOString(),
+      });
 
-    // Update local state
-    setLeads((prevLeads) =>
-      prevLeads.map((l) =>
-        l.id === leadId
-          ? { ...l, status: newStatus, updatedAt: new Date().toISOString() }
-          : l
-      )
-    );
+      // Close the dropdown
+      setShowActionMenu(null);
 
-    // Close the dropdown
-    setShowActionMenu(null);
-
-    // ✅ If marked as onboarded → open AddJD modal
-    if (newStatus === "onboarded") {
-      setSelectedCompanyForJD(lead);  // send company info to AddJD
-      setShowAddJDForm(true);
+      // If marked as onboarded → open AddJD modal
+      if (newStatus === "onboarded") {
+        setSelectedCompanyForJD(lead); // send company info to AddJD
+        setShowAddJDForm(true);
+      }
+    } catch (error) {
+      console.error("Error updating lead status:", error);
     }
-  } catch (error) {
-    console.error("Error updating lead status:", error);
-  }
-};
+  };
 
 
   const toggleActionMenu = (leadId, e) => {
@@ -177,13 +110,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     }
   }, []);
 
-  if (loading) {
-    return (
-      <div className="bg-white rounded-lg shadow p-4 flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
+  // No local loading; parent supplies `leads` (may be empty array while loading)
 
   return (
     <div className="bg-white rounded-lg shadow p-4">
@@ -208,6 +135,11 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         onToggleActionMenu={toggleActionMenu}
         onStatusChange={handleStatusChange}
         onLeadClick={(lead) => {
+          // If parent passed an onLeadSelect handler, prefer that (e.g. navigate to CompanyOpen)
+          if (onLeadSelect) {
+            onLeadSelect(lead);
+            return;
+          }
           setSelectedLead(lead);
           setShowLeadDetails(true);
         }}
@@ -218,19 +150,8 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         <LeadDetailsModal
           lead={selectedLead}
           onClose={() => setShowLeadDetails(false)}
-          onAddContact={(leadId, contactData) => {
-            setLeads(
-              leads.map((lead) =>
-                lead.id === leadId
-                  ? {
-                      ...lead,
-                      contacts: [...lead.contacts, contactData],
-                      updatedAt: new Date().toISOString(),
-                    }
-                  : lead
-              )
-            );
-          }}
+          // LeadDetailsModal writes to Firestore directly; parent onSnapshot will refresh UI
+          onAddContact={null}
           formatDate={formatDate}
         />
       )}
@@ -239,7 +160,6 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       <AddLeads
         show={showAddLeadForm}
         onClose={() => setShowAddLeadForm(false)}
-        onAddLead={handleAddLead}
       />
 
       {/* Add JD Modal */}

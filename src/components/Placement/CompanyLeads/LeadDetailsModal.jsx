@@ -49,7 +49,9 @@ const LeadDetailsModal = ({
         updatedAt: new Date().toISOString()
       });
 
-      onAddContact(lead.id, contactData);
+      if (onAddContact) {
+        onAddContact(lead.id, contactData);
+      }
 
       setNewContact({
         name: '',
