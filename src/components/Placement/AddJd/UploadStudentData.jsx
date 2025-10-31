@@ -9,7 +9,6 @@ const UploadStudentData = () => {
   const [college, setCollege] = useState('');
   const [company, setCompany] = useState('');
   const [course, setCourse] = useState('');
-  const [email, setEmail] = useState('');
   const [templateFields, setTemplateFields] = useState([]);
   const [showUploadModal, setShowUploadModal] = useState(false);
 
@@ -17,13 +16,11 @@ const UploadStudentData = () => {
     const collegeParam = searchParams.get('college');
     const companyParam = searchParams.get('company');
     const courseParam = searchParams.get('course');
-    const emailParam = searchParams.get('email');
     const fieldsParam = searchParams.get('fields');
     
     if (collegeParam) setCollege(decodeURIComponent(collegeParam));
     if (companyParam) setCompany(decodeURIComponent(companyParam));
     if (courseParam) setCourse(decodeURIComponent(courseParam));
-    if (emailParam) setEmail(decodeURIComponent(emailParam));
     
     // ✅ Dynamic template fields from URL
     if (fieldsParam) {

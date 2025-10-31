@@ -12,7 +12,12 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
   // Invoice number conflict state
   const [invoiceNumberConflict, setInvoiceNumberConflict] = useState(false);
   const [checkingInvoiceNumber, setCheckingInvoiceNumber] = useState(false);
-
+const [editableServiceType, setEditableServiceType] = useState(
+  invoice.serviceType || "Training Services"
+);
+const [editableDescription, setEditableDescription] = useState(
+  invoice.customDescription || ""
+);
   // Custom toast state
   const [toast, setToast] = useState(null);
 
@@ -131,7 +136,9 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
       // ✅ Proper date handling karo
       const updateData = {
         invoiceNumber: editableInvoice.invoiceNumber.trim(),
-        raisedDate: parsedDate
+        raisedDate: parsedDate,
+         serviceType: editableServiceType, // ✅ Naya field add karo
+      customDescription: editableDescription // ✅ Custom description save karo
       };
 
       // ✅ Extra validation: check if invoice number already exists in collection
@@ -241,13 +248,15 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
   };
 
   // ✅ Reset function add karo
-  const handleCancelEdit = () => {
-    setIsEditing(false);
-    setEditableInvoice(invoice); // Original data par reset karo
-    if (invoice.installment?.toLowerCase().includes('installment')) {
-      setEditableMonth(invoice.emiMonth || 'oct');
-    }
-  };
+const handleCancelEdit = () => {
+  setIsEditing(false);
+  setEditableInvoice(invoice); // Original data par reset karo
+  setEditableServiceType(invoice.serviceType || "Training Services");
+  setEditableDescription(invoice.customDescription || "");
+  if (invoice.installment?.toLowerCase().includes('installment')) {
+    setEditableMonth(invoice.emiMonth || 'oct');
+  }
+};
 
 
   if (!invoice) return null;
@@ -745,36 +754,64 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
                 <tbody>
                   <tr>
                     <td className="border border-gray-300 px-3 py-1">
-                      <div>
-                        <div className="font-semibold text-sm">
-                          Training Services - {invoice.installment || ""}
-                          {invoice.paymentDetails?.[0]?.percentage &&
-                            ` (${invoice.paymentDetails[0].percentage}%)`}
-                        </div>
-                        <div className="text-xs text-gray-700 mt-1">
-                          {getDynamicDescription(invoice, trainingData)}
-                          {invoice.studentCount && !invoice.installment?.toLowerCase().includes('installment') && ` for ${invoice.studentCount} students`}
-                          {amounts.gstAmount > 0 && !invoice.installment?.toLowerCase().includes('installment') && 
-                            ` + ${interstate ? '18% IGST' : '18% GST (9% CGST + 9% SGST)'}`
-                          }
-                        </div>
+                     <div>
+    {/* Service Type Dropdown - Editable */}
+    {isEditing ? (
+      <div className="mb-2">
+        <select 
+          value={editableServiceType}
+          onChange={(e) => setEditableServiceType(e.target.value)}
+          className="text-sm border border-blue-300 px-2 py-1 rounded bg-white font-semibold"
+        >
+          <option value="Training Services">Training Services</option>
+          <option value="Placement Services">Placement Services</option>
+          <option value="Digital Marketing Services">Digital Marketing Services</option>
+        </select>
+        <span className="ml-2">
+          - {invoice.installment || ""}
+          {invoice.paymentDetails?.[0]?.percentage &&
+            ` (${invoice.paymentDetails[0].percentage}%)`}
+        </span>
+      </div>
+    ) : (
+      <div className="font-semibold text-sm">
+        {editableServiceType} - {invoice.installment || ""}
+        {invoice.paymentDetails?.[0]?.percentage &&
+          ` (${invoice.paymentDetails[0].percentage}%)`}
+      </div>
+    )}
 
-                        {projectCodes.length > 0 && (
-                          <div className="text-xs text-blue-600 mt-1">
-                            <strong>
-                              Project{" "}
-                              {projectCodes.length > 1 ? "Codes" : "Code"}:
-                            </strong>{" "}
-                            {projectCodes.join(", ")}
-                          </div>
-                        )}
-                      </div>
+    {/* Description Text - Editable */}
+    {isEditing ? (
+      <textarea
+        value={editableDescription || getDynamicDescription(invoice, trainingData)}
+        onChange={(e) => setEditableDescription(e.target.value)}
+        className="w-full text-xs border border-gray-300 px-2 py-1 rounded mt-1 resize-y min-h-[60px]"
+        placeholder="Enter description here..."
+      />
+    ) : (
+      <div className="text-xs text-gray-700 mt-1">
+        {editableDescription || getDynamicDescription(invoice, trainingData)}
+        {invoice.studentCount && !invoice.installment?.toLowerCase().includes('installment') && ` for ${invoice.studentCount} students`}
+        {amounts.gstAmount > 0 && !invoice.installment?.toLowerCase().includes('installment') && 
+          ` + ${interstate ? '18% IGST' : '18% GST (9% CGST + 9% SGST)'}`
+        }
+      </div>
+    )}
+
+    {projectCodes.length > 0 && (
+      <div className="text-xs text-blue-600 mt-1">
+        <strong>
+          Project{projectCodes.length > 1 ? "Codes" : "Code"}:
+        </strong>{" "}
+        {projectCodes.join(", ")}
+      </div>
+    )}
+  </div>
                     </td>
                     <td className="border border-gray-300 px-3 py-1">999293</td>
                     <td className="border border-gray-300 px-3 py-1 text-right">
-                      {amounts.baseAmount.toLocaleString("en-IN", {
-                        minimumFractionDigits: 2,
-                      })}
+                      {amounts.baseAmount.toString()}
                     </td>
                   </tr>
                 </tbody>
@@ -797,9 +834,7 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
                       Total (Base Amount)
                     </td>
                     <td className="border border-gray-300 px-3 py-1 text-right">
-                      {amounts.baseAmount.toLocaleString("en-IN", {
-                        minimumFractionDigits: 2,
-                      })}
+                      {amounts.baseAmount.toString()}
                     </td>
                   </tr>
 
@@ -829,9 +864,7 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
                         Add: IGST @ 18%
                       </td>
                       <td className="border border-gray-300 px-3 py-1 text-right">
-                        {amounts.gstAmount.toLocaleString("en-IN", {
-                          minimumFractionDigits: 2,
-                        })}
+                        {amounts.gstAmount.toString()}
                       </td>
                     </tr>
                   ) : (
@@ -842,9 +875,7 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
                           Add: CGST @ 9%
                         </td>
                         <td className="border border-gray-300 px-3 py-1 text-right">
-                          {(amounts.gstAmount / 2).toLocaleString("en-IN", {
-                            minimumFractionDigits: 2,
-                          })}
+                          {(amounts.gstAmount / 2).toString()}
                         </td>
                       </tr>
                       <tr>
@@ -852,9 +883,7 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
                           Add: SGST @ 9%
                         </td>
                         <td className="border border-gray-300 px-3 py-1 text-right">
-                          {(amounts.gstAmount / 2).toLocaleString("en-IN", {
-                            minimumFractionDigits: 2,
-                          })}
+                          {(amounts.gstAmount / 2).toString()}
                         </td>
                       </tr>
                     </>
@@ -866,9 +895,7 @@ const InvoiceModal = ({ invoice, onClose, onInvoiceUpdate }) => {
                     </td>
                     <td className="border border-gray-300 px-3 py-1 text-right font-bold">
                       ₹
-                      {amounts.totalAmount.toLocaleString("en-IN", {
-                        minimumFractionDigits: 2,
-                      })}
+                      {amounts.totalAmount.toString()}
                     </td>
                   </tr>
                 </tbody>

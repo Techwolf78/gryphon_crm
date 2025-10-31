@@ -52,7 +52,7 @@ const RowClickModal = ({ installment, invoice, onClose }) => {
         month: "2-digit",
         year: "numeric",
       });
-    } catch (error) {
+    } catch {
 
       return "Invalid Date";
     }

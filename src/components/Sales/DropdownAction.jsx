@@ -172,7 +172,7 @@ const DropdownActions = ({
                             email: user.email,
                           },
                         });
-                      } catch (error) {
+                      } catch {
                         // Handle error silently
                       }
                       setAssignHovered(false);

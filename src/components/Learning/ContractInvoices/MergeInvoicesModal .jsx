@@ -14,6 +14,7 @@ const MergeInvoicesModal = ({
   const [totalStudents, setTotalStudents] = useState(0);
   const [baseAmount, setBaseAmount] = useState(0);
   const [gstAmount, setGstAmount] = useState(0);
+  const [isGstExcluded, setIsGstExcluded] = useState(false);
 
 // MergeInvoicesModal.js - Amount calculation update
 useEffect(() => {
@@ -37,9 +38,14 @@ useEffect(() => {
     }, 0);
 
     // ✅ Calculate exact amounts without rounding
+    // Check gstType - if any contract has gstType 'exclude', treat as GST excluded
+    const hasExcludedGst = contracts.some(contract => contract.gstType === 'exclude');
+    const gstExcluded = hasExcludedGst;
+    setIsGstExcluded(gstExcluded);
+    
     const totalBaseAmount = invoiceType === 'Cash Invoice' 
       ? calculatedTotal 
-      : Math.round(calculatedTotal / 1.18);
+      : (gstExcluded ? calculatedTotal : Math.round(calculatedTotal / 1.18));
     
     // ✅ Cash aur Tax ke liye alag GST calculation
     let gstAmount = 0;
@@ -50,10 +56,15 @@ useEffect(() => {
       gstAmount = 0;
       netPayableAmount = calculatedTotal;
     } else {
-      // ✅ Tax Invoice: Base Amount calculated, GST calculate karo
-      const gstRate = 0.18;
-      gstAmount = Math.round(totalBaseAmount * gstRate);
-      netPayableAmount = totalBaseAmount + gstAmount;
+      // ✅ Tax Invoice: Base Amount calculated, GST calculate karo based on gstType
+      if (gstExcluded) {
+        gstAmount = 0;
+        netPayableAmount = totalBaseAmount;
+      } else {
+        const gstRate = 0.18;
+        gstAmount = Math.round(totalBaseAmount * gstRate);
+        netPayableAmount = totalBaseAmount + gstAmount;
+      }
     }
 
     // Use exact final amount without rounding
@@ -109,11 +120,8 @@ const getDisplayAmounts = () => {
     let numAmount = Number(amount);
     if (isNaN(numAmount)) return "₹0";
 
-    // Always show full precision for invoice modal - no abbreviations
-    return "₹" + new Intl.NumberFormat('en-IN', {
-      maximumFractionDigits: 2,
-      minimumFractionDigits: 2
-    }).format(numAmount);
+    // Show full precision for exact amounts - no rounding
+    return "₹" + numAmount.toString();
   };
 
   const displayAmounts = getDisplayAmounts();
@@ -212,10 +220,7 @@ const getDisplayAmounts = () => {
                         <td className="px-3 py-2">{contract.year || 'N/A'}</td>
                         <td className="px-3 py-2">{contract.studentCount || '0'}</td>
                         <td className="px-3 py-2 font-semibold">
-                          ₹{new Intl.NumberFormat('en-IN', {
-                            maximumFractionDigits: 2,
-                            minimumFractionDigits: 2
-                          }).format(amount)}
+                          ₹{amount.toString()}
                         </td>
                       </tr>
                     );
@@ -243,7 +248,9 @@ const getDisplayAmounts = () => {
               {invoiceType === 'Cash Invoice' 
                 ? 'Cash Invoice: Base Amount will be used as Final Amount (No GST)' 
                 : invoiceType === 'Tax Invoice'
-                ? 'Tax Invoice: Base Amount + 18% GST = Final Amount'
+                ? isGstExcluded 
+                  ? 'Tax Invoice: GST Excluded - Base Amount = Final Amount'
+                  : 'Tax Invoice: Base Amount + 18% GST = Final Amount'
                 : 'Proforma Invoice: For quotation purposes'
               }
             </p>

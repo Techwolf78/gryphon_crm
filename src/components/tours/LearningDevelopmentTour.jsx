@@ -65,8 +65,7 @@ export default function LearningDevelopmentTour({ userId, enabled = true }) {
         const isCompleted = status === "done";
         setCompleted(isCompleted);
         setRun(enabled && !isCompleted);
-      } catch (error) {
-
+      } catch {
         setRun(enabled); // Default to showing tour if error
       } finally {
         setLoading(false);

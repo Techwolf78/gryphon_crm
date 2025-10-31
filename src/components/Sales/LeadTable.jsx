@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from "react";
-import { FaEllipsisV, FaTimes, FaArrowDown } from "react-icons/fa";
+import { FaEllipsisV, FaTimes } from "react-icons/fa";
 import DropdownActions from "./DropdownAction";
 import ClosedLeads from "../Sales/Closed/ClosedLeads";
 import LeadDetailsModal from "./LeadDetailsModal";
@@ -44,8 +44,6 @@ export default function LeadsTable({
 }) {
   const [selectedLeadForDetails, setSelectedLeadForDetails] = useState(null);
   const [visibleLeadsCount, setVisibleLeadsCount] = useState(10);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [selectedTeamUserId, setSelectedTeamUserId] = useState("all");
 
   const handleLoadMore = useCallback(() => {
     setVisibleLeadsCount((prev) => prev + 20);
@@ -375,8 +373,7 @@ export default function LeadsTable({
             <div className="sticky bottom-0 bg-gray-50  flex justify-center">
               <button
                 onClick={handleLoadMore}
-                disabled={isLoadingMore}
-                className={`
+                className="
         flex items-center justify-center 
         px-5 py-2 
         text-sm font-medium 
@@ -386,50 +383,23 @@ export default function LeadsTable({
         hover:bg-blue-50 
         transition-colors duration-200
         min-w-[160px]
-        ${isLoadingMore ? "opacity-80 pointer-events-none" : ""}
-      `}
+      "
               >
-                {isLoadingMore ? (
-                  <span className="flex items-center gap-2">
-                    <svg
-                      className="animate-spin h-4 w-4 text-blue-600"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                    Loading...
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    Show more
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-4 w-4"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M16.707 10.293a1 1 0 010 1.414l-6 6a1 1 0 01-1.414 0l-6-6a1 1 0 111.414-1.414L9 14.586V3a1 1 0 012 0v11.586l4.293-4.293a1 1 0 011.414 0z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </span>
-                )}
+                <span className="flex items-center gap-2">
+                  Show more
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M16.707 10.293a1 1 0 010 1.414l-6 6a1 1 0 01-1.414 0l-6-6a1 1 0 111.414-1.414L9 14.586V3a1 1 0 012 0v11.586l4.293-4.293a1 1 0 011.414 0z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </span>
               </button>
             </div>
           )}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   EyeIcon,
   MailIcon,
@@ -18,14 +18,10 @@ function CollegeSelection({
   setOtherCollegesInput,
   showOtherCollegesInput,
   setShowOtherCollegesInput,
-  viewStudents,
-  collegeEmails,
   manualEmails,
   handleEmailChange,
   getCollegeEmail,
   collegeDetails,
-  onDownloadTemplate,
-  onUploadExcel,
   selectedTemplateFields,
   onTemplateFieldsChange 
 }) {
@@ -301,7 +297,7 @@ function CollegeSelection({
                         )}
                       </label>
                     </div>
-                    <div className="flex items-center space-x-2">
+                    {/* <div className="flex items-center space-x-2">
                       {college !== "Other" && (
                         <>
                           <button
@@ -329,7 +325,7 @@ function CollegeSelection({
                           </button>
                         </>
                       )}
-                    </div>
+                    </div> */}
                   </div>
 
                   {/* College Details */}

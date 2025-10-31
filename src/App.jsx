@@ -6,13 +6,16 @@ import {
   useLocation,
 } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
-import MsalProviderWrapper from "./context/MsalProviderWrapper";
+import { NotificationsProvider } from "./context/NotificationsContext";
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import DashboardLayout from "./components/DashboardLayout";
 import SessionManager from "./components/SessionManager";
+import ErrorBoundary from "./components/ErrorBoundary";
+import ConnectionStatus from "./components/ConnectionStatus";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import MsalProviderWrapper from "./context/MsalProviderWrapper";
 
 // Lazy load all page components
 const Home = React.lazy(() => import("./pages/Home"));
@@ -67,6 +70,7 @@ const AppContent = () => {
     <>
       {!hideNavbarRoutes.includes(location.pathname) && <Navbar />}
       <SessionManager />
+      <ConnectionStatus />
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<Home />} />
@@ -118,25 +122,31 @@ const AppContent = () => {
 };
  
 const App = () => (
-  <MsalProviderWrapper>
-    <AuthProvider>
-      <Router basename="/">
-        <AppContent />
-      </Router>
-      <ToastContainer
-        position="bottom-right"
-        autoClose={5000}
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="colored"
-      />
-    </AuthProvider>
-  </MsalProviderWrapper>
+  <>
+    <ErrorBoundary>
+      <MsalProviderWrapper>
+        <AuthProvider>
+          <NotificationsProvider>
+            <Router basename="/">
+              <AppContent />
+            </Router>
+          </NotificationsProvider>
+        </AuthProvider>
+      </MsalProviderWrapper>
+    </ErrorBoundary>
+    <ToastContainer
+      position="bottom-right"
+      autoClose={5000}
+      hideProgressBar={false}
+      newestOnTop={false}
+      closeOnClick
+      rtl={false}
+      pauseOnFocusLoss
+      draggable
+      pauseOnHover
+      theme="colored"
+    />
+  </>
 );
  
 export default App;

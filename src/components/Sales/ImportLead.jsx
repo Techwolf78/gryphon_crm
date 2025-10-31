@@ -376,7 +376,6 @@ const processExcel = (file) => {
       // Use batch write for better performance
       const batch = writeBatch(db);
       const currentUser = auth.currentUser;
-      const currentDate = new Date();
 
       validatedLeads.forEach((lead) => {
         const docRef = doc(collection(db, "leads"));

@@ -17,7 +17,6 @@ const AiBot = ({ isOpen, onClose }) => {
   const [inputMessage, setInputMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
-  const [localHandledMessages, setLocalHandledMessages] = useState([]);
   const [expandRing, setExpandRing] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -102,7 +101,6 @@ const AiBot = ({ isOpen, onClose }) => {
       keywords.some((kw) => new RegExp(`\\b${kw}\\b`, "i").test(userMsg))
     );
     if (canned) {
-      setLocalHandledMessages((prev) => [...prev, userMsg]);
       const reply = Array.isArray(canned.replies)
         ? canned.replies[Math.floor(Math.random() * canned.replies.length)]
         : canned.reply;
@@ -155,7 +153,7 @@ const AiBot = ({ isOpen, onClose }) => {
           },
         ]);
       }
-    } catch (err) {
+    } catch {
       setChatMessages((prev) => [
         ...prev,
         {

@@ -19,6 +19,7 @@ import {
   FiUserCheck,
   FiUser,
   FiShield,
+  FiBell
 } from "react-icons/fi";
  
 const roleLinks = {
@@ -169,25 +170,61 @@ const Sidebar = ({ collapsed, onToggle }) => {
  
         {/* Navigation */}
         <nav className="flex-1 p-3 space-y-2 overflow-y-auto">
-          {links.map(({ label, path, icon, skipRedirect }) => (
-            <Link
-              key={path}
-              to={path}
-              state={skipRedirect ? { skipRedirect: true } : undefined}
-              className={`flex items-center px-3 py-2 rounded text-sm transition ${
-                isActive(path) ? "bg-blue-50 text-blue-600 font-medium" : "text-gray-600 hover:bg-gray-100"
-              }`}
-              title={collapsed ? label : ""}
-              onClick={() => {
-                // Auto-close sidebar on mobile after navigation
-                if (window.innerWidth < 1024) {
-                  handleToggle();
-                }
-              }}
-            >
-              <span className="text-lg flex-shrink-0">{icon}</span>
-              {!collapsed && <span className="ml-2 truncate">{label}</span>}
-            </Link>
+          {links.map(({ label, path, icon, skipRedirect, onClick, hasNotification }) => (
+            <div key={path} className="relative">
+              {onClick ? (
+                <button
+                  onClick={() => {
+                    onClick();
+                    // Auto-close sidebar on mobile when opening modal
+                    if (window.innerWidth < 1024) {
+                      handleToggle();
+                    }
+                  }}
+                  className={`w-full flex items-center px-3 py-2 rounded text-sm transition ${
+                    "text-gray-600 hover:bg-gray-100"
+                  } notifications-button`}
+                  title={collapsed ? label : ""}
+                >
+                  <span className="text-lg flex-shrink-0 relative">
+                    {icon}
+                    {collapsed && hasNotification && (
+                      <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                    )}
+                  </span>
+                  {!collapsed && <span className="ml-2 truncate">{label}</span>}
+                  {!collapsed && hasNotification && (
+                    <span className="ml-auto w-2 h-2 bg-red-500 rounded-full"></span>
+                  )}
+                </button>
+              ) : (
+                <Link
+                  to={path}
+                  state={skipRedirect ? { skipRedirect: true } : undefined}
+                  className={`flex items-center px-3 py-2 rounded text-sm transition ${
+                    isActive(path) ? "bg-blue-50 text-blue-600 font-medium" : "text-gray-600 hover:bg-gray-100"
+                  }`}
+                  title={collapsed ? label : ""}
+                  onClick={() => {
+                    // Auto-close sidebar on mobile after navigation
+                    if (window.innerWidth < 1024) {
+                      handleToggle();
+                    }
+                  }}
+                >
+                  <span className="text-lg flex-shrink-0 relative">
+                    {icon}
+                    {collapsed && hasNotification && (
+                      <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                    )}
+                  </span>
+                  {!collapsed && <span className="ml-2 truncate">{label}</span>}
+                  {!collapsed && hasNotification && (
+                    <span className="ml-auto w-2 h-2 bg-red-500 rounded-full"></span>
+                  )}
+                </Link>
+              )}
+            </div>
           ))}
  
           {/* AI Button */}
@@ -209,7 +246,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
           </div>
         </nav>
       </aside>
- 
+
       <AiBot isOpen={isAIDrawerOpen} onClose={() => setIsAIDrawerOpen(false)} />
     </>
   );

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { db } from "../firebase";
-import { collection, getDocs, getDoc } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import StudentListModal from "../components/Placement/StudentListModal";
 import AddJD from "../components/Placement/AddJd/AddJD";
 import CompanyOpen from "../components/Placement/CompanyOpen/CompanyOpen";
@@ -8,7 +8,6 @@ import CompanyLeads from "../components/Placement/CompanyLeads/CompanyLeads";
 import MouPreviewModal from "../components/Placement/MouPreviewModal";
 import PlacementDetailsModal from "../components/Placement/PlacementDetailsModal";
 import { Eye, User, FileText } from "lucide-react";
-import { doc } from "firebase/firestore";
 
 function Placement() {
   const [trainingData, setTrainingData] = useState([]);
@@ -20,7 +19,6 @@ function Placement() {
     students: [],
   });
   const [showJDForm, setShowJDForm] = useState(false);
-  const [viewMode, setViewMode] = useState("training");
   const [mouPreview, setMouPreview] = useState({
     show: false,
     url: null,

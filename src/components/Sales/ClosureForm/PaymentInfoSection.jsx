@@ -59,7 +59,7 @@ const PaymentInfoSection = ({ formData, setFormData }) => {
       netPayableAmount: netPayable,
       paymentDetails, // This will store all payment breakdowns
       emiSplits: formData.paymentType === "EMI" && formData.emiMonths > 0 
-        ? Array(formData.emiMonths).fill(netPayable / formData.emiMonths)
+        ? Array(formData.emiMonths).fill(parseFloat((netPayable / formData.emiMonths).toFixed(2)))
         : prev.emiSplits
     }));
   }, [formData.totalCost, formData.gstType, formData.paymentType, formData.emiMonths, formData.paymentSplits, fields, setFormData]);

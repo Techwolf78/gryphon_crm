@@ -13,7 +13,6 @@ const ProfilePictureModal = ({
   currentImage,
   onClose,
   onSave,
-  avatars,
   defaultIcon,
 }) => {
   const fileRef = useRef(null);
