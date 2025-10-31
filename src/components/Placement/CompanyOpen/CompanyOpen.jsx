@@ -17,14 +17,41 @@ const getCollegeAbbreviation = (collegeName) => {
     .toUpperCase();
 };
 
+import { updateDoc } from "firebase/firestore";
+
 function CompanyOpen() {
   const [companies, setCompanies] = useState([]);
+  // Update company status in Firestore and local state
+  const updateCompanyStatus = async (companyId, newStatus) => {
+    try {
+      // Find the company doc
+      const companyDoc = companies.find((c) => c.id === companyId);
+      if (!companyDoc) return;
+      // Update in Firestore
+      const docRef = doc(db, "companies", companyId);
+      await updateDoc(docRef, { status: newStatus });
+      // Update local state
+      setCompanies((prev) =>
+        prev.map((c) =>
+          c.id === companyId ? { ...c, status: newStatus } : c
+        )
+      );
+    } catch (err) {
+      alert("Failed to update status. Please try again.");
+      console.error("Error updating company status:", err);
+    }
+  };
   const [selectedCompany, setSelectedCompany] = useState(null);
   const [activeTab, setActiveTab] = useState("ongoing");
   const [loading, setLoading] = useState(true);
   const [showJDForm, setShowJDForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(null);
+
+  // Close any open dropdown when tab changes
+  useEffect(() => {
+    setDropdownOpen(null);
+  }, [activeTab]);
   const [filters, setFilters] = useState({});
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [users, setUsers] = useState([]);
@@ -219,6 +246,7 @@ const fetchStudents = async () => {
           dropdownOpen={dropdownOpen}
           setDropdownOpen={setDropdownOpen}
           setShowJDForm={setShowJDForm}
+          updateCompanyStatus={updateCompanyStatus}
         />
 
         {selectedCompany && (
