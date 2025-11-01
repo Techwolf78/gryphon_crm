@@ -335,7 +335,7 @@ if (isDuplicate) {
   return;
 }
 
-} catch (error) {
+} catch {
 
   alert("Something went wrong while checking duplicate.");
   setLoading(false);
@@ -431,7 +431,7 @@ if (isDuplicate) {
 
       setLoading(false);
       handleClose();
-    } catch (error) {
+    } catch {
 
       alert("Failed to add some leads. Please try again.");
       setLoading(false);

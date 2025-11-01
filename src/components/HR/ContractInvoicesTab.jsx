@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
+import ConnectionStatus from '../ConnectionStatus';
 import InvoiceModal from "./InvoiceModal";
 import { saveAs } from "file-saver";
 import * as XLSX from "xlsx";
+import { safeFirebaseQuery } from "../../utils/firebaseUtils";
 
 // Statistics Cards Component
 const StatisticsCards = ({ stats, formatIndianCurrency }) => {
@@ -328,21 +330,24 @@ const ContractInvoicesTab = () => {
   const filtersButtonRef = useRef(null);
   const dropdownRef = useRef(null);
 
-  // Helper function to get payment amounts - consistent with InvoiceModal
+  // Helper function to get payment amounts - uses stored GST values from Firestore
   const getPaymentAmounts = (invoice) => {
-    if (invoice.baseAmount !== undefined) {
+    // Use stored values from Firestore if available
+    if (invoice.baseAmount !== undefined || invoice.gstAmount !== undefined) {
       return {
-        baseAmount: invoice.baseAmount,
-        gstAmount: invoice.gstAmount || 0,
-        totalAmount: invoice.netPayableAmount || invoice.amountRaised || invoice.totalAmount || 0,
+        baseAmount: invoice.baseAmount || invoice.actualBaseAmount || invoice.displayBaseAmount || 0,
+        gstAmount: invoice.gstAmount || invoice.actualGstAmount || invoice.displayGstAmount || 0,
+        totalAmount: invoice.netPayableAmount || invoice.amountRaised || invoice.actualTotalAmount || invoice.displayTotalAmount || invoice.totalAmount || 0,
       };
     }
 
+    // Fallback for legacy invoices without stored GST values
     if (!invoice.paymentDetails || invoice.paymentDetails.length === 0) {
       const total =
         invoice.amount || invoice.netPayableAmount || invoice.amountRaised || invoice.totalAmount || 0;
-      const baseAmount = total / 1.18;
-      const gstAmount = total - baseAmount;
+      // For legacy invoices, use stored values if available, otherwise calculate
+      const baseAmount = invoice.baseAmount || invoice.actualBaseAmount || invoice.displayBaseAmount || (total / 1.18);
+      const gstAmount = invoice.gstAmount || invoice.actualGstAmount || invoice.displayGstAmount || (total - baseAmount);
 
       return {
         baseAmount: Math.round(baseAmount),
@@ -353,12 +358,14 @@ const ContractInvoicesTab = () => {
 
     const payment = invoice.paymentDetails[0];
     return {
-      baseAmount: payment.baseAmount || payment.totalAmount / 1.18,
-      gstAmount: payment.gstAmount || invoice.gstAmount || 0,
+      baseAmount: payment.baseAmount || invoice.baseAmount || invoice.actualBaseAmount || invoice.displayBaseAmount || (payment.totalAmount / 1.18),
+      gstAmount: payment.gstAmount || invoice.gstAmount || invoice.actualGstAmount || invoice.displayGstAmount || 0,
       totalAmount:
         payment.totalAmount ||
         invoice.netPayableAmount ||
         invoice.amountRaised ||
+        invoice.actualTotalAmount ||
+        invoice.displayTotalAmount ||
         invoice.totalAmount ||
         0,
     };
@@ -397,12 +404,21 @@ const ContractInvoicesTab = () => {
       stats.totalAmount += amounts.totalAmount || 0;
       stats.receivedAmount += parseFloat(invoice.receivedAmount) || 0;
 
-      // Calculate total billed amount from payment history (including GST for tax invoices only)
+      // Calculate total billed amount from payment history (using stored GST amounts)
       const totalBilledAmount = invoice.paymentHistory?.reduce((sum, payment) => {
         const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
         const tdsBaseType = payment.tdsBaseType || "base";
         const isCashInvoice = invoice.invoiceType === "Cash Invoice";
-        const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? Math.round(originalAmount * 1.18) : originalAmount);
+
+        if (isCashInvoice) {
+          return sum + originalAmount;
+        }
+
+        // Use stored GST amounts to calculate the rate
+        const amounts = getPaymentAmounts(invoice);
+        const gstRate = amounts.baseAmount > 0 ? amounts.gstAmount / amounts.baseAmount : 0.18; // fallback to 18% if no stored amounts
+
+        const billedAmount = tdsBaseType === "base" ? Math.round(originalAmount * (1 + gstRate)) : originalAmount;
         return sum + billedAmount;
       }, 0) || 0;
 
@@ -423,13 +439,27 @@ const ContractInvoicesTab = () => {
     setStats(stats);
   }, []);
 
-  const fetchInvoices = useCallback(async () => {
+  const fetchInvoices = useCallback(async (retryCount = 0) => {
+    const maxRetries = 3;
+    const baseDelay = 1000; // 1 second
+
     try {
       setLoading(true);
       setError(null);
 
-      const contractsRef = collection(db, "ContractInvoices");
-      const snapshot = await getDocs(contractsRef);
+      // Use safeFirebaseQuery for rate limiting and connection handling
+      const snapshot = await safeFirebaseQuery(
+        async () => {
+          const contractsRef = collection(db, "ContractInvoices");
+          return await getDocs(contractsRef);
+        },
+        {
+          maxRetries,
+          baseDelay,
+          retryOnNetworkError: true,
+          showConnectionError: true
+        }
+      );
 
       if (snapshot.docs.length > 0) {
         const data = snapshot.docs.map((doc) => ({
@@ -453,7 +483,27 @@ const ContractInvoicesTab = () => {
         calculateStats([]);
       }
     } catch (error) {
-      setError(`Error: ${error.message}`);
+      console.error(`Error fetching invoices (attempt ${retryCount + 1}):`, error);
+
+      // Check if it's a network error or temporary Firebase error that should be retried
+      const isRetryableError = error.code === 'unavailable' ||
+                              error.code === 'deadline-exceeded' ||
+                              error.code === 'resource-exhausted' ||
+                              error.message?.includes('network') ||
+                              error.message?.includes('timeout');
+
+      if (isRetryableError && retryCount < maxRetries) {
+        const delay = baseDelay * Math.pow(2, retryCount); // Exponential backoff
+        console.log(`Retrying in ${delay}ms...`);
+
+        setTimeout(() => {
+          fetchInvoices(retryCount + 1);
+        }, delay);
+        return;
+      }
+
+      // If max retries reached or non-retryable error, show error
+      setError(`Failed to load invoices: ${error.message}. Please check your connection and try again.`);
     } finally {
       setLoading(false);
     }
@@ -519,12 +569,21 @@ const ContractInvoicesTab = () => {
         } else if (filters.status === "cancelled") {
           return invoice.approvalStatus === "cancelled";
         } else if (filters.status === "fully_paid") {
-          // Calculate total billed amount from payment history (including GST for tax invoices only)
+          // Calculate total billed amount from payment history (using stored GST amounts)
           const totalBilledAmount = invoice.paymentHistory?.reduce((sum, payment) => {
             const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
             const tdsBaseType = payment.tdsBaseType || "base";
             const isCashInvoice = invoice.invoiceType === "Cash Invoice";
-            const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? Math.round(originalAmount * 1.18) : originalAmount);
+
+            if (isCashInvoice) {
+              return sum + originalAmount;
+            }
+
+            // Use stored GST amounts to calculate the rate
+            const amounts = getPaymentAmounts(invoice);
+            const gstRate = amounts.baseAmount > 0 ? amounts.gstAmount / amounts.baseAmount : 0.18; // fallback to 18% if no stored amounts
+
+            const billedAmount = tdsBaseType === "base" ? Math.round(originalAmount * (1 + gstRate)) : originalAmount;
             return sum + billedAmount;
           }, 0) || 0;
 
@@ -864,12 +923,20 @@ const ContractInvoicesTab = () => {
     const totalAmount = amounts.totalAmount || 0;
     const receivedAmount = parseFloat(invoice.receivedAmount) || 0;
 
-    // Calculate total billed amount from payment history (including GST for tax invoices only)
+    // Calculate total billed amount from payment history (using stored GST amounts)
     const totalBilledAmount = invoice.paymentHistory?.reduce((sum, payment) => {
       const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
       const tdsBaseType = payment.tdsBaseType || "base";
       const isCashInvoice = invoice.invoiceType === "Cash Invoice";
-      const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? Math.round(originalAmount * 1.18) : originalAmount);
+
+      if (isCashInvoice) {
+        return sum + originalAmount;
+      }
+
+      // Use stored GST amounts to calculate the rate
+      const gstRate = amounts.baseAmount > 0 ? amounts.gstAmount / amounts.baseAmount : 0.18; // fallback to 18% if no stored amounts
+
+      const billedAmount = tdsBaseType === "base" ? Math.round(originalAmount * (1 + gstRate)) : originalAmount;
       return sum + billedAmount;
     }, 0) || 0;
 
@@ -1068,18 +1135,19 @@ const ContractInvoicesTab = () => {
 
       if (finalOriginalAmount > invoice.dueAmount) {
         alert(
-          `Calculated original amount (₹${finalOriginalAmount.toFixed(2)}) cannot be more than due amount (₹${invoice.dueAmount})`
+          `Calculated original amount (₹${finalOriginalAmount.toString()}) cannot be more than due amount (₹${invoice.dueAmount})`
         );
         return;
       }
 
-      const invoiceRef = doc(db, "ContractInvoices", invoice.id);
-      const newReceivedAmount =
-        (invoice.receivedAmount || 0) + actualReceived;
+      // Calculate the total billed amount for this payment using stored GST rate
+      const amounts = getPaymentAmounts(invoice);
+      const gstRate = amounts.baseAmount > 0 ? amounts.gstAmount / amounts.baseAmount : 0.18; // fallback to 18% if no stored amounts
+      const totalBilledAmount = tdsBaseType === "base" ? Math.round(finalOriginalAmount * (1 + gstRate)) : finalOriginalAmount;
 
-      // Calculate the total billed amount for this payment
-      const totalBilledAmount = tdsBaseType === "base" ? Math.round(finalOriginalAmount * 1.18) : finalOriginalAmount;
-      const newDueAmount = Math.max(0, invoice.dueAmount - totalBilledAmount);
+      // Calculate new amounts
+      const newReceivedAmount = (parseFloat(invoice.receivedAmount) || 0) + actualReceived;
+      const newDueAmount = Math.max(0, (parseFloat(invoice.dueAmount) || amounts.totalAmount) - totalBilledAmount);
 
       // Create payment record with the combined date and time
       const paymentRecord = {
@@ -1100,6 +1168,7 @@ const ContractInvoicesTab = () => {
         newStatus = "partially_received";
       }
 
+      const invoiceRef = doc(db, "ContractInvoices", invoice.id);
       const updateData = {
         receivedAmount: newReceivedAmount,
         dueAmount: newDueAmount,
@@ -1130,7 +1199,7 @@ const ContractInvoicesTab = () => {
       setPaymentModal({ isOpen: false, invoice: null });
 
       const tdsMessage = tdsPercent > 0
-        ? `\nTDS Deducted: ₹${finalTdsAmount.toFixed(2)} (${tdsPercent}%)`
+        ? `\nTDS Deducted: ₹${finalTdsAmount.toString()} (${tdsPercent}%)`
         : "";
 
       alert(
@@ -1215,7 +1284,7 @@ const ContractInvoicesTab = () => {
                       <div>
                         <p className="text-xs text-gray-600 font-medium">Total TDS</p>
                         <p className="text-xs font-bold text-red-600">
-                          ₹{sortedPayments.reduce((sum, p) => sum + (p.tdsAmount || 0), 0).toFixed(2)}
+                          ₹{sortedPayments.reduce((sum, p) => sum + (p.tdsAmount || 0), 0).toString()}
                         </p>
                       </div>
                       <div>
@@ -1294,7 +1363,7 @@ const ContractInvoicesTab = () => {
                               </td>
                               <td className="px-2 py-1.5 text-xs">
                                 {tdsAmount >= 0 ? (
-                                  <span className="font-bold text-red-700">₹{tdsAmount.toFixed(2)}</span>
+                                  <span className="font-bold text-red-700">₹{tdsAmount.toString()}</span>
                                 ) : (
                                   <span className="text-gray-400">-</span>
                                 )}
@@ -1358,7 +1427,7 @@ const ContractInvoicesTab = () => {
       if (tdsPercent >= 0) { // Allow TDS 0% and above
         const baseAmount = tdsBaseType === "base" ? amounts.baseAmount : amounts.totalAmount;
         const calculatedReceived = baseAmount - (baseAmount * tdsPercent / 100);
-        setAmount(calculatedReceived.toFixed(2));
+        setAmount(calculatedReceived.toString());
       } else {
         setAmount(""); // Clear amount if invalid TDS
       }
@@ -1384,24 +1453,23 @@ const ContractInvoicesTab = () => {
       const originalAmount = receivedAmount / (1 - tdsPercent / 100);
       const tdsAmount = originalAmount - receivedAmount;
 
-      // Calculate base amount and GST (assuming 18% GST for tax invoices, 0% for cash invoices)
+      // Calculate base amount and GST using stored amounts from Firestore
       const isCashInvoice = invoice.invoiceType === "Cash Invoice";
-      const gstRate = isCashInvoice ? 0 : 0.18;
       let baseAmount, gstAmount, totalBilled, actualReceivedAmount;
 
       if (tdsBaseType === "base") {
         // TDS calculated on base amount
         // originalAmount here is the base amount (after TDS deduction)
         baseAmount = originalAmount;
-        gstAmount = amounts.baseAmount * gstRate;
+        gstAmount = isCashInvoice ? 0 : amounts.gstAmount; // Use stored GST amount
         totalBilled = baseAmount + gstAmount;
         actualReceivedAmount = receivedAmount + gstAmount; // Add GST back to show total received
       } else {
         // TDS calculated on total amount including GST
         // originalAmount here is the total billed amount (after TDS deduction)
         totalBilled = originalAmount;
-        baseAmount = totalBilled / (1 + gstRate);
-        gstAmount = totalBilled - baseAmount;
+        baseAmount = isCashInvoice ? totalBilled : amounts.baseAmount; // Use stored base amount
+        gstAmount = isCashInvoice ? 0 : amounts.gstAmount; // Use stored GST amount
         actualReceivedAmount = receivedAmount; // Total amount after TDS
       }
 
@@ -1440,7 +1508,7 @@ const ContractInvoicesTab = () => {
       const originalAmount = tdsPercent > 0 ? receivedAmount / (1 - tdsPercent / 100) : receivedAmount;
       const tdsAmount = originalAmount - receivedAmount;
 
-      // Calculate the total billed amount for validation
+      // Calculate the total billed amount for validation using stored GST amounts
       // For cash invoices, no GST is applied (base = total), for tax invoices, GST is applied
       const isCashInvoice = invoice.invoiceType === "Cash Invoice";
       let totalBilledAmount;
@@ -1449,10 +1517,10 @@ const ContractInvoicesTab = () => {
         // For cash invoices, base = total, no GST
         totalBilledAmount = originalAmount;
       } else {
-        // For tax invoices, apply GST based on TDS base type
+        // For tax invoices, apply GST based on TDS base type using stored amounts
         if (tdsBaseType === "base") {
           // TDS calculated on base amount, GST added to remaining base
-          totalBilledAmount = originalAmount + Math.round(originalAmount * 0.18); // base + GST
+          totalBilledAmount = originalAmount + amounts.gstAmount; // Use stored GST amount
         } else {
           // TDS calculated on total amount including GST
           totalBilledAmount = originalAmount;
@@ -1460,8 +1528,9 @@ const ContractInvoicesTab = () => {
       }
 
       // Check if the calculated total billed amount exceeds due amount
-      if (totalBilledAmount > dueAmount) {
-        alert(`Calculated total billed amount (₹${totalBilledAmount.toFixed(2)}) exceeds due amount (₹${dueAmount})`);
+      if (Math.abs(totalBilledAmount - dueAmount) > 0.01) {
+        const excessAmount = totalBilledAmount - dueAmount;
+        alert(`Calculated total billed amount (₹${totalBilledAmount.toString()}) exceeds due amount (₹${dueAmount.toString()}) by ₹${Math.round(Math.abs(excessAmount) * 100) / 100}. Please reduce the amount to match the due amount.`);
         return;
       }
 
@@ -1477,11 +1546,11 @@ const ContractInvoicesTab = () => {
         currentTime.getSeconds()
       );
 
-      // Calculate the actual received amount based on TDS base type
+      // Calculate the actual received amount based on TDS base type using stored GST amounts
       let actualReceivedAmount = receivedAmount;
       if (tdsBaseType === "base" && !isCashInvoice) {
-        // For TDS on base, add GST to the typed amount
-        actualReceivedAmount = receivedAmount + Math.round(originalAmount * 0.18);
+        // For TDS on base, add GST to the typed amount using stored GST amount
+        actualReceivedAmount = receivedAmount + amounts.gstAmount;
       }
 
       onSubmit(invoice, actualReceivedAmount, paymentDateTime.toISOString(), tdsPercent, originalAmount, tdsAmount, tdsBaseType);
@@ -1725,7 +1794,7 @@ const ContractInvoicesTab = () => {
                 </div>
                 <input
                   type="text"
-                  value={amount && tdsPercentage ? tdsBreakdown.receivedAfterTDS.toFixed(2) : ""}
+                  value={amount && tdsPercentage ? tdsBreakdown.receivedAfterTDS.toString() : ""}
                   readOnly
                   className="w-full pl-6 pr-3 py-2 border border-gray-300 rounded-lg text-xs bg-gray-50 text-gray-900 cursor-not-allowed"
                 />
@@ -1749,16 +1818,16 @@ const ContractInvoicesTab = () => {
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">{tdsBaseType === "base" ? "Base Amount Billed:" : "Total Amount Billed:"}</span>
-                    <span className="font-semibold text-gray-900">₹{(tdsBaseType === "base" ? amounts.baseAmount : tdsBreakdown.totalBilled).toFixed(2)}</span>
+                    <span className="font-semibold text-gray-900">₹{(tdsBaseType === "base" ? amounts.baseAmount : tdsBreakdown.totalBilled).toString()}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">TDS Deducted ({tdsPercentage}%):</span>
-                    <span className="font-semibold text-red-600">-₹{tdsBreakdown.tdsAmount.toFixed(2)}</span>
+                    <span className="font-semibold text-red-600">-₹{tdsBreakdown.tdsAmount.toString()}</span>
                   </div>
                   {tdsBaseType === "base" && invoice.invoiceType !== "Cash Invoice" && (
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600">GST Amount (18%):</span>
-                      <span className="font-semibold text-blue-600">+₹{tdsBreakdown.gstAmount.toFixed(2)}</span>
+                      <span className="text-gray-600">GST Amount:</span>
+                      <span className="font-semibold text-blue-600">{formatIndianCurrency(amounts.gstAmount, false)}</span>
                     </div>
                   )}
                   <div className="flex justify-between items-center border-t border-blue-200 pt-1 mt-1">
@@ -1767,16 +1836,18 @@ const ContractInvoicesTab = () => {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 font-medium">Due Amount:</span>
-                    <span className={`font-bold ${tdsBreakdown.totalBilled > dueAmount ? 'text-red-600' : 'text-green-600'}`}>
-                      ₹{Math.max(0, dueAmount - tdsBreakdown.totalBilled).toFixed(2)}
+                    <span className={`font-bold ${Math.abs(dueAmount - tdsBreakdown.totalBilled) > 0.01 ? 'text-red-600' : 'text-green-600'}`}>
+                      ₹{Math.max(0, Math.round((dueAmount - tdsBreakdown.totalBilled) * 100) / 100).toString()}
                     </span>
                   </div>
-                  {tdsBreakdown.totalBilled > dueAmount && (
+                  {Math.abs(tdsBreakdown.totalBilled - dueAmount) > 0.01 && (
                     <div className="flex items-center space-x-1 mt-1 p-1 bg-red-50 rounded-md border border-red-200">
                       <svg className="w-3 h-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
                       </svg>
-                      <p className="text-xs text-red-700 font-medium">Calculated amount exceeds due amount</p>
+                      <p className="text-xs text-red-700 font-medium">
+                        Calculated amount exceeds due amount by ₹{Math.round(Math.abs(tdsBreakdown.totalBilled - dueAmount) * 100) / 100}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -1795,7 +1866,7 @@ const ContractInvoicesTab = () => {
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={!amount || amount <= 0 || !paymentDate || (tdsPercentage > 0 && tdsBreakdown.totalBilled > dueAmount)}
+                disabled={!amount || amount <= 0 || !paymentDate || (tdsPercentage > 0 && Math.abs(tdsBreakdown.totalBilled - dueAmount) > 0.01)}
                 className="flex-1 px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-xs font-semibold transition-all duration-200 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-sm transform hover:-translate-y-0.5 disabled:transform-none"
               >
                 <div className="flex items-center justify-center space-x-1">
@@ -2262,12 +2333,20 @@ const ContractInvoicesTab = () => {
                 const receivedAmount = parseFloat(invoice.receivedAmount) || 0;
                 const dbDueAmount = parseFloat(invoice.dueAmount) || 0;
 
-                // Calculate total billed amount from payment history (including GST for tax invoices only)
+                // Calculate total billed amount from payment history (using stored GST amounts)
                 const totalBilledAmount = invoice.paymentHistory?.reduce((sum, payment) => {
                   const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
                   const tdsBaseType = payment.tdsBaseType || "base";
                   const isCashInvoice = invoice.invoiceType === "Cash Invoice";
-                  const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? Math.round(originalAmount * 1.18) : originalAmount);
+
+                  if (isCashInvoice) {
+                    return sum + originalAmount;
+                  }
+
+                  // Use stored GST amounts to calculate the rate
+                  const gstRate = amounts.baseAmount > 0 ? amounts.gstAmount / amounts.baseAmount : 0.18; // fallback to 18% if no stored amounts
+
+                  const billedAmount = tdsBaseType === "base" ? Math.round(originalAmount * (1 + gstRate)) : originalAmount;
                   return sum + billedAmount;
                 }, 0) || 0;
 
@@ -2497,12 +2576,20 @@ const ContractInvoicesTab = () => {
                     const receivedAmount = parseFloat(invoice.receivedAmount) || 0;
                     const dbDueAmount = parseFloat(invoice.dueAmount) || 0;
 
-                    // Calculate total billed amount from payment history (including GST for tax invoices only)
+                    // Calculate total billed amount from payment history (using stored GST amounts)
                     const totalBilledAmount = invoice.paymentHistory?.reduce((sum, payment) => {
                       const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
                       const tdsBaseType = payment.tdsBaseType || "base";
                       const isCashInvoice = invoice.invoiceType === "Cash Invoice";
-                      const billedAmount = isCashInvoice ? originalAmount : (tdsBaseType === "base" ? originalAmount + Math.round(originalAmount * 0.18) : originalAmount);
+
+                      if (isCashInvoice) {
+                        return sum + originalAmount;
+                      }
+
+                      // Use stored GST amounts to calculate the rate
+                      const gstRate = amounts.baseAmount > 0 ? amounts.gstAmount / amounts.baseAmount : 0.18; // fallback to 18% if no stored amounts
+
+                      const billedAmount = tdsBaseType === "base" ? Math.round(originalAmount * (1 + gstRate)) : originalAmount;
                       return sum + billedAmount;
                     }, 0) || 0;
 
@@ -2758,6 +2845,8 @@ const ContractInvoicesTab = () => {
           onClose={() => setHistoryModal({ isOpen: false, invoice: null })}
         />
       )}
+
+      <ConnectionStatus onRetry={fetchInvoices} />
     </div>
   );
 };

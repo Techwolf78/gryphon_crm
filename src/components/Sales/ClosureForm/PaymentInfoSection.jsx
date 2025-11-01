@@ -59,7 +59,7 @@ const PaymentInfoSection = ({ formData, setFormData }) => {
       netPayableAmount: netPayable,
       paymentDetails, // This will store all payment breakdowns
       emiSplits: formData.paymentType === "EMI" && formData.emiMonths > 0 
-        ? Array(formData.emiMonths).fill(netPayable / formData.emiMonths)
+        ? Array(formData.emiMonths).fill(parseFloat((netPayable / formData.emiMonths).toFixed(2)))
         : prev.emiSplits
     }));
   }, [formData.totalCost, formData.gstType, formData.paymentType, formData.emiMonths, formData.paymentSplits, fields, setFormData]);
@@ -103,15 +103,8 @@ const PaymentInfoSection = ({ formData, setFormData }) => {
 
   useEffect(() => {
     if (formData.paymentType === "EMI" && formData.totalCost && formData.emiMonths > 0) {
-      const percentEach = 100 / formData.emiMonths;
-      const basePercent = Math.floor(percentEach * 100) / 100;
-      const emiArr = Array.from({ length: formData.emiMonths }, (_, i) => {
-        if (i === formData.emiMonths - 1) {
-          // Last installment takes the remainder to ensure sum equals 100%
-          return (100 - basePercent * (formData.emiMonths - 1)).toFixed(2);
-        }
-        return basePercent.toFixed(2);
-      });
+      const percentEach = (100 / formData.emiMonths).toFixed(2);
+      const emiArr = Array.from({ length: formData.emiMonths }, () => percentEach);
       setAutoEmiSplits(emiArr);
     }
   }, [formData.emiMonths, formData.totalCost, formData.paymentType]);
@@ -315,24 +308,14 @@ const PaymentInfoSection = ({ formData, setFormData }) => {
                 <p className="text-sm text-gray-700">Installments: {formData.emiMonths}</p>
                 <p className="text-sm text-gray-700">Each Installment: {autoEmiSplits[0]}%</p>
                 <p className="text-sm text-gray-700">
-                  Base Amount: ₹{((autoEmiSplits[0] / 100) * formData.totalCost).toFixed(2)}
+                  Base Amount: ₹{(formData.totalCost / formData.emiMonths).toFixed(2)}
                 </p>
                 <p className="text-sm text-gray-700">
                   GST ({formData.gstType === "include" ? "18%" : "0%"}): ₹
-                  {(
-                    (formData.gstType === "include" ? 0.18 : 0) *
-                    (autoEmiSplits[0] / 100) *
-                    formData.totalCost
-                  ).toFixed(2)}
+                  {(formData.gstAmount / formData.emiMonths).toFixed(2)}
                 </p>
                 <p className="text-sm text-gray-900 font-semibold col-span-2">
-                  Total per Installment: ₹
-                  {(
-                    ((autoEmiSplits[0] / 100) * formData.totalCost) +
-                    ((formData.gstType === "include" ? 0.18 : 0) *
-                      (autoEmiSplits[0] / 100) *
-                      formData.totalCost)
-                  ).toFixed(2)}
+                  Total per Installment: ₹{(formData.netPayableAmount / formData.emiMonths).toFixed(2)}
                 </p>
               </div>
 
@@ -346,30 +329,23 @@ const PaymentInfoSection = ({ formData, setFormData }) => {
 
               {showAllInstallments && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-auto-fit gap-4 mt-4">
-                  {autoEmiSplits.map((val, i) => {
-                    const percent = parseFloat(val);
-                    const baseAmount = (percent / 100) * formData.totalCost;
-                    const gstAmount = formData.gstType === "include" ? baseAmount * 0.18 : 0;
-                    const totalWithGST = baseAmount + gstAmount;
-
-                    return (
-                      <div key={i} className="p-4 bg-white rounded-lg shadow border space-y-1">
-                        <p className="font-semibold">Installment {i + 1}</p>
-                        <p className="text-sm text-gray-700">
-                          Amount: ₹{baseAmount.toFixed(2)}
-                        </p>
-                        <p className="text-sm text-gray-700">
-                          GST: ₹{gstAmount.toFixed(2)}
-                        </p>
-                        <p className="text-sm text-gray-900 font-semibold">
-                          Total: ₹{totalWithGST.toFixed(2)}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Calculation: {percent}% of ₹{formData.totalCost.toFixed(2)} + GST
-                        </p>
-                      </div>
-                    );
-                  })}
+                  {formData.paymentDetails.map((detail, i) => (
+                    <div key={i} className="p-4 bg-white rounded-lg shadow border space-y-1">
+                      <p className="font-semibold">Installment {i + 1}</p>
+                      <p className="text-sm text-gray-700">
+                        Amount: ₹{detail.baseAmount}
+                      </p>
+                      <p className="text-sm text-gray-700">
+                        GST: ₹{detail.gstAmount}
+                      </p>
+                      <p className="text-sm text-gray-900 font-semibold">
+                        Total: ₹{detail.totalAmount}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Calculation: {detail.percentage}% of ₹{formData.totalCost.toFixed(2)} + GST
+                      </p>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

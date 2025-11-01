@@ -85,7 +85,7 @@ const FileUploader = ({
             // Validate but don't block upload (no validation rules now)
             validateStudentData(jsonData);
             setPreviewData(jsonData);
-        } catch (error) {
+        } catch {
             setHasFileErrors(true);
             setFileErrorMsg("Error reading file. Please check the format.");
         } finally {

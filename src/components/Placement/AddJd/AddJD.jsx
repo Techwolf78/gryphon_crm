@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { XIcon } from "@heroicons/react/outline";
 import { db } from "../../../firebase";
 import {
@@ -99,7 +99,7 @@ function AddJD({ show, onClose }) {
       }));
 
       setPlacementUsers(users);
-    } catch (error) {
+    } catch {
       setPlacementUsers([]);
     } finally {
       setIsLoadingUsers(false);
@@ -174,7 +174,7 @@ function AddJD({ show, onClose }) {
     setCurrentStep(2);
   };
 
-  const fetchFilteredColleges = async () => {
+  const fetchFilteredColleges = useCallback(async () => {
     if (
       !formData.course ||
       !formData.passingYear ||
@@ -238,7 +238,7 @@ function AddJD({ show, onClose }) {
       console.error("Error fetching colleges:", error);
       setAvailableColleges(["Other"]);
     }
-  };
+  }, [formData.course, formData.passingYear, formData.specialization]);
 
   const fetchStudentsForCollege = async (college) => {
     setIsLoadingStudents(true);
@@ -350,7 +350,7 @@ function AddJD({ show, onClose }) {
             month: "2-digit",
             year: "numeric",
           });
-        } catch (error) {
+        } catch {
           return dateString;
         }
       };
@@ -516,7 +516,7 @@ function AddJD({ show, onClose }) {
 
   useEffect(() => {
     fetchFilteredColleges();
-  }, [formData.course, formData.passingYear, formData.specialization]);
+  }, [formData.course, formData.passingYear, formData.specialization, fetchFilteredColleges]);
 
   if (!show) return null;
 

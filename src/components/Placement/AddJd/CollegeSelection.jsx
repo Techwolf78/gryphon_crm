@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   EyeIcon,
   MailIcon,
@@ -18,14 +18,10 @@ function CollegeSelection({
   setOtherCollegesInput,
   showOtherCollegesInput,
   setShowOtherCollegesInput,
-  viewStudents,
-  collegeEmails,
   manualEmails,
   handleEmailChange,
   getCollegeEmail,
   collegeDetails,
-  onDownloadTemplate,
-  onUploadExcel,
   selectedTemplateFields,
   onTemplateFieldsChange 
 }) {

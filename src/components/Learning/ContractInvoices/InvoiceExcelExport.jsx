@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { saveAs } from "file-saver";
 import * as XLSX from "xlsx";
 import {
   collection,
   getDocs,
   query,
-  where,
   orderBy,
 } from "firebase/firestore";
 import { db } from "../../../firebase";
@@ -35,7 +34,7 @@ export default function InvoiceExcelExport() {
   };
 
   // Fetch invoices from BOTH collections
-  const fetchInvoices = async () => {
+  const fetchInvoices = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -104,13 +103,13 @@ export default function InvoiceExcelExport() {
       });
 
       setInvoices(allInvoices);
-    } catch (error) {
+    } catch {
 
       alert("Failed to fetch invoices. Please check console for details.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
 
   useEffect(() => {
     // Load default financial year
@@ -125,7 +124,7 @@ export default function InvoiceExcelExport() {
     if (filters.financialYear) {
       fetchInvoices();
     }
-  }, [filters.financialYear]);
+  }, [filters.financialYear, fetchInvoices]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -238,7 +237,7 @@ const calculateGSTBreakdown = (invoice) => {
   };
 
   // Get HSN code based on service type
-  const getHSNCode = (invoice) => {
+  const getHSNCode = () => {
     return "9984"; // HSN code for education services
   };
 

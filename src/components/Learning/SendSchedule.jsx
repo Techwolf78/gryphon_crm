@@ -97,14 +97,21 @@ useEffect(() => {
     const pd = phaseData || phaseDocData || {};
     const { collegeStartTime, lunchStartTime, lunchEndTime, collegeEndTime } = pd || {};
 
+    const parseTime = (timeStr) => {
+      const [h, m] = timeStr.split(':').map(Number);
+      return h * 60 + m;
+    };
+
     if (s.includes("AM & PM") || (s.includes("AM") && s.includes("PM"))) {
       if (collegeStartTime && collegeEndTime)
         return `${collegeStartTime} - ${collegeEndTime}`;
       return "AM & PM";
     }
     if (s.includes("AM")) {
-      if (collegeStartTime && lunchStartTime)
+      if (collegeStartTime && lunchStartTime && parseTime(lunchStartTime) <= parseTime(collegeEndTime))
         return `${collegeStartTime} - ${lunchStartTime}`;
+      else if (collegeStartTime && collegeEndTime)
+        return `${collegeStartTime} - ${collegeEndTime}`;
       return "AM";
     }
     if (s.includes("PM")) {
@@ -138,9 +145,17 @@ useEffect(() => {
     if (dayDuration.includes("AM & PM") || (dayDuration.includes("AM") && dayDuration.includes("PM"))) {
       return (end - start - lunchDuration) / 60;
     } else if (dayDuration.includes("AM")) {
-      return lunchStart ? (lunchStart - start) / 60 : (end - start) / 60 / 2;
+      if (lunchStart && lunchStart <= end) {
+        return (lunchStart - start) / 60;
+      } else {
+        return (end - start - lunchDuration) / 60;
+      }
     } else if (dayDuration.includes("PM")) {
-      return lunchEnd ? (end - lunchEnd) / 60 : (end - start) / 60 / 2;
+      if (lunchEnd && lunchEnd >= start) {
+        return (end - lunchEnd) / 60;
+      } else {
+        return (end - start - lunchDuration) / 60;
+      }
     }
     return 0;
   };
@@ -669,7 +684,6 @@ useEffect(() => {
                     </thead>
                     <tbody>
                       {trainerAssignments.map((assignment) => {
-                        console.log("Assignment data:", assignment);
                         return (
                           <tr key={assignment.id} className="hover:bg-gray-50">
                             <td className="px-4 py-2 border border-gray-200">

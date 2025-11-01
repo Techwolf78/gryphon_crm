@@ -45,7 +45,7 @@ function JDMergeModal({ onClose, onProceed, preSelectedColleges = [] }) {
         );
 
         setAvailableColleges(uniqueColleges);
-      } catch (err) {
+      } catch {
 
         setError("Failed to load available colleges");
       } finally {
@@ -143,7 +143,7 @@ function JDMergeModal({ onClose, onProceed, preSelectedColleges = [] }) {
 
       // No matching merged configuration found
       setExistingConfig(null);
-    } catch (err) {
+      } catch (err) {
       console.error("Error checking existing merged config:", err);
       setError("Failed to check for existing configurations");
     } finally {

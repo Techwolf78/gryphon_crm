@@ -22,19 +22,25 @@ const RowClickModal = ({ installment, invoice, contract, onClose }) => {
   const getPaymentAmounts = () => {
     const totalAmount = installment.totalAmount || 0;
 
-    // ✅ USE ROUNDED AMOUNT THAT MATCHES WHAT WILL BE STORED IN FIREBASE
-    // Round the total amount to nearest 1000 (same as invoice generation logic)
-    const roundedTotalAmount = Math.round(totalAmount / 1000) * 1000;
+    // Check GST type from contract
+    const gstType = contract?.gstType || 'include';
 
-    // Calculate base amount from rounded total (same as invoice generation)
-    const baseAmount = Math.round(roundedTotalAmount / 1.18);
-    const gstAmount = roundedTotalAmount - baseAmount;
+    let baseAmount, gstAmount;
+
+    if (gstType === 'exclude') {
+      // If GST is excluded, base amount equals total amount, GST is 0
+      baseAmount = totalAmount;
+      gstAmount = 0;
+    } else {
+      // If GST is included, calculate base amount and GST
+      baseAmount = totalAmount / 1.18;
+      gstAmount = totalAmount - baseAmount;
+    }
 
     return {
       baseAmount: baseAmount,
       gstAmount: gstAmount,
-      totalAmount: roundedTotalAmount,
-      originalTotalAmount: totalAmount, // Keep original for reference
+      totalAmount: totalAmount,
     };
   };
 
@@ -340,12 +346,7 @@ const RowClickModal = ({ installment, invoice, contract, onClose }) => {
                                       {courses.join("/")} {years.join("/")} year
                                       {studentCount && ` for ${studentCount} students`}
                                       {perStudentCost && ` @${perStudentCost} per student`}
-                                      {amounts.gstAmount > 0 && ` + 18% GST`}
-                                      {amounts.originalTotalAmount !== amounts.totalAmount && (
-                                        <span className="block mt-1 text-amber-600 font-medium">
-                                          Note: Amount will be rounded to nearest ₹1000 for invoice generation
-                                        </span>
-                                      )}
+                                      {contract?.gstType !== 'exclude' && amounts.gstAmount > 0 && ` + 18% GST`}
                                     </>
                                   );
                                 } else {
@@ -355,12 +356,7 @@ const RowClickModal = ({ installment, invoice, contract, onClose }) => {
                                       {course} {year} year
                                       {studentCount && ` for ${studentCount} students`}
                                       {perStudentCost && ` @${perStudentCost} per student`}
-                                      {amounts.gstAmount > 0 && ` + 18% GST`}
-                                      {amounts.originalTotalAmount !== amounts.totalAmount && (
-                                        <span className="block mt-1 text-amber-600 font-medium">
-                                          Note: Amount will be rounded to nearest ₹1000 for invoice generation
-                                        </span>
-                                      )}
+                                      {contract?.gstType !== 'exclude' && amounts.gstAmount > 0 && ` + 18% GST`}
                                     </>
                                   );
                                 }
@@ -386,15 +382,8 @@ const RowClickModal = ({ installment, invoice, contract, onClose }) => {
                         </td>
                         <td className="px-4 py-3 border-b border-slate-100 text-right">
                           <span className="font-semibold text-slate-800 text-sm">
-                            {amounts.baseAmount.toLocaleString("en-IN", {
-                              minimumFractionDigits: 2,
-                            })}
+                            {amounts.baseAmount.toString()}
                           </span>
-                          {amounts.originalTotalAmount !== amounts.totalAmount && (
-                            <div className="text-xs text-slate-500 mt-1">
-                              (Will be rounded to ₹{amounts.totalAmount.toLocaleString("en-IN")})
-                            </div>
-                          )}
                         </td>
                       </tr>
                     </tbody>
@@ -416,11 +405,22 @@ const RowClickModal = ({ installment, invoice, contract, onClose }) => {
                     <div className="px-4 py-3 flex justify-between items-center">
                       <span className="text-slate-600 text-sm">Base Amount</span>
                       <span className="font-semibold text-slate-800 text-sm">
-                        ₹{amounts.baseAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                        ₹{amounts.baseAmount.toString()}
                       </span>
                     </div>
 
                     {invoice?.invoiceType === "Cash Invoice" ? (
+                      <>
+                        <div className="px-4 py-3 flex justify-between items-center">
+                          <span className="text-slate-600 text-sm">CGST @ 0%</span>
+                          <span className="text-slate-500 text-sm">₹0.00</span>
+                        </div>
+                        <div className="px-4 py-3 flex justify-between items-center">
+                          <span className="text-slate-600 text-sm">SGST @ 0%</span>
+                          <span className="text-slate-500 text-sm">₹0.00</span>
+                        </div>
+                      </>
+                    ) : contract?.gstType === 'exclude' ? (
                       <>
                         <div className="px-4 py-3 flex justify-between items-center">
                           <span className="text-slate-600 text-sm">CGST @ 0%</span>
@@ -436,13 +436,13 @@ const RowClickModal = ({ installment, invoice, contract, onClose }) => {
                         <div className="px-4 py-3 flex justify-between items-center">
                           <span className="text-slate-600 text-sm">CGST @ 9%</span>
                           <span className="text-slate-800 text-sm">
-                            ₹{(amounts.gstAmount / 2).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            ₹{(amounts.gstAmount / 2).toString()}
                           </span>
                         </div>
                         <div className="px-4 py-3 flex justify-between items-center">
                           <span className="text-slate-600 text-sm">SGST @ 9%</span>
                           <span className="text-slate-800 text-sm">
-                            ₹{(amounts.gstAmount / 2).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            ₹{(amounts.gstAmount / 2).toString()}
                           </span>
                         </div>
                       </>
@@ -451,7 +451,7 @@ const RowClickModal = ({ installment, invoice, contract, onClose }) => {
                     <div className="px-4 py-3 flex justify-between items-center bg-slate-50">
                       <span className="font-semibold text-slate-800 text-sm">Grand Total</span>
                       <span className="text-lg font-bold text-blue-600">
-                        ₹{amounts.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                        ₹{amounts.totalAmount.toString()}
                       </span>
                     </div>
                   </div>

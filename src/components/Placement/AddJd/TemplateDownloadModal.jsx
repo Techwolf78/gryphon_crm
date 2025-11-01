@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { XIcon, DownloadIcon } from '@heroicons/react/outline';
 
-const TemplateDownloadModal = ({ show, onClose, college, formData, selectedFields, onFieldsChange }) => {
+const TemplateDownloadModal = ({ show, onClose, college, formData, onFieldsChange }) => {
   const [selectedColumns, setSelectedColumns] = useState([
     'studentName', 'enrollmentNo', 'email', 'phone', 'course', 'specialization', 
     'currentYear', 'tenthMarks', 'twelfthMarks', 'diplomaMarks', 'cgpa', 'activeBacklogs', 

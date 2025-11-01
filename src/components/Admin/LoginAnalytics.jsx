@@ -10,6 +10,7 @@ import {
 } from "chart.js";
 import { Bar } from "react-chartjs-2";
 import { FiRefreshCw, FiAlertCircle, FiCalendar, FiDatabase } from "react-icons/fi";
+// eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
@@ -212,7 +213,7 @@ const LoginAnalytics = ({ logs, className = "" }) => {
         const result = processLogsToChartData(logs, timeRange);
         setChartData(result);
         setError(null);
-      } catch (err) {
+      } catch {
 
         setError("Failed to process login data");
       } finally {

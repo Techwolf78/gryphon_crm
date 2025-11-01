@@ -811,9 +811,7 @@ const handleCancelEdit = () => {
                     </td>
                     <td className="border border-gray-300 px-3 py-1">999293</td>
                     <td className="border border-gray-300 px-3 py-1 text-right">
-                      {amounts.baseAmount.toLocaleString("en-IN", {
-                        minimumFractionDigits: 2,
-                      })}
+                      {amounts.baseAmount.toString()}
                     </td>
                   </tr>
                 </tbody>
@@ -836,9 +834,7 @@ const handleCancelEdit = () => {
                       Total (Base Amount)
                     </td>
                     <td className="border border-gray-300 px-3 py-1 text-right">
-                      {amounts.baseAmount.toLocaleString("en-IN", {
-                        minimumFractionDigits: 2,
-                      })}
+                      {amounts.baseAmount.toString()}
                     </td>
                   </tr>
 
@@ -868,9 +864,7 @@ const handleCancelEdit = () => {
                         Add: IGST @ 18%
                       </td>
                       <td className="border border-gray-300 px-3 py-1 text-right">
-                        {amounts.gstAmount.toLocaleString("en-IN", {
-                          minimumFractionDigits: 2,
-                        })}
+                        {amounts.gstAmount.toString()}
                       </td>
                     </tr>
                   ) : (
@@ -881,9 +875,7 @@ const handleCancelEdit = () => {
                           Add: CGST @ 9%
                         </td>
                         <td className="border border-gray-300 px-3 py-1 text-right">
-                          {(amounts.gstAmount / 2).toLocaleString("en-IN", {
-                            minimumFractionDigits: 2,
-                          })}
+                          {(amounts.gstAmount / 2).toString()}
                         </td>
                       </tr>
                       <tr>
@@ -891,9 +883,7 @@ const handleCancelEdit = () => {
                           Add: SGST @ 9%
                         </td>
                         <td className="border border-gray-300 px-3 py-1 text-right">
-                          {(amounts.gstAmount / 2).toLocaleString("en-IN", {
-                            minimumFractionDigits: 2,
-                          })}
+                          {(amounts.gstAmount / 2).toString()}
                         </td>
                       </tr>
                     </>
@@ -905,9 +895,7 @@ const handleCancelEdit = () => {
                     </td>
                     <td className="border border-gray-300 px-3 py-1 text-right font-bold">
                       ₹
-                      {amounts.totalAmount.toLocaleString("en-IN", {
-                        minimumFractionDigits: 2,
-                      })}
+                      {amounts.totalAmount.toString()}
                     </td>
                   </tr>
                 </tbody>

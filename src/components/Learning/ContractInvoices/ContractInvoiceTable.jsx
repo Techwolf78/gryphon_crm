@@ -852,8 +852,14 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
   
   // Use the exact amount without rounding
   totalAmount = adjustedTotalAmount;
-  baseAmount = formData.invoiceType === "Cash Invoice" ? totalAmount : Math.round(totalAmount / 1.18);
-  gstAmount = formData.invoiceType === "Cash Invoice" ? 0 : totalAmount - baseAmount;
+  
+  // Check gstType for dynamic GST calculation
+  const isGstExcluded = contract.gstType === 'exclude';
+  
+  baseAmount = formData.invoiceType === "Cash Invoice" ? totalAmount : 
+               (isGstExcluded ? totalAmount : Math.round(totalAmount / 1.18));
+  gstAmount = formData.invoiceType === "Cash Invoice" ? 0 : 
+              (isGstExcluded ? 0 : totalAmount - baseAmount);
 
   const invoiceData = {
     ...formData,
@@ -1173,10 +1179,13 @@ const handleMergeSubmit = async (formData) => {
     // Use first contract for common details
     const firstContract = selectedContractsForMerge[0];
 
+    // Check gstType for dynamic GST calculation (use first contract's gstType)
+    const isGstExcluded = firstContract.gstType === 'exclude';
+
     // Use exact amounts without rounding
     const totalBaseAmount = formData.invoiceType === "Cash Invoice" 
       ? totalInstallmentAmount 
-      : Math.round(totalInstallmentAmount / 1.18);
+      : (isGstExcluded ? totalInstallmentAmount : Math.round(totalInstallmentAmount / 1.18));
     
     // ✅ Cash aur Tax ke liye alag GST calculation
     let gstAmount = 0;
@@ -1187,10 +1196,15 @@ const handleMergeSubmit = async (formData) => {
       gstAmount = 0;
       netPayableAmount = totalBaseAmount;
     } else {
-      // ✅ Tax Invoice: Base Amount calculated, GST calculate karo
-      const gstRate = 0.18;
-      gstAmount = Math.round(totalBaseAmount * gstRate);
-      netPayableAmount = totalBaseAmount + gstAmount;
+      // ✅ Tax Invoice: Base Amount calculated, GST calculate karo based on gstType
+      if (isGstExcluded) {
+        gstAmount = 0;
+        netPayableAmount = totalBaseAmount;
+      } else {
+        const gstRate = 0.18;
+        gstAmount = Math.round(totalBaseAmount * gstRate);
+        netPayableAmount = totalBaseAmount + gstAmount;
+      }
     }
 
     // Use exact final amount without rounding

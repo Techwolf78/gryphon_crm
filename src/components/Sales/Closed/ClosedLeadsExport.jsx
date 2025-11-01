@@ -220,7 +220,7 @@ export const exportClosedLeads = async (filteredLeads, db) => {
 
     // Export the workbook with updated filename
     XLSX.writeFile(workbook, `Client_Onboarded_Data_${dateStr}.xlsx`);
-  } catch (error) {
+  } catch {
 
     alert("Failed to generate export. Please try again.");
   }

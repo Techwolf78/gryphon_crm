@@ -26,8 +26,6 @@ const TargetWithEdit = ({
   const [editValue, setEditValue] = useState(value?.toString() || "");
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState(null);
-  const [showSubordinates, setShowSubordinates] = useState(false);
-  const [subordinateTargets, setSubordinateTargets] = useState([]);
  
   useEffect(() => {
     setEditValue(value?.toString() || "");
@@ -37,11 +35,6 @@ const TargetWithEdit = ({
   const targetUserObj = targetUser || currentUserObj;
   const currentRole = currentUserObj?.role;
   const targetRole = targetUserObj?.role;
- 
-  // Get subordinates for current manager
-  const subordinates = Object.values(users).filter(
-    (u) => u.reportingManager === currentUserObj?.name && ["Assistant Manager", "Executive"].includes(u.role)
-  );
  
   // Check edit permissions
 let canEdit = false;
@@ -174,7 +167,7 @@ if (viewMyLeadsOnly) {
  
       onUpdate();
       setIsEditing(false);
-    } catch (err) {
+    } catch {
 
       setError("Failed to update target. Please try again.");
     } finally {

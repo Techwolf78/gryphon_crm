@@ -79,8 +79,7 @@ const AdminTour = ({ userId }) => {
       }
 
       return false;
-    } catch (error) {
-
+    } catch {
       return false;
     }
   }, [userId]);

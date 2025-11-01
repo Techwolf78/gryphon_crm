@@ -104,13 +104,6 @@ function CompanyFilter({
     setActiveSection(activeSection === section ? null : section);
   };
 
-  // Check if any filter is active
-  const hasActiveFilters = Object.values(filters).some(
-    (filter) =>
-      (typeof filter === "string" && filter) ||
-      (typeof filter === "object" && Object.values(filter).some(Boolean))
-  );
-
   if (!users.length || !companies.length) {
     return (
       <button

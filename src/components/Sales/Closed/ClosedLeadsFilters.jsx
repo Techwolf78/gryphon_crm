@@ -8,7 +8,6 @@ const ClosedLeadsFilters = ({
   setQuarterFilter,
   viewMyLeadsOnly,
   setViewMyLeadsOnly,
-  today,
 }) => {
   return (
     <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-6">
@@ -89,7 +88,6 @@ ClosedLeadsFilters.propTypes = {
   setQuarterFilter: PropTypes.func.isRequired,
   viewMyLeadsOnly: PropTypes.bool.isRequired,
   setViewMyLeadsOnly: PropTypes.func.isRequired,
-  today: PropTypes.instanceOf(Date),
 };
 
 export default ClosedLeadsFilters;
