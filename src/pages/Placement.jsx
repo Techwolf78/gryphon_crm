@@ -8,6 +8,8 @@ import CompanyLeads from "../components/Placement/CompanyLeads/CompanyLeads";
 import MouPreviewModal from "../components/Placement/MouPreviewModal";
 import PlacementDetailsModal from "../components/Placement/PlacementDetailsModal";
 import { Eye, User, FileText } from "lucide-react";
+import { doc } from "firebase/firestore";
+import BudgetDashboard from "../components/Budget/BudgetDashboard";
 
 function Placement() {
   const [trainingData, setTrainingData] = useState([]);
@@ -52,7 +54,7 @@ function Placement() {
 
   // Get active tab index for sliding indicator
   const getActiveTabIndex = () => {
-    const tabs = ["training", "placement", "leads"];
+    const tabs = ["training", "placement", "leads", "budget"];
     return tabs.indexOf(activeTab);
   };
 
@@ -273,12 +275,23 @@ function Placement() {
               >
                 Company Leads ({leads.length})
               </button>
+              <button
+                className={`flex-1 px-6 py-2 font-medium text-sm transition-all duration-150 ${
+                  activeTab === "budget"
+                    ? "text-blue-600 bg-blue-50"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+                onClick={() => setActiveTab("budget")}
+                data-tour="budget-tab"
+              >
+                Budget
+              </button>
             </div>
             {/* Sliding Indicator */}
             <div
               className="absolute bottom-0 h-0.5 bg-blue-600 transition-transform duration-150 ease-out"
               style={{
-                width: "33.333%",
+                width: "25%", // Changed from 33.333% to 25% for 4 tabs
                 transform: `translateX(${getActiveTabIndex() * 100}%)`,
               }}
             ></div>
@@ -572,6 +585,13 @@ function Placement() {
                 setSelectedLead(lead);
                 setActiveTab("placement");
               }}
+            />
+          )}
+
+          {activeTab === "budget" && (
+            <BudgetDashboard
+              department="placement"
+              dashboardTitle="Placement Department Budget"
             />
           )}
 
