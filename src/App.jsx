@@ -6,13 +6,16 @@ import {
   useLocation,
 } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
-import MsalProviderWrapper from "./context/MsalProviderWrapper";
+import { NotificationsProvider } from "./context/NotificationsContext";
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import DashboardLayout from "./components/DashboardLayout";
 import SessionManager from "./components/SessionManager";
+import ErrorBoundary from "./components/ErrorBoundary";
+import ConnectionStatus from "./components/ConnectionStatus";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import MsalProviderWrapper from "./context/MsalProviderWrapper";
 
 // Lazy load all page components
 const Home = React.lazy(() => import("./pages/Home"));
@@ -33,6 +36,7 @@ const NotFound = React.lazy(() => import("./pages/NotFound"));
 const Roadmap = React.lazy(() => import("./pages/Roadmap"));
 const PublicInvoiceDetails = React.lazy(() => import("./pages/PublicInvoiceDetails"));
 const Maintenance = React.lazy(() => import("./pages/Maintenance"));
+const UploadStudentData = React.lazy(() => import("./components/Placement/AddJd/UploadStudentData")); // ✅ Space removed
 
 // Loading component
 const PageLoader = () => (
@@ -51,6 +55,9 @@ const AppContent = () => {
   // Maintenance mode - show maintenance page for all routes
   const isMaintenanceMode = false;
 
+  // Routes where navbar should not appear
+  const hideNavbarRoutes = ['/404', '/upload-student-data'];
+
   if (isMaintenanceMode) {
     return (
       <Suspense fallback={<PageLoader />}>
@@ -61,13 +68,17 @@ const AppContent = () => {
 
   return (
     <>
-      {location.pathname !== "/404" && <Navbar />}
+      {!hideNavbarRoutes.includes(location.pathname) && <Navbar />}
       <SessionManager />
+      <ConnectionStatus />
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/invoice/*" element={<PublicInvoiceDetails />} />
+          
+          {/* Public route for college data upload */}
+          <Route path="/upload-student-data" element={<UploadStudentData />} />
 
           <Route
             path="/dashboard"
@@ -99,7 +110,9 @@ const AppContent = () => {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
-      {location.pathname === "/" && (
+      
+      {/* Show footer only on home page and upload page */}
+      {(location.pathname === "/" || location.pathname === "/upload-student-data") && (
         <Suspense fallback={<div>Loading footer...</div>}>
           <Footer />
         </Suspense>
@@ -109,26 +122,31 @@ const AppContent = () => {
 };
  
 const App = () => (
-  <MsalProviderWrapper>
-    <AuthProvider>
-      <Router basename="/">
-        <AppContent />
-      </Router>
-      <ToastContainer
-        position="bottom-right"
-        autoClose={5000}
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="colored"
-      />
-    </AuthProvider>
-  </MsalProviderWrapper>
+  <>
+    <ErrorBoundary>
+      <MsalProviderWrapper>
+        <AuthProvider>
+          <NotificationsProvider>
+            <Router basename="/">
+              <AppContent />
+            </Router>
+          </NotificationsProvider>
+        </AuthProvider>
+      </MsalProviderWrapper>
+    </ErrorBoundary>
+    <ToastContainer
+      position="bottom-right"
+      autoClose={5000}
+      hideProgressBar={false}
+      newestOnTop={false}
+      closeOnClick
+      rtl={false}
+      pauseOnFocusLoss
+      draggable
+      pauseOnHover
+      theme="colored"
+    />
+  </>
 );
  
 export default App;
- 

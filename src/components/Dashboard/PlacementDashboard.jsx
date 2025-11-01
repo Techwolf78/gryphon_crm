@@ -1,24 +1,9 @@
 import React from 'react';
-import { FiBriefcase, FiUserCheck, FiMapPin, FiUsers, FiBarChart2 } from 'react-icons/fi';
+// eslint-disable-next-line no-unused-vars
 import { motion } from 'framer-motion';
-import { FaHandshake, FaRupeeSign } from 'react-icons/fa';
+import { FaHandshake } from 'react-icons/fa';
 
 const PlacementDashboard = () => {
-  // Metrics data
-  const placementMetrics = [
-    { title: 'Placements', value: '56', icon: <FiBriefcase size={20} />, color: 'bg-indigo-600' },
-    { title: 'Avg. Salary', value: '₹85k', icon: <FaRupeeSign size={20} />, color: 'bg-green-600' },
-    { title: 'Active Candidates', value: '132', icon: <FiUserCheck size={20} />, color: 'bg-amber-500' },
-    { title: 'Top Location', value: 'Remote', icon: <FiMapPin size={20} />, color: 'bg-red-500' }
-  ];
-
-  // Stats for the coming soon section
-  const placementStats = [
-    { label: 'Placement Rate', value: '92%' },
-    { label: 'Avg. Time to Hire', value: '3.2 weeks' },
-    { label: 'Candidate Satisfaction', value: '4.8/5' }
-  ];
-
   return (
     <div className="px-4 py-6">
       {/* Header */}

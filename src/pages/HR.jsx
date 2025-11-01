@@ -26,7 +26,7 @@ const HR = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 w-full">
-      <HRBillsTour userId={user?.uid} />
+      <HRBillsTour userId={user?.uid} enabled={activeTab === "trainerBills"} />
 
       {/* Common Header */}
       <div className="mb-2" data-tour="hr-header">

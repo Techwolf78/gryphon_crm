@@ -1371,7 +1371,6 @@ const BatchDetailsTable = ({
   onSwapTrainer,
   mergeFirestoreConfig,
   courses,
-  onValidationChange,
   globalTrainerAssignments = [], // <-- pass this from parent (InitiationModal)
   training,
   currentTrainingAssignments = [], // <-- assignments from other domains in current training

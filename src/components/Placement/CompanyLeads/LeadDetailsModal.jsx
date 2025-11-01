@@ -1,6 +1,10 @@
 import React, { useState } from "react";
 import { XIcon, PlusIcon } from "@heroicons/react/outline";
-import { updateDoc, doc, arrayUnion } from "firebase/firestore";
+import {
+  getDoc,
+  doc,
+  setDoc,
+} from "firebase/firestore";
 import { db } from "../../../firebase";
 
 const LeadDetailsModal = ({
@@ -15,7 +19,8 @@ const LeadDetailsModal = ({
     email: '',
     phone: '',
     location: '',
-    designation: ''
+    designation: '',
+    linkedin: ''
   });
 
   if (!lead) return null;
@@ -41,24 +46,60 @@ const LeadDetailsModal = ({
         phone: newContact.phone,
         location: newContact.location,
         designation: newContact.designation,
+        linkedin: newContact.linkedin,
         addedAt: new Date().toISOString()
       };
 
-      await updateDoc(doc(db, "CompanyLeads", lead.id), {
-        contacts: arrayUnion(contactData),
-        updatedAt: new Date().toISOString()
-      });
+      if (!lead.groupId) {
+        console.error("Lead does not have groupId");
+        return;
+      }
 
-      onAddContact(lead.id, contactData);
+      // Fetch the group document
+      const groupDocRef = doc(db, "companyGroups", lead.groupId);
+      const groupDocSnap = await getDoc(groupDocRef);
 
-      setNewContact({
-        name: '',
-        email: '',
-        phone: '',
-        location: '',
-        designation: ''
-      });
-      setShowAddContactForm(false);
+      if (groupDocSnap.exists()) {
+        const groupData = groupDocSnap.data();
+        const companies = groupData.companies || [];
+        
+        // Find the company index in the array
+        const companyIndex = companies.findIndex((company, index) => 
+          `${lead.groupId}_${index}` === lead.id
+        );
+
+        if (companyIndex >= 0) {
+          // Update the company contacts
+          const existingContacts = companies[companyIndex].contacts || [];
+          companies[companyIndex] = {
+            ...companies[companyIndex],
+            contacts: [...existingContacts, contactData],
+            updatedAt: new Date().toISOString(),
+          };
+
+          // Save back to Firestore
+          await setDoc(groupDocRef, {
+            ...groupData,
+            companies,
+          });
+
+          onAddContact(lead.id, contactData);
+
+          setNewContact({
+            name: '',
+            email: '',
+            phone: '',
+            location: '',
+            designation: '',
+            linkedin: ''
+          });
+          setShowAddContactForm(false);
+        } else {
+          console.error("Company not found in group");
+        }
+      } else {
+        console.error("Group document not found");
+      }
 
     } catch (error) {
       console.error("Error adding contact:", error);
@@ -163,6 +204,21 @@ const LeadDetailsModal = ({
                   <label className="block text-sm font-medium text-blue-600 mb-1">Location</label>
                   <p className="text-gray-900">{lead.pocLocation || "-"}</p>
                 </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-blue-600 mb-1">LinkedIn</label>
+                  {lead.pocLinkedin ? (
+                    <a
+                      href={lead.pocLinkedin}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 hover:underline"
+                    >
+                      {lead.pocLinkedin}
+                    </a>
+                  ) : (
+                    <p className="text-gray-900">-</p>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -209,6 +265,21 @@ const LeadDetailsModal = ({
                       <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-gray-600 mb-1">Location</label>
                         <p className="text-gray-900">{contact.location || "-"}</p>
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-600 mb-1">LinkedIn</label>
+                        {contact.linkedin ? (
+                          <a
+                            href={contact.linkedin}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 hover:underline"
+                          >
+                            {contact.linkedin}
+                          </a>
+                        ) : (
+                          <p className="text-gray-900">-</p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-600 mb-1">Added On</label>
@@ -290,6 +361,17 @@ const LeadDetailsModal = ({
                       placeholder="Location"
                     />
                   </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-600 mb-1">LinkedIn</label>
+                    <input
+                      type="url"
+                      name="linkedin"
+                      value={newContact.linkedin}
+                      onChange={handleContactChange}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="LinkedIn profile URL"
+                    />
+                  </div>
                 </div>
                 <div className="mt-4 flex justify-end space-x-3">
                   <button
@@ -300,7 +382,8 @@ const LeadDetailsModal = ({
                         email: '',
                         phone: '',
                         location: '',
-                        designation: ''
+                        designation: '',
+                        linkedin: ''
                       });
                     }}
                     className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100"

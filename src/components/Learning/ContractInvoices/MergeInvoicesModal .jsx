@@ -14,6 +14,7 @@ const MergeInvoicesModal = ({
   const [totalStudents, setTotalStudents] = useState(0);
   const [baseAmount, setBaseAmount] = useState(0);
   const [gstAmount, setGstAmount] = useState(0);
+  const [isGstExcluded, setIsGstExcluded] = useState(false);
 
 // MergeInvoicesModal.js - Amount calculation update
 useEffect(() => {
@@ -36,34 +37,60 @@ useEffect(() => {
       return sum + students;
     }, 0);
 
-    // ✅ Keep full precision for display - NO ROUNDING
-    setTotalAmount(calculatedTotal);
+    // ✅ Calculate exact amounts without rounding
+    // Check gstType - if any contract has gstType 'exclude', treat as GST excluded
+    const hasExcludedGst = contracts.some(contract => contract.gstType === 'exclude');
+    const gstExcluded = hasExcludedGst;
+    setIsGstExcluded(gstExcluded);
+    
+    const totalBaseAmount = invoiceType === 'Cash Invoice' 
+      ? calculatedTotal 
+      : (gstExcluded ? calculatedTotal : Math.round(calculatedTotal / 1.18));
+    
+    // ✅ Cash aur Tax ke liye alag GST calculation
+    let gstAmount = 0;
+    let netPayableAmount = 0;
+
+    if (invoiceType === 'Cash Invoice') {
+      // ✅ Cash Invoice: Base Amount same, GST = 0, Total = Base Amount
+      gstAmount = 0;
+      netPayableAmount = calculatedTotal;
+    } else {
+      // ✅ Tax Invoice: Base Amount calculated, GST calculate karo based on gstType
+      if (gstExcluded) {
+        gstAmount = 0;
+        netPayableAmount = totalBaseAmount;
+      } else {
+        const gstRate = 0.18;
+        gstAmount = Math.round(totalBaseAmount * gstRate);
+        netPayableAmount = totalBaseAmount + gstAmount;
+      }
+    }
+
+    // Use exact final amount without rounding
+    const finalNetPayableAmount = netPayableAmount;
+
+    // ✅ Store the actual amounts that will be saved in Firebase
+    setTotalAmount(finalNetPayableAmount);
     setTotalStudents(calculatedStudents);
     
-    // ✅ BASE AMOUNT calculation - divide by 1.18 and keep precision
-    const calculatedBaseAmount = calculatedTotal / 1.18;
-    const calculatedGstAmount = calculatedTotal - calculatedBaseAmount;
+    // ✅ BASE AMOUNT calculation - use the exact amounts that will be stored
+    const calculatedBaseAmount = invoiceType === 'Cash Invoice' ? finalNetPayableAmount : totalBaseAmount;
+    const calculatedGstAmount = invoiceType === 'Cash Invoice' ? 0 : gstAmount;
     
     setBaseAmount(calculatedBaseAmount);
     setGstAmount(calculatedGstAmount);
   }
-}, [contracts, installment]);
+}, [contracts, installment, invoiceType]);
 
 // ✅ Jab invoice type change ho toh SIRF display change hoga
 const getDisplayAmounts = () => {
-  if (invoiceType === 'Cash Invoice') {
-    return {
-      baseAmount: baseAmount,
-      gstAmount: 0,
-      totalAmount: baseAmount // Cash invoice mein total = base amount
-    };
-  } else {
-    return {
-      baseAmount: baseAmount,
-      gstAmount: gstAmount,
-      totalAmount: totalAmount // Tax invoice mein total = base + GST
-    };
-  }
+  // Return the actual amounts that will be stored in Firebase
+  return {
+    baseAmount: baseAmount,
+    gstAmount: gstAmount,
+    totalAmount: totalAmount
+  };
 };
   if (!isOpen) return null;
 
@@ -75,43 +102,26 @@ const getDisplayAmounts = () => {
     onSubmit({
       invoiceType,
       terms: terms || 'Standard terms and conditions apply',
-      // ✅ Send precise values for display/calculation purposes
+      // ✅ Send the actual amounts that will be stored in Firebase
       displayBaseAmount: displayAmounts.baseAmount,
       displayGstAmount: displayAmounts.gstAmount,
       displayTotalAmount: displayAmounts.totalAmount,
-      // ✅ Send rounded values for actual invoice generation
-      actualBaseAmount: Math.round(baseAmount),
-      actualGstAmount: Math.round(gstAmount),
-      actualTotalAmount: Math.round(totalAmount)
+      // ✅ These are the same as display amounts since we're showing what will be stored
+      actualBaseAmount: displayAmounts.baseAmount,
+      actualGstAmount: displayAmounts.gstAmount,
+      actualTotalAmount: displayAmounts.totalAmount
     });
   };
 
-  // Helper function to format currency in Indian numbering system with abbreviations
+  // Helper function to format currency in Indian numbering system with full precision
   const formatIndianCurrency = (amount) => {
-    if (!amount && amount !== 0) return "0";
+    if (!amount && amount !== 0) return "₹0";
 
     let numAmount = Number(amount);
-    if (isNaN(numAmount)) return "0";
+    if (isNaN(numAmount)) return "₹0";
 
-    // For amounts less than 1 lakh, show regular formatting
-    if (numAmount < 100000) {
-      return new Intl.NumberFormat('en-IN').format(numAmount);
-    }
-
-    // For amounts >= 1 lakh, use abbreviations with 2 decimal places for precision
-    if (numAmount >= 10000000000) { // 1000 Cr and above
-      return `${(numAmount / 10000000).toFixed(2)}K Cr`;
-    } else if (numAmount >= 1000000000) { // 100 Cr to 999 Cr
-      return `${(numAmount / 10000000).toFixed(2)} Cr`;
-    } else if (numAmount >= 100000000) { // 10 Cr to 99 Cr
-      return `${(numAmount / 10000000).toFixed(2)} Cr`;
-    } else if (numAmount >= 10000000) { // 1 Cr to 9.9 Cr
-      return `${(numAmount / 10000000).toFixed(2)} Cr`;
-    } else if (numAmount >= 1000000) { // 10 Lakh to 99 Lakh
-      return `${(numAmount / 100000).toFixed(2)} Lakh`;
-    } else { // 1 Lakh to 9.9 Lakh
-      return `${(numAmount / 100000).toFixed(2)} Lakh`;
-    }
+    // Show full precision for exact amounts - no rounding
+    return "₹" + numAmount.toString();
   };
 
   const displayAmounts = getDisplayAmounts();
@@ -210,7 +220,7 @@ const getDisplayAmounts = () => {
                         <td className="px-3 py-2">{contract.year || 'N/A'}</td>
                         <td className="px-3 py-2">{contract.studentCount || '0'}</td>
                         <td className="px-3 py-2 font-semibold">
-                          {formatIndianCurrency(amount)}
+                          ₹{amount.toString()}
                         </td>
                       </tr>
                     );
@@ -238,7 +248,9 @@ const getDisplayAmounts = () => {
               {invoiceType === 'Cash Invoice' 
                 ? 'Cash Invoice: Base Amount will be used as Final Amount (No GST)' 
                 : invoiceType === 'Tax Invoice'
-                ? 'Tax Invoice: Base Amount + 18% GST = Final Amount'
+                ? isGstExcluded 
+                  ? 'Tax Invoice: GST Excluded - Base Amount = Final Amount'
+                  : 'Tax Invoice: Base Amount + 18% GST = Final Amount'
                 : 'Proforma Invoice: For quotation purposes'
               }
             </p>

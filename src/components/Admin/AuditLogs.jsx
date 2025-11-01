@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { format } from "date-fns";
 import { FiAlertCircle, FiClock, FiUser, FiActivity, FiGlobe } from "react-icons/fi";
+// eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
 import PropTypes from "prop-types";
 

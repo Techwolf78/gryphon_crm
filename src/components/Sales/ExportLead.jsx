@@ -318,7 +318,7 @@ const ExportLead = ({ filteredLeads, allLeads }) => {
     try {
       const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
       saveAs(new Blob([wbout], { type: "application/octet-stream" }), fileName);
-    } catch (error) {
+    } catch {
 
       alert("Export failed. Please try again or contact support.");
     }

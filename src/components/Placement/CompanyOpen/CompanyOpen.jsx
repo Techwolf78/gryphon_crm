@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { collection, getDocs, doc } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
 import AddJD from "../AddJd/AddJD";
 import { XIcon } from "@heroicons/react/outline";
@@ -63,53 +63,78 @@ function CompanyOpen() {
     }
   };
 
-const fetchStudents = async () => {
-  if (!selectedCompany || !selectedCompany.college) {
+  const fetchStudents = async () => {
+    if (!selectedCompany || !selectedCompany.college) {
+      return;
+    }
 
-    return;
-  }
+    try {
+      setLoadingStudents(true);
 
-  try {
-    setLoadingStudents(true);
+      const collegeAbbr = getCollegeAbbreviation(selectedCompany.college);
 
-    const collegeAbbr = getCollegeAbbreviation(selectedCompany.college);
+      // Fetch trainingForms collection
+      const trainingFormsSnapshot = await getDocs(collection(db, "trainingForms"));
 
-    // Yahan full trainingForms collection fetch kar rahe hain
-    const trainingFormsSnapshot = await getDocs(collection(db, "trainingForms"));
+      let allStudents = [];
 
-    let allStudents = [];
+      for (const docSnap of trainingFormsSnapshot.docs) {
+        const docId = docSnap.id;
 
-    for (const docSnap of trainingFormsSnapshot.docs) {
-      const docId = docSnap.id;
+        // Only consider documents where collegeAbbr matches
+        if (docId.startsWith(collegeAbbr)) {
+          const studentsRef = collection(doc(db, "trainingForms", docId), "students");
+          const studentsSnapshot = await getDocs(studentsRef);
 
-      // Sirf wahi document consider karo jisme collegeAbbr match karta ho
-      if (docId.startsWith(collegeAbbr)) {
+          const students = studentsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
 
-        const studentsRef = collection(doc(db, "trainingForms", docId), "students");
-        const studentsSnapshot = await getDocs(studentsRef);
-
-        const students = studentsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-
-        allStudents = [...allStudents, ...students];
+          allStudents = [...allStudents, ...students];
+        }
       }
+
+      setStudents(allStudents);
+    } catch (error) {
+      console.error("Error fetching students:", error);
+    } finally {
+      setLoadingStudents(false);
     }
+  };
 
-    setStudents(allStudents);
+  const updateCompanyStatus = async (companyId, newStatus) => {
+    try {
+      // Mark as transitioning for animation
+      setCompanies(prev => prev.map(company => 
+        company.id === companyId 
+          ? { ...company, isTransitioning: true }
+          : company
+      ));
 
-    if (allStudents.length === 0) {
-      // No students found for this company
+      // Update in Firebase
+      const companyRef = doc(db, "companies", companyId);
+      await updateDoc(companyRef, { 
+        status: newStatus,
+        updatedAt: new Date()
+      });
+
+      // Wait for animation, then refetch to update all data
+      setTimeout(() => {
+        fetchCompanies();
+        setDropdownOpen(null);
+      }, 300); // Match animation duration
+
+    } catch (error) {
+      console.error("Error updating company status:", error);
+      // Revert transition state on error
+      setCompanies(prev => prev.map(company => 
+        company.id === companyId 
+          ? { ...company, isTransitioning: false }
+          : company
+      ));
     }
-  } catch (error) {
-    console.error("Error fetching students:", error);
-  } finally {
-    setLoadingStudents(false);
-  }
-};
-
-
+  };
 
   useEffect(() => {
     fetchCompanies();
@@ -219,6 +244,7 @@ const fetchStudents = async () => {
           dropdownOpen={dropdownOpen}
           setDropdownOpen={setDropdownOpen}
           setShowJDForm={setShowJDForm}
+          updateCompanyStatus={updateCompanyStatus}
         />
 
         {selectedCompany && (

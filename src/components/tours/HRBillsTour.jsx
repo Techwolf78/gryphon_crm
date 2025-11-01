@@ -65,8 +65,7 @@ export default function HRBillsTour({ userId, enabled = true }) {
         const isCompleted = status === "done";
         setCompleted(isCompleted);
         setRun(enabled && !isCompleted);
-      } catch (error) {
-
+      } catch {
         setRun(enabled); // Default to showing tour if error
       } finally {
         setLoading(false);
@@ -166,7 +165,8 @@ export default function HRBillsTour({ userId, enabled = true }) {
 
     // If a target is missing (e.g., conditional UI), continue gracefully
     if (type === EVENTS.TARGET_NOT_FOUND) {
-      // continue to next step
+      // Force next step to skip missing targets
+      return { action: 'next' };
     }
   };
 

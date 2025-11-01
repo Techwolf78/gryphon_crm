@@ -1,17 +1,9 @@
 import React from 'react';
-import { FiTarget, FiMail, FiEye, FiShare2, FiTrendingUp } from 'react-icons/fi';
-import { FaRocket } from 'react-icons/fa';
+// eslint-disable-next-line no-unused-vars
 import { motion } from 'framer-motion';
+import { FaRocket } from 'react-icons/fa';
 
 const MarketingDashboard = () => {
-  // Metrics data
-  const metrics = [
-    { title: 'Campaigns', value: '8', icon: <FiTarget size={20} />, color: 'bg-purple-500' },
-    { title: 'Leads Generated', value: '324', icon: <FiMail size={20} />, color: 'bg-blue-500' },
-    { title: 'Impressions', value: '12.4k', icon: <FiEye size={20} />, color: 'bg-green-500' },
-    { title: 'Engagement Rate', value: '4.8%', icon: <FiShare2 size={20} />, color: 'bg-pink-500' }
-  ];
-
   // Emojis for the animation
   const marketingEmojis = ['📈', '📊', '📢', '🎯', '💡'];
 

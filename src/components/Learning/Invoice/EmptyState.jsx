@@ -1,5 +1,6 @@
 import React from "react";
 
+// eslint-disable-next-line no-unused-vars
 function EmptyState({ icon: IconComponent, title, message }) {
   return (
     <div className="text-center py-16 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200">

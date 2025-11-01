@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import dayjs from 'dayjs';
+import { AnimatePresence } from 'framer-motion';
 
 
 // Custom hook for escape key
@@ -142,7 +141,6 @@ const FollowupAlerts = ({
   setReminderPopup,
 }) => {
   const [alerts, setAlerts] = useState([]);
-  const [snoozedAlerts, setSnoozedAlerts] = useState([]);
 
   // Handle escape key for all alerts
   const handleCloseAll = useCallback(() => {
@@ -169,11 +167,9 @@ const FollowupAlerts = ({
   // Snooze functionality for urgent reminders
   const handleSnooze = useCallback((alert) => {
     const snoozeTime = 5 * 60 * 1000; // 5 minutes for urgent reminders
-    setSnoozedAlerts(prev => [...prev, alert]);
     
     setTimeout(() => {
       setAlerts(prev => [...prev, alert]);
-      setSnoozedAlerts(prev => prev.filter(a => a.id !== alert.id));
     }, snoozeTime);
     
     if (alert.type === 'reminder') {
@@ -191,7 +187,7 @@ const FollowupAlerts = ({
   const handleJoinMeeting = useCallback(() => {
     // In a real app, this would launch the meeting URL
     setReminderPopup(null);
-  }, [reminderPopup, setReminderPopup]);
+  }, [setReminderPopup]);
 
   // Dismiss all action
   const handleDismissAll = useCallback(() => {

@@ -38,6 +38,17 @@ function GenerateTrainerInvoice() {
   
   // Custom toast state (like InitiationDashboard)
   const [toast, setToast] = useState(null);
+
+  // Auto-hide toast after 3 seconds
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => {
+        setToast(null);
+      }, 3000); // 3 seconds
+
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
   
   // 🧠 Cache state management
   const [cachedData, setCachedData] = useState(null);
@@ -405,6 +416,7 @@ function GenerateTrainerInvoice() {
                   where("trainerId", "==", trainer.trainerId),
                   where("collegeName", "==", trainer.collegeName),
                   where("phase", "==", trainer.phase),
+                  where("projectCode", "==", trainer.projectCode),
                   limit(5) // Limit to recent invoices only
                 );
 
@@ -1218,4 +1230,3 @@ function GenerateTrainerInvoice() {
 }
 
 export default GenerateTrainerInvoice;
-

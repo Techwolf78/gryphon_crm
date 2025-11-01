@@ -10,7 +10,8 @@ const StatsCards = ({ totalBills, approvedBills, pendingBills, rejectedBills }) 
       color: "from-blue-500 to-blue-600",
       bgColor: "from-blue-50 to-blue-100",
       textColor: "text-blue-700",
-      description: "All submissions"
+      description: "All submissions",
+      tourId: "total-bills-card"
     },
     {
       title: "Approved",
@@ -19,7 +20,8 @@ const StatsCards = ({ totalBills, approvedBills, pendingBills, rejectedBills }) 
       color: "from-emerald-500 to-emerald-600",
       bgColor: "from-emerald-50 to-emerald-100",
       textColor: "text-emerald-700",
-      description: "Ready for payment"
+      description: "Ready for payment",
+      tourId: "approved-bills-card"
     },
     {
       title: "Pending",
@@ -28,7 +30,8 @@ const StatsCards = ({ totalBills, approvedBills, pendingBills, rejectedBills }) 
       color: "from-amber-500 to-amber-600",
       bgColor: "from-amber-50 to-amber-100",
       textColor: "text-amber-700",
-      description: "Awaiting approval"
+      description: "Awaiting approval",
+      tourId: "pending-bills-card"
     },
     {
       title: "Rejected",
@@ -37,7 +40,8 @@ const StatsCards = ({ totalBills, approvedBills, pendingBills, rejectedBills }) 
       color: "from-red-500 to-red-600",
       bgColor: "from-red-50 to-red-100",
       textColor: "text-red-700",
-      description: "Needs revision"
+      description: "Needs revision",
+      tourId: "rejected-bills-card"
     }
   ];
 
@@ -49,6 +53,7 @@ const StatsCards = ({ totalBills, approvedBills, pendingBills, rejectedBills }) 
           <div
             key={stat.title}
             className="group bg-white rounded-lg shadow-sm border border-slate-200/60 hover:shadow-md hover:border-slate-300/60 transition-all duration-300 overflow-hidden"
+            data-tour={stat.tourId}
           >
             <div className="p-3">
               {/* Title at top */}

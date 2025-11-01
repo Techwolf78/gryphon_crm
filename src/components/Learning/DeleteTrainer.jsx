@@ -15,7 +15,7 @@ function DeleteTrainer({ trainerId, trainerName, onClose, onTrainerDeleted }) {
   await deleteDoc(doc(db, "trainers", trainerId));
   onTrainerDeleted(trainerId);
       onClose();
-    } catch (err) {
+    } catch {
 
       setError("Failed to delete trainer. Please try again.");
     } finally {

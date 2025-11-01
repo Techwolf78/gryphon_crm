@@ -32,7 +32,7 @@ const FiltersSection = ({
   };
 
   return (
-    <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+    <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center" data-tour="quick-actions-card">
       {/* Search Input */}
       <div className="relative flex-1 max-w-md">
         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -44,6 +44,7 @@ const FiltersSection = ({
           className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-sm placeholder-slate-400"
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
+          data-tour="search-input"
         />
         {searchTerm && (
           <button
@@ -64,6 +65,7 @@ const FiltersSection = ({
               ? "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
               : `${getStatusColor(statusFilter)} border-current`
           }`}
+          data-tour="filter-button"
         >
           <span className="flex items-center gap-1.5">
             <FiFilter className="h-3 w-3" />
@@ -112,6 +114,7 @@ const FiltersSection = ({
         onClick={onRefresh}
         disabled={isLoading}
         className="inline-flex items-center px-3 py-2 bg-slate-900 text-white rounded text-xs font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md"
+        data-tour="refresh-button"
       >
         <FiRefreshCw className={`h-3 w-3 mr-1.5 ${isLoading ? 'animate-spin' : ''}`} />
         Refresh

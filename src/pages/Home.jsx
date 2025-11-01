@@ -1,6 +1,7 @@
 import React, { useContext, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
+// eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
 const bgImage = '/home/bg.avif';
 import { FaArrowRight } from "react-icons/fa";

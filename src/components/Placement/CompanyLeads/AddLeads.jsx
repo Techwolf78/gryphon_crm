@@ -14,12 +14,14 @@ function AddLeads({ show, onClose, onAddLead }) {
   const [companyName, setCompanyName] = useState("");
   const [sector, setSector] = useState("");
   const [employeeCount, setEmployeeCount] = useState("");
+  const [companyWebsite, setCompanyWebsite] = useState("");
   const [pocName, setPocName] = useState("");
   const [workingSince, setWorkingSince] = useState("");
   const [pocLocation, setPocLocation] = useState("");
   const [pocPhone, setPocPhone] = useState("");
   const [pocMail, setPocMail] = useState("");
   const [pocDesignation, setPocDesignation] = useState("");
+  const [pocLinkedin, setPocLinkedin] = useState("");
   const [status, setStatus] = useState("Warm");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
@@ -44,12 +46,14 @@ function AddLeads({ show, onClose, onAddLead }) {
     setCompanyName("");
     setSector("");
     setEmployeeCount("");
+    setCompanyWebsite("");
     setPocName("");
     setWorkingSince("");
     setPocLocation("");
     setPocPhone("");
     setPocMail("");
     setPocDesignation("");
+    setPocLinkedin("");
     setStatus("Warm");
     setHasUnsavedChanges(false);
   };
@@ -66,39 +70,71 @@ function AddLeads({ show, onClose, onAddLead }) {
       return;
     }
 
-    const newCompany = {
-      companyName,
-      sector,
-      employeeCount: employeeCount ? parseInt(employeeCount) : 0,
-      pocName,
-      workingSince,
-      pocLocation,
-      pocPhone,
-      pocMail,
-      pocDesignation,
+    // Convert to the format expected by the batch system
+    const companyData = {
+      name: companyName,
+      contactPerson: pocName,
+      designation: pocDesignation,
+      phone: pocPhone,
+      companyUrl: companyWebsite,
+      linkedinUrl: pocLinkedin,
+      email: pocMail,
+      location: pocLocation,
+      industry: sector,
+      companySize: employeeCount,
+      source: "Manual Add",
+      notes: "",
       status: status.toLowerCase() || "warm",
-      assignedTo: {
-        uid: user.uid,
-        name: user.displayName?.trim() || "No Name Provided",
-        email: user.email || "No Email Provided",
-      },
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+      contacts: []
     };
 
     try {
-      const docRef = await addDoc(collection(db, "CompanyLeads"), newCompany);
+      // Create a new batch document with this single company
+      const batchData = {
+        companies: [btoa(JSON.stringify(companyData))],
+        uploadedBy: user.uid,
+        uploadedAt: serverTimestamp(),
+        batchSize: 1,
+        source: "manual_add"
+      };
+
+      // Add to companyleads collection
+      const docRef = await addDoc(collection(db, "companyleads"), batchData);
+
+      // Create the lead object for local state update
+      const newLead = {
+        id: `${docRef.id}_0`, // First (and only) company in this batch
+        batchId: docRef.id,
+        ...companyData,
+        // Map fields for UI compatibility
+        companyName: companyData.name,
+        pocName: companyData.contactPerson,
+        pocDesignation: companyData.designation,
+        pocPhone: companyData.phone,
+        companyUrl: companyData.companyUrl,
+        companyWebsite: companyData.companyUrl,
+        linkedinUrl: companyData.linkedinUrl,
+        pocLinkedin: companyData.linkedinUrl,
+        pocMail: companyData.email || '',
+        pocLocation: companyData.location || '',
+        industry: companyData.industry,
+        companySize: companyData.companySize,
+        source: companyData.source,
+        notes: companyData.notes,
+        status: companyData.status,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        contacts: []
+      };
+
       if (onAddLead) {
-        onAddLead({
-          id: docRef.id,
-          ...newCompany,
-          createdAt: new Date().toISOString(),
-        });
+        onAddLead(newLead);
       }
       resetForm();
       onClose();
     } catch (error) {
       console.error("Error adding company:", error);
+      alert("Failed to add company. Please try again.");
     }
   };
 
@@ -145,7 +181,7 @@ function AddLeads({ show, onClose, onAddLead }) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Sector <span className="text-red-500">*</span>
+                Industry <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -159,7 +195,7 @@ function AddLeads({ show, onClose, onAddLead }) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Employee Count <span className="text-red-500">*</span>
+                Company Size <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
@@ -168,6 +204,19 @@ function AddLeads({ show, onClose, onAddLead }) {
                 placeholder="e.g. 250"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Company Website
+              </label>
+              <input
+                type="url"
+                value={companyWebsite}
+                onChange={(e) => updateField(setCompanyWebsite, e.target.value)}
+                placeholder="e.g. https://company.com"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
 
@@ -250,6 +299,19 @@ function AddLeads({ show, onClose, onAddLead }) {
                 placeholder="e.g. HR Manager"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                POC LinkedIn
+              </label>
+              <input
+                type="url"
+                value={pocLinkedin}
+                onChange={(e) => updateField(setPocLinkedin, e.target.value)}
+                placeholder="e.g. https://linkedin.com/in/johndoe"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
 

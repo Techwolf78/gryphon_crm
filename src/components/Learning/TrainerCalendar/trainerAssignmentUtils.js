@@ -17,7 +17,7 @@ export const deleteTrainerAssignment = async (assignment, onSuccess, onError) =>
     if (onSuccess) {
       onSuccess(assignment);
     }
-  } catch (error) {
+  } catch {
 
     if (onError) {
       onError('Failed to delete trainer assignment. Please try again.');

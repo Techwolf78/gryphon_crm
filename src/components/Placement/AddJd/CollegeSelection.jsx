@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   EyeIcon,
   MailIcon,
   CloudDownloadIcon,
   AcademicCapIcon,
+  DocumentDownloadIcon,
+  UploadIcon,
+  CogIcon,
 } from "@heroicons/react/outline";
 
 function CollegeSelection({
@@ -15,14 +18,15 @@ function CollegeSelection({
   setOtherCollegesInput,
   showOtherCollegesInput,
   setShowOtherCollegesInput,
-  viewStudents,
-  collegeEmails,
   manualEmails,
   handleEmailChange,
   getCollegeEmail,
   collegeDetails,
+  selectedTemplateFields,
+  onTemplateFieldsChange 
 }) {
   const [isImporting, setIsImporting] = useState(false);
+  const [showTemplateConfig, setShowTemplateConfig] = useState(false);
 
   const fetchCollegeEmailsFromFirebase = async () => {
     setIsImporting(true);
@@ -76,7 +80,6 @@ function CollegeSelection({
     fetchCollegeEmailsFromFirebase();
   };
 
-  // Get college details for display - Firebase data use karo
   const getCollegeDisplayInfo = (college) => {
     if (college === "Other") return null;
 
@@ -85,10 +88,56 @@ function CollegeSelection({
 
     return {
       specializations: details.specializations || [],
-      year: details.year || "N/A", // Firebase ka year field
+      year: details.year || "N/A",
       passingYear: details.passingYear || "N/A",
       projectCode: details.projectCode || "N/A",
     };
+  };
+
+  // Template configuration functions
+  const handleTemplateFieldToggle = (field) => {
+    const requiredFields = ['studentName', 'enrollmentNo', 'email', 'course', 'specialization', 'currentYear'];
+    
+    // Required fields can't be removed
+    if (requiredFields.includes(field)) return;
+    
+    onTemplateFieldsChange(prev => 
+      prev.includes(field)
+        ? prev.filter(f => f !== field)
+        : [...prev, field]
+    );
+  };
+
+  const selectAllTemplateFields = () => {
+    const allFields = [
+      'studentName', 'enrollmentNo', 'email', 'phone', 'course', 'specialization', 
+      'currentYear', 'tenthMarks', 'twelfthMarks', 'diplomaMarks', 'cgpa', 
+      'activeBacklogs', 'totalBacklogs', 'gender', 'resumeLink'
+    ];
+    onTemplateFieldsChange(allFields);
+  };
+
+  const selectRequiredTemplateFields = () => {
+    const requiredFields = ['studentName', 'enrollmentNo', 'email', 'course', 'specialization', 'currentYear'];
+    onTemplateFieldsChange(requiredFields);
+  };
+
+  const fieldLabels = {
+    'studentName': 'Student Name*',
+    'enrollmentNo': 'Enrollment No*',
+    'email': 'Email*',
+    'phone': 'Phone',
+    'course': 'Course*',
+    'specialization': 'Specialization*',
+    'currentYear': 'Current Year*',
+    'tenthMarks': '10th Marks',
+    'twelfthMarks': '12th Marks',
+    'diplomaMarks': 'Diploma Marks',
+    'cgpa': 'CGPA',
+    'activeBacklogs': 'Active Backlogs',
+    'totalBacklogs': 'Total Backlogs',
+    'gender': 'Gender',
+    'resumeLink': 'Resume Link'
   };
 
   return (
@@ -111,6 +160,71 @@ function CollegeSelection({
         </span>
       </p>
 
+      {/* Template Configuration Section */}
+      <div className="bg-white border border-purple-200 rounded-lg p-4 mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center">
+            <CogIcon className="h-5 w-5 text-purple-600 mr-2" />
+            <h3 className="text-lg font-semibold text-gray-900">
+              📊 Excel Template Configuration
+            </h3>
+          </div>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setShowTemplateConfig(!showTemplateConfig)}
+              className="px-3 py-1 text-sm bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition"
+            >
+              {showTemplateConfig ? 'Hide Config' : 'Show Config'}
+            </button>
+            <button
+              onClick={selectRequiredTemplateFields}
+              className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition"
+            >
+              Minimum
+            </button>
+            <button
+              onClick={selectAllTemplateFields}
+              className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition"
+            >
+              All Fields
+            </button>
+          </div>
+        </div>
+
+        {showTemplateConfig && (
+          <>
+            <p className="text-sm text-gray-600 mb-3">
+              Select the data fields you want colleges to provide. Required fields (*) are mandatory.
+            </p>
+            
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
+              {Object.keys(fieldLabels).map(field => (
+                <label key={field} className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded border border-gray-200">
+                  <input
+                    type="checkbox"
+                    checked={selectedTemplateFields.includes(field)}
+                    onChange={() => handleTemplateFieldToggle(field)}
+                    disabled={fieldLabels[field].includes('*')}
+                    className="rounded text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className={`text-sm ${fieldLabels[field].includes('*') ? 'font-semibold text-gray-800' : 'text-gray-600'}`}>
+                    {fieldLabels[field]}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </>
+        )}
+
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <p className="text-blue-700 text-sm">
+            <strong>Selected {selectedTemplateFields.length} columns:</strong> {
+              selectedTemplateFields.map(field => fieldLabels[field]).join(', ')
+            }
+          </p>
+        </div>
+      </div>
+
       {/* Filter Summary */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
         <div className="flex items-center justify-between">
@@ -120,6 +234,12 @@ function CollegeSelection({
               <span className="text-blue-700">
                 Matched Colleges:{" "}
                 {availableColleges.filter((c) => c !== "Other").length} found
+              </span>
+            </div>
+            <div className="flex items-center">
+              <CogIcon className="h-4 w-4 mr-1 text-purple-600" />
+              <span className="text-purple-700">
+                Template Columns: {selectedTemplateFields.length} selected
               </span>
             </div>
           </div>
@@ -177,18 +297,38 @@ function CollegeSelection({
                         )}
                       </label>
                     </div>
-                    {college !== "Other" && (
-                      <button
-                        onClick={() => viewStudents(college)}
-                        className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-                      >
-                        <EyeIcon className="h-4 w-4 mr-1" />
-                        View Students
-                      </button>
-                    )}
+                    {/* <div className="flex items-center space-x-2">
+                      {college !== "Other" && (
+                        <>
+                          <button
+                            onClick={() => onDownloadTemplate(college)}
+                            className="text-green-600 hover:text-green-800 text-sm flex items-center"
+                            title="Download Template"
+                          >
+                            <DocumentDownloadIcon className="h-4 w-4 mr-1" />
+                            Template
+                          </button>
+                          <button
+                            onClick={() => onUploadExcel(college)}
+                            className="text-purple-600 hover:text-purple-800 text-sm flex items-center"
+                            title="Upload Excel"
+                          >
+                            <UploadIcon className="h-4 w-4 mr-1" />
+                            Upload
+                          </button>
+                          <button
+                            onClick={() => viewStudents(college)}
+                            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+                          >
+                            <EyeIcon className="h-4 w-4 mr-1" />
+                            Students
+                          </button>
+                        </>
+                      )}
+                    </div> */}
                   </div>
 
-                  {/* College Details - Firebase data show karo */}
+                  {/* College Details */}
                   {collegeInfo && (
                     <div className="ml-7 mb-3">
                       <div className="flex flex-wrap gap-2 text-xs">
@@ -335,6 +475,9 @@ function CollegeSelection({
                     selectedColleges.filter((college) => college !== "Other")
                       .length
                   }
+                </p>
+                <p className="text-xs text-purple-700 mt-1">
+                  Template columns: {selectedTemplateFields.length} selected
                 </p>
               </div>
             </div>

@@ -21,6 +21,7 @@ const ClosedLeadsStats = ({
   selectedTeamUserId,
   setSelectedTeamUserId,
   achievedValue: propAchievedValue, // ← rename incoming prop
+  achievedGST: propAchievedGST, // ← add GST prop
   showDirectorLeads,
   shouldShowDepartmentToggle,
 }) => {
@@ -465,6 +466,11 @@ const ClosedLeadsStats = ({
             <p className="text-2xl font-bold text-gray-900 mb-1.5">
               {formatCurrency(achievedValue)}
             </p>
+            {propAchievedGST && Number(propAchievedGST) > 0 && (
+              <div className="text-xs text-gray-500 mt-1">
+                +{formatCurrency(propAchievedGST)} GST
+              </div>
+            )}
             {displayQuarterTarget.adjustedTarget > 0 && (
               <div className="flex items-center justify-center gap-2">
                 <div className="w-16 bg-gray-200 rounded-full h-2 overflow-hidden">
@@ -700,6 +706,7 @@ ClosedLeadsStats.propTypes = {
   selectedTeamUserId: PropTypes.string.isRequired,
   setSelectedTeamUserId: PropTypes.func.isRequired,
   achievedValue: PropTypes.number,
+  achievedGST: PropTypes.number,
   showDirectorLeads: PropTypes.bool,
   shouldShowDepartmentToggle: PropTypes.bool,
 };

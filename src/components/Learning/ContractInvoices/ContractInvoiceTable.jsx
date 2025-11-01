@@ -191,30 +191,13 @@ export default function ContractInvoiceTable() {
 
   // Helper function to format currency in Indian numbering system with abbreviations
   const formatIndianCurrency = (amount) => {
-    if (!amount && amount !== 0) return "0";
+    if (!amount && amount !== 0) return "₹0";
 
     let numAmount = Number(amount);
-    if (isNaN(numAmount)) return "0";
+    if (isNaN(numAmount)) return "₹0";
 
-    // For amounts less than 1 lakh, show regular formatting
-    if (numAmount < 100000) {
-      return new Intl.NumberFormat('en-IN').format(numAmount);
-    }
-
-    // For amounts >= 1 lakh, use abbreviations
-    if (numAmount >= 10000000000) { // 1000 Cr and above
-      return `${(numAmount / 10000000).toFixed(1)}K Cr`;
-    } else if (numAmount >= 1000000000) { // 100 Cr to 999 Cr
-      return `${(numAmount / 10000000).toFixed(1)} Cr`;
-    } else if (numAmount >= 100000000) { // 10 Cr to 99 Cr
-      return `${(numAmount / 10000000).toFixed(1)} Cr`;
-    } else if (numAmount >= 10000000) { // 1 Cr to 9.9 Cr
-      return `${(numAmount / 10000000).toFixed(1)} Cr`;
-    } else if (numAmount >= 1000000) { // 10 Lakh to 99 Lakh
-      return `${(numAmount / 100000).toFixed(2)} Lakh`;
-    } else { // 1 Lakh to 9.9 Lakh
-      return `${(numAmount / 100000).toFixed(2)} Lakh`;
-    }
+    // Always show exact amount with Indian number formatting, no abbreviations
+    return "₹" + new Intl.NumberFormat('en-IN').format(numAmount);
   };
 
   const toggleExpand = (id) => {
@@ -867,10 +850,16 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
   const installmentIndex = contract.paymentDetails.findIndex(p => p === installment);
   const adjustedTotalAmount = getAdjustedInstallmentAmount(contract, installment, installmentIndex);
   
-  // Use the adjusted amount
+  // Use the exact amount without rounding
   totalAmount = adjustedTotalAmount;
-  baseAmount = formData.invoiceType === "Cash Invoice" ? totalAmount : Math.round(totalAmount / 1.18);
-  gstAmount = formData.invoiceType === "Cash Invoice" ? 0 : totalAmount - baseAmount;
+  
+  // Check gstType for dynamic GST calculation
+  const isGstExcluded = contract.gstType === 'exclude';
+  
+  baseAmount = formData.invoiceType === "Cash Invoice" ? totalAmount : 
+               (isGstExcluded ? totalAmount : Math.round(totalAmount / 1.18));
+  gstAmount = formData.invoiceType === "Cash Invoice" ? 0 : 
+              (isGstExcluded ? 0 : totalAmount - baseAmount);
 
   const invoiceData = {
     ...formData,
@@ -1156,23 +1145,20 @@ const handleMergeSubmit = async (formData) => {
     const currentDate = new Date();
     const invoiceNumber = await generateInvoiceNumber(formData.invoiceType);
 
-    // ✅ YEHI IMPORTANT CHANGE HAI - BASE AMOUNT DONO CASES MEIN SAME RAHEGA
-    let totalBaseAmount = 0;
+    // ✅ Calculate total amount first (sum of all contract installments)
+    let totalInstallmentAmount = 0;
     let totalStudentCount = 0;
     const courses = [];
     const years = [];
     let perStudentCost = 0;
 
-    // ✅ Pehle sab contracts ke TOTAL amounts calculate karo (Tax Invoice ke hisab se)
+    // ✅ Pehle sab contracts ke TOTAL amounts calculate karo
     selectedContractsForMerge.forEach((contract) => {
       // Find installment at the same index position
       const installmentDetail = contract.paymentDetails?.[selectedInstallmentForMerge.idx];
       
       const installmentAmount = parseFloat(installmentDetail?.totalAmount) || 0;
-      
-      // ✅ YEHI LINE CHANGE KARO - HAR CONTRACT KA BASE AMOUNT CALCULATE KARO
-      const contractBaseAmount = Math.round(installmentAmount / 1.18);
-      totalBaseAmount += contractBaseAmount;
+      totalInstallmentAmount += installmentAmount;
 
       if (contract.studentCount) {
         totalStudentCount += parseInt(contract.studentCount);
@@ -1193,7 +1179,15 @@ const handleMergeSubmit = async (formData) => {
     // Use first contract for common details
     const firstContract = selectedContractsForMerge[0];
 
-    // ✅ Cash aur Tax ke liye alag GST calculation - BUT BASE AMOUNT SAME RAHEGA
+    // Check gstType for dynamic GST calculation (use first contract's gstType)
+    const isGstExcluded = firstContract.gstType === 'exclude';
+
+    // Use exact amounts without rounding
+    const totalBaseAmount = formData.invoiceType === "Cash Invoice" 
+      ? totalInstallmentAmount 
+      : (isGstExcluded ? totalInstallmentAmount : Math.round(totalInstallmentAmount / 1.18));
+    
+    // ✅ Cash aur Tax ke liye alag GST calculation
     let gstAmount = 0;
     let netPayableAmount = 0;
 
@@ -1202,14 +1196,19 @@ const handleMergeSubmit = async (formData) => {
       gstAmount = 0;
       netPayableAmount = totalBaseAmount;
     } else {
-      // ✅ Tax Invoice: Base Amount same, GST calculate karo
-      const gstRate = 0.18;
-      gstAmount = Math.round(totalBaseAmount * gstRate);
-      netPayableAmount = totalBaseAmount + gstAmount;
+      // ✅ Tax Invoice: Base Amount calculated, GST calculate karo based on gstType
+      if (isGstExcluded) {
+        gstAmount = 0;
+        netPayableAmount = totalBaseAmount;
+      } else {
+        const gstRate = 0.18;
+        gstAmount = Math.round(totalBaseAmount * gstRate);
+        netPayableAmount = totalBaseAmount + gstAmount;
+      }
     }
 
-    // Final amount ko bhi round karo
-    const finalNetPayableAmount = Math.round(netPayableAmount);
+    // Use exact final amount without rounding
+    const finalNetPayableAmount = netPayableAmount;
 
     const mergedInvoiceData = {
       ...formData,
@@ -1235,7 +1234,7 @@ const handleMergeSubmit = async (formData) => {
       totalCost: totalBaseAmount, // ✅ Total cost = Base amount (GST excluded)
       installment: selectedInstallmentForMerge.name,
       installmentIndex: selectedInstallmentForMerge.idx,
-      baseAmount: totalBaseAmount, // ✅ BASE AMOUNT DONO CASES MEIN SAME
+      baseAmount: totalBaseAmount, // ✅ BASE AMOUNT
       gstAmount: gstAmount,
       netPayableAmount: finalNetPayableAmount,
       amountRaised: finalNetPayableAmount,

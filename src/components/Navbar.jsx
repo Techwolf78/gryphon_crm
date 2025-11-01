@@ -11,7 +11,6 @@ import {
 import { toast } from "react-toastify";
 import {
   doc,
-  getDoc,
   collection,
   query,
   where,
@@ -85,7 +84,7 @@ const Navbar = ({ onImageClick = () => {} }) => {
               }
             }
           });
-        } catch (error) {
+        } catch {
 
           toast.error("Failed to load profile picture");
         } finally {

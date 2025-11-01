@@ -197,9 +197,8 @@ const InitiationDashboardExportButton = ({ trainings }) => {
       const tableRef = `${startRef}:${endRef}`;
       // SheetJS community recognizes '!tables' for table metadata; Excel will show it as a table when supported by reader
       ws['!tables'] = [{ name: 'TrainingsTable', ref: tableRef, headerRow: true }];
-    } catch (e) {
+    } catch {
       // Non-critical: if table creation fails, continue without blocking export
-
     }
 
     // Create workbook
@@ -210,7 +209,7 @@ const InitiationDashboardExportButton = ({ trainings }) => {
     try {
       XLSX.writeFile(wb, `trainings_export_${new Date().toISOString().split('T')[0]}.xlsx`);
       setIsDropdownOpen(false);
-    } catch (error) {
+    } catch {
 
       alert('Failed to export data. Please try again.');
     }
