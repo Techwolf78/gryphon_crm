@@ -26,7 +26,8 @@ function CompanyTable({
   setSelectedCompany,
   dropdownOpen,
   setDropdownOpen,
-  setShowJDForm
+  setShowJDForm,
+  updateCompanyStatus
 }) {
   return (
     <div className="mt-2 space-y-2">
@@ -38,7 +39,9 @@ function CompanyTable({
             onClick={() => setSelectedCompany(company)}
           >
             <div
-              className={`grid grid-cols-8 gap-4 p-4 rounded-lg bg-white shadow-sm hover:shadow-md transition-all duration-300 ${borderColorMap[activeTab]}`}
+              className={`grid grid-cols-8 gap-4 p-4 rounded-lg bg-white shadow-sm hover:shadow-md transition-all duration-300 ${borderColorMap[activeTab]} ${
+                company.isTransitioning ? 'opacity-50 scale-95' : 'opacity-100 scale-100'
+              }`}
             >
               <div className="text-sm text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis flex items-center h-full">
                 {company.companyName || "-"}
@@ -117,7 +120,7 @@ function CompanyTable({
                 companyData={company}
                 closeDropdown={() => setDropdownOpen(null)}
                 setSelectedCompany={setSelectedCompany}
-                updateCompanyStatus={() => {}}
+                updateCompanyStatus={updateCompanyStatus}
                 activeTab={activeTab}
               />
             )}
