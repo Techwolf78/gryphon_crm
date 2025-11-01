@@ -1,4 +1,10 @@
-import React, { useContext, useState, useEffect, useRef, useCallback } from "react";
+import React, {
+  useContext,
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+} from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import AiBot from "./AiBot";
@@ -19,80 +25,125 @@ import {
   FiUserCheck,
   FiUser,
   FiShield,
+  FiShoppingCart,
   FiBell
 } from "react-icons/fi";
- 
+
 const roleLinks = {
   admin: [
     { label: "Admin", path: "/dashboard/admin", icon: <FiUsers /> },
-    { label: "Sales", path: "/dashboard/sales", icon: <MdOutlineCurrencyRupee /> },
-    { label: "L & D", path: "/dashboard/learning-development", icon: <FiBook /> },
+    {
+      label: "Sales",
+      path: "/dashboard/sales",
+      icon: <MdOutlineCurrencyRupee />,
+    },
+    {
+      label: "Purchase",
+      path: "/dashboard/purchase",
+      icon: <FiShoppingCart />,
+    },
+    {
+      label: "L & D",
+      path: "/dashboard/learning-development",
+      icon: <FiBook />,
+    },
     { label: "Placement", path: "/dashboard/placement", icon: <FiBriefcase /> },
     { label: "D M", path: "/dashboard/marketing", icon: <FiTrendingUp /> },
     { label: "CA", path: "/dashboard/ca", icon: <FiUserCheck /> },
     { label: "HR", path: "/dashboard/hr", icon: <FiShield /> },
   ],
-  sales: [{ label: "Sales", path: "/dashboard/sales", icon: <MdOutlineCurrencyRupee /> }],
-  placement: [{ label: "Placement", path: "/dashboard/placement", icon: <FiBriefcase /> }],
-  "learning-development": [{ label: "L & D", path: "/dashboard/learning-development", icon: <FiBook /> }],
-  marketing: [{ label: "D M", path: "/dashboard/marketing", icon: <FiTrendingUp /> }],
+  sales: [
+    {
+      label: "Sales",
+      path: "/dashboard/sales",
+      icon: <MdOutlineCurrencyRupee />,
+    },
+  ],
+  placement: [
+    { label: "Placement", path: "/dashboard/placement", icon: <FiBriefcase /> },
+  ],
+  "learning-development": [
+    {
+      label: "L & D",
+      path: "/dashboard/learning-development",
+      icon: <FiBook />,
+    },
+  ],
+  marketing: [
+    { label: "D M", path: "/dashboard/marketing", icon: <FiTrendingUp /> },
+  ],
   ca: [{ label: "CA", path: "/dashboard/ca", icon: <FiUserCheck /> }],
   hr: [{ label: "HR", path: "/dashboard/hr", icon: <FiShield /> }],
+  purchase: [
+    {
+      label: "Purchase",
+      path: "/dashboard/purchase",
+      icon: <FiShoppingCart />,
+    },
+  ],
 };
- 
+
 const normalizeRole = (role) => {
   if (!role) return "";
-  const norm = String(role).toLowerCase().replace(/[^a-z0-9]/g, "");
+  const norm = String(role)
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
   if (norm.includes("admin")) return "admin";
   if (norm.includes("sales")) return "sales";
-  if (norm.includes("placement")) return "placement";
-  if (norm.includes("learning") || norm.includes("l&d") || norm.includes("ld")) return "learning-development";
+  if (norm.includes("purchase")) return "purchase";
+  if (norm.includes("learning") || norm.includes("l&d") || norm.includes("ld"))
+    return "learning-development";
   if (norm.includes("marketing") || norm.includes("dm")) return "marketing";
   if (norm.includes("ca")) return "ca";
   if (norm.includes("hr")) return "hr";
+  if (norm.includes("placement")) return "placement";
   return "";
 };
- 
+
 const Sidebar = ({ collapsed, onToggle }) => {
   const { user } = useContext(AuthContext);
   const location = useLocation();
   const [isAIDrawerOpen, setIsAIDrawerOpen] = useState(false);
   const initializedRef = useRef(false);
- 
+
   // Sync stored preference on mount (run once). If stored value differs from current prop, call onToggle to sync parent.
   useEffect(() => {
     if (initializedRef.current) return;
     initializedRef.current = true;
     try {
-      const raw = localStorage.getItem('sidebar_collapsed');
+      const raw = localStorage.getItem("sidebar_collapsed");
       if (raw !== null) {
         const stored = JSON.parse(raw);
         if (Boolean(stored) !== Boolean(collapsed)) {
-          if (typeof onToggle === 'function') onToggle();
+          if (typeof onToggle === "function") onToggle();
         }
       }
     } catch {
       // ignore storage errors
     }
   }, [collapsed, onToggle]);
- 
+
   const handleToggle = useCallback(() => {
     try {
       const newVal = !collapsed;
-      localStorage.setItem('sidebar_collapsed', JSON.stringify(newVal));
+      localStorage.setItem("sidebar_collapsed", JSON.stringify(newVal));
     } catch {
       // ignore storage errors
     }
-    if (typeof onToggle === 'function') onToggle();
+    if (typeof onToggle === "function") onToggle();
   }, [collapsed, onToggle]);
- 
+
   if (!user) return null;
- 
+
   // Get all departments for the user (handle both single department and array format)
-  const userDepartments = Array.isArray(user.departments) ? user.departments : (user.department ? [user.department] : []);
+  const userDepartments = Array.isArray(user.departments)
+    ? user.departments
+    : user.department
+    ? [user.department]
+    : [];
   const normalizedRole = normalizeRole(user.role);
   const isAdmin = normalizedRole === "admin";
- 
+
   // If admin, show all links. Otherwise, show links for each department the user belongs to
   let departmentLinks = [];
   if (isAdmin) {
@@ -100,10 +151,10 @@ const Sidebar = ({ collapsed, onToggle }) => {
   } else {
     // Collect unique links for all user's departments
     const uniqueLinks = new Map();
-    userDepartments.forEach(dept => {
+    userDepartments.forEach((dept) => {
       const deptRole = normalizeRole(dept);
       if (roleLinks[deptRole]) {
-        roleLinks[deptRole].forEach(link => {
+        roleLinks[deptRole].forEach((link) => {
           if (!uniqueLinks.has(link.path)) {
             uniqueLinks.set(link.path, link);
           }
@@ -112,15 +163,28 @@ const Sidebar = ({ collapsed, onToggle }) => {
     });
     departmentLinks = Array.from(uniqueLinks.values());
   }
- 
-  const isActive = (path) => path === "/dashboard" ? location.pathname === "/dashboard" : location.pathname.startsWith(path);
- 
+
+  const isActive = (path) =>
+    path === "/dashboard"
+      ? location.pathname === "/dashboard"
+      : location.pathname.startsWith(path);
+
   const links = [
-    { label: "Dashboard", path: "/dashboard", icon: <FiHome />, skipRedirect: true },
+    {
+      label: "Dashboard",
+      path: "/dashboard",
+      icon: <FiHome />,
+      skipRedirect: true,
+    },
     ...departmentLinks,
-    { label: "Help", path: "/dashboard/help", icon: <FiHelpCircle />, skipRedirect: true },
+    {
+      label: "Help",
+      path: "/dashboard/help",
+      icon: <FiHelpCircle />,
+      skipRedirect: true,
+    },
   ];
- 
+
   return (
     <>
       {/* Mobile Menu Button */}
@@ -133,7 +197,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
           <FiMenu className="w-5 h-5 text-gray-700" />
         </button>
       )}
- 
+
       {/* Overlay for mobile when sidebar is open */}
       {!collapsed && (
         <div
@@ -141,33 +205,48 @@ const Sidebar = ({ collapsed, onToggle }) => {
           onClick={handleToggle}
         />
       )}
- 
-      <aside className={`
+
+      <aside
+        className={`
         ${collapsed ? "w-16" : "w-64 sm:w-72 lg:w-44"}
         bg-white border-r border-gray-200 flex flex-col fixed h-full z-50
         transition-all duration-300
-        ${collapsed
-          ? "-translate-x-full lg:translate-x-0" // Hide on mobile when collapsed, show on desktop
-          : "translate-x-0" // Always show when expanded
+        ${
+          collapsed
+            ? "-translate-x-full lg:translate-x-0" // Hide on mobile when collapsed, show on desktop
+            : "translate-x-0" // Always show when expanded
         }
         lg:translate-x-0
-      `}>
+      `}
+      >
         {/* Header */}
-    <div className={`p-3 border-b border-gray-200 ${collapsed ? "flex flex-col items-center space-y-2" : "flex items-center justify-between"}`}>
+        <div
+          className={`p-3 border-b border-gray-200 ${
+            collapsed
+              ? "flex flex-col items-center space-y-2"
+              : "flex items-center justify-between"
+          }`}
+        >
           <img
             src={collapsed ? compactLogo : logo}
             alt="SYNC"
-            className={collapsed ? "w-6 h-6" : "h-5 max-w-[120px] sm:max-w-none"}
+            className={
+              collapsed ? "w-6 h-6" : "h-5 max-w-[120px] sm:max-w-none"
+            }
           />
           <button
-      onClick={handleToggle}
+            onClick={handleToggle}
             className="p-1 rounded hover:bg-gray-100 lg:block"
             aria-label={collapsed ? "Expand" : "Collapse"}
           >
-            <img src={collapsed ? expandIcon : collapseIcon} alt="" className="w-4 h-4" />
+            <img
+              src={collapsed ? expandIcon : collapseIcon}
+              alt=""
+              className="w-4 h-4"
+            />
           </button>
         </div>
- 
+
         {/* Navigation */}
         <nav className="flex-1 p-3 space-y-2 overflow-y-auto">
           {links.map(({ label, path, icon, skipRedirect, onClick, hasNotification }) => (
@@ -226,7 +305,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
               )}
             </div>
           ))}
- 
+
           {/* AI Button */}
           <div className="pt-3 border-t border-gray-200">
             <button
@@ -251,6 +330,5 @@ const Sidebar = ({ collapsed, onToggle }) => {
     </>
   );
 };
- 
+
 export default Sidebar;
- 

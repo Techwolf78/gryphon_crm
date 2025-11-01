@@ -24,19 +24,26 @@ const Dashboard = React.lazy(() => import("./pages/Dashboard"));
 const Admin = React.lazy(() => import("./pages/Admin"));
 const Sales = React.lazy(() => import("./pages/Sales"));
 const Placement = React.lazy(() => import("./pages/Placement"));
-const LearningDevelopment = React.lazy(() => import("./pages/LearningDevelopment"));
+const LearningDevelopment = React.lazy(() =>
+  import("./pages/LearningDevelopment")
+);
 const DigitalMarketing = React.lazy(() => import("./pages/Marketing"));
 const Footer = React.lazy(() => import("./pages/footer"));
 const UpdateProfile = React.lazy(() => import("./components/UpdateProfile"));
 const Help = React.lazy(() => import("./pages/Help"));
-const TrainersDashboard = React.lazy(() => import("./components/Learning/TrainersDashboard"));
+const TrainersDashboard = React.lazy(() =>
+  import("./components/Learning/TrainersDashboard")
+);
 const HR = React.lazy(() => import("./pages/HR"));
 const CA = React.lazy(() => import("./pages/CA"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 const Roadmap = React.lazy(() => import("./pages/Roadmap"));
-const PublicInvoiceDetails = React.lazy(() => import("./pages/PublicInvoiceDetails"));
+const PublicInvoiceDetails = React.lazy(() =>
+  import("./pages/PublicInvoiceDetails")
+);
 const Maintenance = React.lazy(() => import("./pages/Maintenance"));
 const UploadStudentData = React.lazy(() => import("./components/Placement/AddJd/UploadStudentData")); // ✅ Space removed
+const Purchase = React.lazy(() => import("./pages/Purchase"));
 
 // Loading component
 const PageLoader = () => (
@@ -48,7 +55,7 @@ const PageLoader = () => (
     </div>
   </div>
 );
- 
+
 const AppContent = () => {
   const location = useLocation();
 
@@ -104,6 +111,7 @@ const AppContent = () => {
             </Route>
             <Route path="hr" element={<HR />} />
             <Route path="ca" element={<CA />} />
+            <Route path="purchase" element={<Purchase />} />
           </Route>
 
           {/* Add the 404 route - catch all unmatched routes */}
@@ -120,7 +128,7 @@ const AppContent = () => {
     </>
   );
 };
- 
+
 const App = () => (
   <>
     <ErrorBoundary>
@@ -150,3 +158,5 @@ const App = () => (
 );
  
 export default App;
+
+
