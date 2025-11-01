@@ -13,37 +13,28 @@ function LeadsTable({
   onLeadClick,
   onStatusChange,
   onEditLead,
+  onScheduleMeeting,
 }) {
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, show: false, leadId: null });
+  const [dropdownOpen, setDropdownOpen] = useState(null);
 
   const handleActionClick = (leadId, e) => {
     e.stopPropagation();
-    if (dropdownPosition.show && dropdownPosition.leadId === leadId) {
-      closeDropdown();
-      return;
-    }
-    const rect = e.target.getBoundingClientRect();
-    setDropdownPosition({
-      top: rect.bottom + window.scrollY,
-      left: rect.left - 176 + window.scrollX,
-      show: true,
-      leadId
-    });
+    setDropdownOpen(dropdownOpen === leadId ? null : leadId);
   };
 
   const closeDropdown = useCallback(() => {
-    setDropdownPosition(prev => ({ ...prev, show: false }));
+    setDropdownOpen(null);
   }, []);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (dropdownPosition.show && !e.target.closest('.dropdown-button')) {
+      if (dropdownOpen && !e.target.closest('.dropdown-container')) {
         closeDropdown();
       }
     };
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
-  }, [dropdownPosition.show, closeDropdown]);
+  }, [dropdownOpen, closeDropdown]);
   return (
     <div className="mt-2 overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200 border border-gray-300">
@@ -123,60 +114,69 @@ function LeadsTable({
                   )}
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 relative border border-gray-300">
-                  <button
-                    onClick={(e) => handleActionClick(lead.id, e)}
-                    className="dropdown-button text-gray-500 hover:text-gray-700 focus:outline-none p-2 rounded-full hover:bg-gray-100 transition-colors"
-                    aria-expanded={dropdownPosition.show && dropdownPosition.leadId === lead.id}
-                    aria-haspopup="true"
-                  >
-                    <FaEllipsisV size={16} />
-                  </button>
-
-                  {dropdownPosition.show && dropdownPosition.leadId === lead.id && (
-                    <div
-                      className="fixed w-44 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50"
-                      style={{ top: dropdownPosition.top, left: dropdownPosition.left }}
+                  <div className="dropdown-container relative">
+                    <button
+                      onClick={(e) => handleActionClick(lead.id, e)}
+                      className="text-gray-500 hover:text-gray-700 focus:outline-none p-2 rounded-full hover:bg-gray-100 transition-colors"
+                      aria-expanded={dropdownOpen === lead.id}
+                      aria-haspopup="true"
                     >
-                      <div className="py-1">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onEditLead(lead);
-                            closeDropdown();
-                          }}
-                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onLeadClick(lead);
-                            closeDropdown();
-                          }}
-                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition"
-                        >
-                          View Details
-                        </button>
+                      <FaEllipsisV size={16} />
+                    </button>
 
-                        {["hot", "warm", "cold", "onboarded"]
-                          .filter((status) => status !== lead.status)
-                          .map((status) => (
-                            <button
-                              key={status}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onStatusChange(lead.id, status);
-                                closeDropdown();
-                              }}
-                              className={`block w-full text-left px-4 py-2 text-sm transition ${statusColorMap[status]}`}
-                            >
-                              Mark as {status}
-                            </button>
-                          ))}
+                    {dropdownOpen === lead.id && (
+                      <div className="absolute right-8 mt-1 w-44 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50">
+                        <div className="py-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onScheduleMeeting(lead);
+                              closeDropdown();
+                            }}
+                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition"
+                          >
+                            Meetings
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditLead(lead);
+                              closeDropdown();
+                            }}
+                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onLeadClick(lead);
+                              closeDropdown();
+                            }}
+                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition"
+                          >
+                            View Details
+                          </button>
+
+                          {["hot", "warm", "cold", "onboarded"]
+                            .filter((status) => status !== lead.status)
+                            .map((status) => (
+                              <button
+                                key={status}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onStatusChange(lead.id, status);
+                                  closeDropdown();
+                                }}
+                                className={`block w-full text-left px-4 py-2 text-sm transition ${statusColorMap[status]}`}
+                              >
+                                Mark as {status}
+                              </button>
+                            ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </td>
               </tr>
             ))

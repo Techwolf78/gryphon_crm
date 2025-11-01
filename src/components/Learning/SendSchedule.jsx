@@ -51,16 +51,37 @@ function SendSchedule({
   const [trainingFormDoc, setTrainingFormDoc] = useState(null);
   const [phaseDocData, setPhaseDocData] = useState(null);
 
-  // Utility: format date
-  const formatDate = (dateStr) => {
-    if (!dateStr) return "";
-    return new Date(dateStr).toLocaleDateString("en-US", {
-      weekday: "short",
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
+  // Helper to calculate training days
+function getTrainingDays(startDate, endDate, excludeDays = "None") {
+  if (!startDate || !endDate) return 0;
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (isNaN(start) || isNaN(end) || end < start) return 0;
+  let days = 0;
+  const cur = new Date(start);
+  while (cur <= end) {
+    const dayOfWeek = cur.getDay();
+    let shouldInclude = true;
+    if (excludeDays === "Saturday" && dayOfWeek === 6) shouldInclude = false;
+    else if (excludeDays === "Sunday" && dayOfWeek === 0) shouldInclude = false;
+    else if (excludeDays === "Both" && (dayOfWeek === 0 || dayOfWeek === 6))
+      shouldInclude = false;
+    if (shouldInclude) days++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return days;
+}
+
+// Utility: format date
+const formatDate = (dateStr) => {
+  if (!dateStr) return "";
+  return new Date(dateStr).toLocaleDateString("en-US", {
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+};
 
 
 
@@ -76,9 +97,15 @@ useEffect(() => {
   let totalLodging = 0;
 
   trainerDetails.forEach(detail => {
+    // Calculate days for this assignment
+    const days = getTrainingDays(detail.startDate, detail.endDate, phaseData?.excludeDays || "None");
+    
+    // Conveyance is one-time per assignment
     totalConveyance += Number(detail.conveyance) || 0;
-    totalFood += Number(detail.food) || 0;
-    totalLodging += Number(detail.lodging) || 0;
+    
+    // Food and lodging are per day * days
+    totalFood += (Number(detail.food) || 0) * days;
+    totalLodging += (Number(detail.lodging) || 0) * days;
   });
 
   setTrainerCostDetails({
@@ -86,7 +113,7 @@ useEffect(() => {
     food: totalFood,
     lodging: totalLodging
   });
-}, [selectedTrainer, trainersData]);
+}, [selectedTrainer, trainersData, phaseData?.excludeDays]);
 
 
 
@@ -429,10 +456,10 @@ useEffect(() => {
       const trainingFees = roundToNearestWhole(totalHours * (feePerHour || 0));
       
       // Calculate expenses the same way as InitiationTrainingDetails
-      // Conveyance is one-time, food and lodging are per day
+      // Conveyance is one-time, food and lodging are already totals from assignments
       const conveyanceTotal = trainerCostDetails.conveyance || 0;
-      const foodTotal = (trainerCostDetails.food || 0) * totalDays;
-      const lodgingTotal = (trainerCostDetails.lodging || 0) * totalDays;
+      const foodTotal = trainerCostDetails.food || 0;
+      const lodgingTotal = trainerCostDetails.lodging || 0;
       const totalExpenses = roundToNearestWhole(conveyanceTotal + foodTotal + lodgingTotal);
       
       const totalAmount = roundToNearestWhole(trainingFees + totalExpenses);
@@ -767,10 +794,10 @@ useEffect(() => {
                 const trainingFees = roundToNearestWhole((feePerHour || 0) * totalHours);
                 
                 // Calculate expenses the same way as InitiationTrainingDetails
-                // Conveyance is one-time, food and lodging are per day
+                // Conveyance is one-time, food and lodging are already totals from assignments
                 const conveyanceTotal = trainerCostDetails.conveyance || 0;
-                const foodTotal = (trainerCostDetails.food || 0) * totalDays;
-                const lodgingTotal = (trainerCostDetails.lodging || 0) * totalDays;
+                const foodTotal = trainerCostDetails.food || 0;
+                const lodgingTotal = trainerCostDetails.lodging || 0;
                 const totalExpenses = roundToNearestWhole(conveyanceTotal + foodTotal + lodgingTotal);
                 
                 const totalAmount = roundToNearestWhole(trainingFees + totalExpenses);
@@ -797,8 +824,8 @@ useEffect(() => {
                         <h4 className="font-medium text-gray-800 mb-2">Expenses</h4>
                         <div className="space-y-1 text-sm">
                           <div>Conveyance: ₹{conveyanceTotal.toLocaleString('en-IN')}</div>
-                          <div>Food: ₹{foodTotal.toLocaleString('en-IN')} (₹{(trainerCostDetails.food || 0).toLocaleString('en-IN')} × {totalDays})</div>
-                          <div>Lodging: ₹{lodgingTotal.toLocaleString('en-IN')} (₹{(trainerCostDetails.lodging || 0).toLocaleString('en-IN')} × {totalDays})</div>
+                          <div>Food: ₹{foodTotal.toLocaleString('en-IN')}</div>
+                          <div>Lodging: ₹{lodgingTotal.toLocaleString('en-IN')}</div>
                           <div className="font-medium">Total Expenses: ₹{totalExpenses.toLocaleString('en-IN')}</div>
                         </div>
                       </div>

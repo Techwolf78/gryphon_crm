@@ -20,6 +20,8 @@ import LeadsHeader from "./LeadsHeader";
 import LeadsFilters from "./LeadsFilters";
 import LeadsTable from "./LeadsTable";
 import LeadDetailsModal from "./LeadDetailsModal";
+import FollowUpCompany from "./FollowUpCompany";
+// import FollowupAlerts from "../Sales/FollowupAlerts";
 
   // Utility function to handle Firestore index errors
   const handleFirestoreIndexError = (error, operation = "operation") => {
@@ -71,6 +73,15 @@ function CompanyLeads() {
   const [leadToEdit, setLeadToEdit] = useState(null);
   const [showBulkUploadForm, setShowBulkUploadForm] = useState(false);
 
+  // Meeting modal state
+  const [showMeetingModal, setShowMeetingModal] = useState(false);
+  const [selectedCompanyForMeeting, setSelectedCompanyForMeeting] = useState(null);
+
+  // Followup alerts state - commented out for now
+  // const [todayFollowUps, setTodayFollowUps] = useState([]);
+  // const [showTodayFollowUpAlert, setShowTodayFollowUpAlert] = useState(false);
+  // const [reminderPopup, setReminderPopup] = useState(null);
+
   // AddJD modal state
 const [showAddJDForm, setShowAddJDForm] = useState(false);
 const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
@@ -78,13 +89,12 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(1000); // Fixed page size of 1000 companies
-  const [sortOrder, setSortOrder] = useState("desc"); // "asc" or "desc"
   const [lastDoc, setLastDoc] = useState(null);
   const [hasMore, setHasMore] = useState(true);
 
 
   // Fetch leads with pagination from Firestore
-  const fetchLeads = useCallback(async (page = 1, sort = "desc", startDoc = null) => {
+  const fetchLeads = useCallback(async (page = 1, startDoc = null) => {
     try {
       setLoading(true);
 
@@ -93,14 +103,14 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       if (startDoc && page > 1) {
         q = query(
           collection(db, "companyleads"),
-          orderBy("__name__", sort), // Order by document ID
+          orderBy("__name__", "desc"), // Always sort descending
           startAfter(startDoc),
           limit(5) // Fetch 5 batches at a time to get ~10,000 companies
         );
       } else {
         q = query(
           collection(db, "companyleads"),
-          orderBy("__name__", sort),
+          orderBy("__name__", "desc"), // Always sort descending
           limit(5)
         );
       }
@@ -160,7 +170,6 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       setLastDoc(lastDocument);
       setHasMore(hasMorePages);
       setCurrentPage(page);
-      setSortOrder(sort);
 
     } catch (error) {
       handleFirestoreIndexError(error, "fetching leads");
@@ -170,7 +179,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         console.log("🔄 Falling back to old CompanyLeads collection...");
         const q = query(
           collection(db, "CompanyLeads"),
-          orderBy("createdAt", sort === "desc" ? "desc" : "asc"),
+          orderBy("createdAt", "desc"),
           limit(pageSize)
         );
         const querySnapshot = await getDocs(q);
@@ -198,15 +207,15 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
   // Initial fetch on component mount
   useEffect(() => {
-    fetchLeads(1, "desc", null);
+    fetchLeads(1, null);
   }, [fetchLeads]);
 
-  // Refetch when pagination or sort changes
+  // Refetch when pagination changes
   useEffect(() => {
-    if (currentPage > 1 || sortOrder !== "desc") {
-      fetchLeads(currentPage, sortOrder, currentPage === 1 ? null : lastDoc);
+    if (currentPage > 1) {
+      fetchLeads(currentPage, currentPage === 1 ? null : lastDoc);
     }
-  }, [currentPage, sortOrder, lastDoc, fetchLeads]);
+  }, [currentPage, lastDoc, fetchLeads]);
 
   // Filter leads based on active tab and search term
   const filteredLeads = useMemo(() => {
@@ -311,6 +320,11 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     setShowEditLeadForm(true);
   };
 
+  const handleScheduleMeeting = (company) => {
+    setSelectedCompanyForMeeting(company);
+    setShowMeetingModal(true);
+  };
+
   const handleUpdateLead = (leadId, updatedData) => {
     const updateCompany = async () => {
       try {
@@ -392,8 +406,6 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         onSearchChange={setSearchTerm}
         onAddLead={() => setShowAddLeadForm(true)}
         onBulkUpload={() => setShowBulkUploadForm(true)}
-        sortOrder={sortOrder}
-        onSortChange={setSortOrder}
       />
 
       <LeadsFilters
@@ -411,6 +423,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         }}
         onStatusChange={handleStatusChange}
         onEditLead={handleEditLead}
+        onScheduleMeeting={handleScheduleMeeting}
       />
 
       {/* Pagination Controls */}
@@ -526,6 +539,25 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         show={showBulkUploadForm}
         onClose={() => setShowBulkUploadForm(false)}
       />
+
+      {/* Meeting Modal */}
+      {showMeetingModal && (
+        <FollowUpCompany
+          company={selectedCompanyForMeeting}
+          onClose={() => setShowMeetingModal(false)}
+        />
+      )}
+
+      {/* Followup Alerts */}
+      {/* <Suspense fallback={<div></div>}>
+        <FollowupAlerts
+          todayFollowUps={todayFollowUps}
+          showTodayFollowUpAlert={showTodayFollowUpAlert}
+          setShowTodayFollowUpAlert={setShowTodayFollowUpAlert}
+          reminderPopup={reminderPopup}
+          setReminderPopup={setReminderPopup}
+        />
+      </Suspense> */}
 
     </div>
 
