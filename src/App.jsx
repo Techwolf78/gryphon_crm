@@ -15,7 +15,6 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import ConnectionStatus from "./components/ConnectionStatus";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import MsalProviderWrapper from "./context/MsalProviderWrapper";
 
 // Lazy load all page components
 const Home = React.lazy(() => import("./pages/Home"));
@@ -132,15 +131,13 @@ const AppContent = () => {
 const App = () => (
   <>
     <ErrorBoundary>
-      <MsalProviderWrapper>
-        <AuthProvider>
-          <NotificationsProvider>
-            <Router basename="/">
-              <AppContent />
-            </Router>
-          </NotificationsProvider>
-        </AuthProvider>
-      </MsalProviderWrapper>
+      <AuthProvider>
+        <NotificationsProvider>
+          <Router basename="/">
+            <AppContent />
+          </Router>
+        </NotificationsProvider>
+      </AuthProvider>
     </ErrorBoundary>
     <ToastContainer
       position="bottom-right"
