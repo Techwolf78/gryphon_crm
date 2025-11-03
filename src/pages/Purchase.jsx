@@ -112,6 +112,15 @@ const budgetComponents = {
     printmedia: "Print Media",
     diwaligifts: "Diwali Gifts",
   },
+  placement: {
+    emails: "Email Subscriptions",
+    laptops: "Laptops & Hardware",
+    tshirts: "T-shirts & Merchandise",
+    printmedia: "Print Media",
+    diwaligifts: "Diwali Gifts",
+    software: "Software & Tools",
+    training: "Training Materials",
+  },
 };
 
 // Component colors mapping
@@ -135,6 +144,8 @@ const componentColors = {
   simcard: "bg-indigo-100 text-indigo-800 border-indigo-200",
   elevenlabs: "bg-amber-100 text-amber-800 border-amber-200",
   performancemarketing: "bg-pink-100 text-pink-800 border-pink-200",
+  software: "bg-teal-100 text-teal-800 border-teal-200",
+  training: "bg-emerald-100 text-emerald-800 border-emerald-200",
 };
 
 // Helper function to get current fiscal year
