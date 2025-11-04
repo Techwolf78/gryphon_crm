@@ -221,7 +221,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
       >
         {/* Header */}
         <div
-          className={`flex-shrink-0 p-3 border-b border-gray-200 ${
+          className={`shrink-0 p-3 border-b border-gray-200 ${
             collapsed
               ? "flex flex-col items-center space-y-2"
               : "flex items-center justify-between"
@@ -267,7 +267,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
                       } notifications-button`}
                       title={collapsed ? label : ""}
                     >
-                      <span className="text-lg flex-shrink-0 relative">
+                      <span className="text-lg shrink-0 relative">
                         {icon}
                         {collapsed && hasNotification && (
                           <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
@@ -293,7 +293,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
                         }
                       }}
                     >
-                      <span className="text-lg flex-shrink-0 relative">
+                      <span className="text-lg shrink-0 relative">
                         {icon}
                         {collapsed && hasNotification && (
                           <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
@@ -318,10 +318,10 @@ const Sidebar = ({ collapsed, onToggle }) => {
                       handleToggle();
                     }
                   }}
-                  className={`w-full flex items-center ${collapsed ? 'justify-center px-2 py-2' : 'px-3 py-2'} rounded text-sm bg-gradient-to-r from-blue-50 to-sky-100 text-blue-700 hover:from-blue-100 hover:to-sky-150 hover:text-blue-800 border border-blue-200 shadow-sm transition-all duration-200`}
+                  className={`w-full flex items-center ${collapsed ? 'justify-center px-2 py-2' : 'px-3 py-2'} rounded text-sm bg-linear-to-r from-blue-50 to-sky-100 text-blue-700 hover:from-blue-100 hover:to-sky-150 hover:text-blue-800 border border-blue-200 shadow-sm transition-all duration-200`}
                   title={collapsed ? "Ask AI" : ""}
                 >
-                  <FiMessageSquare className="text-lg flex-shrink-0" />
+                  <FiMessageSquare className="text-lg shrink-0" />
                   {!collapsed && <span className="ml-2">Ask AI</span>}
                 </button>
               </div>

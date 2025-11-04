@@ -281,12 +281,12 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 py-4 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-gray-50 to-gray-100 py-4 px-4">
       {showPasswordReset && <PasswordResetModal />}
 
       <div className="w-full max-w-4xl bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col lg:flex-row">
         {/* Left Side - Branding */}
-        <div className="lg:w-1/2 bg-gradient-to-br from-[#1C398E] to-[#3886FF] text-white p-6 lg:p-8 relative overflow-hidden">
+        <div className="lg:w-1/2 bg-linear-to-br from-[#1C398E] to-[#3886FF] text-white p-6 lg:p-8 relative overflow-hidden">
           <div className="absolute -top-32 -left-32 w-64 h-64 rounded-full bg-white/10"></div>
           <div className="absolute top-1/4 left-1/4 w-32 h-32 rounded-full bg-white/20"></div>
           <div className="absolute -bottom-40 -right-40 w-80 h-80 rounded-full bg-white/10"></div>
@@ -300,19 +300,19 @@ export default function LoginPage() {
 
             <div className="space-y-3 hidden lg:block">
               <div className="flex items-center">
-                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center mr-3 flex-shrink-0">
+                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center mr-3 shrink-0">
                   <FaCheckCircle className="w-5 h-5 text-white" />
                 </div>
                 <span className="text-sm lg:text-base">Multi-department dashboards</span>
               </div>
               <div className="flex items-center">
-                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center mr-3 flex-shrink-0">
+                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center mr-3 shrink-0">
                   <FaCheckCircle className="w-5 h-5 text-white" />
                 </div>
                 <span className="text-sm lg:text-base">Sales, L&D, Placement & Marketing</span>
               </div>
               <div className="flex items-center">
-                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center mr-3 flex-shrink-0">
+                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center mr-3 shrink-0">
                   <FaCheckCircle className="w-5 h-5 text-white" />
                 </div>
                 <span className="text-sm lg:text-base">Role-specific data visualization</span>
@@ -336,9 +336,9 @@ export default function LoginPage() {
                   : 'bg-green-50 border border-green-200'
               } rounded-lg p-3 flex items-start`}>
                 {messageType === 'error' ? (
-                  <FaExclamationTriangle className="w-5 h-5 text-red-500 mr-3 mt-0.5 flex-shrink-0" />
+                  <FaExclamationTriangle className="w-5 h-5 text-red-500 mr-3 mt-0.5 shrink-0" />
                 ) : (
-                  <FaCheckCircle className="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
+                  <FaCheckCircle className="w-5 h-5 text-green-500 mr-3 mt-0.5 shrink-0" />
                 )}
                 <p className={`text-sm ${
                   messageType === 'error' ? 'text-red-800' : 'text-green-800'
@@ -381,7 +381,7 @@ export default function LoginPage() {
                 </div>
                 {fieldErrors.email.length > 0 && (
                   <div id="email-error" className="mt-2 flex items-start">
-                    <FaExclamationTriangle className="w-4 h-4 text-red-500 mr-2 mt-0.5 flex-shrink-0" />
+                    <FaExclamationTriangle className="w-4 h-4 text-red-500 mr-2 mt-0.5 shrink-0" />
                     <div className="text-red-600 text-sm space-y-1">
                       {fieldErrors.email.map((error, index) => (
                         <p key={`email-${index}`}>{error}</p>
@@ -442,13 +442,13 @@ export default function LoginPage() {
                 </div>
                 {capsLockOn && (
                   <div className="mt-2 text-yellow-600 flex items-center text-sm">
-                    <FaInfoCircle className="mr-2 flex-shrink-0" />
+                    <FaInfoCircle className="mr-2 shrink-0" />
                     Caps Lock is on
                   </div>
                 )}
                 {fieldErrors.password.length > 0 && (
                   <div id="password-error" className="mt-2 flex items-start">
-                    <FaExclamationTriangle className="w-4 h-4 text-red-500 mr-2 mt-0.5 flex-shrink-0" />
+                    <FaExclamationTriangle className="w-4 h-4 text-red-500 mr-2 mt-0.5 shrink-0" />
                     <div className="text-red-600 text-sm space-y-1">
                       {fieldErrors.password.map((error, index) => (
                         <p key={`password-${index}`}>{error}</p>
@@ -478,7 +478,7 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-[#1C398E] to-[#3886FF] hover:from-[#1C398E]/90 hover:to-[#3886FF]/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-linear-to-r from-[#1C398E] to-[#3886FF] hover:from-[#1C398E]/90 hover:to-[#3886FF]/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? (
                     <>

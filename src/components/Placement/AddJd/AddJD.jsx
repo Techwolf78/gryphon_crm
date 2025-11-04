@@ -524,7 +524,7 @@ function AddJD({ show, onClose }) {
     <div className="fixed inset-0 z-52 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden">
         {/* Modal Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center">
+        <div className="bg-linear-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center">
           <h2 className="text-xl font-semibold text-white">
             {currentStep === 1 ? "Add JD Form" : "Select Colleges"}
           </h2>

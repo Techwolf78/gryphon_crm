@@ -72,7 +72,7 @@ function BulkUploadModal({ show, onClose }) {
   return (
     <div className="fixed inset-0 z-54 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
-        <div className="bg-gradient-to-r from-green-600 to-green-700 px-6 py-4 flex justify-between items-center">
+        <div className="bg-linear-to-r from-green-600 to-green-700 px-6 py-4 flex justify-between items-center">
           <h2 className="text-xl font-semibold text-white">Bulk Upload Companies</h2>
           <button
             onClick={onClose}
@@ -123,12 +123,12 @@ function BulkUploadModal({ show, onClose }) {
               <div>
                 <p className="font-medium text-green-700">Required:</p>
                 <ul className="list-disc list-inside text-xs">
-                  <li>CompanyName</li>
-                  <li>ContactPerson</li>
+                  <li>CompanyName (or Company Name)</li>
+                  <li>ContactPerson (or Contact Person)</li>
                   <li>Designation</li>
                   <li>Phone</li>
-                  <li>CompanyUrl</li>
-                  <li>LinkedinUrl</li>
+                  <li>CompanyUrl (or Company URL)</li>
+                  <li>LinkedinUrl (or LinkedIn URL)</li>
                 </ul>
               </div>
               <div>
@@ -137,7 +137,7 @@ function BulkUploadModal({ show, onClose }) {
                   <li>Email</li>
                   <li>Location</li>
                   <li>Industry</li>
-                  <li>CompanySize</li>
+                  <li>CompanySize (or Company Size)</li>
                   <li>Source</li>
                   <li>Notes</li>
                   <li>Status (hot/warm/cold/onboarded)</li>
@@ -145,15 +145,17 @@ function BulkUploadModal({ show, onClose }) {
               </div>
             </div>
             <p className="mt-2 text-xs text-red-600 font-medium">
-              ⚠️ Each batch of ~2000 companies creates:<br/>
+              ⚠️ Each batch of ~1500 companies creates:<br/>
               - 1 write per batch document<br/><br/>
-              For 58,000 companies: ~29 batches × 1 = 29 writes<br/><br/>
+              For 58,000 companies: ~39 batches × 1 = 39 writes<br/><br/>
               Free tier: 20,000 writes/day. This upload is well within limits.<br/><br/>
-              💡 Uses Base64 encoding for efficient storage.
+              ⏱️ 2-second delay between batches to prevent rate limiting.<br/><br/>
+              � Failed batches will be retried up to 3 times with exponential backoff.<br/><br/>
+              �💡 Uses Base64 encoding for efficient storage.
             </p>
             
             <p className="mt-2 text-xs text-gray-500">
-              Other fields (Industry, Company Size, etc.) will be set to default values.
+              <strong>Troubleshooting:</strong> If upload shows 0 records, check that your Excel file has proper column headers and data rows.
             </p>
           </div>
         </div>

@@ -8,12 +8,12 @@ import CompanyLeads from "../components/Placement/CompanyLeads/CompanyLeads";
 import MouPreviewModal from "../components/Placement/MouPreviewModal";
 import PlacementDetailsModal from "../components/Placement/PlacementDetailsModal";
 import { Eye, User, FileText } from "lucide-react";
-import { doc } from "firebase/firestore";
 import BudgetDashboard from "../components/Budget/BudgetDashboard";
 
 function Placement() {
   const [trainingData, setTrainingData] = useState([]);
   const [leads, setLeads] = useState([]);
+  const [totalLeadsCount, setTotalLeadsCount] = useState(0);
   const [selectedTraining, setSelectedTraining] = useState(null);
   const [selectedLead, setSelectedLead] = useState(null);
   const [studentModalData, setStudentModalData] = useState({
@@ -71,13 +71,17 @@ function Placement() {
       }));
       setTrainingData(trainingData);
 
-      // Fetch leads
-      const leadsSnapshot = await getDocs(collection(db, "leads"));
-      const leadsData = leadsSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setLeads(leadsData);
+      // Fetch leads from companyleads collection (batches)
+      const leadsSnapshot = await getDocs(collection(db, "companyleads"));
+      let totalCompanies = 0;
+      leadsSnapshot.docs.forEach((batchDoc) => {
+        const batchData = batchDoc.data();
+        const encodedCompanies = batchData.companies || [];
+        totalCompanies += encodedCompanies.length;
+      });
+      
+      // Set total count for tab display
+      setTotalLeadsCount(totalCompanies);
 
       // Fetch progress for each trainingData
       const progressPromises = trainingData.map(async (item) => {
@@ -273,7 +277,7 @@ function Placement() {
                 onClick={() => setActiveTab("leads")}
                 data-tour="leads-tab"
               >
-                Company Leads ({leads.length})
+                Company Leads ({totalLeadsCount})
               </button>
               <button
                 className={`flex-1 px-6 py-2 font-medium text-sm transition-all duration-150 ${
@@ -324,7 +328,7 @@ function Placement() {
               ) : (
                 <div className="border border-gray-300 rounded-lg animate-fadeIn">
                   <table className="min-w-full divide-y divide-gray-200 border border-gray-300 rounded-lg">
-                    <thead className="bg-gradient-to-r from-blue-500 via-indigo-600 to-indigo-700 text-white rounded-t-lg">
+                    <thead className="bg-linear-to-r from-blue-500 via-indigo-600 to-indigo-700 text-white rounded-t-lg">
                       <tr>
                         <th
                           scope="col"

@@ -17,7 +17,7 @@ const LeadsHeader = ({ searchTerm, setSearchTerm, onAddLead, onBulkUpload }) => 
           onClick={onAddLead}
           className="flex-1 md:flex-none px-4 py-2 text-white rounded-lg font-semibold flex items-center justify-center focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md relative overflow-hidden"
         >
-          <span className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-700 opacity-100 hover:opacity-90 transition-opacity duration-200 z-0"></span>
+          <span className="absolute inset-0 bg-linear-to-r from-blue-600 to-indigo-700 opacity-100 hover:opacity-90 transition-opacity duration-200 z-0"></span>
           <span className="relative z-10 flex items-center">
             <PlusIcon className="h-5 w-5 mr-2" />
             Add Company

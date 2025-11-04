@@ -994,7 +994,7 @@ function BudgetDashboard({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100">
       <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
         <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-6 mb-6">

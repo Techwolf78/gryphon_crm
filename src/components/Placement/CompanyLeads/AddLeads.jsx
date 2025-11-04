@@ -153,7 +153,7 @@ function AddLeads({ show, onClose, onAddLead }) {
   return (
     <div className="fixed inset-0 z-54 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-3xl rounded-xl shadow-2xl overflow-hidden">
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center">
+        <div className="bg-linear-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center">
           <h2 className="text-xl font-semibold text-white">Add New Company</h2>
           <button
             onClick={handleClose}

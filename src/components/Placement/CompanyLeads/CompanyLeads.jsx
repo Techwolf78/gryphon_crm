@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useDebounce } from 'use-debounce';
 import AddLeads from "./AddLeads";
 import EditLeadModal from "./EditLeadModal";
 import BulkUploadModal from "./BulkUploadModal";
@@ -12,8 +13,6 @@ import {
   doc,
   getDoc,
   setDoc,
-  limit,
-  startAfter,
 } from "firebase/firestore";
 import { db } from "../../../firebase";
 import LeadsHeader from "./LeadsHeader";
@@ -86,39 +85,28 @@ function CompanyLeads() {
 const [showAddJDForm, setShowAddJDForm] = useState(false);
 const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(1000); // Fixed page size of 1000 companies
-  const [lastDoc, setLastDoc] = useState(null);
-  const [hasMore, setHasMore] = useState(true);
+  // Debounced search term for performance
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
+
+  // Caching constants
+  const CACHE_KEY = 'companyLeadsCache';
+  const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
 
 
-  // Fetch leads with pagination from Firestore
-  const fetchLeads = useCallback(async (page = 1, startDoc = null) => {
+  // Fetch ALL leads from Firestore (no pagination)
+  const fetchLeads = useCallback(async () => {
     try {
       setLoading(true);
 
-      // Fetch from companyleads collection (batches uploaded via Excel)
-      let q;
-      if (startDoc && page > 1) {
-        q = query(
-          collection(db, "companyleads"),
-          orderBy("__name__", "desc"), // Always sort descending
-          startAfter(startDoc),
-          limit(5) // Fetch 5 batches at a time to get ~10,000 companies
-        );
-      } else {
-        q = query(
-          collection(db, "companyleads"),
-          orderBy("__name__", "desc"), // Always sort descending
-          limit(5)
-        );
-      }
+      // Fetch ALL batch documents from companyleads collection
+      const q = query(
+        collection(db, "companyleads"),
+        orderBy("__name__", "desc") // Sort by document name (batch_39, batch_38, etc.)
+      );
 
       const querySnapshot = await getDocs(q);
 
       const allCompanies = [];
-      let lastDocument = null;
 
       querySnapshot.docs.forEach((batchDoc) => {
         const batchData = batchDoc.data();
@@ -127,7 +115,10 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         // Decode Base64 companies and add batch info
         encodedCompanies.forEach((encodedCompany, index) => {
           try {
-            const decodedCompany = JSON.parse(atob(encodedCompany));
+            // Decode Unicode-safe Base64: atob() first, then decodeURIComponent()
+            const uriDecoded = atob(encodedCompany);
+            const jsonString = decodeURIComponent(uriDecoded);
+            const decodedCompany = JSON.parse(jsonString);
             allCompanies.push({
               id: `${batchDoc.id}_${index}`, // Unique ID combining batchId and index
               batchId: batchDoc.id,
@@ -159,17 +150,17 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
             console.error(`❌ Error decoding company ${index} in batch ${batchDoc.id}:`, error);
           }
         });
-
-        lastDocument = batchDoc;
       });
 
-      // Check if we have more pages
-      const hasMorePages = querySnapshot.docs.length === 5;
-
+      console.log(`✅ Loaded ${allCompanies.length} companies from ${querySnapshot.docs.length} batches`);
       setLeads(allCompanies);
-      setLastDoc(lastDocument);
-      setHasMore(hasMorePages);
-      setCurrentPage(page);
+
+      // Cache the data (with error handling for quota limits)
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({ data: allCompanies, timestamp: Date.now() }));
+      } catch (error) {
+        console.warn("⚠️ Failed to cache data due to storage quota limit:", error);
+      }
 
     } catch (error) {
       handleFirestoreIndexError(error, "fetching leads");
@@ -179,8 +170,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         console.log("🔄 Falling back to old CompanyLeads collection...");
         const q = query(
           collection(db, "CompanyLeads"),
-          orderBy("createdAt", "desc"),
-          limit(pageSize)
+          orderBy("createdAt", "desc")
         );
         const querySnapshot = await getDocs(q);
         const leadsData = querySnapshot.docs.map((doc) => ({
@@ -195,30 +185,58 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           contacts: doc.data().contacts || [],
         }));
         setLeads(leadsData);
-        setHasMore(querySnapshot.docs.length === pageSize);
         console.log("✅ Successfully loaded data from fallback collection");
+
+        // Cache the data (with error handling for quota limits)
+        try {
+          localStorage.setItem(CACHE_KEY, JSON.stringify({ data: leadsData, timestamp: Date.now() }));
+        } catch (error) {
+          console.warn("⚠️ Failed to cache data due to storage quota limit:", error);
+        }
       } catch (fallbackError) {
         handleFirestoreIndexError(fallbackError, "fallback fetch");
       }
     } finally {
       setLoading(false);
     }
-  }, [pageSize]);
+  }, []);
+
+  // Load data from cache or fetch from Firestore
+  const loadData = useCallback(async () => {
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { data, timestamp } = JSON.parse(cached);
+        if (Date.now() - timestamp < CACHE_DURATION) {
+          console.log("✅ Loaded data from cache");
+          setLeads(data);
+          setLoading(false);
+          return;
+        }
+      }
+      // Cache is stale or missing, fetch from Firestore
+      await fetchLeads();
+    } catch (error) {
+      console.error("Error loading data:", error);
+      // Fallback to fetch
+      await fetchLeads();
+    }
+  }, [fetchLeads, CACHE_DURATION]);
 
   // Initial fetch on component mount
   useEffect(() => {
-    fetchLeads(1, null);
-  }, [fetchLeads]);
-
-  // Refetch when pagination changes
-  useEffect(() => {
-    if (currentPage > 1) {
-      fetchLeads(currentPage, currentPage === 1 ? null : lastDoc);
-    }
-  }, [currentPage, lastDoc, fetchLeads]);
+    loadData();
+  }, [loadData]);
 
   // Filter leads based on active tab and search term
   const filteredLeads = useMemo(() => {
+    // Early return for empty search and "all" tab
+    if (!debouncedSearchTerm && activeTab === "all") {
+      return leads;
+    }
+
+    const searchLower = debouncedSearchTerm ? debouncedSearchTerm.toLowerCase() : '';
+
     return leads.filter((lead) => {
       // First filter by status if not showing all
       if (activeTab !== "all" && lead.status !== activeTab) {
@@ -226,24 +244,32 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       }
 
       // Then filter by search term if present
-      if (searchTerm) {
-        const searchLower = searchTerm.toLowerCase();
-        return (
-          lead.companyName?.toLowerCase().includes(searchLower) ||
-          lead.pocName?.toLowerCase().includes(searchLower) ||
-          lead.pocLocation?.toLowerCase().includes(searchLower) ||
-          lead.pocPhone?.toLowerCase().includes(searchLower) ||
-          lead.contacts?.some(
-            (contact) =>
-              contact.name?.toLowerCase().includes(searchLower) ||
-              contact.email?.toLowerCase().includes(searchLower) ||
-              contact.phone?.toLowerCase().includes(searchLower)
-          )
+      if (debouncedSearchTerm) {
+        // Pre-compute string values to avoid repeated conversions
+        const companyName = (lead.companyName || '').toLowerCase();
+        const pocName = (lead.pocName || '').toLowerCase();
+        const pocLocation = (lead.pocLocation || '').toLowerCase();
+        const pocPhone = String(lead.pocPhone || '').toLowerCase();
+
+        // Check main fields first (most likely to match)
+        if (companyName.includes(searchLower) ||
+            pocName.includes(searchLower) ||
+            pocLocation.includes(searchLower) ||
+            pocPhone.includes(searchLower)) {
+          return true;
+        }
+
+        // Check contacts (less common, check last)
+        return lead.contacts?.some(
+          (contact) =>
+            (contact.name || '').toLowerCase().includes(searchLower) ||
+            (contact.email || '').toLowerCase().includes(searchLower) ||
+            String(contact.phone || '').toLowerCase().includes(searchLower)
         );
       }
       return true;
     });
-  }, [leads, activeTab, searchTerm]);
+  }, [leads, activeTab, debouncedSearchTerm]);
 
   // Group leads by status for tab counts
   const leadsByStatus = leads.reduce((acc, lead) => {
@@ -280,13 +306,18 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         const companyIndex = parseInt(leadId.split('_')[1]); // Extract index from "batch_1_5" -> 5
 
         if (companyIndex >= 0 && companyIndex < encodedCompanies.length) {
-          // Decode, update, and re-encode the company
-          const decodedCompany = JSON.parse(atob(encodedCompanies[companyIndex]));
+          // Decode, update, and re-encode the company (Unicode-safe)
+          const uriDecoded = atob(encodedCompanies[companyIndex]);
+          const jsonString = decodeURIComponent(uriDecoded);
+          const decodedCompany = JSON.parse(jsonString);
           const updatedCompany = {
             ...decodedCompany,
             status: newStatus,
           };
-          encodedCompanies[companyIndex] = btoa(JSON.stringify(updatedCompany));
+          // Unicode-safe encoding: encodeURIComponent + btoa
+          const updatedJsonString = JSON.stringify(updatedCompany);
+          const updatedUriEncoded = encodeURIComponent(updatedJsonString);
+          encodedCompanies[companyIndex] = btoa(updatedUriEncoded);
 
           // Save back to Firestore
           await setDoc(batchDocRef, {
@@ -343,13 +374,18 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           const companyIndex = parseInt(leadId.split('_')[1]); // Extract index from "batch_1_5" -> 5
 
           if (companyIndex >= 0 && companyIndex < encodedCompanies.length) {
-            // Decode, update, and re-encode the company
-            const decodedCompany = JSON.parse(atob(encodedCompanies[companyIndex]));
+            // Decode, update, and re-encode the company (Unicode-safe)
+            const uriDecoded = atob(encodedCompanies[companyIndex]);
+            const jsonString = decodeURIComponent(uriDecoded);
+            const decodedCompany = JSON.parse(jsonString);
             const updatedCompany = {
               ...decodedCompany,
               ...updatedData,
             };
-            encodedCompanies[companyIndex] = btoa(JSON.stringify(updatedCompany));
+            // Unicode-safe encoding: encodeURIComponent + btoa
+            const updatedJsonString = JSON.stringify(updatedCompany);
+            const updatedUriEncoded = encodeURIComponent(updatedJsonString);
+            encodedCompanies[companyIndex] = btoa(updatedUriEncoded);
 
             // Save back to Firestore
             await setDoc(batchDocRef, {
@@ -372,6 +408,49 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           : l
       )
     );
+  };
+
+  const handleDeleteLead = async (leadId) => {
+    try {
+      const lead = leads.find((l) => l.id === leadId);
+      if (!lead || !lead.batchId) return;
+
+      // Confirm deletion
+      if (!window.confirm(`Are you sure you want to delete ${lead.companyName}?`)) {
+        return;
+      }
+
+      // Fetch the batch document
+      const batchDocRef = doc(db, "companyleads", lead.batchId);
+      const batchDocSnap = await getDoc(batchDocRef);
+
+      if (batchDocSnap.exists()) {
+        const batchData = batchDocSnap.data();
+        const encodedCompanies = batchData.companies || [];
+
+        // Find the company index in the array
+        const companyIndex = parseInt(leadId.split('_')[1]); // Extract index from "batch_1_5" -> 5
+
+        if (companyIndex >= 0 && companyIndex < encodedCompanies.length) {
+          // Remove the company from the array
+          encodedCompanies.splice(companyIndex, 1);
+
+          // Save back to Firestore
+          await setDoc(batchDocRef, {
+            ...batchData,
+            companies: encodedCompanies,
+          });
+        }
+      }
+
+      // Update local state by removing the lead
+      setLeads((prevLeads) => prevLeads.filter((l) => l.id !== leadId));
+
+      console.log(`✅ Deleted lead: ${lead.companyName}`);
+    } catch (error) {
+      handleFirestoreIndexError(error, "lead deletion");
+      alert("Failed to delete the lead. Please try again.");
+    }
   };
 
 
@@ -403,7 +482,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     <div className="bg-white rounded-lg shadow p-4">
       <LeadsHeader
         searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
+        setSearchTerm={setSearchTerm}
         onAddLead={() => setShowAddLeadForm(true)}
         onBulkUpload={() => setShowBulkUploadForm(true)}
       />
@@ -424,29 +503,24 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         onStatusChange={handleStatusChange}
         onEditLead={handleEditLead}
         onScheduleMeeting={handleScheduleMeeting}
+        onDeleteLead={handleDeleteLead}
       />
 
-      {/* Pagination Controls */}
+      {/* Company Count Display */}
       <div className="flex justify-between items-center mt-4 px-4 py-3 bg-gray-50 rounded-lg">
         <div className="text-sm text-gray-700">
-          Showing {leads.length} companies (Page {currentPage})
+          Total: {leads.length} companies loaded
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-            disabled={currentPage === 1 || loading}
-            className="px-3 py-1 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Previous
-          </button>
-          <button
-            onClick={() => setCurrentPage(prev => prev + 1)}
-            disabled={!hasMore || loading}
-            className="px-3 py-1 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Next
-          </button>
-        </div>
+        <button
+          onClick={async () => {
+            setLoading(true);
+            await fetchLeads();
+          }}
+          className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+          title="Refresh data from server"
+        >
+          Refresh
+        </button>
       </div>
 
       {/* Lead Details Modal */}
@@ -472,14 +546,19 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                   const companyIndex = parseInt(leadId.split('_')[1]); // Extract index from "batch_1_5" -> 5
 
                   if (companyIndex >= 0 && companyIndex < encodedCompanies.length) {
-                    // Decode, update contacts, and re-encode the company
-                    const decodedCompany = JSON.parse(atob(encodedCompanies[companyIndex]));
+                    // Decode, update contacts, and re-encode the company (Unicode-safe)
+                    const uriDecoded = atob(encodedCompanies[companyIndex]);
+                    const jsonString = decodeURIComponent(uriDecoded);
+                    const decodedCompany = JSON.parse(jsonString);
                     const existingContacts = decodedCompany.contacts || [];
                     const updatedCompany = {
                       ...decodedCompany,
                       contacts: [...existingContacts, contactData],
                     };
-                    encodedCompanies[companyIndex] = btoa(JSON.stringify(updatedCompany));
+                    // Unicode-safe encoding: encodeURIComponent + btoa
+                    const updatedJsonString = JSON.stringify(updatedCompany);
+                    const updatedUriEncoded = encodeURIComponent(updatedJsonString);
+                    encodedCompanies[companyIndex] = btoa(updatedUriEncoded);
 
                     // Save back to Firestore
                     await setDoc(batchDocRef, {
