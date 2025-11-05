@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useDebounce } from 'use-debounce';
 import AddLeads from "./AddLeads";
-import EditLeadModal from "./EditLeadModal";
 import BulkUploadModal from "./BulkUploadModal";
 import AddJD from "../AddJd/AddJD"; // ✅ adjust the relative path
 
@@ -18,7 +17,7 @@ import { db } from "../../../firebase";
 import LeadsHeader from "./LeadsHeader";
 import LeadsFilters from "./LeadsFilters";
 import LeadsTable from "./LeadsTable";
-import LeadDetailsModal from "./LeadDetailsModal";
+import LeadViewEditModal from "./LeadViewEditModal";
 import FollowUpCompany from "./FollowUpCompany";
 // import FollowupAlerts from "../Sales/FollowupAlerts";
 
@@ -68,8 +67,6 @@ function CompanyLeads() {
   const [loading, setLoading] = useState(true);
   const [selectedLead, setSelectedLead] = useState(null);
   const [showLeadDetails, setShowLeadDetails] = useState(false);
-  const [showEditLeadForm, setShowEditLeadForm] = useState(false);
-  const [leadToEdit, setLeadToEdit] = useState(null);
   const [showBulkUploadForm, setShowBulkUploadForm] = useState(false);
 
   // Meeting modal state
@@ -303,7 +300,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         const encodedCompanies = batchData.companies || [];
 
         // Find the company index in the array
-        const companyIndex = parseInt(leadId.split('_')[1]); // Extract index from "batch_1_5" -> 5
+        const companyIndex = parseInt(leadId.split('_').pop()); // Extract index from "batch_39_5" -> 5
 
         if (companyIndex >= 0 && companyIndex < encodedCompanies.length) {
           // Decode, update, and re-encode the company (Unicode-safe)
@@ -346,11 +343,6 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     }
   };
 
-  const handleEditLead = (lead) => {
-    setLeadToEdit(lead);
-    setShowEditLeadForm(true);
-  };
-
   const handleScheduleMeeting = (company) => {
     setSelectedCompanyForMeeting(company);
     setShowMeetingModal(true);
@@ -371,7 +363,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           const encodedCompanies = batchData.companies || [];
 
           // Find the company index in the array
-          const companyIndex = parseInt(leadId.split('_')[1]); // Extract index from "batch_1_5" -> 5
+          const companyIndex = parseInt(leadId.split('_').pop()); // Extract index from "batch_39_5" -> 5
 
           if (companyIndex >= 0 && companyIndex < encodedCompanies.length) {
             // Decode, update, and re-encode the company (Unicode-safe)
@@ -408,6 +400,11 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           : l
       )
     );
+
+    // Update selectedLead if it's the currently selected lead
+    if (selectedLead && selectedLead.id === leadId) {
+      setSelectedLead(prev => ({ ...prev, ...updatedData, updatedAt: new Date().toISOString() }));
+    }
   };
 
   const handleDeleteLead = async (leadId) => {
@@ -429,7 +426,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         const encodedCompanies = batchData.companies || [];
 
         // Find the company index in the array
-        const companyIndex = parseInt(leadId.split('_')[1]); // Extract index from "batch_1_5" -> 5
+        const companyIndex = parseInt(leadId.split('_').pop()); // Extract index from "batch_39_5" -> 5
 
         if (companyIndex >= 0 && companyIndex < encodedCompanies.length) {
           // Remove the company from the array
@@ -501,7 +498,6 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           setShowLeadDetails(true);
         }}
         onStatusChange={handleStatusChange}
-        onEditLead={handleEditLead}
         onScheduleMeeting={handleScheduleMeeting}
         onDeleteLead={handleDeleteLead}
       />
@@ -523,9 +519,9 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         </button>
       </div>
 
-      {/* Lead Details Modal */}
+      {/* Lead View/Edit Modal */}
       {showLeadDetails && (
-        <LeadDetailsModal
+        <LeadViewEditModal
           lead={selectedLead}
           onClose={() => setShowLeadDetails(false)}
           onAddContact={(leadId, contactData) => {
@@ -543,7 +539,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                   const encodedCompanies = batchData.companies || [];
 
                   // Find the company index in the array
-                  const companyIndex = parseInt(leadId.split('_')[1]); // Extract index from "batch_1_5" -> 5
+                  const companyIndex = parseInt(leadId.split('_').pop()); // Extract index from "batch_39_5" -> 5
 
                   if (companyIndex >= 0 && companyIndex < encodedCompanies.length) {
                     // Decode, update contacts, and re-encode the company (Unicode-safe)
@@ -585,33 +581,10 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
               )
             );
           }}
+          onUpdateLead={handleUpdateLead}
           formatDate={formatDate}
         />
       )}
-
-      {/* Add Company Modal */}
-      <AddLeads
-        show={showAddLeadForm}
-        onClose={() => setShowAddLeadForm(false)}
-        onAddLead={handleAddLead}
-      />
-
-      {/* Add JD Modal */}
-{showAddJDForm && (
-  <AddJD
-    show={showAddJDForm}
-    onClose={() => setShowAddJDForm(false)}
-    prefillData={selectedCompanyForJD} // ✅ pass company info to prefill
-  />
-)}
-
-      {/* Edit Lead Modal */}
-      <EditLeadModal
-        show={showEditLeadForm}
-        onClose={() => setShowEditLeadForm(false)}
-        lead={leadToEdit}
-        onUpdateLead={handleUpdateLead}
-      />
 
       {/* Bulk Upload Modal */}
       <BulkUploadModal

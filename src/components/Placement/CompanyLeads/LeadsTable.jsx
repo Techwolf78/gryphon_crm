@@ -12,7 +12,6 @@ function LeadsTable({
   leads,
   onLeadClick,
   onStatusChange,
-  onEditLead,
   onScheduleMeeting,
   onDeleteLead,
 }) {
@@ -144,7 +143,7 @@ function LeadsTable({
                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[120px]">
                   {lead.pocLinkedin ? (
                     <a
-                      href={lead.pocLinkedin}
+                      href={lead.pocLinkedin.startsWith('http') ? lead.pocLinkedin : `https://${lead.pocLinkedin}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-blue-600 hover:text-blue-800"
@@ -192,22 +191,12 @@ function LeadsTable({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              onEditLead(lead);
-                              closeDropdown();
-                            }}
-                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
                               onLeadClick(lead);
                               closeDropdown();
                             }}
                             className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition"
                           >
-                            View Details
+                            View/Edit
                           </button>
 
                           {["hot", "warm", "cold", "onboarded"]
