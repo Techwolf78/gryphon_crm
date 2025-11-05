@@ -40,10 +40,10 @@ const DashboardLayout = () => {
         user={user}
       />
       <main
-        className={`flex-grow transition-all duration-300 ease-in-out min-h-screen
+        className={`grow transition-all duration-300 ease-in-out min-h-screen
           ${sidebarCollapsed 
             ? 'ml-0 lg:ml-16' // Change this line - was missing ml-0
-            : 'ml-0 lg:ml-44' // Change this line - was missing ml-0
+            : 'ml-0 lg:ml-36' // Change this line - was missing ml-0
           }
         `}
       >

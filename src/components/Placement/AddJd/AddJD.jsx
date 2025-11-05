@@ -55,7 +55,7 @@ const getStudentCurrentYear = (passingYear, course = "B.Tech") => {
   return courseDuration - yearsRemaining;
 };
 
-function AddJD({ show, onClose }) {
+function AddJD({ show, onClose, company }) {
   const [formData, setFormData] = useState({
     companyName: "",
     companyWebsite: "",
@@ -507,6 +507,49 @@ function AddJD({ show, onClose }) {
       setIsSubmitting(false);
     }
   };
+
+  useEffect(() => {
+    if (show && company) {
+      // Pre-fill form with company data
+      setFormData(prev => ({
+        ...prev,
+        companyName: company.companyName || company.name || "",
+        companyWebsite: company.companyUrl || company.companyWebsite || "",
+      }));
+    } else if (!show) {
+      // Reset form when modal closes
+      setFormData({
+        companyName: "",
+        companyWebsite: "",
+        course: "",
+        specialization: [],
+        passingYear: "",
+        gender: "",
+        marksCriteria: "",
+        otherCriteria: "",
+        jobType: "",
+        jobDesignation: "",
+        jobLocation: "",
+        salary: "",
+        internshipDuration: "",
+        stipend: "",
+        modeOfInterview: "",
+        joiningPeriod: "",
+        companyOpenDate: "",
+        modeOfWork: "",
+        jobDescription: "",
+        source: "",
+        coordinator: "",
+        status: "ongoing",
+        createdAt: serverTimestamp(),
+      });
+      setCurrentStep(1);
+      setSelectedColleges([]);
+      setFormErrors({});
+      setSubmissionError(null);
+      setEmailSent(false);
+    }
+  }, [show, company]);
 
   useEffect(() => {
     if (show) {

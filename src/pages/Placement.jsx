@@ -13,7 +13,6 @@ import BudgetDashboard from "../components/Budget/BudgetDashboard";
 function Placement() {
   const [trainingData, setTrainingData] = useState([]);
   const [leads, setLeads] = useState([]);
-  const [totalLeadsCount, setTotalLeadsCount] = useState(0);
   const [selectedTraining, setSelectedTraining] = useState(null);
   const [selectedLead, setSelectedLead] = useState(null);
   const [studentModalData, setStudentModalData] = useState({
@@ -70,18 +69,6 @@ function Placement() {
         ...doc.data(),
       }));
       setTrainingData(trainingData);
-
-      // Fetch leads from companyleads collection (batches)
-      const leadsSnapshot = await getDocs(collection(db, "companyleads"));
-      let totalCompanies = 0;
-      leadsSnapshot.docs.forEach((batchDoc) => {
-        const batchData = batchDoc.data();
-        const encodedCompanies = batchData.companies || [];
-        totalCompanies += encodedCompanies.length;
-      });
-      
-      // Set total count for tab display
-      setTotalLeadsCount(totalCompanies);
 
       // Fetch progress for each trainingData
       const progressPromises = trainingData.map(async (item) => {
@@ -217,9 +204,9 @@ function Placement() {
   };
 
   return (
-    <div className="p-0">
+    <div className="p-0 -mt-2">
       <style>{tableStyles}</style>
-      <h2 className="text-2xl font-bold mb-1 text-blue-800">
+      <h2 className="text-2xl font-bold mb-1 text-blue-800 mt-0">
         Placement Management
       </h2>
 
@@ -244,7 +231,7 @@ function Placement() {
       {!loading && !error && (
         <>
           {/* Enhanced Tab Navigation with Sliding Indicator */}
-          <div className="relative mb-4">
+          <div className="relative mb-2">
             <div className="flex border-b border-gray-200">
               <button
                 className={`flex-1 px-6 py-2 font-medium text-sm transition-all duration-150 ${
@@ -277,7 +264,7 @@ function Placement() {
                 onClick={() => setActiveTab("leads")}
                 data-tour="leads-tab"
               >
-                Company Leads ({totalLeadsCount})
+                Company Leads
               </button>
               <button
                 className={`flex-1 px-6 py-2 font-medium text-sm transition-all duration-150 ${
