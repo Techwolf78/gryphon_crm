@@ -225,16 +225,58 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     loadData();
   }, [loadData]);
 
+  // Calculate completeness score for lead prioritization
+  const calculateCompletenessScore = useCallback((lead) => {
+    let score = 0;
+
+    // Company Name (required field)
+    if (lead.companyName && lead.companyName.trim() && lead.companyName !== 'N/A') {
+      score += 1;
+    }
+
+    // Contact Person
+    if (lead.pocName && lead.pocName.trim() && lead.pocName !== 'N/A') {
+      score += 1;
+    }
+
+    // Designation
+    if (lead.pocDesignation && lead.pocDesignation.trim() && lead.pocDesignation !== 'N/A') {
+      score += 1;
+    }
+
+    // Contact Details (Phone)
+    if (lead.pocPhone && String(lead.pocPhone).trim() && lead.pocPhone !== 'N/A') {
+      score += 1;
+    }
+
+    // Email ID
+    if (lead.pocMail && lead.pocMail.trim() && lead.pocMail !== 'N/A' && lead.pocMail.includes('@')) {
+      score += 1;
+    }
+
+    // LinkedIn Profile
+    if (lead.pocLinkedin && lead.pocLinkedin.trim() && lead.pocLinkedin !== 'N/A') {
+      score += 1;
+    }
+
+    return score;
+  }, []);
+
   // Filter leads based on active tab and search term
   const filteredLeads = useMemo(() => {
     // Early return for empty search and "all" tab
     if (!debouncedSearchTerm && activeTab === "all") {
-      return leads;
+      // Sort by completeness score when showing all leads
+      return [...leads].sort((a, b) => {
+        const scoreA = calculateCompletenessScore(a);
+        const scoreB = calculateCompletenessScore(b);
+        return scoreB - scoreA; // Higher score first
+      });
     }
 
     const searchLower = debouncedSearchTerm ? debouncedSearchTerm.toLowerCase() : '';
 
-    return leads.filter((lead) => {
+    const filtered = leads.filter((lead) => {
       // First filter by status if not showing all
       if (activeTab !== "all" && lead.status !== activeTab) {
         return false;
@@ -266,7 +308,14 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       }
       return true;
     });
-  }, [leads, activeTab, debouncedSearchTerm]);
+
+    // Sort filtered results by completeness score
+    return filtered.sort((a, b) => {
+      const scoreA = calculateCompletenessScore(a);
+      const scoreB = calculateCompletenessScore(b);
+      return scoreB - scoreA; // Higher score first
+    });
+  }, [leads, activeTab, debouncedSearchTerm, calculateCompletenessScore]);
 
   // Group leads by status for tab counts
   const leadsByStatus = leads.reduce((acc, lead) => {
