@@ -3,10 +3,11 @@ import { XIcon, CloudUploadIcon } from "@heroicons/react/outline";
 import * as XLSX from 'xlsx';
 import { uploadCompaniesFromExcel } from '../../../utils/excelUpload';
 
-function BulkUploadModal({ show, onClose }) {
+function BulkUploadModal({ show, onClose, assigneeId = null }) {
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [assignToMe, setAssignToMe] = useState(false);
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
@@ -45,19 +46,26 @@ function BulkUploadModal({ show, onClose }) {
     try {
       console.log("🚀 Starting Excel upload process...");
 
+      // Determine assignee ID
+      const finalAssigneeId = assignToMe && assigneeId ? assigneeId : null;
+      if (finalAssigneeId) {
+        console.log("👤 Leads will be assigned to user:", finalAssigneeId);
+      }
+
       // Use the new uploadCompaniesFromExcel function
       const result = await uploadCompaniesFromExcel(file, (progressPercent) => {
         setProgress(progressPercent);
-      });
+      }, finalAssigneeId);
 
       console.log("🎊 Upload completed successfully!");
       console.log(`📈 Summary: ${result.totalCompanies} companies uploaded in ${result.totalBatches} batches`);
 
       setProgress(100);
-      alert(`Successfully uploaded ${result.totalCompanies} companies in ${result.totalBatches} batches!`);
+      alert(`Successfully uploaded ${result.totalCompanies} companies in ${result.totalBatches} batches!${finalAssigneeId ? ' Leads have been assigned to you.' : ''}`);
 
       setUploading(false);
       setFile(null);
+      setAssignToMe(false);
       onClose();
 
     } catch (error) {
@@ -71,8 +79,8 @@ function BulkUploadModal({ show, onClose }) {
 
   return (
     <div className="fixed inset-0 z-54 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
-        <div className="bg-gradient-to-r from-green-600 to-green-700 px-6 py-4 flex justify-between items-center">
+      <div className="bg-white w-full max-w-md rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
+        <div className="bg-linear-to-r from-green-600 to-green-700 px-6 py-4 flex justify-between items-center shrink-0">
           <h2 className="text-xl font-semibold text-white">Bulk Upload Companies</h2>
           <button
             onClick={onClose}
@@ -82,7 +90,7 @@ function BulkUploadModal({ show, onClose }) {
           </button>
         </div>
 
-        <div className="p-6">
+        <div className="flex-1 overflow-y-auto p-6">
           <div className="mb-4">
             <div className="flex justify-between items-center mb-2">
               <label className="block text-sm font-medium text-gray-700">
@@ -102,6 +110,23 @@ function BulkUploadModal({ show, onClose }) {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
             />
           </div>
+
+          {assigneeId && (
+            <div className="mb-4">
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={assignToMe}
+                  onChange={(e) => setAssignToMe(e.target.checked)}
+                  className="mr-2 h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                />
+                <span className="text-sm text-gray-700">Assign all leads to me</span>
+              </label>
+              <p className="text-xs text-gray-500 mt-1">
+                When checked, all uploaded leads will be assigned to your account immediately.
+              </p>
+            </div>
+          )}
 
           {uploading && (
             <div className="mb-4">
@@ -123,12 +148,12 @@ function BulkUploadModal({ show, onClose }) {
               <div>
                 <p className="font-medium text-green-700">Required:</p>
                 <ul className="list-disc list-inside text-xs">
-                  <li>CompanyName</li>
-                  <li>ContactPerson</li>
+                  <li>CompanyName (or Company Name)</li>
+                  <li>ContactPerson (or Contact Person)</li>
                   <li>Designation</li>
                   <li>Phone</li>
-                  <li>CompanyUrl</li>
-                  <li>LinkedinUrl</li>
+                  <li>CompanyUrl (or Company URL)</li>
+                  <li>LinkedinUrl (or LinkedIn URL)</li>
                 </ul>
               </div>
               <div>
@@ -137,7 +162,7 @@ function BulkUploadModal({ show, onClose }) {
                   <li>Email</li>
                   <li>Location</li>
                   <li>Industry</li>
-                  <li>CompanySize</li>
+                  <li>CompanySize (or Company Size)</li>
                   <li>Source</li>
                   <li>Notes</li>
                   <li>Status (hot/warm/cold/onboarded)</li>
@@ -145,20 +170,22 @@ function BulkUploadModal({ show, onClose }) {
               </div>
             </div>
             <p className="mt-2 text-xs text-red-600 font-medium">
-              ⚠️ Each batch of ~2000 companies creates:<br/>
+              ⚠️ Each batch of ~1500 companies creates:<br/>
               - 1 write per batch document<br/><br/>
-              For 58,000 companies: ~29 batches × 1 = 29 writes<br/><br/>
+              For 58,000 companies: ~39 batches × 1 = 39 writes<br/><br/>
               Free tier: 20,000 writes/day. This upload is well within limits.<br/><br/>
-              💡 Uses Base64 encoding for efficient storage.
+              ⏱️ 2-second delay between batches to prevent rate limiting.<br/><br/>
+              � Failed batches will be retried up to 3 times with exponential backoff.<br/><br/>
+              �💡 Uses Base64 encoding for efficient storage.
             </p>
             
             <p className="mt-2 text-xs text-gray-500">
-              Other fields (Industry, Company Size, etc.) will be set to default values.
+              <strong>Troubleshooting:</strong> If upload shows 0 records, check that your Excel file has proper column headers and data rows.
             </p>
           </div>
         </div>
 
-        <div className="bg-gray-50 px-6 py-4 flex justify-end">
+        <div className="bg-gray-50 px-6 py-4 flex justify-end shrink-0">
           <div className="flex space-x-3">
             <button
               onClick={onClose}

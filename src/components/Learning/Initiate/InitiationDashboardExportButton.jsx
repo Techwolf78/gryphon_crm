@@ -222,13 +222,13 @@ const InitiationDashboardExportButton = ({ trainings }) => {
         ref={buttonRef}
         type="button"
         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-        className="group relative inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-sm font-medium rounded-lg hover:from-emerald-600 hover:to-emerald-700 transform hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-white"
+        className="group relative inline-flex items-center px-2.5 py-1.5 bg-linear-to-r from-emerald-500 to-emerald-600 text-white text-xs font-medium rounded-lg hover:from-emerald-600 hover:to-emerald-700 transform hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:ring-offset-1 focus:ring-offset-white"
         aria-label="Export training data"
       >
-        <FiDownload className="mr-1.5 w-3.5 h-3.5" />
-        <span className="hidden sm:inline">Export Data</span>
-        <span className="sm:hidden">Export</span>
-        <FiChevronDown className={`ml-1.5 w-3.5 h-3.5 transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''}`} />
+        <FiDownload className="mr-1 w-3 h-3" />
+        <span className="hidden sm:inline">Export</span>
+        <span className="sm:hidden">Exp</span>
+        <FiChevronDown className={`ml-1 w-3 h-3 transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {/* Dropdown Panel */}

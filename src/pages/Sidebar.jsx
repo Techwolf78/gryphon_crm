@@ -38,11 +38,6 @@ const roleLinks = {
       icon: <MdOutlineCurrencyRupee />,
     },
     {
-      label: "Purchase",
-      path: "/dashboard/purchase",
-      icon: <FiShoppingCart />,
-    },
-    {
       label: "L & D",
       path: "/dashboard/learning-development",
       icon: <FiBook />,
@@ -51,6 +46,11 @@ const roleLinks = {
     { label: "D M", path: "/dashboard/marketing", icon: <FiTrendingUp /> },
     { label: "CA", path: "/dashboard/ca", icon: <FiUserCheck /> },
     { label: "HR", path: "/dashboard/hr", icon: <FiShield /> },
+    {
+      label: "Purchase",
+      path: "/dashboard/purchase",
+      icon: <FiShoppingCart />,
+    },
   ],
   sales: [
     {
@@ -104,6 +104,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
   const { user } = useContext(AuthContext);
   const location = useLocation();
   const [isAIDrawerOpen, setIsAIDrawerOpen] = useState(false);
+  const [tooltip, setTooltip] = useState({ show: false, text: '', x: 0, y: 0 });
   const initializedRef = useRef(false);
 
   // Sync stored preference on mount (run once). If stored value differs from current prop, call onToggle to sync parent.
@@ -132,6 +133,28 @@ const Sidebar = ({ collapsed, onToggle }) => {
     }
     if (typeof onToggle === "function") onToggle();
   }, [collapsed, onToggle]);
+
+  const handleMouseEnter = useCallback((text, event) => {
+    if (!collapsed) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    setTooltip({
+      show: true,
+      text,
+      x: rect.right + 8,
+      y: rect.top + rect.height / 2
+    });
+  }, [collapsed]);
+
+  const handleMouseLeave = useCallback(() => {
+    setTooltip({ show: false, text: '', x: 0, y: 0 });
+  }, []);
+
+  // Hide tooltip when sidebar expands
+  useEffect(() => {
+    if (!collapsed) {
+      setTooltip({ show: false, text: '', x: 0, y: 0 });
+    }
+  }, [collapsed]);
 
   if (!user) return null;
 
@@ -208,7 +231,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
 
       <aside
         className={`
-        ${collapsed ? "w-16" : "w-64 sm:w-72 lg:w-44"}
+        ${collapsed ? "w-16" : "w-64 sm:w-72 lg:w-36"}
         bg-white border-r border-gray-200 flex flex-col fixed h-screen z-50
         transition-all duration-300
         ${
@@ -221,7 +244,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
       >
         {/* Header */}
         <div
-          className={`flex-shrink-0 p-3 border-b border-gray-200 ${
+          className={`shrink-0 p-3 border-b border-gray-200 ${
             collapsed
               ? "flex flex-col items-center space-y-2"
               : "flex items-center justify-between"
@@ -236,8 +259,11 @@ const Sidebar = ({ collapsed, onToggle }) => {
           />
           <button
             onClick={handleToggle}
+            onMouseEnter={(e) => handleMouseEnter(collapsed ? "Expand Sidebar" : "Collapse Sidebar", e)}
+            onMouseLeave={handleMouseLeave}
             className="p-1 rounded hover:bg-gray-100 lg:block"
             aria-label={collapsed ? "Expand" : "Collapse"}
+            title={!collapsed ? "Collapse Sidebar" : ""}
           >
             <img
               src={collapsed ? expandIcon : collapseIcon}
@@ -262,12 +288,14 @@ const Sidebar = ({ collapsed, onToggle }) => {
                           handleToggle();
                         }
                       }}
+                      onMouseEnter={(e) => handleMouseEnter(label, e)}
+                      onMouseLeave={handleMouseLeave}
                       className={`w-full flex items-center ${collapsed ? 'justify-center px-2 py-2' : 'px-3 py-2'} rounded text-sm transition ${
                         "text-gray-600 hover:bg-gray-100"
                       } notifications-button`}
-                      title={collapsed ? label : ""}
+                      title={!collapsed ? label : ""}
                     >
-                      <span className="text-lg flex-shrink-0 relative">
+                      <span className="text-lg shrink-0 relative">
                         {icon}
                         {collapsed && hasNotification && (
                           <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
@@ -282,10 +310,12 @@ const Sidebar = ({ collapsed, onToggle }) => {
                     <Link
                       to={path}
                       state={skipRedirect ? { skipRedirect: true } : undefined}
+                      onMouseEnter={(e) => handleMouseEnter(label, e)}
+                      onMouseLeave={handleMouseLeave}
                       className={`flex items-center ${collapsed ? 'justify-center px-2 py-2' : 'px-3 py-2'} rounded text-sm transition ${
                         isActive(path) ? "bg-blue-50 text-blue-600 font-medium" : "text-gray-600 hover:bg-gray-100"
                       }`}
-                      title={collapsed ? label : ""}
+                      title={!collapsed ? label : ""}
                       onClick={() => {
                         // Auto-close sidebar on mobile after navigation
                         if (window.innerWidth < 1024) {
@@ -293,7 +323,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
                         }
                       }}
                     >
-                      <span className="text-lg flex-shrink-0 relative">
+                      <span className="text-lg shrink-0 relative">
                         {icon}
                         {collapsed && hasNotification && (
                           <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
@@ -318,10 +348,12 @@ const Sidebar = ({ collapsed, onToggle }) => {
                       handleToggle();
                     }
                   }}
-                  className={`w-full flex items-center ${collapsed ? 'justify-center px-2 py-2' : 'px-3 py-2'} rounded text-sm bg-gradient-to-r from-blue-50 to-sky-100 text-blue-700 hover:from-blue-100 hover:to-sky-150 hover:text-blue-800 border border-blue-200 shadow-sm transition-all duration-200`}
-                  title={collapsed ? "Ask AI" : ""}
+                  onMouseEnter={(e) => handleMouseEnter("Ask AI", e)}
+                  onMouseLeave={handleMouseLeave}
+                  className={`w-full flex items-center ${collapsed ? 'justify-center px-2 py-2' : 'px-3 py-2'} rounded text-sm bg-linear-to-r from-blue-50 to-sky-100 text-blue-700 hover:from-blue-100 hover:to-sky-150 hover:text-blue-800 border border-blue-200 shadow-sm transition-all duration-200`}
+                  title={!collapsed ? "Ask AI" : ""}
                 >
-                  <FiMessageSquare className="text-lg flex-shrink-0" />
+                  <FiMessageSquare className="text-lg shrink-0" />
                   {!collapsed && <span className="ml-2">Ask AI</span>}
                 </button>
               </div>
@@ -329,6 +361,25 @@ const Sidebar = ({ collapsed, onToggle }) => {
           </div>
         </nav>
       </aside>
+
+      {/* Custom Tooltip */}
+      {tooltip.show && collapsed && (
+        <div
+          className="fixed z-60 pointer-events-none"
+          style={{
+            left: tooltip.x,
+            top: tooltip.y,
+            transform: 'translateY(-50%)'
+          }}
+        >
+          <div className="bg-gray-900 text-white text-sm px-3 py-2 rounded-lg shadow-lg backdrop-blur-sm bg-opacity-95 border border-gray-700 max-w-xs">
+            {tooltip.text}
+            <div
+              className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-1 w-0 h-0 border-t-4 border-b-4 border-r-4 border-transparent border-r-gray-900"
+            ></div>
+          </div>
+        </div>
+      )}
 
       <AiBot isOpen={isAIDrawerOpen} onClose={() => setIsAIDrawerOpen(false)} />
     </>

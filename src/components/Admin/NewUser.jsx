@@ -50,22 +50,38 @@ const NewUser = ({ onUserAdded }) => {
  
   useEffect(() => {
     const fetchManagers = async () => {
+      const relevantDepartments = [];
+      if (departments.includes("Sales")) relevantDepartments.push("Sales");
+      if (departments.includes("Placement")) relevantDepartments.push("Placement");
+
       if (
         (role === "Assistant Manager" || role === "Executive") &&
-        departments.includes("Sales")
+        relevantDepartments.length > 0
       ) {
         try {
+          // Get all managers first, then filter client-side to handle both old and new data formats
           const q = query(
             collection(db, "users"),
-            where("role", "==", "Manager"),
-            where("department", "==", "Sales")
+            where("role", "==", "Manager")
           );
           const querySnapshot = await getDocs(q);
 
-          const managers = querySnapshot.docs.map((doc) => ({
-            id: doc.id,
-            name: doc.data().name,
-          }));
+          const managers = querySnapshot.docs
+            .map((doc) => {
+              const data = doc.data();
+              return {
+                id: doc.id,
+                name: data.name,
+                // Handle both old format (department: string) and new format (departments: array)
+                departments: Array.isArray(data.departments)
+                  ? data.departments
+                  : (data.department ? [data.department] : []),
+              };
+            })
+            .filter((manager) => {
+              // Check if manager belongs to any of the relevant departments
+              return relevantDepartments.some(dept => manager.departments.includes(dept));
+            });
 
           setReportingManagers(managers);
         } catch {
@@ -154,7 +170,7 @@ const NewUser = ({ onUserAdded }) => {
       return;
     }    if (
       (role === "Assistant Manager" || role === "Executive") &&
-      departments.includes("Sales") &&
+      (departments.includes("Sales") || departments.includes("Placement")) &&
       !selectedReportingManager
     ) {
       setError("Please select a Reporting Manager.");
@@ -251,7 +267,7 @@ const NewUser = ({ onUserAdded }) => {
       )}
  
       <div
-        className={`fixed top-0 right-0 h-full w-full sm:w-[380px] lg:w-[420px] xl:w-[450px] bg-white/95 backdrop-blur-xl z-[100] transform transition-transform duration-300 shadow-2xl ${
+        className={`fixed top-0 right-0 h-full w-full sm:w-[380px] lg:w-[420px] xl:w-[450px] bg-white/95 backdrop-blur-xl z-100 transform transition-transform duration-300 shadow-2xl ${
           showForm ? "translate-x-0" : "translate-x-full"
         }`}
       >
@@ -284,13 +300,13 @@ const NewUser = ({ onUserAdded }) => {
               Full Name <span className="text-red-500">*</span>
             </label>
             <div className="flex items-center border-2 border-gray-300 bg-white/60 backdrop-blur rounded-lg px-3 py-2.5 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 focus-within:border-indigo-400 transition-all">
-              <FaUser className="text-gray-400 mr-2.5 flex-shrink-0" size={16} />
+              <FaUser className="text-gray-400 mr-2.5 shrink-0" size={16} />
               <input
                 id="nameInput"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="flex-grow focus:outline-none bg-transparent text-black placeholder-gray-400 text-sm"
+                className="grow focus:outline-none bg-transparent text-black placeholder-gray-400 text-sm"
                 placeholder="Enter full name"
                 required
                 autoComplete="name"
@@ -304,13 +320,13 @@ const NewUser = ({ onUserAdded }) => {
               Email Address <span className="text-red-500">*</span>
             </label>
             <div className="flex items-center border-2 border-gray-300 bg-white/60 backdrop-blur rounded-lg px-3 py-2.5 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 focus-within:border-indigo-400 transition-all">
-              <FaEnvelope className="text-gray-400 mr-2.5 flex-shrink-0" size={16} />
+              <FaEnvelope className="text-gray-400 mr-2.5 shrink-0" size={16} />
               <input
                 id="emailInput"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="flex-grow focus:outline-none bg-transparent text-black placeholder-gray-400 text-sm"
+                className="grow focus:outline-none bg-transparent text-black placeholder-gray-400 text-sm"
                 placeholder="username@gryphonacademy.co.in"
                 required
                 autoComplete="email"
@@ -324,13 +340,13 @@ const NewUser = ({ onUserAdded }) => {
               Password <span className="text-red-500">*</span>
             </label>
             <div className="flex items-center border-2 border-gray-300 bg-white/60 backdrop-blur rounded-lg px-3 py-2.5 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 focus-within:border-indigo-400 transition-all">
-              <FaLock className="text-gray-400 mr-2.5 flex-shrink-0" size={16} />
+              <FaLock className="text-gray-400 mr-2.5 shrink-0" size={16} />
               <input
                 id="passwordInput"
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="flex-grow focus:outline-none bg-transparent text-black placeholder-gray-400 text-sm"
+                className="grow focus:outline-none bg-transparent text-black placeholder-gray-400 text-sm"
                 placeholder={`Min ${MIN_PASSWORD_LENGTH} characters`}
                 required
                 autoComplete="new-password"
@@ -421,12 +437,12 @@ const NewUser = ({ onUserAdded }) => {
                 Role <span className="text-red-500">*</span>
               </label>
               <div className="flex items-center border-2 border-gray-300 bg-white/60 backdrop-blur rounded-lg px-3 py-2.5 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 focus-within:border-indigo-400 transition-all">
-                <FaUserTag className="text-gray-400 mr-2.5 flex-shrink-0" size={16} />
+                <FaUserTag className="text-gray-400 mr-2.5 shrink-0" size={16} />
                 <select
                   id="roleSelect"
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
-                  className="flex-grow bg-transparent focus:outline-none text-black text-sm"
+                  className="grow bg-transparent focus:outline-none text-black text-sm"
                   required
                 >
                   {roles.map((r) => (
@@ -440,30 +456,30 @@ const NewUser = ({ onUserAdded }) => {
           </div>
  
           {/* Compact Reporting Manager Field */}
-          {(role === "Assistant Manager" || role === "Executive") && departments.includes("Sales") && (
+          {(role === "Assistant Manager" || role === "Executive") && (departments.includes("Sales") || departments.includes("Placement")) && (
             <div className="space-y-1.5 bg-blue-50 p-3 rounded-lg border border-blue-200">
               <label htmlFor="managerSelect" className="block text-sm font-medium text-blue-800">
                 Reporting Manager <span className="text-red-500">*</span>
               </label>
               <div className="flex items-center border-2 border-blue-300 bg-white/80 backdrop-blur rounded-lg px-3 py-2.5 shadow-inner focus-within:ring-2 focus-within:ring-blue-400 focus-within:border-blue-400 transition-all">
-                <FaUser className="text-blue-500 mr-2.5 flex-shrink-0" size={16} />
+                <FaUser className="text-blue-500 mr-2.5 shrink-0" size={16} />
                 <select
                   id="managerSelect"
                   value={selectedReportingManager}
                   onChange={(e) => setSelectedReportingManager(e.target.value)}
-                  className="flex-grow bg-transparent focus:outline-none text-black text-sm"
+                  className="grow bg-transparent focus:outline-none text-black text-sm"
                   required
                 >
                   <option value="">Select Reporting Manager</option>
                   {reportingManagers.map((manager) => (
                     <option key={manager.id} value={manager.name}>
-                      {manager.name}
+                      {manager.name} ({manager.departments.join(", ")})
                     </option>
                   ))}
                 </select>
               </div>
               <p className="text-xs text-blue-600 mt-1">
-                Required for Sales executives and assistant managers
+                Required for Sales and Placement executives and assistant managers
               </p>
             </div>
           )}
@@ -471,7 +487,7 @@ const NewUser = ({ onUserAdded }) => {
           {/* Compact Error Message */}
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm font-medium flex items-start">
-              <svg className="w-4 h-4 text-red-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-4 h-4 text-red-500 mr-2 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
               {error}

@@ -10,6 +10,7 @@ import {
   FiRefreshCw,
   FiTrash2,
   FiXCircle,
+  FiEdit3,
 } from "react-icons/fi";
 import { FaEye, FaRupeeSign } from "react-icons/fa";
 import { collection, query, where, getDocs } from "firebase/firestore";
@@ -21,6 +22,7 @@ function TrainerRow({
   handleEditInvoice,
   handleGenerateInvoice,
   handleApproveInvoice,
+  handleViewInvoice,
   downloadingInvoice,
   getDownloadStatus,
   formatDate,
@@ -133,7 +135,7 @@ function TrainerRow({
     <tr className="hover:bg-gray-50/50 transition-colors">
       <td className="px-3 py-3">
         <div className="flex items-center min-w-0">
-          <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg flex items-center justify-center">
+          <div className="shrink-0 h-10 w-10 bg-linear-to-br from-blue-100 to-blue-200 rounded-lg flex items-center justify-center">
             <FiUser className="text-blue-600" />
           </div>
           <div className="ml-3 min-w-0 flex-1">
@@ -166,7 +168,7 @@ function TrainerRow({
       <td className="px-3 py-3">
         <div className="space-y-1 min-w-0">
           <div className="flex items-center gap-1 text-xs text-gray-700">
-            <FiCalendar className="text-blue-500 flex-shrink-0 text-xs" />
+            <FiCalendar className="text-blue-500 shrink-0 text-xs" />
             <span className="font-medium truncate" title={`${formatDate(item.earliestStartDate)} - ${formatDate(item.latestEndDate)}`}>
               {formatDate(item.earliestStartDate)}
             </span>
@@ -176,7 +178,7 @@ function TrainerRow({
           </div>
           
           <div className="flex items-center gap-1 text-xs text-gray-600">
-            <FaRupeeSign className="text-green-500 flex-shrink-0 text-xs" />
+            <FaRupeeSign className="text-green-500 shrink-0 text-xs" />
             <span className="truncate">
               {item.totalCollegeHours}h • {item.perHourCost ? `₹${item.perHourCost}` : "No rate"}
             </span>
@@ -223,53 +225,64 @@ function TrainerRow({
                 
                 return (
                   <>
-                    {/* Compact Action Buttons - Single Row */}
-                    <div className={`flex gap-1 w-full ${hasUndoOption ? 'grid grid-cols-4' : ''}`}>
+                    {/* Compact Action Buttons - Single Row */}  
+                    <div className="flex gap-1 w-full">
+                      {/* View button - icon only, minimal width */}
+                      <button
+                        onClick={() => handleViewInvoice(item)}
+                        className="inline-flex items-center justify-center w-6 h-6 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-all shrink-0"
+                      >
+                        <FaEye className="w-3 h-3" />
+                      </button>
+
+                      {/* Edit button - icon only, minimal width */}
+                      <button
+                        onClick={() => handleEditInvoice(item)}
+                        className="inline-flex items-center justify-center w-6 h-6 text-xs font-medium text-blue-700 bg-white border border-blue-300 rounded hover:bg-blue-50 transition-all shrink-0"
+                      >
+                        <FiEdit3 className="w-3 h-3" />
+                      </button>
+
+                      {/* Download button */}
                       <button
                         onClick={() => handleDownloadInvoice(item)}
                         disabled={
                           downloadingInvoice ===
                           `${item.trainerId}_${item.collegeName}_${item.phase}`
                         }
-                        className={`${hasUndoOption ? 'col-span-1' : 'flex-1'} inline-flex items-center justify-center px-2 py-1 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-50 transition-all`}
+                        className="flex-1 inline-flex items-center justify-center px-2 py-1 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-50 transition-all"
                       >
                         <FiDownload className="w-3 h-3 mr-1" />
                         Download
-                      </button>
-                      
-                      <button
-                        onClick={() => handleEditInvoice(item)}
-                        className={`${hasUndoOption ? 'col-span-1' : 'flex-1'} inline-flex items-center justify-center px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-all`}
-                      >
-                        <FaEye className="w-3 h-3 mr-1" />
-                        View
                       </button>
 
                       {/* Approve button for generated invoices */}
                       {invoiceData && invoiceData.status === "generated" && (
                         <button
                           onClick={() => handleApproveInvoice(item)}
-                          className={`${hasUndoOption ? 'col-span-1' : 'flex-1'} inline-flex items-center justify-center px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-all`}
+                          className="flex-1 inline-flex items-center justify-center px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-all"
                         >
                           <FiCheckCircle className="w-3 h-3 mr-1" />
                           Approve
                         </button>
                       )}
                       
+                      {/* Resubmit button for rejected invoices */}
                       {invoiceData && invoiceData.status === "rejected" && (
                         <button
                           onClick={() => handleEditInvoice(item)}
-                          className={`${hasUndoOption ? 'col-span-1' : 'flex-1'} inline-flex items-center justify-center px-2 py-1 text-xs font-semibold text-white bg-gradient-to-r from-amber-500 to-orange-500 rounded hover:from-amber-600 hover:to-orange-600 transition-all duration-200 shadow-sm hover:shadow-md border border-amber-400 hover:border-amber-500`}
+                          className="flex-1 inline-flex items-center justify-center px-2 py-1 text-xs font-semibold text-white bg-linear-to-r from-amber-500 to-orange-500 rounded hover:from-amber-600 hover:to-orange-600 transition-all duration-200 shadow-sm hover:shadow-md border border-amber-400 hover:border-amber-500"
                         >
                           <FiRefreshCw className="w-3 h-3 mr-1" />
                           Resubmit
                         </button>
                       )}
                       
+                      {/* Undo button */}
                       {hasUndoOption && timeLeft > 0 && (
                         <button
                           onClick={() => handleUndoInvoice(undoInvoice)}
-                          className="col-span-1 inline-flex items-center justify-center px-2 py-1 text-xs font-medium text-white bg-red-500 rounded hover:bg-red-600 transition-all"
+                          className="flex-1 inline-flex items-center justify-center px-2 py-1 text-xs font-medium text-white bg-red-500 rounded hover:bg-red-600 transition-all"
                         >
                           <FiTrash2 className="w-3 h-3 mr-1" />
                           Undo
@@ -322,10 +335,10 @@ function TrainerRow({
             </>
           ) : (
             <>
-              <div className="text-center space-y-2">
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                  <div className="text-xs text-amber-700 flex items-center justify-center mb-2">
-                    <FiClock className="mr-2" />
+              <div className="text-center">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-1">
+                  <div className="text-xs text-amber-700 flex items-center justify-center">
+                    <FiClock className="mr-1" />
                     <span className="font-medium">Available on</span>
                   </div>
                   <div className="text-sm font-semibold text-amber-800">
@@ -339,13 +352,6 @@ function TrainerRow({
                       : "N/A"}
                   </div>
                 </div>
-                <button
-                  disabled
-                  className="w-full inline-flex items-center justify-center px-4 py-3 text-sm font-medium text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed border border-gray-200"
-                >
-                  <FiFileText className="w-4 h-4 mr-2" />
-                  Generate Invoice
-                </button>
               </div>
             </>
           )}

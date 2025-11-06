@@ -326,10 +326,11 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
 
     const allNumbers = [...invoiceNumbers, ...localNumbers];
     
+    // Find the lowest available number starting from 1
     let nextInvoiceNumber = 1;
-    if (allNumbers.length > 0) {
-      const maxInvoiceNumber = Math.max(...allNumbers);
-      nextInvoiceNumber = maxInvoiceNumber + 1;
+    const usedNumbers = new Set(allNumbers);
+    while (usedNumbers.has(nextInvoiceNumber)) {
+      nextInvoiceNumber++;
     }
 
     // Update local tracking
@@ -549,6 +550,20 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
       await deleteDoc(doc(db, collectionName, invoice.id));
 
       console.log("Successfully deleted invoice from Firestore");
+
+      // Remove the undone invoice number from local tracking to allow reuse
+      const parts = invoice.invoiceNumber.split("/");
+      if (parts.length === 4) {
+        const sequentialPart = parts[3];
+        const num = parseInt(sequentialPart, 10);
+        if (!isNaN(num)) {
+          setLocallyGeneratedNumbers(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(num);
+            return newSet;
+          });
+        }
+      }
 
       // If this is a converted Tax invoice, also delete the original Proforma
       if (invoice.convertedFromProforma) {
@@ -1345,7 +1360,7 @@ const handleMergeSubmit = async (formData) => {
           {[...Array(3)].map((_, index) => (
             <div key={index} className="bg-white rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden">
               {/* Header Skeleton */}
-              <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3">
+              <div className="bg-linear-to-r from-blue-600 to-blue-700 px-4 py-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="h-5 bg-blue-500 rounded w-48 mb-2 animate-pulse"></div>
@@ -1758,7 +1773,7 @@ const handleMergeSubmit = async (formData) => {
                         className="bg-white rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden hover:shadow-md transition-shadow duration-200"
                       >
                         {/* College Header */}
-                        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3">
+                        <div className="bg-linear-to-r from-blue-600 to-blue-700 px-4 py-3">
                           <div className="flex items-center justify-between">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
@@ -1782,7 +1797,7 @@ const handleMergeSubmit = async (formData) => {
                                 )}
                               </p>
                             </div>
-                            <div className="ml-3 flex-shrink-0">
+                            <div className="ml-3 shrink-0">
                               <button
                                 onClick={() => toggleExpand(invoice.id)}
                                 className="text-white hover:bg-blue-700/50 p-1 rounded-lg transition-colors duration-200"
@@ -1999,7 +2014,7 @@ const handleMergeSubmit = async (formData) => {
                                         return (
                                           <div
                                             key={`${index}-${groupIndex}`}
-                                            className={`bg-gradient-to-r ${isCancelled ? 'from-red-50 to-red-100/50' : 'from-gray-50 to-gray-100/50'} rounded-xl p-4 border ${isCancelled ? 'border-red-200' : 'border-gray-200'} cursor-pointer hover:shadow-md transition-all duration-200`}
+                                            className={`bg-linear-to-r ${isCancelled ? 'from-red-50 to-red-100/50' : 'from-gray-50 to-gray-100/50'} rounded-xl p-4 border ${isCancelled ? 'border-red-200' : 'border-gray-200'} cursor-pointer hover:shadow-md transition-all duration-200`}
                                             onClick={() => setSelectedInvoice(inv)}
                                           >
                                             <div className="flex items-center justify-between mb-3">
@@ -2159,7 +2174,7 @@ const handleMergeSubmit = async (formData) => {
                                       return (
                                         <div
                                           key={index}
-                                          className="bg-gradient-to-r from-blue-50 to-blue-100/50 rounded-xl p-4 border border-blue-200 cursor-pointer hover:shadow-md transition-all duration-200"
+                                          className="bg-linear-to-r from-blue-50 to-blue-100/50 rounded-xl p-4 border border-blue-200 cursor-pointer hover:shadow-md transition-all duration-200"
                                           onClick={() =>
                                             setRowClickModal({
                                               isOpen: true,
@@ -2623,7 +2638,7 @@ const handleMergeSubmit = async (formData) => {
                       className="bg-white rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden hover:shadow-md transition-shadow duration-200"
                     >
                       {/* College Header */}
-                      <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-4 py-3">
+                      <div className="bg-linear-to-r from-purple-600 to-purple-700 px-4 py-3">
                         <div className="flex items-center justify-between">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
@@ -2648,7 +2663,7 @@ const handleMergeSubmit = async (formData) => {
                               )}
                             </p>
                           </div>
-                          <div className="ml-3 flex-shrink-0">
+                          <div className="ml-3 shrink-0">
                             <button
                               onClick={() => toggleExpand(`merged-${index}`)}
                               className="text-white hover:bg-purple-700/50 p-1 rounded-lg transition-colors duration-200"
@@ -2916,7 +2931,7 @@ const handleMergeSubmit = async (formData) => {
                                     return (
                                       <div
                                         key={`${idx}-${groupIndex}`}
-                                        className={`bg-gradient-to-r ${isCancelled ? 'from-red-50 to-red-100/50' : 'from-gray-50 to-gray-100/50'} rounded-xl p-4 border ${isCancelled ? 'border-red-200' : 'border-gray-200'} cursor-pointer hover:shadow-md transition-all duration-200`}
+                                        className={`bg-linear-to-r ${isCancelled ? 'from-red-50 to-red-100/50' : 'from-gray-50 to-gray-100/50'} rounded-xl p-4 border ${isCancelled ? 'border-red-200' : 'border-gray-200'} cursor-pointer hover:shadow-md transition-all duration-200`}
                                         onClick={() => setSelectedInvoice(inv)}
                                       >
                                         <div className="flex items-center justify-between mb-3">
@@ -3078,7 +3093,7 @@ const handleMergeSubmit = async (formData) => {
                                   return (
                                     <div
                                       key={idx}
-                                      className="bg-gradient-to-r from-purple-50 to-purple-100/50 rounded-xl p-4 border border-purple-200 cursor-pointer hover:shadow-md transition-all duration-200"
+                                      className="bg-linear-to-r from-purple-50 to-purple-100/50 rounded-xl p-4 border border-purple-200 cursor-pointer hover:shadow-md transition-all duration-200"
                                       onClick={() =>
                                         setRowClickModal({
                                           isOpen: true,

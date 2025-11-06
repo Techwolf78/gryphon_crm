@@ -49,8 +49,8 @@ const FollowUpCompany = ({ company, onClose }) => {
   const graphScopes = ["User.Read", "Calendars.ReadWrite"];
 
   // Replace all logInfo and logError calls with no-ops
-  const logInfo = () => {};
-  const logError = () => {};
+  const logInfo = (...args) => console.log(...args);
+  const logError = (...args) => console.error(...args);
 
   // Close time picker when clicking outside
   useEffect(() => {
@@ -67,6 +67,7 @@ const FollowUpCompany = ({ company, onClose }) => {
     if (!company?.id) return;
 
     try {
+      console.log("Fetching past follow-ups for company:", company);
       // For companies, follow-ups are stored within the company data in companyleads collection
       const lead = company; // company is passed as lead-like object
       if (!lead || !lead.batchId) return;
@@ -77,21 +78,36 @@ const FollowUpCompany = ({ company, onClose }) => {
       if (batchDocSnap.exists()) {
         const batchData = batchDocSnap.data();
         const encodedCompanies = batchData.companies || [];
-        const companyIndex = parseInt(lead.id.split('_')[1]);
+        const companyIndex = parseInt(lead.id.split('_').pop());
 
         if (companyIndex >= 0 && companyIndex < encodedCompanies.length) {
-          const decodedCompany = JSON.parse(atob(encodedCompanies[companyIndex]));
+          let jsonString;
+          try {
+            const uriDecoded = atob(encodedCompanies[companyIndex]);
+            jsonString = decodeURIComponent(uriDecoded);
+          } catch (decodeError) {
+            console.log("atob failed, trying decodeURIComponent directly");
+            jsonString = decodeURIComponent(encodedCompanies[companyIndex]);
+          }
+          const decodedCompany = JSON.parse(jsonString);
           const followups = decodedCompany.followups || [];
+          console.log("Fetched past follow-ups:", followups);
           setPastFollowups(followups);
+        } else {
+          console.error("Invalid company index in fetchPastFollowups:", companyIndex);
         }
+      } else {
+        console.error("Batch doc not found in fetchPastFollowups");
       }
     } catch (error) {
+      console.error("Error fetching past follow-ups:", error);
       logError("Error fetching past follow-ups:", error);
     }
   }, [company]);
 
   const handleDeleteFollowup = async (followupKey) => {
     try {
+      console.log("Deleting follow-up with key:", followupKey, "for company:", company);
       const lead = company;
       if (!lead || !lead.batchId) return;
 
@@ -101,10 +117,18 @@ const FollowUpCompany = ({ company, onClose }) => {
       if (batchDocSnap.exists()) {
         const batchData = batchDocSnap.data();
         const encodedCompanies = batchData.companies || [];
-        const companyIndex = parseInt(lead.id.split('_')[1]);
+        const companyIndex = parseInt(lead.id.split('_').pop());
 
         if (companyIndex >= 0 && companyIndex < encodedCompanies.length) {
-          const decodedCompany = JSON.parse(atob(encodedCompanies[companyIndex]));
+          let jsonString;
+          try {
+            const uriDecoded = atob(encodedCompanies[companyIndex]);
+            jsonString = decodeURIComponent(uriDecoded);
+          } catch (decodeError) {
+            console.log("atob failed, trying decodeURIComponent directly");
+            jsonString = decodeURIComponent(encodedCompanies[companyIndex]);
+          }
+          const decodedCompany = JSON.parse(jsonString);
           const followups = decodedCompany.followups || [];
           const updatedFollowups = followups.filter(f => f.key !== followupKey);
 
@@ -119,11 +143,17 @@ const FollowUpCompany = ({ company, onClose }) => {
             companies: encodedCompanies,
           });
 
+          console.log("Successfully deleted follow-up");
           setPastFollowups(updatedFollowups);
           showSnackbar("Follow-up deleted successfully", "success");
+        } else {
+          console.error("Invalid company index in handleDeleteFollowup:", companyIndex);
         }
+      } else {
+        console.error("Batch doc not found in handleDeleteFollowup");
       }
     } catch (error) {
+      console.error("Error deleting follow-up:", error);
       logError("Error deleting follow-up:", error);
       showSnackbar("Failed to delete follow-up", "error");
     }
@@ -231,6 +261,7 @@ const FollowUpCompany = ({ company, onClose }) => {
     setLoading(true);
 
     try {
+      console.log("Starting handleSubmit for company:", company);
       const followupData = {
         key: Date.now().toString(),
         date,
@@ -254,20 +285,35 @@ const FollowUpCompany = ({ company, onClose }) => {
 
       // Save follow-up to company data
       const lead = company;
+      console.log("Lead object:", lead);
       if (!lead || !lead.batchId) {
         throw new Error("Invalid company data");
       }
 
+      console.log("Fetching batchDoc for batchId:", lead.batchId);
       const batchDocRef = doc(db, "companyleads", lead.batchId);
       const batchDocSnap = await getDoc(batchDocRef);
 
       if (batchDocSnap.exists()) {
+        console.log("Batch doc exists");
         const batchData = batchDocSnap.data();
         const encodedCompanies = batchData.companies || [];
-        const companyIndex = parseInt(lead.id.split('_')[1]);
+        console.log("Encoded companies length:", encodedCompanies.length);
+        const companyIndex = parseInt(lead.id.split('_').pop());
+        console.log("Lead ID:", lead.id, "Parsed companyIndex:", companyIndex);
 
         if (companyIndex >= 0 && companyIndex < encodedCompanies.length) {
-          const decodedCompany = JSON.parse(atob(encodedCompanies[companyIndex]));
+          console.log("Company index is valid, decoding company at index", companyIndex);
+          let jsonString;
+          try {
+            const uriDecoded = atob(encodedCompanies[companyIndex]);
+            jsonString = decodeURIComponent(uriDecoded);
+          } catch (decodeError) {
+            console.log("atob failed, trying decodeURIComponent directly");
+            jsonString = decodeURIComponent(encodedCompanies[companyIndex]);
+          }
+          const decodedCompany = JSON.parse(jsonString);
+          console.log("Decoded company:", decodedCompany);
           const followups = decodedCompany.followups || [];
           const updatedFollowups = [followupData, ...followups];
 
@@ -275,12 +321,15 @@ const FollowUpCompany = ({ company, onClose }) => {
             ...decodedCompany,
             followups: updatedFollowups,
           };
+          console.log("Updated company with new followups");
           encodedCompanies[companyIndex] = btoa(JSON.stringify(updatedCompany));
 
+          console.log("Saving updated batch data to Firestore");
           await setDoc(batchDocRef, {
             ...batchData,
             companies: encodedCompanies,
           });
+          console.log("Successfully saved to Firestore");
 
           setPastFollowups(updatedFollowups);
           showSnackbar("Follow-up scheduled successfully!", "success");
@@ -290,9 +339,16 @@ const FollowUpCompany = ({ company, onClose }) => {
           setTime({ hours: 12, minutes: 0, ampm: "AM" });
           setRemarks("");
           setSendInvite(false);
+        } else {
+          console.error("Invalid company index:", companyIndex, "for array length:", encodedCompanies.length);
+          throw new Error("Company index out of bounds");
         }
+      } else {
+        console.error("Batch document does not exist for batchId:", lead.batchId);
+        throw new Error("Batch document not found");
       }
     } catch (error) {
+      console.error("Error in handleSubmit:", error);
       logError("Error saving follow-up:", error);
       showSnackbar("Failed to schedule follow-up", "error");
     } finally {
