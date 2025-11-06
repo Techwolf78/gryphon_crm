@@ -42,6 +42,7 @@ import {
   FiCornerLeftDown,
 } from "react-icons/fi";
 import InitiationDashboardExportButton from './InitiationDashboardExportButton';
+import InitiationDashboardReportButton from './InitiationDashboardReportButton';
 import ChangeTrainerDashboard from "./ChangeTrainerDashboard";
 import TrainerCalendar from "../TrainerCalendar/TrainerCalendar";
 
@@ -1329,10 +1330,10 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
         ) : (
           <div className="space-y-3">
             {/* Header Section */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-3">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200/50 p-2.5">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
                 <div>
-                  <h1 className="text-xl font-bold text-gray-900 tracking-tight">
+                  <h1 className="text-lg font-bold text-gray-900 tracking-tight">
                     Training Status
                   </h1>
                   <p className="text-gray-600 text-xs mt-0.5">
@@ -1344,13 +1345,13 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
                 <div className="flex flex-col sm:flex-row gap-2">
                   {/* Search */}
                   <div className="relative">
-                    <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <FiSearch className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 w-3.5 h-3.5" />
                     <input
                       type="text"
                       placeholder="Search colleges or domains..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 pr-3 py-1.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all w-full sm:w-52"
+                      className="pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500 transition-all w-full sm:w-48"
                     />
                   </div>
 
@@ -1359,15 +1360,15 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
                     <button
                       ref={filtersBtnRef}
                       onClick={toggleFiltersDropdown}
-                      className={`inline-flex items-center px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${
-                        isAnyFilterActive ? "ring-2 ring-blue-500/20" : ""
+                      className={`inline-flex items-center px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500/20 transition-all ${
+                        isAnyFilterActive ? "ring-1 ring-blue-500/20" : ""
                       }`}
                       aria-label="Open filters"
                     >
-                      <FiFilter className="w-4 h-4 mr-1" />
+                      <FiFilter className="w-3.5 h-3.5 mr-1" />
                       Filters
                       {isAnyFilterActive && (
-                        <span className="ml-1 w-2 h-2 bg-blue-500 rounded-full"></span>
+                        <span className="ml-1 w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
                       )}
                     </button>
 
@@ -1375,33 +1376,51 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
                     {filtersDropdownOpen && (
                       <div
                         ref={filtersDropdownRef}
-                        className="absolute right-0 top-full mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-50"
+                        className="absolute right-0 top-full mt-2 w-72 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-50"
                       >
-                        <div className="space-y-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Phase
-                            </label>
-                            <select
-                              value={filterPhase}
-                              onChange={(e) => setFilterPhase(e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                            >
-                              <option value="all">All Phases</option>
-                              <option value="phase-1">Phase 1</option>
-                              <option value="phase-2">Phase 2</option>
-                              <option value="phase-3">Phase 3</option>
-                            </select>
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Phase
+                              </label>
+                              <select
+                                value={filterPhase}
+                                onChange={(e) => setFilterPhase(e.target.value)}
+                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500"
+                              >
+                                <option value="all">All Phases</option>
+                                <option value="phase-1">Phase 1</option>
+                                <option value="phase-2">Phase 2</option>
+                                <option value="phase-3">Phase 3</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Health
+                              </label>
+                              <select
+                                value={activeHealthTab}
+                                onChange={(e) => setActiveHealthTab(e.target.value)}
+                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500"
+                              >
+                                <option value="all">All</option>
+                                <option value="low">Low (&lt;20%)</option>
+                                <option value="medium">Medium</option>
+                                <option value="high">High (&gt;50%)</option>
+                              </select>
+                            </div>
                           </div>
 
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
                               Assigned To
                             </label>
                             <select
                               value={selectedUserFilter}
                               onChange={(e) => setSelectedUserFilter(e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                              className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500"
                             >
                               <option value={defaultSelectedUserFilter}>
                                 {defaultSelectedUserFilter === "all" ? "All Users" : "Me"}
@@ -1416,59 +1435,43 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
                             </select>
                           </div>
 
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Health Filter
-                            </label>
-                            <select
-                              value={activeHealthTab}
-                              onChange={(e) => setActiveHealthTab(e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                            >
-                              <option value="all">All Health</option>
-                              <option value="low">Low (&lt; 20%)</option>
-                              <option value="medium">Medium (20-50%)</option>
-                              <option value="high">High (&gt; 50%)</option>
-                            </select>
-                          </div>
-
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
                                 Start Date
                               </label>
                               <input
                                 type="date"
                                 value={dateFilterStart}
                                 onChange={(e) => setDateFilterStart(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500"
                               />
                             </div>
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
                                 End Date
                               </label>
                               <input
                                 type="date"
                                 value={dateFilterEnd}
                                 onChange={(e) => setDateFilterEnd(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500"
                               />
                             </div>
                           </div>
 
-                          <div className="flex justify-between pt-2">
+                          <div className="flex justify-between items-center pt-1">
                             <button
                               onClick={clearAllFilters}
-                              className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+                              className="text-xs text-gray-500 hover:text-gray-700 transition-colors px-2 py-1"
                             >
                               Clear All
                             </button>
                             <button
                               onClick={applyFilters}
-                              className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                              className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
                             >
-                              Apply Filters
+                              Apply
                             </button>
                           </div>
                         </div>
@@ -1480,40 +1483,41 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
                   <button
                     onClick={handleRefresh}
                     disabled={refreshing}
-                    className="inline-flex items-center px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex items-center px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <FiRefreshCw
-                      className={`w-4 h-4 mr-1 ${refreshing ? "animate-spin" : ""}`}
+                      className={`w-3.5 h-3.5 mr-1 ${refreshing ? "animate-spin" : ""}`}
                     />
                     Refresh
                   </button>
                 </div>
-                <div className="mt-2 lg:mt-0 flex items-center gap-3">
-                  <div className="flex items-center">
+                <div className="mt-2 lg:mt-0 flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     <InitiationDashboardExportButton trainings={trainings} />
+                    <InitiationDashboardReportButton trainings={trainings} />
                   </div>
-                  <div className="w-px h-6 bg-gray-300"></div>
+                  <div className="w-px h-4 bg-gray-300"></div>
                   <button
                     type="button"
                     onClick={() => {
                       setTrainerCalendarTraining(null);
                       setShowTrainerCalendar(true);
                     }}
-                    className="inline-flex items-center px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-all shadow-sm hover:shadow-md"
+                    className="inline-flex items-center px-2.5 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-all shadow-sm hover:shadow-md"
                   >
-                    <FiCalendar className="mr-2 w-4 h-4" /> Trainer Calendar
+                    <FiCalendar className="mr-1.5 w-3.5 h-3.5" /> Calendar
                   </button>
                 </div>
               </div>
 
               {/* Status Tabs (Not Started, Initiated, Hold, In Progress, Done) */}
-              <div className="mt-3">
-                <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-3">
+              <div className="mt-2">
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-1.5 mb-2">
                   {Object.keys(STATUS_LABELS).map((key) => (
                     <button
                       key={key}
                       onClick={() => setActiveStatusTab(key)}
-                      className={`py-2 rounded-xl text-sm font-semibold transition-all ${
+                      className={`py-1.5 px-2 rounded-lg text-xs font-semibold transition-all ${
                         activeStatusTab === key
                           ? key !== "all" && STATUS_UI[key]
                             ? STATUS_UI[key].tabActive
@@ -1537,73 +1541,73 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
 
             {/* Statistics Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200/50 p-3">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200/50 p-2.5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-gray-600 text-sm font-medium">
+                    <p className="text-gray-600 text-xs font-medium">
                       Total Colleges
                     </p>
-                    <p className="text-2xl font-bold text-gray-900 mt-1">
+                    <p className="text-xl font-bold text-gray-900 mt-0.5">
                       {Object.keys(filteredGrouped).length}
                     </p>
                   </div>
-                  <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-                    <FiBookOpen className="w-5 h-5 text-blue-600" />
+                  <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
+                    <FiBookOpen className="w-4 h-4 text-blue-600" />
                   </div>
                 </div>
               </div>
 
               {/* Replaced Active Phases with Total Hours */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200/50 p-3">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200/50 p-2.5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-gray-600 text-sm font-medium">
+                    <p className="text-gray-600 text-xs font-medium">
                       Total Hours
                     </p>
-                    <p className="text-2xl font-bold text-gray-900 mt-1">
+                    <p className="text-xl font-bold text-gray-900 mt-0.5">
                       {trainings
                         .reduce((acc, t) => acc + (t.totaltraininghours || 0), 0)}
                     </p>
                   </div>
-                  <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center">
-                    <FiClock className="w-5 h-5 text-indigo-600" />
+                  <div className="w-8 h-8 bg-indigo-50 rounded-lg flex items-center justify-center">
+                    <FiClock className="w-4 h-4 text-indigo-600" />
                   </div>
                 </div>
               </div>
 
               {/* Replaced Total Batches with Total Cost */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200/50 p-3">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200/50 p-2.5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-gray-600 text-sm font-medium">
+                    <p className="text-gray-600 text-xs font-medium">
                       Total Cost
                     </p>
-                    <p className="text-2xl font-bold text-gray-900 mt-1">
+                    <p className="text-xl font-bold text-gray-900 mt-0.5">
                       ₹
                       {trainings
                         .reduce((acc, t) => acc + (t.totalCost || 0), 0)
                         .toLocaleString('en-IN')}
                     </p>
                   </div>
-                  <div className="w-10 h-10 bg-yellow-50 rounded-lg flex items-center justify-center">
-                    <FiDollarSign className="w-5 h-5 text-yellow-600" />
+                  <div className="w-8 h-8 bg-yellow-50 rounded-lg flex items-center justify-center">
+                    <FiDollarSign className="w-4 h-4 text-yellow-600" />
                   </div>
                 </div>
               </div>
 
               {/* Overall Health */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200/50 p-3">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200/50 p-2.5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-gray-600 text-sm font-medium">
+                    <p className="text-gray-600 text-xs font-medium">
                       Overall Health
                     </p>
-                    <p className="text-2xl font-bold text-gray-900 mt-1">
+                    <p className="text-xl font-bold text-gray-900 mt-0.5">
                       {overallHealth.toFixed(1)}%
                     </p>
                   </div>
-                  <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
-                    <FiTrendingUp className="w-5 h-5 text-green-600" />
+                  <div className="w-8 h-8 bg-green-50 rounded-lg flex items-center justify-center">
+                    <FiTrendingUp className="w-4 h-4 text-green-600" />
                   </div>
                 </div>
               </div>

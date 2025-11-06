@@ -38,7 +38,7 @@ const handleFirestoreIndexError = (error, operation = "operation") => {
 // 8. Add 500ms delay between batches to prevent overwhelming Firestore write stream
 // 9. Log progress: "✅ Uploaded batch_1 (1500 records)"
 // 10. Handle 58,000 records safely without exceeding Firestore limits
-export const uploadCompaniesFromExcel = async (file, onProgress = null) => {
+export const uploadCompaniesFromExcel = async (file, onProgress = null, assigneeId = null) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
@@ -76,23 +76,34 @@ export const uploadCompaniesFromExcel = async (file, onProgress = null) => {
         }
 
         // 2. Convert each row to company object
-        const companies = jsonData.map(row => ({
-          name: row['CompanyName'] || row['Company Name'] || row['companyName'] || row['company_name'] || '',
-          contactPerson: row['ContactPerson'] || row['Contact Person'] || row['contactPerson'] || row['contact_person'] || '',
-          designation: row['Designation'] || row['designation'] || '',
-          phone: row['Phone'] || row['phone'] || row['Phone Number'] || row['phone_number'] || '',
-          companyUrl: row['CompanyUrl'] || row['Company URL'] || row['Company Url'] || row['companyUrl'] || row['company_url'] || '',
-          linkedinUrl: row['LinkedinUrl'] || row['LinkedIn URL'] || row['LinkedIn Url'] || row['linkedinUrl'] || row['linkedin_url'] || '',
-          // Additional fields that may be in Excel
-          email: row['Email'] || row['email'] || '',
-          location: row['Location'] || row['location'] || '',
-          industry: row['Industry'] || row['industry'] || '',
-          companySize: row['CompanySize'] || row['Company Size'] || row['companySize'] || row['company_size'] || '',
-          source: row['Source'] || row['source'] || 'Excel Upload',
-          notes: row['Notes'] || row['notes'] || '',
-          status: row['Status'] || row['status'] || 'cold',
-          contacts: [], // Initialize empty contacts array
-        }));
+        const companies = jsonData.map(row => {
+          const company = {
+            name: row['CompanyName'] || row['Company Name'] || row['companyName'] || row['company_name'] || '',
+            contactPerson: row['ContactPerson'] || row['Contact Person'] || row['contactPerson'] || row['contact_person'] || '',
+            designation: row['Designation'] || row['designation'] || '',
+            phone: row['Phone'] || row['phone'] || row['Phone Number'] || row['phone_number'] || '',
+            companyUrl: row['CompanyUrl'] || row['Company URL'] || row['Company Url'] || row['companyUrl'] || row['company_url'] || '',
+            linkedinUrl: row['LinkedinUrl'] || row['LinkedIn URL'] || row['LinkedIn Url'] || row['linkedinUrl'] || row['linkedin_url'] || '',
+            // Additional fields that may be in Excel
+            email: row['Email'] || row['email'] || '',
+            location: row['Location'] || row['location'] || '',
+            industry: row['Industry'] || row['industry'] || '',
+            companySize: row['CompanySize'] || row['Company Size'] || row['companySize'] || row['company_size'] || '',
+            source: row['Source'] || row['source'] || 'Excel Upload',
+            notes: row['Notes'] || row['notes'] || '',
+            status: row['Status'] || row['status'] || 'cold',
+            contacts: [], // Initialize empty contacts array
+          };
+
+          // If assigneeId is provided, assign the company to that user
+          if (assigneeId) {
+            company.assignedTo = assigneeId;
+            company.assignedBy = assigneeId; // Assuming the uploader is assigning to themselves
+            company.assignedAt = new Date().toISOString();
+          }
+
+          return company;
+        });
 
         console.log("🔄 Converting companies to Base64 encoded JSON strings...");
 

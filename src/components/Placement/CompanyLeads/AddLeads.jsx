@@ -405,29 +405,65 @@ function AddLeads({ show, onClose, onAddLead }) {
   // Check for duplicate contacts (same email AND phone)
   const checkDuplicateContact = async (pocEmail, pocPhone) => {
     try {
-      // Get all company batches
-      const batchesQuery = query(collection(db, "companyleads"));
+      // Only check if both email and phone are provided
+      if (!pocEmail?.trim() || !pocPhone?.trim()) {
+        return { isDuplicate: false };
+      }
+
+      // Get all company batches (limit to recent batches for performance)
+      const batchesQuery = query(
+        collection(db, "companyleads"),
+        orderBy("uploadedAt", "desc"),
+        limit(10) // Only check the 10 most recent batches
+      );
       const batchesSnapshot = await getDocs(batchesQuery);
-      
+
       for (const batchDoc of batchesSnapshot.docs) {
         const batchData = batchDoc.data();
-        
+
         if (batchData.companies && Array.isArray(batchData.companies)) {
           for (const encodedCompany of batchData.companies) {
             try {
-              // Decode the base64 company data
-              const decodedCompany = JSON.parse(decodeURIComponent(atob(encodedCompany)));
-              
+              // Skip if encodedCompany is not a string or is empty
+              if (typeof encodedCompany !== 'string' || !encodedCompany.trim()) {
+                continue;
+              }
+
+              // Decode the base64 company data with better error handling
+              let decodedCompany;
+              try {
+                const uriDecoded = atob(encodedCompany);
+                const jsonString = decodeURIComponent(uriDecoded);
+                decodedCompany = JSON.parse(jsonString);
+              } catch (decodeError) {
+                // If decoding fails, try direct JSON parse (for legacy data)
+                try {
+                  decodedCompany = JSON.parse(encodedCompany);
+                } catch {
+                  console.warn("Skipping corrupted company data in batch:", batchDoc.id, decodeError);
+                  continue; // Skip this corrupted entry
+                }
+              }
+
+              // Ensure decodedCompany is an object
+              if (!decodedCompany || typeof decodedCompany !== 'object') {
+                continue;
+              }
+
               // Check for duplicate email AND phone (both must match)
-              const emailMatch = pocEmail && pocEmail.trim() && decodedCompany.email && decodedCompany.email.trim().toLowerCase() === pocEmail.trim().toLowerCase();
-              const phoneMatch = pocPhone && pocPhone.trim() && decodedCompany.phone && decodedCompany.phone.trim() === pocPhone.trim();
-              
+              const existingEmail = decodedCompany.email || decodedCompany.pocMail || '';
+              const existingPhone = decodedCompany.phone || decodedCompany.pocPhone || '';
+
+              const emailMatch = existingEmail.trim().toLowerCase() === pocEmail.trim().toLowerCase();
+              const phoneMatch = existingPhone.trim() === pocPhone.trim();
+
               if (emailMatch && phoneMatch) {
-                return { 
-                  isDuplicate: true, 
-                  message: `A contact with the same email "${pocEmail}" and phone number "${pocPhone}" already exists in company "${decodedCompany.name}". Do you want to add this entry anyway?`,
+                const companyName = decodedCompany.name || decodedCompany.companyName || 'Unknown Company';
+                return {
+                  isDuplicate: true,
+                  message: `A contact with the same email "${pocEmail}" and phone number "${pocPhone}" already exists in company "${companyName}". Do you want to add this entry anyway?`,
                   duplicateType: 'both',
-                  existingCompany: decodedCompany.name
+                  existingCompany: companyName
                 };
               }
             } catch (decodeError) {
@@ -437,7 +473,7 @@ function AddLeads({ show, onClose, onAddLead }) {
           }
         }
       }
-      
+
       return { isDuplicate: false };
     } catch (error) {
       console.error("Error checking for duplicates:", error);

@@ -86,6 +86,58 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   // Debounced search term for performance
   const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
 
+  // View mode state with localStorage persistence
+  const [viewMyLeadsOnly, setViewMyLeadsOnly] = useState(() => {
+    const saved = localStorage.getItem("placementViewMyLeadsOnly");
+    return saved !== null ? JSON.parse(saved) : false; // Default to "My Team" view
+  });
+
+  // Users data for hierarchical team logic
+  const [allUsers, setAllUsers] = useState({});
+
+  // Persist view mode to localStorage
+  useEffect(() => {
+    localStorage.setItem("placementViewMyLeadsOnly", JSON.stringify(viewMyLeadsOnly));
+  }, [viewMyLeadsOnly]);
+
+  // Fetch all users for hierarchical team logic
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const usersQuery = query(collection(db, "users"));
+        const usersSnapshot = await getDocs(usersQuery);
+        const usersData = {};
+        usersSnapshot.forEach((doc) => {
+          usersData[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        setAllUsers(usersData);
+      } catch (error) {
+        console.error("Error fetching users:", error);
+      }
+    };
+
+    if (user) {
+      fetchUsers();
+    }
+  }, [user]);
+
+  // Get team member IDs recursively (hierarchical)
+  const getTeamMemberIds = useCallback((managerUid, users = allUsers) => {
+    const teamIds = new Set();
+    
+    // Find all direct reports
+    Object.values(users).forEach(userData => {
+      if (userData.reportingManager === managerUid) {
+        teamIds.add(userData.id || userData.uid);
+        // Recursively get their team members
+        const subTeamIds = getTeamMemberIds(userData.id || userData.uid, users);
+        subTeamIds.forEach(id => teamIds.add(id));
+      }
+    });
+    
+    return Array.from(teamIds);
+  }, [allUsers]);
+
   // Caching constants
   const CACHE_KEY = 'companyLeadsCache';
   const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
@@ -159,10 +211,21 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
       console.log(`✅ Loaded ${allCompanies.length} companies from ${querySnapshot.docs.length} batches`);
       
-      // Filter leads by current user (show leads assigned to current user OR unassigned leads)
-      const userLeads = user ? allCompanies.filter(lead => !lead.assignedTo || lead.assignedTo === user.uid) : allCompanies;
+      // Filter leads by current user based on view mode
+      const userLeads = user ? allCompanies.filter(lead => {
+        if (viewMyLeadsOnly) {
+          // My Leads: Only show leads assigned to current user
+          return lead.assignedTo === user.uid;
+        } else {
+          // My Team: Show leads assigned to current user, their team members, OR unassigned leads
+          const teamMemberIds = getTeamMemberIds(user.uid);
+          return !lead.assignedTo || 
+                 lead.assignedTo === user.uid || 
+                 teamMemberIds.includes(lead.assignedTo);
+        }
+      }) : allCompanies;
       
-      console.log(`✅ Filtered to ${userLeads.length} leads for user ${user?.uid || 'guest'}`);
+      console.log(`✅ Filtered to ${userLeads.length} leads for user ${user?.uid || 'guest'} (${viewMyLeadsOnly ? 'My Leads' : 'My Team'} view)`);
       setLeads(userLeads);
 
       // Cache the data (with error handling for quota limits)
@@ -196,8 +259,19 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           assignedTo: doc.data().assignedTo || null,
         }));
         
-        // Filter leads by current user for fallback collection too (show assigned OR unassigned)
-        const userLeadsFallback = user ? leadsData.filter(lead => !lead.assignedTo || lead.assignedTo === user.uid) : leadsData;
+        // Filter leads by current user for fallback collection too
+        const userLeadsFallback = user ? leadsData.filter(lead => {
+          if (viewMyLeadsOnly) {
+            // My Leads: Only show leads assigned to current user
+            return lead.assignedTo === user.uid;
+          } else {
+            // My Team: Show leads assigned to current user, their team members, OR unassigned leads
+            const teamMemberIds = getTeamMemberIds(user.uid);
+            return !lead.assignedTo || 
+                   lead.assignedTo === user.uid || 
+                   teamMemberIds.includes(lead.assignedTo);
+          }
+        }) : leadsData;
         
         setLeads(userLeadsFallback);
         console.log("✅ Successfully loaded data from fallback collection");
@@ -214,7 +288,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, viewMyLeadsOnly, getTeamMemberIds]);
 
   // Load data from cache or fetch from Firestore
   const loadData = useCallback(async () => {
@@ -224,9 +298,20 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         const { data, timestamp } = JSON.parse(cached);
         if (Date.now() - timestamp < CACHE_DURATION) {
           console.log("✅ Loaded data from cache");
-          // Filter cached data by current user (show assigned OR unassigned leads)
-          const userLeads = user ? data.filter(lead => !lead.assignedTo || lead.assignedTo === user.uid) : data;
-          console.log(`✅ Filtered cached data to ${userLeads.length} leads for user ${user?.uid || 'guest'}`);
+          // Filter cached data by current user based on view mode
+          const userLeads = user ? data.filter(lead => {
+            if (viewMyLeadsOnly) {
+              // My Leads: Only show leads assigned to current user
+              return lead.assignedTo === user.uid;
+            } else {
+              // My Team: Show leads assigned to current user, their team members, OR unassigned leads
+              const teamMemberIds = getTeamMemberIds(user.uid);
+              return !lead.assignedTo || 
+                     lead.assignedTo === user.uid || 
+                     teamMemberIds.includes(lead.assignedTo);
+            }
+          }) : data;
+          console.log(`✅ Filtered cached data to ${userLeads.length} leads for user ${user?.uid || 'guest'} (${viewMyLeadsOnly ? 'My Leads' : 'My Team'} view)`);
           setLeads(userLeads);
           setLoading(false);
           return;
@@ -239,7 +324,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       // Fallback to fetch
       await fetchLeads();
     }
-  }, [fetchLeads, CACHE_DURATION, user]);
+  }, [fetchLeads, CACHE_DURATION, user, viewMyLeadsOnly, getTeamMemberIds]);
 
   // Initial fetch on component mount
   useEffect(() => {
@@ -592,6 +677,36 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     }
   }, []);
 
+  // View Mode Toggle Component
+  const ViewModeToggle = () => {
+    return (
+      <div className="flex gap-2">
+        <button
+          onClick={() => setViewMyLeadsOnly(true)}
+          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${
+            viewMyLeadsOnly
+              ? "bg-blue-600 text-white border-blue-600 shadow-md"
+              : "bg-white text-blue-600 border-blue-300 hover:bg-blue-50"
+          }`}
+          aria-label="Show only my leads"
+        >
+          My Leads
+        </button>
+        <button
+          onClick={() => setViewMyLeadsOnly(false)}
+          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${
+            !viewMyLeadsOnly
+              ? "bg-blue-600 text-white border-blue-600 shadow-md"
+              : "bg-white text-blue-600 border-blue-300 hover:bg-blue-50"
+          }`}
+          aria-label="Show my team's leads"
+        >
+          My Team
+        </button>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="bg-white rounded-lg shadow p-4 flex justify-center items-center h-64">
@@ -674,12 +789,50 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
   return (
     <div className="bg-white rounded-lg shadow p-4">
-      <LeadsHeader
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-        onAddLead={() => setShowAddLeadForm(true)}
-        onBulkUpload={() => setShowBulkUploadForm(true)}
-      />
+      {/* Header with View Toggle on Left, Search in Center, Actions on Right */}
+      <div className="flex items-center justify-between mb-4 gap-4">
+        {/* View Mode Toggle on Left */}
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-sm font-medium text-gray-700">View:</span>
+          <ViewModeToggle />
+        </div>
+
+        {/* Search Input in Center */}
+        <div className="flex-1 max-w-md mx-auto">
+          <input
+            type="text"
+            placeholder="Search companies or contacts..."
+            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+
+        {/* Action Buttons on Right */}
+        <div className="flex gap-2 shrink-0">
+          <button
+            onClick={() => setShowAddLeadForm(true)}
+            className="px-3 py-2 text-white rounded-lg font-semibold flex items-center justify-center focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md relative overflow-hidden text-sm"
+          >
+            <span className="absolute inset-0 bg-linear-to-r from-blue-600 to-indigo-700 opacity-100 hover:opacity-90 transition-opacity duration-200 z-0"></span>
+            <span className="relative z-10 flex items-center">
+              <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              Add Company
+            </span>
+          </button>
+          <button
+            onClick={() => setShowBulkUploadForm(true)}
+            className="px-3 py-2 bg-green-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-md text-sm"
+          >
+            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            Bulk Upload
+          </button>
+        </div>
+      </div>
 
       <LeadsFilters
         activeTab={activeTab}
@@ -789,6 +942,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       <BulkUploadModal
         show={showBulkUploadForm}
         onClose={() => setShowBulkUploadForm(false)}
+        assigneeId={user?.uid}
       />
 
       {/* Add Leads Modal */}

@@ -3,10 +3,11 @@ import { XIcon, CloudUploadIcon } from "@heroicons/react/outline";
 import * as XLSX from 'xlsx';
 import { uploadCompaniesFromExcel } from '../../../utils/excelUpload';
 
-function BulkUploadModal({ show, onClose }) {
+function BulkUploadModal({ show, onClose, assigneeId = null }) {
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [assignToMe, setAssignToMe] = useState(false);
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
@@ -45,19 +46,26 @@ function BulkUploadModal({ show, onClose }) {
     try {
       console.log("🚀 Starting Excel upload process...");
 
+      // Determine assignee ID
+      const finalAssigneeId = assignToMe && assigneeId ? assigneeId : null;
+      if (finalAssigneeId) {
+        console.log("👤 Leads will be assigned to user:", finalAssigneeId);
+      }
+
       // Use the new uploadCompaniesFromExcel function
       const result = await uploadCompaniesFromExcel(file, (progressPercent) => {
         setProgress(progressPercent);
-      });
+      }, finalAssigneeId);
 
       console.log("🎊 Upload completed successfully!");
       console.log(`📈 Summary: ${result.totalCompanies} companies uploaded in ${result.totalBatches} batches`);
 
       setProgress(100);
-      alert(`Successfully uploaded ${result.totalCompanies} companies in ${result.totalBatches} batches!`);
+      alert(`Successfully uploaded ${result.totalCompanies} companies in ${result.totalBatches} batches!${finalAssigneeId ? ' Leads have been assigned to you.' : ''}`);
 
       setUploading(false);
       setFile(null);
+      setAssignToMe(false);
       onClose();
 
     } catch (error) {
@@ -71,8 +79,8 @@ function BulkUploadModal({ show, onClose }) {
 
   return (
     <div className="fixed inset-0 z-54 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
-        <div className="bg-linear-to-r from-green-600 to-green-700 px-6 py-4 flex justify-between items-center">
+      <div className="bg-white w-full max-w-md rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
+        <div className="bg-linear-to-r from-green-600 to-green-700 px-6 py-4 flex justify-between items-center shrink-0">
           <h2 className="text-xl font-semibold text-white">Bulk Upload Companies</h2>
           <button
             onClick={onClose}
@@ -82,7 +90,7 @@ function BulkUploadModal({ show, onClose }) {
           </button>
         </div>
 
-        <div className="p-6">
+        <div className="flex-1 overflow-y-auto p-6">
           <div className="mb-4">
             <div className="flex justify-between items-center mb-2">
               <label className="block text-sm font-medium text-gray-700">
@@ -102,6 +110,23 @@ function BulkUploadModal({ show, onClose }) {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
             />
           </div>
+
+          {assigneeId && (
+            <div className="mb-4">
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={assignToMe}
+                  onChange={(e) => setAssignToMe(e.target.checked)}
+                  className="mr-2 h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                />
+                <span className="text-sm text-gray-700">Assign all leads to me</span>
+              </label>
+              <p className="text-xs text-gray-500 mt-1">
+                When checked, all uploaded leads will be assigned to your account immediately.
+              </p>
+            </div>
+          )}
 
           {uploading && (
             <div className="mb-4">
@@ -160,7 +185,7 @@ function BulkUploadModal({ show, onClose }) {
           </div>
         </div>
 
-        <div className="bg-gray-50 px-6 py-4 flex justify-end">
+        <div className="bg-gray-50 px-6 py-4 flex justify-end shrink-0">
           <div className="flex space-x-3">
             <button
               onClick={onClose}
