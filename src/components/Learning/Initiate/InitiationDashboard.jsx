@@ -1165,28 +1165,28 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-3">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
                 <div>
-                  <div className="h-6 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-48 mb-1"></div>
-                  <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-64"></div>
+                  <div className="h-6 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-48 mb-1"></div>
+                  <div className="h-4 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-64"></div>
                 </div>
 
                 {/* Controls Skeleton */}
                 <div className="flex flex-col sm:flex-row gap-2">
                   {/* Search Skeleton */}
                   <div className="relative">
-                    <div className="h-9 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-xl animate-pulse w-full sm:w-52"></div>
+                    <div className="h-9 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded-xl animate-pulse w-full sm:w-52"></div>
                   </div>
 
                   {/* Filters Button Skeleton */}
-                  <div className="h-9 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-xl animate-pulse w-20"></div>
+                  <div className="h-9 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded-xl animate-pulse w-20"></div>
 
                   {/* Refresh Button Skeleton */}
-                  <div className="h-9 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-xl animate-pulse w-20"></div>
+                  <div className="h-9 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded-xl animate-pulse w-20"></div>
                 </div>
 
                 <div className="mt-2 lg:mt-0 flex items-center gap-3">
-                  <div className="h-9 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-24"></div>
+                  <div className="h-9 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-24"></div>
                   <div className="w-px h-6 bg-gray-300"></div>
-                  <div className="h-9 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded-lg animate-pulse w-32"></div>
+                  <div className="h-9 bg-linear-to-r from-blue-200 via-blue-100 to-blue-200 rounded-lg animate-pulse w-32"></div>
                 </div>
               </div>
 
@@ -1194,7 +1194,7 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
               <div className="mt-3">
                 <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-3">
                   {[...Array(6)].map((_, index) => (
-                    <div key={index} className="h-10 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-xl animate-pulse"></div>
+                    <div key={index} className="h-10 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded-xl animate-pulse"></div>
                   ))}
                 </div>
               </div>
@@ -1206,10 +1206,10 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
                 <div key={index} className="bg-white rounded-xl shadow-sm border border-gray-200/50 p-4 h-full">
                   <div className="flex items-center justify-between h-full">
                     <div className="flex-1 min-w-0">
-                      <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-20 mb-2"></div>
-                      <div className="h-7 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-12"></div>
+                      <div className="h-4 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-20 mb-2"></div>
+                      <div className="h-7 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-12"></div>
                     </div>
-                    <div className="w-10 h-10 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-lg animate-pulse flex-shrink-0 ml-3"></div>
+                    <div className="w-10 h-10 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded-lg animate-pulse shrink-0 ml-3"></div>
                   </div>
                 </div>
               ))}
@@ -1219,13 +1219,13 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
             {[...Array(3)].map((_, collegeIndex) => (
               <div key={collegeIndex} className="bg-white rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden">
                 {/* College Header Skeleton */}
-                <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3 min-h-[3rem]">
+                <div className="bg-linear-to-r from-blue-600 to-blue-700 px-4 py-3 min-h-12">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
-                      <div className="h-5 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-48 mb-1"></div>
-                      <div className="h-4 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-full max-w-md"></div>
+                      <div className="h-5 bg-linear-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-48 mb-1"></div>
+                      <div className="h-4 bg-linear-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-full max-w-md"></div>
                     </div>
-                    <div className="w-6 h-6 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse flex-shrink-0 ml-3"></div>
+                    <div className="w-6 h-6 bg-linear-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse shrink-0 ml-3"></div>
                   </div>
                 </div>
 
@@ -1236,7 +1236,7 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
                       <tr>
                         {[...Array(7)].map((_, headerIndex) => (
                           <th key={headerIndex} className="px-4 py-3 text-left">
-                            <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-16"></div>
+                            <div className="h-4 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-16"></div>
                           </th>
                         ))}
                       </tr>
@@ -1246,33 +1246,33 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
                         <tr key={rowIndex} className="hover:bg-blue-50/30">
                           <td className="px-4 py-3 whitespace-nowrap">
                             <div className="flex items-center">
-                              <div className="w-8 h-8 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded-lg animate-pulse mr-3 flex-shrink-0"></div>
-                              <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-16"></div>
+                              <div className="w-8 h-8 bg-linear-to-r from-blue-200 via-blue-100 to-blue-200 rounded-lg animate-pulse mr-3 shrink-0"></div>
+                              <div className="h-4 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-16"></div>
                             </div>
                           </td>
                           <td className="px-4 py-3">
-                            <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-24"></div>
+                            <div className="h-4 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-24"></div>
                           </td>
                           <td className="px-4 py-3">
-                            <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-20"></div>
+                            <div className="h-4 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-20"></div>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <div className="flex items-center">
-                              <div className="w-4 h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse mr-2 flex-shrink-0"></div>
-                              <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-8"></div>
+                              <div className="w-4 h-4 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse mr-2 shrink-0"></div>
+                              <div className="h-4 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-8"></div>
                             </div>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
-                            <div className="h-6 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded-full animate-pulse w-20"></div>
+                            <div className="h-6 bg-linear-to-r from-blue-200 via-blue-100 to-blue-200 rounded-full animate-pulse w-20"></div>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <div className="flex items-center">
-                              <div className="w-4 h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse mr-2 flex-shrink-0"></div>
-                              <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-16"></div>
+                              <div className="w-4 h-4 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse mr-2 shrink-0"></div>
+                              <div className="h-4 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-16"></div>
                             </div>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-right">
-                            <div className="h-8 w-8 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-full animate-pulse ml-auto"></div>
+                            <div className="h-8 w-8 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded-full animate-pulse ml-auto"></div>
                           </td>
                         </tr>
                       ))}
@@ -1286,28 +1286,28 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
                     <div key={cardIndex} className="p-4 hover:bg-blue-50/30">
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center flex-1 min-w-0">
-                          <div className="w-8 h-8 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded-xl animate-pulse mr-2 flex-shrink-0"></div>
+                          <div className="w-8 h-8 bg-linear-to-r from-blue-200 via-blue-100 to-blue-200 rounded-xl animate-pulse mr-2 shrink-0"></div>
                           <div className="flex-1 min-w-0">
-                            <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-16 mb-1"></div>
-                            <div className="h-5 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded-full animate-pulse w-20"></div>
+                            <div className="h-4 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-16 mb-1"></div>
+                            <div className="h-5 bg-linear-to-r from-blue-200 via-blue-100 to-blue-200 rounded-full animate-pulse w-20"></div>
                           </div>
                         </div>
-                        <div className="w-4 h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse flex-shrink-0 ml-2"></div>
+                        <div className="w-4 h-4 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse shrink-0 ml-2"></div>
                       </div>
 
                       <div className="space-y-2">
                         {[...Array(4)].map((_, fieldIndex) => (
                           <div key={fieldIndex}>
-                            <div className="h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-12 mb-1"></div>
-                            <div className={`h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse ${fieldIndex === 0 ? 'w-24' : fieldIndex === 1 ? 'w-32' : fieldIndex === 2 ? 'w-16' : 'w-20'}`}></div>
+                            <div className="h-3 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-12 mb-1"></div>
+                            <div className={`h-3 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse ${fieldIndex === 0 ? 'w-24' : fieldIndex === 1 ? 'w-32' : fieldIndex === 2 ? 'w-16' : 'w-20'}`}></div>
                           </div>
                         ))}
                       </div>
 
                       <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
-                        <div className="flex-1 h-8 bg-gradient-to-r from-green-200 via-green-100 to-green-200 rounded-lg animate-pulse"></div>
-                        <div className="flex-1 h-8 bg-gradient-to-r from-amber-200 via-amber-100 to-amber-200 rounded-lg animate-pulse"></div>
-                        <div className="flex-1 h-8 bg-gradient-to-r from-red-200 via-red-100 to-red-200 rounded-lg animate-pulse"></div>
+                        <div className="flex-1 h-8 bg-linear-to-r from-green-200 via-green-100 to-green-200 rounded-lg animate-pulse"></div>
+                        <div className="flex-1 h-8 bg-linear-to-r from-amber-200 via-amber-100 to-amber-200 rounded-lg animate-pulse"></div>
+                        <div className="flex-1 h-8 bg-linear-to-r from-red-200 via-red-100 to-red-200 rounded-lg animate-pulse"></div>
                       </div>
                     </div>
                   ))}
@@ -1634,7 +1634,7 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
                     className="bg-white rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden"
                   >
                     {/* College Header */}
-                    <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3">
+                    <div className="bg-linear-to-r from-blue-600 to-blue-700 px-4 py-3">
                       <div className="flex items-center justify-between">
                         <div>
                           <h2 className="text-lg font-bold text-white">
@@ -2327,7 +2327,7 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
         <div className="fixed bottom-4 right-4 z-50">
           <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-4 max-w-sm">
             <div className="flex items-start">
-              <div className="flex-shrink-0">
+              <div className="shrink-0">
                 {toast.type === "jd_edit_restricted" ? (
                   <FiX className="w-5 h-5 text-red-500" />
                 ) : (
@@ -2345,7 +2345,7 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
                 )}
               </div>
               {toast.type !== "jd_edit_restricted" && (
-                <div className="ml-3 flex-shrink-0">
+                <div className="ml-3 shrink-0">
                   <button
                     onClick={toast.type === "assignment" ? _handleUndoAssignment : handleUndo}
                     className="text-xs text-blue-600 hover:text-blue-800 font-medium"

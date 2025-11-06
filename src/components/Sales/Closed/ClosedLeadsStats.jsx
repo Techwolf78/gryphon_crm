@@ -25,7 +25,9 @@ const ClosedLeadsStats = ({
   showDirectorLeads,
   shouldShowDepartmentToggle,
 }) => {
-  const selectedFY = propSelectedFY || getCurrentFinancialYear();
+  // Convert short FY format (2025-26) to full format (2025-2026) for target matching
+  const selectedFYFull = propSelectedFY ? `${propSelectedFY.split('-')[0]}-${parseInt(propSelectedFY.split('-')[1]) + 2000}` : getCurrentFinancialYear();
+  const selectedFY = selectedFYFull;
 
   // Remove GST toggle - always show without GST
   // const [showWithGST, setShowWithGST] = useState(false);
@@ -36,13 +38,23 @@ const ClosedLeadsStats = ({
 
   const isManager = userObj?.role === "Manager";
 
+  const isSalesUser = (user) => {
+    return (
+      user.department === "Sales" || 
+      (Array.isArray(user.department) && user.department.includes("Sales")) ||
+      user.departments === "Sales" ||
+      (Array.isArray(user.departments) && user.departments.includes("Sales"))
+    );
+  };
+
   const teamMembers = useMemo(() => {
+
     if (isAdminOrDirector) {
       let members = Object.values(users).filter(
         (u) =>
           ["Head", "Manager", "Assistant Manager", "Executive"].includes(
             u.role
-          ) && u.department === "Sales"
+          ) && isSalesUser(u)
       );
 
       // Include Admin Directors when department filter is ON
@@ -56,14 +68,14 @@ const ClosedLeadsStats = ({
       return members;
     } else if (isHead) {
       return Object.values(users).filter(
-        (u) => ["Manager"].includes(u.role) && u.department === "Sales"
+        (u) => ["Manager"].includes(u.role) && isSalesUser(u)
       );
     } else if (isManager) {
       return Object.values(users).filter(
         (u) =>
           ["Assistant Manager", "Executive"].includes(u.role) &&
           u.reportingManager === userObj.name &&
-          u.department === "Sales"
+          isSalesUser(u)
       );
     }
     return [];
@@ -98,12 +110,21 @@ const ClosedLeadsStats = ({
     return "Q4";
   };
 
-  const getAchievedAmount = useMemo(() => (uid, quarter) => {
+  const getAchievedAmount = useMemo(() => (uid, quarter, fy) => {
     return Object.values(leads)
       .filter((l) => l.assignedTo?.uid === uid && l.phase === "closed")
       .filter((l) => {
+        // Filter by contractStartDate for FY (consistent with main filtering)
+        if (!l.contractStartDate) return false;
+        const contractStartDate = new Date(l.contractStartDate);
+        const leadFY = contractStartDate.getMonth() >= 3 
+          ? `${contractStartDate.getFullYear()}-${contractStartDate.getFullYear() + 1}` 
+          : `${contractStartDate.getFullYear() - 1}-${contractStartDate.getFullYear()}`;
+        if (leadFY !== fy) return false;
+
+        // Filter by quarter if not "all"
         if (quarter === "all") return true;
-        const closedQuarter = getQuarter(new Date(l.closedDate));
+        const closedQuarter = getQuarter(contractStartDate);
         return closedQuarter === quarter;
       })
       .reduce((sum, l) => {
@@ -125,7 +146,7 @@ const ClosedLeadsStats = ({
         return sum + (t ? t.target_amount : 0);
       }, 0);
 
-      const achieved = getAchievedAmount(uid, "all");
+      const achieved = getAchievedAmount(uid, "all", selectedFY);
       const deficit = Math.max(totalTarget - achieved, 0);
 
       return { adjustedTarget: totalTarget, achieved, deficit, baseTarget: totalTarget };
@@ -146,7 +167,7 @@ const ClosedLeadsStats = ({
 
       const adjustedTarget = baseTarget + deficit;
 
-      const achieved = getAchievedAmount(uid, q);
+      const achieved = getAchievedAmount(uid, q, selectedFY);
 
       const diff = adjustedTarget - achieved;
 
@@ -166,8 +187,8 @@ const ClosedLeadsStats = ({
   }, [activeQuarter, selectedFY, targets, getAchievedAmount]);
 
   const getTotalAchievedAmount = useCallback((uids, quarter) => {
-    return uids.reduce((sum, uid) => sum + getAchievedAmount(uid, quarter), 0);
-  }, [getAchievedAmount]);
+    return uids.reduce((sum, uid) => sum + getAchievedAmount(uid, quarter, selectedFY), 0);
+  }, [getAchievedAmount, selectedFY]);
 
   const getCombinedQuarterTarget = useCallback((uids) => {
     let totalAdjustedTarget = 0;
@@ -200,7 +221,7 @@ const ClosedLeadsStats = ({
       (u) =>
         ["Assistant Manager", "Executive"].includes(u.role) &&
         u.reportingManager === targetUser?.name &&
-        u.department === "Sales"
+        isSalesUser(u)
     );
     const allManagerTeam = [targetUser, ...managerTeamMembers];
     allUids = allManagerTeam.map((u) => u.uid);
@@ -220,7 +241,7 @@ const ClosedLeadsStats = ({
           (u) =>
             ["Head", "Manager", "Assistant Manager", "Executive"].includes(
               u.role
-            ) && u.department === "Sales"
+            ) && isSalesUser(u)
         )
         .map((u) => u.uid);
 
@@ -233,7 +254,7 @@ const ClosedLeadsStats = ({
       }
     } else if (isHead) {
       let managers = teamMembers.filter(
-        (u) => u.role === "Manager" && u.department === "Sales"
+        (u) => u.role === "Manager" && isSalesUser(u)
       );
 
       managers.forEach((manager) => {
@@ -243,7 +264,7 @@ const ClosedLeadsStats = ({
           (u) =>
             ["Assistant Manager", "Executive"].includes(u.role) &&
             u.reportingManager === manager.name &&
-            u.department === "Sales"
+            isSalesUser(u)
         );
 
         subordinates.forEach((sub) => {
@@ -257,7 +278,7 @@ const ClosedLeadsStats = ({
         (u) =>
           ["Assistant Manager", "Executive"].includes(u.role) &&
           u.reportingManager === userObj.name &&
-          u.department === "Sales"
+          isSalesUser(u)
       );
 
       subordinates.forEach((sub) => {
@@ -329,7 +350,7 @@ const ClosedLeadsStats = ({
     ? getTotalAchievedAmount(allUids, activeQuarter)
     : selectedTeamUserId === "all" && !effectiveViewMyLeadsOnly && aggregateValues
     ? aggregateValues.achieved
-    : getAchievedAmount(targetUid, activeQuarter);
+    : getAchievedAmount(targetUid, activeQuarter, selectedFY);
 
   const annualTarget =
     selectedTeamUserId === "all" && !effectiveViewMyLeadsOnly && aggregateValues
