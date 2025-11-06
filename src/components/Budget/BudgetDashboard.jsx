@@ -18,6 +18,10 @@ import {
 import { db } from "../../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { Suspense, lazy } from "react";
+import { exportBudget } from "./utils/ExportBudget";
+import { exportPurchaseOrders } from "./utils/ExportPO";
+import { exportPurchaseIntents } from "./utils/ExportIntent";
+import { Plus, PlusIcon } from "lucide-react";
 
 // Lazy load components
 const BudgetForm = lazy(() => import("./BudgetForm"));
@@ -147,9 +151,18 @@ const getDepartmentComponents = (department) => {
     console.warn("❌ No department specified, falling back to admin");
     return budgetComponents.admin || {};
   }
-  // Convert department to lowercase to match budgetComponents keys
-  const deptKey = department.toLowerCase();
+
+  // Convert department to lowercase and handle variations
+  const deptKey = department.toLowerCase().trim();
   const components = budgetComponents[deptKey];
+
+  if (!components) {
+    console.warn(
+      `❌ No components found for department: ${department}, falling back to admin`
+    );
+    return budgetComponents.admin || {};
+  }
+
   return components;
 };
 
@@ -254,6 +267,29 @@ const ActionDropdown = ({ budget, onEdit, onDelete, onView }) => {
             </button>
             <button
               onClick={() => {
+                exportBudget(budget.department, budget.fiscalYear, budget);
+                setIsOpen(false);
+              }}
+              className="flex items-center w-full px-4 py-2 text-sm text-emerald-600 hover:bg-gray-100"
+            >
+              <svg
+                className="w-4 h-4 mr-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+              Export Budget
+            </button>
+
+            <button
+              onClick={() => {
                 onDelete(budget);
                 setIsOpen(false);
               }}
@@ -296,6 +332,9 @@ function BudgetDashboard({
   const [usersLoaded, setUsersLoaded] = useState(false);
   const [currentUserData, setCurrentUserData] = useState(null);
   const [selectedBudgetForDelete, setSelectedBudgetForDelete] = useState(null);
+  // View budget modal
+  const [viewBudgetModal, setViewBudgetModal] = useState(false);
+  const [viewingBudget, setViewingBudget] = useState(null);
 
   // Budget state
   const [departmentBudget, setDepartmentBudget] = useState(null);
@@ -415,7 +454,6 @@ function BudgetDashboard({
   const handleDeleteIntent = useCallback(async (intentId) => {
     try {
       await deleteDoc(doc(db, "purchase_intents", intentId));
-      console.log("Purchase intent deleted successfully");
     } catch (error) {
       console.error("Error deleting purchase intent:", error);
       throw error;
@@ -518,8 +556,6 @@ function BudgetDashboard({
       where("fiscalYear", "==", currentFiscalYear),
       orderBy("createdAt", "desc")
     );
-
-    console.log(intentsQuery);
 
     const unsubIntents = onSnapshot(intentsQuery, (snapshot) => {
       const intents = [];
@@ -721,7 +757,6 @@ function BudgetDashboard({
           // Wait for all archive operations to complete
           if (updatePromises.length > 0) {
             await Promise.all(updatePromises);
-            console.log(`Archived ${updatePromises.length} other budgets`);
           }
         }
 
@@ -793,94 +828,133 @@ function BudgetDashboard({
     [currentUser, department, currentFiscalYear]
   );
 
+  const getDepartmentCode = (department) => {
+    const map = {
+      lnd: "T",
+      dm: "DM",
+      sales: "Sales",
+      cr: "CR",
+      hr: "HR&Admin",
+      admin: "MAN",
+      management: "MAN",
+      placement: "CR", // Placement falls under CR
+    };
+
+    return map[department?.toLowerCase()] || department?.toUpperCase();
+  };
+
+  const generatePurchaseOrderNumber = async (
+    department,
+    fiscalYear,
+    budgetId
+  ) => {
+    const deptCode = getDepartmentCode(department);
+    const prefix = department?.toLowerCase() === "dm" ? "ICEM" : "GA";
+
+    const budgetRef = doc(db, "department_budgets", budgetId);
+
+    // Run a transaction to safely increment the counter
+    const nextNumber = await runTransaction(db, async (transaction) => {
+      const budgetDoc = await transaction.get(budgetRef);
+
+      if (!budgetDoc.exists()) {
+        throw new Error("Budget document not found!");
+      }
+
+      const currentCount = budgetDoc.data().poCounter || 0;
+      const newCount = currentCount + 1;
+
+      transaction.update(budgetRef, { poCounter: increment(1) });
+
+      return newCount;
+    });
+
+    return `${prefix}/${fiscalYear}/${deptCode}/${nextNumber
+      .toString()
+      .padStart(2, "0")}`;
+  };
+
   const handleCreatePurchaseOrder = useCallback(
     async (orderData) => {
       try {
-        // Generate PO Number
-        const poNumber = `PO-${department.toUpperCase()}-${Date.now()}`;
-
-        // Get the intent ID from orderData
-        const intentId = orderData.intentId;
-        if (!intentId) {
-          throw new Error("No intent ID provided");
-        }
-
-        // Get the active budget
+        // Ensure we have an active budget
         const targetBudget = activeBudget || departmentBudget;
-        if (!targetBudget || !targetBudget.id) {
+        if (!targetBudget || !targetBudget.id)
           throw new Error("No active budget found");
-        }
+        // Generate PO Number
+        const poNumber = await generatePurchaseOrderNumber(
+          department,
+          currentFiscalYear,
+          targetBudget.id
+        );
 
-        // Use transaction to ensure all operations succeed or fail together
+        // Basic validation
+        const intentId = orderData.intentId;
+        if (!intentId) throw new Error("No intent ID provided");
+
+        // Get total amount including GST (always defined)
+        const totalAmount = orderData.finalAmount;
+
         await runTransaction(db, async (transaction) => {
-          // 1. Create purchase order
+          // 1️⃣ Create Purchase Order Document
           const orderWithMeta = {
             ...orderData,
             department: department,
             fiscalYear: currentFiscalYear,
-            poNumber: poNumber,
-            status: "approved", // Directly approved since purchase department is creating it
+            poNumber,
+            status: "approved",
             createdBy: currentUser.uid,
             createdAt: serverTimestamp(),
             purchaseDeptApproved: true,
             approvedAt: serverTimestamp(),
-            approvedBy: currentUser.uid,
-            totalCost: orderData.finalPrice, // Use finalPrice as totalCost
+            approvedBy: currentUser.displayName || currentUser.uid,
+            totalCost: totalAmount,
           };
 
           const poRef = doc(collection(db, "purchase_orders"));
           transaction.set(poRef, orderWithMeta);
 
-          // 2. Update purchase intent status to "approved"
+          // 2️⃣ Update Purchase Intent to "approved"
           const intentRef = doc(db, "purchase_intents", intentId);
           transaction.update(intentRef, {
             status: "approved",
             approvedAt: serverTimestamp(),
             approvedBy: currentUser.uid,
             poCreated: true,
-            poNumber: poNumber,
+            poNumber,
             updatedAt: serverTimestamp(),
           });
 
-          // 3. Update budget spent amounts
+          // 3️⃣ Update Department Budget (spent)
           const budgetRef = doc(db, "department_budgets", targetBudget.id);
-
-          // Get the budget component from the intent
           const budgetComponent =
             orderData.budgetComponent || orderData.selectedBudgetComponent;
 
+          const updatePayload = {
+            totalSpent: increment(totalAmount),
+            lastUpdatedAt: serverTimestamp(),
+            updatedBy: currentUser.uid,
+          };
+
           if (budgetComponent) {
-            // Update total spent and component spent
-            transaction.update(budgetRef, {
-              totalSpent: increment(orderData.finalPrice),
-              lastUpdatedAt: serverTimestamp(),
-              updatedBy: currentUser.uid,
-              [`components.${budgetComponent}.spent`]: increment(
-                orderData.finalPrice
-              ),
-            });
-          } else {
-            // If no specific component, just update total spent
-            transaction.update(budgetRef, {
-              totalSpent: increment(orderData.finalPrice),
-              lastUpdatedAt: serverTimestamp(),
-              updatedBy: currentUser.uid,
-            });
+            updatePayload[`components.${budgetComponent}.spent`] =
+              increment(totalAmount);
           }
+
+          transaction.update(budgetRef, updatePayload);
         });
 
-        console.log("Purchase order created successfully with transaction");
+        // Close modal and reset state
         setShowPurchaseOrderModal(false);
         setSelectedIntent(null);
 
-        // Show success message
+        // ✅ Success message
         alert(
-          "Purchase Order created successfully! The intent has been approved and budget updated."
+          "✅ Purchase Order created successfully! The intent has been approved and budget updated."
         );
       } catch (error) {
-        console.error("Error creating purchase order:", error);
+        console.error("❌ Error creating purchase order:", error);
 
-        // Show user-friendly error message
         let errorMessage = "Failed to create purchase order. ";
         if (error.message.includes("No active budget found")) {
           errorMessage +=
@@ -898,48 +972,29 @@ function BudgetDashboard({
     [currentUser, department, currentFiscalYear, activeBudget, departmentBudget]
   );
 
-  const handleApproveOrder = async (order) => {
-    if (!order || !order.id) {
-      console.error("Invalid order object:", order);
-      return;
-    }
-
-    const targetBudget = activeBudget || departmentBudget;
-    if (!targetBudget || !targetBudget.id) {
-      console.error("No department budget found");
-      return;
-    }
-
+  const handleUpdatePurchaseOrder = async (updatedOrder) => {
     try {
-      // 1️⃣ Update the order status to "approved"
-      const orderRef = doc(db, "purchase_orders", order.id);
-      await updateDoc(orderRef, {
-        status: "approved",
-        approvedAt: serverTimestamp(),
-        approvedBy: currentUser?.uid,
-      });
+      if (!updatedOrder?.id) throw new Error("Missing order ID");
 
-      // 2️⃣ Update budget spent amounts
-      const budgetRef = doc(db, "department_budgets", targetBudget.id);
-      const updates = {
-        totalSpent: increment(order.totalCost || 0),
+      const orderRef = doc(db, "purchase_orders", updatedOrder.id);
+
+      const updatedData = {
+        ...updatedOrder,
         lastUpdatedAt: serverTimestamp(),
+        updatedBy: currentUser.uid,
       };
 
-      // Update component spent amount if applicable
-      if (
-        order.budgetComponent &&
-        targetBudget.components?.[order.budgetComponent]
-      ) {
-        const componentUpdates = {};
-        componentUpdates[`components.${order.budgetComponent}.spent`] =
-          increment(order.totalCost || 0);
-        Object.assign(updates, componentUpdates);
-      }
+      await updateDoc(orderRef, updatedData);
 
-      await updateDoc(budgetRef, updates);
+      // Optional: Update local state instantly for better UX
+      setPurchaseOrders((prev) =>
+        prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o))
+      );
+
+      alert("✅ Purchase Order updated successfully!");
     } catch (error) {
-      console.error("Error approving order:", error);
+      console.error("Error updating purchase order:", error);
+      alert("Failed to update purchase order. Please try again.");
     }
   };
 
@@ -955,22 +1010,8 @@ function BudgetDashboard({
   };
 
   const handleViewBudget = (budget) => {
-    const details = `
-      Budget Details:
-      Fiscal Year: FY${budget.fiscalYear}
-      Department: ${budget.deptName || budget.department}
-      Status: ${budget.status}
-      Total Budget: ₹${budget.totalBudget?.toLocaleString("en-IN") || "0"}
-      Total Spent: ₹${budget.totalSpent?.toLocaleString("en-IN") || "0"}
-      Created By: ${budget.ownerName || "Unknown"}
-      Last Updated: ${
-        budget.lastUpdatedAt
-          ? new Date(budget.lastUpdatedAt.seconds * 1000).toLocaleDateString()
-          : "N/A"
-      }
-    `.trim();
-
-    alert(details);
+    setViewingBudget(budget);
+    setViewBudgetModal(true);
   };
 
   const tabConfig = {
@@ -994,8 +1035,8 @@ function BudgetDashboard({
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100">
-      <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
         <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-6 mb-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -1013,43 +1054,54 @@ function BudgetDashboard({
                   setEditingBudget(null);
                   setShowBudgetForm(true);
                 }}
-                className="bg-emerald-700 text-white px-3 py-3 rounded-xl font-semibold hover:opacity-90 transition-all shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),0_4px_6px_rgba(0,0,0,0.4)] hover:shadow-[inset_0_2px_4px_rgba(255,255,255,0.2),0_2px_4px_rgba(0,0,0,0.3)] active:shadow-[inset_0_4px_6px_rgba(0,0,0,0.4)] active:translate-y-0.5 flex items-center"
+                className="bg-violet-700 text-white px-3 py-3 rounded-xl font-semibold hover:opacity-90 transition-all shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),0_4px_6px_rgba(0,0,0,0.4)]  active:shadow-[inset_0_4px_6px_rgba(0,0,0,0.4)] active:translate-y-0.5 flex items-center gap-2"
               >
-                <svg
-                  className="w-5 h-5 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                  />
-                </svg>
+                <Plus />
                 Create Budget
               </button>
 
               <button
                 onClick={() => setShowPurchaseIntentModal(true)}
-                className="bg-sky-700 text-white px-3 py-3 rounded-xl font-semibold hover:opacity-90 transition-all shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),0_4px_6px_rgba(0,0,0,0.4)] hover:shadow-[inset_0_2px_4px_rgba(255,255,255,0.2),0_2px_4px_rgba(0,0,0,0.3)] active:shadow-[inset_0_4px_6px_rgba(0,0,0,0.4)] active:translate-y-0.5 flex items-center"
+                className="bg-sky-700 text-white px-3 py-3  rounded-xl font-semibold hover:opacity-90 transition-all shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),0_4px_6px_rgba(0,0,0,0.4)]  active:shadow-[inset_0_4px_6px_rgba(0,0,0,0.4)] active:translate-y-0.5 flex items-center gap-2"
               >
-                <svg
-                  className="w-5 h-5 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                New Purchase Intent
+                <PlusIcon />
+                Create Intent
               </button>
+              {(activeTab === "intents" || activeTab === "orders") && (
+                <button
+                  onClick={() => {
+                    if (activeTab === "intents") {
+                      exportPurchaseIntents(
+                        department,
+                        currentFiscalYear,
+                        purchaseIntents
+                      );
+                    } else if (activeTab === "orders") {
+                      exportPurchaseOrders(
+                        department,
+                        currentFiscalYear,
+                        purchaseOrders
+                      );
+                    }
+                  }}
+                  className="bg-emerald-600 text-white px-3 py-3 rounded-xl font-semibold hover:opacity-90 transition-all shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),0_4px_6px_rgba(0,0,0,0.4)] active:shadow-[inset_0_4px_6px_rgba(0,0,0,0.4)] active:translate-y-0.5 flex items-center"
+                >
+                  <svg
+                    className="w-5 h-5 mr-2"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  Export{" "}
+                </button>
+              )}
             </div>
           </div>
 
@@ -1280,41 +1332,46 @@ function BudgetDashboard({
             )}
 
             {activeTab === "orders" && (
-              <PurchaseOrdersList
-                orders={filteredOrders}
-                budgetComponents={currentUserDepartmentComponents}
-                componentColors={componentColors}
-                filters={filters}
-                onFiltersChange={setFilters}
-                currentUser={currentUser}
-                departmentBudget={activeBudget || departmentBudget}
-                onApproveOrder={handleApproveOrder}
-                fiscalYear={currentFiscalYear}
-                userDepartment={currentUserDepartment}
-                vendors={vendors}
-                getComponentsForItem={getComponentsForItem}
-                showDepartment={showDepartment}
-              />
+              <>
+                <PurchaseOrdersList
+                  orders={filteredOrders}
+                  budgetComponents={currentUserDepartmentComponents}
+                  componentColors={componentColors}
+                  filters={filters}
+                  onFiltersChange={setFilters}
+                  currentUser={currentUser}
+                  departmentBudget={activeBudget || departmentBudget}
+                  fiscalYear={currentFiscalYear}
+                  userDepartment={currentUserDepartment}
+                  vendors={vendors}
+                  getComponentsForItem={getComponentsForItem}
+                  showDepartment={showDepartment}
+                  onUpdatePurchaseOrder={handleUpdatePurchaseOrder}
+                />
+              </>
             )}
+
             {activeTab === "intents" && (
-              <PurchaseIntentsList
-                intents={filteredIntents}
-                budgetComponents={currentUserDepartmentComponents}
-                componentColors={componentColors}
-                onDeleteIntent={handleDeleteIntent}
-                onViewIntent={handleViewIntent}
-                onCreatePurchaseOrder={(intent) => {
-                  setSelectedIntent(intent);
-                  setShowPurchaseOrderModal(true);
-                }}
-                filters={filters}
-                onFiltersChange={setFilters}
-                currentUser={currentUser}
-                fiscalYear={currentFiscalYear}
-                userDepartment={currentUserDepartment}
-                getComponentsForItem={getComponentsForItem}
-                showDepartment={showDepartment}
-              />
+              <>
+                <PurchaseIntentsList
+                  intents={filteredIntents}
+                  budgetComponents={currentUserDepartmentComponents}
+                  componentColors={componentColors}
+                  onDeleteIntent={handleDeleteIntent}
+                  onViewIntent={handleViewIntent}
+                  onCreatePurchaseOrder={(intent) => {
+                    setSelectedIntent(intent);
+                    setShowPurchaseOrderModal(true);
+                  }}
+                  filters={filters}
+                  onFiltersChange={setFilters}
+                  currentUser={currentUser}
+                  fiscalYear={currentFiscalYear}
+                  userDepartment={currentUserDepartment}
+                  getComponentsForItem={getComponentsForItem}
+                  showDepartment={showDepartment}
+                />
+              </>
             )}
 
             {activeTab === "vendors" && showVendorManagement && (
@@ -1404,6 +1461,7 @@ function BudgetDashboard({
             }}
             onSubmit={handleCreateBudget}
             budgetComponents={currentUserDepartmentComponents}
+            allBudgetComponents={budgetComponents}
             currentUser={currentUser}
             department={department}
             fiscalYear={currentFiscalYear}
@@ -1420,6 +1478,7 @@ function BudgetDashboard({
             }}
             onSubmit={handleUpdateBudget}
             budgetComponents={currentUserDepartmentComponents}
+            allBudgetComponents={budgetComponents}
             existingBudget={editingBudget}
             currentUser={currentUser}
             department={department}
@@ -1452,9 +1511,142 @@ function BudgetDashboard({
             vendors={vendors}
             budgetComponents={currentUserDepartmentComponents}
             fiscalYear={currentFiscalYear}
+            currentUser={currentUser}
           />
         )}
       </Suspense>
+      {/* 🧾 View Budget Modal */}
+      {viewBudgetModal && viewingBudget && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
+            {/* Header */}
+            <div className="bg-emerald-700 text-white px-6 py-4 flex justify-between items-center">
+              <h3 className="text-lg font-semibold">
+                View Budget - FY{viewingBudget.fiscalYear}
+              </h3>
+              <button
+                onClick={() => {
+                  setViewBudgetModal(false);
+                  setViewingBudget(null);
+                }}
+                className="text-white hover:text-gray-200 transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-3 text-gray-800">
+              <div className="grid grid-cols-2 gap-3">
+                <p>
+                  <strong>Department:</strong>{" "}
+                  {viewingBudget.deptName || viewingBudget.department}
+                </p>
+                <p>
+                  <strong>Status:</strong>{" "}
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      viewingBudget.status === "active"
+                        ? "bg-green-100 text-green-800"
+                        : viewingBudget.status === "draft"
+                        ? "bg-yellow-100 text-yellow-800"
+                        : "bg-gray-100 text-gray-800"
+                    }`}
+                  >
+                    {viewingBudget.status}
+                  </span>
+                </p>
+                <p>
+                  <strong>Total Budget:</strong> ₹
+                  {viewingBudget.totalBudget?.toLocaleString("en-IN") || "0"}
+                </p>
+                <p>
+                  <strong>Total Spent:</strong> ₹
+                  {viewingBudget.totalSpent?.toLocaleString("en-IN") || "0"}
+                </p>
+                <p>
+                  <strong>Remaining:</strong> ₹
+                  {(
+                    (viewingBudget.totalBudget || 0) -
+                    (viewingBudget.totalSpent || 0)
+                  ).toLocaleString("en-IN")}
+                </p>
+                <p>
+                  <strong>Created By:</strong>{" "}
+                  {viewingBudget.ownerName || "Unknown"}
+                </p>
+                <p>
+                  <strong>Last Updated:</strong>{" "}
+                  {viewingBudget.lastUpdatedAt
+                    ? new Date(
+                        viewingBudget.lastUpdatedAt.seconds * 1000
+                      ).toLocaleDateString("en-IN")
+                    : "N/A"}
+                </p>
+              </div>
+
+              {/* Optional: Component breakdown */}
+              {viewingBudget.components && (
+                <div className="mt-4">
+                  <h4 className="font-semibold mb-2 text-gray-900">
+                    Components:
+                  </h4>
+                  <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="text-left px-3 py-2 font-medium text-gray-700">
+                            Component
+                          </th>
+                          <th className="text-right px-3 py-2 font-medium text-gray-700">
+                            Allocated (₹)
+                          </th>
+                          <th className="text-right px-3 py-2 font-medium text-gray-700">
+                            Spent (₹)
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(viewingBudget.components || {}).map(
+                          ([key, comp]) => (
+                            <tr
+                              key={key}
+                              className="border-t border-gray-100 hover:bg-gray-50"
+                            >
+                              <td className="px-3 py-2 text-gray-800 capitalize">
+                                {key.replace(/_/g, " ")}
+                              </td>
+                              <td className="px-3 py-2 text-right text-gray-700">
+                                {comp.allocated?.toLocaleString("en-IN") || 0}
+                              </td>
+                              <td className="px-3 py-2 text-right text-gray-700">
+                                {comp.spent?.toLocaleString("en-IN") || 0}
+                              </td>
+                            </tr>
+                          )
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 bg-gray-50 flex justify-end">
+              <button
+                onClick={() => {
+                  setViewBudgetModal(false);
+                  setViewingBudget(null);
+                }}
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-semibold"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (

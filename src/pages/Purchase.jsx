@@ -117,6 +117,16 @@ const budgetComponents = {
     laptops: "Laptops & Hardware",
     tshirts: "T-shirts & Merchandise",
     printmedia: "Print Media",
+    training_materials: "Training Materials",
+    placement_events: "Placement Events",
+    corporate_gifts: "Corporate Gifts",
+    travel_expenses: "Travel Expenses",
+  },
+  placement: {
+    emails: "Email Subscriptions",
+    laptops: "Laptops & Hardware",
+    tshirts: "T-shirts & Merchandise",
+    printmedia: "Print Media",
     diwaligifts: "Diwali Gifts",
     software: "Software & Tools",
     training: "Training Materials",
@@ -453,52 +463,14 @@ function Purchase() {
 
   const handleDeleteIntent = useCallback(async (intentId) => {
     try {
-      await deleteDoc(doc(db, "purchase_intents", intentId));
-      console.log("Purchase intent deleted successfully");
+      const intentRef = doc(db, "purchase_intents", intentId);
+      await updateDoc(intentRef, { status: "rejected" });
+      console.log(`Purchase intent ${intentId} marked as rejected`);
     } catch (error) {
-      console.error("Error deleting purchase intent:", error);
+      console.error("Error updating purchase intent status:", error);
       throw error;
     }
   }, []);
-
-  const handleViewIntent = useCallback(
-    (intent) => {
-      const userDepartment = users[intent.createdBy]?.department;
-      const deptComponents = getDepartmentComponents(userDepartment);
-
-      const details = `
-        Purchase Intent Details:
-
-        Title: ${intent.title}
-        Description: ${intent.description || "N/A"}
-        Amount: ₹${intent.totalEstimate?.toLocaleString("en-IN") || "0"}
-        Status: ${intent.status.replace(/_/g, " ")}
-        Component: ${
-          deptComponents[intent.budgetComponent] || intent.budgetComponent
-        }
-        Urgency: ${intent.urgency || "medium"}
-        Created: ${new Date(intent.createdAt).toLocaleDateString()}
-        Created By: ${users[intent.createdBy]?.displayName || "Unknown"}
-        Department: ${userDepartment || "Unknown"}
-        ${
-          intent.approvedBy
-            ? `Approved By: ${
-                users[intent.approvedBy]?.displayName || "Unknown"
-              }`
-            : ""
-        }
-        ${
-          intent.approvedAt
-            ? `Approved At: ${new Date(intent.approvedAt).toLocaleDateString()}`
-            : ""
-        }
-        ${intent.notes ? `Notes: ${intent.notes}` : ""}
-          `.trim();
-
-      alert(details);
-    },
-    [users]
-  );
 
   useEffect(() => {
     if (!currentUser) return;
@@ -602,24 +574,20 @@ function Purchase() {
     const targetBudget =
       selectedBudgetForOverview || activeBudget || departmentBudget;
 
-    if (!targetBudget || !targetBudget.department) {
+    if (!targetBudget) {
+      console.log("No budget available for utilization calculation");
       return {};
     }
 
     const utilization = {};
     const deptComponents = getDepartmentComponents(targetBudget.department);
 
-    // Check if deptComponents is valid before iterating
-    if (!deptComponents || typeof deptComponents !== "object") {
-      console.warn(
-        `No components found for department: ${targetBudget.department}`
-      );
-      return {};
-    }
-
     Object.keys(deptComponents).forEach((component) => {
-      const allocated = targetBudget.components?.[component]?.allocated || 0;
-      const spent = targetBudget.components?.[component]?.spent || 0;
+      // Check if components exist and have the expected structure
+      const componentData = targetBudget.components?.[component];
+      const allocated = componentData?.allocated || 0;
+      const spent = componentData?.spent || 0;
+
       utilization[component] = {
         allocated,
         spent,
@@ -627,7 +595,6 @@ function Purchase() {
         utilizationRate: allocated > 0 ? (spent / allocated) * 100 : 0,
       };
     });
-
     return utilization;
   }, [selectedBudgetForOverview, activeBudget, departmentBudget]);
 
@@ -745,7 +712,6 @@ function Purchase() {
           // Wait for all archive operations to complete
           if (updatePromises.length > 0) {
             await Promise.all(updatePromises);
-            console.log(`Archived ${updatePromises.length} other budgets`);
           }
         }
 
@@ -930,7 +896,6 @@ function Purchase() {
           }
         });
 
-        console.log("Purchase order created successfully with transaction");
         setShowPurchaseOrderModal(false);
         setSelectedIntent(null);
 
@@ -962,6 +927,27 @@ function Purchase() {
     },
     [currentUser, currentFiscalYear] // Remove department, activeBudget, departmentBudget from dependencies
   );
+
+  const totalSpent = useMemo(() => {
+    const targetBudget =
+      selectedBudgetForOverview || activeBudget || departmentBudget;
+
+    if (!targetBudget) return 0;
+
+    // Sum up component spent amounts from budgetUtilization
+    const componentSpent = Object.values(budgetUtilization).reduce(
+      (sum, comp) => sum + (comp?.spent || 0),
+      0
+    );
+
+    // Use the budget's totalSpent if available, otherwise use calculated component spent
+    return targetBudget.totalSpent || componentSpent;
+  }, [
+    selectedBudgetForOverview,
+    activeBudget,
+    departmentBudget,
+    budgetUtilization,
+  ]);
 
   const handleApproveOrder = async (order) => {
     if (!order || !order.id) {
@@ -1020,10 +1006,6 @@ function Purchase() {
       }
 
       await updateDoc(budgetRef, updates);
-
-      console.log(
-        `✅ Order approved and ${orderDepartment} department budget updated`
-      );
     } catch (error) {
       console.error("Error approving order:", error);
     }
@@ -1082,7 +1064,7 @@ function Purchase() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="w-full max-w-[95vw] sm:max-w-[90vw] lg:max-w-8xl mx-auto px-3 sm:px-5 lg:px-8 py-6 ">
         {/* Header */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -1095,16 +1077,20 @@ function Purchase() {
           </div>
 
           {/* Navigation Tabs */}
-          <div className="flex flex-wrap gap-2 mt-6">
+          <div className="flex flex-nowrap md:flex-wrap gap-2 mt-6 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
             {Object.entries(tabConfig).map(([key, tab]) => (
               <button
                 key={key}
                 onClick={() => setActiveTab(key)}
-                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                  activeTab === key
-                    ? `${tab.color} text-white shadow-lg`
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
+                className={`
+                  relative px-4 py-2 rounded-lg font-semibold transition-all duration-200
+                  ${
+                    activeTab === key
+                      ? `${tab.color} text-white shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),_0_3px_6px_rgba(0,0,0,0.3)]`
+                      : "bg-gray-100 text-gray-700 shadow-[inset_0_2px_2px_rgba(255,255,255,0.8),_0_3px_5px_rgba(0,0,0,0.25)] hover:bg-gray-200"
+                  }
+                  active:translate-y-[2px] active:shadow-[inset_0_3px_6px_rgba(0,0,0,0.4),_inset_0_-2px_2px_rgba(255,255,255,0.5)]
+                `}
               >
                 {tab.name}
               </button>
@@ -1129,45 +1115,44 @@ function Purchase() {
                   </div>
 
                   {budgetHistory.length > 0 ? (
-                    <div className="max-w-[80vw]">
-                      <table className="w-full">
+                    <div className="w-full relative">
+                      <table className="w-full text-sm sm:text-xs md:text-sm lg:text-base min-w-[600px] border-collapse overflow-x-auto">
                         <thead>
                           <tr className="border-b border-gray-200">
-                            <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                            <th className="text-left py-2.5 sm:py-2 px-2 sm:px-3 md:px-4 font-semibold text-gray-700 whitespace-nowrap">
                               Department
                             </th>
-                            <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                            <th className="text-left py-2.5 sm:py-2 px-2 sm:px-3 md:px-4 font-semibold text-gray-700 whitespace-nowrap">
                               Fiscal Year
                             </th>
-                            <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                            <th className="text-left py-2.5 sm:py-2 px-2 sm:px-3 md:px-4 font-semibold text-gray-700 whitespace-nowrap">
                               Total Budget
                             </th>
-                            <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                            <th className="text-left py-2.5 sm:py-2 px-2 sm:px-3 md:px-4 font-semibold text-gray-700 whitespace-nowrap">
                               Total Spent
                             </th>
-                            <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                            <th className="text-left py-2.5 sm:py-2 px-2 sm:px-3 md:px-4 font-semibold text-gray-700 whitespace-nowrap">
                               Remaining
                             </th>
-                            <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                            <th className="text-left py-2.5 sm:py-2 px-2 sm:px-3 md:px-4 font-semibold text-gray-700 whitespace-nowrap">
                               Status
                             </th>
-                            <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                            <th className="text-left py-2.5 sm:py-2 px-2 sm:px-3 md:px-4 font-semibold text-gray-700 whitespace-nowrap">
                               Last Updated
                             </th>
-                            <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                            <th className="text-left py-2.5 sm:py-2 px-2 sm:px-3 md:px-4 font-semibold text-gray-700 whitespace-nowrap">
                               Actions
                             </th>
                           </tr>
                         </thead>
+
                         <tbody>
                           {budgetHistory
-                            // 🔹 Filter budgets by status (active or draft only)
                             .filter(
                               (budget) =>
                                 budget.status === "active" ||
                                 budget.status === "draft"
                             )
-                            // 🔹 Then sort: active first, then by fiscal year
                             .sort((a, b) => {
                               if (
                                 a.status === "active" &&
@@ -1179,7 +1164,6 @@ function Purchase() {
                                 b.status === "active"
                               )
                                 return 1;
-
                               const yearA = parseInt(
                                 a.fiscalYear.split("-")[0]
                               );
@@ -1188,11 +1172,10 @@ function Purchase() {
                               );
                               return yearB - yearA;
                             })
-                            // 🔹 Render table rows
                             .map((budget) => (
                               <tr
                                 key={budget.id}
-                                className={`border-b border-gray-100 hover:bg-gray-50 ${
+                                className={`border-b border-gray-100 hover:bg-gray-50 transition-all ${
                                   budget.status === "active"
                                     ? "bg-green-50"
                                     : budget.id ===
@@ -1201,51 +1184,51 @@ function Purchase() {
                                     : ""
                                 }`}
                               >
-                                <td className="py-3 px-4">
-                                  <div className="flex items-center">
-                                    <span className="font-medium text-gray-900">
-                                      {budget.department
-                                        .charAt(0)
-                                        .toUpperCase() +
-                                        budget.department.slice(1)}
-                                    </span>
-                                  </div>
+                                <td className="py-2.5 sm:py-2 px-2 sm:px-3 md:px-4 whitespace-nowrap">
+                                  <span className="font-medium text-gray-900 text-sm sm:text-xs md:text-sm">
+                                    {budget.department.charAt(0).toUpperCase() +
+                                      budget.department.slice(1)}
+                                  </span>
                                 </td>
-                                <td className="py-3 px-4">
-                                  <div className="flex items-center">
-                                    <span className="font-medium text-gray-900">
+
+                                <td className="py-2.5 sm:py-2 px-2 sm:px-3 md:px-4 whitespace-nowrap">
+                                  <div className="flex items-center flex-wrap gap-1">
+                                    <span className="font-medium text-gray-900 text-sm sm:text-xs md:text-sm">
                                       FY{budget.fiscalYear}
                                     </span>
                                     {budget.status === "active" && (
-                                      <span className="ml-2 px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
+                                      <span className="px-1.5 py-0.5 text-[10px] sm:text-[9px] bg-green-100 text-green-800 rounded-full">
                                         Active
                                       </span>
                                     )}
                                     {budget.id ===
                                       selectedBudgetForOverview?.id && (
-                                      <span className="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                                      <span className="px-1.5 py-0.5 text-[10px] sm:text-[9px] bg-blue-100 text-blue-800 rounded-full">
                                         Selected
                                       </span>
                                     )}
                                   </div>
                                 </td>
-                                <td className="py-3 px-4">
-                                  <span className="font-semibold text-gray-900">
+
+                                <td className="py-2.5 sm:py-2 px-2 sm:px-3 md:px-4 whitespace-nowrap">
+                                  <span className="font-semibold text-gray-900 text-sm sm:text-xs md:text-sm">
                                     ₹
                                     {budget.totalBudget?.toLocaleString(
                                       "en-IN"
                                     ) || "0"}
                                   </span>
                                 </td>
-                                <td className="py-3 px-4">
-                                  <span className="text-gray-700">
+
+                                <td className="py-2.5 sm:py-2 px-2 sm:px-3 md:px-4 whitespace-nowrap">
+                                  <span className="text-gray-700 text-sm sm:text-xs md:text-sm">
                                     ₹
                                     {budget.totalSpent?.toLocaleString(
                                       "en-IN"
                                     ) || "0"}
                                   </span>
                                 </td>
-                                <td className="py-3 px-4">
+
+                                <td className="py-2.5 sm:py-2 px-2 sm:px-3 md:px-4 whitespace-nowrap">
                                   <span
                                     className={`font-medium ${
                                       (budget.totalBudget || 0) -
@@ -1253,7 +1236,7 @@ function Purchase() {
                                       0
                                         ? "text-green-600"
                                         : "text-red-600"
-                                    }`}
+                                    } text-sm sm:text-xs md:text-sm`}
                                   >
                                     ₹
                                     {(
@@ -1262,9 +1245,10 @@ function Purchase() {
                                     ).toLocaleString("en-IN")}
                                   </span>
                                 </td>
-                                <td className="py-3 px-4">
+
+                                <td className="py-2.5 sm:py-2 px-2 sm:px-3 md:px-4 whitespace-nowrap">
                                   <span
-                                    className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                    className={`px-1.5 py-0.5 rounded-full text-[10px] sm:text-[9px] font-medium ${
                                       budget.status === "active"
                                         ? "bg-green-100 text-green-800"
                                         : "bg-yellow-100 text-yellow-800"
@@ -1273,21 +1257,25 @@ function Purchase() {
                                     {budget.status}
                                   </span>
                                 </td>
-                                <td className="py-3 px-4 text-sm text-gray-600">
+
+                                <td className="py-2.5 sm:py-2 px-2 sm:px-3 md:px-4 text-gray-600 text-sm sm:text-xs md:text-sm whitespace-nowrap">
                                   {budget.lastUpdatedAt
                                     ? new Date(
                                         budget.lastUpdatedAt.seconds * 1000
                                       ).toLocaleDateString()
                                     : "N/A"}
                                 </td>
-                                <td className="py-3 px-4">
-                                  <ActionDropdown
-                                    budget={budget}
-                                    onEdit={handleEditBudget}
-                                    onDelete={handleDeleteBudgetClick}
-                                    onView={handleViewBudget}
-                                    onSelect={handleSelectBudgetForOverview} // NEW: Add select handler
-                                  />
+
+                                <td className="relative py-2.5 sm:py-2 px-2 sm:px-3 md:px-4 whitespace-nowrap">
+                                  <div className="relative z-10 scale-90 sm:scale-95 md:scale-100 origin-center">
+                                    <ActionDropdown
+                                      budget={budget}
+                                      onEdit={handleEditBudget}
+                                      onDelete={handleDeleteBudgetClick}
+                                      onView={handleViewBudget}
+                                      onSelect={handleSelectBudgetForOverview}
+                                    />
+                                  </div>
                                 </td>
                               </tr>
                             ))}
@@ -1373,12 +1361,14 @@ function Purchase() {
                           getDepartmentComponents(
                             selectedBudgetForOverview.department
                           ) || {}
-                        } // Ensure object
+                        }
                         componentColors={componentColors}
                         purchaseIntents={purchaseIntents}
                         purchaseOrders={purchaseOrders}
                         fiscalYear={currentFiscalYear}
                         userDepartment={selectedBudgetForOverview.department}
+                        totalSpent={totalSpent}
+                        allBudgetComponents={budgetComponents} // ADD THIS LINE FOR CONSISTENCY
                       />
                     </Suspense>
                   </div>
@@ -1410,7 +1400,6 @@ function Purchase() {
                 componentColors={componentColors}
                 onDeleteIntent={handleDeleteIntent}
                 onApproveIntent={handleApproveIntent}
-                onViewIntent={handleViewIntent}
                 onCreatePurchaseOrder={(intent) => {
                   setSelectedIntent(intent);
                   setShowPurchaseOrderModal(true);
@@ -1448,7 +1437,7 @@ function Purchase() {
 
                 {/* Budget List */}
                 {budgetHistory.length > 0 ? (
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                     {budgetHistory.map((budget) => {
                       const utilization = budget.totalBudget
                         ? ((budget.totalSpent || 0) / budget.totalBudget) * 100
@@ -1625,8 +1614,8 @@ function Purchase() {
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 sm:p-6 z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-auto">
             <div className="p-6">
               <div className="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full mb-4">
                 <svg

@@ -1,209 +1,204 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { getFirestore, doc, getDoc } from "firebase/firestore";
 
-export const exportPurchaseOrderToPDF = (order, vendorData, items = []) => {
-  const doc = new jsPDF("p", "mm", "a4");
-  const vendor = vendorData || {};
+// 🔹 Utility to format numbers safely
+const formatNum = (val) =>
+  typeof val === "number" ? val.toLocaleString("en-IN") : val || "-";
 
-  const capitalizeFirst = (str) => {
-    if (!str) return "_______________________";
-    return str.charAt(0).toUpperCase() + str.slice(1);
-  };
+// 🔹 Capitalize helper
+const capitalizeFirst = (str) =>
+  !str ? "_______________________" : str.charAt(0).toUpperCase() + str.slice(1);
 
-  const logoUrl = "/gryphon_logo.png"; // Put gryphon_logo.png inside public/
+// 🔹 Main Export Function
+export const exportPurchaseOrderToPDF = async (order, vendorData) => {
+  const db = getFirestore();
+  const docId = `${order.department}_FY-20${order.fiscalYear}`;
+  const docRef = doc(db, "department_budgets", docId);
+  let budgetData = {};
 
   try {
-    doc.addImage(logoUrl, "PNG", 14, 10, 45, 25);
-  } catch (e) {
-    console.warn(
-      "Logo could not be loaded. Ensure it's a valid PNG and accessible from /public."
-    );
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      budgetData = snap.data();
+      console.log("✅ Budget data loaded for:", order.department);
+    } else {
+      console.warn("⚠️ No budget data found for:", order.department);
+    }
+  } catch (err) {
+    console.error("Error fetching budget data:", err);
   }
 
-  // --- HEADER ---
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(18);
-  doc.setTextColor(33, 37, 41);
-  doc.text("GRYPHON ACADEMY PRIVATE LIMITED", 120, 18, { align: "center" });
+  const docPDF = new jsPDF("p", "mm", "a4");
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.setTextColor(90, 90, 90);
-  doc.text("www.gryphonacademy.co.in", 120, 24, { align: "center" });
-  doc.text(
-    "9th Floor, Olympia Business House (Achalare) next to Supreme HQ,",
+  // ---------------------------
+  // PAGE 1 (Purchase Order)
+  // ---------------------------
+
+  const logoUrl = "/gryphon_logo.png";
+  try {
+    docPDF.addImage(logoUrl, "PNG", 14, 10, 45, 25);
+  } catch {
+    console.warn("Logo not found in /public.");
+  }
+
+  // 🏢 Header
+  docPDF.setTextColor(40, 40, 40);
+  docPDF.setFont("helvetica", "bold");
+  docPDF.setFontSize(18);
+  docPDF.text("GRYPHON ACADEMY PRIVATE LIMITED", 120, 18, { align: "center" });
+
+  docPDF.setFont("helvetica", "normal");
+  docPDF.setFontSize(10);
+  docPDF.text("www.gryphonacademy.co.in", 120, 24, { align: "center" });
+  docPDF.text(
+    "9th Floor, Olympia Business House, Baner, Pune - 411045",
     120,
     29,
     { align: "center" }
   );
-  doc.text(
-    "Mumbai Bangalore Highway Baner - 411045, Pune Maharashtra",
-    120,
-    34,
-    { align: "center" }
-  );
+  docPDF.setFont("helvetica", "bold");
+  docPDF.setFontSize(12);
+  docPDF.text("--- Purchase Order ---", 120, 42, { align: "center" });
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.setTextColor(33, 37, 41);
-  doc.text("--- Purchase Order ---", 120, 42, { align: "center" });
-
-  // --- DATE & PO No. ---
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.setTextColor(60, 60, 60);
+  // 📅 Dates & PO No
   const approvedDate =
     order.approvedAt?.toDate?.().toLocaleDateString("en-IN") ||
     new Date().toLocaleDateString("en-IN");
 
-  doc.text(`Date : ${approvedDate}`, 15, 52);
-  doc.text(`PO No. : ${order.poNumber || `PO-${order.id?.slice(-6)}`}`, 15, 58);
+  docPDF.setFont("helvetica", "normal");
+  docPDF.setFontSize(10);
+  docPDF.text(`Date : ${approvedDate}`, 15, 52);
+  docPDF.text(
+    `PO No. : ${order.poNumber || `PO-${order.id?.slice(-6)}`}`,
+    15,
+    58
+  );
 
-  // --- VENDOR INFO BOX ---
-  const vendorY = 70;
-
-  const vendorTableData = [
-    ["Vendor Name:", vendor.name || "_______________________"],
-    ["Business Name:", vendor.contact || "_______________________"],
-    ["Address:", vendor.email || "_______________________"],
-    ["Phone:", vendor.phone || "_______________________"],
-  ];
-
-  autoTable(doc, {
-    startY: vendorY,
-    body: vendorTableData,
-    theme: "grid",
-    styles: {
-      fontSize: 10,
-      textColor: [60, 60, 60],
-      lineColor: [0, 0, 0],
-      lineWidth: 0.2,
-      cellPadding: { top: 1, bottom: 1, left: 4, right: 4 },
-    },
-    columnStyles: {
-      0: { fontStyle: "bold", cellWidth: 35, textColor: [40, 40, 40] },
-      1: { fontStyle: "normal", cellWidth: 145, textColor: [20, 20, 20] },
-    },
-  });
-  // --- REQUESTED BY BOX ---
-  const reqY = vendorY + 32;
-  doc.setFont("helvetica", "normal");
-
-  const reqTableData = [
-    [
-      "Requested By:",
-      capitalizeFirst(order.ownerName) || "_______________________",
-    ],
-    [
-      "Department:",
-      capitalizeFirst(order.department) || "_______________________",
-    ],
-    [
-      "Address:",
-      "Gryphon Academy, 9th floor, Olympia Business House, Baner, Pune",
-    ],
-    ["Phone No.:", order.phone || "+91 9767019581"],
-  ];
-
-  autoTable(doc, {
-    startY: reqY, // continue from where previous section ended
-    body: reqTableData,
-    theme: "grid",
-    styles: {
-      fontSize: 10,
-      textColor: [60, 60, 60],
-      lineColor: [0, 0, 0],
-      lineWidth: 0.2,
-      cellPadding: { top: 1, bottom: 1, left: 4, right: 4 },
-    },
-    columnStyles: {
-      0: { fontStyle: "bold", cellWidth: 35, textColor: [40, 40, 40] },
-      1: { fontStyle: "normal", cellWidth: 145, textColor: [40, 40, 40] }, // blue for dynamic data
-    },
-  });
-
-  // --- ITEMS TABLE ---
-  const startTableY = doc.lastAutoTable.finalY + 10;
-
-  autoTable(doc, {
-    startY: startTableY,
-    head: [
+  // 🧾 Vendor Table
+  autoTable(docPDF, {
+    startY: 70,
+    body: [
       [
-        "S.N.",
-        "Category",
-        "Description",
-        "Quantity",
-        "Unit Price (INR)",
-        "Total Price (INR)",
+        "Vendor Name:",
+        order.vendorDetails.contactPerson || "_______________________",
+      ],
+      ["Business Name:", order.vendorDetails.name || "_______________________"],
+      ["Address:", order.vendorDetails.email || "_______________________"],
+      ["Phone:", order.vendorDetails.phone || "_______________________"],
+    ],
+    theme: "grid",
+    styles: {
+      fontSize: 10,
+      lineWidth: 0.2,
+      textColor: [40, 40, 40],
+      lineColor: [0, 0, 0],
+    },
+    columnStyles: { 0: { fontStyle: "bold", cellWidth: 35 } },
+  });
+
+  // 🧍 Requested By
+  autoTable(docPDF, {
+    startY: docPDF.lastAutoTable.finalY + 4,
+    body: [
+      ["Requested By:", capitalizeFirst(order.ownerName)],
+      ["Department:", capitalizeFirst(order.department)],
+      [
+        "Address:",
+        "Gryphon Academy, 9th floor, Olympia Business House, Baner, Pune",
+      ],
+      ["Phone No.:", order.phone || "+91 9767019581"],
+    ],
+    theme: "grid",
+    styles: {
+      fontSize: 10,
+      lineWidth: 0.2,
+      textColor: [40, 40, 40],
+      lineColor: [0, 0, 0],
+    },
+    columnStyles: { 0: { fontStyle: "bold", cellWidth: 35 } },
+  });
+
+  // 📦 Items Table
+  let itemRows = [];
+  if (order.items?.length > 0) {
+    order.items.forEach((item, i) => {
+      itemRows.push([
+        i + 1,
+        capitalizeFirst(order.budgetComponent),
+        item.description,
+        item.quantity,
+        formatNum(item.estPricePerUnit),
+        formatNum(item.estTotal),
+      ]);
+    });
+  } else {
+    itemRows.push(["", "", "", "", "", ""]);
+  }
+
+  // 💰 GST Rows
+  if (order.gstDetails) {
+    const gst = order.gstDetails;
+    const halfGst = (gst.gstAmount || 0) / 2;
+    itemRows.push(
+      ["", "", "SGST @ 9%", "9%", formatNum(halfGst), formatNum(halfGst)],
+      ["", "", "CGST @ 9%", "9%", formatNum(halfGst), formatNum(halfGst)]
+    );
+    if (gst.totalWithGST) {
+      itemRows.push([
+        "",
+        "",
+        "Total (with GST)",
+        "",
+        "",
+        formatNum(gst.totalWithGST),
+      ]);
+    }
+  }
+
+  autoTable(docPDF, {
+    startY: docPDF.lastAutoTable.finalY + 10,
+    head: [["S.N.", "Category", "Description", "Qty", "Unit Price", "Total"]],
+    body: itemRows,
+    theme: "grid",
+    headStyles: { fillColor: [210, 210, 210], textColor: [40, 40, 40] },
+    styles: {
+      fontSize: 9,
+      lineWidth: 0.2,
+      textColor: [40, 40, 40],
+      lineColor: [0, 0, 0],
+    },
+    didParseCell: (data) => {
+      const desc = data.row.raw?.[2] || "";
+      if (desc.includes("SGST") || desc.includes("CGST"))
+        data.cell.styles.fillColor = [245, 245, 245];
+      if (desc.includes("Total (with GST)"))
+        data.cell.styles.fillColor = [230, 230, 230];
+    },
+  });
+
+  // ✍️ Signatures
+  autoTable(docPDF, {
+    startY: docPDF.lastAutoTable.finalY + 10,
+    body: [
+      ["", "", "", "", ""],
+      [
+        "Signature\n\n(Dept. Head)",
+        "Signature\n\n(HR)",
+        "Signature\n\n(Delivery Head)",
+        "Signature\n\n(Co-Founder)",
+        "Signature\n\n(Founder & Director)",
       ],
     ],
-    body:
-      order.items && order.items.length > 0
-        ? order.items.map((item) => [
-            item.sno || "",
-            capitalizeFirst(order.budgetComponent) || "",
-            item.description || "",
-            item.quantity || "",
-            item.estPricePerUnit || "",
-            item.estTotal || "",
-          ])
-        : [["", "", "", "", "", ""]],
-    theme: "grid",
-    headStyles: {
-      fillColor: [210, 210, 210],
-      textColor: 0,
-      halign: "center",
-      fontStyle: "bold",
-    },
-    styles: {
-      fontSize: 9,
-      textColor: [50, 50, 50],
-      lineColor: [0, 0, 0],
-      lineWidth: 0.2,
-      cellPadding: { top: 2, bottom: 2, left: 4, right: 4 },
-    },
-    columnStyles: {
-      0: { halign: "center", cellWidth: 15 }, // S.N.
-      1: { halign: "center", cellWidth: 25 }, // Category
-      2: { halign: "center", cellWidth: 45 }, // Description
-      3: { halign: "center", cellWidth: 25 }, // Quantity
-      4: { halign: "center", cellWidth: 35 }, // Unit Price
-      5: { halign: "center", cellWidth: 35 }, // Total Price
-    },
-  });
-
-  // --- SIGNATURE SECTION ---
-  const sigY = doc.lastAutoTable.finalY + 10;
-  const boxHeight = 20;
-
-  const sigTitles = [
-    "Dept. Head",
-    "HR",
-    "Delivery Head",
-    "Co-Founder",
-    "Founder & Director",
-  ];
-
-  const sigTableData = [
-    // Empty signature boxes (row 1)
-    sigTitles.map(() => " "),
-    // Signature labels (row 2)
-    sigTitles.map((title) => `Signature\n(${title})`),
-  ];
-
-  autoTable(doc, {
-    startY: sigY,
-    body: sigTableData,
     theme: "grid",
     styles: {
       fontSize: 9,
       halign: "center",
-      valign: "middle",
-      cellPadding: { top: 1, bottom: 1, left: 2, right: 2 }, // default smaller padding
-      lineColor: [0, 0, 0],
-      lineWidth: 0.2,
       minCellHeight: 20,
+      textColor: [40, 40, 40],
+      lineColor: [0, 0, 0],
     },
+    // 🔹 Make all 5 boxes equal width
     columnStyles: {
       0: { cellWidth: 36 },
       1: { cellWidth: 36 },
@@ -211,34 +206,138 @@ export const exportPurchaseOrderToPDF = (order, vendorData, items = []) => {
       3: { cellWidth: 36 },
       4: { cellWidth: 36 },
     },
-    didParseCell: function (data) {
-      // Only apply large padding for the first row (the empty signature boxes)
-      if (data.row.index === 0) {
-        data.cell.styles.cellPadding = {
-          top: 10,
-          bottom: 10,
-          left: 2,
-          right: 2,
-        };
+  });
+
+  // 💳 Payment Info
+  const payY = docPDF.lastAutoTable.finalY + 20;
+  docPDF.text("Payment Date: ___________________", 20, payY);
+  docPDF.text("Payment Terms: ___________________", 120, payY);
+
+  docPDF.setFontSize(8);
+  docPDF.text("Generated via Gryphon Purchase Order System", 105, 285, {
+    align: "center",
+  });
+
+  // ---------------------------
+  // PAGE 2 (Budget Summary)
+  // ---------------------------
+  docPDF.addPage();
+  docPDF.setFont("helvetica", "bold");
+  docPDF.setFontSize(14);
+  docPDF.setTextColor(40, 40, 40);
+  docPDF.text(
+    `${order.department?.toUpperCase() || "DEPARTMENT"} BUDGET SUMMARY`,
+    105,
+    20,
+    { align: "center" }
+  );
+
+  const rows = [];
+  const addSection = (title, data, isComponent = false) => {
+    if (!data || Object.keys(data).length === 0) return;
+    let first = true;
+    Object.entries(data).forEach(([key, val]) => {
+      let approved = isComponent ? val.allocated || 0 : val || 0;
+      let spent = isComponent ? val.spent || 0 : "-";
+      let remaining = isComponent ? approved - spent : "-";
+      let percent =
+        isComponent && approved
+          ? ((spent / approved) * 100).toFixed(1) + "%"
+          : "-";
+      rows.push([
+        first ? title : "",
+        key.replace(/_/g, " ").toUpperCase(),
+        formatNum(approved),
+        percent,
+        formatNum(spent),
+        formatNum(remaining),
+      ]);
+      first = false;
+    });
+  };
+
+  addSection("Fixed Cost", budgetData.fixedCosts);
+  addSection("Department Expense", budgetData.departmentExpenses);
+  addSection("", budgetData.components, true);
+  addSection("CSDD Component", budgetData.csddComponents, true);
+
+  const totalApproved = rows.reduce(
+    (s, r) => s + (parseFloat(r[2].replace(/,/g, "")) || 0),
+    0
+  );
+  const totalSpent = rows.reduce(
+    (s, r) => s + (parseFloat(r[4].replace(/,/g, "")) || 0),
+    0
+  );
+  rows.push([
+    "TOTAL",
+    "",
+    formatNum(totalApproved),
+    ((totalSpent / totalApproved) * 100).toFixed(1) + "%",
+    formatNum(totalSpent),
+    formatNum(totalApproved - totalSpent),
+  ]);
+
+  autoTable(docPDF, {
+    startY: 30,
+    head: [
+      [
+        "Category",
+        "Description",
+        "Amount Approved",
+        "Spent %",
+        "Amount Spent",
+        "Remaining",
+      ],
+    ],
+    body: rows,
+    theme: "grid",
+    headStyles: { fillColor: [230, 230, 230], textColor: [40, 40, 40] },
+    styles: {
+      fontSize: 9,
+      lineWidth: 0.2,
+      textColor: [40, 40, 40],
+      lineColor: [0, 0, 0],
+    },
+    didParseCell: (data) => {
+      const spent = parseFloat(
+        (data.row.raw?.[4] || "0").toString().replace(/,/g, "")
+      );
+      const description = data.row.raw?.[1] || "";
+      const isTotalRow = data.row.raw?.[0] === "TOTAL";
+
+      const currentComponent =
+        order.budgetComponent?.replace(/_/g, " ").toUpperCase() || "";
+
+      // Highlight only current purchase component row
+      if (
+        description === currentComponent &&
+        data.row.raw[0] !== "TOTAL" &&
+        spent > 0
+      ) {
+        data.cell.styles.fillColor = [230, 230, 230]; // light grey
+        data.cell.styles.fontStyle = "bold";
+      }
+
+      // Emphasize 'Amount Spent' column
+      if (data.column.index === 4) {
+        data.cell.styles.textColor = [40, 40, 40];
+      }
+
+      // Total row styling
+      if (isTotalRow) {
+        data.cell.styles.fontStyle = "bold";
+        data.cell.styles.textColor = [40, 40, 40];
+        data.cell.styles.fillColor = [230, 230, 230];
       }
     },
   });
 
-  // --- PAYMENT SECTION ---
-  const payY = sigY + boxHeight + 30;
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(60, 60, 60);
-  doc.text("Payment Date: ___________________", 20, payY);
-  doc.text("Payment Terms: ___________________", 120, payY);
-
-  // --- FOOTER ---
-  const footerY = 285;
-  doc.setFontSize(8);
-  doc.setTextColor(120);
-  doc.text("Generated via Gryphon Purchase Order System", 105, footerY, {
+  docPDF.setFontSize(8);
+  docPDF.text("Generated via Gryphon Budget System", 105, 285, {
     align: "center",
   });
 
-  // --- SAVE FILE ---
-  doc.save(`Purchase_Order_${order.poNumber || order.id}.pdf`);
+  // ✅ Save File
+  docPDF.save(`Purchase_Order_${order.poNumber || order.id}.pdf`);
 };

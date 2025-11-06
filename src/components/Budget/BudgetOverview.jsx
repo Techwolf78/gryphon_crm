@@ -65,9 +65,16 @@ const BudgetOverview = ({
       allocated:
         (departmentBudget?.csddExpenses?.intercity_outstation_visits || 0) +
         (departmentBudget?.csddExpenses?.lunch_dinner_with_client || 0) +
-        (departmentBudget?.csddExpenses?.mobile_sim || 0),
-      spent: 0, // Track actual spending if available
-      label: "CSDD ",
+        (departmentBudget?.csddExpenses?.mobile_sim || 0) +
+        Object.values(departmentBudget?.csddComponents || {}).reduce(
+          (sum, comp) => sum + (comp?.allocated || 0),
+          0
+        ),
+      spent: Object.values(departmentBudget?.csddComponents || {}).reduce(
+        (sum, comp) => sum + (comp?.spent || 0),
+        0
+      ),
+      label: "CSDD",
       icon: Heart,
       color: "bg-teal-100 text-teal-800 border-teal-200",
     },
@@ -101,7 +108,6 @@ const BudgetOverview = ({
     additionalBudgetItems.csdd.allocated +
     additionalBudgetItems.fixedCosts.allocated;
 
-  // ✅ Prefer using Firestore totalBudget if available
   const totalAllocated =
     departmentBudget?.totalBudget && departmentBudget.totalBudget > 0
       ? departmentBudget.totalBudget

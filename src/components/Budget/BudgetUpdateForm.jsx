@@ -21,7 +21,8 @@ const BudgetUpdateForm = ({
   show,
   onClose,
   onSubmit,
-  budgetComponents,
+  budgetComponents, // Initial components from parent
+  allBudgetComponents, // All department components
   existingBudget,
   currentUser,
   department = "purchase",
@@ -62,6 +63,20 @@ const BudgetUpdateForm = ({
   const [csddComponentName, setCsddComponentName] = useState("");
   const [csddComponentAllocation, setCsddComponentAllocation] = useState("");
   const [csddComponentNotes, setCsddComponentNotes] = useState("");
+
+  // Simple function to get current department components
+  const getDynamicBudgetComponents = () => {
+    return (
+      allBudgetComponents[formData.department] ||
+      allBudgetComponents.admin ||
+      {}
+    );
+  };
+
+  // Get available components (not yet added)
+  const availableComponents = Object.entries(
+    getDynamicBudgetComponents() || {}
+  ).filter(([key]) => !formData.components?.[key]);
 
   // Initialize form data from existing budget
   useEffect(() => {
@@ -254,12 +269,15 @@ const BudgetUpdateForm = ({
       return;
     }
 
+    // Use dynamic components for the name
+    const dynamicComponents = getDynamicBudgetComponents();
+
     setFormData((prev) => ({
       ...prev,
       components: {
         ...prev.components,
         [selectedComponent]: {
-          name: budgetComponents[selectedComponent],
+          name: dynamicComponents[selectedComponent],
           allocated: componentAllocation,
           spent: 0,
           notes: componentNotes,
@@ -438,12 +456,22 @@ const BudgetUpdateForm = ({
 
   const totalAllocated = calculateTotalAllocated();
 
-  // Get available components (not yet added)
-  const availableComponents = Object.entries(budgetComponents || {}).filter(
-    ([key]) => !formData.components?.[key]
-  );
-
   if (!show || !existingBudget) return null;
+
+  useEffect(() => {
+      const preventScrollChange = (e) => {
+        if (
+          document.activeElement.type === "number" &&
+          document.activeElement.contains(e.target)
+        ) {
+          e.preventDefault(); // stop value change
+        }
+      };
+  
+      window.addEventListener("wheel", preventScrollChange, { passive: false });
+  
+      return () => window.removeEventListener("wheel", preventScrollChange);
+    }, []);
 
   return (
     <div className="fixed inset-0 bg-black/30 mt-10 bg-opacity-50 flex items-center justify-center p-4 z-50">

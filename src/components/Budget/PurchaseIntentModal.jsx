@@ -50,6 +50,19 @@ const PurchaseIntentModal = ({
     }
   }, [show]);
 
+  // 🔹 Auto-sync all item categories with the selected budget component
+  useEffect(() => {
+    if (!formData.budgetComponent) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      requestedItems: prev.requestedItems.map((item) => ({
+        ...item,
+        category: formData.budgetComponent, // sync with selected budget component
+      })),
+    }));
+  }, [formData.budgetComponent]);
+
   const handleItemChange = (index, field, value) => {
     const updatedItems = formData.requestedItems.map((item, i) => {
       if (i === index) {
@@ -201,6 +214,21 @@ const PurchaseIntentModal = ({
     })
   );
 
+  useEffect(() => {
+    const preventScrollChange = (e) => {
+      if (
+        document.activeElement.type === "number" &&
+        document.activeElement.contains(e.target)
+      ) {
+        e.preventDefault(); // stop value change
+      }
+    };
+
+    window.addEventListener("wheel", preventScrollChange, { passive: false });
+
+    return () => window.removeEventListener("wheel", preventScrollChange);
+  }, []);
+
   return (
     <div className="mt-10 fixed inset-0 bg-black/30 bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
@@ -342,21 +370,17 @@ const PurchaseIntentModal = ({
                     <label className="block text-xs font-medium text-gray-600 mb-1">
                       Category *
                     </label>
-                    <select
-                      value={item.category}
-                      onChange={(e) =>
-                        handleItemChange(index, "category", e.target.value)
+                    <input
+                      type="text"
+                      value={
+                        budgetComponents[formData.budgetComponent] ||
+                        formData.budgetComponent ||
+                        "—"
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                      required
-                    >
-                      <option value="">Select Category</option>
-                      {availableCategories.map((cat) => (
-                        <option key={cat.value} value={cat.value}>
-                          {cat.label}
-                        </option>
-                      ))}
-                    </select>
+                      readOnly
+                      className="w-full px-3 py-2 border border-gray-300 bg-gray-100 rounded-lg text-sm cursor-not-allowed"
+                      placeholder="Auto-set from Budget Component"
+                    />
                   </div>
 
                   <div>

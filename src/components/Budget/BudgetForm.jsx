@@ -15,10 +15,31 @@ const BudgetForm = ({
   onClose,
   onSubmit,
   budgetComponents,
+  allBudgetComponents,
   currentUser,
   department,
   fiscalYear = null,
 }) => {
+  const getDynamicBudgetComponents = () => {
+    const deptKey = formData.department?.toLowerCase();
+
+    // Try exact match first
+    if (allBudgetComponents[deptKey]) {
+      return allBudgetComponents[deptKey];
+    }
+
+    // Fallbacks for department aliases
+    const aliasMap = {
+      hrandadmin: "hr",
+      cr: "placement",
+      lnd: "lnd",
+      dm: "dm",
+      ga: "admin",
+    };
+
+    const fallbackKey = aliasMap[deptKey];
+    return allBudgetComponents[fallbackKey] || allBudgetComponents.admin || {};
+  };
   // Generate fiscal year format (e.g., "25-26")
   const getFiscalYear = () => {
     if (fiscalYear) return fiscalYear;
@@ -292,7 +313,7 @@ const BudgetForm = ({
       components: {
         ...prev.components,
         [selectedComponent]: {
-          name: budgetComponents[selectedComponent],
+          name: getDynamicBudgetComponents()[selectedComponent],
           allocated: componentAllocation,
           spent: 0,
           notes: componentNotes,
@@ -389,7 +410,6 @@ const BudgetForm = ({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Submit clicked - Starting validation");
 
     // Clear previous errors
     setFormError("");
@@ -405,7 +425,6 @@ const BudgetForm = ({
     }
 
     setIsSubmitting(true);
-    console.log("Starting budget submission...");
 
     try {
       const budgetData = {
@@ -464,12 +483,9 @@ const BudgetForm = ({
         createdAt: new Date(),
       };
 
-      console.log("Submitting budget data:", budgetData);
-
       // Call the onSubmit function from parent
       await onSubmit(budgetData);
 
-      console.log("Budget submitted successfully");
       onClose();
     } catch (error) {
       console.error("Error saving budget:", error);
@@ -484,12 +500,27 @@ const BudgetForm = ({
 
   const totalAllocated = calculateTotalAllocated();
 
-  // Get available components (not yet added)
-  const availableComponents = Object.entries(budgetComponents || {}).filter(
-    ([key]) => !formData.components?.[key]
-  );
+  // Use it directly in your availableComponents calculation
+  const availableComponents = Object.entries(
+    getDynamicBudgetComponents() || {}
+  ).filter(([key]) => !formData.components?.[key]);
 
   if (!show) return null;
+
+  useEffect(() => {
+      const preventScrollChange = (e) => {
+        if (
+          document.activeElement.type === "number" &&
+          document.activeElement.contains(e.target)
+        ) {
+          e.preventDefault(); // stop value change
+        }
+      };
+  
+      window.addEventListener("wheel", preventScrollChange, { passive: false });
+  
+      return () => window.removeEventListener("wheel", preventScrollChange);
+    }, []);
 
   return (
     <div className="fixed inset-0 bg-black/30 mt-10 bg-opacity-50 flex items-center justify-center p-4 z-50">

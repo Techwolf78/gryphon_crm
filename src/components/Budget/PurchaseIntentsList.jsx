@@ -4,14 +4,13 @@ const PurchaseIntentsList = ({
   intents,
   budgetComponents,
   componentColors,
-  onApproveIntent,
   onCreatePurchaseOrder,
   onDeleteIntent,
   filters,
   onFiltersChange,
   currentUser,
-  userDepartment, // Add userDepartment prop
-  getComponentsForItem, // Add this prop
+  userDepartment,
+  getComponentsForItem, 
   showDepartment = false,
 }) => {
   const [sortConfig, setSortConfig] = useState({
@@ -56,7 +55,6 @@ const PurchaseIntentsList = ({
     if (budgetComponents && typeof budgetComponents === "object") {
       return budgetComponents[componentKey] || componentKey;
     }
-
     return componentKey;
   };
 
@@ -411,8 +409,8 @@ const PurchaseIntentsList = ({
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     ₹
-                    {intent.estimatedTotal?.toLocaleString('en-In') ||
-                      intent.totalEstimate?.toLocaleString('en-In')}
+                    {intent.estimatedTotal?.toLocaleString("en-In") ||
+                      intent.totalEstimate?.toLocaleString("en-In")}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
@@ -535,8 +533,8 @@ const PurchaseIntentsList = ({
                                   />
                                 </svg>
                                 {deletingId === intent.id
-                                  ? "Deleting..."
-                                  : "Delete"}
+                                  ? "Rejecting..."
+                                  : "Reject"}
                               </button>
                             )}
                           </div>
@@ -577,16 +575,19 @@ const PurchaseIntentsList = ({
 
       {/* View Details Modal */}
       {viewModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-1000">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white flex justify-between items-center p-6 border-b border-gray-200">
-              <h2 className="text-2xl font-bold ">Purchase Intent Details</h2>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[1000]">
+          <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-[0_8px_24px_rgba(0,0,0,0.15)] w-full max-w-4xl max-h-[90vh] overflow-hidden border border-gray-100">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex justify-between items-center px-6 py-4 shadow-sm">
+              <h2 className="text-xl font-bold tracking-wide">
+                Purchase Intent Details
+              </h2>
               <button
                 onClick={() => setViewModal(null)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
               >
                 <svg
-                  className="w-6 h-6"
+                  className="w-5 h-5 text-white"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -601,206 +602,207 @@ const PurchaseIntentsList = ({
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto max-h-[70vh]">
-              <div className="space-y-6">
+            {/* Body */}
+            <div className="p-6 overflow-y-auto max-h-[70vh] space-y-8">
+              {/* Basic + Financial Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Basic Information */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      Basic Information
-                    </h3>
-                    <dl className="space-y-3">
-                      {showDepartment && (
-                        <div>
-                          <dt className="text-sm font-medium text-gray-500">
-                            Department
-                          </dt>
-                          <dd className="text-sm text-gray-900">
-                            {viewModal.department.toUpperCase() || "Unknown"}
-                          </dd>
-                        </div>
-                      )}
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">
-                          Title
-                        </dt>
-                        <dd className="text-sm text-gray-900">
-                          {viewModal.title}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">
-                          Description
-                        </dt>
-                        <dd className="text-sm text-gray-900">
-                          {viewModal.description || "N/A"}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">
-                          Budget Component
-                        </dt>
-                        <dd className="text-sm text-gray-900">
-                          {getComponentName(viewModal)} {/* ✅ NEW WAY */}
-                        </dd>
-                      </div>
-                    </dl>
-                  </div>
-
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      Financial Details
-                    </h3>
-                    <dl className="space-y-3">
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">
-                          Total Estimate
-                        </dt>
-                        <dd className="text-sm text-gray-900 font-semibold">
-                          ₹
-                          {viewModal.estimatedTotal?.toLocaleString('en-In') ||
-                            viewModal.totalEstimate?.toLocaleString('en-In')}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">
-                          Status
-                        </dt>
-                        <dd>
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                              viewModal.status
-                            )}`}
-                          >
-                            {viewModal.status.replace(/_/g, " ")}
-                          </span>
-                        </dd>
-                      </div>
-                      {viewModal.requiredBy && (
-                        <div>
-                          <dt className="text-sm font-medium text-gray-500">
-                            Required By
-                          </dt>
-                          <dd className="text-sm text-gray-900">
-                            {formatDate(viewModal.requiredBy)}
-                          </dd>
-                        </div>
-                      )}
-                    </dl>
-                  </div>
-                </div>
-
-                {/* Requested Items */}
-                {viewModal.requestedItems &&
-                  viewModal.requestedItems.length > 0 && (
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                        Requested Items ({viewModal.requestedItems.length})
-                      </h3>
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <div className="space-y-3">
-                          {viewModal.requestedItems.map((item, index) => (
-                            <div
-                              key={index}
-                              className="bg-white p-3 rounded border"
-                            >
-                              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
-                                <div>
-                                  <span className="font-medium text-gray-500">
-                                    Category:
-                                  </span>
-                                  <div className="text-gray-900">
-                                    {item.category}
-                                  </div>
-                                </div>
-                                <div>
-                                  <span className="font-medium text-gray-500">
-                                    Description:
-                                  </span>
-                                  <div className="text-gray-900">
-                                    {item.description}
-                                  </div>
-                                </div>
-                                <div>
-                                  <span className="font-medium text-gray-500">
-                                    Qty × Price:
-                                  </span>
-                                  <div className="text-gray-900">
-                                    {item.quantity} × ₹
-                                    {item.estPricePerUnit?.toLocaleString('en-In')}
-                                  </div>
-                                </div>
-                                <div>
-                                  <span className="font-medium text-gray-500">
-                                    Total:
-                                  </span>
-                                  <div className="text-gray-900 font-semibold">
-                                    ₹{item.estTotal?.toLocaleString('en-In')}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                {/* Timeline Information */}
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Timeline
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3 border-b border-gray-200 pb-1">
+                    Basic Information
                   </h3>
-                  <dl className="space-y-3">
+                  <dl className="space-y-3 text-sm">
+                    {showDepartment && (
+                      <div>
+                        <dt className="font-medium text-gray-500">
+                          Department
+                        </dt>
+                        <dd className="text-gray-900">
+                          {viewModal.department?.toUpperCase() || "Unknown"}
+                        </dd>
+                      </div>
+                    )}
                     <div>
-                      <dt className="text-sm font-medium text-gray-500">
-                        Created
-                      </dt>
-                      <dd className="text-sm text-gray-900">
-                        {formatDateTime(viewModal.createdAt)}
+                      <dt className="font-medium text-gray-500">Title</dt>
+                      <dd className="text-gray-900 font-medium">
+                        {viewModal.title}
                       </dd>
                     </div>
-                    {viewModal.approvedAt && (
+                    <div>
+                      <dt className="font-medium text-gray-500">Description</dt>
+                      <dd className="text-gray-800">
+                        {viewModal.description || "N/A"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-medium text-gray-500">
+                        Budget Component
+                      </dt>
+                      <dd className="text-gray-900">
+                        {getComponentName(viewModal)}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+
+                {/* Financial Details */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3 border-b border-gray-200 pb-1">
+                    Financial Details
+                  </h3>
+                  <dl className="space-y-3 text-sm">
+                    <div>
+                      <dt className="font-medium text-gray-500">
+                        Total Estimate
+                      </dt>
+                      <dd className="text-gray-900 font-semibold">
+                        ₹
+                        {viewModal.estimatedTotal?.toLocaleString("en-IN") ||
+                          viewModal.totalEstimate?.toLocaleString("en-IN")}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-medium text-gray-500">Status</dt>
+                      <dd>
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold shadow-sm ${getStatusColor(
+                            viewModal.status
+                          )}`}
+                        >
+                          {viewModal.status.replace(/_/g, " ")}
+                        </span>
+                      </dd>
+                    </div>
+                    {viewModal.requiredBy && (
                       <div>
-                        <dt className="text-sm font-medium text-gray-500">
-                          Approved
+                        <dt className="font-medium text-gray-500">
+                          Required By
                         </dt>
-                        <dd className="text-sm text-gray-900">
-                          {formatDateTime(viewModal.approvedAt)}
+                        <dd className="text-gray-900">
+                          {formatDate(viewModal.requiredBy)}
                         </dd>
                       </div>
                     )}
                   </dl>
                 </div>
-
-                {/* Action Section for Purchase Department */}
-                {isPurchaseDepartment && viewModal.status === "submitted" && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-blue-900 mb-2">
-                      Purchase Department Action
-                    </h3>
-                    <p className="text-blue-700 mb-4">
-                      You can create a Purchase Order for this intent. This will
-                      automatically approve the intent.
-                    </p>
-                    <button
-                      onClick={() => {
-                        handleCreatePO(viewModal);
-                        setViewModal(null);
-                      }}
-                      className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors font-semibold"
-                    >
-                      Create Purchase Order
-                    </button>
-                  </div>
-                )}
               </div>
+
+              {/* Requested Items */}
+              {viewModal.requestedItems?.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3 border-b border-gray-200 pb-1">
+                    Requested Items ({viewModal.requestedItems.length})
+                  </h3>
+                  <div className="space-y-3">
+                    {viewModal.requestedItems.map((item, index) => (
+                      <div
+                        key={index}
+                        className="bg-gray-50 border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                      >
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+                          <div>
+                            <span className="font-medium text-gray-500">
+                              Category:
+                            </span>
+                            <div className="text-gray-900">{item.category}</div>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-500">
+                              Description:
+                            </span>
+                            <div className="text-gray-900">
+                              {item.description}
+                            </div>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-500">
+                              Qty × Price:
+                            </span>
+                            <div className="text-gray-900">
+                              {item.quantity} × ₹
+                              {item.estPricePerUnit?.toLocaleString("en-IN")}
+                            </div>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-500">
+                              Total:
+                            </span>
+                            <div className="text-gray-900 font-semibold">
+                              ₹{item.estTotal?.toLocaleString("en-IN")}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Timeline */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3 border-b border-gray-200 pb-1">
+                  Timeline
+                </h3>
+                <dl className="space-y-3 text-sm">
+                  <div>
+                    <dt className="font-medium text-gray-500">Created</dt>
+                    <dd className="text-gray-900">
+                      {formatDateTime(viewModal.createdAt)}
+                    </dd>
+                  </div>
+                  {viewModal.approvedAt && (
+                    <div>
+                      <dt className="font-medium text-gray-500">Approved</dt>
+                      <dd className="text-gray-900">
+                        {formatDateTime(viewModal.approvedAt)}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              </div>
+
+              {/* Purchase Department Action */}
+              {isPurchaseDepartment && viewModal.status === "submitted" && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-5">
+                  <h3 className="text-lg font-semibold text-blue-900 mb-2">
+                    Purchase Department Action
+                  </h3>
+                  <p className="text-blue-700 mb-4 text-sm">
+                    You can create a Purchase Order for this intent. This will
+                    automatically approve the intent.
+                  </p>
+                  <button
+                    onClick={() => {
+                      handleCreatePO(viewModal);
+                      setViewModal(null);
+                    }}
+                    className="
+                px-5 py-2 bg-emerald-600 text-white rounded-lg font-semibold
+                shadow-[inset_0_1px_2px_rgba(255,255,255,0.3),0_2px_4px_rgba(0,0,0,0.2)]
+                hover:bg-emerald-700
+                active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3),0_1px_2px_rgba(255,255,255,0.3)]
+                active:translate-y-[0.5px]
+                transition-all duration-150 ease-in-out
+              "
+                  >
+                    Create Purchase Order
+                  </button>
+                </div>
+              )}
             </div>
 
-            <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
+            {/* Footer */}
+            <div className="flex justify-end gap-3 p-5 border-t border-gray-200 bg-gray-50">
               <button
                 onClick={() => setViewModal(null)}
-                className="px-6 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="
+            px-6 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg font-medium
+            shadow-[inset_0_-1px_2px_rgba(0,0,0,0.15),inset_0_1px_2px_rgba(255,255,255,0.6)]
+            hover:bg-gray-50
+            active:shadow-[inset_0_1px_2px_rgba(0,0,0,0.25),inset_0_-1px_1px_rgba(255,255,255,0.5)]
+            active:translate-y-[0.5px]
+            transition-all duration-150 ease-in-out
+          "
               >
                 Close
               </button>
