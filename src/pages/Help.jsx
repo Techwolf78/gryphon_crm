@@ -357,7 +357,7 @@ const Help = () => {
       {showPopup && (
         <div className="fixed inset-0 bg-gray-900/70 backdrop-blur-sm flex items-center justify-center z-54 p-4 animate-fadeIn">
           <div className="bg-white rounded-xl max-w-4xl w-full relative overflow-hidden border border-gray-100 shadow-2xl animate-scaleIn max-h-[90vh] flex flex-col">
-            <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+            <div className="absolute top-0 left-0 w-full h-1.5 bg-linear-to-r from-blue-500 to-indigo-600"></div>
             <button
               onClick={() => setShowPopup(false)}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors z-10"
@@ -672,7 +672,7 @@ const Help = () => {
       {showTicketForm && (
         <div className="fixed inset-0 bg-gray-900/70 backdrop-blur-sm flex items-center justify-center z-54 p-4 animate-fadeIn">
           <div className="bg-white rounded-xl p-4 max-w-md w-full relative overflow-hidden border border-gray-100 shadow-2xl animate-scaleIn max-h-[90vh] overflow-y-auto">
-            <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+            <div className="absolute top-0 left-0 w-full h-1.5 bg-linear-to-r from-blue-500 to-indigo-600"></div>
             <button
               onClick={() => setShowTicketForm(false)}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
@@ -781,7 +781,7 @@ const Help = () => {
       {activeTicket && (
         <div className="fixed inset-0 bg-gray-900/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="bg-white rounded-xl p-6 max-w-2xl w-full relative overflow-hidden border border-gray-100 shadow-2xl animate-scaleIn max-h-[90vh] overflow-y-auto">
-            <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+            <div className="absolute top-0 left-0 w-full h-1.5 bg-linear-to-r from-blue-500 to-indigo-600"></div>
             <button
               onClick={() => setActiveTicket(null)}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
@@ -881,7 +881,7 @@ const Help = () => {
       <div className="w-full">
         {/* Header aligned left */}
         <div className="mb-3">
-          <div className="inline-flex items-center justify-start bg-gradient-to-br from-blue-100 to-indigo-100 rounded-lg p-2 mb-1 shadow-sm border border-white">
+          <div className="inline-flex items-center justify-start bg-linear-to-br from-blue-100 to-indigo-100 rounded-lg p-2 mb-1 shadow-sm border border-white">
             <FiHelpCircle className="text-blue-600 w-4 h-4" />
           </div>
           <h1 className="text-lg sm:text-xl font-bold text-gray-900 mb-1 leading-tight">
@@ -1043,7 +1043,7 @@ const Help = () => {
                   </td>
 
                   <td className="px-3 py-3 text-sm text-gray-500 max-w-[250px]">
-                    <div className="break-words">
+                    <div className="wrap-break-word">
                       {ticket.remark
                         ? ticket.remark
                         : ticket.status === "resolved"
@@ -1079,7 +1079,7 @@ const Help = () => {
               <div className="bg-white rounded-lg shadow-xs border border-gray-100 overflow-hidden transition-all hover:shadow-sm">
                 <div className="p-3">
                   <div className="flex items-center mb-3">
-                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-2 rounded-lg mr-2 shadow-inner border border-white">
+                    <div className="bg-linear-to-br from-blue-50 to-indigo-50 p-2 rounded-lg mr-2 shadow-inner border border-white">
                       <FiMail className="text-blue-600 w-4 h-4" />
                     </div>
                     <h2 className="text-sm font-semibold text-gray-900">

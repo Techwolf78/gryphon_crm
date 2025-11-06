@@ -173,7 +173,7 @@ const ClosedLeadsTable = ({
                 {/* Header */}
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center text-blue-700 font-semibold flex-shrink-0 shadow-sm border border-blue-100/50">
+                    <div className="h-12 w-12 rounded-xl bg-linear-to-br from-blue-50 to-indigo-100 flex items-center justify-center text-blue-700 font-semibold shrink-0 shadow-sm border border-blue-100/50">
                       {lead.businessName?.charAt(0)?.toUpperCase() || "?"}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -187,12 +187,12 @@ const ClosedLeadsTable = ({
                   </div>
                   <div className="flex items-center gap-2">
                     {lead.closureType === "new" ? (
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-emerald-50 to-emerald-100 text-emerald-700 border border-emerald-200">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-linear-to-r from-emerald-50 to-emerald-100 text-emerald-700 border border-emerald-200">
                         <FiCheckCircle className="mr-1 h-3 w-3" />
                         New
                       </span>
                     ) : (
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 border border-blue-200">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-linear-to-r from-blue-50 to-blue-100 text-blue-700 border border-blue-200">
                         <FiRefreshCw className="mr-1 h-3 w-3" />
                         Renewal
                       </span>
@@ -313,7 +313,7 @@ const ClosedLeadsTable = ({
                 {/* Owner Info */}
                 <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                   <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-full bg-gradient-to-br from-slate-100 to-gray-200 flex items-center justify-center text-slate-700 text-xs font-semibold flex-shrink-0 shadow-sm border border-slate-200/50">
+                    <div className="h-8 w-8 rounded-full bg-linear-to-br from-slate-100 to-gray-200 flex items-center justify-center text-slate-700 text-xs font-semibold shrink-0 shadow-sm border border-slate-200/50">
                       {lead.assignedTo?.name
                         ?.split(" ")
                         .map((n) => n[0])
@@ -354,7 +354,7 @@ const ClosedLeadsTable = ({
           <div className={`overflow-x-auto scrollbar-thin scrollbar-thumb-slate-300/60 scrollbar-track-slate-50/50 scrollbar-thumb-rounded-full hover:scrollbar-thumb-slate-400/60 transition-colors min-w-0 ${maxHeight ? 'overflow-y-auto' : ''}`} style={maxHeight ? { maxHeight } : {}}>
             {/* Table */}
             <table className={`min-w-full divide-y divide-gray-200 ${tableClassName}`}>
-              <thead className="bg-gradient-to-r from-blue-600 to-indigo-700">
+              <thead className="bg-linear-to-r from-blue-600 to-indigo-700">
                 <tr>
                   <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
                     <div className="flex items-center space-x-1">
@@ -442,7 +442,7 @@ const ClosedLeadsTable = ({
                     >
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center text-blue-700 font-bold text-sm flex-shrink-0 shadow-sm border border-blue-100/50">
+                          <div className="h-8 w-8 rounded-lg bg-linear-to-br from-blue-50 to-indigo-100 flex items-center justify-center text-blue-700 font-bold text-sm shrink-0 shadow-sm border border-blue-100/50">
                             {lead.businessName?.charAt(0)?.toUpperCase() || "?"}
                           </div>
                           <div className="ml-4">
@@ -476,12 +476,12 @@ const ClosedLeadsTable = ({
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap hidden lg:block">
                         {lead.closureType === "new" ? (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-emerald-50 to-emerald-100 text-emerald-700 border border-emerald-200">
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-linear-to-r from-emerald-50 to-emerald-100 text-emerald-700 border border-emerald-200">
                             <FiCheckCircle className="mr-1.5 h-3 w-3" />
                             New Deal
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 border border-blue-200">
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-linear-to-r from-blue-50 to-blue-100 text-blue-700 border border-blue-200">
                             <FiRefreshCw className="mr-1.5 h-3 w-3" />
                             Renewal
                           </span>
@@ -489,7 +489,7 @@ const ClosedLeadsTable = ({
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-slate-100 to-gray-200 flex items-center justify-center text-slate-700 text-xs font-semibold flex-shrink-0 shadow-sm border border-slate-200/50">
+                          <div className="h-8 w-8 rounded-full bg-linear-to-br from-slate-100 to-gray-200 flex items-center justify-center text-slate-700 text-xs font-semibold shrink-0 shadow-sm border border-slate-200/50">
                             {lead.assignedTo?.name
                               ?.split(" ")
                               .map((n) => n[0])
@@ -598,7 +598,7 @@ const ClosedLeadsTable = ({
                   <tr>
                     <td colSpan="7" className="py-16 text-center">
                       <div className="flex flex-col items-center justify-center space-y-4 px-4">
-                        <div className="w-20 h-20 bg-gradient-to-br from-slate-100 to-gray-200 rounded-2xl flex items-center justify-center shadow-sm border border-slate-200/50">
+                        <div className="w-20 h-20 bg-linear-to-br from-slate-100 to-gray-200 rounded-2xl flex items-center justify-center shadow-sm border border-slate-200/50">
                           <FiTrendingUp className="w-10 h-10 text-slate-400" />
                         </div>
                         <div className="text-center max-w-sm">

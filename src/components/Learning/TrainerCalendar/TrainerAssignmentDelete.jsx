@@ -9,11 +9,11 @@ function DeleteConfirmationModal({ assignment, onConfirm, onCancel }) {
       role="dialog"
       aria-modal="true"
       aria-label="Delete trainer assignment confirmation"
-      className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      className="fixed inset-0 z-90 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
     >
       <div className="w-full max-w-md bg-white rounded-xl shadow-2xl p-6">
         <div className="flex items-start gap-4">
-          <div className="flex-shrink-0 w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+          <div className="shrink-0 w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
             <FiTrash2 className="w-6 h-6 text-red-600" />
           </div>
           <div className="flex-1">

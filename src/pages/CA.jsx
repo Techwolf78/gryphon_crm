@@ -674,7 +674,7 @@ const getDescription = (invoice) => {
             {showFilters && (
               <div className="absolute top-full right-8 mt-2 w-80 max-h-96 bg-white rounded-xl shadow-xl border border-gray-200 z-50 overflow-hidden">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-2">
+                <div className="bg-linear-to-r from-blue-600 to-indigo-600 px-3 py-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-1">
                       <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -834,7 +834,7 @@ const getDescription = (invoice) => {
                         applyFilters();
                         setShowFilters(false);
                       }}
-                      className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-1.5 px-3 rounded-lg text-xs font-semibold transition-all duration-200 shadow-sm hover:shadow-md transform hover:-translate-y-0.5 flex items-center justify-center"
+                      className="flex-1 bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-1.5 px-3 rounded-lg text-xs font-semibold transition-all duration-200 shadow-sm hover:shadow-md transform hover:-translate-y-0.5 flex items-center justify-center"
                     >
                       <svg className="w-3 h-3 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -846,7 +846,7 @@ const getDescription = (invoice) => {
                         clearFilters();
                         setShowFilters(false);
                       }}
-                      className="flex-1 bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white py-1.5 px-3 rounded-lg text-xs font-semibold transition-all duration-200 shadow-sm hover:shadow-md transform hover:-translate-y-0.5 flex items-center justify-center"
+                      className="flex-1 bg-linear-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white py-1.5 px-3 rounded-lg text-xs font-semibold transition-all duration-200 shadow-sm hover:shadow-md transform hover:-translate-y-0.5 flex items-center justify-center"
                     >
                       <svg className="w-3 h-3 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -1009,7 +1009,7 @@ const getDescription = (invoice) => {
                     {/* Invoice Number & Status */}
                     <td className="px-3 py-2 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-sm">
+                        <div className="shrink-0 w-8 h-8 bg-linear-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-sm">
                           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                           </svg>
@@ -1034,10 +1034,10 @@ const getDescription = (invoice) => {
 
                     {/* College Name */}
                     <td className="px-3 py-2">
-                      <div className={`text-xs font-medium break-words ${getRowTextColor(invoice)}`}>
+                      <div className={`text-xs font-medium wrap-break-word ${getRowTextColor(invoice)}`}>
                         {invoice.collegeName || "N/A"}
                       </div>
-                      <div className="text-xs text-gray-500 mt-0.5 break-words">
+                      <div className="text-xs text-gray-500 mt-0.5 wrap-break-word">
                         {invoice.collegeState || "N/A"}
                       </div>
                     </td>
@@ -1055,14 +1055,14 @@ const getDescription = (invoice) => {
                     {/* Registration Status */}
                     <td className="px-3 py-2 whitespace-nowrap">
                       {invoice.registered ? (
-                        <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-sm">
+                        <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-linear-to-r from-green-500 to-emerald-500 text-white shadow-sm">
                           <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                           </svg>
                           Booked
                         </div>
                       ) : (
-                        <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-sm">
+                        <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-linear-to-r from-amber-400 to-orange-500 text-white shadow-sm">
                           <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0 1 1 0 012 0zm-1 3a1 1 0 00-1 1v4a1 1 0 102 0V9a1 1 0 00-1-1z" clipRule="evenodd" />
                           </svg>
@@ -1087,21 +1087,21 @@ const getDescription = (invoice) => {
                     {/* Approval Status */}
                     <td className="px-3 py-2 whitespace-nowrap">
                       {invoice.approvalStatus === "cancelled" ? (
-                        <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-sm">
+                        <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-linear-to-r from-red-500 to-rose-500 text-white shadow-sm">
                           <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                           </svg>
                           Cancelled
                         </div>
                       ) : invoice.approved || invoice.receivedAmount > 0 ? (
-                        <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-sm">
+                        <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-linear-to-r from-green-500 to-emerald-500 text-white shadow-sm">
                           <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                           </svg>
                           Approved
                         </div>
                       ) : (
-                        <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-sm">
+                        <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-linear-to-r from-blue-500 to-indigo-500 text-white shadow-sm">
                           <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0 1 1 0 012 0zm-1 3a1 1 0 00-1 1v4a1 1 0 102 0V9a1 1 0 00-1-1z" clipRule="evenodd" />
                           </svg>
@@ -1128,7 +1128,7 @@ const getDescription = (invoice) => {
                         {invoice.approvalStatus !== "cancelled" && !invoice.registered && (
                           <button
                             onClick={() => openDatePicker(invoice)}
-                            className="inline-flex items-center px-2 py-1 border border-transparent rounded-md text-xs font-medium text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-all duration-200 shadow-sm hover:shadow-md transform hover:-translate-y-0.5"
+                            className="inline-flex items-center px-2 py-1 border border-transparent rounded-md text-xs font-medium text-white bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-all duration-200 shadow-sm hover:shadow-md transform hover:-translate-y-0.5"
                             title="Book this invoice"
                           >
                             <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">

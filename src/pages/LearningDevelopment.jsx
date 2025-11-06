@@ -595,29 +595,29 @@ function LearningDevelopment() {
           isLoading ? (
             <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm ring-1 ring-gray-200/60">
               {/* Desktop Header Skeleton */}
-              <div className="hidden md:grid grid-cols-12 gap-2 px-5 py-3 text-[11px] font-semibold tracking-wide uppercase text-gray-600 bg-gradient-to-r from-gray-50 via-white to-gray-50 border-b border-gray-200">
+              <div className="hidden md:grid grid-cols-12 gap-2 px-5 py-3 text-[11px] font-semibold tracking-wide uppercase text-gray-600 bg-linear-to-r from-gray-50 via-white to-gray-50 border-b border-gray-200">
                 <div className="col-span-3 flex items-center gap-1.5">
-                  <div className="h-4 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-12"></div>
-                  <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-8"></div>
+                  <div className="h-4 bg-linear-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-12"></div>
+                  <div className="h-4 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-8"></div>
                 </div>
                 <div className="col-span-3 flex items-center gap-1.5">
-                  <div className="h-4 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-12"></div>
-                  <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-12"></div>
+                  <div className="h-4 bg-linear-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-12"></div>
+                  <div className="h-4 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-12"></div>
                 </div>
                 <div className="col-span-2 flex items-center gap-1.5">
-                  <div className="h-4 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-12"></div>
-                  <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-16"></div>
+                  <div className="h-4 bg-linear-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-12"></div>
+                  <div className="h-4 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-16"></div>
                 </div>
                 <div className="col-span-2 flex items-center gap-1.5">
-                  <div className="h-4 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-8"></div>
-                  <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-8"></div>
+                  <div className="h-4 bg-linear-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-8"></div>
+                  <div className="h-4 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-8"></div>
                 </div>
                 <div className="col-span-2 flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <div className="h-4 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-10"></div>
-                    <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-10"></div>
+                    <div className="h-4 bg-linear-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-10"></div>
+                    <div className="h-4 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-10"></div>
                   </div>
-                  <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-4 opacity-0"></div>
+                  <div className="h-4 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-4 opacity-0"></div>
                 </div>
               </div>
 
@@ -635,33 +635,33 @@ function LearningDevelopment() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center mb-1">
-                            <div className="h-4 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-6 mr-2"></div>
-                            <div className="h-5 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-20"></div>
+                            <div className="h-4 bg-linear-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-6 mr-2"></div>
+                            <div className="h-5 bg-linear-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-20"></div>
                             {index % 3 === 0 && (
-                              <div className="h-4 w-4 bg-gradient-to-r from-green-200 via-green-100 to-green-200 rounded-full animate-pulse ml-2"></div>
+                              <div className="h-4 w-4 bg-linear-to-r from-green-200 via-green-100 to-green-200 rounded-full animate-pulse ml-2"></div>
                             )}
                           </div>
                           <div className="flex items-center text-gray-600 text-sm">
-                            <div className="h-4 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-6 mr-2"></div>
-                            <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-32"></div>
+                            <div className="h-4 bg-linear-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-6 mr-2"></div>
+                            <div className="h-4 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-32"></div>
                           </div>
-                          <div className="h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-16 mt-1 ml-8"></div>
+                          <div className="h-3 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-16 mt-1 ml-8"></div>
                         </div>
-                        <div className="h-8 w-8 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-full animate-pulse mt-0.5"></div>
+                        <div className="h-8 w-8 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded-full animate-pulse mt-0.5"></div>
                       </div>
 
                       <div className="grid grid-cols-3 gap-3 text-[13px]">
                         <div className="flex items-center">
-                          <div className="h-3 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-4 mr-1.5"></div>
-                          <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-8"></div>
+                          <div className="h-3 bg-linear-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-4 mr-1.5"></div>
+                          <div className="h-4 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-8"></div>
                         </div>
                         <div className="flex items-center">
-                          <div className="h-3 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-4 mr-1.5"></div>
-                          <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-12"></div>
+                          <div className="h-3 bg-linear-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-4 mr-1.5"></div>
+                          <div className="h-4 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-12"></div>
                         </div>
                         <div className="flex items-center">
-                          <div className="h-3 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-4 mr-1.5"></div>
-                          <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-6"></div>
+                          <div className="h-3 bg-linear-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-4 mr-1.5"></div>
+                          <div className="h-4 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-6"></div>
                         </div>
                       </div>
                     </div>
@@ -670,26 +670,26 @@ function LearningDevelopment() {
                     <div className="hidden md:grid grid-cols-12 gap-2 px-5 py-3 text-[13px] items-center">
                       <div className="col-span-3 truncate">
                         <div className="flex items-center gap-2">
-                          <div className="h-4 bg-gradient-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-16"></div>
+                          <div className="h-4 bg-linear-to-r from-blue-200 via-blue-100 to-blue-200 rounded animate-pulse w-16"></div>
                           {index % 3 === 0 && (
-                            <div className="h-4 w-4 bg-gradient-to-r from-green-200 via-green-100 to-green-200 rounded-full animate-pulse"></div>
+                            <div className="h-4 w-4 bg-linear-to-r from-green-200 via-green-100 to-green-200 rounded-full animate-pulse"></div>
                           )}
                         </div>
                       </div>
                       <div className="col-span-3 truncate">
-                        <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-24"></div>
-                        <div className="h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-12 mt-0.5"></div>
+                        <div className="h-4 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-24"></div>
+                        <div className="h-3 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-12 mt-0.5"></div>
                       </div>
                       <div className="col-span-2 flex items-center gap-1.5">
-                        <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-6"></div>
-                        <div className="h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-12"></div>
+                        <div className="h-4 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-6"></div>
+                        <div className="h-3 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-12"></div>
                       </div>
                       <div className="col-span-2">
-                        <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-16"></div>
+                        <div className="h-4 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-16"></div>
                       </div>
                       <div className="col-span-2 flex items-center justify-between">
-                        <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-8"></div>
-                        <div className="h-8 w-8 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-full animate-pulse"></div>
+                        <div className="h-4 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse w-8"></div>
+                        <div className="h-8 w-8 bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 rounded-full animate-pulse"></div>
                       </div>
                     </div>
                   </div>
@@ -743,10 +743,10 @@ function LearningDevelopment() {
                 </div>
 
                 {/* Enhanced Toggle Buttons */}
-                <div className="relative bg-gradient-to-r from-gray-100 to-gray-50 rounded-lg p-0.5 shadow-inner border border-gray-200/50">
+                <div className="relative bg-linear-to-r from-gray-100 to-gray-50 rounded-lg p-0.5 shadow-inner border border-gray-200/50">
                   {/* Background indicator */}
                   <div
-                    className={`absolute top-0.5 bottom-0.5 rounded-md bg-gradient-to-r transition-all duration-300 ease-out shadow-sm ${
+                    className={`absolute top-0.5 bottom-0.5 rounded-md bg-linear-to-r transition-all duration-300 ease-out shadow-sm ${
                       showActiveContracts
                         ? "left-0.5 right-1/2 from-green-400 to-green-500"
                         : "left-1/2 right-0.5 from-gray-400 to-gray-500"

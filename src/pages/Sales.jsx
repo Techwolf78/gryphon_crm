@@ -40,21 +40,21 @@ const tabLabels = {
 
 const tabColorMap = {
   hot: {
-    active: "bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg",
+    active: "bg-linear-to-r from-red-600 to-red-700 text-white shadow-lg",
     inactive: "bg-red-50 text-red-600 hover:bg-red-100 border border-red-200",
   },
   warm: {
-    active: "bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-lg",
+    active: "bg-linear-to-r from-amber-500 to-amber-600 text-white shadow-lg",
     inactive:
       "bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200",
   },
   cold: {
-    active: "bg-gradient-to-r from-cyan-400 to-cyan-500 text-white shadow-lg",
+    active: "bg-linear-to-r from-cyan-400 to-cyan-500 text-white shadow-lg",
     inactive:
       "bg-cyan-50 text-cyan-600 hover:bg-cyan-100 border border-cyan-200",
   },
   closed: {
-    active: "bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg",
+    active: "bg-linear-to-r from-green-600 to-green-700 text-white shadow-lg",
     inactive:
       "bg-green-50 text-green-600 hover:bg-green-100 border border-green-200",
   },
@@ -303,7 +303,8 @@ function Sales() {
   }, [leads, users, currentUser, viewMyLeadsOnly, filters]);
 
   const totalTCV = useMemo(() => {
-    const sum = allVisibleLeads.reduce((sum, [, lead]) => sum + (lead.tcv || 0), 0);
+    const openLeads = allVisibleLeads.filter(([, lead]) => lead.phase !== "closed");
+    const sum = openLeads.reduce((sum, [, lead]) => sum + (lead.tcv || 0), 0);
     return sum;
   }, [allVisibleLeads]);
 
@@ -690,10 +691,10 @@ function Sales() {
   };
 
   return (
-    <div className="bg-gradient-to-br from-gray-50 to-gray-100 font-sans">
+    <div className="bg-linear-to-br from-gray-50 to-gray-100 font-sans">
       <div className="mx-auto">
         {/* Sticky Header Section */}
-        <div className="sticky top-0 z-20 bg-gradient-to-br from-gray-50 to-gray-100 pb-2 border-b border-gray-200">
+        <div className="sticky top-0 z-20 bg-linear-to-br from-gray-50 to-gray-100 pb-2 border-b border-gray-200">
           {/* Dashboard Title and Description */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-2 " data-tour="sales-header">
             <div>
@@ -707,7 +708,7 @@ function Sales() {
 
             <button
               onClick={() => setShowModal(true)}
-              className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-5 py-2.5 rounded-xl font-semibold hover:opacity-90 transition-all shadow-md flex items-center"
+              className="bg-linear-to-r from-blue-600 to-indigo-700 text-white px-5 py-2.5 rounded-xl font-semibold hover:opacity-90 transition-all shadow-md flex items-center"
               data-tour="add-college-button"
             >
               <svg
@@ -786,7 +787,14 @@ function Sales() {
                 setFilters={setRawFilters}
                 isFilterOpen={isFilterOpen}
                 setIsFilterOpen={setIsFilterOpen}
-                users={users}
+                users={Object.fromEntries(
+                  Object.entries(users).filter(([, user]) => 
+                    user.department === "Sales" || 
+                    (Array.isArray(user.department) && user.department.includes("Sales")) ||
+                    user.departments === "Sales" ||
+                    (Array.isArray(user.departments) && user.departments.includes("Sales"))
+                  )
+                )}
                 leads={leads}
                 activeTab={activeTab}
               />

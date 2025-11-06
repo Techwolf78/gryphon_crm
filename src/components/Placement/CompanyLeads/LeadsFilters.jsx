@@ -52,12 +52,12 @@ const tabLabels = {
 
 const LeadsFilters = ({ activeTab, setActiveTab, leadsByStatus = {} }) => {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2 mb-6 pt-4 w-full">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-1 mb-3 pt-2 w-full">
       {Object.keys(tabLabels).map((key) => (
         <button
           key={key}
           onClick={() => setActiveTab(key)}
-          className={`w-full py-2 rounded-xl text-sm font-semibold transition-all duration-300 ease-out transform hover:scale-[1.02] ${
+          className={`w-full py-1 rounded-lg text-sm font-semibold transition-all duration-300 ease-out transform hover:scale-[1.02] ${
             activeTab === key
               ? statusColorMap[key]?.tab?.active || 'bg-blue-600 text-white'
               : statusColorMap[key]?.tab?.inactive || 'bg-gray-100 text-gray-700 hover:bg-gray-200'

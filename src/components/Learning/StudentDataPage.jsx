@@ -136,7 +136,7 @@ function StudentDataPage({ trainingId, onBack }) {
       <div className="mb-4 p-4 bg-red-50 border-l-4 border-red-500 rounded-lg shadow-sm">
         <div className="flex justify-between items-start">
           <div className="flex items-start">
-            <svg className="h-5 w-5 text-red-500 mt-0.5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <svg className="h-5 w-5 text-red-500 mt-0.5 mr-2 shrink-0" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
             </svg>
             <div>
@@ -768,9 +768,9 @@ function StudentDataPage({ trainingId, onBack }) {
   }, [showImportOptions]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-50">
+    <div className="min-h-screen bg-linear-to-br from-purple-50 to-indigo-50">
       <div className="bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-2 text-white flex-shrink-0">
+        <div className="bg-linear-to-r from-purple-600 to-indigo-600 p-2 text-white shrink-0">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-1">
             <div className="flex items-center gap-1">
               <button
@@ -836,7 +836,7 @@ function StudentDataPage({ trainingId, onBack }) {
           </div>
         </div>
 
-        <div className="pt-2 pb-6 px-6 overflow-y-auto flex-grow">
+        <div className="pt-2 pb-6 px-6 overflow-y-auto grow">
           {error && <ProfessionalErrorDisplay error={error} onDismiss={() => setError(null)} />}
 
           {loading ? (

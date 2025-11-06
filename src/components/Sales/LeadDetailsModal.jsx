@@ -86,6 +86,19 @@ const contactMethodMap = {
   },
 };
 
+const formatIndianNumber = (num) => {
+  if (!num || isNaN(num)) return "-";
+  const numStr = num.toString();
+  const [integerPart, decimalPart] = numStr.split('.');
+  
+  // Format integer part in Indian numbering system
+  const lastThree = integerPart.slice(-3);
+  const otherNumbers = integerPart.slice(0, -3);
+  const formatted = otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + (otherNumbers ? "," : "") + lastThree;
+  
+  return decimalPart ? `${formatted}.${decimalPart}` : formatted;
+};
+
 const formatDate = (ms) =>
   ms
     ? new Date(ms).toLocaleDateString(undefined, {
@@ -144,7 +157,7 @@ export default function LeadDetailsModal({
       >
         {/* Header with floating effect */}
         <div
-          className={`sticky top-0 ${statusColors.bg} p-6 rounded-t-2xl flex justify-between items-start z-10 backdrop-blur-sm bg-opacity-90`}
+          className={`sticky top-0 ${statusColors.bg} p-4 rounded-t-2xl flex justify-between items-start z-10 backdrop-blur-sm bg-opacity-90`}
         >
           <div className="flex-1">
             <div className="flex items-start space-x-4">
@@ -155,7 +168,7 @@ export default function LeadDetailsModal({
                 <h2 className="text-3xl font-bold text-gray-900 leading-tight tracking-tight">
                   {selectedLead.businessName || "Unnamed Lead"}
                 </h2>
-                <div className="flex items-center mt-3 space-x-3">
+                <div className="flex items-center mt-2 space-x-2">
                   <span
                     className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold tracking-wider ${statusColors.badge} shadow-md`}
                   >
@@ -190,15 +203,15 @@ export default function LeadDetailsModal({
         </div>
 
         {/* Main Content */}
-        <div className="p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="p-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Column 1 - Contact, Location, Remarks */}
-            <div className="space-y-5 flex flex-col h-full">
+            <div className="space-y-3 flex flex-col h-full">
               {/* Contact Card */}
               <div
-                className={`bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:border-gray-200 ${statusColors.ring} hover:ring-2`}
+                className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:border-gray-200 ${statusColors.ring} hover:ring-2`}
               >
-                <h3 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100 flex items-center">
+                <h3 className="text-lg font-bold text-gray-800 mb-3 pb-2 border-b border-gray-100 flex items-center">
                   <span
                     className={`inline-block w-2 h-2 rounded-full ${statusColors.accent} mr-2`}
                   ></span>
@@ -324,9 +337,9 @@ export default function LeadDetailsModal({
 
               {/* Location Card */}
               <div
-                className={`bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:border-gray-200 ${statusColors.ring} hover:ring-2`}
+                className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:border-gray-200 ${statusColors.ring} hover:ring-2`}
               >
-                <h3 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100 flex items-center">
+                <h3 className="text-lg font-bold text-gray-800 mb-3 pb-2 border-b border-gray-100 flex items-center">
                   <span
                     className={`inline-block w-2 h-2 rounded-full ${statusColors.accent} mr-2`}
                   ></span>
@@ -392,9 +405,9 @@ export default function LeadDetailsModal({
 
               {/* Remarks Card */}
               <div
-                className={`bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:border-gray-200 ${statusColors.ring} hover:ring-2`}
+                className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:border-gray-200 ${statusColors.ring} hover:ring-2`}
               >
-                <h3 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100 flex items-center">
+                <h3 className="text-lg font-bold text-gray-800 mb-3 pb-2 border-b border-gray-100 flex items-center">
                   <span
                     className={`inline-block w-2 h-2 rounded-full ${statusColors.accent} mr-2`}
                   ></span>
@@ -421,7 +434,7 @@ export default function LeadDetailsModal({
                     Lead Remarks
                   </span>
                 </h3>
-                <div className="min-h-[40px] text-gray-900 font-medium">
+                <div className="min-h-10 text-gray-900 font-medium">
                   {selectedLead.remarks || (
                     <span className="text-gray-400">No remarks added.</span>
                   )}
@@ -430,12 +443,12 @@ export default function LeadDetailsModal({
             </div>
 
             {/* Column 2 - Accreditation, Courses, Summary */}
-            <div className="space-y-5 flex flex-col h-full">
+            <div className="space-y-3 flex flex-col h-full">
               {/* Accreditation & Affiliation Card */}
               <div
-                className={`bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:border-gray-200 ${statusColors.ring} hover:ring-2`}
+                className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:border-gray-200 ${statusColors.ring} hover:ring-2`}
               >
-                <h3 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100 flex items-center">
+                <h3 className="text-lg font-bold text-gray-800 mb-3 pb-2 border-b border-gray-100 flex items-center">
                   <span
                     className={`inline-block w-2 h-2 rounded-full ${statusColors.accent} mr-2`}
                   ></span>
@@ -479,9 +492,9 @@ export default function LeadDetailsModal({
 
               {/* Courses Card */}
               <div
-                className={`bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:border-gray-200 ${statusColors.ring} hover:ring-2`}
+                className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:border-gray-200 ${statusColors.ring} hover:ring-2`}
               >
-                <h3 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100 flex items-center">
+                <h3 className="text-lg font-bold text-gray-800 mb-3 pb-2 border-b border-gray-100 flex items-center">
                   <span
                     className={`inline-block w-2 h-2 rounded-full ${statusColors.accent} mr-2`}
                   ></span>
@@ -567,7 +580,7 @@ export default function LeadDetailsModal({
                           </p>
                           <p className="text-gray-900 font-medium">
                             {course.perStudentCost
-                              ? `₹${course.perStudentCost.toLocaleString()}`
+                              ? `₹${formatIndianNumber(course.perStudentCost)}`
                               : "-"}
                           </p>
                         </div>
@@ -577,7 +590,7 @@ export default function LeadDetailsModal({
                           </p>
                           <p className="text-gray-900 font-medium">
                             {course.courseTCV
-                              ? `₹${course.courseTCV.toLocaleString()}`
+                              ? `₹${formatIndianNumber(course.courseTCV)}`
                               : "-"}
                           </p>
                         </div>
@@ -589,11 +602,11 @@ export default function LeadDetailsModal({
 
               {/* Combined Summary Card */}
               <div
-                className={`bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:border-gray-200 ${statusColors.ring} hover:ring-2 flex flex-col gap-6`}
+                className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:border-gray-200 ${statusColors.ring} hover:ring-2 flex flex-col gap-4`}
               >
                 {/* Financial Summary */}
                 <div>
-                  <h3 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100 flex items-center">
+                  <h3 className="text-lg font-bold text-gray-800 mb-3 pb-2 border-b border-gray-100 flex items-center">
                     <span
                       className={`inline-block w-2 h-2 rounded-full ${statusColors.accent} mr-2`}
                     ></span>
@@ -622,7 +635,7 @@ export default function LeadDetailsModal({
                       <p className="mt-1 text-gray-900 font-bold text-lg">
                         {selectedLead.tcv ? (
                           <span className="text-green-600">
-                            ₹{selectedLead.tcv.toLocaleString()}
+                            ₹{formatIndianNumber(selectedLead.tcv)}
                           </span>
                         ) : (
                           "-"
@@ -649,7 +662,7 @@ export default function LeadDetailsModal({
                 </div>
                 {/* Timeline */}
                 <div>
-                  <h3 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100 flex items-center">
+                  <h3 className="text-lg font-bold text-gray-800 mb-3 pb-2 border-b border-gray-100 flex items-center">
                     <span
                       className={`inline-block w-2 h-2 rounded-full ${statusColors.accent} mr-2`}
                     ></span>
@@ -691,7 +704,7 @@ export default function LeadDetailsModal({
                 </div>
                 {/* Followup */}
                 <div>
-                  <h3 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100 flex items-center">
+                  <h3 className="text-lg font-bold text-gray-800 mb-3 pb-2 border-b border-gray-100 flex items-center">
                     <span
                       className={`inline-block w-2 h-2 rounded-full ${statusColors.accent} mr-2`}
                     ></span>
@@ -724,7 +737,7 @@ export default function LeadDetailsModal({
         </div>
 
         {/* Floating Action Buttons */}
-        <div className="sticky bottom-0 bg-gradient-to-t from-white via-white to-transparent pt-8 pb-4 px-6 flex justify-end space-x-3 rounded-b-xl">
+        <div className="sticky bottom-0 bg-linear-to-t from-white via-white to-transparent pt-4 pb-3 px-4 flex justify-end space-x-3 rounded-b-xl">
           <button
             onClick={onClose}
             className={`px-6 py-2.5 rounded-xl text-white font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 ${

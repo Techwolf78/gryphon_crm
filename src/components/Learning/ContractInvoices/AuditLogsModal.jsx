@@ -20,7 +20,7 @@ const AuditLogsModal = ({
     <div className="fixed inset-0 bg-transparent backdrop-blur-lg bg-opacity-60 flex items-center justify-center z-54 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl min-h-[95vh] max-h-[95vh] overflow-hidden border border-gray-200/60">
         {/* Header */}
-        <div className="bg-gradient-to-r from-red-600 to-red-700 px-4 py-3">
+        <div className="bg-linear-to-r from-red-600 to-red-700 px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 bg-white/20 rounded-lg flex items-center justify-center">
@@ -285,7 +285,7 @@ const AuditLogsModal = ({
                       {/* Action */}
                       <div className="col-span-2">
                         <div className="flex items-center gap-2">
-                          <div className="w-5 h-5 bg-red-100 rounded-md flex items-center justify-center flex-shrink-0">
+                          <div className="w-5 h-5 bg-red-100 rounded-md flex items-center justify-center shrink-0">
                             <svg className="w-3 h-3 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
@@ -311,7 +311,7 @@ const AuditLogsModal = ({
                       {/* User */}
                       <div className="col-span-2">
                         <div className="flex items-center gap-1.5">
-                          <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                          <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
                             <svg className="w-2.5 h-2.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                             </svg>

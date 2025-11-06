@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef, useMemo } from "react"
 import { db } from "../../firebase";
 import { collection, getDocs, query, where, orderBy, limit, updateDoc, doc } from "firebase/firestore";
 import InvoiceModal from "./InvoiceModal";
+import EditInvoiceModal from "./Invoice/EditInvoiceModal";
 import { generateInvoicePDF } from "./invoiceUtils";
 import { FiSearch, FiFilter, FiRefreshCw, FiTrash2, FiUser, FiCheckCircle, FiAlertCircle, FiXCircle, FiInfo, FiClock } from "react-icons/fi";
 import Header from "./Invoice/Header";
@@ -21,6 +22,8 @@ function GenerateTrainerInvoice() {
   const [loading, setLoading] = useState(true);
   const [selectedTrainer, setSelectedTrainer] = useState(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [modalMode, setModalMode] = useState('view');
   const [expandedPhases, setExpandedPhases] = useState({});
   const [searchTerm, setSearchTerm] = useState("");
   const [startDateFilter, setStartDateFilter] = useState("");
@@ -594,6 +597,13 @@ function GenerateTrainerInvoice() {
     }
     
     setSelectedTrainer(trainer);
+    setModalMode('edit');
+    setShowInvoiceModal(true);
+  }, []);
+
+  const handleViewInvoice = useCallback((trainer) => {
+    setSelectedTrainer(trainer);
+    setModalMode('view');
     setShowInvoiceModal(true);
   }, []);
 
@@ -980,71 +990,8 @@ function GenerateTrainerInvoice() {
     }
   }, []);  // Function to handle editing an invoice
   const handleEditInvoice = useCallback(async (trainer) => {
-    try {
-      let allInvoices = [];
-
-      if (trainer.isMerged) {
-        // For merged trainings, get the merged invoice
-        const q = query(
-          collection(db, "invoices"),
-          where("trainerId", "==", trainer.trainerId),
-          where("collegeName", "==", trainer.collegeName),
-          where("phase", "==", trainer.phase)
-        );
-
-        const querySnapshot = await getDocs(q);
-        querySnapshot.forEach(doc => {
-          allInvoices.push({ id: doc.id, ...doc.data() });
-        });
-      } else {
-        // Original logic for non-merged trainings
-        const q = query(
-          collection(db, "invoices"),
-          where("trainerId", "==", trainer.trainerId),
-          where("collegeName", "==", trainer.collegeName),
-          where("phase", "==", trainer.phase)
-        );
-
-        const querySnapshot = await getDocs(q);
-        querySnapshot.forEach(doc => {
-          allInvoices.push({ id: doc.id, ...doc.data() });
-        });
-      }
-
-      if (allInvoices.length > 0) {
-        if (allInvoices.length > 1) {
-          // For multiple invoices, show selection dialog
-          const invoiceOptions = allInvoices.map(invoice => 
-            `${invoice.billNumber} (${trainer.collegeName})`
-          );
-          const selectedInvoice = prompt(
-            `Multiple invoices found for ${trainer.trainerName}. Please enter the invoice number you want to edit:\n${invoiceOptions.join(
-              "\n"
-            )}`
-          );
-
-          if (selectedInvoice) {
-            const selectedInvoiceData = allInvoices.find(
-              inv => inv.billNumber === selectedInvoice.split(' ')[0]
-            );
-            if (selectedInvoiceData) {
-              setSelectedTrainer(trainer);
-              setShowInvoiceModal(true);
-            } else {
-              setToast({ type: 'error', message: "Invalid invoice number selected" });
-            }
-          }
-        } else {
-          // Single invoice - edit it directly
-          setSelectedTrainer(trainer);
-          setShowInvoiceModal(true);
-        }
-      } else {
-        setToast({ type: 'warning', message: "No invoice found for this trainer" });
-      }
-    } catch {
-      setToast({ type: 'error', message: "Failed to find invoice. Please try again." });
-    }
+    setSelectedTrainer(trainer);
+    setShowEditModal(true);
   }, []);
 
   // Handle invoice approval (sets invoice=true and status=approved for HR review)
@@ -1099,7 +1046,7 @@ function GenerateTrainerInvoice() {
           
           {/* 🎯 SIMPLIFIED: Clean status with refresh button focus */}
           {!loading && lastFetchTime && (
-            <div className="px-4 py-1 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+            <div className="px-4 py-1 bg-linear-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className={`text-xs font-medium ${
@@ -1186,6 +1133,7 @@ function GenerateTrainerInvoice() {
                 handleEditInvoice={handleEditInvoice}
                 handleGenerateInvoice={handleGenerateInvoice}
                 handleApproveInvoice={handleApproveInvoice}
+                handleViewInvoice={handleViewInvoice}
                 downloadingInvoice={downloadingInvoice}
                 getDownloadStatus={getDownloadStatus}
                 formatDate={formatDate}
@@ -1197,11 +1145,23 @@ function GenerateTrainerInvoice() {
       {showInvoiceModal && selectedTrainer && (
         <InvoiceModal
           trainer={selectedTrainer}
+          initialMode={modalMode}
           onClose={() => {
             setShowInvoiceModal(false);
             setSelectedTrainer(null);
           }}
           onInvoiceGenerated={handleInvoiceGenerated}
+          onToast={setToast}
+        />
+      )}
+      {showEditModal && selectedTrainer && (
+        <EditInvoiceModal
+          trainer={selectedTrainer}
+          onClose={() => {
+            setShowEditModal(false);
+            setSelectedTrainer(null);
+          }}
+          onInvoiceUpdated={handleInvoiceGenerated}
           onToast={setToast}
         />
       )}

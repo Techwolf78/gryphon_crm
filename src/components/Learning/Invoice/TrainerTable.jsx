@@ -12,6 +12,7 @@ function TrainerTable({
   handleEditInvoice,
   handleGenerateInvoice,
   handleApproveInvoice,
+  handleViewInvoice,
   downloadingInvoice,
   getDownloadStatus,
   formatDate,
@@ -27,7 +28,7 @@ function TrainerTable({
         <div key={collegeName} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200">
           {/* Enhanced College Header */}
           <div
-            className="bg-gradient-to-r from-blue-50 via-blue-50 to-blue-50 px-6 py-3 flex justify-between items-center cursor-pointer hover:from-blue-100 hover:to-blue-100 transition-all duration-200 border-l-4 border-blue-500"
+            className="bg-linear-to-r from-blue-50 via-blue-50 to-blue-50 px-4 py-2 flex justify-between items-center cursor-pointer hover:from-blue-100 hover:to-blue-100 transition-all duration-200 border-l-4 border-blue-500"
             onClick={() => togglePhase(collegeName)}
           >
             <div className="flex items-center gap-3">
@@ -72,7 +73,7 @@ function TrainerTable({
                 <div key={`${collegeName}_${phase}`} className="border-b border-gray-100 last:border-b-0">
                   {/* Compact Phase Header within College */}
                   <div 
-                    className="bg-gradient-to-r from-blue-50/30 to-indigo-50/30 px-4 py-2 border-b border-blue-100 cursor-pointer hover:from-blue-100/50 hover:to-indigo-100/50 transition-all duration-200"
+                    className="bg-linear-to-r from-blue-50/30 to-indigo-50/30 px-4 py-2 border-b border-blue-100 cursor-pointer hover:from-blue-100/50 hover:to-indigo-100/50 transition-all duration-200"
                     onClick={() => togglePhase(`${collegeName}_${phase}`)}
                   >
                     <div className="flex items-center justify-between">
@@ -106,7 +107,7 @@ function TrainerTable({
                     <div className="overflow-x-auto overflow-y-hidden">
                       <div className="min-w-0">
                         <table className="w-full min-w-[800px]">
-                          <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+                          <thead className="bg-linear-to-r from-gray-50 to-gray-100">
                             <tr>
                               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                                 Trainer Details
@@ -137,6 +138,7 @@ function TrainerTable({
                               handleEditInvoice={handleEditInvoice}
                               handleGenerateInvoice={handleGenerateInvoice}
                               handleApproveInvoice={handleApproveInvoice}
+                              handleViewInvoice={handleViewInvoice}
                               downloadingInvoice={downloadingInvoice}
                               getDownloadStatus={getDownloadStatus}
                               formatDate={formatDate}

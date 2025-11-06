@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import PropTypes from "prop-types";
-import { FiChevronLeft, FiChevronRight, FiDownload, FiFilter, FiTrendingUp } from "react-icons/fi";
+import { FiChevronLeft, FiChevronRight, FiDownload, FiFilter, FiTrendingUp, FiRotateCw } from "react-icons/fi";
 import { collection, getDocs, doc, getDoc, writeBatch } from "firebase/firestore";
 import { db } from "../../../firebase";
 import ClosedLeadsTable from "./ClosedLeadsTable";
@@ -17,6 +17,13 @@ import * as XLSX from "xlsx";
 const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange }) => {
   const [filterType, setFilterType] = useState("all");
   const [quarterFilter, setQuarterFilter] = useState("all");
+  const [selectedFYFilter, setSelectedFYFilter] = useState(() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const baseYear = month >= 3 ? year : year - 1;
+    return `${baseYear}-${(baseYear + 1).toString().slice(-2)}`;
+  }); // 🆕 Use short format to match dropdown options
   const [targets, setTargets] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
@@ -26,6 +33,9 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
 
   // 🆕 Add enriched leads state
   const [enrichedLeads, setEnrichedLeads] = useState({});
+
+  // 🆕 Add loading state for refresh
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // 🆕 Add cache for training form data to prevent refetching
   const trainingFormCache = useRef({});
@@ -197,10 +207,13 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
             totalCost: parseFloat(trainingFormDataItem.totalCost) || lead.totalCost,
             gstAmount: parseFloat(trainingFormDataItem.gstAmount) || 0,
             netPayableAmount: parseFloat(trainingFormDataItem.netPayableAmount) || lead.totalCost,
+            contractEndDate: trainingFormDataItem.contractEndDate || lead.contractEndDate, // 🆕 Add contractEndDate from trainingForms
+            contractStartDate: trainingFormDataItem.contractStartDate || lead.contractStartDate, // 🆕 Add contractStartDate from trainingForms
             closureType: updatedClosureType, // Use the updated closureType
           };
         } else {
           // For leads without training forms, calculate totalCost from available data
+          // and set contractEndDate to closedDate as fallback
           const studentCount = parseInt(lead.studentCount) || 0;
           const perStudentCost = parseFloat(lead.perStudentCost) || 0;
           const calculatedTotalCost = studentCount * perStudentCost;
@@ -209,6 +222,8 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
             ...lead,
             totalCost: calculatedTotalCost || lead.totalCost || 0,
             gstAmount: 0,
+            contractEndDate: lead.contractEndDate || lead.closedDate, // Fallback to closedDate
+            contractStartDate: lead.contractStartDate || lead.closedDate, // Fallback to closedDate
           };
         }
 
@@ -266,7 +281,6 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
     quarterFilter === "current" ? currentQuarter : quarterFilter,
     [quarterFilter, currentQuarter]
   );
-  const selectedFY = useMemo(() => getFinancialYear(today), [today]);
 
   // 🆕 Memoize current user object lookup
   const currentUserObj = useMemo(() =>
@@ -347,15 +361,24 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
           );
           if (!leadUser) return false;
 
+          const isSalesUser = (user) => {
+            return (
+              user.department === "Sales" ||
+              (Array.isArray(user.department) && user.department.includes("Sales")) ||
+              user.departments === "Sales" ||
+              (Array.isArray(user.departments) && user.departments.includes("Sales"))
+            );
+          };
+
           if (showDirectorLeads) {
             // Show both Sales department and Admin Directors
             return (
-              leadUser.department === "Sales" ||
+              isSalesUser(leadUser) ||
               (leadUser.department === "Admin" && leadUser.role === "Director")
             );
           } else {
             // Show only Sales department
-            return leadUser.department === "Sales";
+            return isSalesUser(leadUser);
           }
         }
 
@@ -376,12 +399,37 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
         return lead.closureType === filterType;
       })
       .filter(([, lead]) => {
-        if (!lead.closedDate) return false;
+        // Use contractStartDate instead of contractEndDate for financial year/quarter filtering
+        if (!lead.contractStartDate) {
+          console.log('❌ Lead filtered out - no contractStartDate:', lead.businessName, lead.projectCode);
+          return false;
+        }
+
+        // Skip FY filtering if "Lifetime" is selected
+        if (selectedFYFilter === "lifetime") {
+          console.log('✅ Lead passed - Lifetime filter active:', lead.businessName);
+        } else {
+          const contractStartDate = new Date(lead.contractStartDate);
+          const closedFY = getFinancialYear(contractStartDate);
+          const closedFYShort = `${closedFY.split('-')[0]}-${closedFY.split('-')[1].slice(-2)}`;
+
+          console.log('🔍 Lead:', lead.businessName, 'contractStartDate:', lead.contractStartDate, 'FY:', closedFY, 'FY Short:', closedFYShort, 'selectedFY:', selectedFYFilter);
+
+          // Always filter by financial year first
+          if (closedFYShort !== selectedFYFilter) {
+            console.log('❌ Lead filtered out - wrong FY:', lead.businessName, closedFYShort, '!==', selectedFYFilter);
+            return false;
+          }
+
+          console.log('✅ Lead passed FY filter:', lead.businessName);
+        }
+
+        // Then filter by quarter if not "all"
         if (selectedQuarter === "all") return true;
-        const closedQuarter = getQuarter(new Date(lead.closedDate));
+        const closedQuarter = getQuarter(new Date(lead.contractStartDate));
         return closedQuarter === selectedQuarter;
       })
-      .sort(([, a], [, b]) => new Date(b.closedDate) - new Date(a.closedDate));
+      .sort(([, a], [, b]) => new Date(b.contractStartDate || b.contractEndDate || b.closedDate) - new Date(a.contractStartDate || a.contractEndDate || a.closedDate));
 
 
     return result;
@@ -391,6 +439,7 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
     currentRole,
     filterType,
     selectedQuarter,
+    selectedFYFilter, // 🆕 Add selectedFYFilter to dependencies
     viewMyLeadsOnly,
     selectedTeamUserId,
     users,
@@ -408,7 +457,7 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterType, quarterFilter, viewMyLeadsOnly]);
+  }, [filterType, quarterFilter, selectedFYFilter, viewMyLeadsOnly]);
 
   const achievedValue = useMemo(() => {
     const value = filteredLeads.reduce(
@@ -452,6 +501,28 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
     await fetchTargets();
   };
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    const startTime = Date.now();
+
+    try {
+      // Clear the training form cache to force fresh data fetch
+      trainingFormCache.current = {};
+      await Promise.all([fetchTargets(), enrichLeadsData()]);
+
+      // Ensure animation runs for at least 2 seconds
+      const elapsedTime = Date.now() - startTime;
+      const remainingTime = Math.max(0, 2000 - elapsedTime);
+      if (remainingTime > 0) {
+        await new Promise(resolve => setTimeout(resolve, remainingTime));
+      }
+    } catch (error) {
+      console.error("Error refreshing data:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
 
   // Add effect to report count changes
   useEffect(() => {
@@ -461,7 +532,7 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
   }, [filteredLeads.length, onCountChange]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
       <div className="w-full py-4">
         {showLeaderboard ? (
           // Leaderboard Section
@@ -471,7 +542,7 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
             users={users}
             formatCurrency={formatCurrency}
             targets={targets}
-            selectedFY={selectedFY}
+            selectedFY={selectedFYFilter} // 🆕 Use selectedFYFilter for leaderboard
             currentUser={currentUser}
             onTargetUpdate={handleTargetUpdate}
           />
@@ -482,10 +553,10 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-2">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <div className="p-1.5 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg shadow-md">
+                    <div className="p-1.5 bg-linear-to-r from-blue-500 to-indigo-600 rounded-lg shadow-md">
                       <FiTrendingUp className="w-5 h-5 text-white" />
                     </div>
-                    <h1 className="text-xl lg:text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+                    <h1 className="text-xl lg:text-2xl font-bold bg-linear-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
                       Closed Deals
                     </h1>
                   </div>
@@ -499,9 +570,9 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
                   {/* Leaderboard Button */}
                   <button
                     onClick={() => setShowLeaderboard(true)}
-                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg shadow-sm hover:bg-gray-50 hover:border-gray-400 hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg shadow-sm hover:bg-gray-50 hover:border-gray-400 hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                   >
-                    <span className="text-base">🏆</span>
+                    <span className="text-sm">🏆</span>
                     Leaderboard
                   </button>
 
@@ -513,10 +584,20 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
                   {/* Export Button */}
                   <button
                     onClick={() => exportClosedLeads(filteredLeads, db)}
-                    className="inline-flex items-center justify-center px-2 py-1 bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-sm font-medium rounded-md shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/25"
+                    className="inline-flex items-center justify-center px-2 py-1 bg-linear-to-r from-emerald-500 to-teal-600 text-white text-sm font-medium rounded-md shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/25"
                   >
                     <FiDownload className="w-3.5 h-3.5 mr-1" />
                     Export
+                  </button>
+
+                  {/* Refresh Button */}
+                  <button
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                    className="inline-flex items-center justify-center px-2 py-0.5 bg-linear-to-r from-blue-500 to-indigo-600 text-white text-sm font-medium rounded-md shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <FiRotateCw className={`w-3.5 h-3.5 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    {isRefreshing ? 'Refreshing...' : 'Refresh'}
                   </button>
 
                   {/* Filters */}
@@ -552,6 +633,35 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
                       </div>
                     </div>
 
+                    {/* Financial Year Filter */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-medium text-gray-700">FY:</span>
+                      <select
+                        value={selectedFYFilter}
+                        onChange={(e) => setSelectedFYFilter(e.target.value)}
+                        className="px-1 py-0.5 border border-gray-300 rounded-md text-xs text-gray-700 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500"
+                      >
+                        {/* Lifetime option */}
+                        <option value="lifetime" style={{ color: '#059669', fontWeight: '600' }}>
+                          Lifetime •
+                        </option>
+                        {/* Generate financial years from current year -5 to +5 */}
+                        {Array.from({ length: 11 }, (_, i) => {
+                          const currentYear = new Date().getFullYear();
+                          const currentMonth = new Date().getMonth();
+                          const baseYear = currentMonth >= 3 ? currentYear : currentYear - 1;
+                          const fy = `${baseYear - 5 + i}-${(baseYear - 5 + i + 1).toString().slice(-2)}`;
+                          const currentFYShort = `${baseYear}-${(baseYear + 1).toString().slice(-2)}`;
+                          const isCurrentFY = fy === currentFYShort;
+                          return (
+                            <option key={fy} value={fy} style={isCurrentFY ? { color: '#2563eb', fontWeight: '600' } : {}}>
+                              {fy}{isCurrentFY ? ' •' : ''}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+
                     {/* Quarter Filter */}
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs font-medium text-gray-700">Quarter:</span>
@@ -585,7 +695,7 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
 
             {/* Department Toggle for Admin Directors */}
             {shouldShowDepartmentToggle && (
-              <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-1.5 mb-2 shadow-sm">
+              <div className="bg-linear-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-1.5 mb-2 shadow-sm">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <h3 className="text-xs font-semibold text-gray-900">Department Filter</h3>
@@ -607,7 +717,7 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
                       onClick={() => setShowDirectorLeads(!showDirectorLeads)}
                       className={`relative inline-flex h-5 w-9 items-center rounded-full transition-all duration-300 ease-in-out focus:outline-none ${
                         showDirectorLeads
-                          ? "bg-gradient-to-r from-amber-400 to-orange-500"
+                          ? "bg-linear-to-r from-amber-400 to-orange-500"
                           : "bg-gray-300"
                       } shadow-sm`}
                       role="switch"
@@ -630,14 +740,13 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
                   </div>
                 </div>
               </div>
-            )}            {/* Stats Dashboard */}
-            <div className="mb-4">
+            )}            <div className="mb-4">
               <ClosedLeadsStats
                 leads={enrichedLeads}
                 targets={targets}
                 currentUser={currentUser}
                 users={users}
-                selectedFY={selectedFY}
+                selectedFY={selectedFYFilter} // 🆕 Use selectedFYFilter instead of current FY
                 activeQuarter={selectedQuarter}
                 formatCurrency={formatCurrency}
                 viewMyLeadsOnly={viewMyLeadsOnly}
@@ -701,7 +810,7 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
                               onClick={() => setCurrentPage(pageNum)}
                               className={`px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-500/25 ${
                                 currentPage === pageNum
-                                  ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg"
+                                  ? "bg-linear-to-r from-blue-500 to-indigo-600 text-white shadow-lg"
                                   : "bg-white text-gray-700 hover:bg-gray-50 hover:shadow-md border border-gray-300"
                               }`}
                             >

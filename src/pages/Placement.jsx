@@ -8,7 +8,6 @@ import CompanyLeads from "../components/Placement/CompanyLeads/CompanyLeads";
 import MouPreviewModal from "../components/Placement/MouPreviewModal";
 import PlacementDetailsModal from "../components/Placement/PlacementDetailsModal";
 import { Eye, User, FileText } from "lucide-react";
-import { doc } from "firebase/firestore";
 import BudgetDashboard from "../components/Budget/BudgetDashboard";
 
 function Placement() {
@@ -70,14 +69,6 @@ function Placement() {
         ...doc.data(),
       }));
       setTrainingData(trainingData);
-
-      // Fetch leads
-      const leadsSnapshot = await getDocs(collection(db, "leads"));
-      const leadsData = leadsSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setLeads(leadsData);
 
       // Fetch progress for each trainingData
       const progressPromises = trainingData.map(async (item) => {
@@ -213,9 +204,9 @@ function Placement() {
   };
 
   return (
-    <div className="p-0">
+    <div className="p-0 -mt-2">
       <style>{tableStyles}</style>
-      <h2 className="text-2xl font-bold mb-1 text-blue-800">
+      <h2 className="text-2xl font-bold mb-1 text-blue-800 mt-0">
         Placement Management
       </h2>
 
@@ -240,7 +231,7 @@ function Placement() {
       {!loading && !error && (
         <>
           {/* Enhanced Tab Navigation with Sliding Indicator */}
-          <div className="relative mb-4">
+          <div className="relative mb-2">
             <div className="flex border-b border-gray-200">
               <button
                 className={`flex-1 px-6 py-2 font-medium text-sm transition-all duration-150 ${
@@ -273,7 +264,7 @@ function Placement() {
                 onClick={() => setActiveTab("leads")}
                 data-tour="leads-tab"
               >
-                Company Leads ({leads.length})
+                Company Leads
               </button>
               <button
                 className={`flex-1 px-6 py-2 font-medium text-sm transition-all duration-150 ${
@@ -324,7 +315,7 @@ function Placement() {
               ) : (
                 <div className="border border-gray-300 rounded-lg animate-fadeIn">
                   <table className="min-w-full divide-y divide-gray-200 border border-gray-300 rounded-lg">
-                    <thead className="bg-gradient-to-r from-blue-500 via-indigo-600 to-indigo-700 text-white rounded-t-lg">
+                    <thead className="bg-linear-to-r from-blue-500 via-indigo-600 to-indigo-700 text-white rounded-t-lg">
                       <tr>
                         <th
                           scope="col"
