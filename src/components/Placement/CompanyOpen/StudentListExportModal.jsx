@@ -5,7 +5,38 @@ import { collection, getDocs } from 'firebase/firestore';
 import * as XLSX from 'xlsx-js-style';
 import { saveAs } from 'file-saver';
 
-// Custom dropdown with enhanced styling
+// Template fields mapping - ye fixed columns hain jo export honge
+const TEMPLATE_FIELDS = [
+  "STUDENT NAME",
+  "ENROLLMENT NUMBER", 
+  "EMAIL",
+  "PHONE NUMBER",
+  "COURSE",
+  "SPECIALIZATION",
+  "CURRENT YEAR",
+  "10TH MARKS %",
+  "12TH MARKS %", 
+  "CGPA",
+  "ACTIVE BACKLOGS",
+  "GENDER"
+];
+
+// Field mapping - Firebase data ke fields ko template fields se map karta hai
+const FIELD_MAPPING = {
+  "STUDENT NAME": ["studentName", "FULL NAME OF STUDENT", "name"],
+  "ENROLLMENT NUMBER": ["enrollmentNo", "ENROLLMENT NUMBER", "enrollment"],
+  "EMAIL": ["email", "EMAIL ID", "accountEmail"],
+  "PHONE NUMBER": ["phone", "accountPhone", "PHONE", "mobile"],
+  "COURSE": ["course", "COURSE"],
+  "SPECIALIZATION": ["specialization", "SPECIALIZATION", "branch"],
+  "CURRENT YEAR": ["currentYear", "YEAR", "academicYear"],
+  "10TH MARKS %": ["tenthMarks", "10TH MARKS", "tenthPercentage"],
+  "12TH MARKS %": ["twelfthMarks", "12TH MARKS", "twelfthPercentage"],
+  "CGPA": ["CGPA", "cgpa", "GPA"],
+  "ACTIVE BACKLOGS": ["activeBacklogs", "BACKLOGS", "currentBacklogs"],
+  "GENDER": ["gender", "GENDER"]
+};
+
 function CompanySelectDropdown({ companies = [], value, onChange }) {
   const [isOpen, setIsOpen] = useState(false);
   
@@ -79,7 +110,6 @@ function CompanySelectDropdown({ companies = [], value, onChange }) {
   );
 }
 
-// Enhanced modal with premium styling
 const StudentListExportModal = ({ companies = [], onClose }) => {
   const [companyCode, setCompanyCode] = useState('');
   const [uploads, setUploads] = useState([]);
@@ -112,7 +142,6 @@ const StudentListExportModal = ({ companies = [], onClose }) => {
           });
         });
 
-        // Sort by date descending
         items.sort((a, b) => {
           const da = a.uploadedAt && a.uploadedAt.seconds ? a.uploadedAt.seconds * 1000 : (a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0);
           const dbt = b.uploadedAt && b.uploadedAt.seconds ? b.uploadedAt.seconds * 1000 : (b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0);
@@ -120,7 +149,6 @@ const StudentListExportModal = ({ companies = [], onClose }) => {
         });
 
         setUploads(items);
-        // Auto-select all uploads for convenience
         setSelectedUploads(new Set(items.map(i => i.id)));
       } catch (err) {
         console.error('Error fetching uploads', err);
@@ -167,9 +195,46 @@ const StudentListExportModal = ({ companies = [], onClose }) => {
 
   const clearAll = () => setSelectedUploads(new Set());
 
+  // Helper function to find value from student data based on template field
+  const getFieldValue = (student, templateField) => {
+    const possibleFields = FIELD_MAPPING[templateField] || [templateField.toLowerCase()];
+    
+    for (const field of possibleFields) {
+      if (student[field] !== undefined && student[field] !== null && student[field] !== '') {
+        return student[field];
+      }
+    }
+    
+    return ''; // Return empty if no value found
+  };
+
+  // New function to determine which columns have data
+  const getColumnsWithData = (students) => {
+    const columnHasData = {};
+    
+    // Initialize all template fields as false
+    TEMPLATE_FIELDS.forEach(field => {
+      columnHasData[field] = false;
+    });
+    
+    // Check each student for each field
+    students.forEach(student => {
+      TEMPLATE_FIELDS.forEach(field => {
+        if (!columnHasData[field]) {
+          const value = getFieldValue(student, field);
+          if (value !== undefined && value !== null && value !== '') {
+            columnHasData[field] = true;
+          }
+        }
+      });
+    });
+    
+    // Return only columns that have data + always include COLLEGE
+    return ['SR NO', ...TEMPLATE_FIELDS.filter(field => columnHasData[field]), 'COLLEGE'];
+  };
+
   const exportSelectedStudents = async () => {
     if (selectedUploads.size === 0) {
-      // Enhanced alert with better UX
       alert('Please select at least one upload to export.');
       return;
     }
@@ -177,15 +242,17 @@ const StudentListExportModal = ({ companies = [], onClose }) => {
     setExporting(true);
     
     try {
-      // Collect students from selected uploads
       const rows = [];
       for (const up of uploads) {
         if (!selectedUploads.has(up.id)) continue;
         const metaCollege = up.college || '';
-        const metaUploadDate = formatFullDate(up.uploadedAt);
 
         up.students.forEach(s => {
-          rows.push({ ...s, COLLEGE: metaCollege, UPLOAD_DATE: metaUploadDate, __uploadId: up.id });
+          rows.push({ 
+            ...s, 
+            COLLEGE: metaCollege,
+            __uploadId: up.id 
+          });
         });
       }
 
@@ -208,36 +275,42 @@ const StudentListExportModal = ({ companies = [], onClose }) => {
         }
       });
 
-      // Build headers
-      const preferred = [
-        'SR NO', 'studentName', 'FULL NAME OF STUDENT', 'enrollmentNo', 'ENROLLMENT NUMBER', 'email', 'EMAIL ID', 'accountEmail', 'phone', 'accountPhone', 'course', 'COURSE', 'specialization', 'SPECIALIZATION', 'currentYear', 'CGPA', 'tenthMarks', 'twelfthMarks', 'activeBacklogs', 'gender', 'status', 'COLLEGE', 'UPLOAD_DATE'
-      ];
-
-      const allKeys = new Set();
-      unique.forEach(u => Object.keys(u).forEach(k => allKeys.add(k)));
-      const headers = [];
-      preferred.forEach(p => { if (allKeys.has(p)) { headers.push(p); allKeys.delete(p); } });
-      Array.from(allKeys).sort().forEach(k => headers.push(k));
-
-      // Build worksheet data with enhanced styling
-      const sheetData = [headers.map(h => ({ v: h, t: 's', s: { 
-        font: { bold: true, color: { rgb: "FFFFFF" } }, 
-        fill: { fgColor: { rgb: "1F2937" } },
-        alignment: { horizontal: "center", vertical: "center" },
-        border: {
-          top: { style: "thin", color: { rgb: "374151" } },
-          left: { style: "thin", color: { rgb: "374151" } },
-          bottom: { style: "thin", color: { rgb: "374151" } },
-          right: { style: "thin", color: { rgb: "374151" } }
+      // Determine which columns actually have data
+      const activeColumns = getColumnsWithData(unique);
+      const dataColumns = activeColumns.filter(col => col !== 'SR NO' && col !== 'COLLEGE');
+      
+      // Build worksheet data with only columns that have data
+      const sheetData = [activeColumns.map(h => ({ 
+        v: h, 
+        t: 's', 
+        s: { 
+          font: { bold: true, color: { rgb: "FFFFFF" } }, 
+          fill: { fgColor: { rgb: "1F2937" } },
+          alignment: { horizontal: "center", vertical: "center" },
+          border: {
+            top: { style: "thin", color: { rgb: "374151" } },
+            left: { style: "thin", color: { rgb: "374151" } },
+            bottom: { style: "thin", color: { rgb: "374151" } },
+            right: { style: "thin", color: { rgb: "374151" } }
+          }
         }
-      }}))];
+      }))];
 
-      unique.forEach((row, idx) => {
-        const r = headers.map(h => {
-          if (h === 'SR NO') return idx + 1;
-          return row[h] !== undefined ? row[h] : '';
+      // Add data rows
+      unique.forEach((student, idx) => {
+        const rowData = [];
+        
+        activeColumns.forEach(column => {
+          if (column === 'SR NO') {
+            rowData.push(idx + 1);
+          } else if (column === 'COLLEGE') {
+            rowData.push(student.COLLEGE || '');
+          } else {
+            rowData.push(getFieldValue(student, column));
+          }
         });
-        sheetData.push(r.map(cell => ({ 
+        
+        sheetData.push(rowData.map(cell => ({ 
           v: cell, 
           t: typeof cell === 'number' ? 'n' : 's',
           s: {
@@ -252,16 +325,19 @@ const StudentListExportModal = ({ companies = [], onClose }) => {
       });
 
       const ws = XLSX.utils.aoa_to_sheet(sheetData);
-      ws['!cols'] = headers.map(h => ({ wch: Math.max(12, Math.min(30, (h.length + 5))) }));
+      
+      // Set column widths based on header lengths
+      ws['!cols'] = activeColumns.map(h => ({ 
+        wch: Math.max(12, Math.min(30, (h.length + 5))) 
+      }));
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Students');
 
       const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-      const fileName = `${companyCode || 'students'}_students_${new Date().toISOString().split('T')[0]}.xlsx`;
+      const fileName = `${companyCode || 'students'}_export_${new Date().toISOString().split('T')[0]}.xlsx`;
       saveAs(new Blob([wbout], { type: 'application/octet-stream' }), fileName);
       
-      // Success feedback
       setTimeout(() => {
         onClose();
       }, 1000);
@@ -281,25 +357,24 @@ const StudentListExportModal = ({ companies = [], onClose }) => {
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-      {/* Backdrop with blur effect */}
       <div 
         className="absolute inset-0 bg-gray-600 bg-opacity-75 transition-opacity backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
       />
       
-      {/* Modal container */}
       <div 
         className="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] overflow-hidden transform transition-all"
         role="dialog"
         aria-modal="true"
         aria-labelledby="export-modal-title"
       >
-        {/* Header with gradient */}
         <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-6 py-5 flex justify-between items-center">
           <div>
             <h2 id="export-modal-title" className="text-xl font-semibold">Export Student Data</h2>
-            <p className="text-blue-100 text-sm mt-1">Select company and uploads to export student information</p>
+            <p className="text-blue-100 text-sm mt-1">
+              Smart export - only columns with data will be included
+            </p>
           </div>
           <button 
             onClick={onClose}
@@ -310,7 +385,6 @@ const StudentListExportModal = ({ companies = [], onClose }) => {
           </button>
         </div>
 
-        {/* Content */}
         <div className="p-6 overflow-y-auto max-h-[calc(95vh-140px)]">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <CompanySelectDropdown
@@ -407,21 +481,19 @@ const StudentListExportModal = ({ companies = [], onClose }) => {
             </div>
           </div>
 
-          {/* Info panel */}
           {selectedCount > 0 && (
             <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-xl">
               <div className="flex items-start">
                 <InformationCircleIcon className="h-5 w-5 text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
                 <div className="text-sm text-blue-700">
                   <p className="font-medium">Ready to export {totalStudents} students from {selectedCount} upload(s)</p>
-                  <p className="mt-1">The exported file will include deduplicated student records with enhanced formatting.</p>
+                  <p className="mt-1">Export will automatically include only columns that contain data</p>
                 </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Footer */}
         <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-between items-center">
           <button 
             onClick={onClose}
@@ -442,7 +514,7 @@ const StudentListExportModal = ({ companies = [], onClose }) => {
             ) : (
               <>
                 <DownloadIcon className="h-4 w-4" />
-                Export Selected
+                Export List
               </>
             )}
           </button>
