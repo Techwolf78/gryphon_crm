@@ -297,35 +297,7 @@ function CollegeSelection({
                         )}
                       </label>
                     </div>
-                    {/* <div className="flex items-center space-x-2">
-                      {college !== "Other" && (
-                        <>
-                          <button
-                            onClick={() => onDownloadTemplate(college)}
-                            className="text-green-600 hover:text-green-800 text-sm flex items-center"
-                            title="Download Template"
-                          >
-                            <DocumentDownloadIcon className="h-4 w-4 mr-1" />
-                            Template
-                          </button>
-                          <button
-                            onClick={() => onUploadExcel(college)}
-                            className="text-purple-600 hover:text-purple-800 text-sm flex items-center"
-                            title="Upload Excel"
-                          >
-                            <UploadIcon className="h-4 w-4 mr-1" />
-                            Upload
-                          </button>
-                          <button
-                            onClick={() => viewStudents(college)}
-                            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-                          >
-                            <EyeIcon className="h-4 w-4 mr-1" />
-                            Students
-                          </button>
-                        </>
-                      )}
-                    </div> */}
+                    
                   </div>
 
                   {/* College Details */}

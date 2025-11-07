@@ -12,7 +12,6 @@ import {
 import emailjs from "@emailjs/browser";
 import AddJDForm from "./AddJDForm";
 import CollegeSelection from "./CollegeSelection";
-import StudentModal from "./StudentModal";
 import TemplateDownloadModal from "./TemplateDownloadModal";
 import ExcelUploadModal from "./ExcelUploadModal";
 
@@ -691,13 +690,7 @@ function AddJD({ show, onClose, company }) {
           </>
         )}
 
-        {/* Student Data Modal */}
-        <StudentModal
-          viewingCollege={viewingCollege}
-          studentsData={studentsData}
-          isLoadingStudents={isLoadingStudents}
-          closeStudentView={closeStudentView}
-        />
+       
 
         {/* Template Download Modal */}
         <TemplateDownloadModal
