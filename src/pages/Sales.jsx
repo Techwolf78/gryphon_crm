@@ -303,7 +303,8 @@ function Sales() {
   }, [leads, users, currentUser, viewMyLeadsOnly, filters]);
 
   const totalTCV = useMemo(() => {
-    const sum = allVisibleLeads.reduce((sum, [, lead]) => sum + (lead.tcv || 0), 0);
+    const openLeads = allVisibleLeads.filter(([, lead]) => lead.phase !== "closed");
+    const sum = openLeads.reduce((sum, [, lead]) => sum + (lead.tcv || 0), 0);
     return sum;
   }, [allVisibleLeads]);
 
@@ -786,7 +787,14 @@ function Sales() {
                 setFilters={setRawFilters}
                 isFilterOpen={isFilterOpen}
                 setIsFilterOpen={setIsFilterOpen}
-                users={users}
+                users={Object.fromEntries(
+                  Object.entries(users).filter(([, user]) => 
+                    user.department === "Sales" || 
+                    (Array.isArray(user.department) && user.department.includes("Sales")) ||
+                    user.departments === "Sales" ||
+                    (Array.isArray(user.departments) && user.departments.includes("Sales"))
+                  )
+                )}
                 leads={leads}
                 activeTab={activeTab}
               />

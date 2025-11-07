@@ -97,7 +97,7 @@ const Dashboard = () => {
     <div className="min-h-screen">
       <div className="mx-auto">
         {/* Top Bar with Department Buttons and Notifications */}
-        <div className="flex justify-between items-center mb-4 sm:mb-6">
+        <div className="flex justify-between items-center mb-0">
           {/* Department Toggle Buttons */}
           <div className="flex flex-wrap gap-2 overflow-x-auto pb-2">
             {departments.map((dept) => {
@@ -206,7 +206,7 @@ const Dashboard = () => {
         </div>
 
         {/* Active Dashboard */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-2 sm:p-4">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-0">
           {departments.find(d => d.id === activeDepartment)?.component}
         </div>
       </div>

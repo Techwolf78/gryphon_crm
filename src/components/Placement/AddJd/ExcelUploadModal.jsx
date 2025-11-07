@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { XIcon, UploadIcon } from '@heroicons/react/outline';
 import { db } from '../../../firebase';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 
 const ExcelUploadModal = ({ show, onClose, college, companyName }) => {
@@ -96,7 +96,7 @@ const ExcelUploadModal = ({ show, onClose, college, companyName }) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
-  // Firebase Save Function - FIXED TIMESTAMP ISSUE
+  // Firebase Save Function - NEW STRUCTURE
   const handleSaveToFirebase = async () => {
     if (!college || !companyName || !validationResults?.jsonStudents?.length) {
       alert('Please upload valid data first');
@@ -106,15 +106,15 @@ const ExcelUploadModal = ({ show, onClose, college, companyName }) => {
     setIsUploading(true);
 
     try {
-      // College code generate karo
-      const collegeCode = college.replace(/\s+/g, '_').toUpperCase();
+      // Company code generate karo
+      const companyCode = companyName.replace(/\s+/g, '_').toUpperCase();
       
       console.log('🔄 Starting Firebase save...');
-      console.log('College:', college);
       console.log('Company:', companyName);
+      console.log('College:', college);
       console.log('Students count:', validationResults.jsonStudents.length);
 
-      // Field names mapping - Capital to lowercase
+      // Field names mapping
       const fieldMapping = {
         'STUDENT NAME': 'studentName',
         'ENROLLMENT NUMBER': 'enrollmentNo', 
@@ -131,7 +131,7 @@ const ExcelUploadModal = ({ show, onClose, college, companyName }) => {
         'RESUME LINK': 'resumeLink'
       };
 
-      // Process students data - WITHOUT serverTimestamp() in array
+      // Process students data
       const processedStudents = validationResults.jsonStudents.map((student, index) => {
         const processedStudent = {};
         
@@ -141,38 +141,45 @@ const ExcelUploadModal = ({ show, onClose, college, companyName }) => {
           processedStudent[newKey] = student[key];
         });
 
-        // Add metadata - WITHOUT serverTimestamp() in array
+        // Add metadata
         return {
           ...processedStudent,
-          company: companyName,
           college: college,
-          uploadDate: new Date().toISOString(), // ✅ Regular Date object
+          uploadDate: new Date().toISOString(),
           rowIndex: index + 1,
           status: 'submitted'
         };
       });
 
-      // Single collection "studentList" mein save karo
-      const collegeDocRef = doc(db, 'studentList', collegeCode);
+      // Step 1: Company document create/update karo
+      const companyDocRef = doc(db, 'studentList', companyCode);
       
-      // 🔥 FIX: Array mein serverTimestamp() nahi, sirf top level pe
-      const saveData = {
-        collegeName: college,
-        collegeCode: collegeCode,
-        company: companyName,
-        lastUpdated: serverTimestamp(), // ✅ Top level pe serverTimestamp allowed
+      await setDoc(companyDocRef, {
+        companyName: companyName,
+        companyCode: companyCode,
+        lastUpdated: serverTimestamp(),
+        totalUploads: await getTotalUploads(companyCode) + 1 // Optional: upload count
+      }, { merge: true });
+
+      // Step 2: Subcollection mein new document add karo with timestamp
+      const uploadsCollectionRef = collection(db, 'studentList', companyCode, 'uploads');
+      
+      const uploadData = {
+        college: college,
+        uploadedAt: serverTimestamp(),
+        students: processedStudents,
         totalStudents: processedStudents.length,
         templateFields: validationResults.headers,
-        students: processedStudents, // ✅ Array mein regular data only
-        uploadedAt: serverTimestamp() // ✅ Top level timestamp
+        collegeCode: college.replace(/\s+/g, '_').toUpperCase()
       };
 
-      console.log('📦 Data to save:', saveData);
+      console.log('📦 Uploading data to:', `studentList/${companyCode}/uploads`);
+      console.log('📊 Data:', uploadData);
       
-      await setDoc(collegeDocRef, saveData, { merge: true });
+      await addDoc(uploadsCollectionRef, uploadData);
 
-      console.log(`✅ ${processedStudents.length} students saved to studentList/${collegeCode}`);
-      alert(`✅ ${processedStudents.length} students saved successfully!\nCollection: studentList/${collegeCode}`);
+      console.log(`✅ ${processedStudents.length} students saved to studentList/${companyCode}/uploads`);
+      alert(`✅ ${processedStudents.length} students saved successfully!\n\n📍 Location: studentList/${companyCode}/uploads\n🏫 College: ${college}\n💼 Company: ${companyName}`);
       
       // Reset and close
       setUploadedFile(null);
@@ -189,43 +196,51 @@ const ExcelUploadModal = ({ show, onClose, college, companyName }) => {
     }
   };
 
+  // Helper function to get total uploads count (optional)
+  const getTotalUploads = async (companyCode) => {
+    // Yahan pe tum existing uploads count kar sakte ho
+    // For now, return 0
+    return 0;
+  };
+
   const handleSubmit = async () => {
     await handleSaveToFirebase();
   };
 
-if (!show) return null;
+  if (!show) return null;
 
-return (
-  <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-500">
-    {/* Z-index bahut high kiya */}
-    <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl z-[10000] transform transition-all duration-300 scale-100 max-h-[90vh] flex flex-col">
-      
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center rounded-t-xl flex-shrink-0">
-        <h2 className="text-xl font-semibold text-white">
-          Upload Student Data - {college}
-        </h2>
-        <button 
-          onClick={onClose} 
-          className="text-white hover:text-gray-200 transition-colors"
-        >
-          <XIcon className="h-5 w-5" />
-        </button>
-      </div>
+  return (
+    <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl z-[10000] transform transition-all duration-300 scale-100 max-h-[90vh] flex flex-col">
+        
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center rounded-t-xl flex-shrink-0">
+          <h2 className="text-xl font-semibold text-white">
+            Upload Student Data
+          </h2>
+          <button 
+            onClick={onClose} 
+            className="text-white hover:text-gray-200 transition-colors"
+          >
+            <XIcon className="h-5 w-5" />
+          </button>
+        </div>
 
         {/* Content */}
         <div className="p-6 overflow-y-auto flex-grow">
-          {/* College & Collection Info */}
+          {/* Storage Info - UPDATED */}
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <h4 className="font-semibold text-blue-800 mb-2">📁 Storage Information</h4>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
-                <span className="font-medium">College:</span> {college}
-              </div>
-              <div>
                 <span className="font-medium">Company:</span> {companyName}
               </div>
-             
+              <div>
+                <span className="font-medium">College:</span> {college}
+              </div>
+              <div className="col-span-2 text-xs text-blue-600 mt-1">
+                📍 Path: studentList/{companyName.replace(/\s+/g, '_').toUpperCase()}/uploads/{new Date().toISOString().split('T')[0]}
+              </div>
             </div>
           </div>
 
@@ -294,9 +309,6 @@ return (
                   </span>
                 ))}
               </div>
-              <p className="text-xs text-blue-600 mt-2">
-                ✅ These exact columns will be preserved in database
-              </p>
             </div>
           )}
         </div>
