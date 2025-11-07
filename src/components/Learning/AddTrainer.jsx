@@ -19,6 +19,7 @@ import {
   FiAlertCircle,
 } from "react-icons/fi";
 import specializationOptions from "./specializationOptions";
+import { auditLogTrainerOperations, auditLogErrorOperations, logLearningActivity } from "../../utils/learningAuditLogger";
 
 function AddTrainer({ onClose, onTrainerAdded, trainers = [] }) {
   const [trainerData, setTrainerData] = useState({
@@ -159,12 +160,22 @@ function AddTrainer({ onClose, onTrainerAdded, trainers = [] }) {
       trainerToSave.specialization = selectedSpecs;
       trainerToSave.otherSpecialization = customSpecs;
 
-  await setDoc(doc(db, "trainers", trainerData.trainerId), trainerToSave, { merge: true });
+      await setDoc(doc(db, "trainers", trainerData.trainerId), trainerToSave, { merge: true });
 
-  // Provide the created trainer (with an id field matching Firestore doc id)
-  onTrainerAdded({ id: trainerData.trainerId, ...trainerToSave });
+      // Audit log: Trainer created
+      await auditLogTrainerOperations.trainerCreated(trainerToSave);
+
+      // Provide the created trainer (with an id field matching Firestore doc id)
+      onTrainerAdded({ id: trainerData.trainerId, ...trainerToSave });
       onClose();
     } catch (err) {
+      // Audit log: Database operation failed
+      await auditLogErrorOperations.databaseOperationFailed(
+        "CREATE",
+        "trainers",
+        err.code || "UNKNOWN_ERROR",
+        err.message
+      );
 
       setError(`Failed to add trainer: ${err.message}`);
     } finally {
@@ -277,6 +288,14 @@ function AddTrainer({ onClose, onTrainerAdded, trainers = [] }) {
         setImportStatus(`${jsonData.length} trainers imported successfully!`);
         setImportProgress(100);
         if (importedTrainers.length) {
+          // Audit log: Bulk trainer import
+          await auditLogTrainerOperations.trainerBulkImport(
+            file.name,
+            jsonData.length,
+            importedTrainers.length,
+            jsonData.length - importedTrainers.length,
+            [] // No errors in this simplified version
+          );
           onTrainerAdded(importedTrainers);
         }
 
@@ -285,6 +304,13 @@ function AddTrainer({ onClose, onTrainerAdded, trainers = [] }) {
           setImportProgress(0);
         }, 3000);
       } catch (error) {
+        // Audit log: File upload failed
+        await auditLogErrorOperations.fileUploadFailed(
+          file.name,
+          error.message,
+          file.size,
+          file.type
+        );
 
         setError(`Import failed: ${error.message}`);
         setImportStatus("Import failed");
@@ -305,6 +331,15 @@ function AddTrainer({ onClose, onTrainerAdded, trainers = [] }) {
   };
 
   const handleExportTemplate = () => {
+    // Audit log: Template downloaded
+    logLearningActivity("TRAINER_TEMPLATE_DOWNLOADED", {
+      entityType: "Template",
+      additionalData: {
+        templateName: "trainer_import_template.xlsx",
+        templateType: "Excel"
+      }
+    });
+
     const templateData = [
       {
         Name: "",

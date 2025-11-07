@@ -16,6 +16,7 @@ import {
   where,
 } from "firebase/firestore";
 import { useAuth } from "../../../context/AuthContext";
+import { auditLogTrainingOperations } from "../../../utils/learningAuditLogger";
 import {
   FiChevronLeft,
   FiCheck,
@@ -690,10 +691,55 @@ function InitiationModal({ training, onClose, onConfirm }) {
           "domains",
           domain
         );
-        return setDoc(domainRef, phaseData, { merge: true });
+        await setDoc(domainRef, phaseData, { merge: true });
+
+        // Log batch creation for each batch in this domain
+        const tableData = tableDataLookup[domain] || [];
+        for (const row of tableData) {
+          if (row.batches) {
+            for (const batch of row.batches) {
+              try {
+                await auditLogTrainingOperations.batchCreated({
+                  trainingId: training.id,
+                  collegeName: training.collegeName,
+                  phase: mainPhase,
+                  domain,
+                  batchCode: batch.batchCode || "",
+                  specialization: row.batch || row.specialization || "",
+                  studentCount: row.stdCount || row.students || 0,
+                  trainerCount: batch.trainers?.length || 0,
+                  totalAssignedHours: batch.assignedHours || 0,
+                  createdBy: user?.uid,
+                  createdByName: user?.displayName || user?.name || "Unknown",
+                });
+              } catch (auditErr) {
+                console.error("Error logging batch creation:", auditErr);
+                // Don't block the main save operation
+              }
+            }
+          }
+        }
       });
 
       await Promise.all([...phaseLevelPromises, ...batchPromises]);
+
+      // Log training initiation audit event
+      try {
+        await auditLogTrainingOperations.trainingInitiated({
+          trainingId: training.id,
+          collegeName: training.collegeName,
+          phases: selectedPhases,
+          domains: domainsList,
+          totalBatches,
+          totalTrainingHours,
+          totalCost,
+          initiatedBy: user?.uid,
+          initiatedByName: user?.displayName || user?.name || "Unknown",
+        });
+      } catch (auditErr) {
+        console.error("Error logging training initiation:", auditErr);
+        // Don't block the main save operation
+      }
 
       // Delete domains marked for deletion via X button
       const deletePromises = domainsToDelete.map(async (domain) => {
