@@ -418,30 +418,6 @@ const StudentListExportModal = ({ companies = [], onClose }) => {
             </div>
           </div>
 
-          {/* Export Fields Preview */}
-          <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Export Fields Preview</h3>
-            <p className="text-xs text-gray-600 mb-3">
-              Only columns with data will be exported automatically
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {TEMPLATE_FIELDS.map((field, index) => (
-                <span 
-                  key={field}
-                  className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                >
-                  {field}
-                  {index < TEMPLATE_FIELDS.length - 1 && (
-                    <ChevronDownIcon className="h-3 w-3 ml-1 rotate-90" />
-                  )}
-                </span>
-              ))}
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                COLLEGE
-              </span>
-            </div>
-          </div>
-
           {/* Uploads list */}
           <div className="border border-gray-200 rounded-xl overflow-hidden">
             <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
@@ -538,7 +514,7 @@ const StudentListExportModal = ({ companies = [], onClose }) => {
             ) : (
               <>
                 <DownloadIcon className="h-4 w-4" />
-                Export Selected (Smart Columns)
+                Export List
               </>
             )}
           </button>
