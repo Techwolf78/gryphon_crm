@@ -278,7 +278,7 @@ const TrainerRow = React.memo(
           }`}
         >
           {/* Trainer Name/Select */}
-          <td className="px-2 py-1 align-top min-w-[160px]">
+          <td className="px-2 py-1 align-top min-w-40">
             {isDuplicate && (
               <div className="text-xs text-red-600 font-medium mb-1 flex items-center">
                 <svg
@@ -499,7 +499,7 @@ const TrainerRow = React.memo(
           </td>
 
           {/* Daily Hours */}
-          <td className="px-2 py-1 relative bg-gradient-to-r from-gray-50 to-white rounded-md overflow-visible">
+          <td className="px-2 py-1 relative bg-linear-to-r from-gray-50 to-white rounded-md overflow-visible">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-gray-700">
                 {trainer.dailyHours && trainer.dailyHours.length > 0
@@ -534,7 +534,7 @@ const TrainerRow = React.memo(
             {showDailyHoursDropdown && trainer.dailyHours && trainer.dailyHours.length > 0 && (
               <div
                 id="daily-hours-dropdown"
-                className="absolute top-full right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-2 z-60 min-w-[240px] max-w-[280px] max-h-48 overflow-y-auto"
+                className="absolute top-full right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-2 z-60 min-w-60 max-w-[280px] max-h-48 overflow-y-auto"
                 role="dialog"
                 aria-labelledby="daily-hours-title"
               >
@@ -918,7 +918,7 @@ const TrainerRow = React.memo(
                           <div
                             role="group"
                             aria-label="Topics"
-                            className="min-h-[20px] rounded border border-dashed border-gray-200 p-0.5 bg-gray-50"
+                            className="min-h-5 rounded border border-dashed border-gray-200 p-0.5 bg-gray-50"
                           >
                             {allTopics.length === 0 ? (
                               <div className="text-sm text-slate-400 py-1 text-center">
@@ -3774,7 +3774,7 @@ const filteredTrainers = useMemo(() => {
 
       {/* Main Batch Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="px-2 py-2 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+        <div className="px-2 py-2 border-b border-gray-200 bg-linear-to-r from-gray-50 to-white">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-semibold text-gray-900">

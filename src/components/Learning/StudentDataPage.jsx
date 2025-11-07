@@ -4,6 +4,7 @@ import { db } from "../../firebase";
 import {
   collection, getDocs, doc, query, onSnapshot, setDoc
 } from "firebase/firestore";
+import { auditLogStudentOperations, auditLogErrorOperations, logLearningActivity } from "../../utils/learningAuditLogger";
 
 function StudentDataPage({ trainingId, onBack }) {
   const [studentData, setStudentData] = useState([]);
@@ -69,13 +70,20 @@ function StudentDataPage({ trainingId, onBack }) {
       });
       setHeaders(dynamicHeaders);
       setStudentData(data);
+
+      // Audit log: Student data viewed
+      await auditLogStudentOperations.studentDataViewed(
+        trainingId,
+        data.length,
+        headers
+      );
     } catch (err) {
       console.error("Error loading student data:", err);
       setError(`Failed to load data: ${err.message}`);
     } finally {
       setLoading(false);
     }
-  }, [trainingId]);
+  }, [trainingId, headers]);
 
   useEffect(() => {
     fetchStudentData();
@@ -467,11 +475,29 @@ function StudentDataPage({ trainingId, onBack }) {
           }
 
           if (uploadedCount > 0) {
+            // Audit log: Student data uploaded
+            await auditLogStudentOperations.studentDataUploaded(
+              trainingId,
+              file.name,
+              uploadedCount,
+              failedUploads,
+              [] // No detailed errors in this simplified version
+            );
+
             fetchStudentData(); // Refresh the displayed data only if we uploaded something
           }
         }
       } catch (err) {
         console.error("Error importing file:", err);
+
+        // Audit log: File upload failed
+        await auditLogErrorOperations.fileUploadFailed(
+          file.name,
+          err.message,
+          file.size,
+          file.type
+        );
+
         setError(`Import error: ${err.message}`);
       } finally {
         setLoading(false);
@@ -542,6 +568,14 @@ function StudentDataPage({ trainingId, onBack }) {
       return;
     }
 
+    // Audit log: Student data exported
+    auditLogStudentOperations.studentDataExported(
+      trainingId,
+      "xlsx",
+      studentData.length,
+      headers
+    );
+
     const exportData = [headers].concat(
       studentData.map(row => headers.map(header => row[header] || ""))
     );
@@ -606,6 +640,16 @@ function StudentDataPage({ trainingId, onBack }) {
   };
 
   const downloadSampleFile = () => {
+    // Audit log: Template downloaded
+    logLearningActivity("STUDENT_TEMPLATE_DOWNLOADED", {
+      entityType: "Template",
+      additionalData: {
+        templateName: "student_data_template.xlsx",
+        templateType: "Excel",
+        trainingId: trainingId
+      }
+    });
+
     // Create template with headers only (no example data)
     const sampleHeaders = [
       "SR NO", "FULL NAME OF STUDENT", "CURRENT COLLEGE NAME", "EMAIL ID", "MOBILE NO.",

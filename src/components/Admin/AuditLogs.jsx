@@ -142,7 +142,7 @@ const AuditLogs = ({ logs, className = "" }) => {
 
         {/* Desktop Table View */}
         <div className="hidden lg:block">
-          <div className="overflow-x-auto">
+          <div className="overflow-hidden">
             <table className="w-full text-left">
               <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
                 <tr>

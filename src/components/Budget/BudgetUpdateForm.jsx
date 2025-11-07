@@ -21,7 +21,8 @@ const BudgetUpdateForm = ({
   show,
   onClose,
   onSubmit,
-  budgetComponents,
+  budgetComponents, // Initial components from parent
+  allBudgetComponents, // All department components
   existingBudget,
   currentUser,
   department = "purchase",
@@ -63,6 +64,20 @@ const BudgetUpdateForm = ({
   const [csddComponentAllocation, setCsddComponentAllocation] = useState("");
   const [csddComponentNotes, setCsddComponentNotes] = useState("");
 
+  // Simple function to get current department components
+  const getDynamicBudgetComponents = () => {
+    return (
+      allBudgetComponents[formData.department] ||
+      allBudgetComponents.admin ||
+      {}
+    );
+  };
+
+  // Get available components (not yet added)
+  const availableComponents = Object.entries(
+    getDynamicBudgetComponents() || {}
+  ).filter(([key]) => !formData.components?.[key]);
+
   // Initialize form data from existing budget
   useEffect(() => {
     if (existingBudget) {
@@ -72,26 +87,58 @@ const BudgetUpdateForm = ({
         fiscalYear: existingBudget.fiscalYear || "",
         ownerName: existingBudget.ownerName || currentUser.displayName,
         fixedCosts: {
-          rent: existingBudget.fixedCosts?.rent ?? "",
-          maintenance: existingBudget.fixedCosts?.maintenance ?? "",
-          electricity: existingBudget.fixedCosts?.electricity ?? "",
-          internet: existingBudget.fixedCosts?.internet ?? "",
-          renovation: existingBudget.fixedCosts?.renovation ?? "",
+          rent: existingBudget.fixedCosts?.rent?.allocated ?? "",
+          maintenance: existingBudget.fixedCosts?.maintenance?.allocated ?? "",
+          electricity: existingBudget.fixedCosts?.electricity?.allocated ?? "",
+          internet: existingBudget.fixedCosts?.internet?.allocated ?? "",
+          renovation: existingBudget.fixedCosts?.renovation?.allocated ?? "",
         },
         departmentExpenses: {
           employeeSalary:
-            existingBudget.departmentExpenses?.employeeSalary ?? "",
+            existingBudget.departmentExpenses?.employeeSalary?.allocated ?? "",
         },
         csddExpenses: {
           intercity_outstation_visits:
-            existingBudget.csddExpenses?.intercity_outstation_visits ?? "",
+            existingBudget.csddExpenses?.intercity_outstation_visits
+              ?.allocated ?? "",
           lunch_dinner_with_client:
-            existingBudget.csddExpenses?.lunch_dinner_with_client ?? "",
-          mobile_sim: existingBudget.csddExpenses?.mobile_sim ?? "",
+            existingBudget.csddExpenses?.lunch_dinner_with_client?.allocated ??
+            "",
+          mobile_sim: existingBudget.csddExpenses?.mobile_sim?.allocated ?? "",
         },
-        components: existingBudget.components || {},
-        csddComponents: existingBudget.csddComponents || {},
-        notes: existingBudget.notes || "",
+        components:
+          Object.fromEntries(
+            Object.entries(existingBudget.departmentExpenses || {})
+              .filter(([key]) => !["employeeSalary"].includes(key))
+              .map(([key, val]) => [
+                key,
+                {
+                  name: key.replace(/_/g, " "),
+                  allocated: val?.allocated ?? "",
+                  spent: val?.spent ?? 0,
+                },
+              ])
+          ) || {},
+        csddComponents:
+          Object.fromEntries(
+            Object.entries(existingBudget.csddExpenses || {})
+              .filter(
+                ([key]) =>
+                  ![
+                    "intercity_outstation_visits",
+                    "lunch_dinner_with_client",
+                    "mobile_sim",
+                  ].includes(key)
+              )
+              .map(([key, val]) => [
+                key,
+                {
+                  name: key.replace(/_/g, " "),
+                  allocated: val?.allocated ?? "",
+                  spent: val?.spent ?? 0,
+                },
+              ])
+          ) || {},
         status: existingBudget.status || "draft",
       });
     }
@@ -254,12 +301,15 @@ const BudgetUpdateForm = ({
       return;
     }
 
+    // Use dynamic components for the name
+    const dynamicComponents = getDynamicBudgetComponents();
+
     setFormData((prev) => ({
       ...prev,
       components: {
         ...prev.components,
         [selectedComponent]: {
-          name: budgetComponents[selectedComponent],
+          name: dynamicComponents[selectedComponent],
           allocated: componentAllocation,
           spent: 0,
           notes: componentNotes,
@@ -371,61 +421,113 @@ const BudgetUpdateForm = ({
     setIsSubmitting(true);
 
     try {
-      // Prepare data for submission - convert empty strings to 0 only when sending
+      // 🔹 Merge departmentExpenses + components
+      const mergedDepartmentExpenses = {
+        // Base department expenses
+        ...Object.fromEntries(
+          Object.entries(formData.departmentExpenses || {}).map(
+            ([key, val]) => [
+              key,
+              {
+                allocated: safeNumber(val),
+                spent:
+                  safeNumber(
+                    existingBudget?.departmentExpenses?.[key]?.spent
+                  ) || 0,
+              },
+            ]
+          )
+        ),
+        // Components merged into the same layer
+        ...Object.fromEntries(
+          Object.entries(formData.components || {}).map(([key, comp]) => [
+            key,
+            {
+              allocated: safeNumber(comp?.allocated),
+              spent: safeNumber(existingBudget?.components?.[key]?.spent) || 0,
+            },
+          ])
+        ),
+      };
+
+      // 🔹 Merge csddExpenses + csddComponents
+      const mergedCsddExpenses = {
+        // 🧹 Include only non-zero CSDD Expenses
+        ...Object.fromEntries(
+          Object.entries(formData.csddExpenses || {})
+            .filter(([_, val]) => safeNumber(val) > 0) // ✅ filter out 0 or empty
+            .map(([key, val]) => [
+              key,
+              {
+                allocated: safeNumber(val),
+                spent:
+                  safeNumber(existingBudget?.csddExpenses?.[key]?.spent) || 0,
+              },
+            ])
+        ),
+
+        // 🧩 Include non-zero custom CSDD components
+        ...Object.fromEntries(
+          Object.entries(formData.csddComponents || {})
+            .filter(([_, comp]) => safeNumber(comp?.allocated) > 0) // ✅ filter out 0
+            .map(([key, comp]) => [
+              key,
+              {
+                allocated: safeNumber(comp?.allocated),
+                spent:
+                  safeNumber(existingBudget?.csddComponents?.[key]?.spent) || 0,
+              },
+            ])
+        ),
+      };
+
+      // 🔹 Fixed costs
+      const fixedCosts = Object.fromEntries(
+        Object.entries(formData.fixedCosts || {}).map(([key, val]) => [
+          key,
+          {
+            allocated: safeNumber(val),
+            spent: safeNumber(existingBudget?.fixedCosts?.[key]?.spent) || 0,
+          },
+        ])
+      );
+
+      // 🔹 Calculate totals
+      const totalBudget = calculateTotalAllocated();
+      const totalSpent =
+        Object.values(fixedCosts).reduce(
+          (sum, c) => sum + safeNumber(c.spent),
+          0
+        ) +
+        Object.values(mergedDepartmentExpenses).reduce(
+          (sum, c) => sum + safeNumber(c.spent),
+          0
+        ) +
+        Object.values(mergedCsddExpenses).reduce(
+          (sum, c) => sum + safeNumber(c.spent),
+          0
+        );
+
+      // 🔹 Build final schema-aligned data
       const budgetData = {
         title: formData.title,
         department: formData.department,
         fiscalYear: formData.fiscalYear,
         ownerName: formData.ownerName,
-        fixedCosts: {
-          rent: safeNumber(formData.fixedCosts.rent),
-          maintenance: safeNumber(formData.fixedCosts.maintenance),
-          electricity: safeNumber(formData.fixedCosts.electricity),
-          internet: safeNumber(formData.fixedCosts.internet),
-          renovation: safeNumber(formData.fixedCosts.renovation),
-        },
-        departmentExpenses: {
-          employeeSalary: safeNumber(
-            formData.departmentExpenses.employeeSalary
-          ),
-        },
-        csddExpenses: {
-          intercity_outstation_visits: safeNumber(
-            formData.csddExpenses.intercity_outstation_visits
-          ),
-          lunch_dinner_with_client: safeNumber(
-            formData.csddExpenses.lunch_dinner_with_client
-          ),
-          mobile_sim: safeNumber(formData.csddExpenses.mobile_sim),
-        },
-        components: Object.fromEntries(
-          Object.entries(formData.components).map(([key, comp]) => [
-            key,
-            {
-              ...comp,
-              allocated: safeNumber(comp.allocated),
-              spent: safeNumber(comp.spent),
-            },
-          ])
-        ),
-        csddComponents: Object.fromEntries(
-          Object.entries(formData.csddComponents).map(([key, comp]) => [
-            key,
-            {
-              ...comp,
-              allocated: safeNumber(comp.allocated),
-              spent: safeNumber(comp.spent),
-            },
-          ])
-        ),
-        notes: formData.notes,
         status: formData.status,
-        totalBudget: calculateTotalAllocated(),
-        totalSpent: safeNumber(existingBudget?.totalSpent),
+        fixedCosts,
+        departmentExpenses: mergedDepartmentExpenses,
+        csddExpenses: mergedCsddExpenses,
+        summary: {
+          totalBudget,
+          totalSpent,
+        },
         lastUpdatedAt: new Date(),
         updatedBy: currentUser?.uid,
+        version: 6,
       };
 
+      // 🔹 Send to Firestore
       await onSubmit(budgetData, existingBudget);
       onClose();
     } catch (error) {
@@ -438,12 +540,22 @@ const BudgetUpdateForm = ({
 
   const totalAllocated = calculateTotalAllocated();
 
-  // Get available components (not yet added)
-  const availableComponents = Object.entries(budgetComponents || {}).filter(
-    ([key]) => !formData.components?.[key]
-  );
-
   if (!show || !existingBudget) return null;
+
+  useEffect(() => {
+    const preventScrollChange = (e) => {
+      if (
+        document.activeElement.type === "number" &&
+        document.activeElement.contains(e.target)
+      ) {
+        e.preventDefault(); // stop value change
+      }
+    };
+
+    window.addEventListener("wheel", preventScrollChange, { passive: false });
+
+    return () => window.removeEventListener("wheel", preventScrollChange);
+  }, []);
 
   return (
     <div className="fixed inset-0 bg-black/30 mt-10 bg-opacity-50 flex items-center justify-center p-4 z-50">

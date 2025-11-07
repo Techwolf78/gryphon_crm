@@ -1,10 +1,11 @@
 import React from 'react';
 import { toast } from 'react-toastify';
+import { FaCopy, FaCheck } from 'react-icons/fa';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null, errorInfo: null };
+    this.state = { hasError: false, error: null, errorInfo: null, copied: false };
   }
 
   static getDerivedStateFromError() {
@@ -36,16 +37,43 @@ class ErrorBoundary extends React.Component {
     this.setState({ hasError: false, error: null, errorInfo: null });
   };
 
+  handleCopyError = async () => {
+    const errorDetails = `
+Error: ${this.state.error.toString()}
+
+Stack Trace:
+${this.state.error.stack || 'No stack trace available'}
+
+${this.state.errorInfo ? `Component Stack:
+${this.state.errorInfo.componentStack}` : ''}
+    `.trim();
+
+    try {
+      await navigator.clipboard.writeText(errorDetails);
+      this.setState({ copied: true });
+      toast.success('Error details copied to clipboard!', {
+        position: "top-right",
+        autoClose: 2000,
+      });
+      setTimeout(() => this.setState({ copied: false }), 2000);
+    } catch {
+      toast.error('Failed to copy error details', {
+        position: "top-right",
+        autoClose: 2000,
+      });
+    }
+  };
+
   render() {
     if (this.state.hasError) {
       // Fallback UI
       return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-zinc-50 flex items-center justify-center p-4 sm:p-6 lg:p-8">
+        <div className="min-h-screen bg-linear-to-br from-slate-50 via-gray-50 to-zinc-50 flex items-center justify-center p-4 sm:p-6 lg:p-8">
           <div className="w-full max-w-sm sm:max-w-md lg:max-w-lg xl:max-w-xl">
             {/* Main Error Card */}
             <div className="bg-white rounded-xl sm:rounded-2xl shadow-xl border border-slate-200/60 backdrop-blur-sm overflow-hidden">
               {/* Header Section with Gradient */}
-              <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-4 sm:px-6 lg:px-8 py-4 sm:py-6 text-center relative overflow-hidden">
+              <div className="bg-linear-to-r from-slate-900 via-slate-800 to-slate-900 px-4 sm:px-6 lg:px-8 py-4 sm:py-6 text-center relative overflow-hidden">
                 {/* Subtle background pattern */}
                 <div className="absolute inset-0 opacity-5">
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1),transparent_50%)]"></div>
@@ -94,7 +122,7 @@ class ErrorBoundary extends React.Component {
                 <div className="space-y-3">
                   <button
                     onClick={this.handleRetry}
-                    className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-2.5 sm:py-3 px-4 sm:px-6 rounded-lg sm:rounded-xl transition-all duration-200 transform hover:scale-[1.02] hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 active:scale-[0.98] text-sm sm:text-base"
+                    className="w-full bg-linear-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-2.5 sm:py-3 px-4 sm:px-6 rounded-lg sm:rounded-xl transition-all duration-200 transform hover:scale-[1.02] hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 active:scale-[0.98] text-sm sm:text-base"
                     aria-label="Try again to reload the application"
                   >
                     <div className="flex items-center justify-center space-x-2">
@@ -142,24 +170,38 @@ class ErrorBoundary extends React.Component {
             {/* Development Error Details */}
             {import.meta.env.DEV && this.state.error && (
               <details className="mt-4 sm:mt-6 bg-slate-900 rounded-lg sm:rounded-xl overflow-hidden border border-slate-700">
-                <summary className="px-4 sm:px-6 py-3 sm:py-4 text-white font-medium cursor-pointer hover:bg-slate-800 transition-colors duration-200 flex items-center space-x-2 text-sm sm:text-base">
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  <span>Developer Information</span>
+                <summary className="px-4 sm:px-6 py-3 sm:py-4 text-white font-medium cursor-pointer hover:bg-slate-800 transition-colors duration-200 flex items-center justify-between text-sm sm:text-base">
+                  <div className="flex items-center space-x-2">
+                    <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span>Developer Information</span>
+                  </div>
+                  <button
+                    onClick={this.handleCopyError}
+                    className="flex items-center space-x-1 text-slate-400 hover:text-white transition-colors duration-200 p-1 rounded hover:bg-slate-700"
+                    title="Copy error details"
+                  >
+                    {this.state.copied ? (
+                      <FaCheck className="w-3 h-3 sm:w-4 sm:h-4 text-green-400" />
+                    ) : (
+                      <FaCopy className="w-3 h-3 sm:w-4 sm:h-4" />
+                    )}
+                    <span className="text-xs hidden sm:inline">{this.state.copied ? 'Copied!' : 'Copy'}</span>
+                  </button>
                 </summary>
                 <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-slate-700">
                   <div className="bg-slate-800 rounded-lg p-3 sm:p-4 font-mono text-xs text-slate-300 overflow-auto max-h-48 sm:max-h-60">
                     <div className="mb-3">
                       <strong className="text-red-400">Error:</strong>
-                      <div className="text-white mt-1 break-words">{this.state.error.toString()}</div>
+                      <div className="text-white mt-1 wrap-break-word">{this.state.error.toString()}</div>
                     </div>
 
                     {this.state.error.stack && (
                       <div className="mb-3">
                         <strong className="text-yellow-400">Stack Trace:</strong>
-                        <pre className="text-slate-400 mt-1 whitespace-pre-wrap text-xs leading-relaxed break-words">
+                        <pre className="text-slate-400 mt-1 whitespace-pre-wrap text-xs leading-relaxed wrap-break-word">
                           {this.state.error.stack}
                         </pre>
                       </div>
@@ -168,7 +210,7 @@ class ErrorBoundary extends React.Component {
                     {this.state.errorInfo && (
                       <div>
                         <strong className="text-blue-400">Component Stack:</strong>
-                        <pre className="text-slate-400 mt-1 whitespace-pre-wrap text-xs leading-relaxed break-words">
+                        <pre className="text-slate-400 mt-1 whitespace-pre-wrap text-xs leading-relaxed wrap-break-word">
                           {this.state.errorInfo.componentStack}
                         </pre>
                       </div>

@@ -22,6 +22,9 @@ import {
   orderBy,
   limit,
   getDoc,
+  where,
+  updateDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
@@ -45,6 +48,9 @@ const Admin = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [currentUser, setCurrentUser] = useState(null);
+  const [timeReports, setTimeReports] = useState([]);
+  const [timeFilter, setTimeFilter] = useState('all');
+  const [loadingTime, setLoadingTime] = useState(false);
 
   useEffect(() => {
     const cachedLogs = sessionStorage.getItem("auditLogs");
@@ -53,6 +59,7 @@ const Admin = () => {
     if (cachedLogs && cachedUsers) {
       setLogs(JSON.parse(cachedLogs));
       setUsers(JSON.parse(cachedUsers));
+      fetchTimeReports('all'); // Load time reports
       return;
     }
 
@@ -120,6 +127,7 @@ const Admin = () => {
       // Refresh error - handled silently
     }
     setRefreshing(false);
+    fetchTimeReports('all'); // Load time reports after refresh
   };
 
   const handleDeleteUserConfirm = async () => {
@@ -143,6 +151,128 @@ const Admin = () => {
   const handleUserUpdated = () => {
     handleRefresh();
     setEditUser(null);
+  };
+
+  const cleanupStaleSessions = async () => {
+    try {
+      const now = new Date();
+      const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000); // 10 minutes ago
+      
+      // Get all active sessions
+      const activeSessionsQuery = query(
+        collection(db, "user_sessions"), 
+        where('isActive', '==', true)
+      );
+      const activeSessionsSnap = await getDocs(activeSessionsQuery);
+      
+      const updatePromises = [];
+      activeSessionsSnap.docs.forEach(docSnap => {
+        const sessionData = docSnap.data();
+        const lastActive = sessionData.lastActive?.toDate();
+        
+        // If lastActive is more than 10 minutes ago, mark as inactive
+        if (lastActive && lastActive < tenMinutesAgo) {
+          updatePromises.push(
+            updateDoc(docSnap.ref, {
+              isActive: false,
+              endTime: serverTimestamp(),
+              duration: Math.floor((lastActive - sessionData.startTime.toDate()) / 1000)
+            })
+          );
+        }
+      });
+      
+      if (updatePromises.length > 0) {
+        await Promise.all(updatePromises);
+        console.log(`Cleaned up ${updatePromises.length} stale sessions`);
+      }
+    } catch (error) {
+      console.error("Error cleaning up stale sessions:", error);
+    }
+  };
+
+  const fetchTimeReports = async (filter = 'all') => {
+    setLoadingTime(true);
+    try {
+      // First, clean up stale sessions (inactive sessions that haven't been updated in 10+ minutes)
+      await cleanupStaleSessions();
+
+      let q = collection(db, "user_sessions");
+      if (filter === '7days') {
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        q = query(q, where('startTime', '>=', sevenDaysAgo));
+      } else if (filter === '30days') {
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        q = query(q, where('startTime', '>=', thirtyDaysAgo));
+      }
+      const snap = await getDocs(q);
+      const sessions = snap.docs.map(d => d.data());
+      // Aggregate by user - get latest location for each user
+      const userTotals = {};
+      const userLocations = {};
+      const userLastActive = {};
+      const now = new Date();
+      sessions.forEach(s => {
+        let dur = s.duration || 0;
+        if (s.isActive) {
+          const start = s.startTime.toDate();
+          dur = Math.floor((now - start) / 1000); // current duration in seconds
+        }
+        if (!userTotals[s.userId]) {
+          userTotals[s.userId] = 0;
+          userLocations[s.userId] = s.location || { address: "Unknown" };
+          userLastActive[s.userId] = s.isActive ? "Active now" : "Last session";
+        } else {
+          // Update location if this session has location data and current is unknown
+          if (s.location && !s.location.error && userLocations[s.userId].address === "Unknown") {
+            userLocations[s.userId] = s.location;
+          }
+          // Update active status
+          if (s.isActive) {
+            userLastActive[s.userId] = "Active now";
+          }
+        }
+        userTotals[s.userId] += dur;
+      });
+      // Fetch user names
+      const userIds = Object.keys(userTotals);
+      const userNames = {};
+      for (const uid of userIds) {
+        try {
+          const userQuery = query(collection(db, "users"), where("uid", "==", uid));
+          const userSnap = await getDocs(userQuery);
+          if (!userSnap.empty) {
+            const userData = userSnap.docs[0].data();
+            userNames[uid] = userData.name || 'Unknown';
+          } else {
+            userNames[uid] = 'Unknown';
+          }
+        } catch (error) {
+          console.error("Error fetching user:", error);
+          userNames[uid] = 'Unknown';
+        }
+      }
+      const reports = Object.entries(userTotals).map(([uid, totalSeconds]) => {
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        const location = userLocations[uid];
+        return {
+          userId: uid,
+          name: userNames[uid] || 'Unknown',
+          timeString: `${hours}h ${minutes}m ${seconds}s`,
+          location: location.error ? "Location unavailable" : location.address || "Unknown",
+          city: location.city || "Unknown",
+          country: location.country || "Unknown",
+          status: userLastActive[uid] || "Offline"
+        };
+      });
+      setTimeReports(reports);
+    } catch (error) {
+      console.error("Error fetching time reports:", error);
+      setTimeReports([]);
+    }
+    setLoadingTime(false);
   };
 
   const filteredUsers = users.filter((u) => {
@@ -403,7 +533,7 @@ const Admin = () => {
 
           {/* Desktop Table Layout */}
           <div className="hidden lg:block" data-tour="user-table">
-            <div className="overflow-x-auto">
+            <div className="overflow-hidden">
               <table className="w-full text-left">
                 <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
                   <tr>
@@ -561,6 +691,97 @@ const Admin = () => {
       <div data-tour="audit-logs">
         <AuditLogs logs={logs} />
       </div>
+
+      {/* Time Tracking Reports */}
+      <section className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-4 sm:p-6">
+          <div className="flex flex-col gap-4 mb-6">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <FiClock className="text-indigo-500" />
+                Time Tracking Reports
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                View employee time spent in the system
+                <br />
+                <span className="text-xs text-gray-400">
+                  Location shows last known location (may be "Unknown" for older sessions or denied permissions)
+                </span>
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <select
+                value={timeFilter}
+                onChange={(e) => setTimeFilter(e.target.value)}
+                className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="all">All Time</option>
+                <option value="7days">Last 7 Days</option>
+                <option value="30days">Last 30 Days</option>
+              </select>
+              <button
+                onClick={() => fetchTimeReports(timeFilter)}
+                disabled={loadingTime}
+                className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-gray-50 rounded-lg transition-colors border border-gray-200"
+                aria-label="Refresh time reports"
+              >
+                <FiRefreshCw className={`w-4 h-4 ${loadingTime ? "animate-spin" : ""}`} />
+              </button>
+            </div>
+          </div>
+          <div className="overflow-hidden">
+            <table className="w-full text-left">
+              <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                <tr>
+                  <th className="px-6 py-3 font-medium">Employee</th>
+                  <th className="px-6 py-3 font-medium">Status</th>
+                  <th className="px-6 py-3 font-medium">Location</th>
+                  <th className="px-6 py-3 font-medium">Total Time</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {timeReports.length > 0 ? (
+                  timeReports.map((report) => (
+                    <tr key={report.userId} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
+                        {report.name}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                          report.status === "Active now" 
+                            ? "bg-green-100 text-green-800" 
+                            : "bg-gray-100 text-gray-800"
+                        }`}>
+                          {report.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-500">
+                        <div className="text-sm">
+                          <div>{report.location}</div>
+                          {report.city !== "Unknown" && (
+                            <div className="text-xs text-gray-400">
+                              {report.city}, {report.country}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-500">
+                        {report.timeString}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="4" className="px-6 py-4 text-center text-gray-500">
+                      No time tracking data available
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
 
       {/* Delete Confirmation Modal - Make responsive */}
       {deleteUser && (

@@ -45,6 +45,7 @@ import InitiationDashboardExportButton from './InitiationDashboardExportButton';
 import InitiationDashboardReportButton from './InitiationDashboardReportButton';
 import ChangeTrainerDashboard from "./ChangeTrainerDashboard";
 import TrainerCalendar from "../TrainerCalendar/TrainerCalendar";
+import { auditLogTrainingOperations } from "../../../utils/learningAuditLogger";
 
 const PHASE_LABELS = {
   "phase-1": "Phase 1",
@@ -241,6 +242,19 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
       await updateDoc(trainingDocRef, {
         assignedTo: userOption,
       });
+
+      // Log training assignment change
+      try {
+        await auditLogTrainingOperations.trainingAssigned(
+          training.trainingId,
+          training.collegeName,
+          prevAssignedUser,
+          userOption
+        );
+      } catch (auditErr) {
+        console.error("Error logging training assignment:", auditErr);
+        // Don't block the main operation
+      }
 
       // Remove all trainings from current user view if not "all" and user changed
       if (
@@ -854,6 +868,19 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
       // Commit all deletions
       await batch.commit();
       
+      // Log training deletion
+      try {
+        await auditLogTrainingOperations.trainingDeleted(
+          training.trainingId,
+          training.collegeName,
+          training.phaseId,
+          "User initiated deletion"
+        );
+      } catch (auditErr) {
+        console.error("Error logging training deletion:", auditErr);
+        // Don't block the main operation
+      }
+      
       // Update local state
       setTrainings(prev => prev.filter(t => t.id !== training.id));
       
@@ -901,6 +928,21 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
         // rollback on error
         fetchData();
       });
+
+      // Log training status change
+      try {
+        await auditLogTrainingOperations.trainingStatusChanged(
+          training.trainingId,
+          training.collegeName,
+          training.phaseId,
+          prevStatus,
+          newStatus,
+          "Manual status override"
+        );
+      } catch (auditErr) {
+        console.error("Error logging training status change:", auditErr);
+        // Don't block the main operation
+      }
 
       // Clear cache since data changed
       try {

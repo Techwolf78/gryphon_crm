@@ -16,6 +16,7 @@ import {
   where,
 } from "firebase/firestore";
 import { useAuth } from "../../../context/AuthContext";
+import { auditLogTrainingOperations } from "../../../utils/learningAuditLogger";
 import {
   FiChevronLeft,
   FiCheck,
@@ -690,10 +691,55 @@ function InitiationModal({ training, onClose, onConfirm }) {
           "domains",
           domain
         );
-        return setDoc(domainRef, phaseData, { merge: true });
+        await setDoc(domainRef, phaseData, { merge: true });
+
+        // Log batch creation for each batch in this domain
+        const tableData = tableDataLookup[domain] || [];
+        for (const row of tableData) {
+          if (row.batches) {
+            for (const batch of row.batches) {
+              try {
+                await auditLogTrainingOperations.batchCreated({
+                  trainingId: training.id,
+                  collegeName: training.collegeName,
+                  phase: mainPhase,
+                  domain,
+                  batchCode: batch.batchCode || "",
+                  specialization: row.batch || row.specialization || "",
+                  studentCount: row.stdCount || row.students || 0,
+                  trainerCount: batch.trainers?.length || 0,
+                  totalAssignedHours: batch.assignedHours || 0,
+                  createdBy: user?.uid,
+                  createdByName: user?.displayName || user?.name || "Unknown",
+                });
+              } catch (auditErr) {
+                console.error("Error logging batch creation:", auditErr);
+                // Don't block the main save operation
+              }
+            }
+          }
+        }
       });
 
       await Promise.all([...phaseLevelPromises, ...batchPromises]);
+
+      // Log training initiation audit event
+      try {
+        await auditLogTrainingOperations.trainingInitiated({
+          trainingId: training.id,
+          collegeName: training.collegeName,
+          phases: selectedPhases,
+          domains: domainsList,
+          totalBatches,
+          totalTrainingHours,
+          totalCost,
+          initiatedBy: user?.uid,
+          initiatedByName: user?.displayName || user?.name || "Unknown",
+        });
+      } catch (auditErr) {
+        console.error("Error logging training initiation:", auditErr);
+        // Don't block the main save operation
+      }
 
       // Delete domains marked for deletion via X button
       const deletePromises = domainsToDelete.map(async (domain) => {
@@ -1447,7 +1493,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
         }
       `}</style>
 
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100">
         {/* Page Header */}
         <div className="bg-white shadow-sm border-b border-gray-200">
           <div className="mx-auto p-3">
@@ -1519,7 +1565,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                         return (
                           <label
                             key={phase}
-                            className={`flex items-center px-3 py-2 rounded-lg border text-sm font-medium transition-all min-w-[80px] ${
+                            className={`flex items-center px-3 py-2 rounded-lg border text-sm font-medium transition-all min-w-20 ${
                               selectedPhases.includes(phase)
                                 ? "border-blue-500 bg-blue-50 text-blue-700"
                                 : "border-gray-200 bg-white hover:border-gray-300"
@@ -1675,7 +1721,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                         </p>
                       </div>
                       {/* Chips for selected domains */}
-                      <div className="flex flex-wrap gap-2 mb-2 min-h-[32px]">
+                      <div className="flex flex-wrap gap-2 mb-2 min-h-8">
                         {selectedDomains.length === 0 && (
                           <span className="text-xs text-gray-400">
                             No domains selected
@@ -1859,7 +1905,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                 {error && (
                   <div className="rounded bg-red-50 border border-red-200 p-3">
                     <div className="flex">
-                      <div className="flex-shrink-0">
+                      <div className="shrink-0">
                         <FiAlertCircle className="h-4 w-4 text-red-400" />
                       </div>
                       <div className="ml-2">
@@ -1874,7 +1920,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                 {success && (
                   <div className="rounded bg-green-50 border border-green-200 p-3">
                     <div className="flex">
-                      <div className="flex-shrink-0">
+                      <div className="shrink-0">
                         <FiCheck className="h-4 w-4 text-green-400" />
                       </div>
                       <div className="ml-2">
@@ -1939,7 +1985,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                 {hasValidationErrors() && (
                   <div className="rounded bg-red-50 border border-red-200 p-3">
                     <div className="flex items-start">
-                      <div className="flex-shrink-0">
+                      <div className="shrink-0">
                         <FiAlertCircle className="h-4 w-4 text-red-400" />
                       </div>
                       <div className="ml-3">
