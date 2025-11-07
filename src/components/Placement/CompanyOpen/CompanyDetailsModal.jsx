@@ -1,6 +1,6 @@
 import React, { useState,  } from "react";
 import { XIcon } from "@heroicons/react/outline";
-import StudentDataView from '../StudentListModal';
+import StudentDataView from './StudentDataView';
 import { db } from '../../../firebase';
 import { collection, getDocs, } from 'firebase/firestore';
 

@@ -120,13 +120,21 @@ function Placement() {
     fetchData();
   }, [fetchData]);
 
-  const fetchStudentData = useCallback(async (trainingDocId) => {
+  const fetchStudentData = useCallback(async (trainingDocId, projectCode) => {
     try {
       setStudentError(null);
+
+      // Use projectCode instead of trainingDocId to build the path
+      const docName = projectCode.replace(/\//g, "-");
       const studentsSnapshot = await getDocs(
-        collection(db, "placementData", trainingDocId, "students")
+        collection(db, "placementData", docName, "students")
       );
-      const students = studentsSnapshot.docs.map((doc) => doc.data());
+
+      const students = studentsSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
       setStudentModalData({ show: true, students });
       setDropdownOpen(null);
     } catch (err) {
@@ -290,7 +298,7 @@ function Placement() {
 
           {activeTab === "training" && (
             <>
-              {sortedTrainingData.length === 0 ? (
+              {activeTab.length === 0 ? (
                 <div className="text-center py-8">
                   <svg
                     className="mx-auto h-12 w-12 text-gray-400"
@@ -532,14 +540,16 @@ function Placement() {
 
                                       <button
                                         onClick={() =>
-                                          fetchStudentData(item.id)
+                                          fetchStudentData(
+                                            item.id,
+                                            item.projectCode
+                                          )
                                         }
                                         className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
                                       >
                                         <User className="w-4 h-4 mr-2" />
                                         Student Data
                                       </button>
-
                                       <button
                                         onClick={() => handleMouPreview(item)}
                                         disabled={!item.mouFileUrl}

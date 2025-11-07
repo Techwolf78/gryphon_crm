@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { XIcon, DownloadIcon, CheckIcon, ChevronDownIcon, InformationCircleIcon } from '@heroicons/react/outline';
+import { XIcon, DownloadIcon, CheckIcon, ChevronDownIcon, InformationCircleIcon, ChevronRightIcon } from '@heroicons/react/outline';
 import { db } from '../../../firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import * as XLSX from 'xlsx-js-style';
@@ -116,11 +116,13 @@ const StudentListExportModal = ({ companies = [], onClose }) => {
   const [loadingUploads, setLoadingUploads] = useState(false);
   const [selectedUploads, setSelectedUploads] = useState(new Set());
   const [exporting, setExporting] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState(new Set());
 
   useEffect(() => {
     if (!companyCode) {
       setUploads([]);
       setSelectedUploads(new Set());
+      setExpandedGroups(new Set());
       return;
     }
 
@@ -150,6 +152,14 @@ const StudentListExportModal = ({ companies = [], onClose }) => {
 
         setUploads(items);
         setSelectedUploads(new Set(items.map(i => i.id)));
+        
+        // Automatically expand all groups initially
+        const groups = new Set();
+        items.forEach(item => {
+          const groupKey = getMonthYearGroup(item.uploadedAt);
+          groups.add(groupKey);
+        });
+        setExpandedGroups(groups);
       } catch (err) {
         console.error('Error fetching uploads', err);
         setUploads([]);
@@ -181,11 +191,71 @@ const StudentListExportModal = ({ companies = [], onClose }) => {
     }
   };
 
+  const getMonthYearGroup = (val) => {
+    if (!val) return 'unknown';
+    try {
+      const date = val.seconds ? new Date(val.seconds * 1000) : new Date(val);
+      return date.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+    } catch {
+      return 'unknown';
+    }
+  };
+
+  // Group uploads by month-year
+  const groupedUploads = useMemo(() => {
+    const groups = {};
+    uploads.forEach(upload => {
+      const groupKey = getMonthYearGroup(upload.uploadedAt);
+      if (!groups[groupKey]) {
+        groups[groupKey] = [];
+      }
+      groups[groupKey].push(upload);
+    });
+    
+    // Sort groups by date (newest first)
+    const sortedGroups = {};
+    Object.keys(groups)
+      .sort((a, b) => {
+        if (a === 'unknown') return 1;
+        if (b === 'unknown') return -1;
+        return new Date(b) - new Date(a);
+      })
+      .forEach(key => {
+        sortedGroups[key] = groups[key];
+      });
+    
+    return sortedGroups;
+  }, [uploads]);
+
   const toggleUploadSelection = (id) => {
     const next = new Set(selectedUploads);
     if (next.has(id)) next.delete(id);
     else next.add(id);
     setSelectedUploads(next);
+  };
+
+  const toggleGroupSelection = (groupKey) => {
+    const groupUploads = groupedUploads[groupKey] || [];
+    const groupIds = new Set(groupUploads.map(u => u.id));
+    const allSelected = groupUploads.every(u => selectedUploads.has(u.id));
+    
+    const next = new Set(selectedUploads);
+    if (allSelected) {
+      groupIds.forEach(id => next.delete(id));
+    } else {
+      groupIds.forEach(id => next.add(id));
+    }
+    setSelectedUploads(next);
+  };
+
+  const toggleGroupExpansion = (groupKey) => {
+    const next = new Set(expandedGroups);
+    if (next.has(groupKey)) {
+      next.delete(groupKey);
+    } else {
+      next.add(groupKey);
+    }
+    setExpandedGroups(next);
   };
 
   const selectAll = () => {
@@ -418,7 +488,7 @@ const StudentListExportModal = ({ companies = [], onClose }) => {
             </div>
           </div>
 
-          {/* Uploads list */}
+          {/* Uploads list with grouping */}
           <div className="border border-gray-200 rounded-xl overflow-hidden">
             <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
               <div className="flex items-center justify-between">
@@ -446,37 +516,80 @@ const StudentListExportModal = ({ companies = [], onClose }) => {
                   </p>
                 </div>
               ) : (
-                <ul className="divide-y divide-gray-100">
-                  {uploads.map(u => (
-                    <li key={u.id} className="hover:bg-gray-50 transition-colors duration-150">
-                      <label className="flex items-start p-4 cursor-pointer">
-                        <div className="flex items-center h-5 mt-0.5">
-                          <input 
-                            type="checkbox" 
-                            checked={selectedUploads.has(u.id)} 
-                            onChange={() => toggleUploadSelection(u.id)}
-                            className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                          />
-                        </div>
-                        <div className="ml-3 flex-1 min-w-0">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-gray-900 truncate">{u.college}</p>
-                              <p className="text-xs text-gray-500 mt-1">
-                                {formatMonthYear(u.uploadedAt)} 
-                                {u.uploadedAt && ` • ${formatFullDate(u.uploadedAt)}`} 
-                                • {u.students.length} students
-                              </p>
-                            </div>
-                            <div className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">
-                              ID: {u.id.slice(0,6)}
-                            </div>
+                <div className="divide-y divide-gray-100">
+                  {Object.entries(groupedUploads).map(([groupKey, groupUploads]) => {
+                    const isExpanded = expandedGroups.has(groupKey);
+                    const groupSelectedCount = groupUploads.filter(u => selectedUploads.has(u.id)).length;
+                    const isAllSelected = groupSelectedCount === groupUploads.length;
+                    const groupStudentCount = groupUploads.reduce((sum, u) => sum + u.students.length, 0);
+                    
+                    return (
+                      <div key={groupKey} className="bg-white">
+                        {/* Group Header */}
+                        <div className="flex items-center p-3 bg-gray-50 border-b border-gray-200">
+                          <button
+                            onClick={() => toggleGroupExpansion(groupKey)}
+                            className="flex items-center gap-2 flex-1 text-left hover:bg-gray-100 rounded px-2 py-1 transition-colors"
+                          >
+                            <ChevronRightIcon 
+                              className={`h-4 w-4 text-gray-600 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} 
+                            />
+                            <span className="font-medium text-gray-900">{groupKey}</span>
+                            <span className="text-sm text-gray-500 ml-2">
+                              ({groupUploads.length} uploads, {groupStudentCount} students)
+                            </span>
+                          </button>
+                          
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm text-gray-500">
+                              {groupSelectedCount}/{groupUploads.length} selected
+                            </span>
+                            <input 
+                              type="checkbox" 
+                              checked={isAllSelected}
+                              onChange={() => toggleGroupSelection(groupKey)}
+                              className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
                           </div>
                         </div>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
+
+                        {/* Group Content */}
+                        {isExpanded && (
+                          <ul className="divide-y divide-gray-100">
+                            {groupUploads.map(u => (
+                              <li key={u.id} className="hover:bg-gray-50 transition-colors duration-150">
+                                <label className="flex items-start p-4 cursor-pointer">
+                                  <div className="flex items-center h-5 mt-0.5">
+                                    <input 
+                                      type="checkbox" 
+                                      checked={selectedUploads.has(u.id)} 
+                                      onChange={() => toggleUploadSelection(u.id)}
+                                      className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                    />
+                                  </div>
+                                  <div className="ml-3 flex-1 min-w-0">
+                                    <div className="flex items-start justify-between">
+                                      <div>
+                                        <p className="text-sm font-medium text-gray-900 truncate">{u.college}</p>
+                                        <p className="text-xs text-gray-500 mt-1">
+                                          {formatFullDate(u.uploadedAt)} 
+                                          • {u.students.length} students
+                                        </p>
+                                      </div>
+                                      <div className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">
+                                        ID: {u.id.slice(0,6)}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </label>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           </div>
