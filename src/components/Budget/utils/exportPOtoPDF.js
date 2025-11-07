@@ -141,8 +141,8 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
     const gst = order.gstDetails;
     const halfGst = (gst.gstAmount || 0) / 2;
     itemRows.push(
-      ["", "", "SGST @ 9%", "9%", formatNum(halfGst), formatNum(halfGst)],
-      ["", "", "CGST @ 9%", "9%", formatNum(halfGst), formatNum(halfGst)]
+      ["", "", "SGST ", "9%", formatNum(halfGst), formatNum(halfGst)],
+      ["", "", "CGST ", "9%", formatNum(halfGst), formatNum(halfGst)]
     );
     if (gst.totalWithGST) {
       itemRows.push([
@@ -233,17 +233,19 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
   );
 
   const rows = [];
-  const addSection = (title, data, isComponent = false) => {
+
+  // ✅ Reusable section helper
+  const addSection = (title, data) => {
     if (!data || Object.keys(data).length === 0) return;
     let first = true;
     Object.entries(data).forEach(([key, val]) => {
-      let approved = isComponent ? val.allocated || 0 : val || 0;
-      let spent = isComponent ? val.spent || 0 : "-";
-      let remaining = isComponent ? approved - spent : "-";
-      let percent =
-        isComponent && approved
-          ? ((spent / approved) * 100).toFixed(1) + "%"
-          : "-";
+      const approved = val?.allocated ?? 0;
+      const spent = val?.spent ?? 0;
+      const remaining = approved - spent;
+      const percent = approved
+        ? ((spent / approved) * 100).toFixed(1) + "%"
+        : "-";
+
       rows.push([
         first ? title : "",
         key.replace(/_/g, " ").toUpperCase(),
@@ -256,28 +258,39 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
     });
   };
 
-  addSection("Fixed Cost", budgetData.fixedCosts);
-  addSection("Department Expense", budgetData.departmentExpenses);
-  addSection("", budgetData.components, true);
-  addSection("CSDD Component", budgetData.csddComponents, true);
+  // ✅ Add each section based on new schema
+  addSection("Fixed Costs", budgetData.fixedCosts);
+  addSection("Department Expenses", budgetData.departmentExpenses);
+  addSection("CSDD Expenses", budgetData.csddExpenses);
 
-  const totalApproved = rows.reduce(
-    (s, r) => s + (parseFloat(r[2].replace(/,/g, "")) || 0),
-    0
-  );
-  const totalSpent = rows.reduce(
-    (s, r) => s + (parseFloat(r[4].replace(/,/g, "")) || 0),
-    0
-  );
+  // ✅ Safe numeric parsing
+  const parseValue = (val) => {
+    if (val == null || val === "-" || val === "") return 0;
+    const strVal = val.toString().replace(/,/g, "");
+    const num = parseFloat(strVal);
+    return isNaN(num) ? 0 : num;
+  };
+
+  // ✅ Total calculations
+  const totalApproved = rows.reduce((sum, r) => sum + parseValue(r[2]), 0);
+  const totalSpent = rows.reduce((sum, r) => sum + parseValue(r[4]), 0);
+  const totalRemaining = totalApproved - totalSpent;
+  const totalPercent =
+    totalApproved > 0
+      ? ((totalSpent / totalApproved) * 100).toFixed(1) + "%"
+      : "-";
+
+  // ✅ Push total row
   rows.push([
     "TOTAL",
     "",
     formatNum(totalApproved),
-    ((totalSpent / totalApproved) * 100).toFixed(1) + "%",
+    totalPercent,
     formatNum(totalSpent),
-    formatNum(totalApproved - totalSpent),
+    formatNum(totalRemaining),
   ]);
 
+  // ✅ AutoTable render
   autoTable(docPDF, {
     startY: 30,
     head: [
@@ -315,7 +328,7 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
         data.row.raw[0] !== "TOTAL" &&
         spent > 0
       ) {
-        data.cell.styles.fillColor = [230, 230, 230]; // light grey
+        data.cell.styles.fillColor = [230, 230, 230];
         data.cell.styles.fontStyle = "bold";
       }
 
@@ -333,6 +346,7 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
     },
   });
 
+  // ✅ Footer
   docPDF.setFontSize(8);
   docPDF.text("Generated via Gryphon Budget System", 105, 285, {
     align: "center",

@@ -121,8 +121,14 @@ const PurchaseIntentModal = ({
 
   const getRemainingBudget = () => {
     if (!currentBudget || !formData.budgetComponent) return 0;
-    const component = currentBudget.components[formData.budgetComponent];
-    return component ? component.allocated - component.spent : 0;
+
+    // Check across all expense groups
+    const component =
+      currentBudget.departmentExpenses?.[formData.budgetComponent] ||
+      currentBudget.fixedCosts?.[formData.budgetComponent] ||
+      currentBudget.csddExpenses?.[formData.budgetComponent];
+
+    return component ? (component.allocated || 0) - (component.spent || 0) : 0;
   };
 
   const handleSubmit = (e) => {
@@ -206,13 +212,12 @@ const PurchaseIntentModal = ({
   const remainingBudget = getRemainingBudget();
   const exceedsBudget = estimatedTotal > remainingBudget;
 
-  // Get available categories from budget components
-  const availableCategories = Object.entries(budgetComponents || {}).map(
-    ([key, label]) => ({
+  const availableCategories = Object.entries(budgetComponents || {})
+    .filter(([key]) => currentBudget?.departmentExpenses?.[key])
+    .map(([key, label]) => ({
       value: key,
       label: label,
-    })
-  );
+    }));
 
   useEffect(() => {
     const preventScrollChange = (e) => {
@@ -294,13 +299,11 @@ const PurchaseIntentModal = ({
                 required
               >
                 <option value="">Select Component</option>
-                {Object.entries(budgetComponents)
-                  .filter(([key]) => currentBudget?.components?.[key])
-                  .map(([key, label]) => (
-                    <option key={key} value={key}>
-                      {label}
-                    </option>
-                  ))}
+                {availableCategories.map((cat) => (
+                  <option key={cat.value} value={cat.value}>
+                    {cat.label}
+                  </option>
+                ))}
               </select>
               {formData.budgetComponent && currentBudget && (
                 <div className="mt-2 text-sm">

@@ -65,6 +65,7 @@ const budgetComponents = {
   hr: {
     tshirts: "T-shirts & Merchandise",
     email: "Email Subscriptions",
+    laptops: "Laptops & Hardware",
     ca: "CA Consultancy",
   },
   dm: {
@@ -104,8 +105,11 @@ const budgetComponents = {
     printmedia: "Print Media",
     training_materials: "Training Materials",
     placement_events: "Placement Events",
-    corporate_gifts: "Corporate Gifts",
+    diwaligifts: "Diwali Gifts",
     travel_expenses: "Travel Expenses",
+  },
+  management: {
+    emails: "Email Subscriptions",
   },
 };
 
@@ -164,15 +168,6 @@ const getDepartmentComponents = (department) => {
   }
 
   return components;
-};
-
-// Helper function to get all components for a department
-const getAllComponentsForDepartment = (department) => {
-  const deptComponents = getDepartmentComponents(department);
-  return Object.entries(deptComponents).map(([key, value]) => ({
-    id: key,
-    name: value,
-  }));
 };
 
 // Action Dropdown Component
@@ -395,16 +390,14 @@ function BudgetDashboard({
     return department || "admin";
   }, [currentUserData, department]);
 
-  const currentUserDepartmentComponents = useMemo(() => {
-    const components = getDepartmentComponents(currentUserDepartment);
-    return components;
+  const isPurchaseDepartment = useMemo(() => {
+    const dept = currentUserDepartment?.toLowerCase();
+    return ["purchase", "admin", "hr"].includes(dept);
   }, [currentUserDepartment]);
 
-  // Get all components for current user's department
-  const allDepartmentComponents = useMemo(() => {
-    if (!currentUserData) return [];
-    return getAllComponentsForDepartment(currentUserDepartment);
-  }, [currentUserData, currentUserDepartment]);
+  const currentUserDepartmentComponents = getDepartmentComponents(
+    currentUserDepartment
+  );
 
   // Find active budget
   const activeBudget = useMemo(() => {
@@ -460,44 +453,14 @@ function BudgetDashboard({
     }
   }, []);
 
-  const handleViewIntent = useCallback(
-    (intent) => {
-      const userDepartment = users[intent.createdBy]?.department;
-      const deptComponents = getDepartmentComponents(userDepartment);
-
-      const details = `
-        Purchase Intent Details:
-
-        Title: ${intent.title}
-        Description: ${intent.description || "N/A"}
-        Amount: ₹${intent.totalEstimate?.toLocaleString("en-IN") || "0"}
-        Status: ${intent.status.replace(/_/g, " ")}
-        Component: ${
-          deptComponents[intent.budgetComponent] || intent.budgetComponent
-        }
-        Urgency: ${intent.urgency || "medium"}
-        Created: ${new Date(intent.createdAt).toLocaleDateString()}
-        Created By: ${users[intent.createdBy]?.displayName || "Unknown"}
-        Department: ${userDepartment || "Unknown"}
-        ${
-          intent.approvedBy
-            ? `Approved By: ${
-                users[intent.approvedBy]?.displayName || "Unknown"
-              }`
-            : ""
-        }
-        ${
-          intent.approvedAt
-            ? `Approved At: ${new Date(intent.approvedAt).toLocaleDateString()}`
-            : ""
-        }
-        ${intent.notes ? `Notes: ${intent.notes}` : ""}
-          `.trim();
-
-      alert(details);
-    },
-    [users]
-  );
+  useEffect(() => {
+    console.log("📦 Effective department:", currentUserDepartment);
+    console.log(
+      "👤 User department from Firestore:",
+      currentUserData?.department
+    );
+    console.log("🧩 Prop department:", department);
+  }, [currentUserDepartment, currentUserData, department]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -610,8 +573,17 @@ function BudgetDashboard({
     const deptComponents = currentUserDepartmentComponents;
 
     Object.keys(deptComponents).forEach((component) => {
-      const allocated = targetBudget.components?.[component]?.allocated || 0;
-      const spent = targetBudget.components?.[component]?.spent || 0;
+      const allocated =
+        targetBudget.departmentExpenses?.[component]?.allocated ||
+        targetBudget.fixedCosts?.[component]?.allocated ||
+        targetBudget.csddExpenses?.[component]?.allocated ||
+        0;
+
+      const spent =
+        targetBudget.departmentExpenses?.[component]?.spent ||
+        targetBudget.fixedCosts?.[component]?.spent ||
+        targetBudget.csddExpenses?.[component]?.spent ||
+        0;
       utilization[component] = {
         allocated,
         spent,
@@ -683,28 +655,25 @@ function BudgetDashboard({
     return filtered;
   }, [purchaseOrders, filters]);
 
-  // Alternative approach with specific document ID
   const handleCreateBudget = useCallback(
     async (budgetData) => {
       try {
-        const budgetWithMeta = {
-          ...budgetData,
-          department: department,
-          fiscalYear: budgetData.fiscalYear || currentFiscalYear,
-          ownerName: currentUser.displayName,
-          totalBudget: budgetData.totalBudget || 0,
-          totalSpent: 0,
-          status: budgetData.status || "draft",
-          createdBy: currentUser.uid,
-          createdAt: serverTimestamp(),
-          lastUpdatedAt: serverTimestamp(),
-          updatedBy: currentUser.uid,
-        };
-
-        // Using setDoc with specific document ID
         const docId = `${department}_FY-20${
           budgetData.fiscalYear || currentFiscalYear
         }`;
+
+        const budgetWithMeta = {
+          ...budgetData,
+          department,
+          fiscalYear: budgetData.fiscalYear || currentFiscalYear,
+          ownerName: currentUser.displayName,
+          status: budgetData.status || "draft",
+          createdBy: currentUser.uid,
+          updatedBy: currentUser.uid,
+          createdAt: serverTimestamp(),
+          lastUpdatedAt: serverTimestamp(),
+        };
+
         await setDoc(doc(db, "department_budgets", docId), budgetWithMeta);
         setShowBudgetForm(false);
       } catch (error) {
@@ -726,17 +695,15 @@ function BudgetDashboard({
       try {
         const budgetRef = doc(db, "department_budgets", existingBudget.id);
 
-        // If setting budget to active, archive all other budgets for this department
+        // 🔹 If this budget is being activated, archive all others in same department
         if (budgetData.status === "active") {
-          // Find all budgets for the same department
           const budgetsQuery = query(
             collection(db, "department_budgets"),
             where("department", "==", existingBudget.department)
           );
           const snapshot = await getDocs(budgetsQuery);
 
-          // Update all other budgets to archived status
-          const updatePromises = [];
+          const archivePromises = [];
           snapshot.forEach((docSnapshot) => {
             if (docSnapshot.id !== existingBudget.id) {
               const otherBudgetRef = doc(
@@ -744,7 +711,7 @@ function BudgetDashboard({
                 "department_budgets",
                 docSnapshot.id
               );
-              updatePromises.push(
+              archivePromises.push(
                 updateDoc(otherBudgetRef, {
                   status: "archived",
                   lastUpdatedAt: serverTimestamp(),
@@ -754,12 +721,10 @@ function BudgetDashboard({
             }
           });
 
-          // Wait for all archive operations to complete
-          if (updatePromises.length > 0) {
-            await Promise.all(updatePromises);
-          }
+          if (archivePromises.length > 0) await Promise.all(archivePromises);
         }
 
+        // 🔹 Update the existing budget with v6 schema
         const updateData = {
           ...budgetData,
           lastUpdatedAt: serverTimestamp(),
@@ -770,10 +735,10 @@ function BudgetDashboard({
         setShowBudgetUpdateForm(false);
         setEditingBudget(null);
 
-        // Show success message
+        // 🔹 Success message
         if (budgetData.status === "active") {
           alert(
-            "Budget set to active! Other budgets for this department have been archived."
+            "Budget set to active! Other budgets for this department archived."
           );
         } else {
           alert("Budget updated successfully!");
@@ -881,6 +846,7 @@ function BudgetDashboard({
         const targetBudget = activeBudget || departmentBudget;
         if (!targetBudget || !targetBudget.id)
           throw new Error("No active budget found");
+
         // Generate PO Number
         const poNumber = await generatePurchaseOrderNumber(
           department,
@@ -899,7 +865,7 @@ function BudgetDashboard({
           // 1️⃣ Create Purchase Order Document
           const orderWithMeta = {
             ...orderData,
-            department: department,
+            department,
             fiscalYear: currentFiscalYear,
             poNumber,
             status: "approved",
@@ -931,20 +897,34 @@ function BudgetDashboard({
             orderData.budgetComponent || orderData.selectedBudgetComponent;
 
           const updatePayload = {
-            totalSpent: increment(totalAmount),
+            // ⬇️ write to the v6 location
+            "summary.totalSpent": increment(totalAmount),
             lastUpdatedAt: serverTimestamp(),
             updatedBy: currentUser.uid,
           };
 
-          if (budgetComponent) {
-            updatePayload[`components.${budgetComponent}.spent`] =
+          // 🔍 Find which section the component belongs to
+          const section = targetBudget.departmentExpenses?.[budgetComponent]
+            ? "departmentExpenses"
+            : targetBudget.fixedCosts?.[budgetComponent]
+            ? "fixedCosts"
+            : targetBudget.csddExpenses?.[budgetComponent]
+            ? "csddExpenses"
+            : null;
+
+          if (section) {
+            updatePayload[`${section}.${budgetComponent}.spent`] =
               increment(totalAmount);
+          } else {
+            console.warn(
+              `⚠️ Budget component "${budgetComponent}" not found in any section.`
+            );
           }
 
           transaction.update(budgetRef, updatePayload);
         });
 
-        // Close modal and reset state
+        // ✅ Close modal and reset state
         setShowPurchaseOrderModal(false);
         setSelectedIntent(null);
 
@@ -975,6 +955,25 @@ function BudgetDashboard({
   const handleUpdatePurchaseOrder = async (updatedOrder) => {
     try {
       if (!updatedOrder?.id) throw new Error("Missing order ID");
+      if (!currentUser) throw new Error("User not authenticated");
+
+      // 🔹 Fetch current user's department safely
+      const userDept =
+        currentUserData?.department ||
+        (currentUserData?.departments && currentUserData.departments[0]) ||
+        "unknown";
+
+      // 🔹 Allow only HR, Admin, or Purchase department users
+      const allowedDepartments = ["hr", "admin", "purchase"];
+      if (!allowedDepartments.includes(userDept.toLowerCase())) {
+        alert(
+          "❌ Only HR, Admin, or Purchase users can update purchase orders."
+        );
+        console.warn(
+          `Unauthorized update attempt by ${currentUser.email} (${userDept})`
+        );
+        return;
+      }
 
       const orderRef = doc(db, "purchase_orders", updatedOrder.id);
 
@@ -986,7 +985,7 @@ function BudgetDashboard({
 
       await updateDoc(orderRef, updatedData);
 
-      // Optional: Update local state instantly for better UX
+      // ✅ Optimistic local state update for UX
       setPurchaseOrders((prev) =>
         prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o))
       );
@@ -1035,7 +1034,7 @@ function BudgetDashboard({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
         <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-6 mb-6">
@@ -1207,7 +1206,7 @@ function BudgetDashboard({
                                 <td className="py-3 px-4">
                                   <span className="font-semibold text-gray-900">
                                     ₹
-                                    {budget.totalBudget?.toLocaleString(
+                                    {budget.summary?.totalBudget?.toLocaleString(
                                       "en-IN"
                                     ) || "0"}
                                   </span>
@@ -1215,7 +1214,7 @@ function BudgetDashboard({
                                 <td className="py-3 px-4">
                                   <span className="text-gray-700">
                                     ₹
-                                    {budget.totalSpent?.toLocaleString(
+                                    {budget.summary?.totalSpent?.toLocaleString(
                                       "en-IN"
                                     ) || "0"}
                                   </span>
@@ -1223,8 +1222,8 @@ function BudgetDashboard({
                                 <td className="py-3 px-4">
                                   <span
                                     className={`font-medium ${
-                                      (budget.totalBudget || 0) -
-                                        (budget.totalSpent || 0) >=
+                                      (budget.summary?.totalBudget || 0) -
+                                        (budget.summary?.totalSpent || 0) >=
                                       0
                                         ? "text-green-600"
                                         : "text-red-600"
@@ -1232,8 +1231,8 @@ function BudgetDashboard({
                                   >
                                     ₹
                                     {(
-                                      (budget.totalBudget || 0) -
-                                      (budget.totalSpent || 0)
+                                      (budget.summary?.totalBudget || 0) -
+                                      (budget.summary?.totalSpent || 0)
                                     ).toLocaleString("en-IN")}
                                   </span>
                                 </td>
@@ -1358,7 +1357,6 @@ function BudgetDashboard({
                   budgetComponents={currentUserDepartmentComponents}
                   componentColors={componentColors}
                   onDeleteIntent={handleDeleteIntent}
-                  onViewIntent={handleViewIntent}
                   onCreatePurchaseOrder={(intent) => {
                     setSelectedIntent(intent);
                     setShowPurchaseOrderModal(true);
@@ -1404,14 +1402,18 @@ function BudgetDashboard({
                             </p>
                             <p className="text-sm text-gray-600">
                               Total Budget: ₹
-                              {budget.totalBudget?.toLocaleString("en-IN")} •
+                              {budget.summary?.totalBudget?.toLocaleString(
+                                "en-IN"
+                              )}
                               Spent: ₹
-                              {budget.totalSpent?.toLocaleString("en-IN")} •
+                              {budget.summary?.totalSpent?.toLocaleString(
+                                "en-IN"
+                              )}
                               Utilization:{" "}
-                              {budget.totalBudget
+                              {budget.summary?.totalBudget
                                 ? (
-                                    ((budget.totalSpent || 0) /
-                                      budget.totalBudget) *
+                                    (budget.summary.totalSpent /
+                                      budget.summary.totalBudget) *
                                     100
                                   ).toFixed(1)
                                 : 0}
@@ -1585,18 +1587,19 @@ function BudgetDashboard({
                 </p>
               </div>
 
-              {/* Optional: Component breakdown */}
-              {viewingBudget.components && (
+              {(viewingBudget.fixedCosts ||
+                viewingBudget.departmentExpenses ||
+                viewingBudget.csddExpenses) && (
                 <div className="mt-4">
                   <h4 className="font-semibold mb-2 text-gray-900">
-                    Components:
+                    Budget Breakdown:
                   </h4>
                   <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg">
                     <table className="w-full text-sm">
                       <thead className="bg-gray-50">
                         <tr>
                           <th className="text-left px-3 py-2 font-medium text-gray-700">
-                            Component
+                            Category
                           </th>
                           <th className="text-right px-3 py-2 font-medium text-gray-700">
                             Allocated (₹)
@@ -1607,22 +1610,28 @@ function BudgetDashboard({
                         </tr>
                       </thead>
                       <tbody>
-                        {Object.entries(viewingBudget.components || {}).map(
-                          ([key, comp]) => (
-                            <tr
-                              key={key}
-                              className="border-t border-gray-100 hover:bg-gray-50"
-                            >
-                              <td className="px-3 py-2 text-gray-800 capitalize">
-                                {key.replace(/_/g, " ")}
-                              </td>
-                              <td className="px-3 py-2 text-right text-gray-700">
-                                {comp.allocated?.toLocaleString("en-IN") || 0}
-                              </td>
-                              <td className="px-3 py-2 text-right text-gray-700">
-                                {comp.spent?.toLocaleString("en-IN") || 0}
-                              </td>
-                            </tr>
+                        {[
+                          "fixedCosts",
+                          "departmentExpenses",
+                          "csddExpenses",
+                        ].map((group) =>
+                          Object.entries(viewingBudget[group] || {}).map(
+                            ([key, comp]) => (
+                              <tr
+                                key={`${group}-${key}`}
+                                className="border-t border-gray-100 hover:bg-gray-50"
+                              >
+                                <td className="px-3 py-2 text-gray-800 capitalize">
+                                  {key.replace(/_/g, " ")}
+                                </td>
+                                <td className="px-3 py-2 text-right text-gray-700">
+                                  {comp.allocated?.toLocaleString("en-IN") || 0}
+                                </td>
+                                <td className="px-3 py-2 text-right text-gray-700">
+                                  {comp.spent?.toLocaleString("en-IN") || 0}
+                                </td>
+                              </tr>
+                            )
                           )
                         )}
                       </tbody>

@@ -10,85 +10,23 @@ import {
   X,
 } from "lucide-react";
 
-const ViewBudgetModal = ({
-  show,
-  onClose,
-  budget,
-  budgetComponents = {},
-  componentColors = {},
-  budgetUtilization = {},
-}) => {
+const ViewBudgetModal = ({ show, onClose, budget, componentColors = {} }) => {
   if (!show || !budget) return null;
 
-  const getDepartmentComponents = (department) => {
-    if (!department) return {};
-    const deptKey = department.toLowerCase();
-    const components = {
-      sales: {
-        emails: "Email Subscriptions",
-        laptops: "Laptops & Hardware",
-        tshirts: "T-shirts",
-        printmedia: "Print Media",
-        diwaligifts: "Diwali Gifts",
-      },
-      cr: {
-        emails: "Email Subscriptions",
-        laptops: "Laptops & Hardware",
-        tshirts: "T-shirts & Merchandise",
-        printmedia: "Print Media",
-        gifts: "Diwali & Other Gifts",
-      },
-      lnd: {
-        laptops: "Laptops & Hardware",
-        printmedia: "Print Media",
-        trainertshirts: "Trainer T-shirts",
-        tshirts: "T-shirts & Merchandise",
-      },
-      hr: {
-        tshirts: "T-shirts & Merchandise",
-        email: "Email Subscriptions",
-        ca: "CA Consultancy",
-      },
-      dm: {
-        laptops: "Laptops & Hardware",
-        email: "Email Subscriptions",
-        printmedia: "Print Media",
-        tshirts: "T-shirts & Merchandise",
-        trademarks: "Trademarks / Domains",
-        adobe: "Adobe Creative Cloud",
-        envato: "Envato Subscription",
-        canva: "Canva Pro",
-        softwareinstallation: "Software Installation",
-        simcard: "SIM Card / Network Tools",
-        elevenlabs: "Eleven Labs Subscription",
-        performancemarketing: "Performance Marketing",
-      },
-      admin: {
-        emails: "Email Subscriptions",
-        pt: "Promotional Tools",
-        laptops: "Laptops & Hardware",
-        tshirts: "T-shirts & Merchandise",
-        printmedia: "Print Media",
-        diwaligifts: "Diwali Gifts",
-      },
-      purchase: {
-        emails: "Email Subscriptions",
-        pt: "Promotional Tools",
-        laptops: "Laptops & Hardware",
-        tshirts: "T-shirts & Merchandise",
-        printmedia: "Print Media",
-        diwaligifts: "Diwali Gifts",
-      },
-    };
-    return components[deptKey] || {};
-  };
-
-  const components = getDepartmentComponents(budget.department);
-  const totalAllocated = budget.totalBudget || 0;
-  const totalSpent = budget.totalSpent || 0;
-  const totalRemaining = totalAllocated - totalSpent;
+  // 🧩 Extract from new schema
+  const summary = budget.summary || {};
+  const totalAllocated = summary.totalBudget || 0;
+  const totalSpent = summary.totalSpent || 0;
+  const totalRemaining = summary.totalRemaining ?? totalAllocated - totalSpent;
   const utilizationRate =
     totalAllocated > 0 ? (totalSpent / totalAllocated) * 100 : 0;
+
+  // 🔹 New unified categories
+  const sections = [
+    { title: "Fixed Costs", data: budget.fixedCosts || {} },
+    { title: "Department Expenses", data: budget.departmentExpenses || {} },
+    { title: "CSDD Expenses", data: budget.csddExpenses || {} },
+  ];
 
   const getStatusColor = (status) => {
     const colors = {
@@ -105,15 +43,20 @@ const ViewBudgetModal = ({
     return "text-red-600";
   };
 
+  const formatNumber = (val) =>
+    typeof val === "number" ? val.toLocaleString("en-IN") : val || "—";
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-1000">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[1000]">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Budget Details</h2>
+            <h2 className="text-2xl font-bold text-gray-900">
+              Budget Overview
+            </h2>
             <p className="text-gray-600 mt-1">
-              Complete overview of budget allocation and utilization
+              Allocation and spending summary for the department
             </p>
           </div>
           <button
@@ -127,7 +70,7 @@ const ViewBudgetModal = ({
         {/* Content */}
         <div className="overflow-y-auto max-h-[calc(90vh-140px)]">
           <div className="p-6 space-y-6">
-            {/* Basic Information */}
+            {/* Basic Info */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
                 <div className="flex items-center gap-3">
@@ -181,7 +124,7 @@ const ViewBudgetModal = ({
                   <div>
                     <p className="text-sm font-medium">Status</p>
                     <p className="text-lg font-bold capitalize">
-                      {budget.status}
+                      {budget.status || "active"}
                     </p>
                   </div>
                 </div>
@@ -194,30 +137,31 @@ const ViewBudgetModal = ({
                 <DollarSign className="w-5 h-5" />
                 Financial Summary
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="text-center">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                <div>
                   <p className="text-sm text-gray-600">Total Budget</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    ₹{totalAllocated.toLocaleString("en-IN")}
+                    ₹{formatNumber(totalAllocated)}
                   </p>
                 </div>
-                <div className="text-center">
+                <div>
                   <p className="text-sm text-gray-600">Total Spent</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    ₹{totalSpent.toLocaleString("en-IN")}
+                    ₹{formatNumber(totalSpent)}
                   </p>
                 </div>
-                <div className="text-center">
+                <div>
                   <p className="text-sm text-gray-600">Remaining</p>
                   <p
                     className={`text-2xl font-bold ${getUtilizationColor(
                       utilizationRate
                     )}`}
                   >
-                    ₹{totalRemaining.toLocaleString("en-IN")}
+                    ₹{formatNumber(totalRemaining)}
                   </p>
                 </div>
               </div>
+
               <div className="mt-4">
                 <div className="flex justify-between text-sm text-gray-600 mb-2">
                   <span>Overall Utilization</span>
@@ -238,7 +182,75 @@ const ViewBudgetModal = ({
               </div>
             </div>
 
-            {/* Additional Information */}
+            {/* 🔹 Budget Sections */}
+            <div className="space-y-6">
+              {sections.map(
+                ({ title, data }) =>
+                  data &&
+                  Object.keys(data).length > 0 && (
+                    <div
+                      key={title}
+                      className="border border-gray-200 rounded-xl p-4"
+                    >
+                      <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                        <PieChart className="w-4 h-4" />
+                        {title}
+                      </h4>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm border-collapse">
+                          <thead>
+                            <tr className="bg-gray-100">
+                              <th className="text-left py-2 px-3 border border-gray-300">
+                                Component
+                              </th>
+                              <th className="text-right py-2 px-3 border border-gray-300">
+                                Allocated
+                              </th>
+                              <th className="text-right py-2 px-3 border border-gray-300">
+                                Spent
+                              </th>
+                              <th className="text-right py-2 px-3 border border-gray-300">
+                                Remaining
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {Object.entries(data).map(([key, val]) => {
+                              const remaining =
+                                (val.allocated || 0) - (val.spent || 0);
+                              return (
+                                <tr key={key} className="hover:bg-gray-50">
+                                  <td className="py-2 px-3 border border-gray-300 capitalize">
+                                    {key.replace(/_/g, " ")}
+                                  </td>
+                                  <td className="text-right py-2 px-3 border border-gray-300">
+                                    ₹{formatNumber(val.allocated)}
+                                  </td>
+                                  <td className="text-right py-2 px-3 border border-gray-300">
+                                    ₹{formatNumber(val.spent)}
+                                  </td>
+                                  <td
+                                    className={`text-right py-2 px-3 border border-gray-300 ${
+                                      remaining < 0
+                                        ? "text-red-600 font-semibold"
+                                        : ""
+                                    }`}
+                                  >
+                                    ₹{formatNumber(remaining)}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )
+              )}
+            </div>
+
+            {/* Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="border border-gray-200 rounded-xl p-4">
                 <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
@@ -251,8 +263,10 @@ const ViewBudgetModal = ({
                     <span className="font-medium">
                       {budget.lastUpdatedAt
                         ? new Date(
-                            budget.lastUpdatedAt.seconds * 1000
-                          ).toLocaleDateString()
+                            budget.lastUpdatedAt.seconds
+                              ? budget.lastUpdatedAt.seconds * 1000
+                              : budget.lastUpdatedAt
+                          ).toLocaleDateString("en-IN")
                         : "N/A"}
                     </span>
                   </div>
@@ -287,8 +301,8 @@ const ViewBudgetModal = ({
                   <div className="flex justify-between">
                     <span className="text-gray-600">Fiscal Period</span>
                     <span className="font-medium">
-                      April 20{budget.fiscalYear.split("-")[0]} - March 20
-                      {budget.fiscalYear.split("-")[1]}
+                      April 20{budget.fiscalYear?.split("-")[0]} - March 20
+                      {budget.fiscalYear?.split("-")[1]}
                     </span>
                   </div>
                 </div>

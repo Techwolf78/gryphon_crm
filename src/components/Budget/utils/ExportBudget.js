@@ -10,31 +10,22 @@ export const exportBudget = async (department, fiscalYear, budgetData) => {
 
     const rows = [];
 
-    // Helper to add sections
-    const addSection = (title, data, isComponent = false) => {
+    // Helper to add a section (used for each of the 3 categories)
+    const addSection = (title, data) => {
       if (!data || Object.keys(data).length === 0) return;
       let firstRow = true;
       Object.entries(data).forEach(([key, val]) => {
-        let approved, spent, remaining, percent;
-
-        if (isComponent) {
-          approved = val.allocated || 0;
-          spent = val.spent || 0;
-          remaining = approved - spent;
-          percent = approved
-            ? ((spent / approved) * 100).toFixed(2) + "%"
-            : "0%";
-        } else {
-          approved = val || 0;
-          spent = "-";
-          remaining = "-";
-          percent = "-";
-        }
+        const allocated = val?.allocated || 0;
+        const spent = val?.spent || 0;
+        const remaining = allocated - spent;
+        const percent = allocated
+          ? ((spent / allocated) * 100).toFixed(2) + "%"
+          : "0%";
 
         rows.push([
           firstRow ? title : "",
           key.replace(/_/g, " ").toUpperCase(),
-          approved,
+          allocated,
           percent,
           spent,
           remaining,
@@ -44,42 +35,16 @@ export const exportBudget = async (department, fiscalYear, budgetData) => {
     };
 
     // 🧾 1️⃣ Fixed Costs
-    addSection("Fixed Cost", budgetData.fixedCosts);
+    addSection("Fixed Costs", budgetData.fixedCosts);
 
-    // 🧾 2️⃣ Department Expense
-    addSection(
-      "Department Expense",
-      budgetData.departmentExpenses || {},
-      false
-    );
-    addSection("", budgetData.components || {}, true);
+    // 🧾 2️⃣ Department Expenses
+    addSection("Department Expenses", budgetData.departmentExpenses);
 
-    // 🧾 3️⃣ CSDD Section (skip 0-value defaults)
-    const mergedCsddData = {
-      ...(budgetData.csddExpenses || {}),
-      ...(budgetData.csddComponents
-        ? Object.fromEntries(
-            Object.entries(budgetData.csddComponents).map(([k, v]) => [
-              k,
-              { allocated: v.allocated || 0, spent: v.spent || 0 },
-            ])
-          )
-        : {}),
-    };
-
-    // 🧹 Filter out default CSDD items that are 0
-    const filteredCsddData = Object.fromEntries(
-      Object.entries(mergedCsddData).filter(([key, val]) => {
-        const value =
-          typeof val === "object" ? val.allocated || val.spent || 0 : val;
-        return value > 0; // ✅ Keep only if non-zero
-      })
-    );
-
-    addSection("CSDD Component", filteredCsddData, true);
+    // 🧾 3️⃣ CSDD Expenses
+    addSection("CSDD Expenses", budgetData.csddExpenses);
 
     // 🧮 4️⃣ Total Row
-    const totalApproved = rows.reduce(
+    const totalAllocated = rows.reduce(
       (sum, r) => sum + (typeof r[2] === "number" ? r[2] : 0),
       0
     );
@@ -87,16 +52,16 @@ export const exportBudget = async (department, fiscalYear, budgetData) => {
       (sum, r) => sum + (typeof r[4] === "number" ? r[4] : 0),
       0
     );
-    const totalRemaining = totalApproved - totalSpent;
+    const totalRemaining = totalAllocated - totalSpent;
     const spentPercent =
-      totalApproved > 0
-        ? ((totalSpent / totalApproved) * 100).toFixed(2) + "%"
+      totalAllocated > 0
+        ? ((totalSpent / totalAllocated) * 100).toFixed(2) + "%"
         : "0%";
 
     rows.push([
       "TOTAL",
       "",
-      totalApproved,
+      totalAllocated,
       spentPercent,
       totalSpent,
       totalRemaining,
@@ -113,7 +78,7 @@ export const exportBudget = async (department, fiscalYear, budgetData) => {
     titleRow.alignment = { horizontal: "center", vertical: "middle" };
     sheet.mergeCells("A1:F1");
 
-    // Header row
+    // 🧱 Header row
     const header = [
       "Category",
       "Description",
@@ -134,7 +99,7 @@ export const exportBudget = async (department, fiscalYear, budgetData) => {
       };
     });
 
-    // Data rows
+    // 🧮 Data rows
     rows.forEach((r) => {
       const row = sheet.addRow(r);
       row.eachCell((cell) => {
@@ -148,7 +113,7 @@ export const exportBudget = async (department, fiscalYear, budgetData) => {
       });
     });
 
-    // Merge category cells for sections
+    // 📊 Merge section headers for category grouping
     const mergeSection = (categoryName) => {
       const startRow =
         sheet._rows.findIndex((r) => r?.getCell(1)?.value === categoryName) + 1;
@@ -169,11 +134,11 @@ export const exportBudget = async (department, fiscalYear, budgetData) => {
       }
     };
 
-    mergeSection("Fixed Cost");
-    mergeSection("Department Expense");
-    mergeSection("CSDD Component");
+    mergeSection("Fixed Costs");
+    mergeSection("Department Expenses");
+    mergeSection("CSDD Expenses");
 
-    // 🟨 Total row style
+    // 💛 Style total row
     const totalRow = sheet.lastRow;
     totalRow.font = { bold: true };
     totalRow.eachCell((cell) => {

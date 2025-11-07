@@ -41,11 +41,11 @@ const ViewPurchaseOrderModal = ({
 
   const handleSave = () => {
     const subtotal = formData.items.reduce(
-      (sum, item) => sum + (parseFloat(item.finalAmount) || 0),
+      (sum, item) => sum + (parseFloat(item.estTotal || item.finalAmount) || 0),
       0
     );
-
-    const gstAmount = subtotal * 0.18;
+    const gstRate = 0.18;
+    const gstAmount = subtotal * gstRate;
     const totalWithGST = subtotal + gstAmount;
 
     const updatedData = {
@@ -60,7 +60,6 @@ const ViewPurchaseOrderModal = ({
     onUpdate(updatedData);
     setIsEditing(false);
   };
-
 
   const vendor = formData.vendorDetails || vendorData || {};
   useEffect(() => {
@@ -163,7 +162,13 @@ const ViewPurchaseOrderModal = ({
                     type="date"
                     value={
                       formData.approvedAt
-                        ? new Date(formData.approvedAt.seconds * 1000)
+                        ? new Date(
+                            formData.approvedAt.seconds
+                              ? formData.approvedAt.seconds * 1000 // Firestore Timestamp
+                              : typeof formData.approvedAt === "number"
+                              ? formData.approvedAt // ms timestamp
+                              : formData.approvedAt // Date or ISO string
+                          )
                             .toISOString()
                             .split("T")[0]
                         : ""
@@ -495,24 +500,6 @@ const ViewPurchaseOrderModal = ({
               </table>
             </div>
           </div>
-
-          {/* Notes */}
-          {formData.notes && (
-            <div className="px-4">
-              <h3 className="font-semibold text-gray-900 mb-2">Notes</h3>
-              {isEditing ? (
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => handleChange("notes", e.target.value)}
-                  className="w-full border border-gray-900 rounded-lg p-2 text-sm"
-                />
-              ) : (
-                <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg">
-                  {formData.notes}
-                </p>
-              )}
-            </div>
-          )}
 
           {/* Signature Boxes */}
           <div className="px-4">

@@ -10,7 +10,7 @@ const PurchaseIntentsList = ({
   onFiltersChange,
   currentUser,
   userDepartment,
-  getComponentsForItem, 
+  getComponentsForItem,
   showDepartment = false,
 }) => {
   const [sortConfig, setSortConfig] = useState({
@@ -133,7 +133,7 @@ const PurchaseIntentsList = ({
   };
 
   // Check if current user is from purchase department
-  const isPurchaseDepartment = ["purchase", "admin"].includes(
+  const isPurchaseDepartment = ["purchase", "admin", "hr"].includes(
     userDepartment?.toLowerCase()
   );
 
@@ -142,9 +142,12 @@ const PurchaseIntentsList = ({
   };
 
   const canDelete = (intent) => {
+    if (!currentUser) return false;
+    const isCreator = intent.createdBy === currentUser.uid;
+    const isAdmin = userDepartment?.toLowerCase() === "admin";
     return (
       (intent.status === "submitted" || intent.status === "rejected") &&
-      currentUser
+      (isCreator || isAdmin)
     );
   };
 
