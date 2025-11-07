@@ -11,7 +11,6 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "../../../firebase";
-import { useAuth } from "../../../context/AuthContext";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faChevronUp,
@@ -25,6 +24,7 @@ import RowClickModal from "./RowClickModal";
 import MergeInvoicesModal from "./MergeInvoicesModal ";
 import InvoiceExcelExport from "./InvoiceExcelExport";
 import AuditLogsModal from "./AuditLogsModal";
+import { logInvoiceOperation } from "../../../utils/learningAuditLogger";
 
 export default function ContractInvoiceTable() {
   const [invoices, setInvoices] = useState([]);
@@ -77,8 +77,6 @@ export default function ContractInvoiceTable() {
   });
 
   // Dynamic Installment Recalculation State - REMOVED FOR SIMPLICITY
-
-  const { user } = useAuth();
 
   // Core Functions - Simplified
 
@@ -590,16 +588,22 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
         }
       }
 
-      // Log the undo action
-      console.log("Logging audit action");
-      await addDoc(collection(db, 'audit_logs'), {
-        action: 'undo',
-        invoiceId: invoice.id,
-        invoiceNumber: invoice.invoiceNumber,
-        timestamp: new Date(),
-        user: user?.email || 'Unknown',
-        details: `Invoice ${invoice.invoiceNumber} cancelled`
-      });
+      // Audit logging for invoice cancellation
+      await logInvoiceOperation(
+        "invoice_cancellation",
+        invoice.id,
+        {
+          invoiceType: invoice.invoiceType,
+          invoiceNumber: invoice.invoiceNumber,
+          contractId: invoice.originalInvoiceId,
+          collegeName: invoice.collegeName,
+          course: invoice.course,
+          year: invoice.year,
+          amount: invoice.amountRaised || invoice.netPayableAmount,
+          installment: invoice.installment,
+          isMergedInvoice: invoice.isMergedInvoice || false
+        }
+      );
 
       console.log("Audit log created successfully");
 
@@ -730,6 +734,22 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
         alert(
           `Invoice converted to Tax Invoice successfully! Invoice Number: ${updatedInvoiceNumber}`
         );
+
+        // Audit logging for invoice conversion
+        await logInvoiceOperation(
+          "invoice_conversion",
+          editInvoice.id,
+          {
+            fromType: "Proforma Invoice",
+            toType: "Tax Invoice",
+            originalNumber: editInvoice.invoiceNumber,
+            newNumber: updatedInvoiceNumber,
+            contractId: editInvoice.originalInvoiceId,
+            collegeName: editInvoice.collegeName,
+            course: editInvoice.course,
+            year: editInvoice.year
+          }
+        );
       }
     } else if (isRegenerate && editInvoice) {
   // CASE 2: Regenerate invoice (same logic with collection selection)
@@ -815,6 +835,21 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
 
   alert(
     `Invoice regenerated successfully! New Invoice Number: ${newInvoiceNumber}`
+  );
+
+  // Audit logging for invoice regeneration
+  await logInvoiceOperation(
+    "invoice_regeneration",
+    newInvoice.id,
+    {
+      invoiceType: formData.invoiceType,
+      newNumber: newInvoiceNumber,
+      regeneratedFrom: editInvoice.invoiceNumber,
+      contractId: editInvoice.originalInvoiceId,
+      collegeName: editInvoice.collegeName,
+      course: editInvoice.course,
+      year: editInvoice.year
+    }
   );
 } else {
   // CASE 3: Naya invoice generate karna
@@ -936,6 +971,22 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
   }
 
   alert(`Invoice ${invoiceNumber} raised successfully!`);
+
+  // Audit logging for new invoice creation
+  await logInvoiceOperation(
+    "invoice_creation",
+    newInvoice.id,
+    {
+      invoiceType: formData.invoiceType,
+      invoiceNumber,
+      contractId: contract.id,
+      installment: installment.name,
+      collegeName: contract.collegeName,
+      course: contract.course,
+      year: contract.year,
+      amount: totalAmount
+    }
+  );
 }
     setShowModal(false);
     setSelectedContract(null);
@@ -1314,6 +1365,25 @@ const handleMergeSubmit = async (formData) => {
       `GST Amount: ${formatCurrency(gstAmount)}\n` +
       `Final Amount: ${formatCurrency(finalNetPayableAmount)}\n` +
       `Invoice Type: ${formData.invoiceType}`
+    );
+
+    // Audit logging for merged invoice creation
+    await logInvoiceOperation(
+      "merged_invoice_creation",
+      newInvoice.id,
+      {
+        invoiceType: formData.invoiceType,
+        invoiceNumber,
+        mergedContractsCount: selectedContractsForMerge.length,
+        collegeName: firstContract.collegeName,
+        course: [...new Set(courses)].join(", "),
+        year: [...new Set(years)].join(", "),
+        totalBaseAmount,
+        gstAmount,
+        finalAmount: finalNetPayableAmount,
+        installment: selectedInstallmentForMerge.name,
+        mergedContractIds: selectedContractsForMerge.map(c => c.id)
+      }
     );
 
     // Reset modal

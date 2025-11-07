@@ -33,6 +33,9 @@ const Help = React.lazy(() => import("./pages/Help"));
 const TrainersDashboard = React.lazy(() =>
   import("./components/Learning/TrainersDashboard")
 );
+const LearningAdminAuditLogs = React.lazy(() =>
+  import("./components/Learning/LearningAdminAuditLogs")
+);
 const HR = React.lazy(() => import("./pages/HR"));
 const CA = React.lazy(() => import("./pages/CA"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
@@ -103,6 +106,7 @@ const AppContent = () => {
             <Route path="learning-development">
               <Route index element={<LearningDevelopment />} />
               <Route path="trainers" element={<TrainersDashboard />} />
+              <Route path="admin" element={<LearningAdminAuditLogs />} />
             </Route>
             <Route path="marketing">
               <Route index element={<DigitalMarketing />} />
