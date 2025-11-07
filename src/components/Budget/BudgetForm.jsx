@@ -15,10 +15,31 @@ const BudgetForm = ({
   onClose,
   onSubmit,
   budgetComponents,
+  allBudgetComponents,
   currentUser,
   department,
   fiscalYear = null,
 }) => {
+  const getDynamicBudgetComponents = () => {
+    const deptKey = formData.department?.toLowerCase();
+
+    // Try exact match first
+    if (allBudgetComponents[deptKey]) {
+      return allBudgetComponents[deptKey];
+    }
+
+    // Fallbacks for department aliases
+    const aliasMap = {
+      hrandadmin: "hr",
+      cr: "placement",
+      lnd: "lnd",
+      dm: "dm",
+      ga: "admin",
+    };
+
+    const fallbackKey = aliasMap[deptKey];
+    return allBudgetComponents[fallbackKey] || allBudgetComponents.admin || {};
+  };
   // Generate fiscal year format (e.g., "25-26")
   const getFiscalYear = () => {
     if (fiscalYear) return fiscalYear;
@@ -94,18 +115,6 @@ const BudgetForm = ({
       title: budgetTitle,
     }));
   }, [formData.department, formData.fiscalYear]);
-
-  // Update title when fiscal year changes
-  useEffect(() => {
-    const budgetTitle = generateBudgetTitle(
-      formData.department,
-      formData.fiscalYear
-    );
-    setFormData((prev) => ({
-      ...prev,
-      title: budgetTitle,
-    }));
-  }, [formData.fiscalYear]);
 
   // Clear form error when form data changes
   useEffect(() => {
@@ -292,7 +301,7 @@ const BudgetForm = ({
       components: {
         ...prev.components,
         [selectedComponent]: {
-          name: budgetComponents[selectedComponent],
+          name: getDynamicBudgetComponents()[selectedComponent],
           allocated: componentAllocation,
           spent: 0,
           notes: componentNotes,
@@ -389,87 +398,99 @@ const BudgetForm = ({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Submit clicked - Starting validation");
-
-    // Clear previous errors
     setFormError("");
 
     if (!(await validateForm())) {
       console.log("Validation failed:", errors);
       if (!formError) {
-        setFormError(
-          error.length > 0 ? errors : "Please fix the form errors above"
-        );
+        setFormError("Please fix the form errors above");
       }
       return;
     }
 
     setIsSubmitting(true);
-    console.log("Starting budget submission...");
 
     try {
+      // 🔹 Merge departmentExpenses + components
+      const mergedDepartmentExpenses = {
+        // base fields (like employeeSalary)
+        ...Object.fromEntries(
+          Object.entries(formData.departmentExpenses || {}).map(
+            ([key, val]) => [key, { allocated: safeNumber(val), spent: 0 }]
+          )
+        ),
+        // additional dynamic components
+        ...Object.fromEntries(
+          Object.entries(formData.components || {}).map(([key, comp]) => [
+            key,
+            {
+              allocated: safeNumber(comp?.allocated),
+              spent: 0,
+            },
+          ])
+        ),
+      };
+
+      // 🔹 Merge csddExpenses + csddComponents
+      const mergedCsddExpenses = {
+        // 🧹 Include only non-zero CSDD Expenses
+        ...Object.fromEntries(
+          Object.entries(formData.csddExpenses || {})
+            .filter(([_, val]) => safeNumber(val) > 0) // ✅ filter out 0 or empty
+            .map(([key, val]) => [
+              key,
+              {
+                allocated: safeNumber(val),
+                spent: 0,
+              },
+            ])
+        ),
+
+        // 🧩 Include non-zero custom CSDD components
+        ...Object.fromEntries(
+          Object.entries(formData.csddComponents || {})
+            .filter(([_, comp]) => safeNumber(comp?.allocated) > 0) // ✅ filter out 0
+            .map(([key, comp]) => [
+              key,
+              {
+                allocated: safeNumber(comp?.allocated),
+                spent: 0,
+              },
+            ])
+        ),
+      };
+
+      // 🔹 Fixed costs (each with allocated/spent)
+      const fixedCosts = Object.fromEntries(
+        Object.entries(formData.fixedCosts || {}).map(([key, val]) => [
+          key,
+          { allocated: safeNumber(val), spent: 0 },
+        ])
+      );
+
+      const totalBudget = calculateTotalAllocated();
+
       const budgetData = {
         title: formData.title,
         department: formData.department,
         fiscalYear: formData.fiscalYear,
         ownerName: formData.ownerName,
-        fixedCosts: {
-          rent: safeNumber(formData.fixedCosts.rent),
-          maintenance: safeNumber(formData.fixedCosts.maintenance),
-          electricity: safeNumber(formData.fixedCosts.electricity),
-          internet: safeNumber(formData.fixedCosts.internet),
-          renovation: safeNumber(formData.fixedCosts.renovation),
-        },
-        departmentExpenses: {
-          employeeSalary: safeNumber(
-            formData.departmentExpenses.employeeSalary
-          ),
-        },
-        csddExpenses: {
-          intercity_outstation_visits: safeNumber(
-            formData.csddExpenses.intercity_outstation_visits
-          ),
-          lunch_dinner_with_client: safeNumber(
-            formData.csddExpenses.lunch_dinner_with_client
-          ),
-          mobile_sim: safeNumber(formData.csddExpenses.mobile_sim),
-        },
-        components: Object.fromEntries(
-          Object.entries(formData.components).map(([key, comp]) => [
-            key,
-            {
-              ...comp,
-              allocated: safeNumber(comp.allocated),
-              spent: 0,
-            },
-          ])
-        ),
-        csddComponents: Object.fromEntries(
-          Object.entries(formData.csddComponents).map(([key, comp]) => [
-            key,
-            {
-              ...comp,
-              allocated: safeNumber(comp.allocated),
-              spent: 0,
-            },
-          ])
-        ),
-        notes: formData.notes,
         status: formData.status,
-        totalBudget: calculateTotalAllocated(),
-        totalSpent: 0,
-        lastUpdatedAt: new Date(),
-        updatedBy: currentUser?.uid,
+        fixedCosts,
+        departmentExpenses: mergedDepartmentExpenses,
+        csddExpenses: mergedCsddExpenses,
+        summary: {
+          totalBudget,
+          totalSpent: 0,
+        },
         createdBy: currentUser?.uid,
+        updatedBy: currentUser?.uid,
         createdAt: new Date(),
+        lastUpdatedAt: new Date(),
+        version: 6,
       };
 
-      console.log("Submitting budget data:", budgetData);
-
-      // Call the onSubmit function from parent
       await onSubmit(budgetData);
-
-      console.log("Budget submitted successfully");
       onClose();
     } catch (error) {
       console.error("Error saving budget:", error);
@@ -484,17 +505,32 @@ const BudgetForm = ({
 
   const totalAllocated = calculateTotalAllocated();
 
-  // Get available components (not yet added)
-  const availableComponents = Object.entries(budgetComponents || {}).filter(
-    ([key]) => !formData.components?.[key]
-  );
+  // Use it directly in your availableComponents calculation
+  const availableComponents = Object.entries(
+    getDynamicBudgetComponents() || {}
+  ).filter(([key]) => !formData.components?.[key]);
 
   if (!show) return null;
+
+  useEffect(() => {
+    const preventScrollChange = (e) => {
+      if (
+        document.activeElement.type === "number" &&
+        document.activeElement.contains(e.target)
+      ) {
+        e.preventDefault(); // stop value change
+      }
+    };
+
+    window.addEventListener("wheel", preventScrollChange, { passive: false });
+
+    return () => window.removeEventListener("wheel", preventScrollChange);
+  }, []);
 
   return (
     <div className="fixed inset-0 bg-black/30 mt-10 bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-        <div className="flex bg-gradient-to-r from-blue-600 to-indigo-600 justify-between items-center p-6 border-b border-gray-200">
+        <div className="flex bg-linear-to-r from-blue-600 to-indigo-600 justify-between items-center p-6 border-b border-gray-200">
           <h2 className="text-2xl font-bold text-white">Create New Budget</h2>
           <button
             onClick={onClose}
@@ -572,6 +608,7 @@ const BudgetForm = ({
                   <option value="lnd">LND</option>
                   <option value="hr">HR</option>
                   <option value="sales">Sales</option>
+                  <option value="management">Management</option>
                 </select>
                 {errors.department && (
                   <p className="mt-1 text-sm text-red-600">

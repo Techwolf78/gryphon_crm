@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { exportPurchaseOrderToPDF } from "./utils/exportPOtoPDF"; // Make sure this path is correct
+import ViewPurchaseOrderModal from "./ViewPurchaseOrderModal";
+
 
 const PurchaseOrdersList = ({
   orders,
@@ -7,10 +9,10 @@ const PurchaseOrdersList = ({
   componentColors,
   filters,
   onFiltersChange,
-  onExportPurchaseOrder,
   vendors,
   getComponentsForItem,
   showDepartment = false,
+  onUpdatePurchaseOrder,
 }) => {
   const [sortConfig, setSortConfig] = useState({
     key: "createdAt",
@@ -142,8 +144,8 @@ const PurchaseOrdersList = ({
   };
 
   const getSavings = (order) => {
-    if (!order.finalPrice || !order.estimatedTotal) return 0;
-    return order.estimatedTotal - order.finalPrice;
+    if (!order.finalAmount || !order.estimatedTotal) return 0;
+    return order.estimatedTotal - order.finalAmount;
   };
 
   const handleExport = (order) => {
@@ -167,7 +169,7 @@ const PurchaseOrdersList = ({
   return (
     <div className="space-y-6" onClick={handleClickOutside}>
       {/* Filters */}
-      <div className="bg-gray-50 p-4 rounded-lg">
+      <div className="bg-gray-50  rounded-lg">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -241,18 +243,18 @@ const PurchaseOrdersList = ({
             <thead className="bg-gray-50">
               <tr>
                 {showDepartment && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Department
                   </th>
                 )}
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   PO Number
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Component
                 </th>
                 <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                  className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                   onClick={() => handleSort("finalPrice")}
                 >
                   <div className="flex items-center">
@@ -319,7 +321,7 @@ const PurchaseOrdersList = ({
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      ₹{order.finalPrice?.toLocaleString("en-In") || "0"}
+                      ₹{order.finalAmount?.toLocaleString("en-In") || "0"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {savings > 0 ? (
@@ -468,211 +470,23 @@ const PurchaseOrdersList = ({
 
       {/* View Details Modal */}
       {viewModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-1000">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-            <div className="flex justify-between items-center p-6 border-b border-gray-200">
-              <h2 className="text-2xl font-bold text-gray-900">
-                Purchase Order Details
-              </h2>
-              <button
-                onClick={() => setViewModal(null)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            <div className="p-6 overflow-y-auto max-h-[70vh]">
-              <div className="space-y-6">
-                {/* Basic Information */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      Order Information
-                    </h3>
-                    <dl className="space-y-3">
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">
-                          PO Number
-                        </dt>
-                        <dd className="text-sm text-gray-900">
-                          {viewModal.poNumber ||
-                            `PO-${viewModal.id?.slice(-6).toUpperCase()}`}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">
-                          Title
-                        </dt>
-                        <dd className="text-sm text-gray-900">
-                          {viewModal.title}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">
-                          Description
-                        </dt>
-                        <dd className="text-sm text-gray-900">
-                          {viewModal.description || "N/A"}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">
-                          Budget Component
-                        </dt>
-                        <dd className="text-sm text-gray-900">
-                          {budgetComponents[viewModal.budgetComponent] ||
-                            viewModal.budgetComponent}
-                        </dd>
-                      </div>
-                    </dl>
-                  </div>
-
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      Financial Details
-                    </h3>
-                    <dl className="space-y-3">
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">
-                          Original Estimate
-                        </dt>
-                        <dd className="text-sm text-gray-900">
-                          ₹
-                          {viewModal.estimatedTotal?.toLocaleString("en-In") ||
-                            "N/A"}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">
-                          Final Price
-                        </dt>
-                        <dd className="text-sm text-gray-900 font-semibold">
-                          ₹{viewModal.finalPrice?.toLocaleString("en-In")}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">
-                          Savings
-                        </dt>
-                        <dd className="text-sm">
-                          {getSavings(viewModal) > 0 ? (
-                            <span className="text-green-600 font-semibold">
-                              +₹{getSavings(viewModal).toLocaleString("en-In")}
-                            </span>
-                          ) : getSavings(viewModal) < 0 ? (
-                            <span className="text-red-600 font-semibold">
-                              -₹
-                              {Math.abs(getSavings(viewModal)).toLocaleString(
-                                "en-In"
-                              )}
-                            </span>
-                          ) : (
-                            <span className="text-gray-500">-</span>
-                          )}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">
-                          Status
-                        </dt>
-                        <dd className="text-sm">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                              viewModal.status
-                            )}`}
-                          >
-                            {viewModal.status}
-                          </span>
-                        </dd>
-                      </div>
-                    </dl>
-                  </div>
-                </div>
-
-                {/* Vendor Information */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Vendor Information
-                  </h3>
-                  <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">
-                        Vendor Name
-                      </dt>
-                      <dd className="text-sm text-gray-900">
-                        {getVendorName(viewModal)}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">
-                        Contact Person
-                      </dt>
-                      <dd className="text-sm text-gray-900">
-                        {getVendorContact(viewModal)}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">
-                        Email
-                      </dt>
-                      <dd className="text-sm text-gray-900">
-                        {getVendorEmail(viewModal)}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">
-                        Phone
-                      </dt>
-                      <dd className="text-sm text-gray-900">
-                        {getVendorPhone(viewModal)}
-                      </dd>
-                    </div>
-                  </dl>
-                </div>
-
-                {/* Additional Notes */}
-                {viewModal.notes && (
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      Additional Notes
-                    </h3>
-                    <p className="text-sm text-gray-700 bg-gray-50 p-4 rounded-lg">
-                      {viewModal.notes}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
-              <button
-                onClick={() => setViewModal(null)}
-                className="px-6 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Close
-              </button>
-              <button
-                onClick={() => handleExport(viewModal)}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
-              >
-                Export To PDF
-              </button>
-            </div>
-          </div>
-        </div>
+        <ViewPurchaseOrderModal
+          show={!!viewModal}
+          onClose={() => setViewModal(null)}
+          order={viewModal}
+          vendors={vendors}
+          budgetComponents={budgetComponents}
+          componentColors={componentColors}
+          getComponentsForItem={getComponentsForItem}
+          onExport={handleExport}
+          onUpdate={onUpdatePurchaseOrder}
+          vendorData={{
+            name: getVendorName(viewModal),
+            contact: getVendorContact(viewModal),
+            email: getVendorEmail(viewModal),
+            phone: getVendorPhone(viewModal),
+          }}
+        />
       )}
     </div>
   );

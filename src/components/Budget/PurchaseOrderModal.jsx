@@ -7,6 +7,7 @@ const PurchaseOrderModal = ({
   intent,
   vendors,
   budgetComponents,
+  // currentUser,
 }) => {
   const [formData, setFormData] = useState({
     vendorId: "",
@@ -17,6 +18,7 @@ const PurchaseOrderModal = ({
     notes: "",
   });
   const [selectedVendor, setSelectedVendor] = useState(null);
+  const [includeGST, setIncludeGST] = useState(false);
 
   // Calculate total from requestedItems
   const calculateIntentTotal = () => {
@@ -35,6 +37,9 @@ const PurchaseOrderModal = ({
   };
 
   const intentTotal = calculateIntentTotal();
+  const gstRate = 0.18; // total 18%
+  const gstAmount = includeGST ? formData.finalPrice * gstRate : 0;
+  const finalTotalWithGST = formData.finalPrice + gstAmount;
 
   useEffect(() => {
     if (intent) {
@@ -57,22 +62,60 @@ const PurchaseOrderModal = ({
   const handleSubmit = (e) => {
     e.preventDefault();
 
+    if (!selectedVendor) {
+      alert("Please select a vendor before submitting.");
+      return;
+    }
+
     const submissionData = {
       ...formData,
       intentId: intent.id,
-      items: intent.requestedItems || [], // Use requestedItems instead of items
+      items: intent.requestedItems || [],
       budgetComponent: intent.selectedBudgetComponent || intent.budgetComponent,
       department: intent.deptId || intent.department,
       estimatedTotal: intentTotal,
       ownerName: intent.ownerName,
       title: intent.title,
       description: intent.description,
+      // approvalBy: currentUser || "N/A",
+      vendorDetails: {
+        vendorId: selectedVendor.id,
+        name: selectedVendor.name || selectedVendor.businessName || "-",
+        contactPerson: selectedVendor.contactPerson || "-",
+        phone: selectedVendor.phone || "-",
+        email: selectedVendor.email || "-",
+        category: selectedVendor.category || "-",
+      },
+      gstDetails: includeGST
+        ? {
+            cgst: 9,
+            sgst: 9,
+            gstAmount,
+            totalWithGST: finalTotalWithGST,
+          }
+        : null,
+      finalAmount: finalTotalWithGST,
     };
 
     onSubmit(submissionData);
   };
 
   if (!show || !intent) return null;
+
+  useEffect(() => {
+      const preventScrollChange = (e) => {
+        if (
+          document.activeElement.type === "number" &&
+          document.activeElement.contains(e.target)
+        ) {
+          e.preventDefault(); // stop value change
+        }
+      };
+  
+      window.addEventListener("wheel", preventScrollChange, { passive: false });
+  
+      return () => window.removeEventListener("wheel", preventScrollChange);
+    }, []);
 
   return (
     <div className="mt-10 fixed inset-0 bg-black/30 bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -406,6 +449,21 @@ const PurchaseOrderModal = ({
                 )}
               </div>
             </div>
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                id="gst"
+                type="checkbox"
+                checked={includeGST}
+                onChange={(e) => setIncludeGST(e.target.checked)}
+                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <label
+                htmlFor="gst"
+                className="text-sm text-gray-700 font-medium"
+              >
+                Include GST (9% CGST + 9% SGST)
+              </label>
+            </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -464,20 +522,30 @@ const PurchaseOrderModal = ({
             </div>
           </div>
 
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Additional Notes
-            </label>
-            <textarea
-              value={formData.notes}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, notes: e.target.value }))
-              }
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Any additional information for HR or the vendor..."
-            />
-          </div>
+          {includeGST && (
+            <div className="mt-2 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg p-3">
+              <div className="flex justify-between">
+                <span>Base Amount:</span>
+                <span>₹{formData.finalPrice.toLocaleString("en-IN")}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>CGST (9%):</span>
+                <span>
+                  ₹{(formData.finalPrice * 0.09).toLocaleString("en-IN")}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>SGST (9%):</span>
+                <span>
+                  ₹{(formData.finalPrice * 0.09).toLocaleString("en-IN")}
+                </span>
+              </div>
+              <div className="flex justify-between border-t border-gray-300 pt-2 mt-2 font-semibold text-gray-900">
+                <span>Total (Incl. GST):</span>
+                <span>₹{finalTotalWithGST.toLocaleString("en-IN")}</span>
+              </div>
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex justify-end gap-3 pt-6 border-t border-gray-200">
