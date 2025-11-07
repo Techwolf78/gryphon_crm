@@ -6,7 +6,7 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  // Fixed column mapping - Only Excel columns we want to show
+  // Fixed column mapping with proper field mapping
   const columnMapping = [
     { displayName: 'SR NO', fieldName: 'srNo', isSrNo: true },
     { displayName: 'STUDENT NAME', fieldName: 'studentName' },
@@ -23,8 +23,38 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
     { displayName: 'GENDER', fieldName: 'gender' },
     { displayName: 'STATUS', fieldName: 'status' },
     { displayName: 'COLLEGE', fieldName: 'college' },
-    { displayName: 'UPLOAD DATE', fieldName: 'uploadDate' }
+    { displayName: 'UPLOAD DATE', fieldName: 'uploadedAt' }
   ];
+
+  // Normalize student data - map different field names to consistent ones
+  const normalizedStudents = useMemo(() => {
+    return students.map((student, index) => {
+      // Debug log to see actual student data structure
+      console.log(`Student ${index}:`, student);
+      
+      return {
+        // Direct mappings
+        studentName: student.studentName || student.name || student['STUDENT NAME'] || 'N/A',
+        enrollmentNo: student.enrollmentNo || student.enrollmentNumber || student['ENROLLMENT NUMBER'] || student.enrollment || 'N/A',
+        email: student.email || student['EMAIL'] || student.emailId || 'N/A',
+        phone: student.phone || student.phoneNumber || student.mobile || student['PHONE NUMBER'] || 'N/A',
+        course: student.course || student['COURSE'] || student.degree || 'N/A',
+        specialization: student.specialization || student['SPECIALIZATION'] || student.branch || 'N/A',
+        currentYear: student.currentYear || student['CURRENT YEAR'] || student.year || 'N/A',
+        tenthMarks: student.tenthMarks || student['10TH MARKS %'] || student.tenthPercentage || 'N/A',
+        twelfthMarks: student.twelfthMarks || student['12TH MARKS %'] || student.twelfthPercentage || 'N/A',
+        cgpa: student.cgpa || student.CGPA || student.gpa || 'N/A',
+        activeBacklogs: student.activeBacklogs || student['ACTIVE BACKLOGS'] || student.backlogs || '0',
+        gender: student.gender || student['GENDER'] || student.sex || 'N/A',
+        status: student.status || student.STATUS || 'submitted',
+        college: student.college || student.collegeName || student['COLLEGE'] || collegeName || 'N/A',
+        uploadedAt: student.uploadedAt || student.uploadDate || student.uploadedDate || 'N/A',
+        
+        // Keep original data for debugging
+        _original: student
+      };
+    });
+  }, [students, collegeName]);
 
   // Get only columns that have data in students
   const displayColumns = useMemo(() => {
@@ -32,17 +62,16 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
       if (col.isSrNo) return true; // Always show SR NO
       
       // Check if any student has this field with data
-      return students.some(student => 
-        student[col.fieldName] !== null && 
-        student[col.fieldName] !== undefined && 
-        student[col.fieldName] !== ''
-      );
+      return normalizedStudents.some(student => {
+        const value = student[col.fieldName];
+        return value !== null && value !== undefined && value !== '' && value !== 'N/A';
+      });
     });
-  }, [students]);
+  }, [normalizedStudents]);
 
   // Filter students
   const filteredStudents = useMemo(() => {
-    let filtered = students.filter(student => {
+    let filtered = normalizedStudents.filter(student => {
       const matchesSearch = Object.values(student).some(value => 
         String(value || '').toLowerCase().includes(searchTerm.toLowerCase())
       );
@@ -52,7 +81,7 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
     });
 
     return filtered;
-  }, [students, searchTerm, statusFilter]);
+  }, [normalizedStudents, searchTerm, statusFilter]);
 
   // Export to Excel function
   const exportToExcel = () => {
@@ -72,17 +101,19 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Students');
-    XLSX.writeFile(workbook, `${companyName}_${collegeName}_students.xlsx`);
+    XLSX.writeFile(workbook, `${companyName}_students.xlsx`);
   };
 
   // Format cell value for display
   const formatCellValue = (value, fieldName) => {
-    if (value === null || value === undefined || value === '') return 'N/A';
-    
+    if (value === null || value === undefined || value === '' || value === 'N/A') {
+      return '-';
+    }
+
     if (fieldName === 'status') {
       return (
         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-          value === 'shortlisted' 
+          value === 'shortlisted'
             ? 'bg-green-100 text-green-800'
             : value === 'rejected'
             ? 'bg-red-100 text-red-800'
@@ -92,21 +123,50 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
         </span>
       );
     }
-    
-    if (fieldName === 'uploadDate' && typeof value === 'string') {
-      // Format date to readable format
+
+    // Handle uploadedAt which may be a Firestore Timestamp object
+    if (fieldName === 'uploadedAt') {
       try {
-        const date = new Date(value);
-        return date.toLocaleDateString('en-IN', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric'
-        });
+        let dateObj = null;
+
+        // Firestore Timestamp has toDate()
+        if (value && typeof value === 'object') {
+          if (typeof value.toDate === 'function') {
+            dateObj = value.toDate();
+          } else if ('seconds' in value) {
+            // { seconds, nanoseconds }
+            dateObj = new Date(value.seconds * 1000 + (value.nanoseconds || 0) / 1e6);
+          }
+        } else if (typeof value === 'number') {
+          // If number, try to guess milliseconds vs seconds
+          dateObj = value > 1e12 ? new Date(value) : new Date(value * 1000);
+        } else {
+          dateObj = new Date(String(value));
+        }
+
+        if (dateObj && !isNaN(dateObj.getTime())) {
+          return dateObj.toLocaleDateString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric'
+          });
+        }
+
+        return String(value);
       } catch {
-        return value;
+        return String(value);
       }
     }
-    
+
+    // If some other object got through, stringify it to avoid React error
+    if (typeof value === 'object') {
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return String(value);
+      }
+    }
+
     return value;
   };
 
@@ -115,13 +175,13 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
       <div className="bg-white rounded-lg shadow-xl w-full max-w-95vw max-h-[95vh] overflow-hidden mx-4">
         
         {/* Header */}
-        <div className="bg-gradient-to-r from-green-600 to-green-500 text-white px-6 py-4 flex justify-between items-center sticky top-0">
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-6 py-4 flex justify-between items-center sticky top-0">
           <div>
             <h2 className="text-xl font-semibold">Student Data</h2>
             <p className="text-green-100 text-sm">
               {companyName && `Company: ${companyName}`} 
               {collegeName && ` | College: ${collegeName}`}
-              {` | Students: ${filteredStudents.length}/${students.length} | Columns: ${displayColumns.length}`}
+              {` | Students: ${filteredStudents.length}/${normalizedStudents.length} | Columns: ${displayColumns.length}`}
             </p>
           </div>
           <button 
@@ -165,11 +225,8 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
               <button
                 onClick={exportToExcel}
                 disabled={filteredStudents.length === 0}
-                className={`w-full px-3 py-2 rounded-md transition flex items-center justify-center ${
-                  filteredStudents.length === 0 
-                    ? 'bg-gray-400 cursor-not-allowed' 
-                    : 'bg-green-600 hover:bg-green-700 text-white'
-                }`}
+                           className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-medium rounded-lg hover:from-blue-700 hover:to-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center gap-2"
+
               >
                 <DownloadIcon className="h-4 w-4 mr-2" />
                 Export
@@ -177,18 +234,19 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
             </div>
           </div>
 
-          {/* Debug Info - Remove this in production */}
-          <div className="mt-2 p-2 bg-yellow-50 rounded border border-yellow-200">
-            <p className="text-xs text-yellow-700">
-              <strong>Debug Info:</strong> {students.length} students loaded | 
-              First student fields: {students[0] ? Object.keys(students[0]).join(', ') : 'No data'}
+          {/* Data Structure Info */}
+          <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
+            <p className="text-xs text-blue-700">
+              <strong>Data Info:</strong> {normalizedStudents.length} students normalized | 
+              First student: {normalizedStudents[0]?.studentName || 'No data'} | 
+              Columns showing: {displayColumns.map(col => col.displayName).join(', ')}
             </p>
           </div>
         </div>
 
-        {/* Students Table - FIXED COLUMN NAMES */}
+        {/* Students Table */}
         <div className="overflow-x-auto overflow-y-auto max-h-[60vh]">
-          {displayColumns.length > 0 && students.length > 0 ? (
+          {displayColumns.length > 0 && normalizedStudents.length > 0 ? (
             <table className="w-full min-w-[1200px]">
               <thead className="bg-gray-50 sticky top-0">
                 <tr>
@@ -224,7 +282,7 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
             </table>
           ) : (
             <div className="p-8 text-center text-gray-500">
-              {students.length === 0 ? 'No student data available' : 'No students found matching your filters'}
+              {normalizedStudents.length === 0 ? 'No student data available' : 'No students found matching your filters'}
             </div>
           )}
         </div>
@@ -232,17 +290,14 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
         {/* Footer */}
         <div className="bg-gray-50 px-6 py-4 border-t flex justify-between items-center">
           <div className="text-sm text-gray-600">
-            Showing {filteredStudents.length} of {students.length} students
+            Showing {filteredStudents.length} of {normalizedStudents.length} students
           </div>
           <div className="flex space-x-3">
             <button
               onClick={exportToExcel}
               disabled={filteredStudents.length === 0}
-              className={`px-4 py-2 rounded-md transition flex items-center ${
-                filteredStudents.length === 0 
-                  ? 'bg-gray-400 cursor-not-allowed' 
-                  : 'bg-green-600 hover:bg-green-700 text-white'
-              }`}
+                          className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-medium rounded-lg hover:from-blue-700 hover:to-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center gap-2"
+
             >
               <DownloadIcon className="h-4 w-4 mr-2" />
               Export Excel
