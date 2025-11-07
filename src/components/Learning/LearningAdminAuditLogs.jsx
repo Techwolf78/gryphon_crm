@@ -13,8 +13,10 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { db } from "../../firebase";
+import { useAuth } from "../../context/AuthContext";
 
 const LearningAdminAuditLogs = () => {
+  const { user } = useAuth();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -119,6 +121,71 @@ const LearningAdminAuditLogs = () => {
   const filteredLogs = useMemo(() => {
     return logs.filter(log => log.action !== 'undo');
   }, [logs]);
+
+  // Access control: Only allow Ajay Pawar (Director)
+  const allowedUid = "Xw3HsAZEgYNAxnEyX8I5THO4eub2";
+  if (!user || user.uid !== allowedUid) {
+    return (
+      <div className=" bg-gray-50 flex items-center justify-center py-3 px-4 sm:py-4 sm:px-6">
+        <div className="max-w-2xl w-full">
+          <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+            <div className="bg-red-600 px-4 sm:px-6 py-2 sm:py-3">
+              <div className="flex items-center">
+                <div className="shrink-0">
+                  <FiAlertCircle className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                </div>
+                <div className="ml-2 sm:ml-3">
+                  <h1 className="text-base sm:text-lg font-semibold text-white">Access Restricted</h1>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-4 sm:px-6 py-3 sm:py-4">
+              <div className="text-center mb-3 sm:mb-4">
+                <div className="mx-auto w-10 h-10 sm:w-12 sm:h-12 bg-red-100 rounded-full flex items-center justify-center mb-2 sm:mb-3">
+                  <FiAlertCircle className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
+                </div>
+                <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-1 sm:mb-2">🚫 Access Denied</h2>
+                <p className="text-sm sm:text-base text-gray-600">You do not have permission to view this content</p>
+              </div>
+
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 sm:p-4 mb-3 sm:mb-4">
+                <div className="text-gray-700 leading-relaxed space-y-2 text-sm sm:text-base">
+                  <p>
+                    This audit log section is restricted to the <span className="font-semibold text-red-600">System Administrator</span> only. Access to these sensitive records requires elevated administrative privileges.
+                  </p>
+                  <p>
+                    All access attempts are logged and monitored for security purposes. If you believe you should have access to this section, please contact your system administrator.
+                  </p>
+                  <div className="pt-2 border-t border-gray-300 mt-2">
+                    <p className="text-sm text-gray-600 font-medium">
+                      🔒 Administrative Access Required
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row justify-center space-y-2 sm:space-y-0 sm:space-x-3">
+                <button
+                  onClick={() => window.history.back()}
+                  className="w-full sm:w-auto inline-flex items-center justify-center px-3 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors text-sm sm:text-base font-medium"
+                >
+                  <FiChevronLeft className="w-4 h-4 mr-2" />
+                  Go Back
+                </button>
+                <button
+                  onClick={() => window.location.href = '/'}
+                  className="w-full sm:w-auto inline-flex items-center justify-center px-3 py-2 bg-blue-600 border border-transparent rounded-md text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors text-sm sm:text-base font-medium"
+                >
+                  Dashboard
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // For display, we'll show pages based on current loaded data
   const totalPages = Math.ceil(filteredLogs.length / logsPerPage);

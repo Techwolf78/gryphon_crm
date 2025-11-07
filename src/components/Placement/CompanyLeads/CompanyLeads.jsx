@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 import { useDebounce } from 'use-debounce';
 import AddLeads from "./AddLeads";
 import BulkUploadModal from "./BulkUploadModal";
@@ -19,6 +19,8 @@ import LeadsFilters from "./LeadsFilters";
 import LeadsTable from "./LeadsTable";
 import LeadViewEditModal from "./LeadViewEditModal";
 import FollowUpCompany from "./FollowUpCompany";
+import PlacementLeadAlert from "../PlacementLeadAlert";
+import ViewModeToggle from "../ViewModeToggle";
 import { useAuth } from "../../../context/AuthContext";
 
   // Utility function to handle Firestore index errors
@@ -45,20 +47,6 @@ import { useAuth } from "../../../context/AuthContext";
     }
   };
 
-  // Test function to simulate index error (for development/testing)
-  const testIndexError = () => {
-    const mockError = {
-      message: "The query requires an index. You can create it here: https://console.firebase.google.com/project/test-project/firestore/indexes?create_composite_index=1"
-    };
-    handleFirestoreIndexError(mockError, "test query");
-  };
-
-  // Expose test function to window for console testing
-  // Usage: Open browser console and run: testFirestoreIndexError()
-  if (typeof window !== 'undefined') {
-    window.testFirestoreIndexError = testIndexError;
-  }
-
 function CompanyLeads() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("hot");
@@ -74,10 +62,10 @@ function CompanyLeads() {
   const [showMeetingModal, setShowMeetingModal] = useState(false);
   const [selectedCompanyForMeeting, setSelectedCompanyForMeeting] = useState(null);
 
-  // Followup alerts state - commented out for now
-  // const [todayFollowUps, setTodayFollowUps] = useState([]);
-  // const [showTodayFollowUpAlert, setShowTodayFollowUpAlert] = useState(false);
-  // const [reminderPopup, setReminderPopup] = useState(null);
+  // Followup alerts state - start with empty array, will be populated dynamically
+  const [todayFollowUps, setTodayFollowUps] = useState([]);
+  const [showTodayFollowUpAlert, setShowTodayFollowUpAlert] = useState(false);
+  const [reminderPopup, setReminderPopup] = useState(null);
 
   // AddJD modal state
 const [showAddJDForm, setShowAddJDForm] = useState(false);
@@ -89,16 +77,11 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   // View mode state with localStorage persistence
   const [viewMyLeadsOnly, setViewMyLeadsOnly] = useState(() => {
     const saved = localStorage.getItem("placementViewMyLeadsOnly");
-    return saved !== null ? JSON.parse(saved) : false; // Default to "My Team" view
+    return saved !== null ? JSON.parse(saved) : true; // Default to "My Leads" view
   });
 
   // Users data for hierarchical team logic
   const [allUsers, setAllUsers] = useState({});
-
-  // Persist view mode to localStorage
-  useEffect(() => {
-    localStorage.setItem("placementViewMyLeadsOnly", JSON.stringify(viewMyLeadsOnly));
-  }, [viewMyLeadsOnly]);
 
   // Fetch all users for hierarchical team logic
   useEffect(() => {
@@ -121,22 +104,121 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     }
   }, [user]);
 
-  // Get team member IDs recursively (hierarchical)
-  const getTeamMemberIds = useCallback((managerUid, users = allUsers) => {
+  // Get team member IDs recursively (hierarchical) - MOVED UP to fix initialization error
+  const getTeamMemberIds = useCallback((managerUid, users = allUsers, visited = new Set()) => {
+    // Prevent infinite recursion
+    if (visited.has(managerUid)) {
+      console.warn('Circular reference detected in team hierarchy for user:', managerUid);
+      return [];
+    }
+    
+    visited.add(managerUid);
     const teamIds = new Set();
     
     // Find all direct reports
     Object.values(users).forEach(userData => {
       if (userData.reportingManager === managerUid) {
-        teamIds.add(userData.id || userData.uid);
-        // Recursively get their team members
-        const subTeamIds = getTeamMemberIds(userData.id || userData.uid, users);
-        subTeamIds.forEach(id => teamIds.add(id));
+        const userId = userData.id || userData.uid;
+        if (userId && !visited.has(userId)) {
+          teamIds.add(userId);
+          // Recursively get their team members
+          const subTeamIds = getTeamMemberIds(userId, users, new Set(visited));
+          subTeamIds.forEach(id => teamIds.add(id));
+        }
       }
     });
     
     return Array.from(teamIds);
   }, [allUsers]);
+
+  // Fetch today's follow-ups from all companies
+  const fetchTodayFollowUps = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const today = new Date().toISOString().split('T')[0]; // Get today's date in YYYY-MM-DD format
+      const allFollowUps = [];
+
+      // Use the already filtered leads from state
+      console.log(`� Checking follow-ups for ${leads.length} filtered leads`);
+
+      // Extract follow-ups from each company
+      leads.forEach(lead => {
+        // Only process hot leads for follow-up alerts
+        if (lead.status !== "hot") return;
+        
+        const followups = lead.followups || [];
+        console.log(`📅 Checking ${followups.length} follow-ups for ${lead.companyName} (assigned to: ${lead.assignedTo})`);
+        followups.forEach(followup => {
+          // Check if follow-up is for today
+          if (followup.date === today) {
+            console.log(`✅ Found follow-up for today: ${followup.time} - ${followup.remarks}`);
+            allFollowUps.push({
+              id: `${lead.id}_${followup.key}`,
+              company: lead.companyName || lead.name || 'Unknown Company',
+              time: followup.time,
+              date: followup.date,
+              remarks: followup.remarks,
+              assignedTo: lead.assignedTo,
+              leadId: lead.id,
+              followupKey: followup.key
+            });
+          }
+        });
+      });
+
+      console.log(`✅ Found ${allFollowUps.length} follow-ups for today in ${viewMyLeadsOnly ? 'My Leads' : 'My Team'} mode`);
+      setTodayFollowUps(allFollowUps);
+
+      // Show alert if there are follow-ups
+      setShowTodayFollowUpAlert(allFollowUps.length > 0);
+
+    } catch (error) {
+      console.error("Error fetching today's follow-ups:", error);
+    }
+  }, [user, leads, viewMyLeadsOnly]);
+
+  // Test function for placement alerts (accessible via window.testPlacementAlerts)
+  useEffect(() => {
+    window.testPlacementAlerts = () => {
+      console.log('🧪 Testing Follow-up System...');
+      console.log('Current user ID:', user?.uid);
+      console.log('View mode:', viewMyLeadsOnly ? 'My Leads' : 'My Team');
+      console.log('Total leads loaded:', leads.length);
+      console.log('Current follow-ups:', todayFollowUps.length, 'items');
+      console.log('Alert showing:', showTodayFollowUpAlert);
+
+      // Show team member info only in My Team mode
+      if (!viewMyLeadsOnly) {
+        const teamMemberIds = getTeamMemberIds(user?.uid);
+        console.log('👥 Team member IDs:', teamMemberIds);
+        console.log('👥 Team members count:', teamMemberIds.length);
+      }
+
+      // Show follow-up details
+      if (todayFollowUps.length > 0) {
+        console.log('📋 Follow-up details:');
+        todayFollowUps.forEach((followup, index) => {
+          console.log(`  ${index + 1}. ${followup.company} at ${followup.time} (${followup.assignedTo})`);
+        });
+      } else {
+        console.log('📋 No follow-ups found for today');
+      }
+
+      // Show leads with follow-ups (limit to first 5 for performance)
+      const leadsWithFollowUps = leads.filter(lead => (lead.followups || []).length > 0).slice(0, 5);
+      console.log('🏢 Leads with follow-ups (showing first 5):', leadsWithFollowUps.length);
+      leadsWithFollowUps.forEach(lead => {
+        const todayFollowUps = (lead.followups || []).filter(f => f.date === new Date().toISOString().split('T')[0]);
+        if (todayFollowUps.length > 0) {
+          console.log(`  - ${lead.companyName}: ${todayFollowUps.length} follow-ups today (assigned to: ${lead.assignedTo})`);
+        }
+      });
+
+      console.log('💡 To test: Schedule a follow-up for today using the "Schedule Follow-up" button');
+      console.log('🔄 Switching view modes will automatically refresh follow-ups');
+    };
+  }, [user, viewMyLeadsOnly, todayFollowUps, showTodayFollowUpAlert, leads, getTeamMemberIds]);
 
   // Caching constants
   const CACHE_KEY = 'companyLeadsCache';
@@ -330,6 +412,13 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Fetch today's follow-ups when leads data changes
+  useEffect(() => {
+    if (leads.length > 0) {
+      fetchTodayFollowUps();
+    }
+  }, [leads, viewMyLeadsOnly, fetchTodayFollowUps]);
 
   // Calculate completeness score for lead prioritization
   const calculateCompletenessScore = useCallback((lead) => {
@@ -677,35 +766,15 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     }
   }, []);
 
-  // View Mode Toggle Component
-  const ViewModeToggle = () => {
-    return (
-      <div className="flex gap-2">
-        <button
-          onClick={() => setViewMyLeadsOnly(true)}
-          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${
-            viewMyLeadsOnly
-              ? "bg-blue-600 text-white border-blue-600 shadow-md"
-              : "bg-white text-blue-600 border-blue-300 hover:bg-blue-50"
-          }`}
-          aria-label="Show only my leads"
-        >
-          My Leads
-        </button>
-        <button
-          onClick={() => setViewMyLeadsOnly(false)}
-          className={`text-xs font-medium px-3 py-1 rounded-full border transition ${
-            !viewMyLeadsOnly
-              ? "bg-blue-600 text-white border-blue-600 shadow-md"
-              : "bg-white text-blue-600 border-blue-300 hover:bg-blue-50"
-          }`}
-          aria-label="Show my team's leads"
-        >
-          My Team
-        </button>
-      </div>
-    );
-  };
+  // Filter follow-ups based on view mode (My Leads vs My Team)
+  const filteredFollowUps = useMemo(() => {
+    if (!user) {
+      return []; // No follow-ups if no user
+    }
+
+    // fetchTodayFollowUps already filters based on view mode, so just return todayFollowUps
+    return todayFollowUps;
+  }, [todayFollowUps, user]);
 
   if (loading) {
     return (
@@ -794,7 +863,10 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         {/* View Mode Toggle on Left */}
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-sm font-medium text-gray-700">View:</span>
-          <ViewModeToggle />
+          <ViewModeToggle
+            viewMyLeadsOnly={viewMyLeadsOnly}
+            setViewMyLeadsOnly={setViewMyLeadsOnly}
+          />
         </div>
 
         {/* Search Input in Center */}
@@ -969,19 +1041,23 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         <FollowUpCompany
           company={selectedCompanyForMeeting}
           onClose={() => setShowMeetingModal(false)}
+          onFollowUpScheduled={() => {
+            // Refresh today's follow-ups when a new follow-up is scheduled
+            fetchTodayFollowUps();
+          }}
         />
       )}
 
       {/* Followup Alerts */}
-      {/* <Suspense fallback={<div></div>}>
-        <FollowupAlerts
-          todayFollowUps={todayFollowUps}
+      <Suspense fallback={<div></div>}>
+        <PlacementLeadAlert
+          todayFollowUps={filteredFollowUps}
           showTodayFollowUpAlert={showTodayFollowUpAlert}
           setShowTodayFollowUpAlert={setShowTodayFollowUpAlert}
           reminderPopup={reminderPopup}
           setReminderPopup={setReminderPopup}
         />
-      </Suspense> */}
+      </Suspense>
 
     </div>
 

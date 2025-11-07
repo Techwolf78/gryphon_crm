@@ -811,7 +811,7 @@ function AddTrainer({ onClose, onTrainerAdded, trainers = [] }) {
 
             {error && (
               <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm flex items-start">
-                <FiAlertCircle className="flex-shrink-0 h-5 w-5 mr-2 mt-0.5" />
+                <FiAlertCircle className="shrink-0 h-5 w-5 mr-2 mt-0.5" />
                 <span>{error}</span>
               </div>
             )}
@@ -820,9 +820,9 @@ function AddTrainer({ onClose, onTrainerAdded, trainers = [] }) {
               <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-blue-700 text-sm flex flex-col">
                 <div className="flex items-start">
                   {importProgress === 100 ? (
-                    <FiCheckCircle className="flex-shrink-0 h-5 w-5 mr-2 mt-0.5 text-green-500" />
+                    <FiCheckCircle className="shrink-0 h-5 w-5 mr-2 mt-0.5 text-green-500" />
                   ) : (
-                    <FiInfo className="flex-shrink-0 h-5 w-5 mr-2 mt-0.5" />
+                    <FiInfo className="shrink-0 h-5 w-5 mr-2 mt-0.5" />
                   )}
                   <span>{importStatus}</span>
                 </div>
