@@ -578,7 +578,7 @@ const PurchaseIntentsList = ({
 
       {/* View Details Modal */}
       {viewModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[1000]">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-1000">
           <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-[0_8px_24px_rgba(0,0,0,0.15)] w-full max-w-4xl max-h-[90vh] overflow-hidden border border-gray-100">
             {/* Header */}
             <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex justify-between items-center px-6 py-4 shadow-sm">

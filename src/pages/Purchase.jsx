@@ -1126,10 +1126,13 @@ function Purchase() {
       setSelectedBudgetForOverview(updatedVersion);
     }
   }, [budgetHistory, selectedBudgetForOverview]);
-  
+
   const handleExpenseSubmit = async (expenseData, fiscalYear) => {
     try {
       await runTransaction(db, async (transaction) => {
+        // 1️⃣ READ PHASE — gather all docs first
+        const docsToUpdate = [];
+
         for (const entry of expenseData.entries) {
           const dept = entry.department.toLowerCase();
           const amount = Number(entry.amount) || 0;
@@ -1137,22 +1140,25 @@ function Purchase() {
 
           const budgetId = `${dept}_FY-20${fiscalYear}`;
           const budgetRef = doc(db, "department_budgets", budgetId);
-          const snap = await transaction.get(budgetRef);
+          const snap = await transaction.get(budgetRef); // READ
 
           if (!snap.exists()) {
             console.warn(`⚠️ No budget found for ${dept}, skipping`);
             continue;
           }
 
+          docsToUpdate.push({ budgetRef, amount, dept });
+        }
+
+        // 2️⃣ WRITE PHASE — apply updates AFTER all reads
+        for (const { budgetRef, amount } of docsToUpdate) {
           const { expenseSection, expenseType, createdBy } = expenseData;
 
-          // Determine correct field path
           const fieldPath =
             expenseSection === "fixedCosts"
               ? `fixedCosts.${expenseType}.spent`
               : `departmentExpenses.${expenseType}.spent`;
 
-          // Prepare atomic update
           const updatePayload = {
             [fieldPath]: increment(amount),
             "summary.totalSpent": increment(amount),
