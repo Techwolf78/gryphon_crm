@@ -383,7 +383,7 @@ const ClosedLeadsStats = ({
   return (
     <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-white/20 overflow-hidden">
       {/* Header Section */}
-      <div className="relative bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-4 text-white">
+      <div className="relative bg-linear-to-r from-blue-600 via-indigo-600 to-purple-600 p-4 text-white">
         <div className="absolute inset-0 bg-black/10"></div>
         <div className="relative">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
@@ -455,10 +455,10 @@ const ClosedLeadsStats = ({
       {/* Stats Cards Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 p-3">
         {/* Achieved Card */}
-        <div className="group bg-gradient-to-br from-emerald-50 to-green-50 rounded-lg p-3 border border-emerald-100/50 hover:shadow-md transition-all duration-300 hover:-translate-y-0.5">
+        <div className="group bg-linear-to-br from-emerald-50 to-green-50 rounded-lg p-3 border border-emerald-100/50 hover:shadow-md transition-all duration-300 hover:-translate-y-0.5">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 bg-gradient-to-r from-emerald-500 to-green-600 rounded-md shadow-md group-hover:scale-110 transition-transform duration-300">
+              <div className="p-1.5 bg-linear-to-r from-emerald-500 to-green-600 rounded-md shadow-md group-hover:scale-110 transition-transform duration-300">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   className="h-3 w-3 text-white"
@@ -496,7 +496,7 @@ const ClosedLeadsStats = ({
               <div className="flex items-center justify-center gap-2">
                 <div className="w-16 bg-gray-200 rounded-full h-2 overflow-hidden">
                   <div
-                    className="bg-gradient-to-r from-emerald-400 to-green-600 h-2 rounded-full transition-all duration-700 ease-out shadow-sm"
+                    className="bg-linear-to-r from-emerald-400 to-green-600 h-2 rounded-full transition-all duration-700 ease-out shadow-sm"
                     style={{ width: `${achievementPercentage}%` }}
                   />
                 </div>
@@ -509,10 +509,10 @@ const ClosedLeadsStats = ({
         </div>
 
         {/* Target Card */}
-        <div className="group bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-3 border border-blue-100/50 hover:shadow-md transition-all duration-300 hover:-translate-y-0.5">
+        <div className="group bg-linear-to-br from-blue-50 to-indigo-50 rounded-lg p-3 border border-blue-100/50 hover:shadow-md transition-all duration-300 hover:-translate-y-0.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-md shadow-md group-hover:scale-110 transition-transform duration-300">
+              <div className="p-1.5 bg-linear-to-r from-blue-500 to-indigo-600 rounded-md shadow-md group-hover:scale-110 transition-transform duration-300">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   className="h-3 w-3 text-white"
@@ -587,8 +587,8 @@ const ClosedLeadsStats = ({
         <div
           className={`group rounded-lg p-3 border hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 ${
             displayDeficit > 0
-              ? "bg-gradient-to-br from-red-50 to-rose-50 border-red-100/50"
-              : "bg-gradient-to-br from-emerald-50 to-green-50 border-emerald-100/50"
+              ? "bg-linear-to-br from-red-50 to-rose-50 border-red-100/50"
+              : "bg-linear-to-br from-emerald-50 to-green-50 border-emerald-100/50"
           }`}
         >
           <div className="flex items-center justify-between">
@@ -596,8 +596,8 @@ const ClosedLeadsStats = ({
               <div
                 className={`p-1.5 rounded-md shadow-md group-hover:scale-110 transition-transform duration-300 ${
                   displayDeficit > 0
-                    ? "bg-gradient-to-r from-red-500 to-rose-600"
-                    : "bg-gradient-to-r from-emerald-500 to-green-600"
+                    ? "bg-linear-to-r from-red-500 to-rose-600"
+                    : "bg-linear-to-r from-emerald-500 to-green-600"
                 }`}
               >
                 {displayDeficit > 0 ? (

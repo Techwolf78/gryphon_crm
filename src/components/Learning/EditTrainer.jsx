@@ -8,6 +8,7 @@ import {
   FiAlertCircle,
 } from "react-icons/fi";
 import specializationOptions from './specializationOptions'
+import { auditLogTrainerOperations, auditLogErrorOperations } from "../../utils/learningAuditLogger";
 
 function EditTrainer({ trainerId, onClose, onTrainerUpdated, trainers = [] }) {
   const [trainerData, setTrainerData] = useState({
@@ -153,6 +154,11 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated, trainers = [] }) {
         setLoading(false);
         return;
       }
+
+      // Get original trainer data for change tracking
+      const originalDoc = await getDoc(doc(db, "trainers", trainerId));
+      const originalData = originalDoc.data();
+
       const specializationArr = selectedSpecs; // only standard
       const otherArr = customSpecs; // custom list
       const trainerToUpdate = {
@@ -176,11 +182,50 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated, trainers = [] }) {
         otherSpecialization: otherArr,
         updatedAt: new Date(),
       };
+
       await updateDoc(doc(db, "trainers", trainerId), trainerToUpdate);
+
+      // Audit log: Trainer updated - track changes
+      const changedFields = [];
+      const oldValues = {};
+      const newValues = {};
+
+      Object.keys(trainerToUpdate).forEach(key => {
+        if (JSON.stringify(originalData[key]) !== JSON.stringify(trainerToUpdate[key])) {
+          changedFields.push(key);
+          oldValues[key] = originalData[key];
+          newValues[key] = trainerToUpdate[key];
+        }
+      });
+
+      if (changedFields.length > 0) {
+        // Get trainer name from multiple sources for robust logging
+        const trainerName = (originalData?.name && originalData.name.trim()) || 
+                           (trainerData?.name && trainerData.name.trim()) || 
+                           "Unknown Trainer";
+        
+        await auditLogTrainerOperations.trainerUpdated(
+          trainerId,
+          trainerName,
+          changedFields,
+          oldValues,
+          newValues
+        );
+      }
+
       onTrainerUpdated({ id: trainerId, ...trainerToUpdate });
       onClose();
     } catch (err) {
       console.error("Error updating trainer:", err);
+
+      // Audit log: Database operation failed
+      await auditLogErrorOperations.databaseOperationFailed(
+        "UPDATE",
+        "trainers",
+        err.code || "UNKNOWN_ERROR",
+        err.message
+      );
+
       setError(`Failed to update trainer: ${err.message}`);
     } finally {
       setLoading(false);
@@ -632,7 +677,7 @@ function EditTrainer({ trainerId, onClose, onTrainerUpdated, trainers = [] }) {
 
             {error && (
               <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm flex items-start">
-                <FiAlertCircle className="flex-shrink-0 h-5 w-5 mr-2 mt-0.5" />
+                <FiAlertCircle className="shrink-0 h-5 w-5 mr-2 mt-0.5" />
                 <span>{error}</span>
               </div>
             )}

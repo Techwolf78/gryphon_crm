@@ -509,7 +509,7 @@ function TrainerCalendar({
       <div className={containerClass}>
   <header className={`${embedded ? 'relative' : 'sticky top-0'} z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 md:p-4 bg-white/95 backdrop-blur ${embedded ? 'border-b border-gray-100 rounded-t-xl' : 'border-b border-gray-100'}`}>        
           <div className="flex items-center gap-4">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-indigo-50 to-white shadow-inner">
+            <div className="p-2 rounded-lg bg-linear-to-br from-indigo-50 to-white shadow-inner">
               <FiCalendar className="text-indigo-600 w-6 h-6" />
             </div>
             <div>
@@ -712,7 +712,7 @@ function TrainerCalendar({
                           {dayBookings.slice(0,3).map((b,i)=>(
                             <div key={i} className="flex items-start justify-between gap-1">
                               <div className="truncate leading-tight">
-                                <div className="font-medium text-gray-800 truncate max-w-[60px] sm:max-w-[80px]">{b.trainerName || b.trainerId}</div>
+                                <div className="font-medium text-gray-800 truncate max-w-[60px] sm:max-w-20">{b.trainerName || b.trainerId}</div>
                                 <div className={`text-[9px] sm:text-[10px] truncate ${b._conflict ? 'text-red-600 font-medium' : 'text-gray-500'}`}>{b.dayDuration} • {b.batchCode || b.domain || ''}</div>
                               </div>
                               <button onClick={(ev)=> { ev.stopPropagation(); setBookingDetail(b); }} className="shrink-0 text-[10px] sm:text-xs text-indigo-600 hover:text-indigo-700 focus:outline-none">Info</button>
@@ -819,7 +819,7 @@ function TrainerCalendar({
                       <button
                         type="button"
                         onClick={()=> toggleGroup(g.date)}
-                        className={`sticky top-0 z-10 w-full flex items-center justify-between px-3 py-1.5 bg-gradient-to-r from-gray-50 to-white border-l-4 ${g.anyConflict ? 'border-red-400' : 'border-indigo-300'} text-xs font-semibold text-gray-700 backdrop-blur cursor-pointer group focus:outline-none focus:ring-2 focus:ring-indigo-500`}
+                        className={`sticky top-0 z-10 w-full flex items-center justify-between px-3 py-1.5 bg-linear-to-r from-gray-50 to-white border-l-4 ${g.anyConflict ? 'border-red-400' : 'border-indigo-300'} text-xs font-semibold text-gray-700 backdrop-blur cursor-pointer group focus:outline-none focus:ring-2 focus:ring-indigo-500`}
                         aria-expanded={!collapsedGroups.has(g.date)}
                         aria-controls={`group-${g.date}`}
                       >
@@ -881,7 +881,7 @@ function TrainerCalendar({
                   ))}
                 </ul>
                 {!showAllPast && groupedBookings.some(g=> g.isPast) && (
-                  <div className="sticky bottom-0 bg-gradient-to-t from-white to-white/70 p-2 text-center">
+                  <div className="sticky bottom-0 bg-linear-to-t from-white to-white/70 p-2 text-center">
                     <button onClick={()=> setShowAllPast(true)} className="text-[11px] text-indigo-600 hover:underline">Show older bookings</button>
                   </div>
                 )}
@@ -912,7 +912,7 @@ function TrainerCalendar({
     />
   )}
   {showBookingsFull && (
-    <div role="dialog" aria-modal="true" aria-label="All bookings" className="fixed inset-0 z-[80] flex flex-col bg-white/90 backdrop-blur-md animate-fadeIn">
+    <div role="dialog" aria-modal="true" aria-label="All bookings" className="fixed inset-0 z-80 flex flex-col bg-white/90 backdrop-blur-md animate-fadeIn">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white/80 backdrop-blur-sm">
         <div className="flex items-center gap-3">
           <FiCalendar className="text-indigo-600 w-5 h-5" />
@@ -953,7 +953,7 @@ function TrainerCalendar({
               <button
                 type="button"
                 onClick={()=> toggleGroup(g.date)}
-                className={`sticky top-0 w-full flex items-center justify-between px-4 py-2 bg-gradient-to-r from-gray-50 to-white border-l-4 ${g.anyConflict ? 'border-red-400' : 'border-indigo-300'} text-xs sm:text-[13px] font-semibold text-gray-700 backdrop-blur cursor-pointer group`}
+                className={`sticky top-0 w-full flex items-center justify-between px-4 py-2 bg-linear-to-r from-gray-50 to-white border-l-4 ${g.anyConflict ? 'border-red-400' : 'border-indigo-300'} text-xs sm:text-[13px] font-semibold text-gray-700 backdrop-blur cursor-pointer group`}
                 aria-expanded={!collapsedGroups.has(g.date)}
                 aria-controls={`full-group-${g.date}`}
               >
@@ -1015,7 +1015,7 @@ function TrainerCalendar({
           ))}
         </ul>
         {!showAllPast && groupedBookings.some(g=> g.isPast) && (
-          <div className="sticky bottom-0 bg-gradient-to-t from-white to-white/70 p-2 text-center border-t border-gray-100">
+          <div className="sticky bottom-0 bg-linear-to-t from-white to-white/70 p-2 text-center border-t border-gray-100">
             <button onClick={()=> setShowAllPast(true)} className="text-[11px] text-indigo-600 hover:underline">Show older bookings</button>
           </div>
         )}

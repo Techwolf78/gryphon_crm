@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { AnimatePresence, motion as _motion } from 'framer-motion';
+import { motion as _motion, AnimatePresence } from 'framer-motion';
 
 
 // Custom hook for escape key
@@ -83,10 +83,10 @@ const AlertBase = ({
             />
           </div>
         )}
-        
+
         {/* Colored top border */}
         <div className={`absolute top-0 left-0 w-full h-0.5 bg-linear-to-r from-${color}-500 to-${color}-600`}></div>
-        
+
         <div className="p-3 flex items-start gap-3">
           {/* Icon */}
           <div className="shrink-0">
@@ -94,7 +94,7 @@ const AlertBase = ({
               {React.cloneElement(icon, { className: 'w-4 h-4' })}
             </div>
           </div>
-          
+
           {/* Content */}
           <div className="flex-1 min-w-0">
             <div className="flex justify-between items-start mb-1">
@@ -115,11 +115,11 @@ const AlertBase = ({
                 </svg>
               </button>
             </div>
-            
+
             <div className={`text-${color}-800 text-xs mb-2`}>
               {children}
             </div>
-            
+
             {/* Actions */}
             {actions && (
               <div className="flex flex-col sm:flex-row justify-end gap-1.5">
@@ -133,7 +133,7 @@ const AlertBase = ({
   );
 };
 
-const FollowupAlerts = ({
+const PlacementLeadAlert = ({
   todayFollowUps,
   showTodayFollowUpAlert,
   setShowTodayFollowUpAlert,
@@ -145,21 +145,15 @@ const FollowupAlerts = ({
   // Check if today's follow-up alert should be shown (once per day)
   const shouldShowTodayAlert = () => {
     const today = new Date().toDateString();
-    const lastShown = localStorage.getItem('salesTodayFollowupAlertLastShown');
+    const lastShown = localStorage.getItem('placementTodayFollowupAlertLastShown');
     return lastShown !== today;
   };
 
   // Mark today's follow-up alert as shown for today
   const markTodayAlertShown = () => {
     const today = new Date().toDateString();
-    localStorage.setItem('salesTodayFollowupAlertLastShown', today);
+    localStorage.setItem('placementTodayFollowupAlertLastShown', today);
   };
-
-  // Handle close today's alert
-  const handleCloseTodayAlert = useCallback(() => {
-    setShowTodayFollowUpAlert(false);
-    markTodayAlertShown();
-  }, [setShowTodayFollowUpAlert]);
 
   // Handle escape key for all alerts
   const handleCloseAll = useCallback(() => {
@@ -173,40 +167,48 @@ const FollowupAlerts = ({
   // Enhanced snooze functionality for "Remind me later"
   const handleRemindLater = useCallback(() => {
     const snoozeTime = 30 * 60 * 1000; // 30 minutes for "remind later"
-    
+
     // Hide the current alert
     setShowTodayFollowUpAlert(false);
-    markTodayAlertShown();
-    
+
     // Set a timeout to show it again
     setTimeout(() => {
       setShowTodayFollowUpAlert(true);
     }, snoozeTime);
   }, [setShowTodayFollowUpAlert]);
 
+  // Handle closing today's follow-up alert
+  const handleCloseTodayAlert = useCallback(() => {
+    setShowTodayFollowUpAlert(false);
+    // Mark as shown for today so it doesn't appear again
+    markTodayAlertShown();
+  }, [setShowTodayFollowUpAlert]);
+
   // Snooze functionality for urgent reminders
   const handleSnooze = useCallback((alert) => {
     const snoozeTime = 5 * 60 * 1000; // 5 minutes for urgent reminders
-    
+
     setTimeout(() => {
       setAlerts(prev => [...prev, alert]);
     }, snoozeTime);
-    
+
     if (alert.type === 'reminder') {
       setReminderPopup(null);
     }
   }, [setReminderPopup]);
 
-  // Simplified View meetings action - just open Outlook
-  const handleViewMeetings = useCallback(() => {
+  // View followups action - open calendar or followups view
+  const handleViewFollowups = useCallback(() => {
     setShowTodayFollowUpAlert(false);
+    // Mark as shown for today so it doesn't appear again
     markTodayAlertShown();
+    // Could navigate to a followups view or open calendar
     window.open('https://outlook.office.com/calendar/view/week', '_blank');
   }, [setShowTodayFollowUpAlert]);
 
-  // Join meeting action
-  const handleJoinMeeting = useCallback(() => {
-    // In a real app, this would launch the meeting URL
+  // Follow up action
+  const handleFollowUp = useCallback(() => {
+    // In a real app, this would open the followup modal or navigate to the lead
     setReminderPopup(null);
   }, [setReminderPopup]);
 
@@ -220,113 +222,111 @@ const FollowupAlerts = ({
       <AnimatePresence>
         {/* Today's Follow-ups Alert */}
         {showTodayFollowUpAlert && shouldShowTodayAlert() && (
-          <AlertBase
-            icon={
-              <svg className={`w-4 h-4 text-indigo-600`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            }
-            color="indigo"
-            title="Today's Meetings"
-            onClose={handleCloseTodayAlert}
-            autoDismiss={true}
-            actions={
-              <>
-                <button
-                  onClick={handleRemindLater}
-                  className="px-2 py-1 text-xs font-medium text-gray-700 hover:text-gray-900 rounded transition-colors"
-                >
-                  Later (30m)
-                </button>
-                <button
-                  onClick={handleViewMeetings}
-                  className="px-2 py-1 bg-linear-to-br from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-medium rounded shadow-sm transition-all"
-                >
-                  View meetings
-                </button>
-              </>
-            }
-          >
-            <p>
-              You have{' '}
-              <span className="font-medium text-indigo-600">
-                {todayFollowUps.length}
-              </span>{' '}
-              {todayFollowUps.length === 1 ? 'meeting' : 'meetings'} today.
-            </p>
-          </AlertBase>
-        )}
-
-        {/* Reminder Popup */}
-        {reminderPopup && (
-          <AlertBase
-            icon={
-              <svg className={`w-4 h-4 text-amber-600`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            }
-            color={reminderPopup.urgent ? 'red' : 'amber'}
-            title={reminderPopup.urgent ? 'Meeting NOW!' : 'Meeting Soon'}
-            onClose={() => setReminderPopup(null)}
-            autoDismiss={!reminderPopup.urgent}
-            position="top-20 right-6"
-            actions={
-              <>
-                <button
-                  onClick={() => handleSnooze({
-                    id: `snooze-${reminderPopup.college}`,
-                    type: 'reminder',
-                    data: reminderPopup
-                  })}
-                  className="px-2 py-1 text-xs font-medium text-amber-700 hover:text-amber-900 rounded transition-colors"
-                >
-                  Snooze 5m
-                </button>
-                <button
-                  onClick={handleJoinMeeting}
-                  className={`px-2 py-1 bg-linear-to-br ${reminderPopup.urgent ? 'from-red-500 to-red-600 hover:from-red-600 hover:to-red-700' : 'from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600'} text-white text-xs font-medium rounded shadow-sm transition-all`}
-                >
-                  {reminderPopup.urgent ? 'Join NOW' : 'Join'}
-                </button>
-              </>
-            }
-          >
-            <p>
-              Meeting with{' '}
-              <span className="font-medium">{reminderPopup.college}</span> {reminderPopup.urgent ? 'now' : `at ${reminderPopup.time}`}.
-            </p>
-          </AlertBase>
-        )}
-
-        {/* Multiple Alerts Support */}
-        {alerts.length > 0 && (
-          <AlertBase
-            icon={
-              <svg className={`w-4 h-4 text-purple-600`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-            }
-            color="purple"
-            title={`${alerts.length} Notifications`}
-            onClose={handleDismissAll}
-            position="top-32 right-6"
-            actions={
+        <AlertBase
+          icon={
+            <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          }
+          color="indigo"
+          title="Today's Follow-ups"
+          onClose={handleCloseTodayAlert}
+          autoDismiss={true}
+          actions={
+            <>
               <button
-                onClick={handleDismissAll}
-                className="px-2 py-1 bg-linear-to-br from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-medium rounded shadow-sm transition-all"
+                onClick={handleRemindLater}
+                className="px-2 py-1 text-xs font-medium text-gray-700 hover:text-gray-900 rounded transition-colors"
               >
-                Dismiss All
+                Later (30m)
               </button>
-            }
-          >
-            <p>
-              {alerts.length} pending {alerts.length === 1 ? 'notification' : 'notifications'}.
-            </p>
-          </AlertBase>
+              <button
+                onClick={handleViewFollowups}
+                className="px-2 py-1 bg-linear-to-br from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-medium rounded shadow-sm transition-all"
+              >
+                View follow-ups
+              </button>
+            </>
+          }
+        >
+          <p>
+            You have{' '}
+            <span className="font-medium text-indigo-600">
+              {todayFollowUps.length}
+            </span>{' '}
+            {todayFollowUps.length === 1 ? 'follow-up' : 'follow-ups'} scheduled for today.
+          </p>
+        </AlertBase>
+      )}
+
+      {/* Reminder Popup */}
+      {reminderPopup && (
+        <AlertBase
+          icon={
+            <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          }
+          color={reminderPopup.urgent ? 'red' : 'amber'}
+          title={reminderPopup.urgent ? 'Follow-up NOW!' : 'Follow-up Soon'}
+          onClose={() => setReminderPopup(null)}
+          autoDismiss={!reminderPopup.urgent}
+          position="top-20 right-6"
+          actions={
+            <>
+              <button
+                onClick={() => handleSnooze({
+                  id: `snooze-${reminderPopup.company}`,
+                  type: 'reminder',
+                  data: reminderPopup
+                })}
+                className="px-2 py-1 text-xs font-medium text-amber-700 hover:text-amber-900 rounded transition-colors"
+              >
+                Snooze 5m
+              </button>
+              <button
+                onClick={handleFollowUp}
+                className={`px-2 py-1 bg-linear-to-br ${reminderPopup.urgent ? 'from-red-500 to-red-600 hover:from-red-600 hover:to-red-700' : 'from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600'} text-white text-xs font-medium rounded shadow-sm transition-all`}
+              >
+                {reminderPopup.urgent ? 'Follow-up NOW' : 'Follow-up'}
+              </button>
+            </>
+          }
+        >
+          <p>
+            Follow-up with{' '}
+            <span className="font-medium">{reminderPopup.company}</span> {reminderPopup.urgent ? 'now' : `at ${reminderPopup.time}`}.
+          </p>
+        </AlertBase>
+      )}
+
+      {/* Multiple Alerts Support */}
+      {alerts.length > 0 && (
+        <AlertBase
+          icon={
+            <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+          }
+          color="purple"
+          title={`${alerts.length} Notifications`}
+          onClose={handleDismissAll}
+          position="top-32 right-6"
+          actions={
+            <button
+              onClick={handleDismissAll}
+              className="px-2 py-1 bg-linear-to-br from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-medium rounded shadow-sm transition-all"
+            >
+              Dismiss All
+            </button>
+          }
+        >
+          <p>
+            {alerts.length} pending {alerts.length === 1 ? 'notification' : 'notifications'}.
+          </p>
+        </AlertBase>
         )}
       </AnimatePresence>
     </>
   );
-};
-
-export default FollowupAlerts;
+};export default PlacementLeadAlert;
