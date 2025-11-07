@@ -494,6 +494,7 @@ const SalesDashboard = ({ filters }) => {
   const userDropdownRef = useRef(null);
   const filterDropdownRef = useRef(null);
   const yearDropdownRef = useRef(null);
+  const yearDropdownContainerRef = useRef(null);
 
   const [timePeriod, setTimePeriod] = useState("quarter");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -541,6 +542,14 @@ const SalesDashboard = ({ filters }) => {
   };
 
   const getDateRange = (period, year = selectedYear) => {
+    // Handle lifetime selection - return a very wide range
+    if (year === "lifetime") {
+      return {
+        start: new Date(2000, 0, 1), // Start from year 2000
+        end: new Date(2100, 11, 31), // End in year 2100
+      };
+    }
+
     const now = new Date();
     const month = now.getMonth();
     const day = now.getDate();
@@ -861,24 +870,24 @@ if (selectedUserId) {
       if (lead.phase === "closed" && lead.totalCost) {
         revenue += lead.totalCost;
 
-        if (lead.closedDate) {
+        if (lead.contractStartDate) {
           try {
-            const closedDate = new Date(lead.closedDate);
-            if (Number.isNaN(closedDate.getTime()))
+            const contractStartDate = new Date(lead.contractStartDate);
+            if (Number.isNaN(contractStartDate.getTime()))
               throw new Error("Invalid date");
 
             let dateKey;
             if (timePeriod === "week") {
               dateKey = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
-                closedDate.getDay()
+                contractStartDate.getDay()
               ];
             } else if (timePeriod === "month") {
               const firstDay = new Date(
-                closedDate.getFullYear(),
-                closedDate.getMonth(),
+                contractStartDate.getFullYear(),
+                contractStartDate.getMonth(),
                 1
               );
-              const pastDaysOfMonth = closedDate.getDate() - 1;
+              const pastDaysOfMonth = contractStartDate.getDate() - 1;
               dateKey = `Week ${
                 Math.floor((firstDay.getDay() + pastDaysOfMonth) / 7) + 1
               }`;
@@ -901,11 +910,11 @@ if (selectedUserId) {
                   new Date(2000, quarterStart + 2, 1).toLocaleString("default", { month: "short" }),
                 ];
               }
-              let monthIdx = closedDate.getMonth() - startMonth;
+              let monthIdx = contractStartDate.getMonth() - startMonth;
               if (isNaN(monthIdx) || monthIdx < 0 || monthIdx > 2) monthIdx = 0; // fallback to first month
               dateKey = months[monthIdx];
             } else {
-              const month = closedDate.getMonth();
+              const month = contractStartDate.getMonth();
               dateKey = [
                 "Apr",
                 "May",
@@ -933,12 +942,14 @@ if (selectedUserId) {
         }
       }
 
-      if (lead.tcv) {
+      if (lead.tcv && lead.phase !== "closed") {
         projectedTCV += lead.tcv;
-      }if (lead.assignedTo && lead.assignedTo.uid) {
-  const user = users.find((u) => u.uid === lead.assignedTo.uid);
-  const memberId = user ? user.id : lead.assignedTo.uid;
-  const memberName = lead.assignedTo.name || "Unknown";
+      }
+
+      if (lead.assignedTo && lead.assignedTo.uid) {
+        const user = users.find((u) => u.uid === lead.assignedTo.uid);
+        const memberId = user ? user.id : lead.assignedTo.uid;
+        const memberName = lead.assignedTo.name || "Unknown";
 
         if (!teamPerformance[memberId]) {
           teamPerformance[memberId] = {
@@ -1133,13 +1144,13 @@ if (selectedUserId) {
       let leads = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
       // Filter by date range in JS, but include leads with missing createdAt
-      // For closed leads, also include if closedDate is in range
+      // For closed leads, also include if contractStartDate is in range
       let currentLeads = leads.filter(lead => {
-        if (!lead.createdAt && !lead.closedDate) return true; // Include if missing both dates
-        if (lead.phase === "closed" && lead.closedDate) {
-          // For closed leads, check closedDate
-          const closed = new Date(lead.closedDate);
-          return closed >= range.start && closed <= range.end;
+        if (!lead.createdAt && !lead.contractStartDate) return true; // Include if missing both dates
+        if (lead.phase === "closed" && lead.contractStartDate) {
+          // For closed leads, check contractStartDate for FY membership
+          const contractStart = new Date(lead.contractStartDate);
+          return contractStart >= range.start && contractStart <= range.end;
         } else if (lead.createdAt) {
           // For other leads, check createdAt
           const created = new Date(lead.createdAt);
@@ -1153,11 +1164,11 @@ if (selectedUserId) {
       // Fetch previous period data for growth calculations
       const prevRange = getPrevDateRange(timePeriod, range.start);
       let prevLeads = leads.filter(lead => {
-        if (!lead.createdAt && !lead.closedDate) return false; // Exclude missing dates for previous
-        if (lead.phase === "closed" && lead.closedDate) {
-          // For closed leads, check closedDate
-          const closed = new Date(lead.closedDate);
-          return closed >= prevRange.start && closed <= prevRange.end;
+        if (!lead.createdAt && !lead.contractStartDate) return false; // Exclude missing dates for previous
+        if (lead.phase === "closed" && lead.contractStartDate) {
+          // For closed leads, check contractStartDate for FY membership
+          const contractStart = new Date(lead.contractStartDate);
+          return contractStart >= prevRange.start && contractStart <= prevRange.end;
         } else if (lead.createdAt) {
           // For other leads, check createdAt
           const created = new Date(lead.createdAt);
@@ -1283,6 +1294,22 @@ if (selectedUserId) {
     };
   }, []);
 
+  // Scroll to selected year option when dropdown opens
+  useEffect(() => {
+    if (isYearDropdownOpen && yearDropdownContainerRef.current) {
+      // Find the selected option button
+      const selectedButton = yearDropdownContainerRef.current.querySelector(
+        `[data-selected-year="${selectedYear}"]`
+      );
+      if (selectedButton) {
+        selectedButton.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+        });
+      }
+    }
+  }, [isYearDropdownOpen, selectedYear]);
+
   // Define calculateGrowth for metrics grid
   const calculateGrowth = (current, previous) => {
     if (previous === 0) return current === 0 ? 0 : 100;
@@ -1305,17 +1332,25 @@ if (selectedUserId) {
 
       // Filter by the current date range (selected year) like the dashboard doe
       leads = leads.filter(lead => {
-        if (!lead.createdAt && !lead.closedDate) return true; // Include if missing both dates
-        if (lead.phase === "closed" && lead.closedDate) {
-          // For closed leads, check closedDate
-          const closed = new Date(lead.closedDate);
-          return closed >= currentDateRange.start && closed <= currentDateRange.end;
+        if (!lead.createdAt && !lead.contractStartDate) return true; // Include if missing both dates
+        if (lead.phase === "closed" && lead.contractStartDate) {
+          // For closed leads, check contractStartDate for FY membership
+          const contractStart = new Date(lead.contractStartDate);
+          return contractStart >= currentDateRange.start && contractStart <= currentDateRange.end;
         } else if (lead.createdAt) {
           // For other leads, check createdAt
           const created = new Date(lead.createdAt);
           return created >= currentDateRange.start && created <= currentDateRange.end;
         }
         return false;
+      });
+
+      // Sort leads: CL first, then H, then W, then C
+      const phasePriority = { closed: 1, hot: 2, warm: 3, cold: 4 };
+      leads = leads.sort((a, b) => {
+        const priorityA = phasePriority[a.phase] || 5;
+        const priorityB = phasePriority[b.phase] || 5;
+        return priorityA - priorityB;
       });
 
       setModalLeads(leads);
@@ -1368,7 +1403,7 @@ if (selectedUserId) {
                   onClick={() => setIsYearDropdownOpen(!isYearDropdownOpen)}
                   className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500 flex items-center gap-2"
                 >
-                  <span>{selectedYear}</span>
+                  <span>{selectedYear === "lifetime" ? "Lifetime" : selectedYear}</span>
                   {isYearDropdownOpen ? (
                     <FiChevronUp className="text-gray-500 h-4 w-4" />
                   ) : (
@@ -1377,14 +1412,33 @@ if (selectedUserId) {
                 </button>
 
                 {isYearDropdownOpen && (
-                  <div className="absolute top-full mt-1 w-full bg-white rounded-lg shadow-lg border border-gray-200 z-10 max-h-48 overflow-y-auto">
-                    {Array.from({ length: 10 }, (_, i) => {
-                      const year = new Date().getFullYear() - 5 + i;
+                  <div className="absolute top-full mt-1 w-full bg-white rounded-lg shadow-lg border border-gray-200 z-10 max-h-48 overflow-y-auto" ref={yearDropdownContainerRef}>
+                    {/* Lifetime option */}
+                    <button
+                      key="lifetime"
+                      type="button"
+                      data-selected-year="lifetime"
+                      onClick={() => {
+                        setSelectedYear("lifetime");
+                        setIsYearDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors flex items-center gap-2 ${
+                        selectedYear === "lifetime" ? 'text-green-600 font-medium' : 'text-gray-700'
+                      }`}
+                      style={{ color: '#059669', fontWeight: '600' }}
+                    >
+                      <span>Lifetime</span>
+                      <span className="text-green-500">•</span>
+                    </button>
+                    {Array.from({ length: 11 }, (_, i) => {
                       const currentYear = new Date().getFullYear();
+                      const year = currentYear - 5 + i;
+                      const isCurrentYear = year === currentYear;
                       return (
                         <button
                           key={year}
                           type="button"
+                          data-selected-year={year}
                           onClick={() => {
                             setSelectedYear(year);
                             setIsYearDropdownOpen(false);
@@ -1392,13 +1446,10 @@ if (selectedUserId) {
                           className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors flex items-center gap-2 ${
                             selectedYear === year ? 'text-indigo-600 font-medium' : 'text-gray-700'
                           }`}
+                          style={isCurrentYear ? { color: '#2563eb', fontWeight: '600' } : {}}
                         >
-                          {year === currentYear && (
-                            <span className="text-blue-500 text-xs">●</span>
-                          )}
-                          <span className={year === currentYear ? 'ml-0' : 'ml-4'}>
-                            {year}
-                          </span>
+                          <span>{year}</span>
+                          {isCurrentYear && <span className="ml-1 text-blue-500">•</span>}
                         </button>
                       );
                     })}
@@ -1778,7 +1829,7 @@ if (selectedUserId) {
     aria-labelledby="modal-title"
   >
     {/* Header */}
-    <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 bg-gradient-to-r from-white via-gray-50 to-indigo-50">
+    <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 bg-linear-to-r from-white via-gray-50 to-indigo-50">
       <div className="flex items-center gap-3">
         <div className="bg-indigo-100 text-indigo-600 rounded-full w-10 h-10 flex items-center justify-center font-bold text-lg shadow-sm">
           {modalMember?.name?.[0] || "?"}
@@ -1826,8 +1877,9 @@ if (selectedUserId) {
           <table className="min-w-full text-sm md:text-base">
             <thead>
               <tr className="bg-gray-50">
-                <th className="text-left px-3 py-2 font-semibold text-gray-700">College</th>
-                <th className="text-left px-3 py-2 font-semibold text-gray-700">Course/Year</th>
+                <th className="text-left px-3 py-2 font-semibold text-gray-700 w-[60%]">College</th>
+                <th className="text-left px-3 py-2 font-semibold text-gray-700 w-[20%]">Course/Year</th>
+                <th className="text-left px-3 py-2 font-semibold text-gray-700 w-[20%]">Projection / TCV</th>
               </tr>
             </thead>
             <tbody>
@@ -1840,7 +1892,7 @@ if (selectedUserId) {
   {/* Symbol for phase */}
   {lead.phase === "cold" && (
     <span
-      className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 font-bold text-xs border border-blue-200 flex-shrink-0"
+      className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 font-bold text-xs border border-blue-200 shrink-0"
       title="Cold"
     >
       C
@@ -1848,7 +1900,7 @@ if (selectedUserId) {
   )}
   {lead.phase === "warm" && (
     <span
-      className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-yellow-100 text-yellow-700 font-bold text-xs border border-yellow-200 flex-shrink-0"
+      className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-yellow-100 text-yellow-700 font-bold text-xs border border-yellow-200 shrink-0"
       title="Warm"
     >
       W
@@ -1856,7 +1908,7 @@ if (selectedUserId) {
   )}
   {lead.phase === "hot" && (
     <span
-      className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-700 font-bold text-xs border border-red-200 flex-shrink-0"
+      className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-700 font-bold text-xs border border-red-200 shrink-0"
       title="Hot"
     >
       H
@@ -1864,7 +1916,7 @@ if (selectedUserId) {
   )}
 {lead.phase === "closed" && (
   <span
-    className="inline-flex items-center justify-center h-6 rounded-full bg-green-100 text-green-700 font-bold text-[10px] border border-green-200 flex-shrink-0"
+    className="inline-flex items-center justify-center h-6 rounded-full bg-green-100 text-green-700 font-bold text-[10px] border border-green-200 shrink-0"
     title="Closed"
     style={{ minWidth: "1.3rem", padding: "0 0.3rem" }}
   >
@@ -1881,6 +1933,20 @@ if (selectedUserId) {
                       ? ` (${lead.courses?.[0]?.year})`
                       : ""}
                   </td>
+                  <td className="px-3 py-2 text-gray-700 font-medium">
+                    <span className={
+                      lead.phase === "closed" ? "text-green-700" :
+                      lead.phase === "hot" ? "text-red-700" :
+                      lead.phase === "warm" ? "text-yellow-700" :
+                      lead.phase === "cold" ? "text-blue-700" :
+                      "text-gray-700"
+                    }>
+                      {lead.phase === "closed" 
+                        ? (lead.totalCost ? formatCurrency(lead.totalCost) : "-")
+                        : (lead.tcv ? formatCurrency(lead.tcv) : "-")
+                      }
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -1890,7 +1956,7 @@ if (selectedUserId) {
     </div>
 
     {/* Footer */}
-    <div className="px-4 py-2 bg-gradient-to-r from-white via-gray-50 to-indigo-50 border-t border-gray-100 flex justify-end">
+    <div className="px-4 py-2 bg-linear-to-r from-white via-gray-50 to-indigo-50 border-t border-gray-100 flex justify-end">
       <button
         className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold shadow hover:bg-indigo-700 transition focus:outline-none focus:ring-2 focus:ring-indigo-400"
         onClick={() => setIsModalOpen(false)}

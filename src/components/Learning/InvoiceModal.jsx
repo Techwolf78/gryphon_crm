@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { db } from "../../firebase";
-import { doc, getDoc, collection, addDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, collection, addDoc } from "firebase/firestore";
 import { query, where, getDocs } from "firebase/firestore";
-import {  FiX, FiEdit2, FiEye, FiFileText, FiSave, FiArrowLeft, FiCheckCircle, FiXCircle, FiAlertCircle } from "react-icons/fi";
+import {  FiX, FiEye, FiFileText, FiSave, FiArrowLeft, FiCheckCircle, FiXCircle, FiAlertCircle } from "react-icons/fi";
 
 // Import the standardized PDF generation function
 
@@ -36,8 +36,9 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
   });
   const [existingInvoice, setExistingInvoice] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [editMode, setEditMode] = useState(false);
   const [viewMode, setViewMode] = useState(false);
+  const [billNumberError, setBillNumberError] = useState('');
+  const billNumberRef = useRef(null);
 
   // Memoize query dependencies to prevent useEffect dependency array size changes
   const queryDeps = useMemo(() => ({
@@ -67,8 +68,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
             panNumber: data.pan || "",
             trainerEmail: data.email || "",
             trainerPhone: data.phone || "",
-            // Only set GST if it's not already set from existing invoice AND we're creating a new invoice
-            ...(!existingInvoice && (prev.gst === undefined || prev.gst === "") ? { gst: data.gst ? "0" : "NA" } : {}),
+            gst: data.gst ? "0" : "NA",
           }));
         } else {
           // Trainer document doesn't exist - this is expected for new trainers
@@ -130,13 +130,32 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
 
     checkExistingInvoice();
     fetchTrainerBankDetails();
-  }, [queryDeps, existingInvoice]);
+  }, [queryDeps]);
 
 const handleSubmit = async (e) => {
   e.preventDefault();
+  if (viewMode) return; // Don't allow submission in view mode
+
   setIsGenerating(true);
 
   try {
+    // Check for duplicate bill number
+    const billNumberQuery = query(
+      collection(db, "invoices"),
+      where("billNumber", "==", invoiceData.billNumber)
+    );
+    const billNumberSnapshot = await getDocs(billNumberQuery);
+    
+    if (!billNumberSnapshot.empty) {
+      setBillNumberError('Invoice number is taken!');
+      setIsGenerating(false);
+      // Scroll to bill number input field
+      setTimeout(() => {
+        billNumberRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+      return;
+    }
+
     // Prepare invoice data
     const invoiceToSave = {
       ...invoiceData,
@@ -156,37 +175,15 @@ const handleSubmit = async (e) => {
       invoice: false,
     };
 
-    if (existingInvoice && editMode) {
-      // If editing a rejected invoice, reset status for HR re-approval
-      const wasRejected = existingInvoice.status === "rejected";
-      const updateData = {
-        ...invoiceToSave,
-        ...(wasRejected && {
-          status: "pending", // Reset to pending for HR re-approval
-          payment: false,   // Reset payment status
-          invoice: true,    // Keep invoice approval from Learning
-          // Clear rejection data
-          rejectedDate: null,
-          rejectedBy: null,
-          rejectionRemarks: null,
-        }),
-      };
-      await updateDoc(doc(db, "invoices", existingInvoice.id), updateData);
-      onToast({ type: 'success', message: wasRejected ? "Invoice updated and sent back to HR for approval!" : "Changes applied successfully!" });
-    } else {
-      invoiceToSave.createdAt = new Date();
-      const docRef = await addDoc(collection(db, "invoices"), invoiceToSave);
-      onToast({ type: 'success', message: "Invoice generated successfully!" });
-      setExistingInvoice({ id: docRef.id, ...invoiceToSave });
-    }
+    invoiceToSave.createdAt = new Date();
+    await addDoc(collection(db, "invoices"), invoiceToSave);
+    onToast({ type: 'success', message: "Invoice generated successfully!" });
 
     await onInvoiceGenerated(invoiceToSave); // Pass the invoice data for undo functionality
-    setEditMode(false);
-    setViewMode(true);
     onClose();
 
   } catch (error) {
-    console.error('Error generating/updating invoice:', error);
+    console.error('Error generating invoice:', error);
     onToast({ type: 'error', message: "Invoice not generated. Please try again." });
   } finally {
     setIsGenerating(false);
@@ -194,30 +191,17 @@ const handleSubmit = async (e) => {
 };
 
 
-  const handleEditToggle = () => {
-    setEditMode(!editMode);
-    setViewMode(false);
-  };
-
-  const handleCancelEdit = () => {
-    if (existingInvoice) {
-      // Reset to original invoice data
-      setInvoiceData((prev) => ({
-        ...prev,
-        ...existingInvoice,
-        billingDate: existingInvoice.billingDate || new Date().toISOString().split("T")[0],
-      }));
-    }
-    setEditMode(false);
-    setViewMode(true);
-  };
-
   const handleChange = (e) => {
     const { name, value, type } = e.target;
     setInvoiceData((prev) => ({
       ...prev,
       [name]: type === "number" ? parseFloat(value) || 0 : value,
     }));
+    
+    // Clear bill number error when bill number changes
+    if (name === 'billNumber') {
+      setBillNumberError('');
+    }
   };
 
   const calculateTotalAmount = () => {
@@ -246,75 +230,39 @@ const handleSubmit = async (e) => {
     return roundToNearestWhole(amountBeforeGST - gstAmount);
   };
 
-  const isReadOnly = viewMode || (existingInvoice && !editMode);
+  const isReadOnly = viewMode;
 
   return (
-    <div className="fixed inset-0 backdrop-blur-md bg-transparent bg-opacity-50 flex items-center justify-center p-4 z-500">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="p-4">
-          {/* Header */}
-          <div className="flex justify-between items-center mb-4">
-            <div className="flex items-center">
-              <h2 className="text-xl font-bold text-gray-800">
-                {editMode ? "Edit Invoice" : 
-                 viewMode ? "View Invoice" : "Generate Invoice"}
-              </h2>
-              {existingInvoice && (
-                <span className="ml-3 bg-blue-100 text-blue-800 text-sm font-medium px-2.5 py-0.5 rounded-full">
-                  {invoiceData.billNumber}
-                </span>
-              )}
-            </div>
-            
-            <div className="flex items-center gap-2">
-              {/* Action Buttons */}
-              {existingInvoice && viewMode && (
-                <>
-                  <button
-                    onClick={handleEditToggle}
-                    className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                    title="Edit Invoice"
-                  >
-                    <FiEdit2 className="mr-1" />
-                    Edit
-                  </button>
-                </>
-              )}
-              
-              {editMode && (
-                <>
-                  <button
-                    onClick={handleCancelEdit}
-                    className="flex items-center px-3 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
-                  >
-                    <FiArrowLeft className="mr-1" />
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSubmit}
-                    disabled={isGenerating}
-                    className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                  >
-                    <FiSave className="mr-1" />
-                    {isGenerating ? "Saving..." : "Save"}
-                  </button>
-                </>
-              )}
-              
-              <button
-                onClick={onClose}
-                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
-                title="Close"
-              >
-                <FiX size={20} />
-              </button>
-            </div>
+    <div className="fixed inset-0 backdrop-blur-md bg-transparent bg-opacity-50 flex items-center justify-center p-2 z-500">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-xl h-[95vh] flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="bg-linear-to-r from-blue-600 to-purple-600 px-2 py-1 flex justify-between items-center shrink-0">
+          <div className="flex items-center">
+            <h2 className="text-base font-bold text-white">
+              {viewMode ? "View Invoice" : "Generate Invoice"}
+            </h2>
+            {existingInvoice && (
+              <span className="ml-2 bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded-full">
+                {invoiceData.billNumber}
+              </span>
+            )}
           </div>
+          
+          <button
+            onClick={onClose}
+            className="p-0.5 text-white hover:bg-black/20 rounded transition-colors"
+            title="Close"
+          >
+            <FiX size={16} />
+          </button>
+        </div>
 
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-2">
           {/* Trainer Info */}
-          <div className="mb-4 p-2 bg-gray-50 rounded-lg">
-            <h3 className="text-base font-semibold text-gray-800 mb-2">Trainer  Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <div className="mb-2 p-1.5 bg-gray-50 rounded-lg">
+            <h3 className="text-sm font-semibold text-gray-800 mb-1.5">Trainer Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-1 text-xs">
               <div><span className="font-medium">Name:</span> {trainer?.trainerName}</div>
               <div><span className="font-medium">ID:</span> {trainer?.trainerId}</div>
               <div><span className="font-medium">College:</span> {trainer?.businessName}</div>
@@ -322,26 +270,30 @@ const handleSubmit = async (e) => {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <form onSubmit={handleSubmit} className="space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               {/* Bill Information */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-0.5">
+                <label className="block text-xs font-medium text-gray-700 mb-0.5">
                   Bill Number
                 </label>
                 <input
+                  ref={billNumberRef}
                   type="text"
                   name="billNumber"
                   value={invoiceData.billNumber}
                   onChange={handleChange}
-                  className="w-full p-1.5 border border-gray-300 rounded-md"
+                  className="w-full p-1 border border-gray-300 rounded-md text-sm"
                   required
                   readOnly={isReadOnly}
                 />
+                {billNumberError && (
+                  <p className="text-red-500 text-xs mt-0.5">{billNumberError}</p>
+                )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-0.5">
+                <label className="block text-xs font-medium text-gray-700 mb-0.5">
                   Billing Date
                 </label>
                 <input
@@ -349,7 +301,7 @@ const handleSubmit = async (e) => {
                   name="billingDate"
                   value={invoiceData.billingDate}
                   onChange={handleChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className="w-full p-1 border border-gray-300 rounded-md text-sm"
                   required
                   readOnly={isReadOnly}
                 />
@@ -357,7 +309,7 @@ const handleSubmit = async (e) => {
 
               {/* Project Information */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-0.5">
+                <label className="block text-xs font-medium text-gray-700 mb-0.5">
                   Project Code
                 </label>
                 <input
@@ -365,14 +317,14 @@ const handleSubmit = async (e) => {
                   name="projectCode"
                   value={invoiceData.projectCode}
                   onChange={handleChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className="w-full p-1 border border-gray-300 rounded-md text-sm"
                   required
                   readOnly={isReadOnly}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-0.5">
+                <label className="block text-xs font-medium text-gray-700 mb-0.5">
                   Domain
                 </label>
                 <input
@@ -380,14 +332,14 @@ const handleSubmit = async (e) => {
                   name="domain"
                   value={invoiceData.domain}
                   onChange={handleChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className="w-full p-1 border border-gray-300 rounded-md text-sm"
                   required
                   readOnly={isReadOnly}
                 />
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-0.5">
+                <label className="block text-xs font-medium text-gray-700 mb-0.5">
                   Topics Covered
                 </label>
                 <input
@@ -395,14 +347,14 @@ const handleSubmit = async (e) => {
                   name="topics"
                   value={invoiceData.topics}
                   onChange={handleChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className="w-full p-1 border border-gray-300 rounded-md text-sm"
                   readOnly={isReadOnly}
                 />
               </div>
 
               {/* Training Dates */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-0.5">
+                <label className="block text-xs font-medium text-gray-700 mb-0.5">
                   Start Date
                 </label>
                 <input
@@ -410,13 +362,13 @@ const handleSubmit = async (e) => {
                   name="startDate"
                   value={invoiceData.startDate}
                   onChange={handleChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className="w-full p-1 border border-gray-300 rounded-md text-sm"
                   readOnly={isReadOnly}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-0.5">
+                <label className="block text-xs font-medium text-gray-700 mb-0.5">
                   End Date
                 </label>
                 <input
@@ -424,14 +376,14 @@ const handleSubmit = async (e) => {
                   name="endDate"
                   value={invoiceData.endDate}
                   onChange={handleChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className="w-full p-1 border border-gray-300 rounded-md text-sm"
                   readOnly={isReadOnly}
                 />
               </div>
 
               {/* Financial Information */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-0.5">
+                <label className="block text-xs font-medium text-gray-700 mb-0.5">
                   Training Rate (₹/hour)
                 </label>
                 <input
@@ -439,7 +391,7 @@ const handleSubmit = async (e) => {
                   name="trainingRate"
                   value={invoiceData.trainingRate}
                   onChange={handleChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className="w-full p-1 border border-gray-300 rounded-md text-sm"
                   required
                   readOnly={isReadOnly}
                   step="0.01"
@@ -448,7 +400,7 @@ const handleSubmit = async (e) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-0.5">
+                <label className="block text-xs font-medium text-gray-700 mb-0.5">
                   Total Hours
                 </label>
                 <input
@@ -456,7 +408,7 @@ const handleSubmit = async (e) => {
                   name="totalHours"
                   value={invoiceData.totalHours}
                   onChange={handleChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className="w-full p-1 border border-gray-300 rounded-md text-sm"
                   required
                   readOnly={isReadOnly}
                   step="0.5"
@@ -465,7 +417,7 @@ const handleSubmit = async (e) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-0.5">
+                <label className="block text-xs font-medium text-gray-700 mb-0.5">
                   TDS (%)
                 </label>
                 <input
@@ -473,7 +425,7 @@ const handleSubmit = async (e) => {
                   name="tds"
                   value={invoiceData.tds}
                   onChange={handleChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className="w-full p-1 border border-gray-300 rounded-md text-sm"
                   required
                   readOnly={isReadOnly}
                   step="0.01"
@@ -483,7 +435,7 @@ const handleSubmit = async (e) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-0.5">
+                <label className="block text-xs font-medium text-gray-700 mb-0.5">
                   Adhoc Adjustment (₹)
                 </label>
                 <input
@@ -491,14 +443,14 @@ const handleSubmit = async (e) => {
                   name="adhocAdjustment"
                   value={invoiceData.adhocAdjustment}
                   onChange={handleChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className="w-full p-1 border border-gray-300 rounded-md text-sm"
                   readOnly={isReadOnly}
                   step="0.01"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-0.5">
+                <label className="block text-xs font-medium text-gray-700 mb-0.5">
                   Conveyance (₹) - One-time
                 </label>
                 <input
@@ -506,7 +458,7 @@ const handleSubmit = async (e) => {
                   name="conveyance"
                   value={invoiceData.conveyance}
                   onChange={handleChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className="w-full p-1 border border-gray-300 rounded-md text-sm"
                   readOnly={isReadOnly}
                   step="0.01"
                   min="0"
@@ -514,7 +466,7 @@ const handleSubmit = async (e) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-0.5">
+                <label className="block text-xs font-medium text-gray-700 mb-0.5">
                   Food (₹)
                 </label>
                 <input
@@ -522,7 +474,7 @@ const handleSubmit = async (e) => {
                   name="food"
                   value={invoiceData.food}
                   onChange={handleChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className="w-full p-1 border border-gray-300 rounded-md text-sm"
                   readOnly={isReadOnly}
                   step="0.01"
                   min="0"
@@ -530,7 +482,7 @@ const handleSubmit = async (e) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-0.5">
+                <label className="block text-xs font-medium text-gray-700 mb-0.5">
                   Lodging (₹)
                 </label>
                 <input
@@ -538,7 +490,7 @@ const handleSubmit = async (e) => {
                   name="lodging"
                   value={invoiceData.lodging}
                   onChange={handleChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className="w-full p-1 border border-gray-300 rounded-md text-sm"
                   readOnly={isReadOnly}
                   step="0.01"
                   min="0"
@@ -547,7 +499,7 @@ const handleSubmit = async (e) => {
 
               {/* Bank Details */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-0.5">
+                <label className="block text-xs font-medium text-gray-700 mb-0.5">
                   Bank Name
                 </label>
                 <input
@@ -555,13 +507,13 @@ const handleSubmit = async (e) => {
                   name="bankName"
                   value={invoiceData.bankName || ""}
                   onChange={handleChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className="w-full p-1 border border-gray-300 rounded-md text-sm"
                   readOnly={isReadOnly}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-0.5">
+                <label className="block text-xs font-medium text-gray-700 mb-0.5">
                   Account Number
                 </label>
                 <input
@@ -569,13 +521,13 @@ const handleSubmit = async (e) => {
                   name="accountNumber"
                   value={invoiceData.accountNumber || ""}
                   onChange={handleChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className="w-full p-1 border border-gray-300 rounded-md text-sm"
                   readOnly={isReadOnly}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-0.5">
+                <label className="block text-xs font-medium text-gray-700 mb-0.5">
                   IFSC Code
                 </label>
                 <input
@@ -583,13 +535,13 @@ const handleSubmit = async (e) => {
                   name="ifscCode"
                   value={invoiceData.ifscCode || ""}
                   onChange={handleChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className="w-full p-1 border border-gray-300 rounded-md text-sm"
                   readOnly={isReadOnly}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-0.5">
+                <label className="block text-xs font-medium text-gray-700 mb-0.5">
                   PAN Number
                 </label>
                 <input
@@ -597,14 +549,14 @@ const handleSubmit = async (e) => {
                   name="panNumber"
                   value={invoiceData.panNumber || ""}
                   onChange={handleChange}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className="w-full p-1 border border-gray-300 rounded-md text-sm"
                   readOnly={isReadOnly}
                 />
               </div>
 
               {/* GST Section */}
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs font-medium text-gray-700 mb-1">
                   GST Application
                 </label>
                 <div className="flex gap-4">
@@ -618,7 +570,7 @@ const handleSubmit = async (e) => {
                       disabled={isReadOnly || (invoiceData.gst !== "NA" && invoiceData.gst !== "")}
                       className="mr-2"
                     />
-                    <span className="text-sm">NA</span>
+                    <span className="text-xs">NA</span>
                   </label>
                   <label className="flex items-center">
                     <input
@@ -630,7 +582,7 @@ const handleSubmit = async (e) => {
                       disabled={isReadOnly || invoiceData.gst === "NA"}
                       className="mr-2"
                     />
-                    <span className="text-sm">0%</span>
+                    <span className="text-xs">0%</span>
                   </label>
                   <label className="flex items-center">
                     <input
@@ -642,54 +594,54 @@ const handleSubmit = async (e) => {
                       disabled={isReadOnly || invoiceData.gst === "NA"}
                       className="mr-2"
                     />
-                    <span className="text-sm">18%</span>
+                    <span className="text-xs">18%</span>
                   </label>
                 </div>
                 {invoiceData.gst === "NA" && (
-                  <p className="text-xs text-gray-500 mt-1">GST not applicable (trainer has no GST number)</p>
+                  <p className="text-xs text-gray-500 mt-0.5">GST not applicable (trainer has no GST number)</p>
                 )}
               </div>
             </div>
 
             {/* Calculation Summary */}
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h3 className="text-lg font-semibold text-blue-800 mb-4">Payment Summary</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center text-sm">
+            <div className="p-2 bg-blue-50 border border-blue-200 rounded-lg">
+              <h3 className="text-sm font-semibold text-blue-800 mb-2">Payment Summary</h3>
+              <div className="space-y-1 text-xs">
+                <div className="flex justify-between items-center">
                   <span className="font-medium">Training Fees:</span>
                   <span>₹{roundToNearestWhole((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0)).toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between items-center text-sm">
+                <div className="flex justify-between items-center">
                   <span className="font-medium">Conveyance (one-time):</span>
                   <span>₹{roundToNearestWhole(parseFloat(invoiceData.conveyance) || 0).toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between items-center text-sm">
+                <div className="flex justify-between items-center">
                   <span className="font-medium">Food:</span>
                   <span>₹{roundToNearestWhole(parseFloat(invoiceData.food) || 0).toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between items-center text-sm">
+                <div className="flex justify-between items-center">
                   <span className="font-medium">Lodging:</span>
                   <span>₹{roundToNearestWhole(parseFloat(invoiceData.lodging) || 0).toLocaleString()}</span>
                 </div>
 
-                <div className="border-t border-blue-300 pt-3">
-                  <div className="flex justify-between items-center text-sm font-semibold">
+                <div className="border-t border-blue-300 pt-1">
+                  <div className="flex justify-between items-center font-semibold">
                     <span className="text-blue-800">Total Amount:</span>
                     <span className="text-blue-800">₹{calculateTotalAmount().toLocaleString()}</span>
                   </div>
                 </div>
 
-                <div className="flex justify-between items-center text-sm">
+                <div className="flex justify-between items-center">
                   <span className="font-medium">TDS ({invoiceData.tds}% on Training Fees):</span>
                   <span>₹{roundToNearestWhole((((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0) * (parseFloat(invoiceData.tds) || 0)) / 100)).toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between items-center text-sm">
+                <div className="flex justify-between items-center">
                   <span className="font-medium">Adhoc Adjustment:</span>
                   <span>₹{roundToNearestWhole(parseFloat(invoiceData.adhocAdjustment) || 0).toLocaleString()}</span>
                 </div>
 
-                <div className="border-t border-blue-300 pt-3">
-                  <div className="flex justify-between items-center text-sm font-semibold">
+                <div className="border-t border-blue-300 pt-1">
+                  <div className="flex justify-between items-center font-semibold">
                     <span className="text-blue-800">Amount:</span>
                     <span className="text-blue-800">₹{(() => {
                       const trainingFees = roundToNearestWhole((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0));
@@ -700,7 +652,7 @@ const handleSubmit = async (e) => {
                   </div>
                 </div>
 
-                <div className="flex justify-between items-center text-sm">
+                <div className="flex justify-between items-center">
                   <span className="font-medium">GST ({invoiceData.gst === "NA" ? "NA" : invoiceData.gst + "%"}):</span>
                   <span className={invoiceData.gst === "18" ? "text-red-600" : ""}>₹{(() => {
                     const trainingFees = roundToNearestWhole((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0));
@@ -716,8 +668,8 @@ const handleSubmit = async (e) => {
                   })()}</span>
                 </div>
 
-                <div className="border-t-2 border-blue-400 pt-3 mt-4">
-                  <div className="flex justify-between items-center text-base font-bold text-green-600">
+                <div className="border-t-2 border-blue-400 pt-1 mt-2">
+                  <div className="flex justify-between items-center text-sm font-bold text-green-600">
                     <span>Net Payment:</span>
                     <span>₹{calculateNetPayment().toLocaleString()}</span>
                   </div>
@@ -725,20 +677,20 @@ const handleSubmit = async (e) => {
               </div>
             </div>
 
-            {/* Action Buttons for New Invoice */}
-            {!existingInvoice && !viewMode && (
-              <div className="flex justify-end space-x-2 pt-2 border-t border-gray-200">
+            {/* Action Buttons */}
+            {!viewMode && (
+              <div className="flex justify-end space-x-2 pt-1 border-t border-gray-200">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-3 py-1.5 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="px-2 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors text-sm"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isGenerating}
-                  className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                  className="px-2 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm"
                 >
                   {isGenerating ? "Generating..." : "Generate Invoice"}
                 </button>

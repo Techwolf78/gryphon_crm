@@ -12,7 +12,6 @@ import {
 import emailjs from "@emailjs/browser";
 import AddJDForm from "./AddJDForm";
 import CollegeSelection from "./CollegeSelection";
-import StudentModal from "./StudentModal";
 import TemplateDownloadModal from "./TemplateDownloadModal";
 import ExcelUploadModal from "./ExcelUploadModal";
 
@@ -55,7 +54,7 @@ const getStudentCurrentYear = (passingYear, course = "B.Tech") => {
   return courseDuration - yearsRemaining;
 };
 
-function AddJD({ show, onClose }) {
+function AddJD({ show, onClose, company }) {
   const [formData, setFormData] = useState({
     companyName: "",
     companyWebsite: "",
@@ -509,6 +508,49 @@ function AddJD({ show, onClose }) {
   };
 
   useEffect(() => {
+    if (show && company) {
+      // Pre-fill form with company data
+      setFormData(prev => ({
+        ...prev,
+        companyName: company.companyName || company.name || "",
+        companyWebsite: company.companyUrl || company.companyWebsite || "",
+      }));
+    } else if (!show) {
+      // Reset form when modal closes
+      setFormData({
+        companyName: "",
+        companyWebsite: "",
+        course: "",
+        specialization: [],
+        passingYear: "",
+        gender: "",
+        marksCriteria: "",
+        otherCriteria: "",
+        jobType: "",
+        jobDesignation: "",
+        jobLocation: "",
+        salary: "",
+        internshipDuration: "",
+        stipend: "",
+        modeOfInterview: "",
+        joiningPeriod: "",
+        companyOpenDate: "",
+        modeOfWork: "",
+        jobDescription: "",
+        source: "",
+        coordinator: "",
+        status: "ongoing",
+        createdAt: serverTimestamp(),
+      });
+      setCurrentStep(1);
+      setSelectedColleges([]);
+      setFormErrors({});
+      setSubmissionError(null);
+      setEmailSent(false);
+    }
+  }, [show, company]);
+
+  useEffect(() => {
     if (show) {
       fetchPlacementUsers();
     }
@@ -524,7 +566,7 @@ function AddJD({ show, onClose }) {
     <div className="fixed inset-0 z-52 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden">
         {/* Modal Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center">
+        <div className="bg-linear-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center">
           <h2 className="text-xl font-semibold text-white">
             {currentStep === 1 ? "Add JD Form" : "Select Colleges"}
           </h2>
@@ -648,13 +690,7 @@ function AddJD({ show, onClose }) {
           </>
         )}
 
-        {/* Student Data Modal */}
-        <StudentModal
-          viewingCollege={viewingCollege}
-          studentsData={studentsData}
-          isLoadingStudents={isLoadingStudents}
-          closeStudentView={closeStudentView}
-        />
+       
 
         {/* Template Download Modal */}
         <TemplateDownloadModal

@@ -178,9 +178,9 @@ const AiBot = ({ isOpen, onClose }) => {
 
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-end justify-end p-4 md:p-6">
+    <div className="fixed inset-0 z-9999 flex items-end justify-end p-4 md:p-6">
       <div
-        className="absolute inset-0 bg-gradient-to-br from-slate-900/40 via-slate-800/30 to-blue-900/40 backdrop-blur-lg transition-all duration-300"
+        className="absolute inset-0 bg-linear-to-br from-slate-900/40 via-slate-800/30 to-blue-900/40 backdrop-blur-lg transition-all duration-300"
         onClick={onClose}
         aria-label="Close chat"
         tabIndex={0}
@@ -202,17 +202,17 @@ const AiBot = ({ isOpen, onClose }) => {
         aria-labelledby="chat-title"
         aria-modal="true"
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between p-3 border-b border-slate-200/60 bg-gradient-to-r from-white/90 via-slate-50/90 to-white/90 backdrop-blur-md rounded-t-3xl">
+        <div className="sticky top-0 z-10 flex items-center justify-between p-3 border-b border-slate-200/60 bg-linear-to-r from-white/90 via-slate-50/90 to-white/90 backdrop-blur-md rounded-t-3xl">
           <div className="flex items-center space-x-3">
             <div className="relative">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 via-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg ring-2 ring-blue-200/40 animate-fadeIn">
+              <div className="w-8 h-8 bg-linear-to-br from-blue-500 via-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg ring-2 ring-blue-200/40 animate-fadeIn">
                 <FiZap className="w-4 h-4 text-white" />
               </div>
             </div>
             <div>
               <h3
                 id="chat-title"
-                className="text-base font-extrabold bg-gradient-to-r from-slate-800 to-blue-700 bg-clip-text text-transparent tracking-tight"
+                className="text-base font-extrabold bg-linear-to-r from-slate-800 to-blue-700 bg-clip-text text-transparent tracking-tight"
               >
                 Gryphon Sales AI Assistant
               </h3>
@@ -255,12 +255,12 @@ const AiBot = ({ isOpen, onClose }) => {
                   <div
                     className={`flex max-w-[85%] ${msg.type === "user" ? "flex-row-reverse" : "flex-row"} items-start space-x-3`}
                   >
-                    <div className={`flex-shrink-0 ${msg.type === "user" ? "ml-2" : "mr-2"}`}>
+                    <div className={`shrink-0 ${msg.type === "user" ? "ml-2" : "mr-2"}`}>
                       <div
                         className={`w-7 h-7 rounded-full flex items-center justify-center shadow-md ring-2 ring-blue-100/40 ${
                           msg.type === "user"
-                            ? "bg-gradient-to-br from-blue-500 to-blue-700"
-                            : "bg-gradient-to-br from-slate-100 to-slate-200"
+                            ? "bg-linear-to-br from-blue-500 to-blue-700"
+                            : "bg-linear-to-br from-slate-100 to-slate-200"
                         } transition-all duration-200`}
                       >
                         {msg.type === "user" ? (
@@ -276,8 +276,8 @@ const AiBot = ({ isOpen, onClose }) => {
                           relative px-4 py-2 rounded-2xl shadow-lg transition-all duration-200 hover:shadow-xl
                           ${
                             msg.type === "user"
-                              ? "bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-200"
-                              : "bg-gradient-to-br from-white to-slate-50/70 text-slate-800 border border-slate-200/60 backdrop-blur-md"
+                              ? "bg-linear-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-200"
+                              : "bg-linear-to-br from-white to-slate-50/70 text-slate-800 border border-slate-200/60 backdrop-blur-md"
                           }
                           ${msg.type === "user" ? "rounded-br-md" : "rounded-bl-md"}
                           group
@@ -351,13 +351,13 @@ const AiBot = ({ isOpen, onClose }) => {
             {loading && (
               <div className="flex justify-start animate-fadeIn">
                 <div className="flex max-w-[85%] flex-row items-start space-x-3">
-                  <div className="flex-shrink-0 mr-2">
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center shadow-md ring-2 ring-blue-100/40 bg-gradient-to-br from-slate-100 to-slate-200">
+                  <div className="shrink-0 mr-2">
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center shadow-md ring-2 ring-blue-100/40 bg-linear-to-br from-slate-100 to-slate-200">
                       <FiZap className="w-4 h-4 text-blue-600 animate-pulse" />
                     </div>
                   </div>
                   <div className="flex flex-col items-start">
-                    <div className="relative px-4 py-2 rounded-2xl shadow-lg bg-gradient-to-br from-white to-slate-50/70 text-slate-800 border border-slate-200/60 backdrop-blur-md rounded-bl-md">
+                    <div className="relative px-4 py-2 rounded-2xl shadow-lg bg-linear-to-br from-white to-slate-50/70 text-slate-800 border border-slate-200/60 backdrop-blur-md rounded-bl-md">
                       <div className="text-sm leading-relaxed font-medium">Thinking...</div>
                     </div>
                   </div>
@@ -367,7 +367,7 @@ const AiBot = ({ isOpen, onClose }) => {
             <div ref={messagesEndRef} />
           </div>
         </div>
-        <div className="border-t border-slate-200/60 bg-gradient-to-r from-white/90 via-slate-50/60 to-white/90 backdrop-blur-md p-4 rounded-b-3xl">
+        <div className="border-t border-slate-200/60 bg-linear-to-r from-white/90 via-slate-50/60 to-white/90 backdrop-blur-md p-4 rounded-b-3xl">
           <form
             className="flex items-end space-x-3"
             onSubmit={(e) => {
@@ -401,7 +401,7 @@ const AiBot = ({ isOpen, onClose }) => {
             <button
               type="submit"
               disabled={!inputMessage.trim() || loading}
-              className="flex-shrink-0 w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-700 text-white rounded-xl hover:from-blue-600 hover:to-blue-800 transition-all duration-200 disabled:from-slate-300 disabled:to-slate-400 disabled:cursor-not-allowed flex items-center justify-center shadow-xl hover:shadow-2xl disabled:shadow-md transform hover:scale-105 disabled:hover:scale-100 ring-2 ring-blue-200/60 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="shrink-0 w-10 h-10 bg-linear-to-r from-blue-500 to-blue-700 text-white rounded-xl hover:from-blue-600 hover:to-blue-800 transition-all duration-200 disabled:from-slate-300 disabled:to-slate-400 disabled:cursor-not-allowed flex items-center justify-center shadow-xl hover:shadow-2xl disabled:shadow-md transform hover:scale-105 disabled:hover:scale-100 ring-2 ring-blue-200/60 focus:outline-none focus:ring-2 focus:ring-blue-500"
               aria-label="Send message"
             >
               <FiSend className="w-5 h-5 transform transition-transform hover:translate-x-0.5" />

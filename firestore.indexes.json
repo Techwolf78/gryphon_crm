@@ -163,6 +163,16 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "companyleads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "batchSize",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

@@ -68,8 +68,8 @@ function DateBookingsModal({ dateBookings, date, onClose, onBookingDetail }) {
       aria-label={`All bookings for ${formattedDate}`}
       className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/40"
     >
-      <div className="w-full max-w-2xl bg-white rounded-xl shadow-2xl p-5 max-h-[80vh] overflow-hidden flex flex-col">
-        <div className="flex items-start justify-between mb-4">
+      <div className="w-full max-w-2xl bg-white rounded-xl shadow-2xl p-5 max-h-[95vh] overflow-hidden flex flex-col">
+        <div className="flex items-start justify-between mb-2">
           <div>
             <h4 className="text-lg font-semibold text-gray-900">All Bookings</h4>
             <p className="text-sm text-gray-500">{dayName}, {formattedDate}</p>
@@ -128,7 +128,7 @@ function DateBookingsModal({ dateBookings, date, onClose, onBookingDetail }) {
           </div>
         </div>
 
-        <div className="mt-4 pt-4 border-t border-gray-200 text-right">
+        <div className="mt-2 pt-2 border-t border-gray-200 text-right">
           <button
             onClick={onClose}
             className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -520,15 +520,6 @@ function TrainerCalendar({
 
           <div className="flex items-center gap-3 ml-auto">
             <ViewToggle />
-            {embedded && (
-              <button
-                type="button"
-                onClick={() => { if (onBack) onBack(); }}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                Back
-              </button>
-            )}
             <div className="relative">
               <button
                 onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
@@ -572,6 +563,16 @@ function TrainerCalendar({
                 </>
               )}
             </div>
+            {embedded && (
+              <button
+                type="button"
+                onClick={() => { if (onBack) onBack(); }}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-black text-white border border-black hover:bg-gray-900 hover:border-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2 shadow-sm hover:shadow-md transition-all duration-200"
+              >
+                <FiChevronLeft className="w-4 h-4" />
+                Back
+              </button>
+            )}
             {!embedded && (
               <button
                 onClick={onClose}

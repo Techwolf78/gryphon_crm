@@ -573,7 +573,7 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
 
   return (
     <>
-      <div className="fixed inset-0 backdrop-blur-sm overflow-y-auto h-full w-full z-[50]">
+      <div className="fixed inset-0 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
         <div className="relative top-20 mx-auto p-5 border w-full bg-white min-h-screen overflow-y-auto">
           <div className="mt-3">
             <div className="flex items-center justify-between mb-4">
@@ -633,7 +633,7 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                       Configure training details for {selectedColleges?.length > 1 ? 'merged colleges' : 'college'} ({selectedColleges?.length || 0} college{selectedColleges?.length !== 1 ? 's' : ''})
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-2 mb-2 min-h-[32px]">
+                  <div className="flex flex-wrap gap-2 mb-2 min-h-8">
                     {selectedColleges.map((college) => (
                       <span
                         key={college.id}
@@ -675,7 +675,7 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                     </p>
                   </div>
                   {/* JD Domain Display */}
-                  <div className="flex flex-wrap gap-2 mb-2 min-h-[32px]">
+                  <div className="flex flex-wrap gap-2 mb-2 min-h-8">
                     <span className="flex items-center bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs font-medium">
                       JD
                       <span className="ml-1 text-blue-600">
@@ -731,7 +731,7 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                 {error && (
                   <div className="rounded bg-red-50 border border-red-200 p-3">
                     <div className="flex">
-                      <div className="flex-shrink-0">
+                      <div className="shrink-0">
                         <FiAlertCircle className="h-4 w-4 text-red-400" />
                       </div>
                       <div className="ml-2">
@@ -746,7 +746,7 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                 {success && (
                   <div className="rounded bg-green-50 border border-green-200 p-3">
                     <div className="flex">
-                      <div className="flex-shrink-0">
+                      <div className="shrink-0">
                         <FiCheck className="h-4 w-4 text-green-400" />
                       </div>
                       <div className="ml-2">
@@ -762,7 +762,7 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                 {hasValidationErrors() && (
                   <div className="rounded bg-red-50 border border-red-200 p-3">
                     <div className="flex items-start">
-                      <div className="flex-shrink-0">
+                      <div className="shrink-0">
                         <FiAlertCircle className="h-4 w-4 text-red-400" />
                       </div>
                       <div className="ml-3">

@@ -30,7 +30,7 @@ const Roadmap = () => {
         <div className="overflow-x-auto">
           <div className="min-w-[600px] md:min-w-[1200px] bg-white rounded-2xl shadow-2xl border border-gray-100 p-0 md:p-0">
             {/* Gradient Header */}
-            <div className="rounded-t-2xl bg-gradient-to-r from-blue-100 via-white to-amber-50 px-6 py-2 md:px-12 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="rounded-t-2xl bg-linear-to-r from-blue-100 via-white to-amber-50 px-6 py-2 md:px-12 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
                 <h4 className="text-2xl md:text-3xl font-bold mb-1 tracking-tight">
                   <span className="text-black">SYNC</span>

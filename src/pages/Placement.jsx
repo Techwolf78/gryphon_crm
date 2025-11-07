@@ -8,6 +8,7 @@ import CompanyLeads from "../components/Placement/CompanyLeads/CompanyLeads";
 import MouPreviewModal from "../components/Placement/MouPreviewModal";
 import PlacementDetailsModal from "../components/Placement/PlacementDetailsModal";
 import { Eye, User, FileText } from "lucide-react";
+import BudgetDashboard from "../components/Budget/BudgetDashboard";
 
 function Placement() {
   const [trainingData, setTrainingData] = useState([]);
@@ -52,7 +53,7 @@ function Placement() {
 
   // Get active tab index for sliding indicator
   const getActiveTabIndex = () => {
-    const tabs = ["training", "placement", "leads"];
+    const tabs = ["training", "placement", "leads", "budget"];
     return tabs.indexOf(activeTab);
   };
 
@@ -68,14 +69,6 @@ function Placement() {
         ...doc.data(),
       }));
       setTrainingData(trainingData);
-
-      // Fetch leads
-      const leadsSnapshot = await getDocs(collection(db, "leads"));
-      const leadsData = leadsSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setLeads(leadsData);
 
       // Fetch progress for each trainingData
       const progressPromises = trainingData.map(async (item) => {
@@ -211,9 +204,9 @@ function Placement() {
   };
 
   return (
-    <div className="p-0">
+    <div className="p-0 -mt-2">
       <style>{tableStyles}</style>
-      <h2 className="text-2xl font-bold mb-1 text-blue-800">
+      <h2 className="text-2xl font-bold mb-1 text-blue-800 mt-0">
         Placement Management
       </h2>
 
@@ -238,7 +231,7 @@ function Placement() {
       {!loading && !error && (
         <>
           {/* Enhanced Tab Navigation with Sliding Indicator */}
-          <div className="relative mb-4">
+          <div className="relative mb-2">
             <div className="flex border-b border-gray-200">
               <button
                 className={`flex-1 px-6 py-2 font-medium text-sm transition-all duration-150 ${
@@ -271,14 +264,25 @@ function Placement() {
                 onClick={() => setActiveTab("leads")}
                 data-tour="leads-tab"
               >
-                Company Leads ({leads.length})
+                Company Leads
+              </button>
+              <button
+                className={`flex-1 px-6 py-2 font-medium text-sm transition-all duration-150 ${
+                  activeTab === "budget"
+                    ? "text-blue-600 bg-blue-50"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+                onClick={() => setActiveTab("budget")}
+                data-tour="budget-tab"
+              >
+                Budget
               </button>
             </div>
             {/* Sliding Indicator */}
             <div
               className="absolute bottom-0 h-0.5 bg-blue-600 transition-transform duration-150 ease-out"
               style={{
-                width: "33.333%",
+                width: "25%", // Changed from 33.333% to 25% for 4 tabs
                 transform: `translateX(${getActiveTabIndex() * 100}%)`,
               }}
             ></div>
@@ -311,7 +315,7 @@ function Placement() {
               ) : (
                 <div className="border border-gray-300 rounded-lg animate-fadeIn">
                   <table className="min-w-full divide-y divide-gray-200 border border-gray-300 rounded-lg">
-                    <thead className="bg-gradient-to-r from-blue-500 via-indigo-600 to-indigo-700 text-white rounded-t-lg">
+                    <thead className="bg-linear-to-r from-blue-500 via-indigo-600 to-indigo-700 text-white rounded-t-lg">
                       <tr>
                         <th
                           scope="col"
@@ -572,6 +576,13 @@ function Placement() {
                 setSelectedLead(lead);
                 setActiveTab("placement");
               }}
+            />
+          )}
+
+          {activeTab === "budget" && (
+            <BudgetDashboard
+              department="placement"
+              dashboardTitle="Placement Department Budget"
             />
           )}
 
