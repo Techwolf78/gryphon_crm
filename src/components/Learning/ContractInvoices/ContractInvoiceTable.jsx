@@ -284,62 +284,53 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
   if (invoiceType === "Cash Invoice") prefix = "CI";
 
   try {
-    const [invoicesSnapshot, proformaSnapshot] = await Promise.all([
-      getDocs(query(collection(db, "ContractInvoices"), 
-        where("financialYear", "==", financialYear.year))),
-      getDocs(query(collection(db, "ProformaInvoices"), 
-        where("financialYear", "==", financialYear.year))),
-    ]);
+    // ✅ Tax aur Cash invoices ke liye ContractInvoices se
+    const invoicesSnapshot = await getDocs(
+      query(collection(db, "ContractInvoices"), 
+        where("financialYear", "==", financialYear.year),
+        where("invoiceType", "in", ["Tax Invoice", "Cash Invoice"]))
+    );
 
-    // Combine existing invoices from database
-    const allInvoices = [
-      ...invoicesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-      ...proformaSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-    ];
+    // ✅ Proforma invoices ke liye alag collection se
+    const proformaSnapshot = await getDocs(
+      query(collection(db, "ProformaInvoices"), 
+        where("financialYear", "==", financialYear.year))
+    );
 
-    // Filter current financial year invoices
-    const currentFYInvoices = allInvoices.filter((inv) => {
-      if (!inv.invoiceNumber) return false;
-      return inv.invoiceNumber.includes(financialYear.year);
-    });
+    // ✅ Invoice type ke hisaab se filter karo
+    let relevantInvoices = [];
+    
+    if (invoiceType === "Proforma Invoice") {
+      relevantInvoices = proformaSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } else {
+      relevantInvoices = invoicesSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(inv => inv.invoiceType === invoiceType);
+    }
 
-    // Extract sequential numbers from ALL invoice types
-    const invoiceNumbers = currentFYInvoices
+    // ✅ Sirf usi type ke invoices count karo
+    const invoiceNumbers = relevantInvoices
       .map((inv) => {
         const parts = inv.invoiceNumber.split("/");
         if (parts.length !== 4) return 0;
         const sequentialPart = parts[3];
         if (/^\d+$/.test(sequentialPart)) {
-          const num = parseInt(sequentialPart, 10);
-          return isNaN(num) ? 0 : num;
+          return parseInt(sequentialPart, 10);
         }
         return 0;
       })
       .filter((num) => num > 0);
 
-    // Also consider locally generated numbers in this session
-    const localNumbers = Array.from(locallyGeneratedNumbers)
-      .map(num => parseInt(num))
-      .filter(num => !isNaN(num) && num > 0);
-
-    const allNumbers = [...invoiceNumbers, ...localNumbers];
-    
-    // Find the lowest available number starting from 1
-    let nextInvoiceNumber = 1;
-    const usedNumbers = new Set(allNumbers);
-    while (usedNumbers.has(nextInvoiceNumber)) {
-      nextInvoiceNumber++;
+    // ✅ Next number find karo
+    let nextNumber = 1;
+    while (invoiceNumbers.includes(nextNumber)) {
+      nextNumber++;
     }
 
-    // Update local tracking
-    setLocallyGeneratedNumbers(prev => new Set([...prev, nextInvoiceNumber]));
+    const invoiceNumber = nextNumber.toString().padStart(2, "0");
+    return `GAPL/${financialYear.year}/${prefix}/${invoiceNumber}`;
 
-    const invoiceNumber = nextInvoiceNumber.toString().padStart(2, "0");
-    const finalInvoiceNumber = `GAPL/${financialYear.year}/${prefix}/${invoiceNumber}`;
-
-    return finalInvoiceNumber;
-  } catch {
-    // Fallback with timestamp to ensure uniqueness
+  } catch (error) {
     const fallbackNumber = `GAPL/${financialYear.year}/${prefix}/F${Date.now().toString().slice(-2)}`;
     return fallbackNumber;
   }
