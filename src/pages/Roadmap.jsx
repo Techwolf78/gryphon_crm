@@ -3,7 +3,7 @@ import React from "react";
 const Roadmap = () => {
 
   return (
-    <div className="min-h-screen bg-gray-50 ">
+    <div className="min-h-screen bg-white ">
       <div className="mx-auto">
         <div className="">
           {/* <button
@@ -28,7 +28,7 @@ const Roadmap = () => {
         </div>
 
         <div className="overflow-x-auto">
-          <div className="min-w-[600px] md:min-w-[1200px] bg-white rounded-2xl shadow-2xl border border-gray-100 p-0 md:p-0">
+          <div className="min-w-[700px] md:min-w-[1400px] bg-white rounded-2xl shadow-2xl border border-gray-100 p-0 md:p-0">
             {/* Gradient Header */}
             <div className="rounded-t-2xl bg-linear-to-r from-blue-100 via-white to-amber-50 px-6 py-2 md:px-12 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
@@ -95,8 +95,8 @@ const Roadmap = () => {
               {/* Months Header */}
               <div className="flex items-center mb-2">
                 <div className="min-w-[120px] md:min-w-[180px]"></div>
-                <div className="flex-1 pl-12 grid grid-cols-6 gap-2">
-                  {["Jun", "Jul", "Aug", "Sep", "Oct", "Nov"].map(
+                <div className="flex-1 pl-12 grid grid-cols-7 gap-2">
+                  {["Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map(
                     (m) => (
                       <div key={m} className="flex flex-col items-center">
                         <div className="flex items-center">
@@ -132,7 +132,7 @@ const Roadmap = () => {
                     label: "Sales Phase",
                     start: 0,
                     span: 2,
-                    color: "bg-green-500",
+                    color: "bg-green-500/80",
                     status: "Completed (1 Jun-30 Jul)",
                     icon: (
                       <svg
@@ -156,7 +156,7 @@ const Roadmap = () => {
                     label: "Initial Testing",
                     start: 0,
                     span: 2,
-                    color: "bg-green-400",
+                    color: "bg-green-400/80",
                     status: "Completed (1 Jul-30 Jul)",
                     icon: (
                       <svg
@@ -180,7 +180,7 @@ const Roadmap = () => {
                     label: "Learning & Development",
                     start: 1,
                     span: 3,
-                    color: "bg-green-500",
+                    color: "bg-green-500/80",
                     status: "Completed (15 Jul-30 Sep)",
                     icon: (
                       <svg
@@ -204,8 +204,8 @@ const Roadmap = () => {
                     label: "Comprehensive Testing (L&D)",
                     start: 3,
                     span: 2,
-                    color: "bg-amber-400",
-                    status: "In Progress (1 Sep-15 Oct)",
+                    color: "bg-amber-400/80",
+                    status: "In Progress (1 Sep-30 Oct)",
                     icon: (
                       <svg
                         className="w-4 h-4 mr-2 animate-spin"
@@ -224,14 +224,35 @@ const Roadmap = () => {
                       </svg>
                     ),
                     text: "text-white",
-                    desc: "Comprehensive QA, fine-tuning processes, and optimization/scalability.",
+                    desc: "Comprehensive QA and fine-tuning processes.<br />Optimization and scalability.",
+                  },
+                  {
+                    label: "HR",
+                    start: 3,
+                    span: 2,
+                    color: "bg-gray-200/80",
+                    status: "Pending (1 Sep-30 Oct)",
+                    icon: (
+                      <svg
+                        className="w-4 h-4 mr-2"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 8v4l2 2" />
+                      </svg>
+                    ),
+                    text: "text-gray-700",
+                    desc: "Trainer bill management and contract invoice processing.<br />Purchase order processing.",
                   },
                   {
                     label: "Placement Phase",
                     start: 4,
-                    span: 1,
-                    color: "bg-gray-200",
-                    status: "Pending (15 Oct-25 Oct)",
+                    span: 2,
+                    color: "bg-gray-200/80",
+                    status: "Pending (10 Oct-20 Nov)",
                     icon: (
                       <svg
                         className="w-4 h-4 mr-2"
@@ -249,10 +270,10 @@ const Roadmap = () => {
                   },
                   {
                     label: "Digital Marketing",
-                    start: 4,
+                    start: 5,
                     span: 2,
-                    color: "bg-gray-500",
-                    status: "Pending (25 Oct-15 Nov)",
+                    color: "bg-gray-500/80",
+                    status: "Pending (25 Nov-15 Dec)",
                     icon: (
                       <svg
                         className="w-4 h-4 mr-2"
@@ -281,7 +302,7 @@ const Roadmap = () => {
                           dangerouslySetInnerHTML={{ __html: row.desc }}
                         ></span>
                       </div>
-                      <div className="flex-1 pl-12 grid grid-cols-6 gap-2">
+                      <div className="flex-1 pl-12 grid grid-cols-7 gap-2">
                         {[...Array(row.start)].map((_, idx) => (
                           <div key={idx}></div>
                         ))}
@@ -295,7 +316,7 @@ const Roadmap = () => {
                             {row.status}
                           </span>
                         </div>
-                        {[...Array(6 - row.start - row.span)].map(
+                        {[...Array(7 - row.start - row.span)].map(
                           (_, idx) => (
                             <div key={idx}></div>
                           )
