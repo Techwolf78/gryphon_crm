@@ -21,7 +21,6 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
     { displayName: 'CGPA', fieldName: 'cgpa' },
     { displayName: 'ACTIVE BACKLOGS', fieldName: 'activeBacklogs' },
     { displayName: 'GENDER', fieldName: 'gender' },
-    { displayName: 'STATUS', fieldName: 'status' },
     { displayName: 'COLLEGE', fieldName: 'college' },
     { displayName: 'UPLOAD DATE', fieldName: 'uploadedAt' }
   ];
@@ -206,20 +205,7 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
               />
             </div>
 
-            {/* Status Filter */}
-            <div>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="all">All Status</option>
-                <option value="submitted">Submitted</option>
-                <option value="shortlisted">Shortlisted</option>
-                <option value="rejected">Rejected</option>
-              </select>
-            </div>
-
+          
             {/* Export Button */}
             <div>
               <button
