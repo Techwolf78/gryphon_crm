@@ -279,38 +279,34 @@ const [locallyGeneratedNumbers, setLocallyGeneratedNumbers] = useState(new Set()
 
 const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
   const financialYear = getCurrentFinancialYear();
-  let prefix = "TI";
-  let collectionName = "ContractInvoices";
-  
-  if (invoiceType === "Proforma Invoice") {
-    prefix = "PI";
-    collectionName = "ProformaInvoices";
-  }
-  if (invoiceType === "Cash Invoice") {
-    prefix = "CI";
-    collectionName = "ContractInvoices"; // Cash invoices also in ContractInvoices
-  }
+  let prefix = "TI"; // Default for Tax Invoice
+  if (invoiceType === "Proforma Invoice") prefix = "PI";
+  if (invoiceType === "Cash Invoice") prefix = "CI";
 
   try {
-    // Sirf usi type ke invoices fetch karo
+    // Har invoice type ke liye alag collection mein search karo
+    let collectionName = "ContractInvoices"; // Tax aur Cash invoices yahan hain
+    if (invoiceType === "Proforma Invoice") {
+      collectionName = "ProformaInvoices";
+    }
+
     const invoicesSnapshot = await getDocs(
       query(
-        collection(db, collectionName), 
+        collection(db, collectionName),
         where("financialYear", "==", financialYear.year),
         where("invoiceType", "==", invoiceType)
       )
     );
 
-    // Current financial year ke usi type ke invoices
+    // Current financial year ke invoices filter karo
     const currentFYInvoices = invoicesSnapshot.docs
       .map((doc) => ({ id: doc.id, ...doc.data() }))
       .filter((inv) => {
         if (!inv.invoiceNumber) return false;
-        return inv.invoiceNumber.includes(financialYear.year) && 
-               inv.invoiceNumber.includes(prefix);
+        return inv.invoiceNumber.includes(financialYear.year);
       });
 
-    // Extract sequential numbers from SAME TYPE ONLY
+    // Sirf isi invoice type ke numbers extract karo
     const invoiceNumbers = currentFYInvoices
       .map((inv) => {
         const parts = inv.invoiceNumber.split("/");
@@ -324,29 +320,38 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
       })
       .filter((num) => num > 0);
 
-    // Also consider locally generated numbers of SAME TYPE
+    // Locally generated numbers bhi check karo (sirf isi type ke)
     const localNumbers = Array.from(locallyGeneratedNumbers)
-      .map(num => parseInt(num))
+      .filter(numStr => {
+        const parts = numStr.split('-');
+        return parts.length === 2 && parts[0] === prefix;
+      })
+      .map(numStr => {
+        const parts = numStr.split('-');
+        return parseInt(parts[1]);
+      })
       .filter(num => !isNaN(num) && num > 0);
 
     const allNumbers = [...invoiceNumbers, ...localNumbers];
     
-    // Find the lowest available number starting from 1 for THIS TYPE
+    // Lowest available number find karo starting from 1
     let nextInvoiceNumber = 1;
     const usedNumbers = new Set(allNumbers);
     while (usedNumbers.has(nextInvoiceNumber)) {
       nextInvoiceNumber++;
     }
 
-    // Update local tracking
-    setLocallyGeneratedNumbers(prev => new Set([...prev, nextInvoiceNumber]));
+    // Local tracking update karo with type prefix
+    const trackingKey = `${prefix}-${nextInvoiceNumber}`;
+    setLocallyGeneratedNumbers(prev => new Set([...prev, trackingKey]));
 
     const invoiceNumber = nextInvoiceNumber.toString().padStart(2, "0");
     const finalInvoiceNumber = `GAPL/${financialYear.year}/${prefix}/${invoiceNumber}`;
 
     return finalInvoiceNumber;
   } catch (error) {
-    // Fallback with timestamp to ensure uniqueness
+    console.error("Error generating invoice number:", error);
+    // Fallback with timestamp
     const fallbackNumber = `GAPL/${financialYear.year}/${prefix}/F${Date.now().toString().slice(-2)}`;
     return fallbackNumber;
   }
@@ -557,18 +562,20 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
       console.log("Successfully deleted invoice from Firestore");
 
       // Remove the undone invoice number from local tracking to allow reuse
-      const parts = invoice.invoiceNumber.split("/");
-      if (parts.length === 4) {
-        const sequentialPart = parts[3];
-        const num = parseInt(sequentialPart, 10);
-        if (!isNaN(num)) {
-          setLocallyGeneratedNumbers(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(num);
-            return newSet;
-          });
-        }
-      }
+ const parts = invoice.invoiceNumber.split("/");
+  if (parts.length === 4) {
+    const prefix = parts[2]; // PI, TI, CI
+    const sequentialPart = parts[3];
+    const num = parseInt(sequentialPart, 10);
+    if (!isNaN(num)) {
+      const trackingKey = `${prefix}-${num}`;
+      setLocallyGeneratedNumbers(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(trackingKey);
+        return newSet;
+      });
+    }
+  }
 
       // If this is a converted Tax invoice, also delete the original Proforma
       if (invoice.convertedFromProforma) {
