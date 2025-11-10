@@ -124,8 +124,8 @@ const PaymentInfoSection = ({ formData, setFormData }) => {
   ]);
 
   return (
-    <section className="p-5 bg-white rounded-xl shadow-lg space-y-6">
-      <h3 className="font-semibold text-2xl text-blue-700 border-b pb-3">Payment Information</h3>
+    <section className="p-4 bg-white rounded-xl shadow-lg space-y-4">
+      <h3 className="font-semibold text-xl text-blue-700 border-b pb-3">Payment Information</h3>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
@@ -300,7 +300,7 @@ const PaymentInfoSection = ({ formData, setFormData }) => {
           </div>
 
           {autoEmiSplits.length > 0 && (
-            <div className="p-5 bg-blue-50 rounded-lg shadow-md space-y-3">
+            <div className="p-4 bg-blue-50 rounded-lg shadow-md space-y-3">
               <h4 className="text-lg font-bold text-blue-800">
                 Installments Summary (1 to {formData.emiMonths})
               </h4>

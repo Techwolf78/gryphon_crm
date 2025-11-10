@@ -5,12 +5,12 @@ const POCInfoSection = ({ formData, handleChange }) => {
     "w-full px-3 py-2 border rounded-lg border-gray-300 focus:outline-none focus:ring focus:ring-blue-400 transition";
 
   return (
-    <section className="p-5 bg-white rounded-xl shadow space-y-6">
-      <h3 className="font-semibold text-2xl text-blue-700 border-b pb-2">POC Information</h3>
+    <section className="p-4 bg-white rounded-xl shadow space-y-4">
+      <h3 className="font-semibold text-xl text-blue-700 border-b pb-2">POC Information</h3>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* TPO */}
-        <div className="space-y-2">
+        <div className="space-y-1">
           <label className="font-medium">TPO Name <span className="text-red-500">*</span></label>
           <input
             name="tpoName"
@@ -43,7 +43,7 @@ const POCInfoSection = ({ formData, handleChange }) => {
         </div>
 
         {/* Training Coordinator */}
-        <div className="space-y-2">
+        <div className="space-y-1">
           <label className="font-medium">Training Name</label>
           <input
             name="trainingName"
@@ -73,7 +73,7 @@ const POCInfoSection = ({ formData, handleChange }) => {
         </div>
 
         {/* Accounts */}
-        <div className="space-y-2">
+        <div className="space-y-1">
           <label className="font-medium">Account Name</label>
           <input
             name="accountName"

@@ -6,6 +6,7 @@ import { XIcon } from "@heroicons/react/outline";
 import CompanyDetailsModal from "./CompanyDetailsModal";
 import CompanyHeader from "./CompanyHeader";
 import CompanyTable from "./CompanyTable";
+import PlacedStudent from "./PlacedStudent";
 
 // Function to get college abbreviation
 const getCollegeAbbreviation = (collegeName) => {
@@ -23,7 +24,6 @@ function CompanyOpen() {
   const [activeTab, setActiveTab] = useState("ongoing");
   const [loading, setLoading] = useState(true);
   const [showJDForm, setShowJDForm] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(null);
   const [filters, setFilters] = useState({});
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -31,6 +31,8 @@ function CompanyOpen() {
   const [error, setError] = useState(null);
   const [students, setStudents] = useState([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
+  const [showPlacedStudent, setShowPlacedStudent] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const fetchCompanies = async () => {
     try {
@@ -106,30 +108,37 @@ function CompanyOpen() {
   const updateCompanyStatus = async (companyId, newStatus) => {
     try {
       // Mark as transitioning for animation
-      setCompanies(prev => prev.map(company => 
-        company.id === companyId 
+      setCompanies(prev => prev.map(company =>
+        company.id === companyId
           ? { ...company, isTransitioning: true }
           : company
       ));
 
       // Update in Firebase
       const companyRef = doc(db, "companies", companyId);
-      await updateDoc(companyRef, { 
+      await updateDoc(companyRef, {
         status: newStatus,
         updatedAt: new Date()
       });
 
-      // Wait for animation, then refetch to update all data
-      setTimeout(() => {
-        fetchCompanies();
-        setDropdownOpen(null);
-      }, 300); // Match animation duration
+      // Switch to the new status tab immediately for smooth UX
+      setActiveTab(newStatus);
+
+      // Update local state optimistically
+      setCompanies(prev => prev.map(company =>
+        company.id === companyId
+          ? { ...company, status: newStatus, isTransitioning: false, updatedAt: new Date() }
+          : company
+      ));
+
+      // Close dropdown immediately
+      setDropdownOpen(null);
 
     } catch (error) {
       console.error("Error updating company status:", error);
       // Revert transition state on error
-      setCompanies(prev => prev.map(company => 
-        company.id === companyId 
+      setCompanies(prev => prev.map(company =>
+        company.id === companyId
           ? { ...company, isTransitioning: false }
           : company
       ));
@@ -187,19 +196,19 @@ function CompanyOpen() {
 
   if (loading) {
     return (
-      <div className="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen p-6 flex justify-center items-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      <div className="bg-linear-to-br from-gray-50 to-gray-100 min-h-screen p-2 flex justify-center items-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen p-6">
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
+      <div className="bg-linear-to-br from-gray-50 to-gray-100 min-h-screen p-2">
+        <div className="bg-red-50 border-l-4 border-red-500 p-3 rounded-lg">
           <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <div className="shrink-0">
+              <svg className="h-4 w-4 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
               </svg>
             </div>
@@ -207,7 +216,7 @@ function CompanyOpen() {
               <p className="text-sm text-red-700">{error}</p>
               <button
                 onClick={fetchCompanies}
-                className="mt-2 text-sm text-red-500 hover:text-red-700 font-medium"
+                className="mt-1 text-sm text-red-500 hover:text-red-700 font-medium"
               >
                 Retry
               </button>
@@ -219,8 +228,8 @@ function CompanyOpen() {
   }
 
   return (
-    <div className="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen font-sans">
-      <div className="mx-auto p-6">
+    <div className="bg-linear-to-br from-gray-50 to-gray-100 min-h-screen font-sans">
+      <div className="mx-auto p-0">
         <CompanyHeader
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
@@ -234,6 +243,7 @@ function CompanyOpen() {
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           setShowJDForm={setShowJDForm}
+          setShowPlacedStudent={setShowPlacedStudent}
           fetchCompanies={fetchCompanies}
         />
 
@@ -265,6 +275,13 @@ function CompanyOpen() {
             setShowJDForm(false);
             fetchCompanies();
           }} />
+        )}
+
+        {showPlacedStudent && (
+          <PlacedStudent
+            show={showPlacedStudent}
+            onClose={() => setShowPlacedStudent(false)}
+          />
         )}
       </div>
     </div>

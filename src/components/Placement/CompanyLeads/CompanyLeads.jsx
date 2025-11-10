@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 import { useDebounce } from 'use-debounce';
+import { PlusIcon, CloudUploadIcon } from "@heroicons/react/outline";
 import AddLeads from "./AddLeads";
 import BulkUploadModal from "./BulkUploadModal";
 import AddJD from "../AddJd/AddJD"; // ✅ adjust the relative path
@@ -14,7 +15,6 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { db } from "../../../firebase";
-import LeadsHeader from "./LeadsHeader";
 import LeadsFilters from "./LeadsFilters";
 import LeadsTable from "./LeadsTable";
 import LeadViewEditModal from "./LeadViewEditModal";
@@ -26,25 +26,6 @@ import { useAuth } from "../../../context/AuthContext";
   // Utility function to handle Firestore index errors
   const handleFirestoreIndexError = (error, operation = "operation") => {
     console.error(`❌ Firestore Index Error in ${operation}:`, error);
-
-    if (error.message && error.message.includes('index')) {
-      console.error("🔍 Firestore Index Error Detected!");
-      console.error("💡 To fix this, create the required index:");
-
-      // Try to extract index URL from error message
-      const indexUrlMatch = error.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
-      if (indexUrlMatch) {
-        console.log("🔗 %cClick here to create index", "color: blue; text-decoration: underline; cursor: pointer; font-weight: bold;", indexUrlMatch[0]);
-        console.log("📋 Or copy this URL: " + indexUrlMatch[0]);
-
-        // Make the link clickable in some browsers
-        console.log("🚨 After creating the index, refresh the page to retry the " + operation + ".");
-      } else {
-        console.error("❓ Could not extract index URL from error.");
-        console.log("🔗 Go to: https://console.firebase.google.com/project/YOUR_PROJECT_ID/firestore/indexes");
-        console.log("📝 Replace YOUR_PROJECT_ID with your actual Firebase project ID");
-      }
-    }
   };
 
 function CompanyLeads() {
@@ -140,7 +121,6 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       const allFollowUps = [];
 
       // Use the already filtered leads from state
-      console.log(`� Checking follow-ups for ${leads.length} filtered leads`);
 
       // Extract follow-ups from each company
       leads.forEach(lead => {
@@ -148,11 +128,9 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         if (lead.status !== "hot") return;
         
         const followups = lead.followups || [];
-        console.log(`📅 Checking ${followups.length} follow-ups for ${lead.companyName} (assigned to: ${lead.assignedTo})`);
         followups.forEach(followup => {
           // Check if follow-up is for today
           if (followup.date === today) {
-            console.log(`✅ Found follow-up for today: ${followup.time} - ${followup.remarks}`);
             allFollowUps.push({
               id: `${lead.id}_${followup.key}`,
               company: lead.companyName || lead.name || 'Unknown Company',
@@ -166,8 +144,6 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           }
         });
       });
-
-      console.log(`✅ Found ${allFollowUps.length} follow-ups for today in ${viewMyLeadsOnly ? 'My Leads' : 'My Team'} mode`);
       setTodayFollowUps(allFollowUps);
 
       // Show alert if there are follow-ups
@@ -176,57 +152,16 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     } catch (error) {
       console.error("Error fetching today's follow-ups:", error);
     }
-  }, [user, leads, viewMyLeadsOnly]);
+  }, [user, leads]);
 
   // Test function for placement alerts (accessible via window.testPlacementAlerts)
   useEffect(() => {
-    window.testPlacementAlerts = () => {
-      console.log('🧪 Testing Follow-up System...');
-      console.log('Current user ID:', user?.uid);
-      console.log('View mode:', viewMyLeadsOnly ? 'My Leads' : 'My Team');
-      console.log('Total leads loaded:', leads.length);
-      console.log('Current follow-ups:', todayFollowUps.length, 'items');
-      console.log('Alert showing:', showTodayFollowUpAlert);
-
-      // Show team member info only in My Team mode
-      if (!viewMyLeadsOnly) {
-        const teamMemberIds = getTeamMemberIds(user?.uid);
-        console.log('👥 Team member IDs:', teamMemberIds);
-        console.log('👥 Team members count:', teamMemberIds.length);
-      }
-
-      // Show follow-up details
-      if (todayFollowUps.length > 0) {
-        console.log('📋 Follow-up details:');
-        todayFollowUps.forEach((followup, index) => {
-          console.log(`  ${index + 1}. ${followup.company} at ${followup.time} (${followup.assignedTo})`);
-        });
-      } else {
-        console.log('📋 No follow-ups found for today');
-      }
-
-      // Show leads with follow-ups (limit to first 5 for performance)
-      const leadsWithFollowUps = leads.filter(lead => (lead.followups || []).length > 0).slice(0, 5);
-      console.log('🏢 Leads with follow-ups (showing first 5):', leadsWithFollowUps.length);
-      leadsWithFollowUps.forEach(lead => {
-        const todayFollowUps = (lead.followups || []).filter(f => f.date === new Date().toISOString().split('T')[0]);
-        if (todayFollowUps.length > 0) {
-          console.log(`  - ${lead.companyName}: ${todayFollowUps.length} follow-ups today (assigned to: ${lead.assignedTo})`);
-        }
-      });
-
-      console.log('💡 To test: Schedule a follow-up for today using the "Schedule Follow-up" button');
-      console.log('🔄 Switching view modes will automatically refresh follow-ups');
-    };
+    // Test functionality removed for production
   }, [user, viewMyLeadsOnly, todayFollowUps, showTodayFollowUpAlert, leads, getTeamMemberIds]);
 
   // Caching constants
   const CACHE_KEY = 'companyLeadsCache';
   const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
-
-  // Maintenance mode - set to true during updates to prevent data corruption
-  // Change to false when updates are complete to restore normal functionality
-  const [isMaintenanceMode] = useState(false);
 
 
   // Fetch ALL leads from Firestore (no pagination)
@@ -291,23 +226,18 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         });
       });
 
-      console.log(`✅ Loaded ${allCompanies.length} companies from ${querySnapshot.docs.length} batches`);
-      
       // Filter leads by current user based on view mode
       const userLeads = user ? allCompanies.filter(lead => {
         if (viewMyLeadsOnly) {
           // My Leads: Only show leads assigned to current user
           return lead.assignedTo === user.uid;
         } else {
-          // My Team: Show leads assigned to current user, their team members, OR unassigned leads
+          // My Team: Show leads assigned to team members OR unassigned leads (exclude current user's leads)
           const teamMemberIds = getTeamMemberIds(user.uid);
-          return !lead.assignedTo || 
-                 lead.assignedTo === user.uid || 
-                 teamMemberIds.includes(lead.assignedTo);
+          return !lead.assignedTo || teamMemberIds.includes(lead.assignedTo);
         }
       }) : allCompanies;
       
-      console.log(`✅ Filtered to ${userLeads.length} leads for user ${user?.uid || 'guest'} (${viewMyLeadsOnly ? 'My Leads' : 'My Team'} view)`);
       setLeads(userLeads);
 
       // Cache the data (with error handling for quota limits)
@@ -322,7 +252,6 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
       // Fallback to old CompanyLeads collection if new structure fails
       try {
-        console.log("🔄 Falling back to old CompanyLeads collection...");
         const q = query(
           collection(db, "CompanyLeads"),
           orderBy("createdAt", "desc")
@@ -347,16 +276,13 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
             // My Leads: Only show leads assigned to current user
             return lead.assignedTo === user.uid;
           } else {
-            // My Team: Show leads assigned to current user, their team members, OR unassigned leads
+            // My Team: Show leads assigned to team members OR unassigned leads (exclude current user's leads)
             const teamMemberIds = getTeamMemberIds(user.uid);
-            return !lead.assignedTo || 
-                   lead.assignedTo === user.uid || 
-                   teamMemberIds.includes(lead.assignedTo);
+            return !lead.assignedTo || teamMemberIds.includes(lead.assignedTo);
           }
         }) : leadsData;
         
         setLeads(userLeadsFallback);
-        console.log("✅ Successfully loaded data from fallback collection");
 
         // Cache the data (with error handling for quota limits)
         try {
@@ -379,21 +305,17 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       if (cached) {
         const { data, timestamp } = JSON.parse(cached);
         if (Date.now() - timestamp < CACHE_DURATION) {
-          console.log("✅ Loaded data from cache");
           // Filter cached data by current user based on view mode
           const userLeads = user ? data.filter(lead => {
             if (viewMyLeadsOnly) {
               // My Leads: Only show leads assigned to current user
               return lead.assignedTo === user.uid;
             } else {
-              // My Team: Show leads assigned to current user, their team members, OR unassigned leads
+              // My Team: Show leads assigned to team members OR unassigned leads (exclude current user's leads)
               const teamMemberIds = getTeamMemberIds(user.uid);
-              return !lead.assignedTo || 
-                     lead.assignedTo === user.uid || 
-                     teamMemberIds.includes(lead.assignedTo);
+              return !lead.assignedTo || teamMemberIds.includes(lead.assignedTo);
             }
           }) : data;
-          console.log(`✅ Filtered cached data to ${userLeads.length} leads for user ${user?.uid || 'guest'} (${viewMyLeadsOnly ? 'My Leads' : 'My Team'} view)`);
           setLeads(userLeads);
           setLoading(false);
           return;
@@ -548,6 +470,15 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
   const handleStatusChange = async (leadId, newStatus) => {
     try {
+      // Mark as transitioning for animation
+      setLeads((prevLeads) =>
+        prevLeads.map((l) =>
+          l.id === leadId
+            ? { ...l, isTransitioning: true }
+            : l
+        )
+      );
+
       const lead = leads.find((l) => l.id === leadId);
       if (!lead || !lead.batchId) return;
 
@@ -567,9 +498,19 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           const uriDecoded = atob(encodedCompanies[companyIndex]);
           const jsonString = decodeURIComponent(uriDecoded);
           const decodedCompany = JSON.parse(jsonString);
+
+          // If the lead is currently unassigned, assign it to the current user
+          const isCurrentlyUnassigned = !decodedCompany.assignedTo;
+          const assignmentData = isCurrentlyUnassigned && user ? {
+            assignedTo: user.uid,
+            assignedBy: user.uid,
+            assignedAt: new Date().toISOString(),
+          } : {};
+
           const updatedCompany = {
             ...decodedCompany,
             status: newStatus,
+            ...assignmentData,
           };
           // Unicode-safe encoding: encodeURIComponent + btoa
           const updatedJsonString = JSON.stringify(updatedCompany);
@@ -584,14 +525,27 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         }
       }
 
-      // Update local state
+      // Update local state optimistically
+      const currentLead = leads.find((l) => l.id === leadId);
+      const isCurrentlyUnassigned = currentLead && !currentLead.assignedTo;
+      const localAssignmentData = isCurrentlyUnassigned && user ? {
+        assignedTo: user.uid,
+        assignedBy: user.uid,
+        assignedAt: new Date().toISOString(),
+      } : {};
+
       setLeads((prevLeads) =>
         prevLeads.map((l) =>
           l.id === leadId
-            ? { ...l, status: newStatus, updatedAt: new Date().toISOString() }
+            ? { ...l, status: newStatus, updatedAt: new Date().toISOString(), ...localAssignmentData, isTransitioning: false }
             : l
         )
       );
+
+      // Switch to "called" tab when status is changed to "called"
+      if (newStatus === "called") {
+        setActiveTab("called");
+      }
 
       // ✅ If marked as onboarded → open AddJD modal
       if (newStatus === "onboarded") {
@@ -600,6 +554,14 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       }
     } catch (error) {
       handleFirestoreIndexError(error, "lead status update");
+      // Revert transition state on error
+      setLeads((prevLeads) =>
+        prevLeads.map((l) =>
+          l.id === leadId
+            ? { ...l, isTransitioning: false }
+            : l
+        )
+      );
     }
   };
 
@@ -703,9 +665,6 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     }
   };
 
-  // TODO: Add lead reassignment functionality in future update
-  // const handleReassignLead = async (leadId, newAssigneeId) => { ... }
-
   const handleDeleteLead = async (leadId) => {
     try {
       const lead = leads.find((l) => l.id === leadId);
@@ -741,8 +700,6 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
       // Update local state by removing the lead
       setLeads((prevLeads) => prevLeads.filter((l) => l.id !== leadId));
-
-      console.log(`✅ Deleted lead: ${lead.companyName}`);
     } catch (error) {
       handleFirestoreIndexError(error, "lead deletion");
       alert("Failed to delete the lead. Please try again.");
@@ -778,79 +735,19 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow p-4 flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-
-  // Maintenance mode - show message when updates are underway
-  if (isMaintenanceMode) {
-    return (
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="flex flex-col items-center justify-center py-16 px-4">
-          <div className="text-center">
-            <div className="mx-auto flex items-center justify-center h-24 w-24 rounded-full bg-yellow-100 mb-6">
-              <svg
-                className="h-12 w-12 text-yellow-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
-                />
-              </svg>
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              🚧 New Updates Underway
-            </h2>
-            <p className="text-lg text-gray-600 mb-4">
-              Our developers are currently pushing important changes to the system.
-            </p>
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-              <div className="flex">
-                <div className="shrink-0">
-                  <svg
-                    className="h-5 w-5 text-yellow-400"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-yellow-800">
-                    Please Do Not Use Any Features
-                  </h3>
-                  <div className="mt-2 text-sm text-yellow-700">
-                    <p>
-                      To prevent data corruption and ensure a smooth update process, 
-                      please refrain from adding, editing, or deleting any company leads 
-                      until the maintenance is complete.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
-              <div className="animate-pulse">
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                </div>
-              </div>
-              <span>Updates in progress...</span>
-            </div>
-          </div>
+      <div className="bg-black rounded-lg shadow p-4 relative min-h-screen overflow-hidden">
+        <video 
+          src="/home/loading.mp4" 
+          autoPlay 
+          loop 
+          muted 
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            e.target.style.display = 'none';
+          }}
+        />
+        <div className="absolute inset-0 flex justify-center pt-8">
+          <p className="text-white text-4xl">Loading your leads...</p>
         </div>
       </div>
     );
@@ -859,54 +756,45 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   return (
     <div className="bg-white rounded-lg shadow p-4">
       {/* Header with View Toggle on Left, Search in Center, Actions on Right */}
-      <div className="flex items-center justify-between mb-4 gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-2 gap-2">
         {/* View Mode Toggle on Left */}
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-sm font-medium text-gray-700">View:</span>
+        <div className="flex items-center gap-2 shrink-0 h-8">
+          <span className="text-xs font-medium text-gray-700">View:</span>
           <ViewModeToggle
             viewMyLeadsOnly={viewMyLeadsOnly}
             setViewMyLeadsOnly={setViewMyLeadsOnly}
           />
         </div>
 
-        {/* Search Input in Center */}
-        <div className="flex-1 max-w-md mx-auto">
+        {/* Search in Center */}
+        <div className="flex-1 flex justify-center max-w-md h-8">
           <input
             type="text"
             placeholder="Search companies or contacts..."
-            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+            className="w-full px-3 py-1 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs h-full"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
 
         {/* Action Buttons on Right */}
-        <div className="flex gap-2 shrink-0">
+        <div className="flex gap-1 shrink-0 h-8">
           <button
             onClick={() => setShowAddLeadForm(true)}
-            className="px-3 py-2 text-white rounded-lg font-semibold flex items-center justify-center focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md relative overflow-hidden text-sm"
+            className="px-3 py-1 bg-linear-to-r from-blue-600 to-indigo-700 text-white rounded-lg font-semibold flex items-center justify-center hover:from-blue-700 hover:to-indigo-800 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md transition-all duration-200 text-xs h-full"
           >
-            <span className="absolute inset-0 bg-linear-to-r from-blue-600 to-indigo-700 opacity-100 hover:opacity-90 transition-opacity duration-200 z-0"></span>
-            <span className="relative z-10 flex items-center">
-              <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-              Add Company
-            </span>
+            <PlusIcon className="h-3 w-3 mr-1" />
+            Add Company
           </button>
           <button
             onClick={() => setShowBulkUploadForm(true)}
-            className="px-3 py-2 bg-green-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-md text-sm"
+            className="px-3 py-1 bg-green-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-md text-xs h-full"
           >
-            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-            </svg>
+            <CloudUploadIcon className="h-3 w-3 mr-1" />
             Bulk Upload
           </button>
         </div>
-      </div>
-
-      <LeadsFilters
+      </div>      <LeadsFilters
         activeTab={activeTab}
         onTabChange={setActiveTab}
         setActiveTab={setActiveTab}
@@ -924,6 +812,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         onDeleteLead={handleDeleteLead}
         currentUserId={user?.uid}
         currentUser={user}
+        order={true}
       />
 
       {/* Company Count Display */}

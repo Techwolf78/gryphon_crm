@@ -16,8 +16,8 @@ const AuditLogs = ({ logs, className = "" }) => {
 
   const sortedLogs = useMemo(() => {
     return [...filteredLogs].sort((a, b) => {
-      const dateA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp);
-      const dateB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp);
+      const dateA = new Date(a.timestamp);
+      const dateB = new Date(b.timestamp);
       
       const timeA = dateA && !isNaN(dateA.getTime()) ? dateA.getTime() : 0;
       const timeB = dateB && !isNaN(dateB.getTime()) ? dateB.getTime() : 0;
@@ -99,7 +99,7 @@ const AuditLogs = ({ logs, className = "" }) => {
           <div className="space-y-4 p-4">
             {currentLogs.length > 0 ? (
               currentLogs.map((log) => {
-                const dateObj = log.timestamp?.toDate ? log.timestamp.toDate() : new Date(log.timestamp);
+                const dateObj = new Date(log.timestamp);
                 const isValidDate = dateObj && !isNaN(dateObj.getTime());
                 const dateFormatted = isValidDate ? format(dateObj, "MMM dd, yyyy") : "Invalid Date";
                 const timeFormatted = isValidDate ? format(dateObj, "hh:mm a") : "—";
@@ -156,7 +156,7 @@ const AuditLogs = ({ logs, className = "" }) => {
               <tbody className="divide-y divide-gray-100">
                 {currentLogs.length > 0 ? (
                   currentLogs.map((log) => {
-                    const dateObj = log.timestamp?.toDate ? log.timestamp.toDate() : new Date(log.timestamp);
+                    const dateObj = new Date(log.timestamp);
                     const isValidDate = dateObj && !isNaN(dateObj.getTime());
                     const dateFormatted = isValidDate ? format(dateObj, "MMM dd, yyyy") : "Invalid Date";
                     const timeFormatted = isValidDate ? format(dateObj, "hh:mm a") : "—";

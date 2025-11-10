@@ -21,14 +21,14 @@ const statusColorMap = {
       inactive: "bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200"
     }
   },
-  cold: {
-    bg: "bg-blue-50",
-    text: "text-blue-600",
-    border: "border-blue-300",
-    activeBg: "bg-blue-100",
+  called: {
+    bg: "bg-purple-50",
+    text: "text-purple-600",
+    border: "border-purple-300",
+    activeBg: "bg-purple-100",
     tab: {
-      active: "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg",
-      inactive: "bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200"
+      active: "bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg",
+      inactive: "bg-purple-50 text-purple-600 hover:bg-purple-100 border border-purple-200"
     }
   },
   onboarded: {
@@ -47,12 +47,13 @@ const tabLabels = {
   hot: "Hot",
   warm: "Warm",
   cold: "Cold",
+  called: "Called",
   onboarded: "Onboarded"
 };
 
 const LeadsFilters = ({ activeTab, setActiveTab, leadsByStatus = {} }) => {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-1 mb-3 pt-2 w-full">
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-x-4 gap-y-1 mb-3 pt-2 w-full">
       {Object.keys(tabLabels).map((key) => (
         <button
           key={key}
@@ -71,6 +72,8 @@ const LeadsFilters = ({ activeTab, setActiveTab, leadsByStatus = {} }) => {
                 ? "ring-orange-400"
                 : key === "cold"
                 ? "ring-blue-500"
+                : key === "called"
+                ? "ring-purple-500"
                 : key === "onboarded"
                 ? "ring-green-500"
                 : "ring-gray-500"

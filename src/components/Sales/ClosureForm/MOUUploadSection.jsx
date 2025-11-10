@@ -26,9 +26,9 @@ const MOUUploadSection = ({
   };
  
   return (
-    <section className="p-6 bg-white rounded-xl border border-gray-200">
+    <section className="p-4 bg-white rounded-xl border border-gray-200">
       <div className="flex items-center gap-2 pb-2 border-b border-blue-700 mb-6">
-        <h3 className="text-2xl font-semibold text-blue-700">MOU Details</h3>
+        <h3 className="text-xl font-semibold text-blue-700">MOU Details</h3>
       </div>
  
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

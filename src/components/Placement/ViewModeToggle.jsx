@@ -2,12 +2,12 @@ import React from 'react';
 
 const ViewModeToggle = ({ viewMyLeadsOnly, setViewMyLeadsOnly }) => {
   return (
-    <div className="flex items-center bg-gray-100 rounded-lg p-1">
+    <div className="flex items-center bg-linear-to-r from-green-50 to-blue-50 rounded-full p-1 border border-green-200">
       <button
         onClick={() => setViewMyLeadsOnly(true)}
-        className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+        className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-200 ${
           viewMyLeadsOnly
-            ? 'bg-white text-blue-600 shadow-sm'
+            ? 'bg-linear-to-r from-green-500 to-green-600 text-white shadow-lg transform scale-105'
             : 'text-gray-600 hover:text-gray-900'
         }`}
       >
@@ -15,9 +15,9 @@ const ViewModeToggle = ({ viewMyLeadsOnly, setViewMyLeadsOnly }) => {
       </button>
       <button
         onClick={() => setViewMyLeadsOnly(false)}
-        className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+        className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-200 ${
           !viewMyLeadsOnly
-            ? 'bg-white text-blue-600 shadow-sm'
+            ? 'bg-linear-to-r from-green-500 to-green-600 text-white shadow-lg transform scale-105'
             : 'text-gray-600 hover:text-gray-900'
         }`}
       >

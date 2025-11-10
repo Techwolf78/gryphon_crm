@@ -212,24 +212,24 @@ function Placement() {
   };
 
   return (
-    <div className="p-0 -mt-2">
+    <div className="p-0 -mt-1">
       <style>{tableStyles}</style>
-      <h2 className="text-2xl font-bold mb-1 text-blue-800 mt-0">
+      <h2 className="text-xl font-bold mb-2 text-blue-800 mt-0">
         Placement Management
       </h2>
 
       {loading && (
-        <div className="flex justify-center items-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+        <div className="flex justify-center items-center py-4">
+          <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-500"></div>
         </div>
       )}
 
       {error && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
-          <p className="text-red-700">{error}</p>
+        <div className="bg-red-50 border-l-4 border-red-500 p-3 mb-3">
+          <p className="text-red-700 text-sm">{error}</p>
           <button
             onClick={fetchData}
-            className="mt-2 text-red-500 hover:text-red-700 font-medium"
+            className="mt-1 text-red-500 hover:text-red-700 font-medium text-sm"
           >
             Retry
           </button>
@@ -239,10 +239,10 @@ function Placement() {
       {!loading && !error && (
         <>
           {/* Enhanced Tab Navigation with Sliding Indicator */}
-          <div className="relative mb-2">
+          <div className="relative mb-3">
             <div className="flex border-b border-gray-200">
               <button
-                className={`flex-1 px-6 py-2 font-medium text-sm transition-all duration-150 ${
+                className={`flex-1 px-4 py-2 font-medium text-sm transition-all duration-150 ${
                   activeTab === "training"
                     ? "text-blue-600 bg-blue-50"
                     : "text-gray-500 hover:text-gray-700"
@@ -250,10 +250,10 @@ function Placement() {
                 onClick={() => setActiveTab("training")}
                 data-tour="training-tab"
               >
-                Training Data ({trainingData.length})
+                Training ({trainingData.length})
               </button>
               <button
-                className={`flex-1 px-6 py-2 font-medium text-sm transition-all duration-150 ${
+                className={`flex-1 px-4 py-2 font-medium text-sm transition-all duration-150 ${
                   activeTab === "placement"
                     ? "text-blue-600 bg-blue-50"
                     : "text-gray-500 hover:text-gray-700"
@@ -261,10 +261,10 @@ function Placement() {
                 onClick={() => setActiveTab("placement")}
                 data-tour="placement-tab"
               >
-                Placement Stats
+                Placement
               </button>
               <button
-                className={`flex-1 px-6 py-2 font-medium text-sm transition-all duration-150 ${
+                className={`flex-1 px-4 py-2 font-medium text-sm transition-all duration-150 ${
                   activeTab === "leads"
                     ? "text-blue-600 bg-blue-50"
                     : "text-gray-500 hover:text-gray-700"
@@ -272,10 +272,10 @@ function Placement() {
                 onClick={() => setActiveTab("leads")}
                 data-tour="leads-tab"
               >
-                Company Leads
+                Leads
               </button>
               <button
-                className={`flex-1 px-6 py-2 font-medium text-sm transition-all duration-150 ${
+                className={`flex-1 px-4 py-2 font-medium text-sm transition-all duration-150 ${
                   activeTab === "budget"
                     ? "text-blue-600 bg-blue-50"
                     : "text-gray-500 hover:text-gray-700"
@@ -299,9 +299,9 @@ function Placement() {
           {activeTab === "training" && (
             <>
               {activeTab.length === 0 ? (
-                <div className="text-center py-8">
+                <div className="text-center py-6">
                   <svg
-                    className="mx-auto h-12 w-12 text-gray-400"
+                    className="mx-auto h-8 w-8 text-gray-400"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -313,10 +313,10 @@ function Placement() {
                       d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
-                  <h3 className="mt-2 text-lg font-medium text-gray-900">
+                  <h3 className="mt-1 text-sm font-medium text-gray-900">
                     No training data found
                   </h3>
-                  <p className="mt-1 text-gray-500">
+                  <p className="mt-1 text-xs text-gray-500">
                     There are currently no training programs to display.
                   </p>
                 </div>
@@ -327,7 +327,7 @@ function Placement() {
                       <tr>
                         <th
                           scope="col"
-                          className="px-4 py-3 text-left text-xs font-medium  uppercase tracking-wider cursor-pointer  select-none border border-gray-300 rounded-t"
+                          className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider cursor-pointer select-none border border-gray-300 rounded-t"
                           onClick={handleProjectCodeSort}
                         >
                           <div className="flex items-center justify-between">
@@ -374,43 +374,43 @@ function Placement() {
                         </th>
                         <th
                           scope="col"
-                          className="px-4 py-3 text-left text-xs font-medium border border-gray-300 uppercase tracking-wider"
+                          className="px-2 py-2 text-left text-xs font-medium border border-gray-300 uppercase tracking-wider"
                         >
                           College
                         </th>
                         <th
                           scope="col"
-                          className="px-4 py-3 text-left text-xs font-medium border border-gray-300 uppercase tracking-wider"
+                          className="px-2 py-2 text-left text-xs font-medium border border-gray-300 uppercase tracking-wider"
                         >
                           Course
                         </th>
                         <th
                           scope="col"
-                          className="px-4 py-3 text-left text-xs font-medium border border-gray-300 uppercase tracking-wider"
+                          className="px-2 py-2 text-left text-xs font-medium border border-gray-300 uppercase tracking-wider"
                         >
                           Year
                         </th>
                         <th
                           scope="col"
-                          className="px-4 py-3 text-left text-xs font-medium border border-gray-300 uppercase tracking-wider"
+                          className="px-2 py-2 text-left text-xs font-medium border border-gray-300 uppercase tracking-wider"
                         >
-                          Delivery Type
+                          Type
                         </th>
                         <th
                           scope="col"
-                          className="px-4 py-3 text-left text-xs font-medium border border-gray-300 uppercase tracking-wider"
+                          className="px-2 py-2 text-left text-xs font-medium border border-gray-300 uppercase tracking-wider"
                         >
-                          Total Students
+                          Students
                         </th>
                         <th
                           scope="col"
-                          className="px-4 py-3 text-left text-xs font-medium border border-gray-300 uppercase tracking-wider"
+                          className="px-2 py-2 text-left text-xs font-medium border border-gray-300 uppercase tracking-wider"
                         >
                           Progress
                         </th>
                         <th
                           scope="col"
-                          className="px-4 py-3 text-left text-xs font-medium border border-gray-300 uppercase tracking-wider rounded-tr-lg"
+                          className="px-2 py-2 text-left text-xs font-medium border border-gray-300 uppercase tracking-wider rounded-tr-lg"
                         >
                           Actions
                         </th>
@@ -427,42 +427,42 @@ function Placement() {
                             onClick={() => handleViewDetails(item)}
                           >
                             <td
-                              className="px-1 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
+                              className="px-2 py-2 whitespace-nowrap text-sm border border-gray-300 truncate max-w-32"
                               title={formatCellValue(item.projectCode)}
                             >
                               {formatCellValue(item.projectCode)}
                             </td>
                             <td
-                              className="px-1 py-3 whitespace-nowrap text-sm border border-gray-300 truncate max-w-48"
+                              className="px-2 py-2 whitespace-nowrap text-sm border border-gray-300 truncate max-w-40"
                               title={formatCellValue(item.collegeName)}
                             >
                               {formatCellValue(item.collegeName)}
                             </td>
                             <td
-                              className="px-1 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
+                              className="px-2 py-2 whitespace-nowrap text-sm border border-gray-300 truncate max-w-24"
                               title={formatCellValue(item.course)}
                             >
                               {formatCellValue(item.course)}
                             </td>
                             <td
-                              className="px-1 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
+                              className="px-2 py-2 whitespace-nowrap text-sm border border-gray-300 truncate max-w-16"
                               title={formatCellValue(item.year)}
                             >
                               {formatCellValue(item.year)}
                             </td>
                             <td
-                              className="px-1 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
+                              className="px-2 py-2 whitespace-nowrap text-sm border border-gray-300 truncate max-w-20"
                               title={formatCellValue(item.deliveryType)}
                             >
                               {formatCellValue(item.deliveryType)}
                             </td>
                             <td
-                              className="px-1 py-3 whitespace-nowrap text-sm border border-gray-300 truncate"
+                              className="px-2 py-2 whitespace-nowrap text-sm border border-gray-300 truncate max-w-16 text-center"
                               title={formatCellValue(item.studentCount)}
                             >
                               {formatCellValue(item.studentCount)}
                             </td>
-                            <td className="px-1 py-3 whitespace-nowrap text-sm border border-gray-300 text-gray-500">
+                            <td className="px-2 py-2 whitespace-nowrap text-sm border border-gray-300 text-gray-500">
                               {progressData[item.projectCode] ? (
                                 progressData[item.projectCode].length > 0 ? (
                                   <div className="flex flex-wrap gap-1">
@@ -470,16 +470,16 @@ function Placement() {
                                       (phase, idx) => (
                                         <span
                                           key={idx}
-                                          className={`px-2 py-1 rounded-full text-white text-xs font-semibold ${
+                                          className={`inline-block px-2 py-1 rounded text-xs font-medium text-white border ${
                                             phase.status === "Done"
-                                              ? "bg-green-500"
+                                              ? "bg-green-500 border-green-600"
                                               : phase.status === "Initiated"
-                                              ? "bg-amber-500"
+                                              ? "bg-amber-500 border-amber-600"
                                               : phase.status === "Ongoing"
-                                              ? "bg-cyan-700"
+                                              ? "bg-cyan-700 border-cyan-800"
                                               : phase.status === "Hold"
-                                              ? "bg-rose-500"
-                                              : "bg-gray-400"
+                                              ? "bg-rose-500 border-rose-600"
+                                              : "bg-gray-400 border-gray-500"
                                           }`}
                                           title={`${phase.name}: ${phase.status}`}
                                         >
@@ -489,17 +489,17 @@ function Placement() {
                                     )}
                                   </div>
                                 ) : (
-                                  <span className=" text-xs italic">
+                                  <span className="text-xs italic text-gray-500">
                                     No phases
                                   </span>
                                 )
                               ) : (
-                                <span className=" text-xs italic">
+                                <span className="text-xs italic text-gray-500">
                                   Loading...
                                 </span>
                               )}
                             </td>
-                            <td className="px-1 py-3 whitespace-nowrap text-sm text-gray-500 relative">
+                            <td className="px-2 py-2 whitespace-nowrap text-sm text-gray-500 relative">
                               <div className="flex justify-center">
                                 <button
                                   onClick={(e) => toggleDropdown(item.id, e)}
@@ -507,7 +507,7 @@ function Placement() {
                                   title="Actions"
                                 >
                                   <svg
-                                    className="w-5 h-5 text-gray-600"
+                                    className="w-4 h-4 text-gray-600"
                                     fill="none"
                                     stroke="currentColor"
                                     viewBox="0 0 24 24"

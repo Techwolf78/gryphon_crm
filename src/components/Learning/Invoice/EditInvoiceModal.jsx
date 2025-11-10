@@ -184,6 +184,13 @@ function EditInvoiceModal({ trainer, onClose, onInvoiceUpdated, onToast }) {
           totalAmount: calculations.totalAmount,
           netPayment: calculations.netPayment,
           updatedAt: new Date(),
+          // If resubmitting a rejected invoice, reset status to pending (like approved)
+          ...(invoiceData.status === "rejected" && {
+            status: "pending",
+            rejectedDate: null,
+            rejectedBy: null,
+            rejectionRemarks: null,
+          }),
         };
 
         await updateDoc(invoiceRef, updatedInvoice);
