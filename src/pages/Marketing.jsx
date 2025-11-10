@@ -8,7 +8,7 @@ const DigitalMarketing = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-[100vh] bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center px-2 sm:px-4">
+    <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 flex items-center justify-center px-2 sm:px-4">
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -21,7 +21,7 @@ const DigitalMarketing = () => {
               initial={{ rotate: -15, scale: 0.8 }}
               animate={{ rotate: 0, scale: 1 }}
               transition={{ delay: 0.2, type: "spring" }}
-              className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-xl"
+              className="bg-linear-to-br from-blue-50 to-indigo-50 p-4 rounded-xl"
             >
               <FiTool className="text-indigo-600 text-3xl" />
             </motion.div>
@@ -79,7 +79,7 @@ const DigitalMarketing = () => {
             className="bg-blue-50 border border-blue-100 rounded-lg p-3 sm:p-4 max-w-2xl mx-auto"
           >
             <div className="flex items-start">
-              <div className="flex-shrink-0 pt-0.5">
+              <div className="shrink-0 pt-0.5">
                 <svg
                   className="h-5 w-5 text-blue-600"
                   fill="currentColor"

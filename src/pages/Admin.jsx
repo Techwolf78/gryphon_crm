@@ -12,6 +12,11 @@ import {
   FiActivity,
   FiClock,
   FiEdit,
+  FiChevronUp,
+  FiChevronDown,
+  FiArrowUp,
+  FiArrowDown,
+  FiChevronsUp,
 } from "react-icons/fi";
 import {
   collection,
@@ -51,13 +56,22 @@ const Admin = () => {
   const [timeReports, setTimeReports] = useState([]);
   const [timeFilter, setTimeFilter] = useState('all');
   const [loadingTime, setLoadingTime] = useState(false);
+  const [sortOrder, setSortOrder] = useState(null); // null, 'asc', 'desc'
 
   useEffect(() => {
     const cachedLogs = sessionStorage.getItem("auditLogs");
     const cachedUsers = sessionStorage.getItem("userList");
 
     if (cachedLogs && cachedUsers) {
-      setLogs(JSON.parse(cachedLogs));
+      const parsedLogs = JSON.parse(cachedLogs).map(log => ({
+        ...log,
+        timestamp: typeof log.timestamp === 'string' ? log.timestamp : 
+                  (log.timestamp?.toDate ? log.timestamp.toDate().toISOString() : 
+                   (log.timestamp?._seconds ? new Date(log.timestamp._seconds * 1000 + log.timestamp._nanoseconds / 1000000).toISOString() :
+                    (log.timestamp?.seconds ? new Date(log.timestamp.seconds * 1000 + (log.timestamp.nanoseconds || 0) / 1000000).toISOString() :
+                     new Date().toISOString())))
+      }));
+      setLogs(parsedLogs);
       setUsers(JSON.parse(cachedUsers));
       fetchTimeReports('all'); // Load time reports
       return;
@@ -116,6 +130,7 @@ const Admin = () => {
       const logData = logsSnap.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
+        timestamp: doc.data().timestamp?.toDate ? doc.data().timestamp.toDate().toISOString() : doc.data().timestamp,
       }));
 
       setUsers(userData);
@@ -264,7 +279,8 @@ const Admin = () => {
           location: location.error ? "Location unavailable" : location.address || "Unknown",
           city: location.city || "Unknown",
           country: location.country || "Unknown",
-          status: userLastActive[uid] || "Offline"
+          status: userLastActive[uid] || "Offline",
+          totalSeconds: totalSeconds
         };
       });
       setTimeReports(reports);
@@ -273,6 +289,16 @@ const Admin = () => {
       setTimeReports([]);
     }
     setLoadingTime(false);
+  };
+
+  const handleSort = () => {
+    if (sortOrder === 'asc') {
+      setSortOrder('desc');
+    } else if (sortOrder === 'desc') {
+      setSortOrder(null);
+    } else {
+      setSortOrder('asc');
+    }
   };
 
   const filteredUsers = users.filter((u) => {
@@ -294,7 +320,7 @@ const Admin = () => {
   const todayLogins = logs.filter((log) => {
     if (!log.action || !log.action.trim().startsWith("Logged in")) return false;
     const today = new Date();
-    const logDate = log.timestamp?.toDate ? log.timestamp.toDate() : new Date(log.timestamp);
+    const logDate = new Date(log.timestamp);
     
     if (!logDate || isNaN(logDate.getTime())) return false;
     
@@ -730,55 +756,78 @@ const Admin = () => {
             </div>
           </div>
           <div className="overflow-hidden">
-            <table className="w-full text-left">
-              <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
-                <tr>
-                  <th className="px-6 py-3 font-medium">Employee</th>
-                  <th className="px-6 py-3 font-medium">Status</th>
-                  <th className="px-6 py-3 font-medium">Location</th>
-                  <th className="px-6 py-3 font-medium">Total Time</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {timeReports.length > 0 ? (
-                  timeReports.map((report) => (
-                    <tr key={report.userId} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
-                        {report.name}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                          report.status === "Active now" 
-                            ? "bg-green-100 text-green-800" 
-                            : "bg-gray-100 text-gray-800"
-                        }`}>
-                          {report.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-gray-500">
-                        <div className="text-sm">
-                          <div>{report.location}</div>
-                          {report.city !== "Unknown" && (
-                            <div className="text-xs text-gray-400">
-                              {report.city}, {report.country}
-                            </div>
-                          )}
+            {(() => {
+              const sortedReports = [...timeReports].sort((a, b) => {
+                if (!sortOrder) return 0;
+                const aSec = a.totalSeconds;
+                const bSec = b.totalSeconds;
+                if (sortOrder === 'asc') {
+                  return aSec - bSec;
+                } else {
+                  return bSec - aSec;
+                }
+              });
+              return (
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                    <tr>
+                      <th className="px-6 py-3 font-medium">Employee</th>
+                      <th className="px-6 py-3 font-medium">Status</th>
+                      <th className="px-6 py-3 font-medium">Location</th>
+                      <th className="px-6 py-3 font-medium cursor-pointer select-none hover:bg-gray-100 transition-colors" onClick={handleSort}>
+                        <div className="flex items-center">
+                          <span>Total Time</span>
+                          <div className="ml-1">
+                            {!sortOrder && <FiChevronsUp className="w-4 h-4 text-gray-400" />}
+                            {sortOrder === 'asc' && <FiArrowUp className="w-4 h-4 text-indigo-600" />}
+                            {sortOrder === 'desc' && <FiArrowDown className="w-4 h-4 text-indigo-600" />}
+                          </div>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-gray-500">
-                        {report.timeString}
-                      </td>
+                      </th>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="4" className="px-6 py-4 text-center text-gray-500">
-                      No time tracking data available
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {sortedReports.length > 0 ? (
+                      sortedReports.map((report) => (
+                        <tr key={report.userId} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
+                            {report.name}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                              report.status === "Active now" 
+                                ? "bg-green-100 text-green-800" 
+                                : "bg-gray-100 text-gray-800"
+                            }`}>
+                              {report.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-gray-500">
+                            <div className="text-sm">
+                              <div>{report.location}</div>
+                              {report.city !== "Unknown" && (
+                                <div className="text-xs text-gray-400">
+                                  {report.city}, {report.country}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-gray-500">
+                            {report.timeString}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="4" className="px-6 py-4 text-center text-gray-500">
+                          No time tracking data available
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              );
+            })()}
           </div>
         </div>
       </section>

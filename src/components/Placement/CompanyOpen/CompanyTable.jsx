@@ -30,7 +30,7 @@ function CompanyTable({
   updateCompanyStatus
 }) {
   return (
-    <div className="mt-2 space-y-2">
+    <div className="mt-1 space-y-1">
       {filteredCompanies.length > 0 ? (
         filteredCompanies.map((company) => (
           <div
@@ -39,7 +39,7 @@ function CompanyTable({
             onClick={() => setSelectedCompany(company)}
           >
             <div
-              className={`grid grid-cols-8 gap-4 p-4 rounded-lg bg-white shadow-sm hover:shadow-md transition-all duration-300 ${borderColorMap[activeTab]} ${
+              className={`grid grid-cols-8 gap-2 p-2 rounded-lg bg-white shadow-sm hover:shadow-md transition-all duration-200 ease-out ${borderColorMap[activeTab]} ${
                 company.isTransitioning ? 'opacity-50 scale-95' : 'opacity-100 scale-100'
               }`}
             >
@@ -127,10 +127,10 @@ function CompanyTable({
           </div>
         ))
       ) : (
-        <div className="bg-white rounded-xl p-8 text-center border-2 border-dashed border-gray-200">
+        <div className="bg-white rounded-xl p-4 text-center border-2 border-dashed border-gray-200">
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            className="h-16 w-16 mx-auto text-gray-400"
+            className="h-10 w-10 mx-auto text-gray-400"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -143,15 +143,15 @@ function CompanyTable({
             />
           </svg>
 
-          <h3 className="mt-4 text-lg font-medium text-gray-900">
+          <h3 className="mt-2 text-sm font-medium text-gray-900">
             No companies found
           </h3>
-          <p className="mt-1 text-gray-500">
+          <p className="mt-1 text-xs text-gray-500">
             Get started by adding a new company
           </p>
           <button
             onClick={() => setShowJDForm(true)}
-            className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition"
+            className="mt-3 bg-blue-600 text-white px-3 py-1.5 rounded-lg font-medium hover:bg-blue-700 transition text-sm"
           >
             Add Company
           </button>

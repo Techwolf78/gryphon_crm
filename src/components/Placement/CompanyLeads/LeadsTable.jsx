@@ -5,6 +5,7 @@ const statusColorMap = {
   hot: "text-red-600 hover:bg-red-50",
   warm: "text-orange-600 hover:bg-orange-50",
   cold: "text-blue-600 hover:bg-blue-50",
+  called: "text-purple-600 hover:bg-purple-50",
   onboarded: "text-green-600 hover:bg-green-50",
 };
 
@@ -242,7 +243,7 @@ function LeadsTable({
 
                             <div className="px-2 py-1">
                               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Change Status</p>
-                              {["hot", "warm", "cold", "onboarded"]
+                              {["called", "hot", "warm", "cold", "onboarded"]
                                 .filter((status) => status !== lead.status)
                                 .map((status) => (
                                   <button
@@ -258,6 +259,7 @@ function LeadsTable({
                                       status === 'hot' ? 'bg-red-500' :
                                       status === 'warm' ? 'bg-orange-500' :
                                       status === 'cold' ? 'bg-blue-500' :
+                                      status === 'called' ? 'bg-purple-500' :
                                       'bg-green-500'
                                     }`}></div>
                                     Mark as {status.charAt(0).toUpperCase() + status.slice(1)}

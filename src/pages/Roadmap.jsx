@@ -1,12 +1,14 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 
 const Roadmap = () => {
+  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-white ">
       <div className="mx-auto">
         <div className="">
-          {/* <button
+          <button
             onClick={() => navigate("/dashboard/marketing")}
             className="flex items-center text-indigo-600 hover:text-indigo-800 font-medium"
           >
@@ -24,7 +26,7 @@ const Roadmap = () => {
               />
             </svg>
             Back to Marketing
-          </button> */}
+          </button>
         </div>
 
         <div className="overflow-x-auto">
