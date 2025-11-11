@@ -35,13 +35,13 @@ const ClosedLeadDetailModal = ({ lead, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex justify-center items-center z-[100] p-4 animate-fadeIn">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex justify-center items-center z-100 p-4 animate-fadeIn">
       <div
         ref={modalRef}
         className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl border border-gray-100 animate-slideUp transform transition-all duration-300"
       >
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3 flex justify-between items-center sticky top-0 z-10">
+        <div className="bg-linear-to-r from-blue-600 to-blue-700 px-4 py-3 flex justify-between items-center sticky top-0 z-10">
           <div className="flex items-center space-x-2">
             <div className="p-1.5 rounded-lg bg-white/10 backdrop-blur-sm">
               <IoIosSchool className="text-white text-lg" />
@@ -77,7 +77,7 @@ const ClosedLeadDetailModal = ({ lead, onClose }) => {
             title="Institution Details"
             icon={<IoMdBusiness className="text-blue-500" />}
             badge={`${lead?.collegeCode || 'No Code'}`}
-            className="bg-gradient-to-br from-blue-50 to-blue-50/70"
+            className="bg-linear-to-br from-blue-50 to-blue-50/70"
           >
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               <DetailCard label="College Name" value={lead?.collegeName} iconColor="text-blue-400" />
@@ -94,7 +94,7 @@ const ClosedLeadDetailModal = ({ lead, onClose }) => {
           <ModernSection
             title="Contact Information"
             icon={<MdPeople className="text-purple-500" />}
-            className="bg-gradient-to-br from-purple-50 to-purple-50/70"
+            className="bg-linear-to-br from-purple-50 to-purple-50/70"
           >
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               <ContactCard
@@ -129,7 +129,7 @@ const ClosedLeadDetailModal = ({ lead, onClose }) => {
             title="Program Details"
             icon={<IoIosSchool className="text-green-500" />}
             badge={`${lead?.studentCount || '0'} Students`}
-            className="bg-gradient-to-br from-green-50 to-green-50/70"
+            className="bg-linear-to-br from-green-50 to-green-50/70"
           >
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               <DetailCard label="Course" value={lead?.course} iconColor="text-green-400" />
@@ -214,7 +214,7 @@ const ClosedLeadDetailModal = ({ lead, onClose }) => {
             title="Financial Information"
             icon={<FaRupeeSign className="text-amber-500" />}
             badge={formatCurrency(lead?.netPayableAmount || lead?.totalCost)}
-            className="bg-gradient-to-br from-amber-50 to-amber-50/70"
+            className="bg-linear-to-br from-amber-50 to-amber-50/70"
           >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <DetailCard
@@ -262,7 +262,7 @@ const ClosedLeadDetailModal = ({ lead, onClose }) => {
             title="Contract Details"
             icon={<FaFilePdf className="text-red-500" />}
             badge={lead?.mouFileUrl ? "MOU Uploaded" : "No MOU"}
-            className="bg-gradient-to-br from-red-50 to-red-50/70"
+            className="bg-linear-to-br from-red-50 to-red-50/70"
           >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <DetailCard
