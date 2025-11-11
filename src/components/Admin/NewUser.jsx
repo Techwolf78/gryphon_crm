@@ -32,7 +32,7 @@ const roles = ["Director", "Head", "Manager", "Assistant Manager", "Executive"];
 // Validation constants
 const MIN_PASSWORD_LENGTH = 8;
 const PASSWORD_COMPLEXITY_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/;
-const EMAIL_REGEX = /^[^\s@]+@gryphonacademy\.co\.in$/;
+const EMAIL_REGEX = /^[a-z0-9.]+@gryphonacademy\.co\.in$/;
  
 const NewUser = ({ onUserAdded }) => {
   const [showForm, setShowForm] = useState(false);
@@ -131,54 +131,152 @@ const NewUser = ({ onUserAdded }) => {
     e.preventDefault();
     setError("");
     setLoading(true);
- 
+
     // Validation checks
-    if (!name || !email || !password) {
-      setError("All fields are required.");
+    if (!name.trim()) {
+      setError("Full name is required and cannot be empty.");
       setLoading(false);
       return;
     }
- 
+
+    if (name.trim().length < 2) {
+      setError("Full name must be at least 2 characters long. Please enter your complete name.");
+      setLoading(false);
+      return;
+    }
+
+    if (!/^[a-zA-Z\s]+$/.test(name.trim())) {
+      setError("Full name can only contain letters and spaces. Please remove any numbers or special characters.");
+      setLoading(false);
+      return;
+    }
+
+    if (!email.trim()) {
+      setError("Email address is required.");
+      setLoading(false);
+      return;
+    }
+
     if (!EMAIL_REGEX.test(email)) {
-      setError("Please enter a valid email address ending with @gryphonacademy.co.in");
+      if (!email.includes('@')) {
+        setError("Email must include the @ symbol. Format: username@gryphonacademy.co.in");
+      } else if (!email.endsWith('@gryphonacademy.co.in')) {
+        const afterAt = email.split('@')[1] || '';
+        if (afterAt !== 'gryphonacademy.co.in') {
+          setError(`Domain should be "gryphonacademy.co.in" (you have "${afterAt}"). Please correct the domain part after @.`);
+        } else {
+          setError("Email must end with @gryphonacademy.co.in. Please check your spelling.");
+        }
+      } else if (/[A-Z]/.test(email.split('@')[0])) {
+        setError("Username before @ must be all lowercase. Please use only small letters, numbers, or dots.");
+      } else {
+        setError("Please use format: yourname@gryphonacademy.co.in (all lowercase before @, correct domain)");
+      }
       setLoading(false);
       return;
     }
- 
+
+    if (!password) {
+      setError("Password is required.");
+      setLoading(false);
+      return;
+    }
+
     if (password.length < MIN_PASSWORD_LENGTH) {
-      setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters long.`);
+      setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters long. Please add more characters.`);
       setLoading(false);
       return;
     }
- 
+
+    if (!/[A-Z]/.test(password)) {
+      setError("Password must contain at least one uppercase letter (A-Z). Please add a capital letter.");
+      setLoading(false);
+      return;
+    }
+
+    if (!/[a-z]/.test(password)) {
+      setError("Password must contain at least one lowercase letter (a-z). Please add a small letter.");
+      setLoading(false);
+      return;
+    }
+
+    if (!/\d/.test(password)) {
+      setError("Password must contain at least one number (0-9). Please add a digit.");
+      setLoading(false);
+      return;
+    }
+
     if (!PASSWORD_COMPLEXITY_REGEX.test(password)) {
       setError("Password must contain at least one uppercase letter, one lowercase letter, and one number.");
       setLoading(false);
       return;
     }
 
-    if (!roles.includes(role)) {
-      setError("Please select a valid role.");
+    if (!role) {
+      setError("Please select a role from the dropdown menu.");
       setLoading(false);
       return;
     }
 
-    if (departments.length === 0) {
-      setError("Please select at least one department.");
+    if (!roles.includes(role)) {
+      setError("Please select a valid role from the available options in the dropdown.");
+      setLoading(false);
+      return;
+    }
+
+    if (!departments || departments.length === 0) {
+      setError("Please select at least one department from the dropdown menu.");
       setDepartmentError(true);
       setLoading(false);
       return;
-    }    if (
+    }
+
+    // Check if selected departments are valid
+    const invalidDepts = departments.filter(dept => !departmentsList.includes(dept));
+    if (invalidDepts.length > 0) {
+      setError(`Invalid department(s) selected: ${invalidDepts.join(", ")}. Please choose from the available options.`);
+      setLoading(false);
+      return;
+    }
+
+    if (
       (role === "Assistant Manager" || role === "Executive") &&
       (departments.includes("Sales") || departments.includes("Placement")) &&
       !selectedReportingManager
     ) {
-      setError("Please select a Reporting Manager.");
+      setError("Reporting Manager is required for Sales and Placement roles. Please select a manager from the dropdown.");
       setLoading(false);
       return;
     }
+
+    // Validate selected reporting manager exists
+    if (
+      (role === "Assistant Manager" || role === "Executive") &&
+      (departments.includes("Sales") || departments.includes("Placement")) &&
+      selectedReportingManager
+    ) {
+      const validManager = reportingManagers.find(manager => manager.name === selectedReportingManager);
+      if (!validManager) {
+        setError("Selected Reporting Manager is not valid. Please choose from the available managers in the dropdown.");
+        setLoading(false);
+        return;
+      }
+    }
  
     try {
+      // Check if email already exists
+      const emailCheckQuery = query(
+        collection(db, "users"),
+        where("email", "==", email.toLowerCase())
+      );
+      const emailCheckSnapshot = await getDocs(emailCheckQuery);
+      
+      if (!emailCheckSnapshot.empty) {
+        setError("This email address is already registered. Please use a different email address or contact admin if you need to reset the existing account.");
+        setLoading(false);
+        return;
+      }
+
       // Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
         secondaryAuth,
@@ -235,9 +333,26 @@ const NewUser = ({ onUserAdded }) => {
       if (onUserAdded) onUserAdded();
       toast.success(`${name} (${role}, ${departments.join(", ")}) added successfully!`);
     } catch (err) {
+      // Handle specific Firebase errors with user-friendly messages
+      let errorMessage = "Failed to add user";
+      
+      if (err.code === 'auth/email-already-in-use') {
+        errorMessage = "This email is already registered in the system. Please try a different email address.";
+      } else if (err.code === 'auth/invalid-email') {
+        errorMessage = "The email format is invalid. Please check and correct the email address.";
+      } else if (err.code === 'auth/weak-password') {
+        errorMessage = "Password is too weak. Please create a stronger password with uppercase, lowercase, and numbers.";
+      } else if (err.code === 'auth/network-request-failed') {
+        errorMessage = "Network connection failed. Please check your internet connection and try again.";
+      } else if (err.code === 'permission-denied') {
+        errorMessage = "You don't have permission to add users. Please contact your administrator.";
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+
       // Error adding user - handled through error state and toast
-      setError(err.message || "Failed to add user");
-      toast.error(err.message || "Failed to add user");
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -299,7 +414,7 @@ const NewUser = ({ onUserAdded }) => {
             <label htmlFor="nameInput" className="block text-sm font-medium text-gray-700">
               Full Name <span className="text-red-500">*</span>
             </label>
-            <div className="flex items-center border-2 border-gray-300 bg-white/60 backdrop-blur rounded-lg px-3 py-2.5 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 focus-within:border-indigo-400 transition-all">
+            <div className="flex items-center border-2 border-gray-300 bg-white/60 backdrop-blur rounded-lg px-3 py-2.5 shadow-inner focus-within:ring-1 focus-within:ring-indigo-400 focus-within:border-indigo-400 transition-all">
               <FaUser className="text-gray-400 mr-2.5 shrink-0" size={16} />
               <input
                 id="nameInput"
@@ -319,7 +434,7 @@ const NewUser = ({ onUserAdded }) => {
             <label htmlFor="emailInput" className="block text-sm font-medium text-gray-700">
               Email Address <span className="text-red-500">*</span>
             </label>
-            <div className="flex items-center border-2 border-gray-300 bg-white/60 backdrop-blur rounded-lg px-3 py-2.5 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 focus-within:border-indigo-400 transition-all">
+            <div className="flex items-center border-2 border-gray-300 bg-white/60 backdrop-blur rounded-lg px-3 py-2.5 shadow-inner focus-within:ring-1 focus-within:ring-indigo-400 focus-within:border-indigo-400 transition-all">
               <FaEnvelope className="text-gray-400 mr-2.5 shrink-0" size={16} />
               <input
                 id="emailInput"
@@ -339,7 +454,7 @@ const NewUser = ({ onUserAdded }) => {
             <label htmlFor="passwordInput" className="block text-sm font-medium text-gray-700">
               Password <span className="text-red-500">*</span>
             </label>
-            <div className="flex items-center border-2 border-gray-300 bg-white/60 backdrop-blur rounded-lg px-3 py-2.5 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 focus-within:border-indigo-400 transition-all">
+            <div className="flex items-center border-2 border-gray-300 bg-white/60 backdrop-blur rounded-lg px-3 py-2.5 shadow-inner focus-within:ring-1 focus-within:ring-indigo-400 focus-within:border-indigo-400 transition-all">
               <FaLock className="text-gray-400 mr-2.5 shrink-0" size={16} />
               <input
                 id="passwordInput"
@@ -390,7 +505,7 @@ const NewUser = ({ onUserAdded }) => {
               <label className="block text-sm font-medium text-gray-700">
                 Departments <span className="text-red-500">*</span>
               </label>
-              <div className="border-2 border-gray-300 bg-white/60 backdrop-blur rounded-lg px-3 py-2.5 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 focus-within:border-indigo-400 transition-all">
+              <div className={`border-2 border-gray-300 bg-white/60 backdrop-blur rounded-lg px-3 shadow-inner focus-within:ring-1 focus-within:ring-indigo-400 focus-within:border-indigo-400 transition-all ${departments.length > 0 ? 'py-3' : 'py-2.5'}`}>
                 <div className="flex flex-wrap gap-2 mb-2">
                   {departments.map((dept, index) => (
                     <span
@@ -436,7 +551,7 @@ const NewUser = ({ onUserAdded }) => {
               <label htmlFor="roleSelect" className="block text-sm font-medium text-gray-700">
                 Role <span className="text-red-500">*</span>
               </label>
-              <div className="flex items-center border-2 border-gray-300 bg-white/60 backdrop-blur rounded-lg px-3 py-2.5 shadow-inner focus-within:ring-2 focus-within:ring-indigo-400 focus-within:border-indigo-400 transition-all">
+              <div className="flex items-center border-2 border-gray-300 bg-white/60 backdrop-blur rounded-lg px-3 py-2.5 shadow-inner focus-within:ring-1 focus-within:ring-indigo-400 focus-within:border-indigo-400 transition-all">
                 <FaUserTag className="text-gray-400 mr-2.5 shrink-0" size={16} />
                 <select
                   id="roleSelect"
@@ -461,7 +576,7 @@ const NewUser = ({ onUserAdded }) => {
               <label htmlFor="managerSelect" className="block text-sm font-medium text-blue-800">
                 Reporting Manager <span className="text-red-500">*</span>
               </label>
-              <div className="flex items-center border-2 border-blue-300 bg-white/80 backdrop-blur rounded-lg px-3 py-2.5 shadow-inner focus-within:ring-2 focus-within:ring-blue-400 focus-within:border-blue-400 transition-all">
+              <div className="flex items-center border-2 border-blue-300 bg-white/80 backdrop-blur rounded-lg px-3 py-2.5 shadow-inner focus-within:ring-1 focus-within:ring-blue-400 focus-within:border-blue-400 transition-all">
                 <FaUser className="text-blue-500 mr-2.5 shrink-0" size={16} />
                 <select
                   id="managerSelect"

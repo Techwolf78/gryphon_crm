@@ -210,6 +210,13 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
             contractEndDate: trainingFormDataItem.contractEndDate || lead.contractEndDate, // 🆕 Add contractEndDate from trainingForms
             contractStartDate: trainingFormDataItem.contractStartDate || lead.contractStartDate, // 🆕 Add contractStartDate from trainingForms
             closureType: updatedClosureType, // Use the updated closureType
+            courses: trainingFormDataItem.courses || lead.courses, // 🆕 Add courses data from trainingForms
+            topics: trainingFormDataItem.topics || lead.topics, // 🆕 Add topics data from trainingForms
+            deliveryType: trainingFormDataItem.deliveryType || lead.deliveryType, // 🆕 Add delivery type
+            course: trainingFormDataItem.course || lead.course, // 🆕 Add course
+            year: trainingFormDataItem.year || lead.year, // 🆕 Add year
+            passingYear: trainingFormDataItem.passingYear || lead.passingYear, // 🆕 Add passing year
+            totalHours: trainingFormDataItem.totalHours || lead.totalHours, // 🆕 Add total hours
           };
         } else {
           // For leads without training forms, calculate totalCost from available data

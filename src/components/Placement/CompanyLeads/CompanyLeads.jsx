@@ -75,6 +75,8 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           usersData[doc.id] = { id: doc.id, ...doc.data() };
         });
         setAllUsers(usersData);
+        console.log('Fetched users:', Object.values(usersData).map(u => ({ id: u.id, departments: u.departments, displayName: u.displayName })));
+        console.log('Placement users:', Object.values(usersData).filter(u => u.departments && u.departments.some(dept => dept.toLowerCase().includes('placement'))));
       } catch (error) {
         console.error("Error fetching users:", error);
       }
@@ -450,6 +452,50 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     });
   }, [leads, activeTab, debouncedSearchTerm, calculateCompletenessScore]);
 
+  // Group called leads by date for the called tab
+  const groupedCalledLeads = useMemo(() => {
+    if (activeTab !== "called") return null;
+
+    const calledLeads = leads.filter(lead => lead.status === "called");
+
+    // Group by date (using updatedAt as the called date)
+    const grouped = calledLeads.reduce((acc, lead) => {
+      try {
+        const date = lead.updatedAt ? new Date(lead.updatedAt).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        }) : 'Unknown Date';
+
+        if (!acc[date]) {
+          acc[date] = [];
+        }
+        acc[date].push(lead);
+      } catch {
+        // If date parsing fails, group under 'Unknown Date'
+        if (!acc['Unknown Date']) {
+          acc['Unknown Date'] = [];
+        }
+        acc['Unknown Date'].push(lead);
+      }
+      return acc;
+    }, {});
+
+    // Sort dates in descending order (most recent first)
+    const sortedGrouped = {};
+    Object.keys(grouped)
+      .sort((a, b) => {
+        if (a === 'Unknown Date') return 1;
+        if (b === 'Unknown Date') return -1;
+        return new Date(b) - new Date(a);
+      })
+      .forEach(date => {
+        sortedGrouped[date] = grouped[date];
+      });
+
+    return sortedGrouped;
+  }, [leads, activeTab]);
+
   // Group leads by status for tab counts
   const leadsByStatus = leads.reduce((acc, lead) => {
     acc[lead.status] = (acc[lead.status] || 0) + 1;
@@ -706,6 +752,64 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     }
   };
 
+  const handleAssignLead = async (leadId, userId) => {
+    try {
+      const lead = leads.find((l) => l.id === leadId);
+      if (!lead || !lead.batchId) return;
+
+      // Fetch the batch document
+      const batchDocRef = doc(db, "companyleads", lead.batchId);
+      const batchDocSnap = await getDoc(batchDocRef);
+
+      if (batchDocSnap.exists()) {
+        const batchData = batchDocSnap.data();
+        const encodedCompanies = batchData.companies || [];
+
+        // Find the company index in the array
+        const companyIndex = parseInt(leadId.split('_').pop()); // Extract index from "batch_39_5" -> 5
+
+        if (companyIndex >= 0 && companyIndex < encodedCompanies.length) {
+          // Decode, update, and re-encode the company (Unicode-safe)
+          const uriDecoded = atob(encodedCompanies[companyIndex]);
+          const jsonString = decodeURIComponent(uriDecoded);
+          const decodedCompany = JSON.parse(jsonString);
+
+          const updatedCompany = {
+            ...decodedCompany,
+            assignedTo: userId,
+            assignedBy: user?.uid,
+            assignedAt: new Date().toISOString(),
+          };
+          // Unicode-safe encoding: encodeURIComponent + btoa
+          const updatedJsonString = JSON.stringify(updatedCompany);
+          const updatedUriEncoded = encodeURIComponent(updatedJsonString);
+          encodedCompanies[companyIndex] = btoa(updatedUriEncoded);
+
+          // Save back to Firestore
+          await setDoc(batchDocRef, {
+            ...batchData,
+            companies: encodedCompanies,
+          });
+        }
+      }
+
+      // Update local state optimistically
+      setLeads((prevLeads) =>
+        prevLeads.map((l) =>
+          l.id === leadId
+            ? { ...l, assignedTo: userId, assignedBy: user?.uid, assignedAt: new Date().toISOString() }
+            : l
+        )
+      );
+
+      // Show success message
+      console.log(`Lead assigned successfully to user ${userId}`);
+    } catch (error) {
+      handleFirestoreIndexError(error, "lead assignment");
+      alert("Failed to assign the lead. Please try again.");
+    }
+  };
+
 
   const formatDate = useCallback((dateString) => {
     try {
@@ -735,20 +839,8 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
   if (loading) {
     return (
-      <div className="bg-black rounded-lg shadow p-4 relative min-h-screen overflow-hidden">
-        <video 
-          src="/home/loading.mp4" 
-          autoPlay 
-          loop 
-          muted 
-          className="w-full h-full object-cover"
-          onError={(e) => {
-            e.target.style.display = 'none';
-          }}
-        />
-        <div className="absolute inset-0 flex justify-center pt-8">
-          <p className="text-white text-4xl">Loading your leads...</p>
-        </div>
+      <div className="bg-white rounded-lg shadow p-4 flex items-center justify-center min-h-screen">
+        <p className="text-gray-600 text-xl">Loading your leads...</p>
       </div>
     );
   }
@@ -803,6 +895,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
       <LeadsTable
         leads={filteredLeads}
+        groupedCalledLeads={groupedCalledLeads}
         onLeadClick={(lead) => {
           setSelectedLead(lead);
           setShowLeadDetails(true);
@@ -810,8 +903,10 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         onStatusChange={handleStatusChange}
         onScheduleMeeting={handleScheduleMeeting}
         onDeleteLead={handleDeleteLead}
+        onAssignLead={handleAssignLead}
         currentUserId={user?.uid}
         currentUser={user}
+        allUsers={allUsers}
         order={true}
       />
 
