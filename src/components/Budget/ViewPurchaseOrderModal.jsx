@@ -248,14 +248,15 @@ const ViewPurchaseOrderModal = ({
                   {[
                     ["Requested By", "ownerName", formData.ownerName],
                     [
-                      "Department",
-                      "department",
-                      formData.department?.toUpperCase(),
+                      "Business Name",
+                      "Business Name",
+                      "Gryphon Academy Pvt Ltd",
                     ],
+                    ["Address", "companyAddress", " Baner, Pune "],
                     [
-                      "Address",
+                      "City, State, Zip Code",
                       "companyAddress",
-                      "Gryphon Academy, 9th Floor, Olympia Business House (Achalare), Baner, Pune - 411045",
+                      " Maharashtra ",
                     ],
                     [
                       "Phone",

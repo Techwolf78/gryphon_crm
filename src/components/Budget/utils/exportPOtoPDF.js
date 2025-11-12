@@ -84,7 +84,7 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
         order.vendorDetails.contactPerson || "_______________________",
       ],
       ["Business Name:", order.vendorDetails.name || "_______________________"],
-      ["Address:", order.vendorDetails.email || "_______________________"],
+      ["Address:", order.vendorDetails.address || "_______________________"],
       ["Phone:", order.vendorDetails.phone || "_______________________"],
     ],
     theme: "grid",
@@ -94,7 +94,7 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
       textColor: [40, 40, 40],
       lineColor: [0, 0, 0],
     },
-    columnStyles: { 0: { fontStyle: "bold", cellWidth: 35 } },
+    columnStyles: { 0: { fontStyle: "bold", cellWidth: 40 } },
   });
 
   // 🧍 Requested By
@@ -102,12 +102,10 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
     startY: docPDF.lastAutoTable.finalY + 4,
     body: [
       ["Requested By:", capitalizeFirst(order.ownerName)],
-      ["Department:", capitalizeFirst(order.department)],
-      [
-        "Address:",
-        "Gryphon Academy, 9th floor, Olympia Business House, Baner, Pune",
-      ],
-      ["Phone No.:", order.phone || "+91 9767019581"],
+      ["Business Name:", "Gryphon Academy Pvt Ltd"],
+      ["Address:", "Baner, Pune"],
+      ["City, State, Zip Code:", "Maharashtra"],
+      ["Phone No.:", order.phone || "7400574438"],
     ],
     theme: "grid",
     styles: {
@@ -116,7 +114,7 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
       textColor: [40, 40, 40],
       lineColor: [0, 0, 0],
     },
-    columnStyles: { 0: { fontStyle: "bold", cellWidth: 35 } },
+    columnStyles: { 0: { fontStyle: "bold", cellWidth: 40 } },
   });
 
   // 📦 Items Table

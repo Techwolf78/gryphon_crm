@@ -32,6 +32,7 @@ const BudgetOverview = lazy(() => import("./BudgetOverview"));
 const PurchaseIntentsList = lazy(() => import("./PurchaseIntentsList"));
 const PurchaseOrdersList = lazy(() => import("./PurchaseOrdersList"));
 const VendorManagement = lazy(() => import("./VendorManagement"));
+const ViewBudgetModal = lazy(() => import("./ViewBudgetModal"));
 
 // Loading component
 const ComponentLoader = () => (
@@ -678,7 +679,7 @@ function BudgetDashboard({
         setShowBudgetForm(false);
       } catch (error) {
         console.error("Error creating budget:", error);
-        alert("Failed to create budget. Please try again.");
+        toast.error("Failed to create budget. Please try again.");
         throw error;
       }
     },
@@ -737,15 +738,15 @@ function BudgetDashboard({
 
         // 🔹 Success message
         if (budgetData.status === "active") {
-          alert(
+          toast.info(
             "Budget set to active! Other budgets for this department archived."
           );
         } else {
-          alert("Budget updated successfully!");
+          toast.error("Budget Updated Successfully");
         }
       } catch (error) {
         console.error("Error updating budget:", error);
-        alert("Failed to update budget. Please try again.");
+        toast.error("Failed to update budget. Please try again");
         throw error;
       }
     },
@@ -764,7 +765,7 @@ function BudgetDashboard({
       setSelectedBudgetForDelete(null);
     } catch (error) {
       console.error("Error deleting budget:", error);
-      alert("Failed to delete budget. Please try again.");
+      toast.error("Failed to delete budget. Please try again.");
     } finally {
       setDeletingBudget(false);
     }
@@ -929,11 +930,11 @@ function BudgetDashboard({
         setSelectedIntent(null);
 
         // ✅ Success message
-        alert(
-          "✅ Purchase Order created successfully! The intent has been approved and budget updated."
+        toast.success(
+          "Purchase order created successfully, budget has been updated"
         );
       } catch (error) {
-        console.error("❌ Error creating purchase order:", error);
+        toast.error("Error creating purchase order: ", error);
 
         let errorMessage = "Failed to create purchase order. ";
         if (error.message.includes("No active budget found")) {
@@ -944,8 +945,7 @@ function BudgetDashboard({
         } else {
           errorMessage += "Please try again.";
         }
-
-        alert(errorMessage);
+        toast.error(errorMessage);
         throw error;
       }
     },
@@ -966,8 +966,8 @@ function BudgetDashboard({
       // 🔹 Allow only HR, Admin, or Purchase department users
       const allowedDepartments = ["hr", "admin", "purchase"];
       if (!allowedDepartments.includes(userDept.toLowerCase())) {
-        alert(
-          "❌ Only HR, Admin, or Purchase users can update purchase orders."
+        toast.warning(
+          "Only HR, Admin, Purchase users can update purchase orders"
         );
         console.warn(
           `Unauthorized update attempt by ${currentUser.email} (${userDept})`
@@ -989,11 +989,10 @@ function BudgetDashboard({
       setPurchaseOrders((prev) =>
         prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o))
       );
-
-      alert("✅ Purchase Order updated successfully!");
+      toast.success("Purchase order updated successfully");
     } catch (error) {
       console.error("Error updating purchase order:", error);
-      alert("Failed to update purchase order. Please try again.");
+      toast.error("Failed to update purchase order. Please try again.");
     }
   };
 
@@ -1253,7 +1252,11 @@ function BudgetDashboard({
                                   {budget.lastUpdatedAt
                                     ? new Date(
                                         budget.lastUpdatedAt.seconds * 1000
-                                      ).toLocaleDateString()
+                                      ).toLocaleDateString("en-IN", {
+                                        day: "2-digit",
+                                        month: "short",
+                                        year: "numeric",
+                                      })
                                     : "N/A"}
                                 </td>
                                 <td className="py-3 px-4">
@@ -1487,6 +1490,16 @@ function BudgetDashboard({
           />
         )}
 
+        {/* 🔹 View Budget Modal */}
+        {viewBudgetModal && viewingBudget && (
+          <ViewBudgetModal
+            show={viewBudgetModal}
+            onClose={() => setViewBudgetModal(false)}
+            budget={viewingBudget}
+            componentColors={componentColors}
+          />
+        )}
+
         {showPurchaseIntentModal && (
           <PurchaseIntentModal
             show={showPurchaseIntentModal}
@@ -1517,145 +1530,6 @@ function BudgetDashboard({
           />
         )}
       </Suspense>
-      {/* 🧾 View Budget Modal */}
-      {viewBudgetModal && viewingBudget && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
-            {/* Header */}
-            <div className="bg-emerald-700 text-white px-6 py-4 flex justify-between items-center">
-              <h3 className="text-lg font-semibold">
-                View Budget - FY{viewingBudget.fiscalYear}
-              </h3>
-              <button
-                onClick={() => {
-                  setViewBudgetModal(false);
-                  setViewingBudget(null);
-                }}
-                className="text-white hover:text-gray-200 transition"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="p-6 space-y-3 text-gray-800">
-              <div className="grid grid-cols-2 gap-3">
-                <p>
-                  <strong>Department:</strong>{" "}
-                  {viewingBudget.deptName || viewingBudget.department}
-                </p>
-                <p>
-                  <strong>Status:</strong>{" "}
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      viewingBudget.status === "active"
-                        ? "bg-green-100 text-green-800"
-                        : viewingBudget.status === "draft"
-                        ? "bg-yellow-100 text-yellow-800"
-                        : "bg-gray-100 text-gray-800"
-                    }`}
-                  >
-                    {viewingBudget.status}
-                  </span>
-                </p>
-                <p>
-                  <strong>Total Budget:</strong> ₹
-                  {viewingBudget.totalBudget?.toLocaleString("en-IN") || "0"}
-                </p>
-                <p>
-                  <strong>Total Spent:</strong> ₹
-                  {viewingBudget.totalSpent?.toLocaleString("en-IN") || "0"}
-                </p>
-                <p>
-                  <strong>Remaining:</strong> ₹
-                  {(
-                    (viewingBudget.totalBudget || 0) -
-                    (viewingBudget.totalSpent || 0)
-                  ).toLocaleString("en-IN")}
-                </p>
-                <p>
-                  <strong>Created By:</strong>{" "}
-                  {viewingBudget.ownerName || "Unknown"}
-                </p>
-                <p>
-                  <strong>Last Updated:</strong>{" "}
-                  {viewingBudget.lastUpdatedAt
-                    ? new Date(
-                        viewingBudget.lastUpdatedAt.seconds * 1000
-                      ).toLocaleDateString("en-IN")
-                    : "N/A"}
-                </p>
-              </div>
-
-              {(viewingBudget.fixedCosts ||
-                viewingBudget.departmentExpenses ||
-                viewingBudget.csddExpenses) && (
-                <div className="mt-4">
-                  <h4 className="font-semibold mb-2 text-gray-900">
-                    Budget Breakdown:
-                  </h4>
-                  <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg">
-                    <table className="w-full text-sm">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="text-left px-3 py-2 font-medium text-gray-700">
-                            Category
-                          </th>
-                          <th className="text-right px-3 py-2 font-medium text-gray-700">
-                            Allocated (₹)
-                          </th>
-                          <th className="text-right px-3 py-2 font-medium text-gray-700">
-                            Spent (₹)
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[
-                          "fixedCosts",
-                          "departmentExpenses",
-                          "csddExpenses",
-                        ].map((group) =>
-                          Object.entries(viewingBudget[group] || {}).map(
-                            ([key, comp]) => (
-                              <tr
-                                key={`${group}-${key}`}
-                                className="border-t border-gray-100 hover:bg-gray-50"
-                              >
-                                <td className="px-3 py-2 text-gray-800 capitalize">
-                                  {key.replace(/_/g, " ")}
-                                </td>
-                                <td className="px-3 py-2 text-right text-gray-700">
-                                  {comp.allocated?.toLocaleString("en-IN") || 0}
-                                </td>
-                                <td className="px-3 py-2 text-right text-gray-700">
-                                  {comp.spent?.toLocaleString("en-IN") || 0}
-                                </td>
-                              </tr>
-                            )
-                          )
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-4 bg-gray-50 flex justify-end">
-              <button
-                onClick={() => {
-                  setViewBudgetModal(false);
-                  setViewingBudget(null);
-                }}
-                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-semibold"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
