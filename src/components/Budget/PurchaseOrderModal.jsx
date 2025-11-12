@@ -85,6 +85,10 @@ const PurchaseOrderModal = ({
         phone: selectedVendor.phone || "-",
         email: selectedVendor.email || "-",
         category: selectedVendor.category || "-",
+        address:
+          `${selectedVendor?.address?.city || ""} ${
+            selectedVendor?.address?.state || ""
+          }`.trim() || "-",
       },
       gstDetails: includeGST
         ? {
@@ -103,19 +107,19 @@ const PurchaseOrderModal = ({
   if (!show || !intent) return null;
 
   useEffect(() => {
-      const preventScrollChange = (e) => {
-        if (
-          document.activeElement.type === "number" &&
-          document.activeElement.contains(e.target)
-        ) {
-          e.preventDefault(); // stop value change
-        }
-      };
-  
-      window.addEventListener("wheel", preventScrollChange, { passive: false });
-  
-      return () => window.removeEventListener("wheel", preventScrollChange);
-    }, []);
+    const preventScrollChange = (e) => {
+      if (
+        document.activeElement.type === "number" &&
+        document.activeElement.contains(e.target)
+      ) {
+        e.preventDefault(); // stop value change
+      }
+    };
+
+    window.addEventListener("wheel", preventScrollChange, { passive: false });
+
+    return () => window.removeEventListener("wheel", preventScrollChange);
+  }, []);
 
   return (
     <div className="mt-10 fixed inset-0 bg-black/30 bg-opacity-50 flex items-center justify-center p-4 z-50">

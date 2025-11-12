@@ -22,7 +22,7 @@ import { exportBudget } from "../components/Budget/utils/ExportBudget";
 import { exportPurchaseOrders } from "../components/Budget/utils/ExportPO";
 import { exportPurchaseIntents } from "../components/Budget/utils/ExportIntent";
 import ViewBudgetModal from "../components/Budget/ViewBudgetModal";
-import { Plus, PlusIcon } from "lucide-react";
+import { toast } from "react-toastify";
 
 // Lazy load components
 const BudgetForm = lazy(() => import("../components/Budget/BudgetForm"));
@@ -735,36 +735,6 @@ function Purchase() {
     return filtered;
   }, [purchaseOrders, filters]);
 
-  const handleCreateBudget = useCallback(
-    async (budgetData) => {
-      try {
-        const docId = `${budgetData.department}_FY-20${
-          budgetData.fiscalYear || currentFiscalYear
-        }`;
-
-        const budgetWithMeta = {
-          ...budgetData,
-          department: budgetData.department,
-          fiscalYear: budgetData.fiscalYear || currentFiscalYear,
-          ownerName: currentUser.displayName,
-          status: budgetData.status || "draft",
-          createdBy: currentUser.uid,
-          updatedBy: currentUser.uid,
-          createdAt: serverTimestamp(),
-          lastUpdatedAt: serverTimestamp(),
-        };
-
-        await setDoc(doc(db, "department_budgets", docId), budgetWithMeta);
-        setShowBudgetForm(false);
-      } catch (error) {
-        console.error("Error creating budget:", error);
-        alert("Failed to create budget. Please try again.");
-        throw error;
-      }
-    },
-    [currentUser, currentFiscalYear]
-  );
-
   const handleUpdateBudget = useCallback(
     async (budgetData, existingBudget) => {
       if (!existingBudget || !existingBudget.id) {
@@ -822,15 +792,13 @@ function Purchase() {
 
         // 🔹 Success message
         if (budgetData.status === "active") {
-          alert(
-            "Budget set to active! Other budgets for this department archived."
-          );
+          toast.info("Budget set to active — all other budgets archived.");
         } else {
-          alert("Budget updated successfully!");
+          toast.success("Budget updated successfully!");
         }
       } catch (error) {
         console.error("Error updating budget:", error);
-        alert("Failed to update budget. Please try again.");
+        toast.error("Failed to update budget. Please try again.");
         throw error;
       }
     },
@@ -855,7 +823,7 @@ function Purchase() {
       setSelectedBudgetForDelete(null);
     } catch (error) {
       console.error("Error deleting budget:", error);
-      alert("Failed to delete budget. Please try again.");
+      toast.error("Failed to delete budget. Please try again.");
     } finally {
       setDeletingBudget(false);
     }
@@ -1004,9 +972,7 @@ function Purchase() {
         setSelectedIntent(null);
 
         // ✅ Success message
-        alert(
-          "✅ Purchase Order created successfully! The intent has been approved and budget updated."
-        );
+        toast.success("Purchase Order created successfully!");
       } catch (error) {
         console.error("❌ Error creating purchase order:", error);
 
@@ -1024,7 +990,7 @@ function Purchase() {
           errorMessage += "Please try again.";
         }
 
-        alert(errorMessage);
+        toast.error(errorMessage);
         throw error;
       }
     },
@@ -1050,10 +1016,10 @@ function Purchase() {
         prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o))
       );
 
-      alert("✅ Purchase Order updated successfully!");
+      toast.success("Purchase Order updated successfully!");
     } catch (error) {
       console.error("Error updating purchase order:", error);
-      alert("Failed to update purchase order. Please try again.");
+      toast.error("Failed to update purchase order. Please try again.");
     }
   };
 
@@ -1169,11 +1135,10 @@ function Purchase() {
           transaction.update(budgetRef, updatePayload);
         }
       });
-
-      alert("✅ Expense deducted successfully across all departments!");
+      toast.success("Expense deducted successfully across all departments!");
     } catch (error) {
       console.error("❌ Error applying expense:", error);
-      alert("Failed to record expense. Please try again.");
+      toast.success("Failed to record expense. Please try again.");
       throw error;
     }
   };
