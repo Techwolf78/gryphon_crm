@@ -50,11 +50,12 @@ const TrainerBillsTab = ({ onBillsCountChange }) => {
           const food = data.food || 0;
           const lodging = data.lodging || 0;
           const subTotal = trainingFees + conveyance + food + lodging;
-          const tdsAmount = (trainingFees * (data.tds || 0)) / 100;
+          const gstAmount = data.gst === "18" ? Math.round(trainingFees * 0.18) : 0;
+          const taxableAmount = trainingFees + gstAmount;
+          const tdsAmount = (taxableAmount * (data.tds || 0)) / 100;
+          const otherExpenses = subTotal - trainingFees;
           const adhocAdjustment = data.adhocAdjustment || 0;
-          const amountBeforeGST = subTotal - tdsAmount + adhocAdjustment;
-          const gstAmount = data.gst === "18" ? Math.round(amountBeforeGST * 0.18) : 0;
-          calculatedNetPayment = amountBeforeGST - gstAmount;
+          calculatedNetPayment = taxableAmount - tdsAmount + otherExpenses + adhocAdjustment;
         }
 
         return {

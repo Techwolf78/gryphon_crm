@@ -59,9 +59,12 @@ function BulkUploadModal({ show, onClose, assigneeId = null }) {
 
       console.log("🎊 Upload completed successfully!");
       console.log(`📈 Summary: ${result.totalCompanies} companies uploaded in ${result.totalBatches} batches`);
+      console.log(`🧠 Smart batching: ${result.batchesUpdated || 0} batches updated, ${result.batchesCreated || result.totalBatches} batches created`);
+      console.log(`🧹 Deduplication: ${result.duplicatesRemoved || 0} duplicates removed, ${result.totalExisting || 0} companies already existed`);
 
       setProgress(100);
-      alert(`Successfully uploaded ${result.totalCompanies} companies in ${result.totalBatches} batches!${finalAssigneeId ? ' Leads have been assigned to you.' : ''}`);
+      const duplicateInfo = result.duplicatesRemoved > 0 ? `\n• ${result.duplicatesRemoved} duplicates removed (${result.totalExisting} already existed)` : '';
+      alert(`Successfully uploaded ${result.totalCompanies} companies!\n\nSmart batching results:\n• ${result.batchesUpdated || 0} existing batches updated\n• ${result.batchesCreated || result.totalBatches} new batches created\n• Total batches: ${result.totalBatches}${duplicateInfo}${finalAssigneeId ? '\n• Leads have been assigned to you.' : ''}`);
 
       setUploading(false);
       setFile(null);
@@ -170,13 +173,15 @@ function BulkUploadModal({ show, onClose, assigneeId = null }) {
               </div>
             </div>
             <p className="mt-2 text-xs text-red-600 font-medium">
-              ⚠️ Each batch of ~1500 companies creates:<br/>
+              ⚠️ Each batch of ~1000 companies creates:<br/>
               - 1 write per batch document<br/><br/>
-              For 58,000 companies: ~39 batches × 1 = 39 writes<br/><br/>
+              For 58,000 companies: ~58 batches × 1 = 58 writes<br/><br/>
               Free tier: 20,000 writes/day. This upload is well within limits.<br/><br/>
               ⏱️ 2-second delay between batches to prevent rate limiting.<br/><br/>
               � Failed batches will be retried up to 3 times with exponential backoff.<br/><br/>
-              �💡 Uses Base64 encoding for efficient storage.
+              🧠 <strong>Smart batching enabled:</strong> Automatically detects existing batches and continues numbering from the highest batch found. If the last batch has space (&lt;999 records), new records will be appended to it. Otherwise, a new batch is created automatically.<br/><br/>
+              🧹 <strong>Deduplication enabled:</strong> Automatically checks for existing companies using Company Name + Contact Person + Phone as unique identifier. Prevents duplicate uploads and shows exactly how many duplicates were removed.<br/><br/>
+              �💡 Uses Base64 encoding for efficient storage and reduced document size.
             </p>
             
             <p className="mt-2 text-xs text-gray-500">

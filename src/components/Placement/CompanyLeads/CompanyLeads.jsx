@@ -20,8 +20,10 @@ import LeadsTable from "./LeadsTable";
 import LeadViewEditModal from "./LeadViewEditModal";
 import FollowUpCompany from "./FollowUpCompany";
 import PlacementLeadAlert from "../PlacementLeadAlert";
-import ViewModeToggle from "../ViewModeToggle";
+import ViewModeToggle from "./ViewModeToggle";
 import { useAuth } from "../../../context/AuthContext";
+import { useMsal } from "@azure/msal-react";
+import { InteractionRequiredAuthError } from "@azure/msal-browser";
 
   // Utility function to handle Firestore index errors
   const handleFirestoreIndexError = (error, operation = "operation") => {
@@ -30,7 +32,11 @@ import { useAuth } from "../../../context/AuthContext";
 
 function CompanyLeads() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState("hot");
+  const { instance, accounts } = useMsal();
+  const [activeTab, setActiveTab] = useState(() => {
+    const saved = localStorage.getItem("companyLeadsActiveTab");
+    return saved || "hot";
+  });
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddLeadForm, setShowAddLeadForm] = useState(false);
   const [leads, setLeads] = useState([]);
@@ -52,14 +58,96 @@ function CompanyLeads() {
 const [showAddJDForm, setShowAddJDForm] = useState(false);
 const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
-  // Debounced search term for performance
-  const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
-
   // View mode state with localStorage persistence
   const [viewMyLeadsOnly, setViewMyLeadsOnly] = useState(() => {
     const saved = localStorage.getItem("placementViewMyLeadsOnly");
     return saved !== null ? JSON.parse(saved) : true; // Default to "My Leads" view
   });
+
+  // User filter state
+  const [selectedUserFilter, setSelectedUserFilter] = useState('all'); // 'all', 'unassigned', or user UID
+
+  // Debounced search term for performance
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
+
+  // Microsoft 365 Connection Status
+  const [ms365ConnectionStatus, setMs365ConnectionStatus] = useState('checking'); // 'checking', 'connected', 'weak', 'disconnected'
+  const [ms365TestingConnection, setMs365TestingConnection] = useState(false);
+
+  // Test Microsoft 365 connection status
+  const testMs365Connection = useCallback(async () => {
+    if (!accounts || accounts.length === 0) {
+      setMs365ConnectionStatus('disconnected');
+      return;
+    }
+
+    setMs365TestingConnection(true);
+    try {
+      // Try to acquire token silently first
+      const silentRequest = {
+        scopes: ["https://graph.microsoft.com/Calendars.ReadWrite"],
+        account: accounts[0],
+      };
+
+      const response = await instance.acquireTokenSilent(silentRequest);
+      if (response.accessToken) {
+        setMs365ConnectionStatus('connected');
+      } else {
+        setMs365ConnectionStatus('weak');
+      }
+    } catch (error) {
+      if (error instanceof InteractionRequiredAuthError) {
+        // Token needs interaction, connection is weak
+        setMs365ConnectionStatus('weak');
+      } else {
+        console.error('MS365 connection test failed:', error);
+        setMs365ConnectionStatus('disconnected');
+      }
+    } finally {
+      setMs365TestingConnection(false);
+    }
+  }, [instance, accounts]);
+
+  // Connect to Microsoft 365
+  const connectToMs365 = useCallback(async () => {
+    if (!accounts || accounts.length === 0) {
+      try {
+        const loginRequest = {
+          scopes: ["https://graph.microsoft.com/Calendars.ReadWrite"],
+          prompt: "select_account",
+        };
+        await instance.loginPopup(loginRequest);
+        // After login, test connection
+        setTimeout(() => testMs365Connection(), 1000);
+      } catch (error) {
+        console.error('MS365 login failed:', error);
+        setMs365ConnectionStatus('disconnected');
+      }
+    } else {
+      // Already have accounts, try to get token
+      try {
+        const tokenRequest = {
+          scopes: ["https://graph.microsoft.com/Calendars.ReadWrite"],
+          account: accounts[0],
+        };
+        await instance.acquireTokenPopup(tokenRequest);
+        setMs365ConnectionStatus('connected');
+      } catch (error) {
+        console.error('MS365 token acquisition failed:', error);
+        setMs365ConnectionStatus('disconnected');
+      }
+    }
+  }, [instance, accounts, testMs365Connection]);
+
+  // Log view mode changes
+  useEffect(() => {
+    localStorage.setItem("placementViewMyLeadsOnly", JSON.stringify(viewMyLeadsOnly));
+  }, [viewMyLeadsOnly]);
+
+  // Test MS365 connection on component mount and when accounts change
+  useEffect(() => {
+    testMs365Connection();
+  }, [testMs365Connection]);
 
   // Users data for hierarchical team logic
   const [allUsers, setAllUsers] = useState({});
@@ -75,8 +163,6 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           usersData[doc.id] = { id: doc.id, ...doc.data() };
         });
         setAllUsers(usersData);
-        console.log('Fetched users:', Object.values(usersData).map(u => ({ id: u.id, departments: u.departments, displayName: u.displayName })));
-        console.log('Placement users:', Object.values(usersData).filter(u => u.departments && u.departments.some(dept => dept.toLowerCase().includes('placement'))));
       } catch (error) {
         console.error("Error fetching users:", error);
       }
@@ -87,31 +173,55 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     }
   }, [user]);
 
-  // Get team member IDs recursively (hierarchical) - MOVED UP to fix initialization error
-  const getTeamMemberIds = useCallback((managerUid, users = allUsers, visited = new Set()) => {
-    // Prevent infinite recursion
-    if (visited.has(managerUid)) {
-      console.warn('Circular reference detected in team hierarchy for user:', managerUid);
-      return [];
-    }
-    
-    visited.add(managerUid);
-    const teamIds = new Set();
-    
-    // Find all direct reports
-    Object.values(users).forEach(userData => {
-      if (userData.reportingManager === managerUid) {
-        const userId = userData.id || userData.uid;
-        if (userId && !visited.has(userId)) {
-          teamIds.add(userId);
-          // Recursively get their team members
-          const subTeamIds = getTeamMemberIds(userId, users, new Set(visited));
-          subTeamIds.forEach(id => teamIds.add(id));
-        }
+  // Get team member IDs based on role-based logic (matches Sales module)
+  const getTeamMemberIds = useCallback((managerUid, users = allUsers) => {
+    const user = Object.values(users).find((u) => u.uid === managerUid);
+    if (!user) return [];
+
+    const isPlacementDept = user.departments?.includes("Placement") || user.department === "Placement";
+    const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
+
+    if (user.role === "Director") {
+      // Director sees all placement team leads
+      return Object.values(users)
+        .filter(u => u.departments?.includes("Placement") || u.department === "Placement")
+        .map(u => u.uid || u.id);
+    } else if (user.role === "Head") {
+      // Head sees Managers and their subordinates in Placement (regardless of Head's own department)
+      const teamMembers = [];
+      
+      // Find all Managers in Placement
+      const managers = Object.values(users).filter(
+        (u) => u.role === "Manager" && 
+        (u.departments?.includes("Placement") || u.department === "Placement")
+      );
+      teamMembers.push(...managers.map(u => u.uid || u.id));
+      
+        // Find subordinates of those Managers
+        managers.forEach(manager => {
+          const subordinates = Object.values(users).filter(
+            (u) =>
+              u.reportingManager === manager.name &&
+              ["Assistant Manager", "Executive"].includes(u.role) &&
+              (u.departments?.includes("Placement") || u.department === "Placement")
+          );
+          teamMembers.push(...subordinates.map(u => u.uid || u.id));
+        });      return teamMembers;
+    } else if (isPlacementDept && isHigherRole) {
+      if (user.role === "Manager") {
+        // Manager sees direct subordinates (Assistant Manager, Executive)
+        const subordinates = Object.values(users).filter(
+          (u) =>
+            u.reportingManager === user.name &&
+            ["Assistant Manager", "Executive"].includes(u.role) &&
+            (u.departments?.includes("Placement") || u.department === "Placement")
+        );
+        return subordinates.map((u) => u.uid || u.id);
       }
-    });
-    
-    return Array.from(teamIds);
+    }
+
+    // Lower roles or non-placement users see no team members
+    return [];
   }, [allUsers]);
 
   // Fetch today's follow-ups from all companies
@@ -136,6 +246,8 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
             allFollowUps.push({
               id: `${lead.id}_${followup.key}`,
               company: lead.companyName || lead.name || 'Unknown Company',
+              contactPerson: lead.pocName || 'N/A',
+              contactPhone: lead.pocPhone || 'N/A',
               time: followup.time,
               date: followup.date,
               remarks: followup.remarks,
@@ -218,6 +330,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
               assignedTo: decodedCompany.assignedTo || null,
               assignedBy: decodedCompany.assignedBy || null,
               assignedAt: decodedCompany.assignedAt || null,
+              calledAt: decodedCompany.calledAt || null,
               createdAt: decodedCompany.createdAt || new Date().toISOString(),
               updatedAt: decodedCompany.updatedAt || new Date().toISOString(),
               contacts: decodedCompany.contacts || [],
@@ -228,23 +341,59 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         });
       });
 
-      // Filter leads by current user based on view mode
-      const userLeads = user ? allCompanies.filter(lead => {
+      // Filter leads by current user based on view mode and user filter
+      let teamMemberIds = [];
+      if (!viewMyLeadsOnly && user) {
+        teamMemberIds = getTeamMemberIds(user.uid);
+      }
+      
+      let userLeads = user ? allCompanies.filter(lead => {
         if (viewMyLeadsOnly) {
           // My Leads: Only show leads assigned to current user
           return lead.assignedTo === user.uid;
         } else {
           // My Team: Show leads assigned to team members OR unassigned leads (exclude current user's leads)
-          const teamMemberIds = getTeamMemberIds(user.uid);
           return !lead.assignedTo || teamMemberIds.includes(lead.assignedTo);
         }
       }) : allCompanies;
+
+      // Apply user filter
+      if (selectedUserFilter !== 'all') {
+        if (selectedUserFilter === 'unassigned') {
+          userLeads = userLeads.filter(lead => !lead.assignedTo);
+        } else {
+          userLeads = userLeads.filter(lead => lead.assignedTo === selectedUserFilter);
+        }
+      }
       
       setLeads(userLeads);
 
-      // Cache the data (with error handling for quota limits)
+      // Cache the data (with size checking and compression for large datasets)
       try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify({ data: allCompanies, timestamp: Date.now() }));
+        const cacheData = { data: allCompanies, timestamp: Date.now() };
+        const jsonString = JSON.stringify(cacheData);
+        
+        // Check if data is too large for localStorage (limit ~5MB)
+        if (jsonString.length > 4 * 1024 * 1024) { // 4MB limit to be safe
+          console.warn("⚠️ Dataset too large for localStorage caching, skipping cache");
+        } else {
+          // For large datasets, compress by storing only essential fields
+          if (allCompanies.length > 1000) {
+            const compressedData = allCompanies.map(company => ({
+              id: company.id,
+              companyName: company.companyName,
+              status: company.status,
+              assignedTo: company.assignedTo,
+              updatedAt: company.updatedAt,
+              calledAt: company.calledAt,
+              batchId: company.batchId
+            }));
+            const compressedCacheData = { data: compressedData, timestamp: Date.now(), compressed: true };
+            localStorage.setItem(CACHE_KEY, JSON.stringify(compressedCacheData));
+          } else {
+            localStorage.setItem(CACHE_KEY, jsonString);
+          }
+        }
       } catch (error) {
         console.warn("⚠️ Failed to cache data due to storage quota limit:", error);
       }
@@ -268,27 +417,66 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           updatedAt: doc.data().updatedAt?.toDate
             ? doc.data().updatedAt.toDate().toISOString()
             : new Date().toISOString(),
+          calledAt: doc.data().calledAt?.toDate
+            ? doc.data().calledAt.toDate().toISOString()
+            : doc.data().calledAt || null,
           contacts: doc.data().contacts || [],
           assignedTo: doc.data().assignedTo || null,
         }));
         
         // Filter leads by current user for fallback collection too
-        const userLeadsFallback = user ? leadsData.filter(lead => {
+        let teamMemberIds = [];
+        if (!viewMyLeadsOnly && user) {
+          teamMemberIds = getTeamMemberIds(user.uid);
+        }
+        
+        let userLeadsFallback = user ? leadsData.filter(lead => {
           if (viewMyLeadsOnly) {
             // My Leads: Only show leads assigned to current user
             return lead.assignedTo === user.uid;
           } else {
             // My Team: Show leads assigned to team members OR unassigned leads (exclude current user's leads)
-            const teamMemberIds = getTeamMemberIds(user.uid);
             return !lead.assignedTo || teamMemberIds.includes(lead.assignedTo);
           }
         }) : leadsData;
+
+        // Apply user filter
+        if (selectedUserFilter !== 'all') {
+          if (selectedUserFilter === 'unassigned') {
+            userLeadsFallback = userLeadsFallback.filter(lead => !lead.assignedTo);
+          } else {
+            userLeadsFallback = userLeadsFallback.filter(lead => lead.assignedTo === selectedUserFilter);
+          }
+        }
         
         setLeads(userLeadsFallback);
 
-        // Cache the data (with error handling for quota limits)
+        // Cache the data (with size checking and compression for large datasets)
         try {
-          localStorage.setItem(CACHE_KEY, JSON.stringify({ data: leadsData, timestamp: Date.now() }));
+          const cacheData = { data: leadsData, timestamp: Date.now() };
+          const jsonString = JSON.stringify(cacheData);
+          
+          // Check if data is too large for localStorage (limit ~5MB)
+          if (jsonString.length > 4 * 1024 * 1024) { // 4MB limit to be safe
+            console.warn("⚠️ Dataset too large for localStorage caching, skipping cache");
+          } else {
+            // For large datasets, compress by storing only essential fields
+            if (leadsData.length > 1000) {
+              const compressedData = leadsData.map(company => ({
+                id: company.id,
+                companyName: company.companyName,
+                status: company.status,
+                assignedTo: company.assignedTo,
+                updatedAt: company.updatedAt,
+                calledAt: company.calledAt,
+                batchId: company.batchId
+              }));
+              const compressedCacheData = { data: compressedData, timestamp: Date.now(), compressed: true };
+              localStorage.setItem(CACHE_KEY, JSON.stringify(compressedCacheData));
+            } else {
+              localStorage.setItem(CACHE_KEY, jsonString);
+            }
+          }
         } catch (error) {
           console.warn("⚠️ Failed to cache data due to storage quota limit:", error);
         }
@@ -298,53 +486,65 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     } finally {
       setLoading(false);
     }
-  }, [user, viewMyLeadsOnly, getTeamMemberIds]);
+  }, [user, viewMyLeadsOnly, getTeamMemberIds, selectedUserFilter]);
 
   // Load data from cache or fetch from Firestore
   const loadData = useCallback(async () => {
     try {
       const cached = localStorage.getItem(CACHE_KEY);
       if (cached) {
-        const { data, timestamp } = JSON.parse(cached);
+        const { data, timestamp, compressed } = JSON.parse(cached);
         if (Date.now() - timestamp < CACHE_DURATION) {
-          // Filter cached data by current user based on view mode
-          const userLeads = user ? data.filter(lead => {
+          // If cache is compressed, we need fresh data for full functionality
+          if (compressed) {
+            await fetchLeads();
+            return;
+          }
+          
+          // Filter cached data by current user based on view mode and user filter
+          let teamMemberIds = [];
+          if (!viewMyLeadsOnly && user) {
+            teamMemberIds = getTeamMemberIds(user.uid);
+          }
+          
+          let userLeads = user ? data.filter(lead => {
             if (viewMyLeadsOnly) {
               // My Leads: Only show leads assigned to current user
               return lead.assignedTo === user.uid;
             } else {
               // My Team: Show leads assigned to team members OR unassigned leads (exclude current user's leads)
-              const teamMemberIds = getTeamMemberIds(user.uid);
               return !lead.assignedTo || teamMemberIds.includes(lead.assignedTo);
             }
           }) : data;
+
+          // Apply user filter
+          if (selectedUserFilter !== 'all') {
+            if (selectedUserFilter === 'unassigned') {
+              userLeads = userLeads.filter(lead => !lead.assignedTo);
+            } else {
+              userLeads = userLeads.filter(lead => lead.assignedTo === selectedUserFilter);
+            }
+          }
+
           setLeads(userLeads);
           setLoading(false);
           return;
         }
       }
-      // Cache is stale or missing, fetch from Firestore
+      // Cache is stale, missing, or compressed - fetch from Firestore
       await fetchLeads();
     } catch (error) {
       console.error("Error loading data:", error);
       // Fallback to fetch
       await fetchLeads();
     }
-  }, [fetchLeads, CACHE_DURATION, user, viewMyLeadsOnly, getTeamMemberIds]);
+  }, [fetchLeads, CACHE_DURATION, user, viewMyLeadsOnly, getTeamMemberIds, selectedUserFilter]);
 
   // Initial fetch on component mount
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  // Fetch today's follow-ups when leads data changes
-  useEffect(() => {
-    if (leads.length > 0) {
-      fetchTodayFollowUps();
-    }
-  }, [leads, viewMyLeadsOnly, fetchTodayFollowUps]);
-
-  // Calculate completeness score for lead prioritization
+  
   const calculateCompletenessScore = useCallback((lead) => {
     let score = 0;
 
@@ -383,6 +583,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
   // Filter leads based on active tab and search term
   const filteredLeads = useMemo(() => {
+    
     // Early return for empty search and "all" tab
     if (!debouncedSearchTerm && activeTab === "all") {
       // Sort by manual leads first, then by completeness score
@@ -452,16 +653,40 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     });
   }, [leads, activeTab, debouncedSearchTerm, calculateCompletenessScore]);
 
-  // Group called leads by date for the called tab
-  const groupedCalledLeads = useMemo(() => {
-    if (activeTab !== "called") return null;
+  // Group leads by date for all tabs (hot, warm, cold, called, onboarded)
+  const groupedLeads = useMemo(() => {
+    // Only group for specific tabs
+    if (!["hot", "warm", "cold", "called", "onboarded"].includes(activeTab)) return null;
 
-    const calledLeads = leads.filter(lead => lead.status === "called");
+    // Don't group if there are too many leads (performance issue) - DISABLED: LeadsTable handles pagination within groups
+    // if (leads.length > 50000) {
+    //   console.warn(`⚠️ Too many leads (${leads.length}) for grouped view, falling back to paginated view`);
+    //   return null;
+    // }
 
-    // Group by date (using updatedAt as the called date)
-    const grouped = calledLeads.reduce((acc, lead) => {
+    // Don't group cold leads in "My Team" view (too many companies) - ENABLED for performance
+    if (!viewMyLeadsOnly && activeTab === "cold") {
+      console.warn(`⚠️ Cold tab in "My Team" view not grouped by date for performance, using paginated view`);
+      return null;
+    }
+
+    const filteredLeads = leads.filter(lead => lead.status === activeTab);
+
+    // Group by date based on status
+    const grouped = filteredLeads.reduce((acc, lead) => {
       try {
-        const date = lead.updatedAt ? new Date(lead.updatedAt).toLocaleDateString('en-US', {
+        let dateField;
+        
+        // Determine which date field to use based on status
+        if (activeTab === "called") {
+          // For called leads, use calledAt (when they were marked as called)
+          dateField = lead.calledAt;
+        } else {
+          // For other statuses, use updatedAt (when they were last updated to this status)
+          dateField = lead.updatedAt;
+        }
+        
+        const date = dateField ? new Date(dateField).toLocaleDateString('en-US', {
           year: 'numeric',
           month: 'short',
           day: 'numeric'
@@ -471,6 +696,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           acc[date] = [];
         }
         acc[date].push(lead);
+
       } catch {
         // If date parsing fails, group under 'Unknown Date'
         if (!acc['Unknown Date']) {
@@ -494,13 +720,20 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       });
 
     return sortedGrouped;
-  }, [leads, activeTab]);
+  }, [leads, activeTab, viewMyLeadsOnly]);
 
-  // Group leads by status for tab counts
-  const leadsByStatus = leads.reduce((acc, lead) => {
-    acc[lead.status] = (acc[lead.status] || 0) + 1;
-    return acc;
-  }, {});
+  // Group leads by status for tab counts (calculate based on what user can actually see)
+  const leadsByStatus = useMemo(() => {
+    const counts = { hot: 0, warm: 0, cold: 0, called: 0, onboarded: 0 };
+
+    leads.forEach(lead => {
+      if (lead.status && counts[lead.status] !== undefined) {
+        counts[lead.status]++;
+      }
+    });
+
+    return counts;
+  }, [leads]);
 
   const handleAddLead = (newLead) => {
     setLeads((prevLeads) => [
@@ -556,8 +789,13 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           const updatedCompany = {
             ...decodedCompany,
             status: newStatus,
+            updatedAt: new Date().toISOString(),
             ...assignmentData,
           };
+          // Add calledAt timestamp when status changes to "called"
+          if (newStatus === "called") {
+            updatedCompany.calledAt = new Date().toISOString();
+          }
           // Unicode-safe encoding: encodeURIComponent + btoa
           const updatedJsonString = JSON.stringify(updatedCompany);
           const updatedUriEncoded = encodeURIComponent(updatedJsonString);
@@ -580,10 +818,13 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         assignedAt: new Date().toISOString(),
       } : {};
 
+      // Add calledAt timestamp when status changes to "called"
+      const calledAtData = newStatus === "called" ? { calledAt: new Date().toISOString() } : {};
+
       setLeads((prevLeads) =>
         prevLeads.map((l) =>
           l.id === leadId
-            ? { ...l, status: newStatus, updatedAt: new Date().toISOString(), ...localAssignmentData, isTransitioning: false }
+            ? { ...l, status: newStatus, updatedAt: new Date().toISOString(), ...localAssignmentData, ...calledAtData, isTransitioning: false }
             : l
         )
       );
@@ -616,98 +857,112 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     setShowMeetingModal(true);
   };
 
-  const handleUpdateLead = (leadId, updatedData) => {
-    const updateCompany = async () => {
-      try {
-        const lead = leads.find((l) => l.id === leadId);
-        if (!lead || !lead.batchId) return;
-
-        // Fetch the batch document
-        const batchDocRef = doc(db, "companyleads", lead.batchId);
-        const batchDocSnap = await getDoc(batchDocRef);
-
-        if (batchDocSnap.exists()) {
-          const batchData = batchDocSnap.data();
-          const encodedCompanies = batchData.companies || [];
-
-          // Find the company index in the array
-          const companyIndex = parseInt(leadId.split('_').pop()); // Extract index from "batch_39_5" -> 5
-
-          if (companyIndex >= 0 && companyIndex < encodedCompanies.length) {
-            // Decode, update, and re-encode the company (Unicode-safe)
-            const uriDecoded = atob(encodedCompanies[companyIndex]);
-            const jsonString = decodeURIComponent(uriDecoded);
-            const decodedCompany = JSON.parse(jsonString);
-            
-            // If the lead is currently unassigned, assign it to the current user
-            const isCurrentlyUnassigned = !decodedCompany.assignedTo;
-            const assignmentData = isCurrentlyUnassigned && user ? {
-              assignedTo: user.uid,
-              assignedBy: user.uid,
-              assignedAt: new Date().toISOString(),
-            } : {};
-            
-            const updatedCompany = {
-              ...decodedCompany,
-              ...updatedData,
-              ...assignmentData,
-            };
-            // Unicode-safe encoding: encodeURIComponent + btoa
-            const updatedJsonString = JSON.stringify(updatedCompany);
-            const updatedUriEncoded = encodeURIComponent(updatedJsonString);
-            encodedCompanies[companyIndex] = btoa(updatedUriEncoded);
-
-            // Save back to Firestore
-            await setDoc(batchDocRef, {
-              ...batchData,
-              companies: encodedCompanies,
-            });
-          }
-        }
-      } catch (error) {
-        handleFirestoreIndexError(error, "company update");
+  const handleUpdateLead = async (leadId, updatedData) => {
+    try {
+      const lead = leads.find((l) => l.id === leadId);
+      if (!lead || !lead.batchId) {
+        throw new Error('Lead or batch ID not found');
       }
-    };
-    updateCompany();
 
-    // Map Firestore field names back to UI field names for local state update
-    const uiFieldUpdates = {
-      companyName: updatedData.name || updatedData.companyName,
-      pocName: updatedData.contactPerson || updatedData.pocName,
-      pocDesignation: updatedData.designation || updatedData.pocDesignation,
-      pocPhone: updatedData.phone || updatedData.pocPhone,
-      pocMail: updatedData.email || updatedData.pocMail,
-      pocLocation: updatedData.location || updatedData.pocLocation,
-      companyWebsite: updatedData.companyUrl || updatedData.companyWebsite,
-      pocLinkedin: updatedData.linkedinUrl || updatedData.pocLinkedin,
-      industry: updatedData.industry,
-      companySize: updatedData.companySize,
-      status: updatedData.status,
-      workingSince: updatedData.workingSince,
-      updatedAt: new Date().toISOString(),
-    };
+      // Fetch the batch document
+      const batchDocRef = doc(db, "companyleads", lead.batchId);
+      const batchDocSnap = await getDoc(batchDocRef);
 
-    // Check if we need to add assignment data to local state
-    const currentLead = leads.find((l) => l.id === leadId);
-    const isCurrentlyUnassigned = currentLead && !currentLead.assignedTo;
-    const localAssignmentData = isCurrentlyUnassigned && user ? {
-      assignedTo: user.uid,
-      assignedBy: user.uid,
-      assignedAt: new Date().toISOString(),
-    } : {};
+      if (!batchDocSnap.exists()) {
+        throw new Error('Batch document not found');
+      }
 
-    // Update local state with UI field names and assignment data
-    setLeads((prevLeads) =>
-      prevLeads.map((l) =>
-        l.id === leadId
-          ? { ...l, ...uiFieldUpdates, ...localAssignmentData }
-          : l
-      )
-    );
+      const batchData = batchDocSnap.data();
+      const encodedCompanies = batchData.companies || [];
 
-    // Update selectedLead if it's the currently selected lead
-    if (selectedLead && selectedLead.id === leadId) {
-      setSelectedLead(prev => ({ ...prev, ...uiFieldUpdates, ...localAssignmentData }));
+      // Find the company index in the array
+      const companyIndex = parseInt(leadId.split('_').pop()); // Extract index from "batch_39_5" -> 5
+
+      if (companyIndex < 0 || companyIndex >= encodedCompanies.length) {
+        throw new Error('Invalid company index');
+      }
+
+      // Decode, update, and re-encode the company (Unicode-safe)
+      const uriDecoded = atob(encodedCompanies[companyIndex]);
+      const jsonString = decodeURIComponent(uriDecoded);
+      const decodedCompany = JSON.parse(jsonString);
+      
+      // If the lead is currently unassigned, assign it to the current user
+      const isCurrentlyUnassigned = !decodedCompany.assignedTo;
+      const assignmentData = isCurrentlyUnassigned && user ? {
+        assignedTo: user.uid,
+        assignedBy: user.uid,
+        assignedAt: new Date().toISOString(),
+      } : {};
+      
+      const updatedCompany = {
+        ...decodedCompany,
+        ...updatedData,
+        ...assignmentData,
+      };
+      // Preserve calledAt if it exists and status is not changing to "called"
+      if (decodedCompany.calledAt && updatedData.status !== "called") {
+        updatedCompany.calledAt = decodedCompany.calledAt;
+      }
+      // Add calledAt timestamp when status changes to "called" and it doesn't exist
+      if (updatedData.status === "called" && !decodedCompany.calledAt) {
+        updatedCompany.calledAt = new Date().toISOString();
+      }
+      // Unicode-safe encoding: encodeURIComponent + btoa
+      const updatedJsonString = JSON.stringify(updatedCompany);
+      const updatedUriEncoded = encodeURIComponent(updatedJsonString);
+      encodedCompanies[companyIndex] = btoa(updatedUriEncoded);
+
+      // Save back to Firestore
+      await setDoc(batchDocRef, {
+        ...batchData,
+        companies: encodedCompanies,
+      });
+
+      // Map Firestore field names back to UI field names for local state update
+      const uiFieldUpdates = {
+        companyName: updatedData.name || updatedData.companyName,
+        pocName: updatedData.contactPerson || updatedData.pocName,
+        pocDesignation: updatedData.designation || updatedData.pocDesignation,
+        pocPhone: updatedData.phone || updatedData.pocPhone,
+        pocMail: updatedData.email || updatedData.pocMail,
+        pocLocation: updatedData.location || updatedData.pocLocation,
+        companyWebsite: updatedData.companyUrl || updatedData.companyWebsite,
+        pocLinkedin: updatedData.linkedinUrl || updatedData.pocLinkedin,
+        industry: updatedData.industry,
+        companySize: updatedData.companySize,
+        status: updatedData.status,
+        workingSince: updatedData.workingSince,
+        calledAt: updatedData.calledAt || decodedCompany.calledAt, // Preserve existing calledAt
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Check if we need to add assignment data to local state
+      const localAssignmentData = isCurrentlyUnassigned && user ? {
+        assignedTo: user.uid,
+        assignedBy: user.uid,
+        assignedAt: new Date().toISOString(),
+      } : {};
+
+      // Update local state with UI field names and assignment data
+      setLeads((prevLeads) =>
+        prevLeads.map((l) =>
+          l.id === leadId
+            ? { ...l, ...uiFieldUpdates, ...localAssignmentData }
+            : l
+        )
+      );
+
+      // Update selectedLead if it's the currently selected lead
+      if (selectedLead && selectedLead.id === leadId) {
+        setSelectedLead(prev => ({ ...prev, ...uiFieldUpdates, ...localAssignmentData }));
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating company:', error);
+      handleFirestoreIndexError(error, "company update");
+      return { success: false, error: error.message };
     }
   };
 
@@ -802,8 +1057,6 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         )
       );
 
-      // Show success message
-      console.log(`Lead assigned successfully to user ${userId}`);
     } catch (error) {
       handleFirestoreIndexError(error, "lead assignment");
       alert("Failed to assign the lead. Please try again.");
@@ -849,13 +1102,36 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     <div className="bg-white rounded-lg shadow p-4">
       {/* Header with View Toggle on Left, Search in Center, Actions on Right */}
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-2 gap-2">
-        {/* View Mode Toggle on Left */}
-        <div className="flex items-center gap-2 shrink-0 h-8">
-          <span className="text-xs font-medium text-gray-700">View:</span>
+        {/* View Mode Toggle and User Filter on Left */}
+        <div className="flex items-center gap-4 shrink-0 h-8">
           <ViewModeToggle
             viewMyLeadsOnly={viewMyLeadsOnly}
             setViewMyLeadsOnly={setViewMyLeadsOnly}
           />
+          <span className="text-xs font-medium text-gray-700">User:</span>
+          <select
+            value={selectedUserFilter}
+            onChange={(e) => setSelectedUserFilter(e.target.value)}
+            className="px-2 py-1 border rounded text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-full"
+          >
+            <option value="all">All Users</option>
+            <option value="unassigned">Unassigned</option>
+            {Object.values(allUsers)
+              .filter(u => {
+                if (viewMyLeadsOnly) {
+                  return u.uid === user?.uid;
+                } else {
+                  const teamMemberIds = getTeamMemberIds(user?.uid || '');
+                  return teamMemberIds.includes(u.uid || u.id);
+                }
+              })
+              .map(u => (
+                <option key={u.uid || u.id} value={u.uid || u.id}>
+                  {u.name || u.displayName || 'Unknown User'}
+                </option>
+              ))
+            }
+          </select>
         </div>
 
         {/* Search in Center */}
@@ -869,6 +1145,43 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           />
         </div>
 
+        {/* Microsoft 365 Connection Status */}
+        <div className="flex items-center gap-2 shrink-0 h-8">
+          <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 rounded border">
+            {ms365TestingConnection ? (
+              <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+            ) : (
+              <div
+                className={`w-3 h-3 rounded-full ${
+                  ms365ConnectionStatus === 'connected'
+                    ? 'bg-green-500'
+                    : ms365ConnectionStatus === 'weak'
+                    ? 'bg-yellow-500'
+                    : 'bg-red-500'
+                }`}
+              ></div>
+            )}
+            <span className="text-xs text-gray-600">
+              {ms365TestingConnection
+                ? 'Testing...'
+                : ms365ConnectionStatus === 'connected'
+                ? 'MS365'
+                : ms365ConnectionStatus === 'weak'
+                ? 'MS365'
+                : 'MS365'
+              }
+            </span>
+            {ms365ConnectionStatus !== 'connected' && !ms365TestingConnection && (
+              <button
+                onClick={connectToMs365}
+                className="ml-1 px-2 py-0.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
+              >
+                Connect
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Action Buttons on Right */}
         <div className="flex gap-1 shrink-0 h-8">
           <button
@@ -878,24 +1191,29 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
             <PlusIcon className="h-3 w-3 mr-1" />
             Add Company
           </button>
-          <button
-            onClick={() => setShowBulkUploadForm(true)}
-            className="px-3 py-1 bg-green-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-md text-xs h-full"
-          >
-            <CloudUploadIcon className="h-3 w-3 mr-1" />
-            Bulk Upload
-          </button>
+          {user?.departments?.includes("admin") && (
+            <button
+              onClick={() => setShowBulkUploadForm(true)}
+              className="px-3 py-1 bg-green-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-md text-xs h-full"
+            >
+              <CloudUploadIcon className="h-3 w-3 mr-1" />
+              Bulk Upload
+            </button>
+          )}
         </div>
       </div>      <LeadsFilters
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={(tab) => {
+          setActiveTab(tab);
+        }}
         setActiveTab={setActiveTab}
         leadsByStatus={leadsByStatus}
       />
 
       <LeadsTable
         leads={filteredLeads}
-        groupedCalledLeads={groupedCalledLeads}
+        groupedLeads={groupedLeads}
+        activeTab={activeTab}
         onLeadClick={(lead) => {
           setSelectedLead(lead);
           setShowLeadDetails(true);
@@ -913,7 +1231,13 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       {/* Company Count Display */}
       <div className="flex justify-between items-center mt-4 px-4 py-3 bg-gray-50 rounded-lg">
         <div className="text-sm text-gray-700">
-          Total: {leads.length} companies loaded
+          Total: {filteredLeads.length} companies loaded
+          {selectedUserFilter !== 'all' && (
+            <span className="ml-2 text-blue-600">
+              (filtered by {selectedUserFilter === 'unassigned' ? 'unassigned leads' : 
+                Object.values(allUsers).find(u => (u.uid || u.id) === selectedUserFilter)?.name || 'user'})
+            </span>
+          )}
         </div>
         <button
           onClick={async () => {
@@ -932,65 +1256,74 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         <LeadViewEditModal
           lead={selectedLead}
           onClose={() => setShowLeadDetails(false)}
-          onAddContact={(leadId, contactData) => {
-            const updateContacts = async () => {
-              try {
-                const lead = leads.find((l) => l.id === leadId);
-                if (!lead || !lead.batchId) return;
-
-                // Fetch the batch document
-                const batchDocRef = doc(db, "companyleads", lead.batchId);
-                const batchDocSnap = await getDoc(batchDocRef);
-
-                if (batchDocSnap.exists()) {
-                  const batchData = batchDocSnap.data();
-                  const encodedCompanies = batchData.companies || [];
-
-                  // Find the company index in the array
-                  const companyIndex = parseInt(leadId.split('_').pop()); // Extract index from "batch_39_5" -> 5
-
-                  if (companyIndex >= 0 && companyIndex < encodedCompanies.length) {
-                    // Decode, update contacts, and re-encode the company (Unicode-safe)
-                    const uriDecoded = atob(encodedCompanies[companyIndex]);
-                    const jsonString = decodeURIComponent(uriDecoded);
-                    const decodedCompany = JSON.parse(jsonString);
-                    const existingContacts = decodedCompany.contacts || [];
-                    const updatedCompany = {
-                      ...decodedCompany,
-                      contacts: [...existingContacts, contactData],
-                    };
-                    // Unicode-safe encoding: encodeURIComponent + btoa
-                    const updatedJsonString = JSON.stringify(updatedCompany);
-                    const updatedUriEncoded = encodeURIComponent(updatedJsonString);
-                    encodedCompanies[companyIndex] = btoa(updatedUriEncoded);
-
-                    // Save back to Firestore
-                    await setDoc(batchDocRef, {
-                      ...batchData,
-                      companies: encodedCompanies,
-                    });
-                  }
-                }
-              } catch (error) {
-                handleFirestoreIndexError(error, "contact update");
+          onAddContact={async (leadId, contactData) => {
+            try {
+              const lead = leads.find((l) => l.id === leadId);
+              if (!lead || !lead.batchId) {
+                throw new Error('Lead or batch ID not found');
               }
-            };
-            updateContacts();
 
-            setLeads(
-              leads.map((lead) =>
-                lead.id === leadId
-                  ? {
-                      ...lead,
-                      contacts: [...lead.contacts, contactData],
-                      updatedAt: new Date().toISOString(),
-                    }
-                  : lead
-              )
-            );
+              // Fetch the batch document
+              const batchDocRef = doc(db, "companyleads", lead.batchId);
+              const batchDocSnap = await getDoc(batchDocRef);
+
+              if (!batchDocSnap.exists()) {
+                throw new Error('Batch document not found');
+              }
+
+              const batchData = batchDocSnap.data();
+              const encodedCompanies = batchData.companies || [];
+
+              // Find the company index in the array
+              const companyIndex = parseInt(leadId.split('_').pop()); // Extract index from "batch_39_5" -> 5
+
+              if (companyIndex < 0 || companyIndex >= encodedCompanies.length) {
+                throw new Error('Invalid company index');
+              }
+
+              // Decode, update contacts, and re-encode the company (Unicode-safe)
+              const uriDecoded = atob(encodedCompanies[companyIndex]);
+              const jsonString = decodeURIComponent(uriDecoded);
+              const decodedCompany = JSON.parse(jsonString);
+              const existingContacts = decodedCompany.contacts || [];
+              const updatedCompany = {
+                ...decodedCompany,
+                contacts: [...existingContacts, contactData],
+              };
+              // Unicode-safe encoding: encodeURIComponent + btoa
+              const updatedJsonString = JSON.stringify(updatedCompany);
+              const updatedUriEncoded = encodeURIComponent(updatedJsonString);
+              encodedCompanies[companyIndex] = btoa(updatedUriEncoded);
+
+              // Save back to Firestore
+              await setDoc(batchDocRef, {
+                ...batchData,
+                companies: encodedCompanies,
+              });
+
+              // Update local state
+              setLeads(
+                leads.map((lead) =>
+                  lead.id === leadId
+                    ? {
+                        ...lead,
+                        contacts: [...lead.contacts, contactData],
+                        updatedAt: new Date().toISOString(),
+                      }
+                    : lead
+                )
+              );
+
+              return { success: true };
+            } catch (error) {
+              console.error('Error adding contact:', error);
+              handleFirestoreIndexError(error, "contact update");
+              return { success: false, error: error.message };
+            }
           }}
           onUpdateLead={handleUpdateLead}
           formatDate={formatDate}
+          allUsers={allUsers}
         />
       )}
 
@@ -1026,8 +1359,9 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           company={selectedCompanyForMeeting}
           onClose={() => setShowMeetingModal(false)}
           onFollowUpScheduled={() => {
-            // Refresh today's follow-ups when a new follow-up is scheduled
+            // Refresh today's follow-ups and main leads data when a new follow-up is scheduled
             fetchTodayFollowUps();
+            fetchLeads();
           }}
         />
       )}

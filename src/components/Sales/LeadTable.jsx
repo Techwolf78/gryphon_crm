@@ -176,45 +176,45 @@ export default function LeadsTable({
         <div
           className={`${gridColumns} ${headerColorMap[activeTab]} text-sm font-medium px-5 py-2`}
         >
-          <div className="break-words">
+          <div className="wrap-break-word">
             College
             <br />
             Name
           </div>
-          <div className="break-words">
+          <div className="wrap-break-word">
             Course/
             <br />
             Year
           </div>
-          <div className="break-words">City</div>
-          <div className="break-words">
+          <div className="wrap-break-word">City</div>
+          <div className="wrap-break-word">
             Contact
             <br />
             Name
           </div>
-          <div className="break-words">
+          <div className="wrap-break-word">
             Phone
             <br />
             No.
           </div>
-          <div className="break-words">TCV</div>
-          <div className="break-words">
+          <div className="wrap-break-word">TCV</div>
+          <div className="wrap-break-word">
             Opened
             <br />
             Date
           </div>
-          <div className="break-words">
+          <div className="wrap-break-word">
             Expected
             <br />
             Closure
           </div>
-          <div className="break-words">Meetings</div>
-          <div className="break-words">
+          <div className="wrap-break-word">Meetings</div>
+          <div className="wrap-break-word">
             Assigned
             <br />
             To
           </div>
-          <div className="text-center break-words">Actions</div>
+          <div className="text-center wrap-break-word">Actions</div>
         </div>
 
         {/* Scrollable Body */}
@@ -382,7 +382,7 @@ export default function LeadsTable({
         rounded-md 
         hover:bg-blue-50 
         transition-colors duration-200
-        min-w-[160px]
+        min-w-40
       "
               >
                 <span className="flex items-center gap-2">

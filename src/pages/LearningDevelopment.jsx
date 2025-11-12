@@ -75,6 +75,7 @@ function LearningDevelopment() {
   });
   const [showJDMergeModal, setShowJDMergeModal] = useState(false);
   const [selectedJDColleges, setSelectedJDColleges] = useState([]);
+  const [referenceTraining, setReferenceTraining] = useState(null);
   const [showOperationsConfigModal, setShowOperationsConfigModal] =
     useState(false);
   const [operationsConfig, setOperationsConfig] = useState(null);
@@ -346,7 +347,7 @@ function LearningDevelopment() {
   };
 
   // Handle JD Training initiation
-  const handleInitiateJD = () => {
+  const handleInitiateJD = (training = null) => {
     // TODO: Remove this toast notification and uncomment the line below when JD training is ready for production
     // toast.info("JD Training feature is still under development and not available for use yet", {
     //   position: "top-right",
@@ -358,6 +359,7 @@ function LearningDevelopment() {
     // });
 
     // Uncomment the line below when ready to enable JD training functionality:
+    setReferenceTraining(training);
     setShowJDMergeModal(true);
   };
 
@@ -914,6 +916,7 @@ function LearningDevelopment() {
           onClose={() => setShowJDMergeModal(false)}
           onProceed={handleJDCollegesSelected}
           preSelectedColleges={selectedJDColleges}
+          referenceTraining={referenceTraining}
         />
       )}
 

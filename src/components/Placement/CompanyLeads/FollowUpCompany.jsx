@@ -147,7 +147,10 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
             ...decodedCompany,
             followups: updatedFollowups,
           };
-          encodedCompanies[companyIndex] = btoa(JSON.stringify(updatedCompany));
+          // Use Unicode-safe encoding: encodeURIComponent + btoa to handle Unicode characters
+          const deleteJsonString = JSON.stringify(updatedCompany);
+          const deleteUriEncoded = encodeURIComponent(deleteJsonString);
+          encodedCompanies[companyIndex] = btoa(deleteUriEncoded);
 
           await setDoc(batchDocRef, {
             ...batchData,
@@ -207,7 +210,7 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
       const endDateTime = dayjs(eventDateTime).add(1, 'hour').format();
 
       const event = {
-        subject: `Follow-up with ${company.companyName || company.name}`,
+        subject: `Follow-up with ${company.companyName || company.name}${company.pocName && company.pocName !== 'N/A' ? ` | ${company.pocName}` : ''}${company.pocPhone && company.pocPhone !== 'N/A' ? ` | ${company.pocPhone}` : ''}`,
         body: {
           contentType: "HTML",
           content: remarks || "Scheduled follow-up meeting",
@@ -335,8 +338,10 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
             ...decodedCompany,
             followups: updatedFollowups,
           };
-          console.log("Updated company with new followups");
-          encodedCompanies[companyIndex] = btoa(JSON.stringify(updatedCompany));
+          // Use Unicode-safe encoding: encodeURIComponent + btoa to handle Unicode characters
+          const updatedJsonString = JSON.stringify(updatedCompany);
+          const uriEncoded = encodeURIComponent(updatedJsonString);
+          encodedCompanies[companyIndex] = btoa(uriEncoded);
 
           console.log("Saving updated batch data to Firestore");
           await setDoc(batchDocRef, {
@@ -352,6 +357,9 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
           if (onFollowUpScheduled) {
             onFollowUpScheduled();
           }
+
+          // Auto-close the modal on successful submission
+          onClose();
 
           // Reset form
           setDate(dayjs().format("YYYY-MM-DD"));
@@ -404,7 +412,7 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
       const endDateTime = dayjs(eventDateTime).add(1, 'hour').format();
 
       const event = {
-        subject: `Follow-up with ${company.companyName || company.name}`,
+        subject: `Follow-up with ${company.companyName || company.name}${company.pocName && company.pocName !== 'N/A' ? ` | ${company.pocName}` : ''}${company.pocPhone && company.pocPhone !== 'N/A' ? ` | ${company.pocPhone}` : ''}`,
         body: {
           contentType: "HTML",
           content: followup.remarks || "Scheduled follow-up meeting",
@@ -482,7 +490,10 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
             ...decodedCompany,
             followups: updatedFollowups,
           };
-          encodedCompanies[companyIndex] = btoa(JSON.stringify(updatedCompany));
+          // Use Unicode-safe encoding: encodeURIComponent + btoa to handle Unicode characters
+          const retryJsonString = JSON.stringify(updatedCompany);
+          const retryUriEncoded = encodeURIComponent(retryJsonString);
+          encodedCompanies[companyIndex] = btoa(retryUriEncoded);
 
           await setDoc(batchDocRef, {
             ...batchData,

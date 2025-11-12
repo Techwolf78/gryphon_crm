@@ -33,8 +33,16 @@ function Placement() {
     useState("asc");
   const [isProjectCodeSorted, setIsProjectCodeSorted] = useState(false);
 
-  // Enhanced Tab Navigation State
-  const [activeTab, setActiveTab] = useState("training");
+  // Enhanced Tab Navigation State with localStorage persistence
+  const [activeTab, setActiveTab] = useState(() => {
+    const saved = localStorage.getItem("placementActiveTab");
+    return saved || "training";
+  });
+
+  // Persist active tab changes
+  useEffect(() => {
+    localStorage.setItem("placementActiveTab", activeTab);
+  }, [activeTab]);
 
   // Inline CSS for animations
   const tableStyles = `
