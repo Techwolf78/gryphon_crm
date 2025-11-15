@@ -206,7 +206,7 @@ export const AuthProvider = ({ children }) => {
             setUser({
               ...firebaseUser,
               role: userData.role || "guest",
-              department: userData.department || userData.departments || "guest", // Handle both old single department and new array format
+              department: userData.department || (Array.isArray(userData.departments) ? userData.departments[0] : "guest"), // Handle both old single department and new array format
               departments: userData.departments || (userData.department ? [userData.department] : []), // Store departments as array
               reportingManager: userData.reportingManager || null,
             });

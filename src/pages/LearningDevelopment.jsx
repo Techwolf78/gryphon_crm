@@ -716,7 +716,7 @@ function LearningDevelopment() {
                     ></div>
                   </div>
                   <span className="text-gray-600 font-medium">
-                    Loading training data...
+                    Crunching the latest data, just for you. Wait tight...
                   </span>
                 </div>
               </div>

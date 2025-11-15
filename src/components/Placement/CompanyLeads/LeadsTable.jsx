@@ -600,10 +600,10 @@ function LeadsTable({
                 })
               ) : (
                 // Render regular flat list for other tabs
-                currentLeads.map((lead) => (
+                currentLeads.map((lead, index) => (
                   <tr
                     key={lead.id}
-                    className="hover:bg-gray-50 cursor-pointer"
+                    className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-25'} hover:bg-gray-50 cursor-pointer transition-colors`}
                     onClick={() => onLeadClick(lead)}
                   >
                     <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[150px]">
