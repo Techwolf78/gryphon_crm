@@ -159,11 +159,7 @@ const PurchaseIntentsList = ({
       ? new Date(timestamp.seconds * 1000)
       : new Date(timestamp);
 
-    return date.toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
+    return date.toLocaleDateString("en-IN");
   };
 
   const formatDateTime = (timestamp) => {
@@ -199,12 +195,12 @@ const PurchaseIntentsList = ({
   };
 
   return (
-    <div className="space-y-6" onClick={handleClickOutside}>
+    <div className="space-y-4" onClick={handleClickOutside}>
       {/* Filters */}
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="bg-gray-50 p-3 rounded-lg text-sm">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-xs font-medium text-gray-700 mb-1">
               Status
             </label>
             <select
@@ -212,7 +208,7 @@ const PurchaseIntentsList = ({
               onChange={(e) =>
                 onFiltersChange({ ...filters, status: e.target.value })
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs"
             >
               <option value="">All Status</option>
               <option value="submitted">Submitted</option>
@@ -225,7 +221,7 @@ const PurchaseIntentsList = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-xs font-medium text-gray-700 mb-1">
               Component
             </label>
             <select
@@ -233,7 +229,7 @@ const PurchaseIntentsList = ({
               onChange={(e) =>
                 onFiltersChange({ ...filters, component: e.target.value })
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs"
             >
               <option value="">All Components</option>
               {getComponentsForItem
@@ -266,7 +262,7 @@ const PurchaseIntentsList = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-xs font-medium text-gray-700 mb-1">
               From Date
             </label>
             <input
@@ -278,12 +274,12 @@ const PurchaseIntentsList = ({
                   dateRange: { ...filters.dateRange, start: e.target.value },
                 })
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-xs font-medium text-gray-700 mb-1">
               To Date
             </label>
             <input
@@ -295,7 +291,7 @@ const PurchaseIntentsList = ({
                   dateRange: { ...filters.dateRange, end: e.target.value },
                 })
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs"
             />
           </div>
         </div>
@@ -303,30 +299,30 @@ const PurchaseIntentsList = ({
 
       {/* Results Count */}
       <div className="flex justify-between items-center">
-        <p className="text-sm text-gray-600">
+        <p className="text-xs text-gray-600">
           Showing {sortedIntents.length} purchase intent
           {sortedIntents.length !== 1 ? "s" : ""}
         </p>
         {isPurchaseDepartment && (
-          <p className="text-sm text-blue-600 font-medium">
+          <p className="text-xs text-blue-600 font-medium">
             Purchase Department - Can Create Purchase Orders
           </p>
         )}
       </div>
 
       {/* Intents Table */}
-      <div className="bg-white border border-gray-200 rounded-lg">
+      <div className="bg-white border border-gray-200 rounded-lg text-sm">
         <div className="">
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
                 {showDepartment && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Department
                   </th>
                 )}
                 <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                   onClick={() => handleSort("title")}
                 >
                   <div className="flex items-center">
@@ -338,11 +334,11 @@ const PurchaseIntentsList = ({
                     )}
                   </div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Component
                 </th>
                 <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                   onClick={() => handleSort("estimatedTotal")}
                 >
                   <div className="flex items-center">
@@ -354,11 +350,11 @@ const PurchaseIntentsList = ({
                     )}
                   </div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
                 <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                   onClick={() => handleSort("createdAt")}
                 >
                   <div className="flex items-center">
@@ -370,7 +366,7 @@ const PurchaseIntentsList = ({
                     )}
                   </div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
                   Actions
                 </th>
               </tr>
@@ -379,16 +375,16 @@ const PurchaseIntentsList = ({
               {sortedIntents.map((intent) => (
                 <tr key={intent.id} className="hover:bg-gray-50">
                   {showDepartment && (
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-900">
                       {intent.department.toUpperCase() || "Unknown"}
                     </td>
                   )}
-                  <td className="px-6 py-4">
+                  <td className="px-4 py-3">
                     <div>
                       <div className="text-sm font-medium text-gray-900">
                         {intent.title}
                       </div>
-                      <div className="text-sm text-gray-500 max-w-xs">
+                      <div className="text-xs text-gray-500 max-w-xs">
                         {intent.description}
                       </div>
                       <div className="text-xs text-gray-400 mt-1">
@@ -401,33 +397,33 @@ const PurchaseIntentsList = ({
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-4 py-3 whitespace-nowrap">
                     <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getComponentColor(
+                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getComponentColor(
                         intent
                       )}`}
                     >
                       {getComponentName(intent)} {/* ✅ NEW WAY */}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                     ₹
                     {intent.estimatedTotal?.toLocaleString("en-In") ||
                       intent.totalEstimate?.toLocaleString("en-In")}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-4 py-3 whitespace-nowrap">
                     <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
+                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
                         intent.status
                       )}`}
                     >
                       {intent.status.replace(/_/g, " ")}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
                     {formatDate(intent.createdAt)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium relative">
+                  <td className="px-4 py-3 whitespace-nowrap text-xs font-medium relative">
                     {/* 3-dot Dropdown Menu */}
                     <div className="relative">
                       <button
@@ -438,7 +434,7 @@ const PurchaseIntentsList = ({
                         className="flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
                       >
                         <svg
-                          className="w-5 h-5"
+                          className="w-4 h-4"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -454,7 +450,7 @@ const PurchaseIntentsList = ({
 
                       {/* Dropdown Menu */}
                       {activeDropdown === intent.id && (
-                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
+                        <div className="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-10 text-xs">
                           <div className="py-1">
                             {/* View Action - Always Available */}
                             <button
@@ -462,10 +458,10 @@ const PurchaseIntentsList = ({
                                 e.stopPropagation();
                                 setViewModal(intent);
                               }}
-                              className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                              className="flex items-center w-full px-3 py-1.5 text-gray-700 hover:bg-gray-100"
                             >
                               <svg
-                                className="w-4 h-4 mr-2"
+                                className="w-3.5 h-3.5 mr-2"
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
@@ -493,10 +489,10 @@ const PurchaseIntentsList = ({
                                   e.stopPropagation();
                                   handleCreatePO(intent);
                                 }}
-                                className="flex items-center w-full px-4 py-2 text-sm text-green-600 hover:bg-green-50"
+                                className="flex items-center w-full px-3 py-1.5 text-green-600 hover:bg-green-50"
                               >
                                 <svg
-                                  className="w-4 h-4 mr-2"
+                                  className="w-3.5 h-3.5 mr-2"
                                   fill="none"
                                   stroke="currentColor"
                                   viewBox="0 0 24 24"
@@ -520,10 +516,10 @@ const PurchaseIntentsList = ({
                                   setDeleteConfirm(intent.id);
                                 }}
                                 disabled={deletingId === intent.id}
-                                className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="flex items-center w-full px-3 py-1.5 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 <svg
-                                  className="w-4 h-4 mr-2"
+                                  className="w-3.5 h-3.5 mr-2"
                                   fill="none"
                                   stroke="currentColor"
                                   viewBox="0 0 24 24"
@@ -552,9 +548,9 @@ const PurchaseIntentsList = ({
         </div>
 
         {sortedIntents.length === 0 && (
-          <div className="text-center py-12">
+          <div className="text-center py-8">
             <svg
-              className="w-12 h-12 text-gray-400 mx-auto mb-4"
+              className="w-10 h-10 text-gray-400 mx-auto mb-3"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -566,8 +562,8 @@ const PurchaseIntentsList = ({
                 d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
               />
             </svg>
-            <p className="text-gray-500 text-lg">No purchase intents found</p>
-            <p className="text-gray-400 mt-2">
+            <p className="text-gray-500 text-base">No purchase intents found</p>
+            <p className="text-gray-400 mt-1.5 text-xs">
               {isPurchaseDepartment
                 ? "Purchase intents from other departments will appear here for PO creation"
                 : "Create your first purchase intent to get started"}
@@ -578,19 +574,19 @@ const PurchaseIntentsList = ({
 
       {/* View Details Modal */}
       {viewModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-1000">
-          <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-[0_8px_24px_rgba(0,0,0,0.15)] w-full max-w-4xl max-h-[90vh] overflow-hidden border border-gray-100">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-3 z-1000 text-sm">
+          <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-[0_8px_24px_rgba(0,0,0,0.15)] w-full max-w-4xl max-h-[90vh] overflow-hidden border border-gray-100">
             {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex justify-between items-center px-6 py-4 shadow-sm">
-              <h2 className="text-xl font-bold tracking-wide">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex justify-between items-center px-4 py-3 shadow-sm">
+              <h2 className="text-lg font-bold tracking-wide">
                 Purchase Intent Details
               </h2>
               <button
                 onClick={() => setViewModal(null)}
-                className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+                className="p-1 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
               >
                 <svg
-                  className="w-5 h-5 text-white"
+                  className="w-4 h-4 text-white"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -606,15 +602,15 @@ const PurchaseIntentsList = ({
             </div>
 
             {/* Body */}
-            <div className="p-6 overflow-y-auto max-h-[70vh] space-y-8">
+            <div className="p-4 overflow-y-auto max-h-[70vh] space-y-6">
               {/* Basic + Financial Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Basic Information */}
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3 border-b border-gray-200 pb-1">
+                  <h3 className="text-base font-semibold text-gray-900 mb-2 border-b border-gray-200 pb-1">
                     Basic Information
                   </h3>
-                  <dl className="space-y-3 text-sm">
+                  <dl className="space-y-2 text-xs">
                     {showDepartment && (
                       <div>
                         <dt className="font-medium text-gray-500">
@@ -650,10 +646,10 @@ const PurchaseIntentsList = ({
 
                 {/* Financial Details */}
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3 border-b border-gray-200 pb-1">
+                  <h3 className="text-base font-semibold text-gray-900 mb-2 border-b border-gray-200 pb-1">
                     Financial Details
                   </h3>
-                  <dl className="space-y-3 text-sm">
+                  <dl className="space-y-2 text-xs">
                     <div>
                       <dt className="font-medium text-gray-500">
                         Total Estimate
@@ -668,7 +664,7 @@ const PurchaseIntentsList = ({
                       <dt className="font-medium text-gray-500">Status</dt>
                       <dd>
                         <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold shadow-sm ${getStatusColor(
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold shadow-sm ${getStatusColor(
                             viewModal.status
                           )}`}
                         >
@@ -693,16 +689,16 @@ const PurchaseIntentsList = ({
               {/* Requested Items */}
               {viewModal.requestedItems?.length > 0 && (
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3 border-b border-gray-200 pb-1">
+                  <h3 className="text-base font-semibold text-gray-900 mb-2 border-b border-gray-200 pb-1">
                     Requested Items ({viewModal.requestedItems.length})
                   </h3>
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {viewModal.requestedItems.map((item, index) => (
                       <div
                         key={index}
-                        className="bg-gray-50 border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                        className="bg-gray-50 border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow"
                       >
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
                           <div>
                             <span className="font-medium text-gray-500">
                               Category:
@@ -743,10 +739,10 @@ const PurchaseIntentsList = ({
 
               {/* Timeline */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3 border-b border-gray-200 pb-1">
+                <h3 className="text-base font-semibold text-gray-900 mb-2 border-b border-gray-200 pb-1">
                   Timeline
                 </h3>
-                <dl className="space-y-3 text-sm">
+                <dl className="space-y-2 text-xs">
                   <div>
                     <dt className="font-medium text-gray-500">Created</dt>
                     <dd className="text-gray-900">
@@ -766,11 +762,11 @@ const PurchaseIntentsList = ({
 
               {/* Purchase Department Action */}
               {isPurchaseDepartment && viewModal.status === "submitted" && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-5">
-                  <h3 className="text-lg font-semibold text-blue-900 mb-2">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h3 className="text-base font-semibold text-blue-900 mb-1.5">
                     Purchase Department Action
                   </h3>
-                  <p className="text-blue-700 mb-4 text-sm">
+                  <p className="text-blue-700 mb-3 text-xs">
                     You can create a Purchase Order for this intent. This will
                     automatically approve the intent.
                   </p>
@@ -780,7 +776,7 @@ const PurchaseIntentsList = ({
                       setViewModal(null);
                     }}
                     className="
-                px-5 py-2 bg-emerald-600 text-white rounded-lg font-semibold
+                px-4 py-1.5 bg-emerald-600 text-white rounded-lg font-semibold text-xs
                 shadow-[inset_0_1px_2px_rgba(255,255,255,0.3),0_2px_4px_rgba(0,0,0,0.2)]
                 hover:bg-emerald-700
                 active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3),0_1px_2px_rgba(255,255,255,0.3)]
@@ -795,11 +791,11 @@ const PurchaseIntentsList = ({
             </div>
 
             {/* Footer */}
-            <div className="flex justify-end gap-3 p-5 border-t border-gray-200 bg-gray-50">
+            <div className="flex justify-end gap-2 p-4 border-t border-gray-200 bg-gray-50">
               <button
                 onClick={() => setViewModal(null)}
                 className="
-            px-6 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg font-medium
+            px-4 py-1.5 text-gray-700 bg-white border border-gray-300 rounded-lg font-medium text-xs
             shadow-[inset_0_-1px_2px_rgba(0,0,0,0.15),inset_0_1px_2px_rgba(255,255,255,0.6)]
             hover:bg-gray-50
             active:shadow-[inset_0_1px_2px_rgba(0,0,0,0.25),inset_0_-1px_1px_rgba(255,255,255,0.5)]
@@ -816,12 +812,12 @@ const PurchaseIntentsList = ({
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
-            <div className="p-6">
-              <div className="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full mb-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-3 z-50 text-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="p-4">
+              <div className="flex items-center justify-center w-10 h-10 mx-auto bg-red-100 rounded-full mb-3">
                 <svg
-                  className="w-6 h-6 text-red-600"
+                  className="w-5 h-5 text-red-600"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -834,30 +830,30 @@ const PurchaseIntentsList = ({
                   />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
+              <h3 className="text-base font-semibold text-gray-900 text-center mb-1.5">
                 Delete Purchase Intent?
               </h3>
-              <p className="text-gray-600 text-center mb-6">
+              <p className="text-gray-600 text-center mb-4 text-xs">
                 Are you sure you want to delete this purchase intent? This
                 action cannot be undone.
               </p>
-              <div className="flex gap-3">
+              <div className="flex gap-2">
                 <button
                   onClick={() => setDeleteConfirm(null)}
                   disabled={deletingId}
-                  className="flex-1 px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  className="flex-1 px-3 py-1.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 text-xs"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={() => handleDelete(deleteConfirm)}
                   disabled={deletingId}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold disabled:opacity-50 flex items-center justify-center"
+                  className="flex-1 px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold disabled:opacity-50 flex items-center justify-center text-xs"
                 >
                   {deletingId ? (
                     <>
                       <svg
-                        className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                        className="animate-spin -ml-1 mr-1.5 h-3.5 w-3.5 text-white"
                         fill="none"
                         viewBox="0 0 24 24"
                       >

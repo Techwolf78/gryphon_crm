@@ -900,21 +900,6 @@ const AddVendorModal = ({ show, onClose, vendorCategories, currentUser }) => {
                 </div>
               </div>
             </div>
-
-            {/* Additional Notes */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Additional Notes
-              </label>
-              <textarea
-                name="notes"
-                value={formData.notes}
-                onChange={handleInputChange}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Any additional information about this vendor..."
-              />
-            </div>
           </div>
 
           {/* Action Buttons */}
@@ -1345,21 +1330,6 @@ const EditVendorModal = ({
                 </div>
               </div>
             </div>
-
-            {/* Additional Notes */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Additional Notes
-              </label>
-              <textarea
-                name="notes"
-                value={formData.notes}
-                onChange={handleInputChange}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Any additional information about this vendor..."
-              />
-            </div>
           </div>
 
           {/* Action Buttons */}
@@ -1418,9 +1388,9 @@ const ViewVendorModal = ({ show, onClose, vendor, vendorStats }) => {
   const formatDate = (date) => {
     if (!date) return "N/A";
     if (date.seconds) {
-      return new Date(date.seconds * 1000).toLocaleDateString();
+      return new Date(date.seconds * 1000).toLocaleDateString("en-IN");
     }
-    return new Date(date).toLocaleDateString();
+    return new Date(date).toLocaleDateString("en-IN");
   };
 
   return (
@@ -1616,18 +1586,6 @@ const ViewVendorModal = ({ show, onClose, vendor, vendorStats }) => {
                 </p>
               </div>
             </div>
-
-            {/* Additional Notes */}
-            {vendor.notes && (
-              <div>
-                <h4 className="text-lg font-semibold text-gray-900 mb-2">
-                  Additional Notes
-                </h4>
-                <p className="text-gray-700 bg-gray-50 p-4 rounded-lg">
-                  {vendor.notes}
-                </p>
-              </div>
-            )}
 
             {/* Metadata */}
             <div className="border-t border-gray-200 pt-4">
