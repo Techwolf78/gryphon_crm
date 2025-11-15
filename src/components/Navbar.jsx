@@ -136,7 +136,7 @@ const Navbar = ({ onImageClick = () => {} }) => {
         <img
           src="https://res.cloudinary.com/dcjmaapvi/image/upload/v1740489025/ga-hori_ylcnm3.png"
           alt="Gryphon CRM Logo"
-          className="h-20 w-auto"
+          className="h-16 w-auto"
         />
       </Link>
 

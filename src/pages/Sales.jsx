@@ -23,6 +23,7 @@ const ExpectedDateModal = lazy(() => import("../components/Sales/ExpectedDateWar
 const LeadsTable = lazy(() => import("../components/Sales/LeadTable"));
 const LeadFilters = lazy(() => import("../components/Sales/LeadFilters"));
 const SalesTour = lazy(() => import("../components/tours/SalesTour"));
+const BudgetDashboard = lazy(() => import("../components/Budget/BudgetDashboard"));
 
 // Loading component for lazy loaded components
 const ComponentLoader = () => (
@@ -94,6 +95,7 @@ function Sales() {
   });
   const [isViewModeLoading, setIsViewModeLoading] = useState(true);
   const [closedLeadsCount, setClosedLeadsCount] = useState(0); // Add this state
+  const [showBudget, setShowBudget] = useState(false);
 
   // Persist view mode to localStorage
   useEffect(() => {
@@ -690,6 +692,14 @@ function Sales() {
     );
   };
 
+  if (showBudget) {
+    return (
+      <Suspense fallback={<ComponentLoader />}>
+        <BudgetDashboard department="Sales" onBack={() => setShowBudget(false)} />
+      </Suspense>
+    );
+  }
+
   return (
     <div className="bg-linear-to-br from-gray-50 to-gray-100 font-sans">
       <div className="mx-auto">
@@ -706,25 +716,41 @@ function Sales() {
               </p>
             </div>
 
-            <button
-              onClick={() => setShowModal(true)}
-              className="bg-linear-to-r from-blue-600 to-indigo-700 text-white px-5 py-2.5 rounded-xl font-semibold hover:opacity-90 transition-all shadow-md flex items-center"
-              data-tour="add-college-button"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 mr-2"
-                viewBox="0 0 20 20"
-                fill="currentColor"
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setShowModal(true)}
+                className="bg-linear-to-r from-blue-600 to-indigo-700 text-white px-5 py-2.5 rounded-xl font-semibold hover:opacity-90 transition-all shadow-md flex items-center"
+                data-tour="add-college-button"
               >
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              Add College
-            </button>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5 mr-2"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                Add College
+              </button>
+              <button
+                onClick={() => setShowBudget(true)}
+                className="bg-white text-green-600 border border-green-300 px-4 py-2 rounded-lg font-medium hover:bg-green-50 transition-colors shadow-sm flex items-center"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5 mr-2"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" />
+                </svg>
+                Budget
+              </button>
+            </div>
           </div>
 
           {/* View Mode and Filters */}

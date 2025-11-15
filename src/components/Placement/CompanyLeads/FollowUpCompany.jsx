@@ -25,6 +25,8 @@ import { db } from "../../../firebase";
 import { useMsal } from "@azure/msal-react";
 import { InteractionRequiredAuthError } from "@azure/msal-browser";
 
+import { logPlacementActivity } from "../../../utils/placementAuditLogger";
+
 const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
   const [date, setDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [time, setTime] = useState({
@@ -147,7 +149,10 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
             ...decodedCompany,
             followups: updatedFollowups,
           };
-          encodedCompanies[companyIndex] = btoa(JSON.stringify(updatedCompany));
+          // Use Unicode-safe encoding: encodeURIComponent + btoa to handle Unicode characters
+          const deleteJsonString = JSON.stringify(updatedCompany);
+          const deleteUriEncoded = encodeURIComponent(deleteJsonString);
+          encodedCompanies[companyIndex] = btoa(deleteUriEncoded);
 
           await setDoc(batchDocRef, {
             ...batchData,
@@ -155,6 +160,17 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
           });
 
           console.log("Successfully deleted follow-up");
+
+          // Log the follow-up deletion activity
+          await logPlacementActivity({
+            action: 'DELETE_FOLLOWUP',
+            leadId: lead.id,
+            leadName: lead.companyName || lead.name,
+            details: {
+              followupKey
+            }
+          });
+
           setPastFollowups(updatedFollowups);
           showSnackbar("Follow-up deleted successfully", "success");
         } else {
@@ -207,7 +223,7 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
       const endDateTime = dayjs(eventDateTime).add(1, 'hour').format();
 
       const event = {
-        subject: `Follow-up with ${company.companyName || company.name}`,
+        subject: `Follow-up with ${company.companyName || company.name}${company.pocName && company.pocName !== 'N/A' ? ` | ${company.pocName}` : ''}${company.pocPhone && company.pocPhone !== 'N/A' ? ` | ${company.pocPhone}` : ''}`,
         body: {
           contentType: "HTML",
           content: remarks || "Scheduled follow-up meeting",
@@ -335,8 +351,10 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
             ...decodedCompany,
             followups: updatedFollowups,
           };
-          console.log("Updated company with new followups");
-          encodedCompanies[companyIndex] = btoa(JSON.stringify(updatedCompany));
+          // Use Unicode-safe encoding: encodeURIComponent + btoa to handle Unicode characters
+          const updatedJsonString = JSON.stringify(updatedCompany);
+          const uriEncoded = encodeURIComponent(updatedJsonString);
+          encodedCompanies[companyIndex] = btoa(uriEncoded);
 
           console.log("Saving updated batch data to Firestore");
           await setDoc(batchDocRef, {
@@ -345,6 +363,20 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
           });
           console.log("Successfully saved to Firestore");
 
+          // Log the follow-up scheduling activity
+          await logPlacementActivity({
+            action: 'SCHEDULE_FOLLOWUP',
+            leadId: lead.id,
+            leadName: lead.companyName || lead.name,
+            details: {
+              date,
+              time: getFullTimeString(),
+              remarks,
+              calendarEventCreated: followupData.calendarEventCreated,
+              sendInvite
+            }
+          });
+
           setPastFollowups(updatedFollowups);
           showSnackbar("Follow-up scheduled successfully!", "success");
 
@@ -352,6 +384,9 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
           if (onFollowUpScheduled) {
             onFollowUpScheduled();
           }
+
+          // Auto-close the modal on successful submission
+          onClose();
 
           // Reset form
           setDate(dayjs().format("YYYY-MM-DD"));
@@ -404,7 +439,7 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
       const endDateTime = dayjs(eventDateTime).add(1, 'hour').format();
 
       const event = {
-        subject: `Follow-up with ${company.companyName || company.name}`,
+        subject: `Follow-up with ${company.companyName || company.name}${company.pocName && company.pocName !== 'N/A' ? ` | ${company.pocName}` : ''}${company.pocPhone && company.pocPhone !== 'N/A' ? ` | ${company.pocPhone}` : ''}`,
         body: {
           contentType: "HTML",
           content: followup.remarks || "Scheduled follow-up meeting",
@@ -482,7 +517,10 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
             ...decodedCompany,
             followups: updatedFollowups,
           };
-          encodedCompanies[companyIndex] = btoa(JSON.stringify(updatedCompany));
+          // Use Unicode-safe encoding: encodeURIComponent + btoa to handle Unicode characters
+          const retryJsonString = JSON.stringify(updatedCompany);
+          const retryUriEncoded = encodeURIComponent(retryJsonString);
+          encodedCompanies[companyIndex] = btoa(retryUriEncoded);
 
           await setDoc(batchDocRef, {
             ...batchData,
@@ -611,6 +649,45 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
 
         {/* Content */}
         <div className="p-4 overflow-y-auto max-h-[calc(85vh-120px)]">
+          {/* Company Confirmation Section */}
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+            <div className="flex items-start space-x-3">
+              <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center shrink-0">
+                <FaExclamationTriangle className="text-amber-600 text-sm" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-amber-900 mb-1">Confirm Company Details</h3>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-medium text-amber-700">Company:</span>
+                    <span className="text-sm font-semibold text-amber-900">{company.companyName || company.name || 'N/A'}</span>
+                  </div>
+                  {company.pocName && company.pocName !== 'N/A' && (
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs font-medium text-amber-700">Contact:</span>
+                      <span className="text-sm text-amber-800">{company.pocName}</span>
+                    </div>
+                  )}
+                  {company.pocPhone && company.pocPhone !== 'N/A' && (
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs font-medium text-amber-700">Phone:</span>
+                      <span className="text-sm text-amber-800">{company.pocPhone}</span>
+                    </div>
+                  )}
+                  {company.pocMail && company.pocMail !== 'N/A' && (
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs font-medium text-amber-700">Email:</span>
+                      <span className="text-sm text-amber-800">{company.pocMail}</span>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-amber-700 mt-2">
+                  Please verify this is the correct company before scheduling the follow-up.
+                </p>
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Side - Form */}
             <div className="lg:col-span-2 space-y-4">

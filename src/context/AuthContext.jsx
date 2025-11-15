@@ -170,7 +170,12 @@ export const AuthProvider = ({ children }) => {
         setUser({
           ...currentUser,
           role: userData.role || "guest",
-          department: userData.department || "guest",
+          departments: Array.isArray(userData.departments) 
+            ? userData.departments 
+            : (userData.department ? [userData.department] : []),
+          department: Array.isArray(userData.departments) 
+            ? userData.departments[0] 
+            : (userData.department || "guest"),  // Keep for legacy compatibility
           reportingManager: userData.reportingManager || null,
         });
         setPhotoURL(userData.photoURL || "");
@@ -206,8 +211,12 @@ export const AuthProvider = ({ children }) => {
             setUser({
               ...firebaseUser,
               role: userData.role || "guest",
-              department: userData.department || userData.departments || "guest", // Handle both old single department and new array format
-              departments: userData.departments || (userData.department ? [userData.department] : []), // Store departments as array
+              departments: Array.isArray(userData.departments) 
+                ? userData.departments 
+                : (userData.department ? [userData.department] : []),
+              department: Array.isArray(userData.departments) 
+                ? userData.departments[0] 
+                : (userData.department || "guest"),  // Keep for legacy compatibility
               reportingManager: userData.reportingManager || null,
             });
             setPhotoURL(userData.photoURL || "");

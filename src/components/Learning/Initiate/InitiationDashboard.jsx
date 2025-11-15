@@ -574,7 +574,7 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
         else if (user.department === "L & D") {
           q = query(
             collection(db, "users"),
-            where("department", "==", "L & D")
+            where("departments", "array-contains", "L & D")
           );
         }
         // Everyone else can only see themselves (no filter dropdown)

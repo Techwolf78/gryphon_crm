@@ -104,14 +104,13 @@ function EditInvoiceModal({ trainer, onClose, onInvoiceUpdated, onToast }) {
   // Memoized calculations
   const calculations = useMemo(() => {
     const trainingFees = Math.round((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0));
-    const expenses = Math.round((parseFloat(invoiceData.conveyance) || 0) + (parseFloat(invoiceData.food) || 0) + (parseFloat(invoiceData.lodging) || 0));
-    const totalAmount = trainingFees + expenses;
-    const tdsAmount = Math.round((trainingFees * (parseFloat(invoiceData.tds) || 0)) / 100);
-    const amountBeforeGST = totalAmount + (parseFloat(invoiceData.adhocAdjustment) || 0) - tdsAmount;
-    const gstAmount = invoiceData.gst === "18" ? Math.round(amountBeforeGST * 0.18) : 0;
-    const netPayment = amountBeforeGST - gstAmount;
+    const gstAmount = invoiceData.gst === "18" ? Math.round(trainingFees * 0.18) : 0;
+    const taxableAmount = trainingFees + gstAmount;
+    const tdsAmount = Math.round((taxableAmount * (parseFloat(invoiceData.tds) || 0)) / 100);
+    const otherExpenses = Math.round((parseFloat(invoiceData.conveyance) || 0) + (parseFloat(invoiceData.food) || 0) + (parseFloat(invoiceData.lodging) || 0));
+    const netPayment = taxableAmount - tdsAmount + otherExpenses + (parseFloat(invoiceData.adhocAdjustment) || 0);
 
-    return { trainingFees, expenses, totalAmount, tdsAmount, amountBeforeGST, gstAmount, netPayment };
+    return { trainingFees, gstAmount, taxableAmount, tdsAmount, otherExpenses, netPayment };
   }, [invoiceData]);
 
   const handleSubmit = async (e) => {
@@ -181,7 +180,7 @@ function EditInvoiceModal({ trainer, onClose, onInvoiceUpdated, onToast }) {
 
         const updatedInvoice = {
           ...invoiceData,
-          totalAmount: calculations.totalAmount,
+          totalAmount: calculations.taxableAmount, // Taxable amount (training fees + GST)
           netPayment: calculations.netPayment,
           updatedAt: new Date(),
           // If resubmitting a rejected invoice, reset status to pending (like approved)
@@ -379,16 +378,12 @@ function EditInvoiceModal({ trainer, onClose, onInvoiceUpdated, onToast }) {
               </h3>
               <div className="space-y-1 text-sm">
                 <SummaryRow label="Training Fees:" value={`₹${calculations.trainingFees.toLocaleString()}`} />
-                <SummaryRow label="Conveyance:" value={`₹${(parseFloat(invoiceData.conveyance) || 0).toLocaleString()}`} />
-                <SummaryRow label="Food:" value={`₹${(parseFloat(invoiceData.food) || 0).toLocaleString()}`} />
-                <SummaryRow label="Lodging:" value={`₹${(parseFloat(invoiceData.lodging) || 0).toLocaleString()}`} />
-                <SummaryRow label="Total Amount:" value={`₹${calculations.totalAmount.toLocaleString()}`} bold borderTop />
-                <SummaryRow label={`TDS (${invoiceData.tds}%):`} value={`-₹${calculations.tdsAmount.toLocaleString()}`} />
+                <SummaryRow label={`GST (${invoiceData.gst === "NA" ? "NA" : invoiceData.gst + "%"}):`} 
+                           value={`₹${calculations.gstAmount.toLocaleString()}`} />
+                <SummaryRow label="Taxable Amount (Training Fees + GST):" value={`₹${calculations.taxableAmount.toLocaleString()}`} bold borderTop />
+                <SummaryRow label={`TDS (${invoiceData.tds}% on Training Fees + GST only):`} value={`-₹${calculations.tdsAmount.toLocaleString()}`} />
+                <SummaryRow label="Other Expenses (Conveyance + Food + Lodging):" value={`₹${calculations.otherExpenses.toLocaleString()}`} />
                 <SummaryRow label="Adhoc Adjustment:" value={`₹${(parseFloat(invoiceData.adhocAdjustment) || 0).toLocaleString()}`} />
-                <SummaryRow label="Amount before GST:" value={`₹${calculations.amountBeforeGST.toLocaleString()}`} borderTop />
-                <SummaryRow label={`GST (${invoiceData.gst === "NA" ? "NA" : invoiceData.gst + "%"}):`}
-                           value={`${invoiceData.gst === "18" ? "-" : ""}₹${calculations.gstAmount.toLocaleString()}`}
-                           red={invoiceData.gst === "18"} />
                 <div className="border-t-2 border-green-400 pt-1 mt-2">
                   <SummaryRow label="Net Payment:" value={`₹${calculations.netPayment.toLocaleString()}`} bold />
                 </div>

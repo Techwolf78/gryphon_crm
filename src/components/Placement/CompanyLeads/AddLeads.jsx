@@ -18,6 +18,7 @@ const statusOptions = [
   "Hot",
   "Warm",
   "Cold",
+  "Called",
   "Onboarded",
 ];
 
@@ -163,9 +164,8 @@ function AddLeads({ show, onClose, onAddLead }) {
         }
         break;
       case "employeeCount":
-        if (!value.trim()) {
-          error = "Company size is required";
-        } else if (!validateCompanySize(value)) {
+        // Company size is now optional, but if provided, validate the range
+        if (value.trim() && !validateCompanySize(value)) {
           error = "Company size must be between 1-100,000";
         }
         break;
@@ -178,7 +178,7 @@ function AddLeads({ show, onClose, onAddLead }) {
         if (!value.trim()) error = "POC name is required";
         break;
       case "workingSince":
-        if (!value) error = "Working since date is required";
+        // Working since is now optional
         break;
       case "pocLocation":
         if (!value.trim()) error = "POC location is required";
@@ -301,6 +301,21 @@ function AddLeads({ show, onClose, onAddLead }) {
       assignedAt: serverTimestamp(),
     };
 
+    // Add status-specific timestamp when company is created
+    const currentTimestamp = new Date().toISOString();
+    const statusLower = status.toLowerCase();
+    if (statusLower === "hot") {
+      companyData.hotAt = currentTimestamp;
+    } else if (statusLower === "warm") {
+      companyData.warmAt = currentTimestamp;
+    } else if (statusLower === "cold") {
+      companyData.coldAt = currentTimestamp;
+    } else if (statusLower === "called") {
+      companyData.calledAt = currentTimestamp;
+    } else if (statusLower === "onboarded") {
+      companyData.onboardedAt = currentTimestamp;
+    }
+
     try {
       // Improved batching strategy with dynamic sizing
       const getOptimalBatchSize = (totalCompanies) => {
@@ -388,7 +403,13 @@ function AddLeads({ show, onClose, onAddLead }) {
         assignedAt: new Date().toISOString(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        contacts: []
+        contacts: [],
+        // Include status-specific timestamps
+        hotAt: companyData.hotAt,
+        warmAt: companyData.warmAt,
+        coldAt: companyData.coldAt,
+        calledAt: companyData.calledAt,
+        onboardedAt: companyData.onboardedAt,
       };
 
       if (onAddLead) {
@@ -484,9 +505,7 @@ function AddLeads({ show, onClose, onAddLead }) {
   const isFormValid = 
     companyName.trim() && 
     sector.trim() &&
-    employeeCount.trim() && 
     pocName.trim() && 
-    workingSince.trim() &&
     pocLocation.trim() && 
     pocPhone.trim() &&
     pocDesignation.trim() &&
@@ -578,7 +597,7 @@ function AddLeads({ show, onClose, onAddLead }) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Company Size <span className="text-red-500">*</span>
+                Company Size
               </label>
               <input
                 type="number"
@@ -634,7 +653,7 @@ function AddLeads({ show, onClose, onAddLead }) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Working Since <span className="text-red-500">*</span>
+                Working Since
               </label>
               <input
                 type="date"

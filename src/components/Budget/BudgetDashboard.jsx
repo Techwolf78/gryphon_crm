@@ -318,6 +318,7 @@ function BudgetDashboard({
   department,
   showVendorManagement = false,
   showDepartment = false,
+  onBack,
 }) {
   // State management
   const [activeTab, setActiveTab] = useState("budgets");
@@ -1035,11 +1036,37 @@ function BudgetDashboard({
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 text-sm">
-      <div className="max-w-8xl mx-auto px-3 sm:px-4 lg:px-6 py-4">
+
+    <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100">
+      <div className=" mx-auto py-6">
         {/* Header */}
-        <div className="bg-white rounded-xl shadow-md border border-gray-200 p-4 mb-4">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+        <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-6 mb-6">
+          {/* Back Button */}
+          {onBack && (
+            <div className="mb-4">
+              <button
+                onClick={onBack}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-lg font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.98] focus:outline-none focus:ring-1 focus:ring-blue-500 focus:ring-offset-1 text-xs"
+              >
+                <svg
+                  className="w-3.5 h-3.5 text-gray-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
+                <span>Back to Sales</span>
+              </button>
+            </div>
+          )}
+
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <h1 className="text-xl font-bold text-gray-900">
                 {department.charAt(0).toUpperCase() + department.slice(1)}{" "}
@@ -1139,6 +1166,7 @@ function BudgetDashboard({
                   {budgetHistory.length > 0 ? (
                     <div className="max-w-full ">
                       <table className="w-full min-w-[600px] text-sm">
+
                         <thead>
                           <tr className="border-b border-gray-200">
                             <th className="text-left py-2 px-3 font-semibold text-gray-700">

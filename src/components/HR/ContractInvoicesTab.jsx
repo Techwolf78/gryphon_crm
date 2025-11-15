@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
-import ConnectionStatus from '../ConnectionStatus';
 import InvoiceModal from "./InvoiceModal";
 import { saveAs } from "file-saver";
 import * as XLSX from "xlsx";
-import { safeFirebaseQuery } from "../../utils/firebaseUtils";
 
 // Statistics Cards Component
 const StatisticsCards = ({ stats, formatIndianCurrency }) => {
@@ -439,27 +437,12 @@ const ContractInvoicesTab = () => {
     setStats(stats);
   }, []);
 
-  const fetchInvoices = useCallback(async (retryCount = 0) => {
-    const maxRetries = 3;
-    const baseDelay = 1000; // 1 second
-
+  const fetchInvoices = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Use safeFirebaseQuery for rate limiting and connection handling
-      const snapshot = await safeFirebaseQuery(
-        async () => {
-          const contractsRef = collection(db, "ContractInvoices");
-          return await getDocs(contractsRef);
-        },
-        {
-          maxRetries,
-          baseDelay,
-          retryOnNetworkError: true,
-          showConnectionError: true
-        }
-      );
+      const snapshot = await getDocs(collection(db, "ContractInvoices"));
 
       if (snapshot.docs.length > 0) {
         const data = snapshot.docs.map((doc) => ({
@@ -482,28 +465,8 @@ const ContractInvoicesTab = () => {
         setFilteredInvoices([]);
         calculateStats([]);
       }
-    } catch (error) {
-      console.error(`Error fetching invoices (attempt ${retryCount + 1}):`, error);
-
-      // Check if it's a network error or temporary Firebase error that should be retried
-      const isRetryableError = error.code === 'unavailable' ||
-                              error.code === 'deadline-exceeded' ||
-                              error.code === 'resource-exhausted' ||
-                              error.message?.includes('network') ||
-                              error.message?.includes('timeout');
-
-      if (isRetryableError && retryCount < maxRetries) {
-        const delay = baseDelay * Math.pow(2, retryCount); // Exponential backoff
-        console.log(`Retrying in ${delay}ms...`);
-
-        setTimeout(() => {
-          fetchInvoices(retryCount + 1);
-        }, delay);
-        return;
-      }
-
-      // If max retries reached or non-retryable error, show error
-      setError(`Failed to load invoices: ${error.message}. Please check your connection and try again.`);
+    } catch {
+      setError("Failed to load invoices. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -2194,6 +2157,26 @@ const ContractInvoicesTab = () => {
                   </div>
                 )}
               </div>
+
+              <button
+                onClick={() => fetchInvoices()}
+                className="inline-flex items-center justify-center px-2 py-1 border border-gray-300 rounded text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+              >
+                <svg
+                  className="w-2.5 h-2.5 mr-1"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                </svg>
+                Refresh
+              </button>
 
               <button
                 onClick={exportToExcel}
