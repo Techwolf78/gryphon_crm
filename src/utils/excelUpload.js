@@ -226,6 +226,9 @@ export const uploadCompaniesFromExcel = async (file, onProgress = null, assignee
 
         // 2. Convert each row to company object
         const companies = jsonData.map(row => {
+          const status = row['Status'] || row['status'] || 'cold';
+          const currentTimestamp = new Date().toISOString();
+          
           const company = {
             name: row['CompanyName'] || row['Company Name'] || row['companyName'] || row['company_name'] || '',
             contactPerson: row['ContactPerson'] || row['Contact Person'] || row['contactPerson'] || row['contact_person'] || '',
@@ -240,9 +243,30 @@ export const uploadCompaniesFromExcel = async (file, onProgress = null, assignee
             companySize: row['CompanySize'] || row['Company Size'] || row['companySize'] || row['company_size'] || '',
             source: row['Source'] || row['source'] || 'Excel Upload',
             notes: row['Notes'] || row['notes'] || '',
-            status: row['Status'] || row['status'] || 'cold',
+            status: status.toLowerCase() || 'cold',
             contacts: [], // Initialize empty contacts array
           };
+
+          // Add status-specific timestamp when company is created from Excel
+          const statusLower = status.toLowerCase();
+          if (statusLower === "hot") {
+            company.hotAt = currentTimestamp;
+          } else if (statusLower === "warm") {
+            company.warmAt = currentTimestamp;
+          } else if (statusLower === "cold") {
+            company.coldAt = currentTimestamp;
+          } else if (statusLower === "called") {
+            company.calledAt = currentTimestamp;
+          } else if (statusLower === "onboarded") {
+            company.onboardedAt = currentTimestamp;
+          }
+
+          // If assigneeId is provided, assign the company to that user
+          if (assigneeId) {
+            company.assignedTo = assigneeId;
+            company.assignedBy = assigneeId; // Assuming the uploader is assigning to themselves
+            company.assignedAt = new Date().toISOString();
+          }
 
           // If assigneeId is provided, assign the company to that user
           if (assigneeId) {

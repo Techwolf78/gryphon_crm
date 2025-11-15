@@ -40,6 +40,16 @@ const statusColorMap = {
       active: "bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg",
       inactive: "bg-green-50 text-green-600 hover:bg-green-100 border border-green-200"
     }
+  },
+  deleted: {
+    bg: "bg-gray-50",
+    text: "text-gray-600",
+    border: "border-gray-300",
+    activeBg: "bg-gray-100",
+    tab: {
+      active: "bg-gradient-to-r from-gray-600 to-gray-700 text-white shadow-lg",
+      inactive: "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200"
+    }
   }
 };
 
@@ -48,13 +58,35 @@ const tabLabels = {
   warm: "Warm",
   cold: "Cold",
   called: "Called",
-  onboarded: "Onboarded"
+  onboarded: "Onboarded",
+  deleted: "Deleted"
 };
 
-const LeadsFilters = ({ activeTab, setActiveTab, leadsByStatus = {} }) => {
+const LeadsFilters = ({ activeTab, setActiveTab, leadsByStatus = {}, user }) => {
+  // Get available tabs based on user permissions
+  const getAvailableTabs = () => {
+    const baseTabs = ['hot', 'warm', 'cold', 'called', 'onboarded'];
+    // Only show deleted tab for admin department users or admin role
+    const isAdmin = user?.departments?.includes("admin") || 
+                   user?.departments?.includes("Admin") || 
+                   user?.department === "admin" || 
+                   user?.department === "Admin" ||
+                   user?.role === "admin" || 
+                   user?.role === "Admin";
+    
+    if (isAdmin) {
+      baseTabs.push('deleted');
+    }
+    return baseTabs;
+  };
+
+  const availableTabs = getAvailableTabs();
+
   return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-x-4 gap-y-1 mb-3 pt-2 w-full">
-      {Object.keys(tabLabels).map((key) => (
+    <div className={`grid gap-x-4 gap-y-1 mb-3 pt-2 w-full ${
+      availableTabs.length === 6 ? 'grid-cols-2 md:grid-cols-6' : 'grid-cols-2 md:grid-cols-5'
+    }`}>
+      {availableTabs.map((key) => (
         <button
           key={key}
           onClick={() => setActiveTab(key)}
@@ -76,6 +108,8 @@ const LeadsFilters = ({ activeTab, setActiveTab, leadsByStatus = {} }) => {
                 ? "ring-purple-500"
                 : key === "onboarded"
                 ? "ring-green-500"
+                : key === "deleted"
+                ? "ring-gray-500"
                 : "ring-gray-500"
               : ""
           }`}

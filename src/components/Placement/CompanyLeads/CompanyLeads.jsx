@@ -21,9 +21,12 @@ import LeadViewEditModal from "./LeadViewEditModal";
 import FollowUpCompany from "./FollowUpCompany";
 import PlacementLeadAlert from "../PlacementLeadAlert";
 import ViewModeToggle from "./ViewModeToggle";
+import LeadFilters from "./LeadFilters";
 import { useAuth } from "../../../context/AuthContext";
 import { useMsal } from "@azure/msal-react";
 import { InteractionRequiredAuthError } from "@azure/msal-browser";
+
+import { logPlacementActivity, AUDIT_ACTIONS } from "../../../utils/placementAuditLogger";
 
   // Utility function to handle Firestore index errors
   const handleFirestoreIndexError = (error, operation = "operation") => {
@@ -34,6 +37,11 @@ function CompanyLeads() {
   const { user } = useAuth();
   const { instance, accounts } = useMsal();
   const [activeTab, setActiveTab] = useState(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tab = urlParams.get('tab');
+    if (tab && ['hot', 'warm', 'cold', 'called', 'onboarded', 'deleted'].includes(tab)) {
+      return tab;
+    }
     const saved = localStorage.getItem("companyLeadsActiveTab");
     return saved || "hot";
   });
@@ -60,6 +68,10 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
   // View mode state with localStorage persistence
   const [viewMyLeadsOnly, setViewMyLeadsOnly] = useState(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const view = urlParams.get('view');
+    if (view === 'myteam') return false;
+    if (view === 'myleads') return true;
     const saved = localStorage.getItem("placementViewMyLeadsOnly");
     return saved !== null ? JSON.parse(saved) : true; // Default to "My Leads" view
   });
@@ -67,8 +79,34 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   // User filter state
   const [selectedUserFilter, setSelectedUserFilter] = useState('all'); // 'all', 'unassigned', or user UID
 
+  // Additional filter states
+  const [companyFilter, setCompanyFilter] = useState('');
+  const [phoneFilter, setPhoneFilter] = useState('');
+
+  // Filter modal state
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+
   // Debounced search term for performance
   const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
+
+  // Debounced search logging
+  const [debouncedSearchForLogging] = useDebounce(searchTerm, 1000);
+
+  // Log search activity when debounced search changes
+  useEffect(() => {
+    if (debouncedSearchForLogging.trim()) {
+      logPlacementActivity({
+        userId: user?.uid,
+        userName: user?.displayName || user?.name || "Unknown User",
+        action: AUDIT_ACTIONS.SEARCH_PERFORMED,
+        companyId: null,
+        companyName: null,
+        details: `Searched for: "${debouncedSearchForLogging}"`,
+        changes: { searchTerm: debouncedSearchForLogging },
+        sessionId: sessionStorage.getItem('sessionId') || 'unknown'
+      });
+    }
+  }, [debouncedSearchForLogging, user]);
 
   // Microsoft 365 Connection Status
   const [ms365ConnectionStatus, setMs365ConnectionStatus] = useState('checking'); // 'checking', 'connected', 'weak', 'disconnected'
@@ -139,10 +177,10 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     }
   }, [instance, accounts, testMs365Connection]);
 
-  // Log view mode changes
+  // Persist active tab changes
   useEffect(() => {
-    localStorage.setItem("placementViewMyLeadsOnly", JSON.stringify(viewMyLeadsOnly));
-  }, [viewMyLeadsOnly]);
+    localStorage.setItem("companyLeadsActiveTab", activeTab);
+  }, [activeTab]);
 
   // Test MS365 connection on component mount and when accounts change
   useEffect(() => {
@@ -268,11 +306,6 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     }
   }, [user, leads]);
 
-  // Test function for placement alerts (accessible via window.testPlacementAlerts)
-  useEffect(() => {
-    // Test functionality removed for production
-  }, [user, viewMyLeadsOnly, todayFollowUps, showTodayFollowUpAlert, leads, getTeamMemberIds]);
-
   // Caching constants
   const CACHE_KEY = 'companyLeadsCache';
   const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
@@ -331,6 +364,10 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
               assignedBy: decodedCompany.assignedBy || null,
               assignedAt: decodedCompany.assignedAt || null,
               calledAt: decodedCompany.calledAt || null,
+              warmAt: decodedCompany.warmAt || null,
+              coldAt: decodedCompany.coldAt || null,
+              hotAt: decodedCompany.hotAt || null,
+              onboardedAt: decodedCompany.onboardedAt || null,
               createdAt: decodedCompany.createdAt || new Date().toISOString(),
               updatedAt: decodedCompany.updatedAt || new Date().toISOString(),
               contacts: decodedCompany.contacts || [],
@@ -420,6 +457,18 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           calledAt: doc.data().calledAt?.toDate
             ? doc.data().calledAt.toDate().toISOString()
             : doc.data().calledAt || null,
+          warmAt: doc.data().warmAt?.toDate
+            ? doc.data().warmAt.toDate().toISOString()
+            : doc.data().warmAt || null,
+          coldAt: doc.data().coldAt?.toDate
+            ? doc.data().coldAt.toDate().toISOString()
+            : doc.data().coldAt || null,
+          hotAt: doc.data().hotAt?.toDate
+            ? doc.data().hotAt.toDate().toISOString()
+            : doc.data().hotAt || null,
+          onboardedAt: doc.data().onboardedAt?.toDate
+            ? doc.data().onboardedAt.toDate().toISOString()
+            : doc.data().onboardedAt || null,
           contacts: doc.data().contacts || [],
           assignedTo: doc.data().assignedTo || null,
         }));
@@ -487,6 +536,90 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       setLoading(false);
     }
   }, [user, viewMyLeadsOnly, getTeamMemberIds, selectedUserFilter]);
+
+  // Backfill warmAt timestamps for existing warm leads
+  const backfillWarmAtTimestamps = useCallback(async () => {
+    try {
+      console.log("Starting backfill of warmAt timestamps...");
+
+      // Fetch ALL batch documents from companyleads collection
+      const q = query(collection(db, "companyleads"), orderBy("__name__", "desc"));
+      const querySnapshot = await getDocs(q);
+
+      let updatedCount = 0;
+      let totalBatches = querySnapshot.docs.length;
+      console.log(`Processing ${totalBatches} batch documents...`);
+
+      for (const batchDoc of querySnapshot.docs) {
+        const batchData = batchDoc.data();
+        const encodedCompanies = batchData.companies || [];
+        let hasUpdates = false;
+        let batchWarmLeads = 0;
+        let batchUpdated = 0;
+
+        console.log(`Processing batch ${batchDoc.id} with ${encodedCompanies.length} companies...`);
+
+        // Decode and check each company
+        const updatedCompanies = encodedCompanies.map(encodedCompany => {
+          try {
+            const uriDecoded = atob(encodedCompany);
+            const jsonString = decodeURIComponent(uriDecoded);
+            const decodedCompany = JSON.parse(jsonString);
+
+            // Count warm leads in this batch
+            if (decodedCompany.status === "warm") {
+              batchWarmLeads++;
+              console.log(`Found warm lead: ${decodedCompany.name || decodedCompany.companyName}, warmAt: ${decodedCompany.warmAt}, updatedAt: ${decodedCompany.updatedAt}`);
+            }
+
+            // If lead is warm and doesn't have warmAt, set it to updatedAt or current timestamp
+            if (decodedCompany.status === "warm" && !decodedCompany.warmAt) {
+              // Use updatedAt if available, otherwise use current timestamp as fallback
+              const timestampToUse = decodedCompany.updatedAt || new Date().toISOString();
+              decodedCompany.warmAt = timestampToUse;
+              hasUpdates = true;
+              updatedCount++;
+              batchUpdated++;
+              console.log(`Backfilled warmAt for ${decodedCompany.name || decodedCompany.companyName} using ${decodedCompany.updatedAt ? 'updatedAt' : 'current timestamp'}`);
+            }
+
+            // Re-encode
+            const updatedJsonString = JSON.stringify(decodedCompany);
+            const updatedUriEncoded = encodeURIComponent(updatedJsonString);
+            return btoa(updatedUriEncoded);
+          } catch (error) {
+            console.error(`Error processing company in batch ${batchDoc.id}:`, error);
+            return encodedCompany; // Return unchanged if error
+          }
+        });
+
+        console.log(`Batch ${batchDoc.id}: ${batchWarmLeads} warm leads, ${batchUpdated} updated`);
+
+        // Save back to Firestore if there were updates
+        if (hasUpdates) {
+          await setDoc(batchDoc.ref, {
+            ...batchData,
+            companies: updatedCompanies,
+          });
+          console.log(`Saved updates for batch ${batchDoc.id}`);
+        }
+      }
+
+      console.log(`Backfill completed. Updated ${updatedCount} warm leads across ${totalBatches} batches.`);
+      if (updatedCount > 0) {
+        // Refresh the data
+        await fetchLeads();
+      }
+    } catch (error) {
+      console.error("Error during backfill:", error);
+    }
+  }, [fetchLeads]);
+
+  // Expose backfill function to window for manual execution
+  useEffect(() => {
+    window.backfillWarmAt = backfillWarmAtTimestamps;
+    console.log("Backfill function available as window.backfillWarmAt()");
+  }, [backfillWarmAtTimestamps]);
 
   // Load data from cache or fetch from Firestore
   const loadData = useCallback(async () => {
@@ -585,7 +718,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   const filteredLeads = useMemo(() => {
     
     // Early return for empty search and "all" tab
-    if (!debouncedSearchTerm && activeTab === "all") {
+    if (!debouncedSearchTerm && activeTab === "all" && selectedUserFilter === 'all' && !companyFilter.trim() && !phoneFilter.trim()) {
       // Sort by manual leads first, then by completeness score
       return [...leads].sort((a, b) => {
         // Manual leads always come first
@@ -603,11 +736,38 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     }
 
     const searchLower = debouncedSearchTerm ? debouncedSearchTerm.toLowerCase() : '';
+    const companyFilterLower = companyFilter.trim().toLowerCase();
+    const phoneFilterValue = phoneFilter.trim();
 
     const filtered = leads.filter((lead) => {
       // First filter by status if not showing all
       if (activeTab !== "all" && lead.status !== activeTab) {
         return false;
+      }
+
+      // Filter by user assignment
+      if (selectedUserFilter !== 'all') {
+        if (selectedUserFilter === 'unassigned') {
+          if (lead.assignedTo) return false; // Exclude assigned leads
+        } else {
+          if (lead.assignedTo !== selectedUserFilter) return false; // Only show leads assigned to selected user
+        }
+      }
+
+      // Filter by company name
+      if (companyFilterLower) {
+        const companyName = (lead.companyName || '').toLowerCase().trim();
+        if (companyName !== companyFilterLower) {
+          return false;
+        }
+      }
+
+      // Filter by phone number
+      if (phoneFilterValue) {
+        const pocPhone = String(lead.pocPhone || '').trim();
+        if (pocPhone !== phoneFilterValue.trim()) {
+          return false;
+        }
       }
 
       // Then filter by search term if present
@@ -651,12 +811,12 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       const scoreB = calculateCompletenessScore(b);
       return scoreB - scoreA; // Higher score first
     });
-  }, [leads, activeTab, debouncedSearchTerm, calculateCompletenessScore]);
+  }, [leads, activeTab, debouncedSearchTerm, selectedUserFilter, companyFilter, phoneFilter, calculateCompletenessScore]);
 
-  // Group leads by date for all tabs (hot, warm, cold, called, onboarded)
+  // Group leads by date for all tabs (hot, warm, cold, called, onboarded, deleted)
   const groupedLeads = useMemo(() => {
     // Only group for specific tabs
-    if (!["hot", "warm", "cold", "called", "onboarded"].includes(activeTab)) return null;
+    if (!["hot", "warm", "cold", "called", "onboarded", "deleted"].includes(activeTab)) return null;
 
     // Don't group if there are too many leads (performance issue) - DISABLED: LeadsTable handles pagination within groups
     // if (leads.length > 50000) {
@@ -670,10 +830,11 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       return null;
     }
 
-    const filteredLeads = leads.filter(lead => lead.status === activeTab);
+    // Use filteredLeads instead of all leads to respect applied filters
+    const leadsToGroup = filteredLeads.filter(lead => lead.status === activeTab);
 
     // Group by date based on status
-    const grouped = filteredLeads.reduce((acc, lead) => {
+    const grouped = leadsToGroup.reduce((acc, lead) => {
       try {
         let dateField;
         
@@ -681,6 +842,21 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         if (activeTab === "called") {
           // For called leads, use calledAt (when they were marked as called)
           dateField = lead.calledAt;
+        } else if (activeTab === "warm") {
+          // For warm leads, use warmAt (when they were marked as warm)
+          dateField = lead.warmAt;
+        } else if (activeTab === "cold") {
+          // For cold leads, use coldAt (when they were marked as cold)
+          dateField = lead.coldAt;
+        } else if (activeTab === "hot") {
+          // For hot leads, use hotAt (when they were marked as hot)
+          dateField = lead.hotAt;
+        } else if (activeTab === "onboarded") {
+          // For onboarded leads, use onboardedAt (when they were marked as onboarded)
+          dateField = lead.onboardedAt;
+        } else if (activeTab === "deleted") {
+          // For deleted leads, use deletedAt (when they were marked as deleted)
+          dateField = lead.deletedAt;
         } else {
           // For other statuses, use updatedAt (when they were last updated to this status)
           dateField = lead.updatedAt;
@@ -691,6 +867,9 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           month: 'short',
           day: 'numeric'
         }) : 'Unknown Date';
+
+        // Debug logging for all tabs to see date grouping
+        console.log(`${activeTab} lead: ${lead.companyName}, dateField: ${dateField}, grouped under: ${date}`);
 
         if (!acc[date]) {
           acc[date] = [];
@@ -720,11 +899,11 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       });
 
     return sortedGrouped;
-  }, [leads, activeTab, viewMyLeadsOnly]);
+  }, [filteredLeads, activeTab, viewMyLeadsOnly]);
 
   // Group leads by status for tab counts (calculate based on what user can actually see)
   const leadsByStatus = useMemo(() => {
-    const counts = { hot: 0, warm: 0, cold: 0, called: 0, onboarded: 0 };
+    const counts = { hot: 0, warm: 0, cold: 0, called: 0, onboarded: 0, deleted: 0 };
 
     leads.forEach(lead => {
       if (lead.status && counts[lead.status] !== undefined) {
@@ -761,6 +940,18 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       const lead = leads.find((l) => l.id === leadId);
       if (!lead || !lead.batchId) return;
 
+      // Log the status change activity
+      logPlacementActivity({
+        userId: user?.uid,
+        userName: user?.displayName || user?.name || "Unknown User",
+        action: AUDIT_ACTIONS.STATUS_CHANGE,
+        companyId: leadId,
+        companyName: lead.companyName || lead.name || "Unknown Company",
+        details: `Changed status from "${lead.status}" to "${newStatus}"`,
+        changes: { oldStatus: lead.status, newStatus },
+        sessionId: sessionStorage.getItem('sessionId') || 'unknown'
+      });
+
       // Fetch the batch document
       const batchDocRef = doc(db, "companyleads", lead.batchId);
       const batchDocSnap = await getDoc(batchDocRef);
@@ -792,9 +983,19 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
             updatedAt: new Date().toISOString(),
             ...assignmentData,
           };
-          // Add calledAt timestamp when status changes to "called"
+          // Add status-specific timestamp when status changes
           if (newStatus === "called") {
             updatedCompany.calledAt = new Date().toISOString();
+          } else if (newStatus === "warm") {
+            updatedCompany.warmAt = new Date().toISOString();
+          } else if (newStatus === "cold") {
+            updatedCompany.coldAt = new Date().toISOString();
+          } else if (newStatus === "hot") {
+            updatedCompany.hotAt = new Date().toISOString();
+          } else if (newStatus === "onboarded") {
+            updatedCompany.onboardedAt = new Date().toISOString();
+          } else if (newStatus === "deleted") {
+            updatedCompany.deletedAt = new Date().toISOString();
           }
           // Unicode-safe encoding: encodeURIComponent + btoa
           const updatedJsonString = JSON.stringify(updatedCompany);
@@ -820,11 +1021,16 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
       // Add calledAt timestamp when status changes to "called"
       const calledAtData = newStatus === "called" ? { calledAt: new Date().toISOString() } : {};
+      const warmAtData = newStatus === "warm" ? { warmAt: new Date().toISOString() } : {};
+      const coldAtData = newStatus === "cold" ? { coldAt: new Date().toISOString() } : {};
+      const hotAtData = newStatus === "hot" ? { hotAt: new Date().toISOString() } : {};
+      const onboardedAtData = newStatus === "onboarded" ? { onboardedAt: new Date().toISOString() } : {};
+      const deletedAtData = newStatus === "deleted" ? { deletedAt: new Date().toISOString() } : {};
 
       setLeads((prevLeads) =>
         prevLeads.map((l) =>
           l.id === leadId
-            ? { ...l, status: newStatus, updatedAt: new Date().toISOString(), ...localAssignmentData, ...calledAtData, isTransitioning: false }
+            ? { ...l, status: newStatus, updatedAt: new Date().toISOString(), ...localAssignmentData, ...calledAtData, ...warmAtData, ...coldAtData, ...hotAtData, ...onboardedAtData, ...deletedAtData, isTransitioning: false }
             : l
         )
       );
@@ -853,6 +1059,17 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   };
 
   const handleScheduleMeeting = (company) => {
+    // Log the schedule meeting activity
+    logPlacementActivity({
+      userId: user?.uid,
+      userName: user?.displayName || user?.name || "Unknown User",
+      action: AUDIT_ACTIONS.SCHEDULE_FOLLOWUP,
+      companyId: company.id,
+      companyName: company.companyName || company.name || "Unknown Company",
+      details: `Opened follow-up scheduling modal for ${company.companyName || company.name || "Unknown Company"}`,
+      sessionId: sessionStorage.getItem('sessionId') || 'unknown'
+    });
+
     setSelectedCompanyForMeeting(company);
     setShowMeetingModal(true);
   };
@@ -864,7 +1081,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         throw new Error('Lead or batch ID not found');
       }
 
-      // Fetch the batch document
+      // Decode the current company data to compare changes
       const batchDocRef = doc(db, "companyleads", lead.batchId);
       const batchDocSnap = await getDoc(batchDocRef);
 
@@ -874,21 +1091,86 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
       const batchData = batchDocSnap.data();
       const encodedCompanies = batchData.companies || [];
-
-      // Find the company index in the array
-      const companyIndex = parseInt(leadId.split('_').pop()); // Extract index from "batch_39_5" -> 5
+      const companyIndex = parseInt(leadId.split('_').pop());
 
       if (companyIndex < 0 || companyIndex >= encodedCompanies.length) {
         throw new Error('Invalid company index');
       }
 
+      // Decode current company data for comparison
+      const currentUriDecoded = atob(encodedCompanies[companyIndex]);
+      const currentJsonString = decodeURIComponent(currentUriDecoded);
+      const currentCompany = JSON.parse(currentJsonString);
+
+      // Compare changes and create detailed description
+      const changes = {};
+      const changeDescriptions = [];
+
+      // Field mapping for better display names
+      const fieldLabels = {
+        name: 'Company Name',
+        companyName: 'Company Name',
+        contactPerson: 'Contact Person',
+        pocName: 'Contact Person',
+        designation: 'Designation',
+        pocDesignation: 'Designation',
+        phone: 'Phone',
+        pocPhone: 'Phone',
+        email: 'Email',
+        pocMail: 'Email',
+        location: 'Location',
+        pocLocation: 'Location',
+        companyUrl: 'Company Website',
+        companyWebsite: 'Company Website',
+        linkedinUrl: 'LinkedIn URL',
+        pocLinkedin: 'LinkedIn URL',
+        industry: 'Industry',
+        companySize: 'Company Size',
+        status: 'Status',
+        workingSince: 'Working Since'
+      };
+
+      // Check each field for changes
+      Object.keys(updatedData).forEach(key => {
+        const oldValue = currentCompany[key];
+        const newValue = updatedData[key];
+
+        // Only log if there's an actual change
+        if (oldValue !== newValue && newValue !== undefined) {
+          const fieldName = fieldLabels[key] || key;
+          changes[key] = {
+            old: oldValue || 'Not set',
+            new: newValue || 'Not set'
+          };
+          changeDescriptions.push(`${fieldName}: "${oldValue || 'Not set'}" → "${newValue || 'Not set'}"`);
+        }
+      });
+
+      // Create detailed description
+      const details = changeDescriptions.length > 0
+        ? `Updated: ${changeDescriptions.join(', ')}`
+        : 'Updated lead information';
+
+      // Log the update activity with detailed changes
+      logPlacementActivity({
+        userId: user?.uid,
+        userName: user?.displayName || user?.name || "Unknown User",
+        action: AUDIT_ACTIONS.UPDATE_LEAD,
+        companyId: leadId,
+        companyName: lead.companyName || lead.name || "Unknown Company",
+        details: details,
+        changes: changes,
+        sessionId: sessionStorage.getItem('sessionId') || 'unknown'
+      });
+
+      // Continue with the update logic using the already fetched data
       // Decode, update, and re-encode the company (Unicode-safe)
-      const uriDecoded = atob(encodedCompanies[companyIndex]);
-      const jsonString = decodeURIComponent(uriDecoded);
-      const decodedCompany = JSON.parse(jsonString);
+      const updateUriDecoded = atob(encodedCompanies[companyIndex]);
+      const updateJsonString = decodeURIComponent(updateUriDecoded);
+      const updateDecodedCompany = JSON.parse(updateJsonString);
       
       // If the lead is currently unassigned, assign it to the current user
-      const isCurrentlyUnassigned = !decodedCompany.assignedTo;
+      const isCurrentlyUnassigned = !updateDecodedCompany.assignedTo;
       const assignmentData = isCurrentlyUnassigned && user ? {
         assignedTo: user.uid,
         assignedBy: user.uid,
@@ -896,17 +1178,45 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       } : {};
       
       const updatedCompany = {
-        ...decodedCompany,
+        ...updateDecodedCompany,
         ...updatedData,
         ...assignmentData,
       };
       // Preserve calledAt if it exists and status is not changing to "called"
-      if (decodedCompany.calledAt && updatedData.status !== "called") {
-        updatedCompany.calledAt = decodedCompany.calledAt;
+      if (updateDecodedCompany.calledAt && updatedData.status !== "called") {
+        updatedCompany.calledAt = updateDecodedCompany.calledAt;
       }
-      // Add calledAt timestamp when status changes to "called" and it doesn't exist
-      if (updatedData.status === "called" && !decodedCompany.calledAt) {
+      // Preserve status timestamps
+      if (updateDecodedCompany.warmAt && updatedData.status !== "warm") {
+        updatedCompany.warmAt = updateDecodedCompany.warmAt;
+      }
+      if (updateDecodedCompany.coldAt && updatedData.status !== "cold") {
+        updatedCompany.coldAt = updateDecodedCompany.coldAt;
+      }
+      if (updateDecodedCompany.hotAt && updatedData.status !== "hot") {
+        updatedCompany.hotAt = updateDecodedCompany.hotAt;
+      }
+      if (updateDecodedCompany.onboardedAt && updatedData.status !== "onboarded") {
+        updatedCompany.onboardedAt = updateDecodedCompany.onboardedAt;
+      }
+      if (updateDecodedCompany.deletedAt && updatedData.status !== "deleted") {
+        updatedCompany.deletedAt = updateDecodedCompany.deletedAt;
+      }
+      // Add status timestamps when status changes
+      if (updatedData.status === "called" && !updateDecodedCompany.calledAt) {
         updatedCompany.calledAt = new Date().toISOString();
+      }
+      if (updatedData.status === "warm" && !updateDecodedCompany.warmAt) {
+        updatedCompany.warmAt = new Date().toISOString();
+      }
+      if (updatedData.status === "cold" && !updateDecodedCompany.coldAt) {
+        updatedCompany.coldAt = new Date().toISOString();
+      }
+      if (updatedData.status === "hot" && !updateDecodedCompany.hotAt) {
+        updatedCompany.hotAt = new Date().toISOString();
+      }
+      if (updatedData.status === "onboarded" && !updateDecodedCompany.onboardedAt) {
+        updatedCompany.onboardedAt = new Date().toISOString();
       }
       // Unicode-safe encoding: encodeURIComponent + btoa
       const updatedJsonString = JSON.stringify(updatedCompany);
@@ -933,7 +1243,12 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         companySize: updatedData.companySize,
         status: updatedData.status,
         workingSince: updatedData.workingSince,
-        calledAt: updatedData.calledAt || decodedCompany.calledAt, // Preserve existing calledAt
+        calledAt: updatedData.calledAt || updateDecodedCompany.calledAt, // Preserve existing calledAt
+        warmAt: updatedData.warmAt || updateDecodedCompany.warmAt,
+        coldAt: updatedData.coldAt || updateDecodedCompany.coldAt,
+        hotAt: updatedData.hotAt || updateDecodedCompany.hotAt,
+        onboardedAt: updatedData.onboardedAt || updateDecodedCompany.onboardedAt,
+        deletedAt: updatedData.deletedAt || updateDecodedCompany.deletedAt,
         updatedAt: new Date().toISOString(),
       };
 
@@ -971,10 +1286,21 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       const lead = leads.find((l) => l.id === leadId);
       if (!lead || !lead.batchId) return;
 
-      // Confirm deletion
-      if (!window.confirm(`Are you sure you want to delete ${lead.companyName}?`)) {
+      // Confirm deletion - now it's actually marking as deleted
+      if (!window.confirm(`Are you sure you want to mark this lead as deleted? It will be moved to the Deleted tab.`)) {
         return;
       }
+
+      // Log the delete activity
+      logPlacementActivity({
+        userId: user?.uid,
+        userName: user?.displayName || user?.name || "Unknown User",
+        action: AUDIT_ACTIONS.DELETE_LEAD,
+        companyId: leadId,
+        companyName: lead.companyName || lead.name || "Unknown Company",
+        details: `Marked lead as deleted`,
+        sessionId: sessionStorage.getItem('sessionId') || 'unknown'
+      });
 
       // Fetch the batch document
       const batchDocRef = doc(db, "companyleads", lead.batchId);
@@ -988,8 +1314,21 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         const companyIndex = parseInt(leadId.split('_').pop()); // Extract index from "batch_39_5" -> 5
 
         if (companyIndex >= 0 && companyIndex < encodedCompanies.length) {
-          // Remove the company from the array
-          encodedCompanies.splice(companyIndex, 1);
+          // Decode, update status to "deleted", and re-encode the company (Unicode-safe)
+          const uriDecoded = atob(encodedCompanies[companyIndex]);
+          const jsonString = decodeURIComponent(uriDecoded);
+          const decodedCompany = JSON.parse(jsonString);
+
+          const updatedCompany = {
+            ...decodedCompany,
+            status: "deleted",
+            deletedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          // Unicode-safe encoding: encodeURIComponent + btoa
+          const updatedJsonString = JSON.stringify(updatedCompany);
+          const updatedUriEncoded = encodeURIComponent(updatedJsonString);
+          encodedCompanies[companyIndex] = btoa(updatedUriEncoded);
 
           // Save back to Firestore
           await setDoc(batchDocRef, {
@@ -999,11 +1338,29 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         }
       }
 
-      // Update local state by removing the lead
-      setLeads((prevLeads) => prevLeads.filter((l) => l.id !== leadId));
+      // Update local state - change status to "deleted" instead of removing
+      setLeads((prevLeads) =>
+        prevLeads.map((l) =>
+          l.id === leadId
+            ? { ...l, status: "deleted", deletedAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+            : l
+        )
+      );
+
+      // Switch to "deleted" tab if user is admin
+      const isAdmin = user?.departments?.includes("admin") || 
+                     user?.departments?.includes("Admin") || 
+                     user?.department === "admin" || 
+                     user?.department === "Admin" ||
+                     user?.role === "admin" || 
+                     user?.role === "Admin";
+      
+      if (isAdmin) {
+        setActiveTab("deleted");
+      }
     } catch (error) {
       handleFirestoreIndexError(error, "lead deletion");
-      alert("Failed to delete the lead. Please try again.");
+      alert("Failed to mark the lead as deleted. Please try again.");
     }
   };
 
@@ -1011,6 +1368,22 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     try {
       const lead = leads.find((l) => l.id === leadId);
       if (!lead || !lead.batchId) return;
+
+      // Get assignee name
+      const assignee = Object.values(allUsers).find(u => (u.uid || u.id) === userId);
+      const assigneeName = assignee?.displayName || assignee?.name || "Unknown User";
+
+      // Log the assignment activity
+      logPlacementActivity({
+        userId: user?.uid,
+        userName: user?.displayName || user?.name || "Unknown User",
+        action: AUDIT_ACTIONS.ASSIGN_LEAD,
+        companyId: leadId,
+        companyName: lead.companyName || lead.name || "Unknown Company",
+        details: `Assigned lead to ${assigneeName}`,
+        changes: { assignedTo: userId, assigneeName },
+        sessionId: sessionStorage.getItem('sessionId') || 'unknown'
+      });
 
       // Fetch the batch document
       const batchDocRef = doc(db, "companyleads", lead.batchId);
@@ -1102,36 +1475,57 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     <div className="bg-white rounded-lg shadow p-4">
       {/* Header with View Toggle on Left, Search in Center, Actions on Right */}
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-2 gap-2">
-        {/* View Mode Toggle and User Filter on Left */}
+        {/* View Mode Toggle and Filters on Left */}
         <div className="flex items-center gap-4 shrink-0 h-8">
           <ViewModeToggle
             viewMyLeadsOnly={viewMyLeadsOnly}
-            setViewMyLeadsOnly={setViewMyLeadsOnly}
+            setViewMyLeadsOnly={(value) => {
+              // Log view mode change
+              logPlacementActivity({
+                userId: user?.uid,
+                userName: user?.displayName || user?.name || "Unknown User",
+                action: AUDIT_ACTIONS.FILTER_APPLIED,
+                companyId: null,
+                companyName: null,
+                details: `Changed view mode to: ${value ? 'My Leads Only' : 'All Leads'}`,
+                changes: { viewMyLeadsOnly: value },
+                sessionId: sessionStorage.getItem('sessionId') || 'unknown'
+              });
+              setViewMyLeadsOnly(value);
+              // Update URL
+              const url = new URL(window.location);
+              url.searchParams.set('view', value ? 'myleads' : 'myteam');
+              window.history.replaceState(null, '', url);
+            }}
           />
-          <span className="text-xs font-medium text-gray-700">User:</span>
-          <select
-            value={selectedUserFilter}
-            onChange={(e) => setSelectedUserFilter(e.target.value)}
-            className="px-2 py-1 border rounded text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-full"
-          >
-            <option value="all">All Users</option>
-            <option value="unassigned">Unassigned</option>
-            {Object.values(allUsers)
-              .filter(u => {
-                if (viewMyLeadsOnly) {
-                  return u.uid === user?.uid;
-                } else {
-                  const teamMemberIds = getTeamMemberIds(user?.uid || '');
-                  return teamMemberIds.includes(u.uid || u.id);
-                }
-              })
-              .map(u => (
-                <option key={u.uid || u.id} value={u.uid || u.id}>
-                  {u.name || u.displayName || 'Unknown User'}
-                </option>
-              ))
-            }
-          </select>
+          <LeadFilters
+            filters={{ selectedUserFilter, companyFilter, phoneFilter }}
+            setFilters={(newFilters) => {
+              // Log filter application
+              logPlacementActivity({
+                userId: user?.uid,
+                userName: user?.displayName || user?.name || "Unknown User",
+                action: AUDIT_ACTIONS.FILTER_APPLIED,
+                companyId: null,
+                companyName: null,
+                details: `Applied filters: User=${newFilters.selectedUserFilter || 'all'}, Company="${newFilters.companyFilter || ''}", Phone="${newFilters.phoneFilter || ''}"`,
+                changes: newFilters,
+                sessionId: sessionStorage.getItem('sessionId') || 'unknown'
+              });
+
+              setSelectedUserFilter(newFilters.selectedUserFilter || 'all');
+              setCompanyFilter(newFilters.companyFilter || '');
+              setPhoneFilter(newFilters.phoneFilter || '');
+            }}
+            isFilterOpen={isFilterOpen}
+            setIsFilterOpen={setIsFilterOpen}
+            allUsers={allUsers}
+            leads={leads}
+            activeTab={activeTab}
+            viewMyLeadsOnly={viewMyLeadsOnly}
+            currentUser={user}
+            getTeamMemberIds={getTeamMemberIds}
+          />
         </div>
 
         {/* Search in Center */}
@@ -1141,7 +1535,9 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
             placeholder="Search companies or contacts..."
             className="w-full px-3 py-1 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs h-full"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+            }}
           />
         </div>
 
@@ -1191,7 +1587,12 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
             <PlusIcon className="h-3 w-3 mr-1" />
             Add Company
           </button>
-          {user?.departments?.includes("admin") && (
+          {user && (user?.departments?.includes("admin") || 
+                     user?.departments?.includes("Admin") || 
+                     user?.department === "admin" || 
+                     user?.department === "Admin" ||
+                     user?.role === "admin" || 
+                     user?.role === "Admin") && (
             <button
               onClick={() => setShowBulkUploadForm(true)}
               className="px-3 py-1 bg-green-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-md text-xs h-full"
@@ -1204,10 +1605,26 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       </div>      <LeadsFilters
         activeTab={activeTab}
         onTabChange={(tab) => {
+          // Log tab change activity
+          logPlacementActivity({
+            userId: user?.uid,
+            userName: user?.displayName || user?.name || "Unknown User",
+            action: AUDIT_ACTIONS.FILTER_APPLIED,
+            companyId: null,
+            companyName: null,
+            details: `Changed tab filter to: ${tab}`,
+            changes: { tabFilter: tab },
+            sessionId: sessionStorage.getItem('sessionId') || 'unknown'
+          });
           setActiveTab(tab);
+          // Update URL
+          const url = new URL(window.location);
+          url.searchParams.set('tab', tab);
+          window.history.replaceState(null, '', url);
         }}
         setActiveTab={setActiveTab}
         leadsByStatus={leadsByStatus}
+        user={user}
       />
 
       <LeadsTable
@@ -1215,6 +1632,17 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         groupedLeads={groupedLeads}
         activeTab={activeTab}
         onLeadClick={(lead) => {
+          // Log the view activity
+          logPlacementActivity({
+            userId: user?.uid,
+            userName: user?.displayName || user?.name || "Unknown User",
+            action: AUDIT_ACTIONS.VIEW_LEAD,
+            companyId: lead.id,
+            companyName: lead.companyName || lead.name || "Unknown Company",
+            details: `Viewed lead details for ${lead.companyName || lead.name || "Unknown Company"}`,
+            sessionId: sessionStorage.getItem('sessionId') || 'unknown'
+          });
+
           setSelectedLead(lead);
           setShowLeadDetails(true);
         }}
@@ -1238,9 +1666,30 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                 Object.values(allUsers).find(u => (u.uid || u.id) === selectedUserFilter)?.name || 'user'})
             </span>
           )}
+          {companyFilter.trim() && (
+            <span className="ml-2 text-green-600">
+              (company: "{companyFilter.trim()}")
+            </span>
+          )}
+          {phoneFilter.trim() && (
+            <span className="ml-2 text-purple-600">
+              (phone: "{phoneFilter.trim()}")
+            </span>
+          )}
         </div>
         <button
           onClick={async () => {
+            // Log refresh action
+            logPlacementActivity({
+              userId: user?.uid,
+              userName: user?.displayName || user?.name || "Unknown User",
+              action: AUDIT_ACTIONS.VIEW_LEAD,
+              companyId: null,
+              companyName: null,
+              details: `Refreshed leads data`,
+              sessionId: sessionStorage.getItem('sessionId') || 'unknown'
+            });
+
             setLoading(true);
             await fetchLeads();
           }}
@@ -1262,6 +1711,15 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
               if (!lead || !lead.batchId) {
                 throw new Error('Lead or batch ID not found');
               }
+
+              // Log contact addition
+              await logPlacementActivity({
+                action: 'ADD_CONTACT',
+                leadId: leadId,
+                leadName: lead.companyName || lead.name,
+                details: `Added contact: ${contactData.name || 'Unknown'} (${contactData.email || contactData.phone || 'No contact info'})`,
+                changes: contactData
+              });
 
               // Fetch the batch document
               const batchDocRef = doc(db, "companyleads", lead.batchId);

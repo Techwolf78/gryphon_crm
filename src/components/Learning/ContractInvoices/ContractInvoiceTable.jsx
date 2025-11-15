@@ -94,6 +94,21 @@ export default function ContractInvoiceTable() {
           id: doc.id,
           ...doc.data(),
         }));
+        console.log(`Training Forms: ${trainingFormsData.length} colleges fetched`);
+
+        // 1️⃣.1️⃣ Fetch digital marketing contracts
+        const digitalMarketingSnapshot = await getDocs(
+          query(collection(db, "digitalMarketing"), orderBy("createdAt", "desc"))
+        );
+        const digitalMarketingData = digitalMarketingSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        console.log(`Digital Marketing: ${digitalMarketingData.length} colleges fetched`);
+
+        // Combine both collections
+        const combinedContracts = [...trainingFormsData, ...digitalMarketingData];
+        console.log(`Total Combined: ${combinedContracts.length} colleges from both collections`);
 
         // 2️⃣ Fetch ContractInvoices
         const invoicesSnapshot = await getDocs(
@@ -123,7 +138,7 @@ export default function ContractInvoiceTable() {
         }));
         setExistingProformas(proformaData);
 
-        setInvoices(trainingFormsData);
+        setInvoices(combinedContracts);
       } catch {
         setError("Failed to load data. Please try again.");
       } finally {

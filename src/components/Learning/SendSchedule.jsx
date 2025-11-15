@@ -45,6 +45,8 @@ function SendSchedule({
 
   const [feePerHour, setFeePerHour] = useState(0);
 
+  const [trainerDetails, setTrainerDetails] = useState([]);
+
   const [success, setSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -113,6 +115,8 @@ useEffect(() => {
     food: totalFood,
     lodging: totalLodging
   });
+
+  setTrainerDetails(trainerDetails);
 }, [selectedTrainer, trainersData, phaseData?.excludeDays]);
 
 
@@ -147,44 +151,6 @@ useEffect(() => {
       return "PM";
     }
     return slot;
-  };
-
-  // Utility: calculate hours for dayDuration
-  const calculateHours = (dayDuration) => {
-    if (!dayDuration) return 0;
-    const pd = phaseData || phaseDocData || {};
-    const { collegeStartTime, lunchStartTime, lunchEndTime, collegeEndTime } = pd;
-
-    if (!collegeStartTime || !collegeEndTime) return dayDuration.includes("AM & PM") ? 7 : dayDuration.includes("AM") || dayDuration.includes("PM") ? 3 : 0;
-
-    const parseTime = (timeStr) => {
-      const [h, m] = timeStr.split(':').map(Number);
-      return h * 60 + m;
-    };
-
-    const start = parseTime(collegeStartTime);
-    const end = parseTime(collegeEndTime);
-    const lunchStart = lunchStartTime && lunchEndTime ? parseTime(lunchStartTime) : null;
-    const lunchEnd = lunchStartTime && lunchEndTime ? parseTime(lunchEndTime) : null;
-
-    const lunchDuration = lunchStart && lunchEnd ? lunchEnd - lunchStart : 0;
-
-    if (dayDuration.includes("AM & PM") || (dayDuration.includes("AM") && dayDuration.includes("PM"))) {
-      return (end - start - lunchDuration) / 60;
-    } else if (dayDuration.includes("AM")) {
-      if (lunchStart && lunchStart <= end) {
-        return (lunchStart - start) / 60;
-      } else {
-        return (end - start - lunchDuration) / 60;
-      }
-    } else if (dayDuration.includes("PM")) {
-      if (lunchEnd && lunchEnd >= start) {
-        return (end - lunchEnd) / 60;
-      } else {
-        return (end - start - lunchDuration) / 60;
-      }
-    }
-    return 0;
   };
 
   useEffect(() => {
@@ -367,7 +333,9 @@ useEffect(() => {
                 domain: detail.domain,
                 batchCode: detail.batchCode,
                 trainerId: detail.trainerId,
-                sourceTrainingId: training.id
+                sourceTrainingId: training.id,
+                assignedHours: detail.assignedHours || 0,
+                rate: detail.perHourCost || 0
               });
             }
           }
@@ -441,19 +409,30 @@ useEffect(() => {
     try {
       
       const totalHours = (() => {
-        // Calculate based on dayDuration of assignments using the same calculateHours function
+        // Calculate based on assigned hours from trainersData
         return trainerAssignments.reduce((acc, assignment) => {
-          return acc + calculateHours(assignment.dayDuration);
+          return acc + (assignment.assignedHours || 0);
         }, 0);
       })();
 
       // Calculate total training days from assignments
       const totalDays = new Set(trainerAssignments.map(a => a.date)).size;
 
+      // Get trainer details for accurate fee calculation
+      const trainerDetails = trainersData.filter(trainer => 
+        trainer.trainerId === selectedTrainer.trainerId || trainer.id === selectedTrainer.id
+      );
+
       // FIXED: Use new calculation logic (matching InvoiceModal)
       const roundToNearestWhole = (num) => Math.round(num);
       
-      const trainingFees = roundToNearestWhole(totalHours * (feePerHour || 0));
+      const trainingFees = roundToNearestWhole(
+        trainerDetails.reduce((acc, detail) => {
+          const hours = detail.assignedHours || 0;
+          const rate = detail.perHourCost || 0;
+          return acc + (hours * rate);
+        }, 0)
+      );
       
       // Calculate expenses the same way as InitiationTrainingDetails
       // Conveyance is one-time, food and lodging are already totals from assignments
@@ -470,9 +449,9 @@ useEffect(() => {
 
       const scheduleRows = trainerAssignments
         .map((assignment) => {
-          let hoursPerDay = calculateHours(assignment.dayDuration);
+          let hoursPerDay = assignment.assignedHours || 0;
 
-          const perDayCost = (feePerHour || 0) * hoursPerDay;
+          const perDayCost = (assignment.rate || 0) * hoursPerDay;
 
           return `
 <tr>
@@ -483,7 +462,7 @@ useEffect(() => {
   <td>${assignment.batchCode || "-"}</td>
   <td>${getTimingForSlot(assignment.dayDuration)}</td>
   <td>${hoursPerDay.toFixed(2)}</td>
-  <td>₹ ${feePerHour || 0}</td>
+  <td>₹ ${assignment.rate || 0}</td>
   <td>₹ ${perDayCost.toFixed(2)}</td>
 </tr>`;
         })
@@ -514,8 +493,8 @@ useEffect(() => {
             ? (() => {
                 // Calculate total fee for all assignments (not average)
                 const totalFee = trainerAssignments.reduce((acc, assignment) => {
-                  const hours = calculateHours(assignment.dayDuration);
-                  return acc + (hours * (feePerHour || 0));
+                  const hours = assignment.assignedHours || 0;
+                  return acc + (hours * (assignment.rate || 0));
                 }, 0);
                 return totalFee;
               })()
@@ -729,7 +708,7 @@ useEffect(() => {
                               {getTimingForSlot(assignment.dayDuration)}
                             </td>
                             <td className="px-4 py-2 border border-gray-200">
-                              {calculateHours(assignment.dayDuration).toFixed(2)}
+                              {(assignment.assignedHours || 0).toFixed(2)}
                             </td>
 
                             <td className="px-4 py-2 border border-gray-200">
@@ -780,9 +759,9 @@ useEffect(() => {
               </h3>
 
               {(() => {
-                // Calculate financial details using the same calculateHours function as the table
+                // Calculate financial details using assigned hours instead of calculated
                 const totalHours = trainerAssignments.reduce((acc, assignment) => {
-                  return acc + calculateHours(assignment.dayDuration);
+                  return acc + (assignment.assignedHours || 0);
                 }, 0);
 
                 // Calculate total training days from assignments
@@ -791,7 +770,13 @@ useEffect(() => {
                 // Round to nearest whole number (matching InvoiceModal)
                 const roundToNearestWhole = (num) => Math.round(num);
 
-                const trainingFees = roundToNearestWhole((feePerHour || 0) * totalHours);
+                const trainingFees = roundToNearestWhole(
+                  trainerDetails.reduce((acc, detail) => {
+                    const hours = detail.assignedHours || 0;
+                    const rate = detail.perHourCost || 0;
+                    return acc + (hours * rate);
+                  }, 0)
+                );
                 
                 // Calculate expenses the same way as InitiationTrainingDetails
                 // Conveyance is one-time, food and lodging are already totals from assignments
@@ -885,7 +870,7 @@ useEffect(() => {
                     <button
                       type="button"
                       onClick={handleImportEmail}
-                      className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white border border-blue-500 rounded-lg hover:from-blue-600 hover:to-blue-700 hover:border-blue-600 transition-all duration-200 text-sm font-medium whitespace-nowrap shadow-sm hover:shadow-md transform hover:scale-105 flex items-center gap-2"
+                      className="px-4 py-2 bg-linear-to-r from-blue-500 to-blue-600 text-white border border-blue-500 rounded-lg hover:from-blue-600 hover:to-blue-700 hover:border-blue-600 transition-all duration-200 text-sm font-medium whitespace-nowrap shadow-sm hover:shadow-md transform hover:scale-105 flex items-center gap-2"
                       title="Import email from trainer database"
                     >
                       <FiMail className="w-4 h-4" />
