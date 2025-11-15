@@ -457,6 +457,11 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
                   Available Leads ({filteredLeads.length} total)
                 </h3>
                 <div className="flex items-center space-x-2">
+                  {selectedLeads.length > 0 && (
+                    <span className="px-2 py-1 bg-white/80 backdrop-blur-md text-blue-700 text-xs font-medium rounded-full border border-blue-200/50 shadow-sm">
+                      {selectedLeads.length} selected
+                    </span>
+                  )}
                   <button
                     onClick={handleSelectAllLeads}
                     className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium shadow-sm"

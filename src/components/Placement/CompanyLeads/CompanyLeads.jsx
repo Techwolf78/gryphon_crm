@@ -1575,34 +1575,30 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
         {/* Microsoft 365 Connection Status */}
         <div className="flex items-center gap-2 shrink-0 h-8">
-          <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 rounded border">
+          <div className="flex items-center gap-2 px-2 py-1 bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-gray-200/50">
             {ms365TestingConnection ? (
               <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
             ) : (
               <div
                 className={`w-3 h-3 rounded-full ${
                   ms365ConnectionStatus === 'connected'
-                    ? 'bg-green-500'
+                    ? 'bg-green-500 shadow-green-500/30 shadow-lg'
                     : ms365ConnectionStatus === 'weak'
-                    ? 'bg-yellow-500'
-                    : 'bg-red-500'
+                    ? 'bg-yellow-500 shadow-yellow-500/30 shadow-lg'
+                    : 'bg-red-500 shadow-red-500/30 shadow-lg'
                 }`}
               ></div>
             )}
-            <span className="text-xs text-gray-600">
-              {ms365TestingConnection
-                ? 'Testing...'
-                : ms365ConnectionStatus === 'connected'
-                ? 'MS365'
-                : ms365ConnectionStatus === 'weak'
-                ? 'MS365'
-                : 'MS365'
-              }
-            </span>
+            <img 
+              src="https://cdn-icons-png.flaticon.com/512/732/732221.png" 
+              alt="Microsoft Logo" 
+              title="Microsoft 365"
+              className="w-3 h-3 rounded-sm object-cover" 
+            />
             {ms365ConnectionStatus !== 'connected' && !ms365TestingConnection && (
               <button
                 onClick={connectToMs365}
-                className="ml-1 px-2 py-0.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
+                className="ml-1 px-3 py-1 bg-blue-600 text-white text-xs font-semibold rounded-xl hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md transition-all duration-200"
               >
                 Connect
               </button>
@@ -1633,7 +1629,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
               Bulk Upload
             </button>
           )}
-          {user && (user?.role === "Director" || user?.role === "Head") && (
+          {user && (user?.role === "Director" || user?.role === "Head") && !viewMyLeadsOnly && (
             <button
               onClick={() => setShowBulkAssignModal(true)}
               className="px-3 py-1 bg-purple-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-purple-700 focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 shadow-md text-xs h-full"
