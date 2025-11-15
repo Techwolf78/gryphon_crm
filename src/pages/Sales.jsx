@@ -120,7 +120,7 @@ function Sales() {
 
     if (!user) return counts;
 
-    const isSalesDept = user.department === "Sales";
+    const isSalesDept = user.department === "Sales" || (Array.isArray(user.departments) && user.departments.includes("Sales"));
     const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
     const isLowerRole = ["Assistant Manager", "Executive"].includes(user.role);
 
@@ -230,7 +230,7 @@ function Sales() {
         (!filters.contactMethod ||
           lead.contactMethod?.toLowerCase() ===
             filters.contactMethod.toLowerCase());
-      const isSalesDept = user.department === "Sales";
+      const isSalesDept = user.department === "Sales" || (Array.isArray(user.departments) && user.departments.includes("Sales"));
       const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
 
       if (user.role === "Director") {
@@ -370,7 +370,7 @@ function Sales() {
         (!filters.contactMethod ||
           lead.contactMethod?.toLowerCase() ===
             filters.contactMethod.toLowerCase());
-      const isSalesDept = user.department === "Sales";
+      const isSalesDept = user.department === "Sales" || (Array.isArray(user.departments) && user.departments.includes("Sales"));
       const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
 
       if (user.role === "Director") {

@@ -97,7 +97,8 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
 
   const handleOversizedBatch = async (batchRef, batchData, batchGroups) => {
     const batchId = batchRef.id;
-    const companies = batchData.companies || [];
+    const isCompaniesArray = Array.isArray(batchData.companies);
+    const companies = isCompaniesArray ? (batchData.companies || []) : Object.values(batchData.companies || {});
     
     console.log(`Handling oversized batch ${batchId} with ${companies.length} companies`);
     
@@ -114,12 +115,33 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
         }
         
         const freshBatchData = freshDocSnap.data();
-        const encodedCompanies = [...(freshBatchData.companies || [])];
+        const isFreshCompaniesArray = Array.isArray(freshBatchData.companies);
+        let encodedCompanies;
+        if (isFreshCompaniesArray) {
+          encodedCompanies = [...(freshBatchData.companies || [])];
+        } else {
+          encodedCompanies = { ...(freshBatchData.companies || {}) };
+        }
         const companyIndex = parseInt(leadId.split('_').pop());
         
-        if (companyIndex >= 0 && companyIndex < encodedCompanies.length) {
+        let isValidIndex;
+        if (isFreshCompaniesArray) {
+          isValidIndex = companyIndex >= 0 && companyIndex < encodedCompanies.length;
+        } else {
+          isValidIndex = encodedCompanies[companyIndex.toString()] !== undefined;
+        }
+        
+        if (isValidIndex) {
+          // Get current encoded
+          let currentEncoded;
+          if (isFreshCompaniesArray) {
+            currentEncoded = encodedCompanies[companyIndex];
+          } else {
+            currentEncoded = encodedCompanies[companyIndex.toString()];
+          }
+          
           // Decode and update single company
-          const uriDecoded = atob(encodedCompanies[companyIndex]);
+          const uriDecoded = atob(currentEncoded);
           const jsonString = decodeURIComponent(uriDecoded);
           const decodedCompany = JSON.parse(jsonString);
 
@@ -134,7 +156,14 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
           // Encode back
           const updatedJsonString = JSON.stringify(updatedCompany);
           const updatedUriEncoded = encodeURIComponent(updatedJsonString);
-          encodedCompanies[companyIndex] = btoa(updatedUriEncoded);
+          const updatedEncoded = btoa(updatedUriEncoded);
+          
+          // Update in encodedCompanies
+          if (isFreshCompaniesArray) {
+            encodedCompanies[companyIndex] = updatedEncoded;
+          } else {
+            encodedCompanies[companyIndex.toString()] = updatedEncoded;
+          }
           
           // Update single document
           await setDoc(batchRef, { ...freshBatchData, companies: encodedCompanies });
@@ -159,6 +188,8 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
     setLoading(true);
     setProgress({ current: 0, total: selectedLeads.length, errors: [], status: 'Assigning...' });
 
+    console.log('Starting bulk assign with:', { selectedUser, assignmentDate, selectedLeadsCount: selectedLeads.length });
+
     try {
       // Assign all leads to the single selected user
       const assignments = [];
@@ -166,12 +197,17 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
         assignments.push({ leadId, userId: selectedUser });
       });
 
+      console.log('Created assignments array:', assignments.length);
+
       let errorList = [];
 
       // Process assignments in batches to avoid overloading
-      const batchSize = 10; // Increased batch size since using writeBatch
+      const batchSize = 1; // Process one batch at a time for slower, safer updates
+      console.log('Starting batch processing, batchSize:', batchSize);
       for (let i = 0; i < assignments.length; i += batchSize) {
         const batchAssignments = assignments.slice(i, i + batchSize);
+
+        console.log(`Processing batch ${Math.floor(i / batchSize) + 1}, assignments:`, batchAssignments.length);
 
         // Group assignments by batchId
         const batchGroups = {};
@@ -187,12 +223,17 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
           batchGroups[lead.batchId].push({ leadId, userId, lead });
         });
 
+        console.log('Batch groups created:', Object.keys(batchGroups).length);
+
         // Fetch and update each batch document
         const updates = [];
         for (const batchId of Object.keys(batchGroups)) {
+          console.log(`Processing batch ${batchId} with ${batchGroups[batchId].length} leads`);
           try {
             const batchDocRef = doc(db, "companyleads", batchId);
             const batchDocSnap = await getDoc(batchDocRef);
+
+            console.log(`Fetched batch ${batchId}, exists:`, batchDocSnap.exists());
 
             if (!batchDocSnap.exists()) {
               batchGroups[batchId].forEach(({ leadId }) => {
@@ -202,33 +243,65 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
             }
 
             const batchData = batchDocSnap.data();
-            const encodedCompanies = [...(batchData.companies || [])];
+            const isCompaniesArray = Array.isArray(batchData.companies);
+            let encodedCompanies;
+            if (isCompaniesArray) {
+              encodedCompanies = [...(batchData.companies || [])];
+            } else {
+              encodedCompanies = { ...(batchData.companies || {}) };
+            }
 
             // Update each lead in this batch
             batchGroups[batchId].forEach(({ leadId, userId }) => {
               const companyIndex = parseInt(leadId.split('_').pop());
-              if (companyIndex < 0 || companyIndex >= encodedCompanies.length) {
+              let isValidIndex;
+              if (isCompaniesArray) {
+                isValidIndex = companyIndex >= 0 && companyIndex < encodedCompanies.length;
+              } else {
+                isValidIndex = encodedCompanies[companyIndex.toString()] !== undefined;
+              }
+              if (!isValidIndex) {
                 errorList.push(`Lead ${leadId}: Invalid company index`);
                 return;
               }
 
               // Decode and update
-              const uriDecoded = atob(encodedCompanies[companyIndex]);
+              let currentEncoded;
+              if (isCompaniesArray) {
+                currentEncoded = encodedCompanies[companyIndex];
+              } else {
+                currentEncoded = encodedCompanies[companyIndex.toString()];
+              }
+              const uriDecoded = atob(currentEncoded);
               const jsonString = decodeURIComponent(uriDecoded);
               const decodedCompany = JSON.parse(jsonString);
+
+              const assignedAtValue = new Date(assignmentDate).toISOString();
+              console.log(`Updating lead ${leadId} for user ${userId}, assignedAt:`, assignedAtValue);
 
               const updatedCompany = {
                 ...decodedCompany,
                 assignedTo: userId,
                 assignedBy: currentUser.uid,
-                assignedAt: new Date(assignmentDate).toISOString(),
-                dateField: new Date(assignmentDate).toISOString(),
+                assignedAt: assignedAtValue,
+                dateField: assignedAtValue,
               };
               
-              // Create individual document for each lead
-              const leadDocRef = doc(db, 'companyleads', leadId);
-              updates.push({ ref: leadDocRef, data: updatedCompany });
+              // Encode back
+              const updatedJsonString = JSON.stringify(updatedCompany);
+              const updatedUriEncoded = encodeURIComponent(updatedJsonString);
+              const updatedEncoded = btoa(updatedUriEncoded);
+              
+              // Update encodedCompanies
+              if (isCompaniesArray) {
+                encodedCompanies[companyIndex] = updatedEncoded;
+              } else {
+                encodedCompanies[companyIndex.toString()] = updatedEncoded;
+              }
             });
+
+            // Update the batch document
+            updates.push({ ref: batchDocRef, data: { ...batchData, companies: encodedCompanies } });
           } catch (error) {
             console.error(`Error processing batch ${batchId}:`, error);
             batchGroups[batchId].forEach(({ leadId }) => {
@@ -236,6 +309,8 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
             });
           }
         }
+
+        console.log('Updates prepared:', updates.length);
 
         // Use writeBatch to commit all updates
         if (updates.length > 0) {
@@ -245,6 +320,7 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
               batch.set(ref, data);
             });
             await batch.commit();
+            console.log('Batch committed successfully');
           } catch (batchError) {
             // Handle Firestore document size limit error
             if (batchError.message && batchError.message.includes('exceeds the maximum allowed size')) {
@@ -254,16 +330,20 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
               for (const update of updates) {
                 try {
                   await setDoc(update.ref, update.data);
+                  console.log('Individual update committed for', update.ref.id);
                 } catch (docError) {
                   if (docError.message && docError.message.includes('exceeds the maximum allowed size')) {
                     // Document is too large, need to split it
                     await handleOversizedBatch(update.ref, update.data, batchGroups);
+                    console.log('Handled oversized batch for', update.ref.id);
                   } else {
+                    console.error('Doc error:', docError);
                     throw docError;
                   }
                 }
               }
             } else {
+              console.error('Batch commit error:', batchError);
               throw batchError;
             }
           }
@@ -271,6 +351,7 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
 
         // Log activities for successful assignments
         const successfulAssignments = batchAssignments.filter(({ leadId }) => !errorList.some(e => e.includes(leadId)));
+        console.log('Successful assignments in this batch:', successfulAssignments.length);
         const assignmentsByUser = {};
         successfulAssignments.forEach(({ userId }) => {
           if (!assignmentsByUser[userId]) {
@@ -296,18 +377,22 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
           });
         });
 
+        console.log('Logged activities for batch');
+
         setProgress(prev => ({ ...prev, current: Math.min(prev.total, i + batchAssignments.length), errors: [...prev.errors, ...errorList] }));
 
         // Take a break after each batch except the last
         if (i + batchSize < assignments.length) {
           setProgress(prev => ({ ...prev, status: 'Taking a break to avoid overloading the backend...' }));
-          await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second break
+          await new Promise(resolve => setTimeout(resolve, 5000)); // 5 second break
           setProgress(prev => ({ ...prev, status: 'Assigning...' }));
+          console.log('Took break after batch');
         }
       }
 
       // Consolidated logging after all batches
       const allSuccessfulAssignments = assignments.filter(a => !errorList.some(e => e.includes(a.leadId)));
+      console.log('Total successful assignments:', allSuccessfulAssignments.length);
       const totalAssignmentsByUser = {};
       allSuccessfulAssignments.forEach(({ userId }) => {
         if (!totalAssignmentsByUser[userId]) {
@@ -336,6 +421,8 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
       // Update local state via callback
       const successfulAssignments = assignments.filter(a => !errorList.some(e => e.includes(a.leadId)));
       onAssign(successfulAssignments, assignmentDate);
+
+      console.log('Bulk assign completed, updating local state');
 
       // Show results
       setProgress(prev => ({ ...prev, errors: errorList }));
