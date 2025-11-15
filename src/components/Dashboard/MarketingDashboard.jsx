@@ -9,11 +9,6 @@ const MarketingDashboard = () => {
 
   return (
     <div className="px-4 py-6">
-      {/* Development Banner */}
-      <div className="mb-6 bg-yellow-400 text-black text-center py-3 px-4 rounded-lg font-medium">
-        This represents dummy data and is under active development.
-      </div>
-
       {/* Header */}
       <div className="mb-8">
         <h2 className="text-2xl font-bold text-gray-800">Marketing Dashboard</h2>

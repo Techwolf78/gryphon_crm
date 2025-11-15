@@ -1099,9 +1099,7 @@ if (selectedUserId) {
       const usersRef = collection(db, "users");
       
       let usersQuery;
-      if (currentUser?.department === "sales") {
-        usersQuery = query(usersRef, where("department", "==", "sales"));
-      } else if (currentUser?.department === "Admin") {
+      if (currentUser?.department?.toLowerCase() === "sales" || currentUser?.department?.toLowerCase() === "dm" || currentUser?.department === "Admin") {
         usersQuery = query(usersRef);
       } else {
         usersQuery = query(
@@ -1378,10 +1376,14 @@ if (selectedUserId) {
     setModalLeads([]); // Clear previous
 
     try {
+      let uid = member.id;
+      const user = users.find(u => u.id === member.id);
+      if (user) {
+        uid = user.uid;
+      }
+
       const leadsRef = collection(db, "leads");
-      const user = users.find((u) => u.name.toLowerCase().trim() === member.name.toLowerCase().trim());
-      if (!user) return;
-      const leadsQuery = query(leadsRef, where("assignedTo.uid", "==", user.uid));
+      const leadsQuery = query(leadsRef, where("assignedTo.uid", "==", uid));
       const snapshot = await getDocs(leadsQuery);
       let leads = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
@@ -1391,7 +1393,7 @@ if (selectedUserId) {
       let dmContracts = dmSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
       // Filter DM by createdBy.uid
-      let memberDmContracts = dmContracts.filter(dm => dm.createdBy?.uid === user.uid);
+      let memberDmContracts = dmContracts.filter(dm => dm.createdBy?.uid === uid);
 
       // Map DM to similar structure
       const dmAsLeads = memberDmContracts.map(dm => ({

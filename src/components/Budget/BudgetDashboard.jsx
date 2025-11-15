@@ -317,6 +317,7 @@ function BudgetDashboard({
   department,
   showVendorManagement = false,
   showDepartment = false,
+  onBack,
 }) {
   // State management
   const [activeTab, setActiveTab] = useState("budgets");
@@ -1034,9 +1035,34 @@ function BudgetDashboard({
 
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className=" mx-auto py-6">
         {/* Header */}
         <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-6 mb-6">
+          {/* Back Button */}
+          {onBack && (
+            <div className="mb-4">
+              <button
+                onClick={onBack}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-lg font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.98] focus:outline-none focus:ring-1 focus:ring-blue-500 focus:ring-offset-1 text-xs"
+              >
+                <svg
+                  className="w-3.5 h-3.5 text-gray-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
+                <span>Back to Sales</span>
+              </button>
+            </div>
+          )}
+
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">
@@ -1135,7 +1161,7 @@ function BudgetDashboard({
                   </div>
 
                   {budgetHistory.length > 0 ? (
-                    <div className="max-w-[80vw]">
+                    <div>
                       <table className="w-full">
                         <thead>
                           <tr className="border-b border-gray-200">

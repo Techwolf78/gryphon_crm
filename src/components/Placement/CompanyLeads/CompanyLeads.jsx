@@ -3,6 +3,7 @@ import { useDebounce } from 'use-debounce';
 import { PlusIcon, CloudUploadIcon } from "@heroicons/react/outline";
 import AddLeads from "./AddLeads";
 import BulkUploadModal from "./BulkUploadModal";
+import BulkAssignModal from "./BulkAssignModal";
 import AddJD from "../AddJd/AddJD"; // ✅ adjust the relative path
 
 import {
@@ -53,6 +54,9 @@ function CompanyLeads() {
   const [showLeadDetails, setShowLeadDetails] = useState(false);
   const [showBulkUploadForm, setShowBulkUploadForm] = useState(false);
 
+  // Bulk Assign modal state
+  const [showBulkAssignModal, setShowBulkAssignModal] = useState(false);
+
   // Meeting modal state
   const [showMeetingModal, setShowMeetingModal] = useState(false);
   const [selectedCompanyForMeeting, setSelectedCompanyForMeeting] = useState(null);
@@ -61,6 +65,15 @@ function CompanyLeads() {
   const [todayFollowUps, setTodayFollowUps] = useState([]);
   const [showTodayFollowUpAlert, setShowTodayFollowUpAlert] = useState(false);
   const [reminderPopup, setReminderPopup] = useState(null);
+
+  // Toast notification state
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+  // Show toast function
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
+  };
 
   // AddJD modal state
 const [showAddJDForm, setShowAddJDForm] = useState(false);
@@ -1436,6 +1449,25 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     }
   };
 
+  const handleBulkAssign = (assignments, assignmentDate) => {
+    // Update local state with the new assignments
+    setLeads((prevLeads) =>
+      prevLeads.map((lead) => {
+        const assignment = assignments.find(a => a.leadId === lead.id);
+        if (assignment) {
+          return {
+            ...lead,
+            assignedTo: assignment.userId,
+            assignedBy: user?.uid,
+            assignedAt: new Date(assignmentDate).toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return lead;
+      })
+    );
+  };
+
 
   const formatDate = useCallback((dateString) => {
     try {
@@ -1599,6 +1631,14 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
             >
               <CloudUploadIcon className="h-3 w-3 mr-1" />
               Bulk Upload
+            </button>
+          )}
+          {user && (user?.role === "Director" || user?.role === "Head") && (
+            <button
+              onClick={() => setShowBulkAssignModal(true)}
+              className="px-3 py-1 bg-purple-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-purple-700 focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 shadow-md text-xs h-full"
+            >
+              Bulk Assign
             </button>
           )}
         </div>
@@ -1792,6 +1832,18 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         assigneeId={user?.uid}
       />
 
+      {/* Bulk Assign Modal */}
+      <BulkAssignModal
+        show={showBulkAssignModal}
+        onClose={() => setShowBulkAssignModal(false)}
+        unassignedLeads={leads.filter(lead => !lead.assignedTo)}
+        allUsers={allUsers}
+        onAssign={handleBulkAssign}
+        currentUser={user}
+        onRefresh={fetchLeads}
+        showToast={showToast}
+      />
+
       {/* Add Leads Modal */}
       <AddLeads
         show={showAddLeadForm}
@@ -1834,6 +1886,18 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           setReminderPopup={setReminderPopup}
         />
       </Suspense>
+
+      {/* iPhone-style Toast */}
+      {toast.show && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-60 transition-all duration-500 ease-out opacity-100 translate-y-0">
+          <div className="px-6 py-4 rounded-2xl shadow-xl backdrop-blur-md border max-w-sm mx-auto bg-green-100 text-black border-green-300 shadow-green-500/20">
+            <div className="flex items-center space-x-3">
+              <div className="w-2 h-2 rounded-full animate-pulse bg-green-500"></div>
+              <p className="text-sm font-medium">{toast.message}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
 

@@ -9,6 +9,7 @@ const DMMOUUploadSection = ({
   setContractStartDate,
   contractEndDate,
   setContractEndDate,
+  readOnly = false,
 }) => {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -38,7 +39,7 @@ const DMMOUUploadSection = ({
             Signed MOU
           </label>
           <div className="flex gap-2">
-            <label className="h-[42px] flex-1 flex items-center justify-center w-full p-2 border border-gray-200 rounded-lg cursor-pointer bg-blue-700 hover:border-blue-300  transition-colors">
+            <label className={`h-[42px] flex-1 flex items-center justify-center w-full p-2 border border-gray-200 rounded-lg cursor-pointer bg-blue-700 hover:border-blue-300  transition-colors ${readOnly ? 'pointer-events-none opacity-50' : ''}`}>
               <div className="flex items-center justify-center gap-2 w-full">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -64,6 +65,7 @@ const DMMOUUploadSection = ({
                 accept=".pdf"
                 className="hidden"
                 onChange={handleFileChange}
+                disabled={readOnly}
               />
             </label>
             {mouFile && (
@@ -72,6 +74,7 @@ const DMMOUUploadSection = ({
                 onClick={handlePreview}
                 className="h-[42px] w-[42px] flex items-center justify-center border border-gray-200 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-blue-600 transition-colors"
                 title="Preview MOU"
+                disabled={readOnly}
               >
                 <FaEye className="h-4 w-4" />
               </button>
@@ -125,6 +128,7 @@ const DMMOUUploadSection = ({
               value={contractStartDate}
               onChange={(e) => setContractStartDate(e.target.value)}
               required
+              disabled={readOnly}
             />
           </div>
         </div>
@@ -158,6 +162,7 @@ const DMMOUUploadSection = ({
               onChange={(e) => setContractEndDate(e.target.value)}
               required
               min={contractStartDate}
+              disabled={readOnly}
             />
           </div>
         </div>

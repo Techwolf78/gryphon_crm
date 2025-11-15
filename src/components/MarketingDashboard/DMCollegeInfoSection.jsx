@@ -9,6 +9,7 @@ const DMCollegeInfoSection = ({
   collegeCodeError,
   pincodeError,
   isEdit,
+  readOnly = false,
 }) => {
   const inputClass =
     "w-full px-3 py-2 border-gray-300 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white";
@@ -45,7 +46,7 @@ const DMCollegeInfoSection = ({
             value={formData.collegeName}
             onChange={handleChange}
             required
-            disabled={isEdit} // ✅ disable when editing
+            disabled={readOnly || isEdit} // ✅ disable when editing or viewing
           />
         </div>
 
@@ -61,7 +62,7 @@ const DMCollegeInfoSection = ({
             value={formData.collegeCode}
             onChange={handleChange}
             required
-            disabled={isEdit} // ✅ disable when editing
+            disabled={readOnly || isEdit} // ✅ disable when editing or viewing
           />
           {collegeCodeError && (
             <p className="text-red-500 text-sm mt-1">{collegeCodeError}</p>
@@ -77,6 +78,7 @@ const DMCollegeInfoSection = ({
             placeholder="Enter GST Number"
             value={formData.gstNumber}
             onChange={handleChange}
+            disabled={readOnly}
           />
         </div>
       </div>
@@ -94,6 +96,7 @@ const DMCollegeInfoSection = ({
             value={formData.address}
             onChange={handleChange}
             required
+            disabled={readOnly}
           />
         </div>
 
@@ -114,6 +117,7 @@ const DMCollegeInfoSection = ({
             }}
             placeholder="Select state"
             isClearable
+            isDisabled={readOnly}
             styles={{
               control: (provided) => ({
                 ...provided,
@@ -157,7 +161,7 @@ const DMCollegeInfoSection = ({
             }
             placeholder="Select city"
             isClearable
-            isDisabled={!formData.state}
+            isDisabled={readOnly || !formData.state}
             styles={{
               control: (provided, state) => ({
                 ...provided,
@@ -200,6 +204,7 @@ const DMCollegeInfoSection = ({
             value={formData.pincode}
             onChange={handleChange}
             required
+            disabled={readOnly}
           />
           {pincodeError && (
             <p className="text-red-500 text-sm mt-1">{pincodeError}</p>

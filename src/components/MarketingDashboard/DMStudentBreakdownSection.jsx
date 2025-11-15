@@ -44,7 +44,7 @@ const digitalMarketingServices = [
   "Other"
 ];
 
-const DMStudentBreakdownSection = ({ formData, setFormData }) => {
+const DMStudentBreakdownSection = ({ formData, setFormData, readOnly = false }) => {
   // Add state to track when "Others"/"Other" was selected
   const [isCustomCourse, setIsCustomCourse] = useState(false);
   const [isCustomDeliveryType, setIsCustomDeliveryType] = useState(false);
@@ -104,6 +104,7 @@ const DMStudentBreakdownSection = ({ formData, setFormData }) => {
                 }
               }} 
               required
+              disabled={readOnly}
             >
               <option value="">Select Course</option>
               {courseOptions.map(course => <option key={course} value={course}>{course}</option>)}
@@ -121,13 +122,14 @@ const DMStudentBreakdownSection = ({ formData, setFormData }) => {
                 onChange={(e) => handleOtherCourseChange(e.target.value)} 
                 placeholder="Enter course name" 
                 required 
+                disabled={readOnly}
               />
             </div>
           )}
 
           <div className="space-y-1">
             <label className="font-medium">Year <span className="text-red-500">*</span></label>
-            <select className={selectClass} value={formData.year} onChange={(e) => handleChange("year", e.target.value)} required>
+            <select className={selectClass} value={formData.year} onChange={(e) => handleChange("year", e.target.value)} required disabled={readOnly}>
               <option value="">Select Year</option>
               {/* Fix: For custom courses, show default years */}
               {(isCustomCourse ? courseYears.Others : (courseYears[formData.course] || [])).map(year => <option key={year} value={year}>{year}</option>)}
@@ -141,6 +143,7 @@ const DMStudentBreakdownSection = ({ formData, setFormData }) => {
               value={isCustomDeliveryType ? "Other" : formData.deliveryType}
               onChange={handleDeliveryTypeChange}
               required
+              disabled={readOnly}
             >
               <option value="">Delivery Type</option>
               {deliveryTypes.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
@@ -149,7 +152,7 @@ const DMStudentBreakdownSection = ({ formData, setFormData }) => {
 
           <div className="space-y-1">
             <label className="font-medium">Passing Year <span className="text-red-500">*</span></label>
-            <select className={selectClass} value={formData.passingYear} onChange={(e) => handleChange("passingYear", e.target.value)} required>
+            <select className={selectClass} value={formData.passingYear} onChange={(e) => handleChange("passingYear", e.target.value)} required disabled={readOnly}>
               <option value="">Passing Year</option>
               {generatePassingYears().map(year => <option key={year} value={year}>{year}</option>)}
             </select>
@@ -185,6 +188,7 @@ const DMStudentBreakdownSection = ({ formData, setFormData }) => {
                         setFormData(prev => ({ ...prev, selectedServices: newServices }));
                       }
                     }}
+                    disabled={readOnly}
                   />
                   {service}
                 </label>
@@ -210,6 +214,7 @@ const DMStudentBreakdownSection = ({ formData, setFormData }) => {
                   setCustomService("");
                 }
               }}
+              disabled={readOnly}
             />
             <p className="text-xs text-gray-500">Press Enter to add custom service</p>
           </div>
@@ -233,6 +238,7 @@ const DMStudentBreakdownSection = ({ formData, setFormData }) => {
                         setFormData(prev => ({ ...prev, selectedServices: newServices }));
                       }}
                       className="ml-2 text-blue-600 hover:text-blue-800"
+                      disabled={readOnly}
                     >
                       ×
                     </button>

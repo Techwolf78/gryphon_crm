@@ -1,6 +1,6 @@
 import React from "react";
 
-const DMPOCInfoSection = ({ formData, handleChange }) => {
+const DMPOCInfoSection = ({ formData, handleChange, readOnly = false }) => {
   const inputClass =
     "w-full px-3 py-2 border rounded-lg border-gray-300 focus:outline-none focus:ring focus:ring-blue-400 transition";
 
@@ -19,6 +19,7 @@ const DMPOCInfoSection = ({ formData, handleChange }) => {
             value={formData.tpoName}
             onChange={handleChange}
             required
+            disabled={readOnly}
           />
 
           <label className="font-medium">TPO Email <span className="text-red-500">*</span></label>
@@ -29,6 +30,7 @@ const DMPOCInfoSection = ({ formData, handleChange }) => {
             value={formData.tpoEmail}
             onChange={handleChange}
             required
+            disabled={readOnly}
           />
 
           <label className="font-medium">TPO Phone <span className="text-red-500">*</span></label>
@@ -39,6 +41,7 @@ const DMPOCInfoSection = ({ formData, handleChange }) => {
             value={formData.tpoPhone}
             onChange={handleChange}
             required
+            disabled={readOnly}
           />
         </div>
 
@@ -51,6 +54,7 @@ const DMPOCInfoSection = ({ formData, handleChange }) => {
             placeholder="Enter training coordinator's name"
             value={formData.trainingName}
             onChange={handleChange}
+            disabled={readOnly}
           />
 
           <label className="font-medium">Training Email</label>
@@ -60,6 +64,7 @@ const DMPOCInfoSection = ({ formData, handleChange }) => {
             placeholder="Enter training coordinator's email"
             value={formData.trainingEmail}
             onChange={handleChange}
+            disabled={readOnly}
           />
 
           <label className="font-medium">Training Phone</label>
@@ -69,6 +74,7 @@ const DMPOCInfoSection = ({ formData, handleChange }) => {
             placeholder="Enter training coordinator's phone"
             value={formData.trainingPhone}
             onChange={handleChange}
+            disabled={readOnly}
           />
         </div>
 
@@ -81,6 +87,7 @@ const DMPOCInfoSection = ({ formData, handleChange }) => {
             placeholder="Enter account person’s name"
             value={formData.accountName}
             onChange={handleChange}
+            disabled={readOnly}
           />
 
           <label className="font-medium">Account Email</label>
@@ -90,6 +97,7 @@ const DMPOCInfoSection = ({ formData, handleChange }) => {
             placeholder="Enter account person’s email"
             value={formData.accountEmail}
             onChange={handleChange}
+            disabled={readOnly}
           />
 
           <label className="font-medium">Account Phone</label>
@@ -99,6 +107,7 @@ const DMPOCInfoSection = ({ formData, handleChange }) => {
             placeholder="Enter account person’s phone"
             value={formData.accountPhone}
             onChange={handleChange}
+            disabled={readOnly}
           />
         </div>
       </div>

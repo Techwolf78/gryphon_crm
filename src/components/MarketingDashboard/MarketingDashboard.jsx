@@ -21,6 +21,8 @@ const MarketingDashboard = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingContract, setEditingContract] = useState(null);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewingContract, setViewingContract] = useState(null);
   const [users, setUsers] = useState({});
 
   useEffect(() => {
@@ -71,6 +73,11 @@ const MarketingDashboard = () => {
   const handleEdit = (contract) => {
     setEditingContract(contract.raw);
     setShowEditModal(true);
+  };
+
+  const handleView = (contract) => {
+    setViewingContract(contract.raw);
+    setShowViewModal(true);
   };
 
   const handleUpdate = async (updated) => {
@@ -160,7 +167,7 @@ const MarketingDashboard = () => {
               </div>
 
               <div className="bg-white rounded-xl p-4 shadow-sm">
-                <ContractsTable contracts={contracts} onDelete={handleDelete} onUpdate={handleUpdate} onEdit={handleEdit} />
+                <ContractsTable contracts={contracts} onDelete={handleDelete} onUpdate={handleUpdate} onEdit={handleEdit} onView={handleView} />
               </div>
 
               {/* Add Contract Modal -> open TrainingForm with an empty lead */}
@@ -195,6 +202,21 @@ const MarketingDashboard = () => {
                       setEditingContract(null);
                     }}
                     existingFormData={editingContract}
+                  />
+                </React.Suspense>
+              )}
+
+              {/* View Contract Modal */}
+              {showViewModal && viewingContract && (
+                <React.Suspense fallback={<div className="p-6">Loading form…</div>}>
+                  <EditDMForm
+                    show={true}
+                    onClose={() => {
+                      setShowViewModal(false);
+                      setViewingContract(null);
+                    }}
+                    existingFormData={viewingContract}
+                    readOnly={true}
                   />
                 </React.Suspense>
               )}

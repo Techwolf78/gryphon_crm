@@ -1,6 +1,6 @@
 import React from "react";
 
-const ContractsTable = ({ contracts = [], onDelete, onUpdate, onEdit }) => {
+const ContractsTable = ({ contracts = [], onDelete, onUpdate, onEdit, onView }) => {
 
   if (!contracts || contracts.length === 0) {
     return (
@@ -75,6 +75,7 @@ const ContractsTable = ({ contracts = [], onDelete, onUpdate, onEdit }) => {
 
               <td className="px-1 py-3 align-top border-b">
                 <div className="flex items-center gap-2">
+                  <button onClick={()=>onView && onView(c)} className="px-3 py-1 rounded-md bg-green-50 text-green-600 border border-green-100 text-sm">View</button>
                   <button onClick={()=>onEdit && onEdit(c)} className="px-3 py-1 rounded-md bg-white border border-gray-200 text-sm">Edit</button>
                   <button onClick={()=>onDelete && onDelete(c.id)} className="px-3 py-1 rounded-md bg-red-50 text-red-600 border border-red-100 text-sm">Delete</button>
                 </div>

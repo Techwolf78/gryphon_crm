@@ -11,7 +11,7 @@ const paymentFields = {
   EMI: [],
 };
 
-const DMPaymentInfoSection = ({ formData, setFormData }) => {
+const DMPaymentInfoSection = ({ formData, setFormData, readOnly = false }) => {
   const fields = useMemo(() => paymentFields[formData.paymentType] || [], [formData.paymentType]);
   const [autoEmiSplits, setAutoEmiSplits] = useState([]);
   const [showAllInstallments, setShowAllInstallments] = useState(false);
@@ -222,6 +222,7 @@ const DMPaymentInfoSection = ({ formData, setFormData }) => {
             setAutoEmiSplits([]);
             setShowAllInstallments(false);
           }}
+          disabled={readOnly}
         >
           <option value="">Select</option>
           <option value="AT">AT - Advanced Training</option>
@@ -247,6 +248,7 @@ const DMPaymentInfoSection = ({ formData, setFormData }) => {
                 onChange={(e) =>
                   setFormData((prev) => ({ ...prev, gstType: e.target.value }))
                 }
+                disabled={readOnly}
               />
               With GST
             </label>
@@ -259,6 +261,7 @@ const DMPaymentInfoSection = ({ formData, setFormData }) => {
                 onChange={(e) =>
                   setFormData((prev) => ({ ...prev, gstType: e.target.value }))
                 }
+                disabled={readOnly}
               />
               Without GST
             </label>
@@ -311,6 +314,7 @@ const DMPaymentInfoSection = ({ formData, setFormData }) => {
                   className={inputClass}
                   value={percent}
                   onChange={(e) => handlePaymentChange(i, e.target.value)}
+                  disabled={readOnly}
                 />
               </div>
             );
@@ -333,6 +337,7 @@ const DMPaymentInfoSection = ({ formData, setFormData }) => {
                 setFormData((prev) => ({ ...prev, emiMonths: count }));
                 setShowAllInstallments(false);
               }}
+              disabled={readOnly}
             />
           </div>
 
@@ -360,6 +365,7 @@ const DMPaymentInfoSection = ({ formData, setFormData }) => {
                 type="button"
                 className="px-4 py-2 mt-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
                 onClick={() => setShowAllInstallments(!showAllInstallments)}
+                disabled={readOnly}
               >
                 {showAllInstallments ? "Hide Installment Details" : "View All Installment Details"}
               </button>

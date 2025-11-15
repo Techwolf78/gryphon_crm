@@ -21,6 +21,7 @@ const EditDMForm = ({
   show,
   onClose,
   existingFormData,
+  readOnly = false,
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -318,7 +319,7 @@ const EditDMForm = ({
     <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center px-4 z-54">
       <div className="bg-white w-full max-w-7xl h-[98vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col relative animate-fadeIn">
         <div className="flex justify-between items-center px-4 py-2 border-b bg-blue-100">
-          <h2 className="text-xl font-bold text-blue-800">Edit Digital Marketing Contract</h2>
+          <h2 className="text-xl font-bold text-blue-800">{readOnly ? "View" : "Edit"} Digital Marketing Contract</h2>
           <div className="flex items-center space-x-3 w-[450px]">
             <input
               name="projectCode"
@@ -344,13 +345,15 @@ const EditDMForm = ({
             collegeCodeError={collegeCodeError}
             pincodeError={pincodeError}
             isEdit={true}
+            readOnly={readOnly}
           />
-          <DMPOCInfoSection formData={formData} handleChange={handleChange} />
+          <DMPOCInfoSection formData={formData} handleChange={handleChange} readOnly={readOnly} />
           <DMStudentBreakdownSection
             formData={formData}
             setFormData={setFormData}
+            readOnly={readOnly}
           />
-          <DMPaymentInfoSection formData={formData} setFormData={setFormData} />
+          <DMPaymentInfoSection formData={formData} setFormData={setFormData} readOnly={readOnly} />
           <DMMOUUploadSection
             mouFile={mouFile}
             setMouFile={setMouFile}
@@ -359,6 +362,7 @@ const EditDMForm = ({
             setContractStartDate={setContractStartDate}
             contractEndDate={contractEndDate}
             setContractEndDate={setContractEndDate}
+            readOnly={readOnly}
           />
           <div className="pt-2 flex justify-end space-x-4">
             <button
@@ -367,15 +371,17 @@ const EditDMForm = ({
               className="px-4 py-1 border border-gray-300 rounded-lg hover:bg-gray-100"
               disabled={isSubmitting}
             >
-              Cancel
+              Close
             </button>
-            <button
-              type="submit"
-              className="bg-blue-600 text-white px-4 py-1 rounded-lg hover:bg-blue-700 disabled:bg-blue-400"
-              disabled={isSubmitting || !isFormValid}
-            >
-              {isSubmitting ? "Updating..." : "Update"}
-            </button>
+            {!readOnly && (
+              <button
+                type="submit"
+                className="bg-blue-600 text-white px-4 py-1 rounded-lg hover:bg-blue-700 disabled:bg-blue-400"
+                disabled={isSubmitting || !isFormValid}
+              >
+                {isSubmitting ? "Updating..." : "Update"}
+              </button>
+            )}
           </div>
         </form>
         {isSubmitting && (
