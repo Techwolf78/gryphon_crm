@@ -52,6 +52,7 @@ const Help = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshClicks, setRefreshClicks] = useState([]);
   const [rateLimitCountdown, setRateLimitCountdown] = useState(0);
+  const [users, setUsers] = useState([]);
  
  
  
@@ -59,6 +60,7 @@ const Help = () => {
     title: "",
     description: "",
     priority: "medium",
+    onBehalfOf: "",
   });
  
   const isAdmin = user?.department === "Admin";
@@ -150,6 +152,7 @@ const Help = () => {
         status: "not-resolved",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+        onBehalfOf: ticketForm.onBehalfOf || null,
       });
  
       // Send email using EmailJS
@@ -173,6 +176,7 @@ const Help = () => {
               minute: "2-digit",
             }),
             year: new Date().getFullYear(),
+            on_behalf_of: ticketForm.onBehalfOf || "N/A",
             // reply_to should match your EmailJS template settings
             reply_to: user.email,
           },
@@ -199,6 +203,7 @@ const Help = () => {
         title: "",
         description: "",
         priority: "medium",
+        onBehalfOf: "",
       });
       setShowTicketForm(false);
       fetchTickets();
@@ -222,15 +227,15 @@ const Help = () => {
           orderBy("createdAt", "desc")
         );
       }
- 
+
       const querySnapshot = await getDocs(q);
- 
+
       // This is a valid empty state - no need to show error
       if (querySnapshot.empty) {
         setTickets([]);
         return;
       }
- 
+
       const ticketsData = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
@@ -239,7 +244,7 @@ const Help = () => {
       }));
       setTickets(ticketsData);
     } catch (error) {
- 
+
       // Only show toast for actual errors, not empty collections
       if (error.code !== "permission-denied") {
         // You might want to handle permission errors differently
@@ -247,8 +252,20 @@ const Help = () => {
       }
     }
   }, [isAdmin, user?.email]);
- 
-  const updateTicketStatus = async (ticketId, status) => {
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "users"));
+      const usersData = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setUsers(usersData);
+    } catch (error) {
+      console.error("Failed to fetch users:", error);
+      toast.error("Failed to load users");
+    }
+  }, []);  const updateTicketStatus = async (ticketId, status) => {
     try {
       const ticketRef = doc(db, "tickets", ticketId);
       await updateDoc(ticketRef, {
@@ -283,8 +300,11 @@ const Help = () => {
   useEffect(() => {
     if (user) {
       fetchTickets();
+      if (isAdmin) {
+        fetchUsers();
+      }
     }
-  }, [user, fetchTickets]);
+  }, [user, fetchTickets, isAdmin, fetchUsers]);
 
   // Update countdown timer for rate limiting
   useEffect(() => {
@@ -702,6 +722,26 @@ const Help = () => {
                     placeholder="your@email.com"
                   />
                 </div>
+                {isAdmin && (
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Raise on behalf of (optional)
+                    </label>
+                    <select
+                      name="onBehalfOf"
+                      value={ticketForm.onBehalfOf}
+                      onChange={handleTicketFormChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Select user...</option>
+                      {users.map((u) => (
+                        <option key={u.email} value={u.email}>
+                          {u.name} ({u.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="mb-3">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Title
@@ -810,7 +850,7 @@ const Help = () => {
               </div>
  
               <div className="flex items-center text-sm text-gray-500 mb-4">
-                <span>Created by: {activeTicket.createdBy}</span>
+                <span>Created by: {activeTicket.onBehalfOf || activeTicket.createdBy}</span>
                 <span className="mx-2">•</span>
                 <span>
                   Status:
@@ -1007,7 +1047,7 @@ const Help = () => {
                   </td>
                   {isAdmin && (
                     <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
-                      {ticket.createdBy}
+                      {ticket.onBehalfOf || ticket.createdBy}
                     </td>
                   )}
                   <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
