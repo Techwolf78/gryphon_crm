@@ -17,6 +17,37 @@ export default function ManageCSDD({
     requestReimbursement: "Request Reimbursement",
   };
 
+  // ====== BUDGET CHECK ======
+  const hasBudget =
+    currentBudget &&
+    Object.keys(currentBudget).length > 0 &&
+    currentBudget.csddExpenses; // or any key you rely on
+
+  if (!hasBudget) {
+    return (
+      <div className="max-w-auto mx-auto p-8 bg-white rounded-2xl shadow-lg border border-gray-100 text-center">
+        {/* Content */}
+        <h2 className="text-2xl font-semibold text-gray-900 mb-3">
+          Budget Not Configured
+        </h2>
+
+        <div className="space-y-2 mb-6">
+          <p className="text-gray-600 leading-relaxed">
+            The CSDD budget for FY {fiscalYear} has not been created yet.
+          </p>
+          <p className="text-gray-500 text-sm">
+            Please contact the {department.toUpperCase()} Head to set up the
+            budget.
+          </p>
+        </div>
+
+        {/* Action Button */}
+      </div>
+    );
+  }
+
+  // ====== NORMAL UI RENDERS BELOW ======
+
   return (
     <div className="p-6 bg-white rounded-xl shadow-sm border border-gray-200">
       {/* Header */}

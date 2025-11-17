@@ -23,6 +23,7 @@ import { exportPurchaseOrders } from "./utils/ExportPO";
 import { exportPurchaseIntents } from "./utils/ExportIntent";
 import { Plus, PlusIcon } from "lucide-react";
 import ManageCSDD from "./ManageCSDD";
+import { toast } from "react-toastify";
 
 // Lazy load components
 const BudgetForm = lazy(() => import("./BudgetForm"));
@@ -1036,7 +1037,6 @@ function BudgetDashboard({
   }
 
   return (
-
     <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100">
       <div className=" mx-auto py-6">
         {/* Header */}
@@ -1166,7 +1166,6 @@ function BudgetDashboard({
                   {budgetHistory.length > 0 ? (
                     <div className="max-w-full ">
                       <table className="w-full min-w-[600px] text-sm">
-
                         <thead>
                           <tr className="border-b border-gray-200">
                             <th className="text-left py-2 px-3 font-semibold text-gray-700">

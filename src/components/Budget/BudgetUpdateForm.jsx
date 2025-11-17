@@ -9,6 +9,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebase";
 import { Trash2, Package } from "lucide-react";
+import { toast } from "react-toastify";
 
 // Helper function to safely convert to number with fallback (only for calculations)
 const safeNumber = (value, fallback = 0) => {
