@@ -2828,8 +2828,6 @@ const ContractInvoicesTab = () => {
           onClose={() => setHistoryModal({ isOpen: false, invoice: null })}
         />
       )}
-
-      <ConnectionStatus onRetry={fetchInvoices} />
     </div>
   );
 };

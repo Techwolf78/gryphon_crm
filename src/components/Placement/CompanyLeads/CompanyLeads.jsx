@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, Suspense } from "react";
+import React, { useState, useEffect, useCallback, useMemo, Suspense, useRef } from "react";
 import { useDebounce } from 'use-debounce';
 import { PlusIcon, CloudUploadIcon } from "@heroicons/react/outline";
 import AddLeads from "./AddLeads";
@@ -28,6 +28,7 @@ import { useMsal } from "@azure/msal-react";
 import { InteractionRequiredAuthError } from "@azure/msal-browser";
 
 import { logPlacementActivity, AUDIT_ACTIONS } from "../../../utils/placementAuditLogger";
+import ViewToggle from "./ViewToggle";
 
   // Utility function to handle Firestore index errors
   const handleFirestoreIndexError = (error, operation = "operation") => {
@@ -69,11 +70,11 @@ function CompanyLeads() {
   // Toast notification state
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
-  // Show toast function
-  const showToast = (message, type = 'success') => {
+  // Show toast function - memoized to prevent recreation
+  const showToast = useCallback((message, type = 'success') => {
     setToast({ show: true, message, type });
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
-  };
+  }, []);
 
   // AddJD modal state
 const [showAddJDForm, setShowAddJDForm] = useState(false);
@@ -89,21 +90,38 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     return saved !== null ? JSON.parse(saved) : true; // Default to "My Leads" view
   });
 
+  // View mode state for date vs table view
+  const [viewMode, setViewMode] = useState(() => {
+    const saved = localStorage.getItem("placementViewMode");
+    return saved || "date"; // Default to "date" view
+  });
+
   // User filter state
   const [selectedUserFilter, setSelectedUserFilter] = useState('all'); // 'all', 'unassigned', or user UID
 
   // Additional filter states
   const [companyFilter, setCompanyFilter] = useState('');
   const [phoneFilter, setPhoneFilter] = useState('');
+  const [dateFilterType, setDateFilterType] = useState('single');
+  const [singleDate, setSingleDate] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   // Filter modal state
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
-  // Debounced search term for performance
-  const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
+  // Microsoft 365 connection state
+  const [ms365ConnectionStatus, setMs365ConnectionStatus] = useState('disconnected');
+  const [ms365TestingConnection, setMs365TestingConnection] = useState(false);
 
-  // Debounced search logging
-  const [debouncedSearchForLogging] = useDebounce(searchTerm, 1000);
+  // Users state for hierarchical team logic
+  const [allUsers, setAllUsers] = useState({});
+
+  // Debounced search term for performance
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
+
+  // Debounced search logging with longer delay to avoid logging every keystroke
+  const [debouncedSearchForLogging] = useDebounce(searchTerm, 2000);
 
   // Log search activity when debounced search changes
   useEffect(() => {
@@ -120,10 +138,6 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       });
     }
   }, [debouncedSearchForLogging, user]);
-
-  // Microsoft 365 Connection Status
-  const [ms365ConnectionStatus, setMs365ConnectionStatus] = useState('checking'); // 'checking', 'connected', 'weak', 'disconnected'
-  const [ms365TestingConnection, setMs365TestingConnection] = useState(false);
 
   // Test Microsoft 365 connection status
   const testMs365Connection = useCallback(async () => {
@@ -195,13 +209,15 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     localStorage.setItem("companyLeadsActiveTab", activeTab);
   }, [activeTab]);
 
+  // Persist view mode changes
+  useEffect(() => {
+    localStorage.setItem("placementViewMode", viewMode);
+  }, [viewMode]);
+
   // Test MS365 connection on component mount and when accounts change
   useEffect(() => {
     testMs365Connection();
   }, [testMs365Connection]);
-
-  // Users data for hierarchical team logic
-  const [allUsers, setAllUsers] = useState({});
 
   // Fetch all users for hierarchical team logic
   useEffect(() => {
@@ -476,7 +492,6 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         
         // Check if data is too large for localStorage (limit ~5MB)
         if (jsonString.length > 4 * 1024 * 1024) { // 4MB limit to be safe
-          console.warn("⚠️ Dataset too large for localStorage caching, skipping cache");
         } else {
           // For large datasets, compress by storing only essential fields
           if (allCompanies.length > 1000) {
@@ -571,7 +586,6 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           
           // Check if data is too large for localStorage (limit ~5MB)
           if (jsonString.length > 4 * 1024 * 1024) { // 4MB limit to be safe
-            console.warn("⚠️ Dataset too large for localStorage caching, skipping cache");
           } else {
             // For large datasets, compress by storing only essential fields
             if (leadsData.length > 1000) {
@@ -682,7 +696,6 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   // Expose backfill function to window for manual execution
   useEffect(() => {
     window.backfillWarmAt = backfillWarmAtTimestamps;
-    console.log("Backfill function available as window.backfillWarmAt()");
   }, [backfillWarmAtTimestamps]);
 
   // Load data from cache or fetch from Firestore
@@ -834,6 +847,30 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         }
       }
 
+      // Filter by date
+      if (dateFilterType && ((dateFilterType === 'single' && singleDate) || (dateFilterType === 'range' && startDate && endDate))) {
+        const getDateField = (lead) => {
+          if (activeTab === "called") return lead.calledAt;
+          if (activeTab === "warm") return lead.warmAt;
+          if (activeTab === "cold") return lead.coldAt;
+          if (activeTab === "hot") return lead.hotAt;
+          if (activeTab === "onboarded") return lead.onboardedAt;
+          if (activeTab === "deleted") return lead.deletedAt;
+          return lead.updatedAt;
+        };
+
+        const dateField = getDateField(lead);
+        if (!dateField) return false;
+
+        const leadDate = new Date(dateField).toISOString().split('T')[0]; // YYYY-MM-DD
+
+        if (dateFilterType === 'single') {
+          if (leadDate !== singleDate) return false;
+        } else {
+          if (leadDate < startDate || leadDate > endDate) return false;
+        }
+      }
+
       // Then filter by search term if present
       if (debouncedSearchTerm) {
         // Pre-compute string values to avoid repeated conversions
@@ -875,12 +912,12 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       const scoreB = calculateCompletenessScore(b);
       return scoreB - scoreA; // Higher score first
     });
-  }, [leads, activeTab, debouncedSearchTerm, selectedUserFilter, companyFilter, phoneFilter, calculateCompletenessScore]);
+  }, [leads, activeTab, debouncedSearchTerm, selectedUserFilter, companyFilter, phoneFilter, dateFilterType, singleDate, startDate, endDate, calculateCompletenessScore]);
 
   // Group leads by date for all tabs (hot, warm, cold, called, onboarded, deleted)
   const groupedLeads = useMemo(() => {
-    // Only group for specific tabs
-    if (!["hot", "warm", "cold", "called", "onboarded", "deleted"].includes(activeTab)) return null;
+    // Only group for specific tabs and when view mode is "date"
+    if (viewMode !== "date" || !["hot", "warm", "cold", "called", "onboarded", "deleted"].includes(activeTab)) return null;
 
     // Don't group if there are too many leads (performance issue) - DISABLED: LeadsTable handles pagination within groups
     // if (leads.length > 50000) {
@@ -944,7 +981,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         }
 
         // Debug logging for all tabs to see date grouping
-        console.log(`${activeTab} lead: ${lead.companyName}, dateField: ${dateField}, assignedAt: ${lead.assignedAt}, grouped under: ${date}`);
+        // console.log(`${activeTab} lead: ${lead.companyName}, dateField: ${dateField}, assignedAt: ${lead.assignedAt}, grouped under: ${date}`);
 
         if (!acc[date]) {
           acc[date] = [];
@@ -974,7 +1011,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       });
 
     return sortedGrouped;
-  }, [filteredLeads, activeTab, viewMyLeadsOnly]);
+  }, [filteredLeads, activeTab, viewMyLeadsOnly, viewMode]);
 
   // Group leads by status for tab counts (calculate based on what user can actually see)
   const leadsByStatus = useMemo(() => {
@@ -1662,7 +1699,6 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   };
 
   const formatDate = useCallback((dateString) => {
-    console.log('formatDate called with:', dateString);
     if (dateString === 'Unknown Date') return 'Unknown Date';
     try {
       return dateString
@@ -1675,7 +1711,6 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           })
         : "-";
     } catch {
-      console.log('formatDate error for:', dateString);
       return "-";
     }
   }, []);
@@ -1725,8 +1760,12 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
               window.history.replaceState(null, '', url);
             }}
           />
+          <ViewToggle
+            viewMode={viewMode}
+            setViewMode={setViewMode}
+          />
           <LeadFilters
-            filters={{ selectedUserFilter, companyFilter, phoneFilter }}
+            filters={{ selectedUserFilter, companyFilter, phoneFilter, dateFilterType, singleDate, startDate, endDate }}
             setFilters={(newFilters) => {
               // Log filter application
               logPlacementActivity({
@@ -1735,7 +1774,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                 action: AUDIT_ACTIONS.FILTER_APPLIED,
                 companyId: null,
                 companyName: null,
-                details: `Applied filters: User=${newFilters.selectedUserFilter || 'all'}, Company="${newFilters.companyFilter || ''}", Phone="${newFilters.phoneFilter || ''}"`,
+                details: `Applied filters: User=${newFilters.selectedUserFilter || 'all'}, Company="${newFilters.companyFilter || ''}", Phone="${newFilters.phoneFilter || ''}", Date Type="${newFilters.dateFilterType || 'single'}", Single Date="${newFilters.singleDate || ''}", Start Date="${newFilters.startDate || ''}", End Date="${newFilters.endDate || ''}"`,
                 changes: newFilters,
                 sessionId: sessionStorage.getItem('sessionId') || 'unknown'
               });
@@ -1743,6 +1782,10 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
               setSelectedUserFilter(newFilters.selectedUserFilter || 'all');
               setCompanyFilter(newFilters.companyFilter || '');
               setPhoneFilter(newFilters.phoneFilter || '');
+              setDateFilterType(newFilters.dateFilterType || 'single');
+              setSingleDate(newFilters.singleDate || '');
+              setStartDate(newFilters.startDate || '');
+              setEndDate(newFilters.endDate || '');
             }}
             isFilterOpen={isFilterOpen}
             setIsFilterOpen={setIsFilterOpen}
@@ -2041,7 +2084,8 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       <BulkUploadModal
         show={showBulkUploadForm}
         onClose={() => setShowBulkUploadForm(false)}
-        assigneeId={user?.uid}
+        allUsers={allUsers}
+        currentUser={user}
       />
 
       {/* Bulk Assign Modal */}

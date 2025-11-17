@@ -80,7 +80,7 @@ function TrainerRow({
   const getStatusInfo = () => {
     if (!invoiceData) {
       return {
-        label: "Not Generated",
+        label: "Pending",
         bg: "bg-gray-50",
         text: "text-gray-700",
         border: "border-gray-200",
@@ -143,11 +143,6 @@ function TrainerRow({
               {item.trainerName}
             </div>
             <div className="text-xs text-gray-600 truncate">ID: {item.trainerId}</div>
-            <div className="inline-flex items-center mt-1">
-              <span className="bg-blue-100 text-blue-700 text-xs font-medium px-2 py-0.5 rounded truncate">
-                {item.phase}
-              </span>
-            </div>
           </div>
         </div>
       </td>
@@ -193,11 +188,37 @@ function TrainerRow({
         </div>
       </td>
       <td className="px-3 py-3">
-        <div className="space-y-2">
-          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${statusInfo.bg} ${statusInfo.text} border ${statusInfo.border} shadow-sm`}>
-            <StatusIcon className="mr-1.5 h-3.5 w-3.5" />
+        <div className="text-sm font-semibold text-green-600">
+          {item.perHourCost && item.totalCollegeHours ? `₹${(item.perHourCost * item.totalCollegeHours).toLocaleString('en-IN')}` : "N/A"}
+        </div>
+      </td>
+      <td className="px-3 py-3">
+        <div className="space-y-1">
+          <span className={`inline-flex items-center px-1 py-0.5 rounded-full text-[10px] font-medium ${statusInfo.bg} ${statusInfo.text} border ${statusInfo.border} shadow-sm`}>
+            <StatusIcon className="mr-1 h-3 w-3" />
             {statusInfo.label}
           </span>
+          
+          {/* Stack additional info based on status */}
+          {invoiceData && (
+            <>
+              {invoiceData.createdAt && !isNaN(new Date(invoiceData.createdAt).getTime()) && invoiceData.status !== "rejected" && (
+                <div className="text-xs text-gray-500">
+                  {invoiceData.status === "generated" ? "Generated" : invoiceData.status === "approved" ? "Approved" : "Paid"}: {formatDate(new Date(invoiceData.createdAt))}
+                </div>
+              )}
+              {invoiceData.approvedAt && invoiceData.status === "approved" && (
+                <div className="text-xs text-gray-500">
+                  Approved: {formatDate(new Date(invoiceData.approvedAt))}
+                </div>
+              )}
+              {invoiceData.paidAt && invoiceData.status === "paid" && (
+                <div className="text-xs text-gray-500">
+                  Paid: {formatDate(new Date(invoiceData.paidAt))}
+                </div>
+              )}
+            </>
+          )}
           
           {/* Show rejection remarks directly below status when rejected */}
           {invoiceData?.status === "rejected" && invoiceData?.rejectionRemarks && (
@@ -326,9 +347,9 @@ function TrainerRow({
               <div className="flex justify-center">
                 <button
                   onClick={() => handleGenerateInvoice(item)}
-                  className="w-full inline-flex items-center justify-center px-4 py-3 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all shadow-sm hover:shadow-md border border-blue-600"
+                  className="w-full inline-flex items-center justify-center px-2 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all shadow-sm hover:shadow-md border border-blue-600"
                 >
-                  <FiFileText className="w-5 h-5 mr-2" />
+                  <FiFileText className="w-4 h-4 mr-1" />
                   Generate Invoice
                 </button>
               </div>
@@ -336,12 +357,12 @@ function TrainerRow({
           ) : (
             <>
               <div className="text-center">
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-1">
-                  <div className="text-xs text-amber-700 flex items-center justify-center">
-                    <FiClock className="mr-1" />
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-0.5 max-w-32 mx-auto">
+                  <div className="text-[10px] text-amber-700 flex items-center justify-center">
+                    <FiClock className="mr-1 text-[10px]" />
                     <span className="font-medium">Available on</span>
                   </div>
-                  <div className="text-sm font-semibold text-amber-800">
+                  <div className="text-xs font-semibold text-amber-800">
                     {item.latestEndDate
                       ? formatDate(
                           new Date(
