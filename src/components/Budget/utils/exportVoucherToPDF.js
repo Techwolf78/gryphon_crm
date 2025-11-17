@@ -276,7 +276,29 @@ export default async function exportVoucherToPDF(voucher, budgetData = {}) {
     });
   };
 
-  // Add All Sections
+  /* ===============================================
+   APPLY VOUCHER IMPACT BEFORE BUILDING TABLE
+   =============================================== */
+
+  if (
+    voucher.status !== "approved" &&
+    voucher.csddComponent &&
+    budgetData.csddExpenses
+  ) {
+    const comp = voucher.csddComponent;
+    const approvedComp = budgetData.csddExpenses[comp];
+
+    if (approvedComp) {
+      approvedComp.spent =
+        Number(approvedComp.spent || 0) +
+        Number(voucher.advanceUsed || voucher.totalAmount || 0);
+    }
+  }
+
+  /* ===============================================
+   BUILD SUMMARY TABLE AFTER APPLYING VOUCHER
+   =============================================== */
+
   addSection("Fixed Costs", budgetData.fixedCosts || {});
   addSection("Department Expenses", budgetData.departmentExpenses || {});
   addSection("CSDD Expenses", budgetData.csddExpenses || {});

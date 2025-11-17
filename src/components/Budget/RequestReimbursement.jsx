@@ -237,7 +237,7 @@ export default function RequestReimbursement({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-4 px-4">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-auto mx-auto">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 ">
           {/* EMPLOYEE DETAILS */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

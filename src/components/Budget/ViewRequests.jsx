@@ -13,6 +13,7 @@ import {
 import { db } from "../../firebase";
 import exportVoucherToPDF from "./utils/exportVoucherToPDF.js";
 import exportReimbursementPDF from "./utils/exportReimbursementPDF.js";
+import SettlementModal from "./SettlementModal.jsx";
 
 export default function ViewRequests({
   department,
@@ -25,6 +26,7 @@ export default function ViewRequests({
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
+  const [showSettlementModal, setShowSettlementModal] = useState(false);
 
   const csddCollection = collection(db, "csdd_expenses");
 
@@ -74,13 +76,15 @@ export default function ViewRequests({
 
     try {
       const ref = doc(db, "csdd_expenses", request.id);
+
+      // First update request status
       await updateDoc(ref, {
         status: "approved",
         approvedAt: serverTimestamp(),
         approvedBy: currentUser?.uid,
       });
 
-      // Budget update
+      // ---- Budget update ----
       if (
         currentBudget?.id &&
         request.csddComponent &&
@@ -88,14 +92,34 @@ export default function ViewRequests({
       ) {
         const budgetRef = doc(db, "department_budgets", currentBudget.id);
 
-        await updateDoc(budgetRef, {
-          [`csddExpenses.${request.csddComponent}.spent`]: increment(
-            request.totalAmount
-          ),
-          "summary.totalSpent": increment(request.totalAmount),
+        // ❌ DO NOT RECALCULATE ANYTHING
+        // ✔ USE values stored in request:
+
+        const advanceUsed = Number(
+          request.advanceUsed || request.totalAmount || 0
+        );
+        const usedFromBalance = Number(request.usedFromEmployeeBalance || 0);
+
+        const budgetUpdate = {
           lastUpdatedAt: serverTimestamp(),
           updatedBy: currentUser?.uid,
-        });
+        };
+
+        // 1️⃣ Deduct from department budget (ONLY the final sanctioned amount)
+        if (advanceUsed > 0) {
+          budgetUpdate[`csddExpenses.${request.csddComponent}.spent`] =
+            increment(advanceUsed);
+
+          budgetUpdate["summary.totalSpent"] = increment(advanceUsed);
+        }
+
+        // 2️⃣ Reduce the employee’s advance balance by the amount used
+        if (usedFromBalance > 0 && request.employeeId) {
+          budgetUpdate[`employeeAdvanceBalances.${request.employeeId}`] =
+            increment(-usedFromBalance);
+        }
+
+        await updateDoc(budgetRef, budgetUpdate);
       }
 
       setActionLoading(null);
@@ -492,6 +516,33 @@ export default function ViewRequests({
                       </button>
                     </div>
                   )}
+
+                  {req.status === "approved" &&
+                    req.type === "voucher" &&
+                    !req.settled && (
+                      <button
+                        onClick={() => {
+                          setSelectedRequest(req);
+                          setShowSettlementModal(true);
+                        }}
+                        className="flex-1 px-4 py-2.5 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-xl hover:bg-amber-100 hover:border-amber-300 transition-all duration-200 flex items-center gap-2 justify-center group/btn"
+                      >
+                        <svg
+                          className="w-4 h-4 group-hover/btn:scale-110 transition-transform duration-200"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                        Settle
+                      </button>
+                    )}
                 </div>
               </div>
             </div>
@@ -752,6 +803,15 @@ export default function ViewRequests({
             </div>
           </div>
         </div>
+      )}
+
+      {showSettlementModal && selectedRequest && (
+        <SettlementModal
+          request={selectedRequest}
+          currentBudget={currentBudget}
+          currentUser={currentUser}
+          onClose={() => setShowSettlementModal(false)}
+        />
       )}
     </div>
   );

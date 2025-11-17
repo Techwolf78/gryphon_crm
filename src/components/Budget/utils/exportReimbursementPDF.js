@@ -294,6 +294,18 @@ export default async function exportReimbursementPDF(
       first = false;
     });
   };
+  /* =======================================================
+   APPLY REIMBURSEMENT IMPACT BEFORE BUILDING SUMMARY
+   ======================================================= */
+  if (voucher.csddComponent && budgetData.csddExpenses) {
+    const comp = voucher.csddComponent;
+    const compObj = budgetData.csddExpenses[comp];
+
+    if (compObj) {
+      compObj.spent =
+        Number(compObj.spent || 0) + Number(voucher.totalAmount || 0); // reimbursement adds to spent
+    }
+  }
 
   /* ---------------- ADD ALL BUDGET SECTIONS ---------------- */
   addSection("Fixed Costs", budgetData.fixedCosts || {});
