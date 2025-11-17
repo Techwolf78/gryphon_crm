@@ -344,51 +344,102 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         const encodedCompanies = batchData.companies || [];
 
         // Decode Base64 companies and add batch info
-        encodedCompanies.forEach((encodedCompany, index) => {
-          try {
-            // Decode Unicode-safe Base64: atob() first, then decodeURIComponent()
-            const uriDecoded = atob(encodedCompany);
-            const jsonString = decodeURIComponent(uriDecoded);
-            const decodedCompany = JSON.parse(jsonString);
-            allCompanies.push({
-              id: `${batchDoc.id}_${index}`, // Unique ID combining batchId and index
-              batchId: batchDoc.id,
-              ...decodedCompany,
-              // Map the fields to match existing UI component expectations
-              companyName: decodedCompany.name || decodedCompany.companyName || '',
-              pocName: decodedCompany.contactPerson || decodedCompany.pocName || '',
-              pocDesignation: decodedCompany.designation || decodedCompany.pocDesignation || '',
-              pocPhone: decodedCompany.phone || decodedCompany.pocPhone || '',
-              companyUrl: decodedCompany.companyUrl || '',
-              companyWebsite: decodedCompany.companyWebsite || decodedCompany.companyUrl || '',
-              linkedinUrl: decodedCompany.linkedinUrl || '',
-              pocLinkedin: decodedCompany.pocLinkedin || decodedCompany.linkedinUrl || '',
-              // Handle email field mapping (Excel might put email in companyUrl)
-              pocMail: decodedCompany.email || decodedCompany.pocMail || 
-                      (decodedCompany.companyUrl && decodedCompany.companyUrl.includes('@') ? decodedCompany.companyUrl : ''),
-              pocLocation: decodedCompany.location || decodedCompany.pocLocation || '',
-              industry: decodedCompany.industry || decodedCompany.sector || '',
-              companySize: decodedCompany.companySize || decodedCompany.employeeCount || '',
-              source: decodedCompany.source || 'Excel Upload',
-              notes: decodedCompany.notes || '',
-              status: decodedCompany.status || "hot",
-              workingSince: decodedCompany.workingSince || '',
-              assignedTo: decodedCompany.assignedTo || null,
-              assignedBy: decodedCompany.assignedBy || null,
-              assignedAt: decodedCompany.assignedAt || null,
-              calledAt: decodedCompany.calledAt || null,
-              warmAt: decodedCompany.warmAt || null,
-              coldAt: decodedCompany.coldAt || null,
-              hotAt: decodedCompany.hotAt || null,
-              onboardedAt: decodedCompany.onboardedAt || null,
-              createdAt: decodedCompany.createdAt || new Date().toISOString(),
-              updatedAt: decodedCompany.updatedAt || new Date().toISOString(),
-              contacts: decodedCompany.contacts || [],
-            });
-          } catch (error) {
-            console.error(`❌ Error decoding company ${index} in batch ${batchDoc.id}:`, error);
-          }
-        });
+        if (Array.isArray(encodedCompanies)) {
+          // Array structure
+          encodedCompanies.forEach((encodedCompany, index) => {
+            try {
+              // Decode Unicode-safe Base64: atob() first, then decodeURIComponent()
+              const uriDecoded = atob(encodedCompany);
+              const jsonString = decodeURIComponent(uriDecoded);
+              const decodedCompany = JSON.parse(jsonString);
+              allCompanies.push({
+                id: `${batchDoc.id}_${index}`, // Unique ID combining batchId and index
+                batchId: batchDoc.id,
+                ...decodedCompany,
+                // Map the fields to match existing UI component expectations
+                companyName: decodedCompany.name || decodedCompany.companyName || '',
+                pocName: decodedCompany.contactPerson || decodedCompany.pocName || '',
+                pocDesignation: decodedCompany.designation || decodedCompany.pocDesignation || '',
+                pocPhone: decodedCompany.phone || decodedCompany.pocPhone || '',
+                companyUrl: decodedCompany.companyUrl || '',
+                companyWebsite: decodedCompany.companyWebsite || decodedCompany.companyUrl || '',
+                linkedinUrl: decodedCompany.linkedinUrl || '',
+                pocLinkedin: decodedCompany.pocLinkedin || decodedCompany.linkedinUrl || '',
+                // Handle email field mapping (Excel might put email in companyUrl)
+                pocMail: decodedCompany.email || decodedCompany.pocMail || 
+                        (decodedCompany.companyUrl && decodedCompany.companyUrl.includes('@') ? decodedCompany.companyUrl : ''),
+                pocLocation: decodedCompany.location || decodedCompany.pocLocation || '',
+                industry: decodedCompany.industry || decodedCompany.sector || '',
+                companySize: decodedCompany.companySize || decodedCompany.employeeCount || '',
+                source: decodedCompany.source || 'Excel Upload',
+                notes: decodedCompany.notes || '',
+                status: decodedCompany.status || "hot",
+                workingSince: decodedCompany.workingSince || '',
+                assignedTo: decodedCompany.assignedTo || null,
+                assignedBy: decodedCompany.assignedBy || null,
+                assignedAt: decodedCompany.assignedAt || null,
+                calledAt: decodedCompany.calledAt || null,
+                warmAt: decodedCompany.warmAt || null,
+                coldAt: decodedCompany.coldAt || null,
+                hotAt: decodedCompany.hotAt || null,
+                onboardedAt: decodedCompany.onboardedAt || null,
+                createdAt: decodedCompany.createdAt || new Date().toISOString(),
+                updatedAt: decodedCompany.updatedAt || new Date().toISOString(),
+                contacts: decodedCompany.contacts || [],
+              });
+            } catch (error) {
+              console.error(`❌ Error decoding company ${index} in batch ${batchDoc.id}:`, error);
+            }
+          });
+        } else {
+          // Map structure (e.g., batch_9)
+          Object.entries(encodedCompanies).forEach(([key, encodedCompany]) => {
+            const index = parseInt(key);
+            try {
+              // Decode Unicode-safe Base64: atob() first, then decodeURIComponent()
+              const uriDecoded = atob(encodedCompany);
+              const jsonString = decodeURIComponent(uriDecoded);
+              const decodedCompany = JSON.parse(jsonString);
+              allCompanies.push({
+                id: `${batchDoc.id}_${index}`, // Unique ID combining batchId and index
+                batchId: batchDoc.id,
+                ...decodedCompany,
+                // Map the fields to match existing UI component expectations
+                companyName: decodedCompany.name || decodedCompany.companyName || '',
+                pocName: decodedCompany.contactPerson || decodedCompany.pocName || '',
+                pocDesignation: decodedCompany.designation || decodedCompany.pocDesignation || '',
+                pocPhone: decodedCompany.phone || decodedCompany.pocPhone || '',
+                companyUrl: decodedCompany.companyUrl || '',
+                companyWebsite: decodedCompany.companyWebsite || decodedCompany.companyUrl || '',
+                linkedinUrl: decodedCompany.linkedinUrl || '',
+                pocLinkedin: decodedCompany.pocLinkedin || decodedCompany.linkedinUrl || '',
+                // Handle email field mapping (Excel might put email in companyUrl)
+                pocMail: decodedCompany.email || decodedCompany.pocMail || 
+                        (decodedCompany.companyUrl && decodedCompany.companyUrl.includes('@') ? decodedCompany.companyUrl : ''),
+                pocLocation: decodedCompany.location || decodedCompany.pocLocation || '',
+                industry: decodedCompany.industry || decodedCompany.sector || '',
+                companySize: decodedCompany.companySize || decodedCompany.employeeCount || '',
+                source: decodedCompany.source || 'Excel Upload',
+                notes: decodedCompany.notes || '',
+                status: decodedCompany.status || "hot",
+                workingSince: decodedCompany.workingSince || '',
+                assignedTo: decodedCompany.assignedTo || null,
+                assignedBy: decodedCompany.assignedBy || null,
+                assignedAt: decodedCompany.assignedAt || null,
+                calledAt: decodedCompany.calledAt || null,
+                warmAt: decodedCompany.warmAt || null,
+                coldAt: decodedCompany.coldAt || null,
+                hotAt: decodedCompany.hotAt || null,
+                onboardedAt: decodedCompany.onboardedAt || null,
+                createdAt: decodedCompany.createdAt || new Date().toISOString(),
+                updatedAt: decodedCompany.updatedAt || new Date().toISOString(),
+                contacts: decodedCompany.contacts || [],
+              });
+            } catch (error) {
+              console.error(`❌ Error decoding company ${index} in batch ${batchDoc.id}:`, error);
+            }
+          });
+        }
       });
 
       // Filter leads by current user based on view mode and user filter
@@ -875,14 +926,25 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           dateField = lead.updatedAt;
         }
         
-        const date = dateField ? new Date(dateField).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric'
-        }) : 'Unknown Date';
+        let date;
+        if (dateField) {
+          date = new Date(dateField).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+          });
+        } else if (lead.assignedAt) {
+          date = new Date(lead.assignedAt).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+          });
+        } else {
+          date = 'Unknown Date';
+        }
 
         // Debug logging for all tabs to see date grouping
-        console.log(`${activeTab} lead: ${lead.companyName}, dateField: ${dateField}, grouped under: ${date}`);
+        console.log(`${activeTab} lead: ${lead.companyName}, dateField: ${dateField}, assignedAt: ${lead.assignedAt}, grouped under: ${date}`);
 
         if (!acc[date]) {
           acc[date] = [];
@@ -972,49 +1034,96 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       if (batchDocSnap.exists()) {
         const batchData = batchDocSnap.data();
         const encodedCompanies = batchData.companies || [];
-
-        // Find the company index in the array
         const companyIndex = parseInt(leadId.split('_').pop()); // Extract index from "batch_39_5" -> 5
 
-        if (companyIndex >= 0 && companyIndex < encodedCompanies.length) {
-          // Decode, update, and re-encode the company (Unicode-safe)
-          const uriDecoded = atob(encodedCompanies[companyIndex]);
-          const jsonString = decodeURIComponent(uriDecoded);
-          const decodedCompany = JSON.parse(jsonString);
+        let updated = false;
+        if (Array.isArray(encodedCompanies)) {
+          if (companyIndex >= 0 && companyIndex < encodedCompanies.length) {
+            // Decode, update, and re-encode the company (Unicode-safe)
+            const uriDecoded = atob(encodedCompanies[companyIndex]);
+            const jsonString = decodeURIComponent(uriDecoded);
+            const decodedCompany = JSON.parse(jsonString);
 
-          // If the lead is currently unassigned, assign it to the current user
-          const isCurrentlyUnassigned = !decodedCompany.assignedTo;
-          const assignmentData = isCurrentlyUnassigned && user ? {
-            assignedTo: user.uid,
-            assignedBy: user.uid,
-            assignedAt: new Date().toISOString(),
-          } : {};
+            // If the lead is currently unassigned, assign it to the current user
+            const isCurrentlyUnassigned = !decodedCompany.assignedTo;
+            const assignmentData = isCurrentlyUnassigned && user ? {
+              assignedTo: user.uid,
+              assignedBy: user.uid,
+              assignedAt: new Date().toISOString(),
+            } : {};
 
-          const updatedCompany = {
-            ...decodedCompany,
-            status: newStatus,
-            updatedAt: new Date().toISOString(),
-            ...assignmentData,
-          };
-          // Add status-specific timestamp when status changes
-          if (newStatus === "called") {
-            updatedCompany.calledAt = new Date().toISOString();
-          } else if (newStatus === "warm") {
-            updatedCompany.warmAt = new Date().toISOString();
-          } else if (newStatus === "cold") {
-            updatedCompany.coldAt = new Date().toISOString();
-          } else if (newStatus === "hot") {
-            updatedCompany.hotAt = new Date().toISOString();
-          } else if (newStatus === "onboarded") {
-            updatedCompany.onboardedAt = new Date().toISOString();
-          } else if (newStatus === "deleted") {
-            updatedCompany.deletedAt = new Date().toISOString();
+            const updatedCompany = {
+              ...decodedCompany,
+              status: newStatus,
+              updatedAt: new Date().toISOString(),
+              ...assignmentData,
+            };
+            // Add status-specific timestamp when status changes
+            if (newStatus === "called") {
+              updatedCompany.calledAt = new Date().toISOString();
+            } else if (newStatus === "warm") {
+              updatedCompany.warmAt = new Date().toISOString();
+            } else if (newStatus === "cold") {
+              updatedCompany.coldAt = new Date().toISOString();
+            } else if (newStatus === "hot") {
+              updatedCompany.hotAt = new Date().toISOString();
+            } else if (newStatus === "onboarded") {
+              updatedCompany.onboardedAt = new Date().toISOString();
+            } else if (newStatus === "deleted") {
+              updatedCompany.deletedAt = new Date().toISOString();
+            }
+            // Unicode-safe encoding: encodeURIComponent + btoa
+            const updatedJsonString = JSON.stringify(updatedCompany);
+            const updatedUriEncoded = encodeURIComponent(updatedJsonString);
+            encodedCompanies[companyIndex] = btoa(updatedUriEncoded);
+            updated = true;
           }
-          // Unicode-safe encoding: encodeURIComponent + btoa
-          const updatedJsonString = JSON.stringify(updatedCompany);
-          const updatedUriEncoded = encodeURIComponent(updatedJsonString);
-          encodedCompanies[companyIndex] = btoa(updatedUriEncoded);
+        } else {
+          // Map structure
+          const key = companyIndex.toString();
+          if (encodedCompanies[key]) {
+            // Decode, update, and re-encode the company (Unicode-safe)
+            const uriDecoded = atob(encodedCompanies[key]);
+            const jsonString = decodeURIComponent(uriDecoded);
+            const decodedCompany = JSON.parse(jsonString);
 
+            // If the lead is currently unassigned, assign it to the current user
+            const isCurrentlyUnassigned = !decodedCompany.assignedTo;
+            const assignmentData = isCurrentlyUnassigned && user ? {
+              assignedTo: user.uid,
+              assignedBy: user.uid,
+              assignedAt: new Date().toISOString(),
+            } : {};
+
+            const updatedCompany = {
+              ...decodedCompany,
+              status: newStatus,
+              updatedAt: new Date().toISOString(),
+              ...assignmentData,
+            };
+            // Add status-specific timestamp when status changes
+            if (newStatus === "called") {
+              updatedCompany.calledAt = new Date().toISOString();
+            } else if (newStatus === "warm") {
+              updatedCompany.warmAt = new Date().toISOString();
+            } else if (newStatus === "cold") {
+              updatedCompany.coldAt = new Date().toISOString();
+            } else if (newStatus === "hot") {
+              updatedCompany.hotAt = new Date().toISOString();
+            } else if (newStatus === "onboarded") {
+              updatedCompany.onboardedAt = new Date().toISOString();
+            } else if (newStatus === "deleted") {
+              updatedCompany.deletedAt = new Date().toISOString();
+            }
+            // Unicode-safe encoding: encodeURIComponent + btoa
+            const updatedJsonString = JSON.stringify(updatedCompany);
+            const updatedUriEncoded = encodeURIComponent(updatedJsonString);
+            encodedCompanies[key] = btoa(updatedUriEncoded);
+            updated = true;
+          }
+        }
+
+        if (updated) {
           // Save back to Firestore
           await setDoc(batchDocRef, {
             ...batchData,
@@ -1106,14 +1215,29 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       const encodedCompanies = batchData.companies || [];
       const companyIndex = parseInt(leadId.split('_').pop());
 
-      if (companyIndex < 0 || companyIndex >= encodedCompanies.length) {
+      let validIndex = false;
+      if (Array.isArray(encodedCompanies)) {
+        validIndex = companyIndex >= 0 && companyIndex < encodedCompanies.length;
+      } else {
+        validIndex = encodedCompanies[companyIndex.toString()] !== undefined;
+      }
+
+      if (!validIndex) {
         throw new Error('Invalid company index');
       }
 
       // Decode current company data for comparison
-      const currentUriDecoded = atob(encodedCompanies[companyIndex]);
-      const currentJsonString = decodeURIComponent(currentUriDecoded);
-      const currentCompany = JSON.parse(currentJsonString);
+      let currentUriDecoded, currentJsonString, currentCompany;
+      if (Array.isArray(encodedCompanies)) {
+        currentUriDecoded = atob(encodedCompanies[companyIndex]);
+        currentJsonString = decodeURIComponent(currentUriDecoded);
+        currentCompany = JSON.parse(currentJsonString);
+      } else {
+        const key = companyIndex.toString();
+        currentUriDecoded = atob(encodedCompanies[key]);
+        currentJsonString = decodeURIComponent(currentUriDecoded);
+        currentCompany = JSON.parse(currentJsonString);
+      }
 
       // Compare changes and create detailed description
       const changes = {};
@@ -1178,9 +1302,17 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
       // Continue with the update logic using the already fetched data
       // Decode, update, and re-encode the company (Unicode-safe)
-      const updateUriDecoded = atob(encodedCompanies[companyIndex]);
-      const updateJsonString = decodeURIComponent(updateUriDecoded);
-      const updateDecodedCompany = JSON.parse(updateJsonString);
+      let updateUriDecoded, updateJsonString, updateDecodedCompany;
+      if (Array.isArray(encodedCompanies)) {
+        updateUriDecoded = atob(encodedCompanies[companyIndex]);
+        updateJsonString = decodeURIComponent(updateUriDecoded);
+        updateDecodedCompany = JSON.parse(updateJsonString);
+      } else {
+        const key = companyIndex.toString();
+        updateUriDecoded = atob(encodedCompanies[key]);
+        updateJsonString = decodeURIComponent(updateUriDecoded);
+        updateDecodedCompany = JSON.parse(updateJsonString);
+      }
       
       // If the lead is currently unassigned, assign it to the current user
       const isCurrentlyUnassigned = !updateDecodedCompany.assignedTo;
@@ -1234,7 +1366,12 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       // Unicode-safe encoding: encodeURIComponent + btoa
       const updatedJsonString = JSON.stringify(updatedCompany);
       const updatedUriEncoded = encodeURIComponent(updatedJsonString);
-      encodedCompanies[companyIndex] = btoa(updatedUriEncoded);
+      if (Array.isArray(encodedCompanies)) {
+        encodedCompanies[companyIndex] = btoa(updatedUriEncoded);
+      } else {
+        const key = companyIndex.toString();
+        encodedCompanies[key] = btoa(updatedUriEncoded);
+      }
 
       // Save back to Firestore
       await setDoc(batchDocRef, {
@@ -1326,23 +1463,50 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         // Find the company index in the array
         const companyIndex = parseInt(leadId.split('_').pop()); // Extract index from "batch_39_5" -> 5
 
-        if (companyIndex >= 0 && companyIndex < encodedCompanies.length) {
-          // Decode, update status to "deleted", and re-encode the company (Unicode-safe)
-          const uriDecoded = atob(encodedCompanies[companyIndex]);
-          const jsonString = decodeURIComponent(uriDecoded);
-          const decodedCompany = JSON.parse(jsonString);
+        let updated = false;
+        if (Array.isArray(encodedCompanies)) {
+          if (companyIndex >= 0 && companyIndex < encodedCompanies.length) {
+            // Decode, update status to "deleted", and re-encode the company (Unicode-safe)
+            const uriDecoded = atob(encodedCompanies[companyIndex]);
+            const jsonString = decodeURIComponent(uriDecoded);
+            const decodedCompany = JSON.parse(jsonString);
 
-          const updatedCompany = {
-            ...decodedCompany,
-            status: "deleted",
-            deletedAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-          // Unicode-safe encoding: encodeURIComponent + btoa
-          const updatedJsonString = JSON.stringify(updatedCompany);
-          const updatedUriEncoded = encodeURIComponent(updatedJsonString);
-          encodedCompanies[companyIndex] = btoa(updatedUriEncoded);
+            const updatedCompany = {
+              ...decodedCompany,
+              status: "deleted",
+              deletedAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+            // Unicode-safe encoding: encodeURIComponent + btoa
+            const updatedJsonString = JSON.stringify(updatedCompany);
+            const updatedUriEncoded = encodeURIComponent(updatedJsonString);
+            encodedCompanies[companyIndex] = btoa(updatedUriEncoded);
+            updated = true;
+          }
+        } else {
+          // Map structure
+          const key = companyIndex.toString();
+          if (encodedCompanies[key]) {
+            // Decode, update status to "deleted", and re-encode the company (Unicode-safe)
+            const uriDecoded = atob(encodedCompanies[key]);
+            const jsonString = decodeURIComponent(uriDecoded);
+            const decodedCompany = JSON.parse(jsonString);
 
+            const updatedCompany = {
+              ...decodedCompany,
+              status: "deleted",
+              deletedAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+            // Unicode-safe encoding: encodeURIComponent + btoa
+            const updatedJsonString = JSON.stringify(updatedCompany);
+            const updatedUriEncoded = encodeURIComponent(updatedJsonString);
+            encodedCompanies[key] = btoa(updatedUriEncoded);
+            updated = true;
+          }
+        }
+
+        if (updated) {
           // Save back to Firestore
           await setDoc(batchDocRef, {
             ...batchData,
@@ -1409,23 +1573,50 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         // Find the company index in the array
         const companyIndex = parseInt(leadId.split('_').pop()); // Extract index from "batch_39_5" -> 5
 
-        if (companyIndex >= 0 && companyIndex < encodedCompanies.length) {
-          // Decode, update, and re-encode the company (Unicode-safe)
-          const uriDecoded = atob(encodedCompanies[companyIndex]);
-          const jsonString = decodeURIComponent(uriDecoded);
-          const decodedCompany = JSON.parse(jsonString);
+        let updated = false;
+        if (Array.isArray(encodedCompanies)) {
+          if (companyIndex >= 0 && companyIndex < encodedCompanies.length) {
+            // Decode, update, and re-encode the company (Unicode-safe)
+            const uriDecoded = atob(encodedCompanies[companyIndex]);
+            const jsonString = decodeURIComponent(uriDecoded);
+            const decodedCompany = JSON.parse(jsonString);
 
-          const updatedCompany = {
-            ...decodedCompany,
-            assignedTo: userId,
-            assignedBy: user?.uid,
-            assignedAt: new Date().toISOString(),
-          };
-          // Unicode-safe encoding: encodeURIComponent + btoa
-          const updatedJsonString = JSON.stringify(updatedCompany);
-          const updatedUriEncoded = encodeURIComponent(updatedJsonString);
-          encodedCompanies[companyIndex] = btoa(updatedUriEncoded);
+            const updatedCompany = {
+              ...decodedCompany,
+              assignedTo: userId,
+              assignedBy: user?.uid,
+              assignedAt: new Date().toISOString(),
+            };
+            // Unicode-safe encoding: encodeURIComponent + btoa
+            const updatedJsonString = JSON.stringify(updatedCompany);
+            const updatedUriEncoded = encodeURIComponent(updatedJsonString);
+            encodedCompanies[companyIndex] = btoa(updatedUriEncoded);
+            updated = true;
+          }
+        } else {
+          // Map structure
+          const key = companyIndex.toString();
+          if (encodedCompanies[key]) {
+            // Decode, update, and re-encode the company (Unicode-safe)
+            const uriDecoded = atob(encodedCompanies[key]);
+            const jsonString = decodeURIComponent(uriDecoded);
+            const decodedCompany = JSON.parse(jsonString);
 
+            const updatedCompany = {
+              ...decodedCompany,
+              assignedTo: userId,
+              assignedBy: user?.uid,
+              assignedAt: new Date().toISOString(),
+            };
+            // Unicode-safe encoding: encodeURIComponent + btoa
+            const updatedJsonString = JSON.stringify(updatedCompany);
+            const updatedUriEncoded = encodeURIComponent(updatedJsonString);
+            encodedCompanies[key] = btoa(updatedUriEncoded);
+            updated = true;
+          }
+        }
+
+        if (updated) {
           // Save back to Firestore
           await setDoc(batchDocRef, {
             ...batchData,
@@ -1449,7 +1640,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     }
   };
 
-  const handleBulkAssign = (assignments, assignmentDate) => {
+  const handleBulkAssign = async (assignments, assignmentDate) => {
     // Update local state with the new assignments
     setLeads((prevLeads) =>
       prevLeads.map((lead) => {
@@ -1466,10 +1657,13 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         return lead;
       })
     );
+    // Refresh data from Firestore to ensure consistency
+    await fetchLeads();
   };
 
-
   const formatDate = useCallback((dateString) => {
+    console.log('formatDate called with:', dateString);
+    if (dateString === 'Unknown Date') return 'Unknown Date';
     try {
       return dateString
         ? new Date(dateString).toLocaleDateString("en-US", {
@@ -1481,6 +1675,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           })
         : "-";
     } catch {
+      console.log('formatDate error for:', dateString);
       return "-";
     }
   }, []);
@@ -1689,6 +1884,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         currentUserId={user?.uid}
         currentUser={user}
         allUsers={allUsers}
+        formatDate={formatDate}
         order={true}
       />
 
@@ -1771,14 +1967,29 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
               // Find the company index in the array
               const companyIndex = parseInt(leadId.split('_').pop()); // Extract index from "batch_39_5" -> 5
 
-              if (companyIndex < 0 || companyIndex >= encodedCompanies.length) {
+              let validIndex = false;
+              if (Array.isArray(encodedCompanies)) {
+                validIndex = companyIndex >= 0 && companyIndex < encodedCompanies.length;
+              } else {
+                validIndex = encodedCompanies[companyIndex.toString()] !== undefined;
+              }
+
+              if (!validIndex) {
                 throw new Error('Invalid company index');
               }
 
               // Decode, update contacts, and re-encode the company (Unicode-safe)
-              const uriDecoded = atob(encodedCompanies[companyIndex]);
-              const jsonString = decodeURIComponent(uriDecoded);
-              const decodedCompany = JSON.parse(jsonString);
+              let uriDecoded, jsonString, decodedCompany;
+              if (Array.isArray(encodedCompanies)) {
+                uriDecoded = atob(encodedCompanies[companyIndex]);
+                jsonString = decodeURIComponent(uriDecoded);
+                decodedCompany = JSON.parse(jsonString);
+              } else {
+                const key = companyIndex.toString();
+                uriDecoded = atob(encodedCompanies[key]);
+                jsonString = decodeURIComponent(uriDecoded);
+                decodedCompany = JSON.parse(jsonString);
+              }
               const existingContacts = decodedCompany.contacts || [];
               const updatedCompany = {
                 ...decodedCompany,
@@ -1787,7 +1998,12 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
               // Unicode-safe encoding: encodeURIComponent + btoa
               const updatedJsonString = JSON.stringify(updatedCompany);
               const updatedUriEncoded = encodeURIComponent(updatedJsonString);
-              encodedCompanies[companyIndex] = btoa(updatedUriEncoded);
+              if (Array.isArray(encodedCompanies)) {
+                encodedCompanies[companyIndex] = btoa(updatedUriEncoded);
+              } else {
+                const key = companyIndex.toString();
+                encodedCompanies[key] = btoa(updatedUriEncoded);
+              }
 
               // Save back to Firestore
               await setDoc(batchDocRef, {

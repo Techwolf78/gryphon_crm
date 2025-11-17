@@ -29,6 +29,7 @@ function LeadsTable({
   currentUserId,
   currentUser,
   allUsers,
+  formatDate, // Add formatDate prop
 }) {
   const [dropdownOpen, setDropdownOpen] = useState(null);
   const [assignSubmenuOpen, setAssignSubmenuOpen] = useState(null);
@@ -313,7 +314,7 @@ function LeadsTable({
                               </svg>
                             </div>
                             <div>
-                              <h3 className="text-sm font-semibold text-gray-900">{date}</h3>
+                              <h3 className="text-sm font-semibold text-gray-900">{formatDate ? formatDate(date) : date}</h3>
                             </div>
                           </div>
                           <div className="flex items-center">

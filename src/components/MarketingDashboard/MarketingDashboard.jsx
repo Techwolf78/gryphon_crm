@@ -7,12 +7,14 @@ import { collection, query, orderBy, onSnapshot, deleteDoc, doc, updateDoc, serv
 import { db } from "../../firebase";
 const DMTrainingForm = React.lazy(() => import("./DMTrainingForm"));
 const EditDMForm = React.lazy(() => import("./EditDMForm"));
+const BudgetDashboard = React.lazy(() => import("../Budget/BudgetDashboard"));
 
 const SECTION = {
   CONTRACTS: "contracts",
   ANALYTICS: "analytics",
   TASKS: "tasks",
   ADMISSIONS: "admissions",
+  BUDGET: "budget",
 };
 
 const MarketingDashboard = () => {
@@ -149,6 +151,16 @@ const MarketingDashboard = () => {
               >
                 Task Manager
               </button>
+              <button
+                onClick={() => setActive(SECTION.BUDGET)}
+                className={`py-2 px-4 rounded-md font-medium text-sm transition-colors ${
+                  active === SECTION.BUDGET
+                    ? "bg-[#1C39BB] text-white shadow-sm"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                }`}
+              >
+                Budget
+              </button>
             </nav>
           </div>
         </div>
@@ -239,6 +251,12 @@ const MarketingDashboard = () => {
             <div className="bg-white rounded-xl p-4 shadow-sm">
               <TaskManager contracts={contracts} />
             </div>
+          )}
+
+          {active === SECTION.BUDGET && (
+            <React.Suspense fallback={<div className="p-6">Loading budget...</div>}>
+              <BudgetDashboard department="dm" />
+            </React.Suspense>
           )}
         </div>
       </div>
