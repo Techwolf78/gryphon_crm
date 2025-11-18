@@ -403,7 +403,7 @@ function Placement() {
                 onClick={() => setActiveTab("training")}
                 data-tour="training-tab"
               >
-                Training ({filteredTrainingData.length})
+                Programs & Colleges ({filteredTrainingData.length})
               </button>
               <button
                 className={`flex-1 px-4 py-2 font-medium text-sm transition-all duration-150 ${
@@ -414,7 +414,7 @@ function Placement() {
                 onClick={() => setActiveTab("placement")}
                 data-tour="placement-tab"
               >
-                Placement
+                Job Openings
               </button>
               <button
                 className={`flex-1 px-4 py-2 font-medium text-sm transition-all duration-150 ${
@@ -425,7 +425,7 @@ function Placement() {
                 onClick={() => setActiveTab("leads")}
                 data-tour="leads-tab"
               >
-                Leads
+                Company Leads
               </button>
               <button
                 className={`flex-1 px-4 py-2 font-medium text-sm transition-all duration-150 ${
@@ -436,7 +436,7 @@ function Placement() {
                 onClick={() => setActiveTab("budget")}
                 data-tour="budget-tab"
               >
-                Budget
+                Budget Management
               </button>
             </div>
             {/* Sliding Indicator */}

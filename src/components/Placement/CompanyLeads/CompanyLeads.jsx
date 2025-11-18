@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, Suspense, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 import { useDebounce } from 'use-debounce';
 import { PlusIcon, CloudUploadIcon } from "@heroicons/react/outline";
 import AddLeads from "./AddLeads";
@@ -120,24 +120,27 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   // Debounced search term for performance
   const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
 
-  // Debounced search logging with longer delay to avoid logging every keystroke
-  const [debouncedSearchForLogging] = useDebounce(searchTerm, 2000);
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(100); // Start with 100 companies per page
+  const [totalCompanies, setTotalCompanies] = useState(0);
+  const [hasMorePages, setHasMorePages] = useState(false);
 
   // Log search activity when debounced search changes
   useEffect(() => {
-    if (debouncedSearchForLogging.trim()) {
+    if (debouncedSearchTerm.trim()) {
       logPlacementActivity({
         userId: user?.uid,
         userName: user?.displayName || user?.name || "Unknown User",
         action: AUDIT_ACTIONS.SEARCH_PERFORMED,
         companyId: null,
         companyName: null,
-        details: `Searched for: "${debouncedSearchForLogging}"`,
-        changes: { searchTerm: debouncedSearchForLogging },
+        details: `Searched for: "${debouncedSearchTerm}"`,
+        changes: { searchTerm: debouncedSearchTerm },
         sessionId: sessionStorage.getItem('sessionId') || 'unknown'
       });
     }
-  }, [debouncedSearchForLogging, user]);
+  }, [debouncedSearchTerm, user]);
 
   // Test Microsoft 365 connection status
   const testMs365Connection = useCallback(async () => {
@@ -276,14 +279,27 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         });      return teamMembers;
     } else if (isPlacementDept && isHigherRole) {
       if (user.role === "Manager") {
-        // Manager sees direct subordinates (Assistant Manager, Executive)
-        const subordinates = Object.values(users).filter(
-          (u) =>
-            u.reportingManager === user.name &&
-            ["Assistant Manager", "Executive"].includes(u.role) &&
-            (u.departments?.includes("Placement") || u.department === "Placement")
+        // Manager sees all other Managers and their subordinates in Placement (same as Head)
+        const teamMembers = [];
+        
+        // Find all Managers in Placement
+        const managers = Object.values(users).filter(
+          (u) => u.role === "Manager" && 
+          (u.departments?.includes("Placement") || u.department === "Placement")
         );
-        return subordinates.map((u) => u.uid || u.id);
+        teamMembers.push(...managers.map(u => u.uid || u.id));
+        
+        // Find subordinates of ALL Managers
+        managers.forEach(manager => {
+          const subordinates = Object.values(users).filter(
+            (u) =>
+              u.reportingManager === manager.name &&
+              ["Assistant Manager", "Executive"].includes(u.role) &&
+              (u.departments?.includes("Placement") || u.department === "Placement")
+          );
+          teamMembers.push(...subordinates.map(u => u.uid || u.id));
+        });
+        return teamMembers;
       }
     }
 
@@ -340,12 +356,18 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
 
 
-  // Fetch ALL leads from Firestore (no pagination)
-  const fetchLeads = useCallback(async () => {
+  // Fetch ALL leads from Firestore (with pagination for performance)
+  const fetchLeads = useCallback(async (page = 1, size = pageSize) => {
     try {
       setLoading(true);
 
-      // Fetch ALL batch documents from companyleads collection
+      // Calculate offset for pagination
+      const offset = (page - 1) * size;
+      let companiesCollected = 0;
+      let companiesToFetch = size;
+      const allCompanies = [];
+
+      // Fetch batches in order until we have enough companies
       const q = query(
         collection(db, "companyleads"),
         orderBy("__name__", "desc") // Sort by document name (batch_39, batch_38, etc.)
@@ -353,26 +375,48 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
       const querySnapshot = await getDocs(q);
 
-      const allCompanies = [];
+      // First pass: count total companies and determine which batches to fetch
+      let totalCount = 0;
+      const batchesToFetch = [];
 
-      querySnapshot.docs.forEach((batchDoc) => {
+      for (const batchDoc of querySnapshot.docs) {
+        const batchData = batchDoc.data();
+        const encodedCompanies = batchData.companies || [];
+        const batchCompanyCount = Array.isArray(encodedCompanies) ? encodedCompanies.length : Object.keys(encodedCompanies).length;
+        totalCount += batchCompanyCount;
+
+        // Determine if we need this batch for current page
+        if (totalCount > offset) {
+          batchesToFetch.push({
+            doc: batchDoc,
+            startIndex: Math.max(0, offset - (totalCount - batchCompanyCount)),
+            companiesNeeded: companiesToFetch
+          });
+          if (companiesToFetch <= 0) break;
+        }
+      }
+
+      setTotalCompanies(totalCount);
+      setHasMorePages(totalCount > offset + size);
+
+      // Second pass: fetch only the required batches and decode only needed companies
+      for (const batchInfo of batchesToFetch) {
+        const { doc: batchDoc, startIndex, companiesNeeded } = batchInfo;
         const batchData = batchDoc.data();
         const encodedCompanies = batchData.companies || [];
 
-        // Decode Base64 companies and add batch info
         if (Array.isArray(encodedCompanies)) {
-          // Array structure
-          encodedCompanies.forEach((encodedCompany, index) => {
+          // Array structure - decode only the companies we need
+          const endIndex = Math.min(encodedCompanies.length, startIndex + companiesNeeded);
+          for (let i = startIndex; i < endIndex && companiesCollected < size; i++) {
             try {
-              // Decode Unicode-safe Base64: atob() first, then decodeURIComponent()
-              const uriDecoded = atob(encodedCompany);
+              const uriDecoded = atob(encodedCompanies[i]);
               const jsonString = decodeURIComponent(uriDecoded);
               const decodedCompany = JSON.parse(jsonString);
               allCompanies.push({
-                id: `${batchDoc.id}_${index}`, // Unique ID combining batchId and index
+                id: `${batchDoc.id}_${i}`,
                 batchId: batchDoc.id,
                 ...decodedCompany,
-                // Map the fields to match existing UI component expectations
                 companyName: decodedCompany.name || decodedCompany.companyName || '',
                 pocName: decodedCompany.contactPerson || decodedCompany.pocName || '',
                 pocDesignation: decodedCompany.designation || decodedCompany.pocDesignation || '',
@@ -381,8 +425,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                 companyWebsite: decodedCompany.companyWebsite || decodedCompany.companyUrl || '',
                 linkedinUrl: decodedCompany.linkedinUrl || '',
                 pocLinkedin: decodedCompany.pocLinkedin || decodedCompany.linkedinUrl || '',
-                // Handle email field mapping (Excel might put email in companyUrl)
-                pocMail: decodedCompany.email || decodedCompany.pocMail || 
+                pocMail: decodedCompany.email || decodedCompany.pocMail ||
                         (decodedCompany.companyUrl && decodedCompany.companyUrl.includes('@') ? decodedCompany.companyUrl : ''),
                 pocLocation: decodedCompany.location || decodedCompany.pocLocation || '',
                 industry: decodedCompany.industry || decodedCompany.sector || '',
@@ -403,24 +446,28 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                 updatedAt: decodedCompany.updatedAt || new Date().toISOString(),
                 contacts: decodedCompany.contacts || [],
               });
+              companiesCollected++;
+              companiesToFetch--;
             } catch (error) {
-              console.error(`❌ Error decoding company ${index} in batch ${batchDoc.id}:`, error);
+              console.error(`❌ Error decoding company ${i} in batch ${batchDoc.id}:`, error);
             }
-          });
+          }
         } else {
-          // Map structure (e.g., batch_9)
-          Object.entries(encodedCompanies).forEach(([key, encodedCompany]) => {
-            const index = parseInt(key);
+          // Map structure - decode only the companies we need
+          const keys = Object.keys(encodedCompanies).sort((a, b) => parseInt(a) - parseInt(b));
+          const startKeyIndex = startIndex;
+          const endKeyIndex = Math.min(keys.length, startKeyIndex + companiesNeeded);
+
+          for (let i = startKeyIndex; i < endKeyIndex && companiesCollected < size; i++) {
+            const key = keys[i];
             try {
-              // Decode Unicode-safe Base64: atob() first, then decodeURIComponent()
-              const uriDecoded = atob(encodedCompany);
+              const uriDecoded = atob(encodedCompanies[key]);
               const jsonString = decodeURIComponent(uriDecoded);
               const decodedCompany = JSON.parse(jsonString);
               allCompanies.push({
-                id: `${batchDoc.id}_${index}`, // Unique ID combining batchId and index
+                id: `${batchDoc.id}_${key}`,
                 batchId: batchDoc.id,
                 ...decodedCompany,
-                // Map the fields to match existing UI component expectations
                 companyName: decodedCompany.name || decodedCompany.companyName || '',
                 pocName: decodedCompany.contactPerson || decodedCompany.pocName || '',
                 pocDesignation: decodedCompany.designation || decodedCompany.pocDesignation || '',
@@ -429,8 +476,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                 companyWebsite: decodedCompany.companyWebsite || decodedCompany.companyUrl || '',
                 linkedinUrl: decodedCompany.linkedinUrl || '',
                 pocLinkedin: decodedCompany.pocLinkedin || decodedCompany.linkedinUrl || '',
-                // Handle email field mapping (Excel might put email in companyUrl)
-                pocMail: decodedCompany.email || decodedCompany.pocMail || 
+                pocMail: decodedCompany.email || decodedCompany.pocMail ||
                         (decodedCompany.companyUrl && decodedCompany.companyUrl.includes('@') ? decodedCompany.companyUrl : ''),
                 pocLocation: decodedCompany.location || decodedCompany.pocLocation || '',
                 industry: decodedCompany.industry || decodedCompany.sector || '',
@@ -451,12 +497,16 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                 updatedAt: decodedCompany.updatedAt || new Date().toISOString(),
                 contacts: decodedCompany.contacts || [],
               });
+              companiesCollected++;
+              companiesToFetch--;
             } catch (error) {
-              console.error(`❌ Error decoding company ${index} in batch ${batchDoc.id}:`, error);
+              console.error(`❌ Error decoding company ${key} in batch ${batchDoc.id}:`, error);
             }
-          });
+          }
         }
-      });
+
+        if (companiesCollected >= size) break;
+      }
 
       // Filter leads by current user based on view mode and user filter
       let teamMemberIds = [];
@@ -613,7 +663,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     } finally {
       setLoading(false);
     }
-  }, [user, viewMyLeadsOnly, getTeamMemberIds, selectedUserFilter]);
+  }, [user, viewMyLeadsOnly, getTeamMemberIds, selectedUserFilter, pageSize]);
 
   // Backfill warmAt timestamps for existing warm leads
   const backfillWarmAtTimestamps = useCallback(async () => {
@@ -701,54 +751,59 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   // Load data from cache or fetch from Firestore
   const loadData = useCallback(async () => {
     try {
-      const cached = localStorage.getItem(CACHE_KEY);
-      if (cached) {
-        const { data, timestamp, compressed } = JSON.parse(cached);
-        if (Date.now() - timestamp < CACHE_DURATION) {
-          // If cache is compressed, we need fresh data for full functionality
-          if (compressed) {
-            await fetchLeads();
+      // Skip cache for pagination to ensure fresh data for each page
+      const shouldSkipCache = totalCompanies > pageSize || currentPage > 1;
+      
+      if (!shouldSkipCache) {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const { data, timestamp, compressed } = JSON.parse(cached);
+          if (Date.now() - timestamp < CACHE_DURATION) {
+            // If cache is compressed, we need fresh data for full functionality
+            if (compressed) {
+              await fetchLeads(currentPage, pageSize);
+              return;
+            }
+
+            // Filter cached data by current user based on view mode and user filter
+            let teamMemberIds = [];
+            if (!viewMyLeadsOnly && user) {
+              teamMemberIds = getTeamMemberIds(user.uid);
+            }
+
+            let userLeads = user ? data.filter(lead => {
+              if (viewMyLeadsOnly) {
+                // My Leads: Only show leads assigned to current user
+                return lead.assignedTo === user.uid;
+              } else {
+                // My Team: Show leads assigned to team members OR unassigned leads (exclude current user's leads)
+                return !lead.assignedTo || teamMemberIds.includes(lead.assignedTo);
+              }
+            }) : data;
+
+            // Apply user filter
+            if (selectedUserFilter !== 'all') {
+              if (selectedUserFilter === 'unassigned') {
+                userLeads = userLeads.filter(lead => !lead.assignedTo);
+              } else {
+                userLeads = userLeads.filter(lead => lead.assignedTo === selectedUserFilter);
+              }
+            }
+
+            setLeads(userLeads);
+            setLoading(false);
             return;
           }
-          
-          // Filter cached data by current user based on view mode and user filter
-          let teamMemberIds = [];
-          if (!viewMyLeadsOnly && user) {
-            teamMemberIds = getTeamMemberIds(user.uid);
-          }
-          
-          let userLeads = user ? data.filter(lead => {
-            if (viewMyLeadsOnly) {
-              // My Leads: Only show leads assigned to current user
-              return lead.assignedTo === user.uid;
-            } else {
-              // My Team: Show leads assigned to team members OR unassigned leads (exclude current user's leads)
-              return !lead.assignedTo || teamMemberIds.includes(lead.assignedTo);
-            }
-          }) : data;
-
-          // Apply user filter
-          if (selectedUserFilter !== 'all') {
-            if (selectedUserFilter === 'unassigned') {
-              userLeads = userLeads.filter(lead => !lead.assignedTo);
-            } else {
-              userLeads = userLeads.filter(lead => lead.assignedTo === selectedUserFilter);
-            }
-          }
-
-          setLeads(userLeads);
-          setLoading(false);
-          return;
         }
       }
-      // Cache is stale, missing, or compressed - fetch from Firestore
-      await fetchLeads();
+      // Cache is stale, missing, or pagination is active - fetch from Firestore
+      await fetchLeads(currentPage, pageSize);
     } catch (error) {
       console.error("Error loading data:", error);
       // Fallback to fetch
-      await fetchLeads();
+      await fetchLeads(currentPage, pageSize);
     }
-  }, [fetchLeads, CACHE_DURATION, user, viewMyLeadsOnly, getTeamMemberIds, selectedUserFilter]);
+  }, [fetchLeads, CACHE_DURATION, user, viewMyLeadsOnly, getTeamMemberIds, selectedUserFilter, currentPage, pageSize, totalCompanies]);
 
   // Initial fetch on component mount
   useEffect(() => {
@@ -1695,7 +1750,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       })
     );
     // Refresh data from Firestore to ensure consistency
-    await fetchLeads();
+    await fetchLeads(currentPage, pageSize);
   };
 
   const formatDate = useCallback((dateString) => {
@@ -1966,7 +2021,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
             });
 
             setLoading(true);
-            await fetchLeads();
+            await fetchLeads(currentPage, pageSize);
           }}
           className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
           title="Refresh data from server"
@@ -1974,6 +2029,60 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           Refresh
         </button>
       </div>
+
+      {/* Pagination Controls */}
+      {totalCompanies > pageSize && (
+        <div className="flex flex-col sm:flex-row justify-between items-center mt-4 px-4 py-3 bg-gray-50 rounded-lg gap-4">
+          {/* Page Size Selector */}
+          <div className="flex items-center gap-2">
+            <label htmlFor="pageSize" className="text-sm text-gray-700">Show:</label>
+            <select
+              id="pageSize"
+              value={pageSize}
+              onChange={(e) => {
+                const newSize = parseInt(e.target.value);
+                setPageSize(newSize);
+                setCurrentPage(1); // Reset to first page when changing page size
+              }}
+              className="px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={200}>200</option>
+              <option value={500}>500</option>
+            </select>
+            <span className="text-sm text-gray-600">per page</span>
+          </div>
+
+          {/* Page Navigation */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 bg-white border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              Previous
+            </button>
+
+            <span className="text-sm text-gray-700">
+              Page {currentPage} of {Math.ceil(totalCompanies / pageSize)}
+            </span>
+
+            <button
+              onClick={() => setCurrentPage(prev => prev + 1)}
+              disabled={!hasMorePages}
+              className="px-3 py-1 bg-white border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              Next
+            </button>
+          </div>
+
+          {/* Total Count */}
+          <div className="text-sm text-gray-600">
+            Total: {totalCompanies} companies
+          </div>
+        </div>
+      )}
 
       {/* Lead View/Edit Modal */}
       {showLeadDetails && (
@@ -2127,7 +2236,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           onFollowUpScheduled={() => {
             // Refresh today's follow-ups and main leads data when a new follow-up is scheduled
             fetchTodayFollowUps();
-            fetchLeads();
+            fetchLeads(currentPage, pageSize);
           }}
         />
       )}
