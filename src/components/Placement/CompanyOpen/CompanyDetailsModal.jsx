@@ -137,18 +137,7 @@ function CompanyDetails({ company, onClose }) {
         </div>
 
         <div className="sticky bottom-0 bg-gray-50 px-6 py-4 border-t flex justify-between">
-          <button
-            onClick={() => {
-              fetchStudents();
-              setShowStudentData(true);
-            }}
-            disabled={loadingStudents}
-            className={`px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition ${
-              loadingStudents ? "opacity-50 cursor-not-allowed" : ""
-            }`}
-          >
-            {loadingStudents ? "Loading Students..." : "View Student Data"}
-          </button>
+        
 
           <button
             onClick={onClose}

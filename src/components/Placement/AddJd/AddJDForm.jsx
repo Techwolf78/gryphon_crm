@@ -3,6 +3,7 @@ import specializationOptions from './specializationOptions';
 
 function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClose, placementUsers, isLoadingUsers }) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [otherRound, setOtherRound] = useState('');
 
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;
@@ -20,6 +21,52 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
         return { ...prev, specialization: prev.specialization.filter(spec => spec !== value) };
       }
     });
+  };
+
+  // Hiring Rounds handler
+  const handleHiringRoundsChange = (e) => {
+    const { value, checked } = e.target;
+    setHasUnsavedChanges(true);
+    
+    if (value === 'Others' && checked) {
+      // If Others is selected, clear other rounds and add only Others
+      setFormData(prev => ({ 
+        ...prev, 
+        hiringRounds: ['Others'],
+        otherRound: otherRound 
+      }));
+    } else if (value === 'Others' && !checked) {
+      // If Others is deselected, clear both
+      setFormData(prev => ({ 
+        ...prev, 
+        hiringRounds: prev.hiringRounds.filter(round => round !== 'Others'),
+        otherRound: ''
+      }));
+      setOtherRound('');
+    } else {
+      // For regular rounds
+      setFormData(prev => {
+        if (checked) {
+          // Remove Others if any other round is selected
+          const filteredRounds = prev.hiringRounds.filter(round => round !== 'Others');
+          return { 
+            ...prev, 
+            hiringRounds: [...filteredRounds, value],
+            otherRound: filteredRounds.includes('Others') ? prev.otherRound : ''
+          };
+        } else {
+          return { ...prev, hiringRounds: prev.hiringRounds.filter(round => round !== value) };
+        }
+      });
+    }
+  };
+
+  // Other Round input handler
+  const handleOtherRoundChange = (e) => {
+    const value = e.target.value;
+    setOtherRound(value);
+    setHasUnsavedChanges(true);
+    setFormData(prev => ({ ...prev, otherRound: value }));
   };
 
   const handleClose = useCallback(() => {
@@ -482,6 +529,71 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
         </div>
       </div>
 
+      {/* UPDATED: Hiring Rounds Field with HR Round and Resume Screening */}
+      <div className="col-span-2">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Hiring Rounds
+        </label>
+        <div className="p-4 border border-gray-300 rounded-lg bg-gray-50">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+            {[
+              'Resume Screening',
+              'GD (Group Discussion)', 
+              'CR (Coding Round)', 
+              'TI (Technical Interview)',
+              'HR Round',
+              'PI (Personal Interview)'
+            ].map((round) => (
+              <div key={round} className="flex items-center">
+                <input
+                  type="checkbox"
+                  id={round}
+                  value={round}
+                  checked={formData.hiringRounds?.includes(round) || false}
+                  onChange={handleHiringRoundsChange}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor={round} className="ml-2 text-sm text-gray-700">
+                  {round}
+                </label>
+              </div>
+            ))}
+            
+            {/* Others option */}
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="others"
+                value="Others"
+                checked={formData.hiringRounds?.includes('Others') || false}
+                onChange={handleHiringRoundsChange}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label htmlFor="others" className="ml-2 text-sm text-gray-700">
+                Others
+              </label>
+            </div>
+          </div>
+
+          {/* Other Round Input */}
+          {formData.hiringRounds?.includes('Others') && (
+            <div className="mt-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Specify Other Rounds
+              </label>
+              <input
+                type="text"
+                value={otherRound}
+                onChange={handleOtherRoundChange}
+                placeholder="e.g. Aptitude Test, Case Study, etc."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Rest of the form remains the same */}
       {formData.jobType === "Internship" || formData.jobType === "Int + PPO" ? (
         <>
           <div>
@@ -751,7 +863,6 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
         )}
       </div>
 
-      {/* Close/Cancel Button */}
       <div className="col-span-2 flex justify-end pt-4">
         <button
           type="button"
@@ -764,4 +875,5 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
     </div>
   );
 }
+
 export default AddJDForm;
