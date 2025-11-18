@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from "react";
 import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
 import AddJD from "../AddJd/AddJD";
-import { XIcon } from "@heroicons/react/outline";
 import CompanyDetailsModal from "./CompanyDetailsModal";
 import CompanyHeader from "./CompanyHeader";
 import CompanyTable from "./CompanyTable";
@@ -33,17 +32,48 @@ function CompanyOpen() {
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [showPlacedStudent, setShowPlacedStudent] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [globalMatchStats, setGlobalMatchStats] = useState({ total: 0, matched: 0 });
 
+  // Fetch companies with student counts
   const fetchCompanies = async () => {
     try {
       setLoading(true);
       setError(null);
       const snapshot = await getDocs(collection(db, "companies"));
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setCompanies(data);
+      const companiesData = await Promise.all(
+        snapshot.docs.map(async (doc) => {
+          const companyData = {
+            id: doc.id,
+            ...doc.data(),
+          };
+          
+          // Pre-fetch student count for each company
+          try {
+            const companyCode = companyData.companyName?.replace(/\s+/g, '_').toUpperCase();
+            if (companyCode) {
+              const uploadsCollectionRef = collection(db, 'studentList', companyCode, 'uploads');
+              const querySnapshot = await getDocs(uploadsCollectionRef);
+              
+              let totalStudents = 0;
+              querySnapshot.forEach((uploadDoc) => {
+                const uploadData = uploadDoc.data();
+                if (uploadData.students && Array.isArray(uploadData.students)) {
+                  totalStudents += uploadData.students.length;
+                }
+              });
+              
+              companyData.studentCount = totalStudents;
+            }
+          } catch (error) {
+            console.error(`Error fetching student count for ${companyData.companyName}:`, error);
+            companyData.studentCount = 0;
+          }
+          
+          return companyData;
+        })
+      );
+      
+      setCompanies(companiesData);
     } catch (err) {
       console.error("Error fetching companies:", err);
       setError("Failed to load companies. Please try again.");
@@ -105,6 +135,42 @@ function CompanyOpen() {
     }
   };
 
+  // Function to update round status
+  const updateRoundStatus = async (companyId, roundIndex, newStatus, hiringRounds) => {
+    try {
+      // Update in Firebase
+      const companyRef = doc(db, "companies", companyId);
+      const companyDoc = companies.find(company => company.id === companyId);
+      
+      // Create updated roundStatus array
+      const currentRoundStatus = companyDoc.roundStatus || [];
+      const updatedRoundStatus = [...currentRoundStatus];
+      updatedRoundStatus[roundIndex] = newStatus;
+      
+      await updateDoc(companyRef, {
+        roundStatus: updatedRoundStatus,
+        updatedAt: new Date()
+      });
+
+      // Update local state
+      setCompanies(prev => prev.map(company =>
+        company.id === companyId
+          ? { 
+              ...company, 
+              roundStatus: updatedRoundStatus,
+              updatedAt: new Date()
+            }
+          : company
+      ));
+
+      console.log(`Updated round status: ${hiringRounds[roundIndex]} -> ${newStatus}`);
+
+    } catch (error) {
+      console.error("Error updating round status:", error);
+      alert("Failed to update round status. Please try again.");
+    }
+  };
+
   const updateCompanyStatus = async (companyId, newStatus) => {
     try {
       // Mark as transitioning for animation
@@ -143,6 +209,73 @@ function CompanyOpen() {
           : company
       ));
     }
+  };
+
+  // Add this function in CompanyOpen component
+  const fetchCompanyStudents = async (company) => {
+    if (!company?.companyName) return [];
+    
+    try {
+      const companyCode = company.companyName.replace(/\s+/g, '_').toUpperCase();
+      const uploadsCollectionRef = collection(db, 'studentList', companyCode, 'uploads');
+      
+      const querySnapshot = await getDocs(uploadsCollectionRef);
+      
+      const allStudents = [];
+      querySnapshot.forEach((doc) => {
+        const uploadData = doc.data();
+        if (uploadData.students && Array.isArray(uploadData.students)) {
+          const studentsWithMeta = uploadData.students.map(student => ({
+            ...student,
+            uploadedAt: uploadData.uploadedAt,
+            college: uploadData.college
+          }));
+          allStudents.push(...studentsWithMeta);
+        }
+      });
+      
+      return allStudents;
+    } catch (error) {
+      console.error('Error fetching students:', error);
+      return [];
+    }
+  };
+
+  // TrainingForms se students fetch karne ka function
+  const fetchTrainingFormStudents = async (collegeName) => {
+    if (!collegeName) return [];
+    
+    try {
+      const collegeAbbr = getCollegeAbbreviation(collegeName);
+      const trainingFormsSnapshot = await getDocs(collection(db, "trainingForms"));
+      
+      let allStudents = [];
+      
+      for (const docSnap of trainingFormsSnapshot.docs) {
+        const docId = docSnap.id;
+        
+        if (docId.startsWith(collegeAbbr)) {
+          const studentsRef = collection(doc(db, "trainingForms", docId), "students");
+          const studentsSnapshot = await getDocs(studentsRef);
+          
+          const students = studentsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          
+          allStudents = [...allStudents, ...students];
+        }
+      }
+      
+      return allStudents;
+    } catch (error) {
+      console.error("Error fetching training form students:", error);
+      return [];
+    }
+  };
+
+  const handleMatchStatsUpdate = (stats) => {
+    setGlobalMatchStats(stats);
   };
 
   useEffect(() => {
@@ -245,6 +378,7 @@ function CompanyOpen() {
           setShowJDForm={setShowJDForm}
           setShowPlacedStudent={setShowPlacedStudent}
           fetchCompanies={fetchCompanies}
+          matchStats={globalMatchStats}
         />
 
         <CompanyTable
@@ -255,6 +389,10 @@ function CompanyOpen() {
           setDropdownOpen={setDropdownOpen}
           setShowJDForm={setShowJDForm}
           updateCompanyStatus={updateCompanyStatus}
+          updateRoundStatus={updateRoundStatus}
+          fetchCompanyStudents={fetchCompanyStudents}
+          fetchTrainingFormStudents={fetchTrainingFormStudents}
+          onMatchStatsUpdate={handleMatchStatsUpdate}
         />
 
         {selectedCompany && (

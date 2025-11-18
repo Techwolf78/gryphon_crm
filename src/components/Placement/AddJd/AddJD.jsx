@@ -68,6 +68,7 @@ function AddJD({ show, onClose, company }) {
     jobDesignation: "",
     jobLocation: "",
     salary: "",
+    hiringRounds: [], 
     internshipDuration: "",
     stipend: "",
     modeOfInterview: "",
@@ -78,6 +79,7 @@ function AddJD({ show, onClose, company }) {
     source: "",
     coordinator: "",
     status: "ongoing",
+    
     createdAt: serverTimestamp(),
   });
   const [placementUsers, setPlacementUsers] = useState([]);

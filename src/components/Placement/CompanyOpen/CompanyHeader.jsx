@@ -221,18 +221,7 @@ function CompanyHeader({
       </div>
 
       {/* Table header row */}
-      <div
-        className={`grid grid-cols-8 ${headerColorMap[activeTab]} text-sm font-medium px-2 py-1.5 rounded-lg`}
-      >
-        <div className="wrap-break-word">Company</div>
-        <div className="wrap-break-word">College</div>
-        <div className="wrap-break-word">Eligible</div>
-        <div className="wrap-break-word">Source</div>
-        <div className="wrap-break-word">Salary</div>
-        <div className="wrap-break-word">Type</div>
-        <div className="wrap-break-word">Date</div>
-        <div className="text-center wrap-break-word">Actions</div>
-      </div>
+     
     </div>
   );
 }
