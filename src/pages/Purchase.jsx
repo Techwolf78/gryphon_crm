@@ -156,12 +156,20 @@ const componentColors = {
   travel_expenses: "bg-lime-100 text-lime-800 border-lime-200",
 };
 
-// Helper function to get current fiscal year
+// Indian Fiscal Year → April 1 to March 31
 const getCurrentFiscalYear = () => {
-  const currentYear = new Date().getFullYear();
-  const nextYear = (currentYear + 1) % 100;
-  return `${currentYear.toString().slice(-2)}-${nextYear
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth(); // 0 = Jan, 3 = April
+
+  // If month < 3, we are before April → fiscal year belongs to previous year
+  const fyStartYear = month >= 3 ? year : year - 1;
+  const fyEndYear = fyStartYear + 1;
+
+  // Return in "YY-YY" format
+  return `${fyStartYear.toString().slice(-2)}-${fyEndYear
     .toString()
+    .slice(-2)
     .padStart(2, "0")}`;
 };
 
