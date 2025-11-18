@@ -27,15 +27,35 @@ export default function ViewRequests({
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
   const [showSettlementModal, setShowSettlementModal] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const [filterStatus, setFilterStatus] = useState("submitted");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
   const csddCollection = collection(db, "csdd_expenses");
 
+  const canApprove = department?.toLowerCase() === "purchase";
+
+  const totalPages = Math.ceil(requests.length / pageSize);
+  const paginated = requests.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
   useEffect(() => {
-    const q = query(
-      csddCollection,
-      where("department", "==", department),
-      where("fiscalYear", "==", fiscalYear)
-    );
+    let q;
+
+    if (department?.toLowerCase() === "purchase") {
+      // PURCHASE only sees submitted requests
+      q = query(csddCollection, where("fiscalYear", "==", fiscalYear));
+    } else {
+      // OTHER DEPARTMENTS see all their own requests
+      q = query(
+        csddCollection,
+        where("department", "==", department),
+        where("fiscalYear", "==", fiscalYear)
+      );
+    }
 
     const unsub = onSnapshot(q, (snap) => {
       const docs = [];
@@ -50,12 +70,41 @@ export default function ViewRequests({
         return db - da;
       });
 
-      setRequests(sorted);
+      let filtered = sorted;
+
+      // SEARCH
+      if (searchText.trim() !== "") {
+        const s = searchText.toLowerCase();
+        filtered = filtered.filter(
+          (r) =>
+            (r.name || "").toLowerCase().includes(s) ||
+            (r.purpose || "").toLowerCase().includes(s) ||
+            (r.employeeId || "").toLowerCase().includes(s)
+        );
+      }
+
+      // STATUS FILTER
+      if (filterStatus !== "all") {
+        filtered = filtered.filter((r) => r.status === filterStatus);
+      }
+
+      setRequests(filtered);
+
       setLoading(false);
     });
 
     return () => unsub();
-  }, [department, fiscalYear]);
+  }, [
+    department,
+    fiscalYear,
+    searchText,
+    filterStatus,
+    searchText,
+    filterStatus,
+  ]);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchText, filterStatus]);
 
   // Format date
   const formatDate = (d) => {
@@ -113,7 +162,7 @@ export default function ViewRequests({
           budgetUpdate["summary.totalSpent"] = increment(advanceUsed);
         }
 
-        // 2️⃣ Reduce the employee’s advance balance by the amount used
+        // 2️⃣ Reduce the employee's advance balance by the amount used
         if (usedFromBalance > 0 && request.employeeId) {
           budgetUpdate[`employeeAdvanceBalances.${request.employeeId}`] =
             increment(-usedFromBalance);
@@ -208,6 +257,93 @@ export default function ViewRequests({
 
   return (
     <div className="space-y-6">
+      {/* Modern Search and Filter Section */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex-1 max-w-md">
+            <div className="relative">
+              <svg
+                className="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+              <input
+                type="text"
+                placeholder="Search by employee, purpose, or ID..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 placeholder-gray-500 text-gray-900"
+              />
+              {searchText && (
+                <button
+                  onClick={() => setSearchText("")}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 hover:bg-gray-200 rounded-full transition-colors duration-200"
+                >
+                  <svg
+                    className="w-4 h-4 text-gray-500"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <svg
+                className="w-4 h-4 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z"
+                />
+              </svg>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-gray-900 appearance-none bg-no-repeat bg-right-4 pr-10"
+                style={{
+                  backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
+                  backgroundPosition: "right 0.75rem center",
+                  backgroundSize: "1.5em 1.5em",
+                }}
+              >
+                <option value="submitted">Submitted</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+                <option value="all">All Status</option>
+              </select>
+            </div>
+
+            {/* Results Count */}
+            <div className="hidden sm:block px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium border border-blue-100">
+              {requests.length} request{requests.length !== 1 ? "s" : ""}
+            </div>
+          </div>
+        </div>
+      </div>
       {/* No data */}
       {requests.length === 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center shadow-sm">
@@ -235,10 +371,9 @@ export default function ViewRequests({
           </p>
         </div>
       )}
-
       {/* Request List */}
-      <div className="grid gap-4">
-        {requests.map((req, index) => (
+      <div className="space-y-4">
+        {paginated.map((req, index) => (
           <div
             key={req.id}
             className="bg-white rounded-2xl border border-gray-100 p-6 shadow-xs hover:shadow-md transition-all duration-300 hover:border-gray-200 group"
@@ -463,33 +598,10 @@ export default function ViewRequests({
                     Details
                   </button>
 
-                  {req.status === "submitted" && (
-                    <div className="flex gap-2 w-full lg:w-auto">
-                      <button
-                        onClick={() => handleReject(req)}
-                        disabled={actionLoading === req.id}
-                        className="flex-1 px-4 py-2.5 text-sm font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-xl hover:bg-rose-100 hover:border-rose-300 disabled:opacity-50 transition-all duration-200 flex items-center gap-2 justify-center group/btn"
-                      >
-                        {actionLoading === req.id ? (
-                          <div className="w-4 h-4 border-2 border-rose-600 border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <svg
-                            className="w-4 h-4 group-hover/btn:scale-110 transition-transform duration-200"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M6 18L18 6M6 6l12 12"
-                            />
-                          </svg>
-                        )}
-                        Reject
-                      </button>
-
+                  {/* APPROVAL + REJECTION LOGIC */}
+                  <div className="flex gap-2 w-full lg:w-auto">
+                    {/* Everyone except purchase CANNOT approve */}
+                    {canApprove && req.status === "submitted" && (
                       <button
                         onClick={() => handleApprove(req)}
                         disabled={actionLoading === req.id}
@@ -499,7 +611,7 @@ export default function ViewRequests({
                           <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                         ) : (
                           <svg
-                            className="w-4 h-4 group-hover/btn:scale-110 transition-transform duration-200"
+                            className="w-4 h-4"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -514,10 +626,39 @@ export default function ViewRequests({
                         )}
                         Approve
                       </button>
-                    </div>
-                  )}
+                    )}
 
-                  {req.status === "approved" &&
+                    {/* Reject visible to ALL departments when status=submitted */}
+                    {req.status === "submitted" && (
+                      <button
+                        onClick={() => handleReject(req)}
+                        disabled={actionLoading === req.id}
+                        className="flex-1 px-4 py-2.5 text-sm font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-xl hover:bg-rose-100 hover:border-rose-300 disabled:opacity-50 transition-all duration-200 flex items-center gap-2 justify-center group/btn"
+                      >
+                        {actionLoading === req.id ? (
+                          <div className="w-4 h-4 border-2 border-rose-600 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        )}
+                        Reject
+                      </button>
+                    )}
+                  </div>
+
+                  {canApprove &&
+                    req.status === "approved" &&
                     req.type === "voucher" &&
                     !req.settled && (
                       <button
@@ -549,6 +690,88 @@ export default function ViewRequests({
           </div>
         ))}
       </div>
+
+      {/* Modern Pagination */}
+      {totalPages > 1 && (
+        <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-sm text-gray-600">
+              Showing{" "}
+              <span className="font-semibold text-gray-900">
+                {(currentPage - 1) * pageSize + 1}-
+                {Math.min(currentPage * pageSize, requests.length)}
+              </span>{" "}
+              of{" "}
+              <span className="font-semibold text-gray-900">
+                {requests.length}
+              </span>{" "}
+              requests
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => p - 1)}
+                className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 group"
+              >
+                <svg
+                  className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform duration-200"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
+                Previous
+              </button>
+
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                  (page) => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`w-10 h-10 flex items-center justify-center text-sm font-medium rounded-xl transition-all duration-200 ${
+                        currentPage === page
+                          ? "bg-blue-600 text-white shadow-sm"
+                          : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  )
+                )}
+              </div>
+
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((p) => p + 1)}
+                className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 group"
+              >
+                Next
+                <svg
+                  className="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-200"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Details Modal */}
       {showDetailsModal && selectedRequest && (
@@ -761,7 +984,7 @@ export default function ViewRequests({
 
             {/* Modal Footer */}
             <div className="border-t border-gray-200 px-6 py-4 bg-gray-50">
-              <div className="flex justify-end items-center">
+              <div className="flex justify-end gap-2 items-center">
                 {/* EXPORT PDF BUTTON (Voucher or Reimbursement) */}
                 {(selectedRequest.type === "voucher" ||
                   selectedRequest.type === "reimbursement") && (

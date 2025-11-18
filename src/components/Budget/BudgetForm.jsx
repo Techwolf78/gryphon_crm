@@ -42,11 +42,19 @@ const BudgetForm = ({
   };
   // Generate fiscal year format (e.g., "25-26")
   const getFiscalYear = () => {
-    if (fiscalYear) return fiscalYear;
-    const currentYear = new Date().getFullYear();
-    const nextYear = (currentYear + 1) % 100;
-    return `${currentYear.toString().slice(-2)}-${nextYear
+    if (fiscalYear) return fiscalYear; // If parent passes fiscal year, use it
+
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth(); // 0 = Jan, 3 = April
+
+    // If before April, fiscal year belongs to previous year
+    const fyStartYear = month >= 3 ? year : year - 1;
+    const fyEndYear = fyStartYear + 1;
+
+    return `${fyStartYear.toString().slice(-2)}-${fyEndYear
       .toString()
+      .slice(-2)
       .padStart(2, "0")}`;
   };
 
