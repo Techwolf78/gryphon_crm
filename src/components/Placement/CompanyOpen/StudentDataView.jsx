@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { XIcon, DownloadIcon } from '@heroicons/react/outline';
 import * as XLSX from 'xlsx';
 
-const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
+const StudentDataView = ({ students, onClose, companyName, collegeName, unmatchedStudents = [] }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
@@ -22,14 +22,18 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
     { displayName: 'ACTIVE BACKLOGS', fieldName: 'activeBacklogs' },
     { displayName: 'GENDER', fieldName: 'gender' },
     { displayName: 'COLLEGE', fieldName: 'college' },
-    { displayName: 'UPLOAD DATE', fieldName: 'uploadedAt' }
+    { displayName: 'UPLOAD DATE', fieldName: 'uploadedAt' },
+    { displayName: 'MATCH STATUS', fieldName: 'isMatched' }
   ];
 
   // Normalize student data - map different field names to consistent ones
   const normalizedStudents = useMemo(() => {
     return students.map((student, index) => {
-      // Debug log to see actual student data structure
-      console.log(`Student ${index}:`, student);
+      // Check if student is unmatched
+      const isUnmatched = unmatchedStudents.some(unmatched => 
+        unmatched.studentName?.toLowerCase() === student.studentName?.toLowerCase() ||
+        unmatched.email?.toLowerCase() === student.email?.toLowerCase()
+      );
       
       return {
         // Direct mappings
@@ -48,17 +52,19 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
         status: student.status || student.STATUS || 'submitted',
         college: student.college || student.collegeName || student['COLLEGE'] || collegeName || 'N/A',
         uploadedAt: student.uploadedAt || student.uploadDate || student.uploadedDate || 'N/A',
+        isMatched: !isUnmatched,
         
         // Keep original data for debugging
         _original: student
       };
     });
-  }, [students, collegeName]);
+  }, [students, collegeName, unmatchedStudents]);
 
   // Get only columns that have data in students
   const displayColumns = useMemo(() => {
     return columnMapping.filter(col => {
       if (col.isSrNo) return true; // Always show SR NO
+      if (col.fieldName === 'isMatched') return true; // Always show match status
       
       // Check if any student has this field with data
       return normalizedStudents.some(student => {
@@ -91,6 +97,8 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
       displayColumns.forEach(col => {
         if (col.isSrNo) {
           row[col.displayName] = index + 1;
+        } else if (col.fieldName === 'isMatched') {
+          row[col.displayName] = student.isMatched ? 'Matched' : 'Not Found in Training Data';
         } else {
           row[col.displayName] = student[col.fieldName];
         }
@@ -107,6 +115,18 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
   const formatCellValue = (value, fieldName) => {
     if (value === null || value === undefined || value === '' || value === 'N/A') {
       return '-';
+    }
+
+    if (fieldName === 'isMatched') {
+      return value ? (
+        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+          ✓ Matched
+        </span>
+      ) : (
+        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+          ✗ Not Found
+        </span>
+      );
     }
 
     if (fieldName === 'status') {
@@ -169,6 +189,18 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
     return value;
   };
 
+  // Get row background color based on match status
+  const getRowClassName = (student) => {
+    return student.isMatched ? '' : 'bg-red-50 border-l-4 border-red-400';
+  };
+
+  // Count matched vs unmatched
+  const matchStats = useMemo(() => {
+    const matched = normalizedStudents.filter(s => s.isMatched).length;
+    const unmatched = normalizedStudents.filter(s => !s.isMatched).length;
+    return { matched, unmatched, total: normalizedStudents.length };
+  }, [normalizedStudents]);
+
   return (
     <div className="fixed inset-0 flex items-center justify-center z-60 bg-black bg-opacity-50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-95vw max-h-[95vh] overflow-hidden mx-4">
@@ -182,6 +214,14 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
               {collegeName && ` | College: ${collegeName}`}
               {` | Students: ${filteredStudents.length}/${normalizedStudents.length} | Columns: ${displayColumns.length}`}
             </p>
+            {/* Match Statistics */}
+            <div className={`mt-1 px-2 py-1 rounded text-xs font-medium ${
+              matchStats.unmatched === 0 
+                ? 'bg-green-500 text-white' 
+                : 'bg-red-500 text-white'
+            }`}>
+              📊 Match Status: {matchStats.matched} matched, {matchStats.unmatched} not found in training Data
+            </div>
           </div>
           <button 
             onClick={onClose}
@@ -206,26 +246,16 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
             </div>
 
           
-            {/* Export Button */}
-            <div>
-              <button
-                onClick={exportToExcel}
-                disabled={filteredStudents.length === 0}
-                           className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-medium rounded-lg hover:from-blue-700 hover:to-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center gap-2"
 
-              >
-                <DownloadIcon className="h-4 w-4 mr-2" />
-                Export
-              </button>
-            </div>
+          
           </div>
 
           {/* Data Structure Info */}
           <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
             <p className="text-xs text-blue-700">
               <strong>Data Info:</strong> {normalizedStudents.length} students normalized | 
-              First student: {normalizedStudents[0]?.studentName || 'No data'} | 
-              Columns showing: {displayColumns.map(col => col.displayName).join(', ')}
+              Match Status: {matchStats.matched} matched, {matchStats.unmatched} not found | 
+              Red rows indicate students not found in training Data
             </p>
           </div>
         </div>
@@ -248,13 +278,17 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredStudents.map((student, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
+                  <tr 
+                    key={index} 
+                    className={`hover:bg-gray-50 ${getRowClassName(student)}`}
+                    title={!student.isMatched ? "Student not found in training Data" : ""}
+                  >
                     {displayColumns.map((col, colIndex) => (
                       <td 
                         key={colIndex} 
                         className={`px-4 py-3 whitespace-nowrap text-sm border ${
                           col.isSrNo ? 'text-center font-medium bg-gray-50' : ''
-                        }`}
+                        } ${!student.isMatched && colIndex > 0 ? 'text-red-700 font-medium' : ''}`}
                       >
                         {col.isSrNo 
                           ? index + 1
@@ -276,14 +310,18 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
         {/* Footer */}
         <div className="bg-gray-50 px-6 py-4 border-t flex justify-between items-center">
           <div className="text-sm text-gray-600">
-            Showing {filteredStudents.length} of {normalizedStudents.length} students
+            Showing {filteredStudents.length} of {normalizedStudents.length} students | 
+            <span className={`ml-2 font-medium ${
+              matchStats.unmatched === 0 ? 'text-green-600' : 'text-red-600'
+            }`}>
+              {matchStats.matched} matched, {matchStats.unmatched} not found
+            </span>
           </div>
           <div className="flex space-x-3">
             <button
               onClick={exportToExcel}
               disabled={filteredStudents.length === 0}
-                          className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-medium rounded-lg hover:from-blue-700 hover:to-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center gap-2"
-
+              className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-medium rounded-lg hover:from-blue-700 hover:to-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center gap-2"
             >
               <DownloadIcon className="h-4 w-4 mr-2" />
               Export Excel

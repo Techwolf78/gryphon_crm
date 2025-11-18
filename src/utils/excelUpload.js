@@ -31,7 +31,7 @@ const getNextBatchInfo = async () => {
 
     console.log(`� Found ${highestBatchNumber} existing batches. Last batch: ${lastBatchId}`);
 
-    // Check if the last batch is almost full (1499+ records)
+    // Check if the last batch has space (<999 records)
     let shouldCreateNewBatch = true;
     let nextBatchNumber = highestBatchNumber + 1;
 
@@ -39,14 +39,14 @@ const getNextBatchInfo = async () => {
       const lastBatchSize = lastBatchData.companies.length;
       console.log(`📏 Last batch (${lastBatchId}) has ${lastBatchSize} records`);
 
-      if (lastBatchSize < 1499) {
+      if (lastBatchSize < 999) {
         // Last batch has space, we can append to it
         shouldCreateNewBatch = false;
         nextBatchNumber = highestBatchNumber;
-        console.log(`✅ Will append to existing batch_${nextBatchNumber} (${lastBatchSize}/1500 records)`);
+        console.log(`✅ Will append to existing batch_${nextBatchNumber} (${lastBatchSize}/999 records)`);
       } else {
-        // Last batch is full or almost full, create new batch
-        console.log(`� Last batch is full (${lastBatchSize}/1500), will create batch_${nextBatchNumber}`);
+        // Last batch is full, create new batch
+        console.log(`� Last batch is full (${lastBatchSize}/999), will create batch_${nextBatchNumber}`);
       }
     } else if (highestBatchNumber === 0) {
       // No existing batches, start from 1
@@ -69,86 +69,6 @@ const getNextBatchInfo = async () => {
       shouldCreateNewBatch: true,
       lastBatchData: null,
       lastBatchId: null
-    };
-  }
-};
-
-// Generate unique identifier for deduplication
-const generateCompanyKey = (company) => {
-  const name = company.name?.toString().toLowerCase().trim() || '';
-  const contactPerson = company.contactPerson?.toString().toLowerCase().trim() || '';
-  const phone = company.phone?.toString().toLowerCase().trim() || '';
-  const key = `${name}_${contactPerson}_${phone}`;
-  return btoa(encodeURIComponent(key)).substring(0, 50); // Limit length for Firestore
-};
-
-// Check for existing companies to prevent duplicates
-const checkExistingCompanies = async (companies) => {
-  try {
-    console.log("🔍 Checking for existing companies to prevent duplicates...");
-
-    // Get all existing batches
-    const batchesQuery = query(collection(db, "companyleads"), orderBy("__name__"));
-    const batchesSnapshot = await getDocs(batchesQuery);
-
-    const existingKeys = new Set();
-    let totalExistingCompanies = 0;
-    let skippedCompanies = 0;
-
-    for (const batchDoc of batchesSnapshot.docs) {
-      const batchData = batchDoc.data();
-      if (batchData.companies && Array.isArray(batchData.companies)) {
-        for (const encodedCompany of batchData.companies) {
-          try {
-            // Decode the company to check for duplicates
-            const decodedCompany = JSON.parse(decodeURIComponent(atob(encodedCompany)));
-            // Ensure the decoded company has the expected structure
-            if (decodedCompany && typeof decodedCompany === 'object') {
-              const key = generateCompanyKey(decodedCompany);
-              existingKeys.add(key);
-              totalExistingCompanies++;
-            } else {
-              console.warn("⚠️ Invalid company data structure, skipping:", decodedCompany);
-              skippedCompanies++;
-            }
-          } catch (decodeError) {
-            // Skip invalid encoded data but continue processing
-            console.warn("⚠️ Could not decode company data, skipping:", decodeError.message);
-            skippedCompanies++;
-          }
-        }
-      }
-    }
-
-    console.log(`📊 Found ${totalExistingCompanies} existing companies across ${batchesSnapshot.size} batches (${skippedCompanies} skipped due to decode errors)`);
-
-    // Filter out duplicates
-    const uniqueCompanies = [];
-    const duplicateCount = companies.length;
-
-    for (const company of companies) {
-      const key = generateCompanyKey(company);
-      if (!existingKeys.has(key)) {
-        uniqueCompanies.push(company);
-      }
-    }
-
-    const removedDuplicates = duplicateCount - uniqueCompanies.length;
-    console.log(`🧹 Removed ${removedDuplicates} duplicate companies, ${uniqueCompanies.length} unique companies to upload`);
-
-    return {
-      uniqueCompanies,
-      duplicatesRemoved: removedDuplicates,
-      totalExisting: totalExistingCompanies
-    };
-  } catch (error) {
-    console.error("❌ Error checking for duplicates:", error);
-    // If we can't check for duplicates, proceed with all companies but warn the user
-    console.warn("⚠️ Could not check for duplicates, proceeding with all companies");
-    return {
-      uniqueCompanies: companies,
-      duplicatesRemoved: 0,
-      totalExisting: 0
     };
   }
 };
@@ -268,45 +188,20 @@ export const uploadCompaniesFromExcel = async (file, onProgress = null, assignee
             company.assignedAt = new Date().toISOString();
           }
 
-          // If assigneeId is provided, assign the company to that user
-          if (assigneeId) {
-            company.assignedTo = assigneeId;
-            company.assignedBy = assigneeId; // Assuming the uploader is assigning to themselves
-            company.assignedAt = new Date().toISOString();
-          }
-
           return company;
         });
 
-        // 3. Check for duplicates before proceeding
-        const deduplicationResult = await checkExistingCompanies(companies);
-        const { uniqueCompanies, duplicatesRemoved, totalExisting } = deduplicationResult;
-
-        if (uniqueCompanies.length === 0) {
-          console.log("ℹ️ All companies in the Excel file are already uploaded. No new uploads needed.");
-          resolve({
-            totalCompanies: 0,
-            totalBatches: 0,
-            batchSize: 1000, // Reduced batch size
-            smartBatching: true,
-            duplicatesRemoved,
-            totalExisting,
-            message: "All companies already exist in the database"
-          });
-          return;
-        }
-
         console.log("🔄 Converting companies to Base64 encoded JSON strings...");
 
-        // 4. Encode each company object as Base64 JSON string (Unicode-safe)
-        const encodedCompanies = uniqueCompanies.map(company => {
+        // 3. Encode each company object as Base64 JSON string (Unicode-safe)
+        const encodedCompanies = companies.map(company => {
           // Use encodeURIComponent + btoa to handle Unicode characters
           const jsonString = JSON.stringify(company);
           const uriEncoded = encodeURIComponent(jsonString);
           return btoa(uriEncoded);
         });
 
-        console.log(`✨ Encoded ${encodedCompanies.length} companies as Base64 strings (after removing ${duplicatesRemoved} duplicates)`);
+        console.log(`✨ Encoded ${encodedCompanies.length} companies as Base64 strings`);
 
         // 4. Get smart batching information
         const batchInfo = await getNextBatchInfo();
@@ -314,10 +209,10 @@ export const uploadCompaniesFromExcel = async (file, onProgress = null, assignee
 
         console.log(`🎯 Smart batching: Starting from batch_${nextBatchNumber}, Create new: ${shouldCreateNewBatch}`);
 
-        // 5. Handle batching logic with reduced batch size to prevent 1MB limit
+        // 5. Handle batching logic with batch size limit
         let batchesToUpload = [];
         let currentBatchNumber = nextBatchNumber;
-        const chunkSize = 1000; // Reduced from 1500 to prevent 1MB limit issues
+        const chunkSize = 1000; // Batch size limit
 
         if (!shouldCreateNewBatch && lastBatchData) {
           // Append to existing batch
@@ -421,8 +316,6 @@ export const uploadCompaniesFromExcel = async (file, onProgress = null, assignee
           smartBatching: true,
           batchesUpdated: batchesToUpload.filter(b => b.isUpdate).length,
           batchesCreated: batchesToUpload.filter(b => !b.isUpdate).length,
-          duplicatesRemoved,
-          totalExisting,
           originalCompaniesCount: companies.length
         });
 

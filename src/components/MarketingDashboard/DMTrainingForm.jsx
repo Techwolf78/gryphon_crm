@@ -415,7 +415,6 @@ const DMTrainingForm = ({
             };
             try {
               await setDoc(doc(db, "digitalMarketing", sanitizedProjectCode), formDocData);
-              await setDoc(doc(db, "placementData", sanitizedProjectCode), formDocData);
             } catch (error) {
               console.error("Error saving training form:", error);
             }

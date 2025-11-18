@@ -32,9 +32,8 @@ export const logPlacementActivity = async ({
     };
 
     await addDoc(collection(db, "placement_audit_logs"), auditLog);
-    console.log("Audit log created:", auditLog);
   } catch (error) {
-    console.error("Error creating audit log:", error);
+    // Error creating audit log - silently handled
   }
 };
 

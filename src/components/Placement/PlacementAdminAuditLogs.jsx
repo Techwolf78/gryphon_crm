@@ -17,9 +17,7 @@ const PlacementAdminAuditLogs = () => {
   const [showFilters, setShowFilters] = useState(false);
   const filterRef = useRef(null);
 
-  // Fetch placement users for filtering
-  const fetchUsers = useCallback(async () => {
-    try {
+    const fetchUsers = useCallback(async () => {
       const usersRef = collection(db, "users");
       const usersSnapshot = await getDocs(usersRef);
       const usersData = {};
@@ -58,61 +56,53 @@ const PlacementAdminAuditLogs = () => {
         }
       });
       setAllUsers(usersData);
-    } catch (error) {
-      console.error("Error fetching users:", error);
-    }
-  }, []);
+    }, []);
 
   // Fetch all audit logs without pagination
   const fetchAuditLogs = useCallback(async () => {
-    try {
-      setLoading(true);
-      
-      let q = query(
-        collection(db, "placement_audit_logs"),
-        orderBy("timestamp", "desc")
-      );
+    setLoading(true);
+    
+    let q = query(
+      collection(db, "placement_audit_logs"),
+      orderBy("timestamp", "desc")
+    );
 
-      // Apply filters
-      if (selectedUser !== "all") {
-        q = query(q, where("userId", "==", selectedUser));
-      }
-
-      if (selectedAction !== "all") {
-        q = query(q, where("action", "==", selectedAction));
-      }
-
-      if (startDate) {
-        const startTimestamp = new Date(startDate);
-        startTimestamp.setHours(0, 0, 0, 0); // Set to start of day
-        q = query(q, where("timestamp", ">=", startTimestamp));
-      }
-
-      if (endDate) {
-        const endTimestamp = new Date(endDate);
-        endTimestamp.setHours(23, 59, 59, 999); // Set to end of day
-        q = query(q, where("timestamp", "<=", endTimestamp));
-      }
-
-      const querySnapshot = await getDocs(q);
-      const logs = [];
-
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        logs.push({
-          id: doc.id,
-          ...data,
-          timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp),
-        });
-      });
-
-      setAuditLogs(logs);
-      
-    } catch (error) {
-      console.error("Error fetching audit logs:", error);
-    } finally {
-      setLoading(false);
+    // Apply filters
+    if (selectedUser !== "all") {
+      q = query(q, where("userId", "==", selectedUser));
     }
+
+    if (selectedAction !== "all") {
+      q = query(q, where("action", "==", selectedAction));
+    }
+
+    if (startDate) {
+      const startTimestamp = new Date(startDate);
+      startTimestamp.setHours(0, 0, 0, 0); // Set to start of day
+      q = query(q, where("timestamp", ">=", startTimestamp));
+    }
+
+    if (endDate) {
+      const endTimestamp = new Date(endDate);
+      endTimestamp.setHours(23, 59, 59, 999); // Set to end of day
+      q = query(q, where("timestamp", "<=", endTimestamp));
+    }
+
+    const querySnapshot = await getDocs(q);
+    const logs = [];
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      logs.push({
+        id: doc.id,
+        ...data,
+        timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp),
+      });
+    });
+
+    setAuditLogs(logs);
+    
+    setLoading(false);
   }, [selectedUser, selectedAction, startDate, endDate]);
 
   // Filter logs based on search term (memoized for performance)

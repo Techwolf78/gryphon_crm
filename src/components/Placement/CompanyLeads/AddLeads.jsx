@@ -515,310 +515,361 @@ function AddLeads({ show, onClose, onAddLead }) {
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 z-54 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-2">
-      <div className="bg-white w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden">
-        <div className={`px-4 py-3 flex justify-between items-center ${duplicateWarning ? 'bg-red-600' : 'bg-linear-to-r from-blue-600 to-indigo-700'}`}>
-          <div className="flex-1">
-            <h2 className={`text-lg font-semibold ${duplicateWarning ? 'text-white' : 'text-white'}`}>Add New Company</h2>
-            {duplicateWarning && (
-              <div className="mt-2 text-sm text-red-100">
-                ⚠️ Duplicate contact found: Same email and phone already exists in company "{duplicateWarning.existingCompany}"
+    <div className="fixed inset-0 z-54 bg-gray-900/60 backdrop-blur-xl flex items-center justify-center p-4">
+      <div className="bg-white/95 backdrop-blur-xl w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden border border-white/20"
+           style={{
+             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.05)'
+           }}>
+        {/* Header */}
+        <div className={`px-4 py-2 ${duplicateWarning ? 'bg-linear-to-r from-red-500 to-red-600' : 'bg-linear-to-r from-blue-500 to-blue-600'}`}>
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
               </div>
-            )}
-          </div>
-          <button
-            onClick={handleClose}
-            className={`${duplicateWarning ? 'text-white hover:text-red-200' : 'text-white hover:text-gray-200'} focus:outline-none`}
-          >
-            <XIcon className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="p-4 overflow-y-auto max-h-[calc(100vh-140px)]">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Company Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={companyName}
-                onChange={(e) => updateField(setCompanyName, e.target.value, "companyName")}
-                placeholder="e.g. Acme Corporation"
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  validationErrors.companyName && touchedFields.companyName ? 'border-red-500' : 'border-gray-300'
-                }`}
-                required
-              />
-              {validationErrors.companyName && touchedFields.companyName && (
-                <span className="text-red-500 text-xs mt-1">{validationErrors.companyName}</span>
-              )}
+              <div>
+                <h2 className="text-lg font-semibold text-white tracking-tight">Add New Company</h2>
+                {duplicateWarning && (
+                  <div className="mt-0.5 text-xs text-red-100 opacity-90">
+                    ⚠️ Duplicate contact found
+                  </div>
+                )}
+              </div>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Industry <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={sector}
-                onChange={(e) => updateField(setSector, e.target.value, "sector")}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  validationErrors.sector && touchedFields.sector ? 'border-red-500' : 'border-gray-300'
-                }`}
-                required
-              >
-                <option value="">Select Industry</option>
-                {industryOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-              {sector === "Other" && (
-                <input
-                  type="text"
-                  value={customIndustry}
-                  onChange={(e) => updateField(setCustomIndustry, e.target.value, "customIndustry")}
-                  onFocus={() => {
-                    // Trigger validation when focused
-                    validateField("customIndustry", customIndustry);
-                    setTouchedFields(prev => ({ ...prev, customIndustry: true }));
-                  }}
-                  placeholder="Please specify the industry"
-                  className={`w-full mt-2 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                    validationErrors.customIndustry && touchedFields.customIndustry ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                />
-              )}
-              {validationErrors.customIndustry && touchedFields.customIndustry && (
-                <span className="text-red-500 text-xs mt-1">{validationErrors.customIndustry}</span>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Company Size
-              </label>
-              <input
-                type="number"
-                value={employeeCount}
-                onChange={(e) => updateField(setEmployeeCount, e.target.value, "employeeCount")}
-                placeholder="e.g. 250"
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  validationErrors.employeeCount && touchedFields.employeeCount ? 'border-red-500' : 'border-gray-300'
-                }`}
-                required
-              />
-              {validationErrors.employeeCount && touchedFields.employeeCount && (
-                <span className="text-red-500 text-xs mt-1">{validationErrors.employeeCount}</span>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Company Website
-              </label>
-              <input
-                type="url"
-                value={companyWebsite}
-                onChange={(e) => updateField(setCompanyWebsite, e.target.value, "companyWebsite")}
-                placeholder="e.g. https://company.com"
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  validationErrors.companyWebsite && touchedFields.companyWebsite ? 'border-red-500' : 'border-gray-300'
-                }`}
-              />
-              {validationErrors.companyWebsite && touchedFields.companyWebsite && (
-                <span className="text-red-500 text-xs mt-1">{validationErrors.companyWebsite}</span>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                POC Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={pocName}
-                onChange={(e) => updateField(setPocName, e.target.value, "pocName")}
-                placeholder="e.g. John Doe"
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  validationErrors.pocName && touchedFields.pocName ? 'border-red-500' : 'border-gray-300'
-                }`}
-                required
-              />
-              {validationErrors.pocName && touchedFields.pocName && (
-                <span className="text-red-500 text-xs mt-1">{validationErrors.pocName}</span>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Working Since
-              </label>
-              <input
-                type="date"
-                value={workingSince}
-                onChange={(e) => updateField(setWorkingSince, e.target.value, "workingSince")}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  validationErrors.workingSince && touchedFields.workingSince ? 'border-red-500' : 'border-gray-300'
-                }`}
-                required
-              />
-              {validationErrors.workingSince && touchedFields.workingSince && (
-                <span className="text-red-500 text-xs mt-1">{validationErrors.workingSince}</span>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                POC Location <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={pocLocation}
-                onChange={(e) => updateField(setPocLocation, e.target.value, "pocLocation")}
-                placeholder="e.g. Mumbai"
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  validationErrors.pocLocation && touchedFields.pocLocation ? 'border-red-500' : 'border-gray-300'
-                }`}
-                required
-              />
-              {validationErrors.pocLocation && touchedFields.pocLocation && (
-                <span className="text-red-500 text-xs mt-1">{validationErrors.pocLocation}</span>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                POC Phone <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={pocPhone}
-                onChange={(e) => updateField(setPocPhone, e.target.value, "pocPhone")}
-                placeholder="e.g. +91 9876543210"
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  validationErrors.pocPhone && touchedFields.pocPhone ? 'border-red-500' : 'border-gray-300'
-                }`}
-                required
-              />
-              {validationErrors.pocPhone && touchedFields.pocPhone && (
-                <span className="text-red-500 text-xs mt-1">{validationErrors.pocPhone}</span>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                POC Mail
-              </label>
-              <input
-                type="email"
-                value={pocMail}
-                onChange={(e) => updateField(setPocMail, e.target.value, "pocMail")}
-                placeholder="e.g. john@company.com"
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  validationErrors.pocMail && touchedFields.pocMail ? 'border-red-500' : 'border-gray-300'
-                }`}
-              />
-              {validationErrors.pocMail && touchedFields.pocMail && (
-                <span className="text-red-500 text-xs mt-1">{validationErrors.pocMail}</span>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                POC Designation <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={pocDesignation}
-                onChange={(e) => updateField(setPocDesignation, e.target.value, "pocDesignation")}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  validationErrors.pocDesignation && touchedFields.pocDesignation ? 'border-red-500' : 'border-gray-300'
-                }`}
-                required
-              >
-                <option value="">Select Designation</option>
-                {designationOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-              {pocDesignation === "Other" && (
-                <input
-                  type="text"
-                  value={customDesignation}
-                  onChange={(e) => updateField(setCustomDesignation, e.target.value, "customDesignation")}
-                  onFocus={() => {
-                    // Trigger validation when focused
-                    validateField("customDesignation", customDesignation);
-                    setTouchedFields(prev => ({ ...prev, customDesignation: true }));
-                  }}
-                  placeholder="Please specify the designation"
-                  className={`w-full mt-2 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                    validationErrors.customDesignation && touchedFields.customDesignation ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                />
-              )}
-              {validationErrors.customDesignation && touchedFields.customDesignation && (
-                <span className="text-red-500 text-xs mt-1">{validationErrors.customDesignation}</span>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                POC LinkedIn
-              </label>
-              <input
-                type="url"
-                value={pocLinkedin}
-                onChange={(e) => updateField(setPocLinkedin, e.target.value, "pocLinkedin")}
-                placeholder="e.g. https://linkedin.com/in/johndoe"
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  validationErrors.pocLinkedin && touchedFields.pocLinkedin ? 'border-red-500' : 'border-gray-300'
-                }`}
-              />
-              {validationErrors.pocLinkedin && touchedFields.pocLinkedin && (
-                <span className="text-red-500 text-xs mt-1">{validationErrors.pocLinkedin}</span>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Status
-              </label>
-              <select
-                value={status}
-                onChange={(e) => updateField(setStatus, e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                {statusOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gray-50 px-4 py-3 flex justify-end">
-          <div className="flex space-x-3">
             <button
               onClick={handleClose}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              className="w-6 h-6 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 backdrop-blur-sm"
+            >
+              <XIcon className="h-3 w-3 text-white" />
+            </button>
+          </div>
+        </div>
+
+        {/* Form Content */}
+        <div className="p-3 overflow-y-auto max-h-[calc(100vh-120px)]">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {/* Company Information Section */}
+            <div className="md:col-span-2">
+              <div className="bg-gray-50/50 rounded-lg p-2 border border-gray-100/50 mb-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-4 h-4 bg-blue-500 rounded-md flex items-center justify-center">
+                    <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                  </div>
+                  <h3 className="font-semibold text-gray-900 text-xs">Company Information</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wide">
+                      Company Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={companyName}
+                      onChange={(e) => updateField(setCompanyName, e.target.value, "companyName")}
+                      placeholder="e.g. Acme Corporation"
+                      className={`w-full px-2 py-1.5 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 shadow-sm ${
+                        validationErrors.companyName && touchedFields.companyName ? 'border-red-400 bg-red-50' : 'border-gray-200'
+                      }`}
+                      required
+                    />
+                    {validationErrors.companyName && touchedFields.companyName && (
+                      <span className="text-red-500 text-xs mt-0.5 block">{validationErrors.companyName}</span>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wide">
+                      Industry <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={sector}
+                      onChange={(e) => updateField(setSector, e.target.value, "sector")}
+                      className={`w-full px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 shadow-sm ${
+                        validationErrors.sector && touchedFields.sector ? 'border-red-400 bg-red-50' : 'border-gray-200'
+                      }`}
+                      required
+                    >
+                      <option value="">Select Industry</option>
+                      {industryOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                    {sector === "Other" && (
+                      <input
+                        type="text"
+                        value={customIndustry}
+                        onChange={(e) => updateField(setCustomIndustry, e.target.value, "customIndustry")}
+                        onFocus={() => {
+                          validateField("customIndustry", customIndustry);
+                          setTouchedFields(prev => ({ ...prev, customIndustry: true }));
+                        }}
+                        placeholder="Please specify the industry"
+                        className={`w-full mt-1.5 px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 shadow-sm ${
+                          validationErrors.customIndustry && touchedFields.customIndustry ? 'border-red-400 bg-red-50' : 'border-gray-200'
+                        }`}
+                      />
+                    )}
+                    {validationErrors.customIndustry && touchedFields.customIndustry && (
+                      <span className="text-red-500 text-xs mt-0.5 block">{validationErrors.customIndustry}</span>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wide">
+                      Company Size
+                    </label>
+                    <input
+                      type="number"
+                      value={employeeCount}
+                      onChange={(e) => updateField(setEmployeeCount, e.target.value, "employeeCount")}
+                      placeholder="e.g. 250"
+                      className={`w-full px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 shadow-sm ${
+                        validationErrors.employeeCount && touchedFields.employeeCount ? 'border-red-400 bg-red-50' : 'border-gray-200'
+                      }`}
+                    />
+                    {validationErrors.employeeCount && touchedFields.employeeCount && (
+                      <span className="text-red-500 text-xs mt-0.5 block">{validationErrors.employeeCount}</span>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wide">
+                      Company Website
+                    </label>
+                    <input
+                      type="url"
+                      value={companyWebsite}
+                      onChange={(e) => updateField(setCompanyWebsite, e.target.value, "companyWebsite")}
+                      placeholder="e.g. https://company.com"
+                      className={`w-full px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 shadow-sm ${
+                        validationErrors.companyWebsite && touchedFields.companyWebsite ? 'border-red-400 bg-red-50' : 'border-gray-200'
+                      }`}
+                    />
+                    {validationErrors.companyWebsite && touchedFields.companyWebsite && (
+                      <span className="text-red-500 text-xs mt-0.5 block">{validationErrors.companyWebsite}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Contact Person Section */}
+            <div className="md:col-span-2">
+              <div className="bg-gray-50/50 rounded-lg p-2 border border-gray-100/50 mb-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-4 h-4 bg-green-500 rounded-md flex items-center justify-center">
+                    <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                  <h3 className="font-semibold text-gray-900 text-xs">Contact Person</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wide">
+                      POC Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={pocName}
+                      onChange={(e) => updateField(setPocName, e.target.value, "pocName")}
+                      placeholder="e.g. John Doe"
+                      className={`w-full px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all duration-200 shadow-sm ${
+                        validationErrors.pocName && touchedFields.pocName ? 'border-red-400 bg-red-50' : 'border-gray-200'
+                      }`}
+                      required
+                    />
+                    {validationErrors.pocName && touchedFields.pocName && (
+                      <span className="text-red-500 text-xs mt-0.5 block">{validationErrors.pocName}</span>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wide">
+                      POC Designation <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={pocDesignation}
+                      onChange={(e) => updateField(setPocDesignation, e.target.value, "pocDesignation")}
+                      className={`w-full px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all duration-200 shadow-sm ${
+                        validationErrors.pocDesignation && touchedFields.pocDesignation ? 'border-red-400 bg-red-50' : 'border-gray-200'
+                      }`}
+                      required
+                    >
+                      <option value="">Select Designation</option>
+                      {designationOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                    {pocDesignation === "Other" && (
+                      <input
+                        type="text"
+                        value={customDesignation}
+                        onChange={(e) => updateField(setCustomDesignation, e.target.value, "customDesignation")}
+                        onFocus={() => {
+                          validateField("customDesignation", customDesignation);
+                          setTouchedFields(prev => ({ ...prev, customDesignation: true }));
+                        }}
+                        placeholder="Please specify the designation"
+                        className={`w-full mt-1.5 px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all duration-200 shadow-sm ${
+                          validationErrors.customDesignation && touchedFields.customDesignation ? 'border-red-400 bg-red-50' : 'border-gray-200'
+                        }`}
+                      />
+                    )}
+                    {validationErrors.customDesignation && touchedFields.customDesignation && (
+                      <span className="text-red-500 text-xs mt-0.5 block">{validationErrors.customDesignation}</span>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wide">
+                      POC Phone <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={pocPhone}
+                      onChange={(e) => updateField(setPocPhone, e.target.value, "pocPhone")}
+                      placeholder="e.g. +91 9876543210"
+                      className={`w-full px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all duration-200 shadow-sm ${
+                        validationErrors.pocPhone && touchedFields.pocPhone ? 'border-red-400 bg-red-50' : 'border-gray-200'
+                      }`}
+                      required
+                    />
+                    {validationErrors.pocPhone && touchedFields.pocPhone && (
+                      <span className="text-red-500 text-xs mt-0.5 block">{validationErrors.pocPhone}</span>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wide">
+                      POC Mail
+                    </label>
+                    <input
+                      type="email"
+                      value={pocMail}
+                      onChange={(e) => updateField(setPocMail, e.target.value, "pocMail")}
+                      placeholder="e.g. john@company.com"
+                      className={`w-full px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all duration-200 shadow-sm ${
+                        validationErrors.pocMail && touchedFields.pocMail ? 'border-red-400 bg-red-50' : 'border-gray-200'
+                      }`}
+                    />
+                    {validationErrors.pocMail && touchedFields.pocMail && (
+                      <span className="text-red-500 text-xs mt-0.5 block">{validationErrors.pocMail}</span>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wide">
+                      POC Location <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={pocLocation}
+                      onChange={(e) => updateField(setPocLocation, e.target.value, "pocLocation")}
+                      placeholder="e.g. Mumbai"
+                      className={`w-full px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all duration-200 shadow-sm ${
+                        validationErrors.pocLocation && touchedFields.pocLocation ? 'border-red-400 bg-red-50' : 'border-gray-200'
+                      }`}
+                      required
+                    />
+                    {validationErrors.pocLocation && touchedFields.pocLocation && (
+                      <span className="text-red-500 text-xs mt-0.5 block">{validationErrors.pocLocation}</span>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wide">
+                      POC LinkedIn
+                    </label>
+                    <input
+                      type="url"
+                      value={pocLinkedin}
+                      onChange={(e) => updateField(setPocLinkedin, e.target.value, "pocLinkedin")}
+                      placeholder="e.g. https://linkedin.com/in/johndoe"
+                      className={`w-full px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all duration-200 shadow-sm ${
+                        validationErrors.pocLinkedin && touchedFields.pocLinkedin ? 'border-red-400 bg-red-50' : 'border-gray-200'
+                      }`}
+                    />
+                    {validationErrors.pocLinkedin && touchedFields.pocLinkedin && (
+                      <span className="text-red-500 text-xs mt-0.5 block">{validationErrors.pocLinkedin}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Additional Information Section */}
+            <div className="md:col-span-2">
+              <div className="bg-gray-50/50 rounded-lg p-2 border border-gray-100/50">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-4 h-4 bg-purple-500 rounded-md flex items-center justify-center">
+                    <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="font-semibold text-gray-900 text-xs">Additional Information</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wide">
+                      Working Since
+                    </label>
+                    <input
+                      type="date"
+                      value={workingSince}
+                      onChange={(e) => updateField(setWorkingSince, e.target.value, "workingSince")}
+                      className="w-full px-2.5 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-200 shadow-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wide">
+                      Status
+                    </label>
+                    <select
+                      value={status}
+                      onChange={(e) => updateField(setStatus, e.target.value)}
+                      className="w-full px-2.5 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-200 shadow-sm"
+                    >
+                      {statusOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="bg-gray-50/80 px-4 py-2 border-t border-gray-100/50">
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={handleClose}
+              className="px-3 py-1.5 text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
             >
               Cancel
             </button>
             <button
               onClick={handleAddCompany}
               disabled={!isFormValid}
-              className={`px-4 py-2 rounded-lg text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+              className={`px-4 py-1.5 text-sm font-semibold text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-lg transform hover:scale-[1.02] ${
                 !isFormValid
-                  ? duplicateWarning 
-                    ? "bg-red-400 cursor-not-allowed" 
+                  ? duplicateWarning
+                    ? "bg-red-400 cursor-not-allowed"
                     : "bg-gray-400 cursor-not-allowed"
-                  : "bg-blue-600 hover:bg-blue-700"
+                  : "bg-linear-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
               }`}
             >
               Add Company

@@ -1,13 +1,49 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { XIcon, CloudUploadIcon } from "@heroicons/react/outline";
 import * as XLSX from 'xlsx';
 import { uploadCompaniesFromExcel } from '../../../utils/excelUpload';
+import { collection, getDocs, query } from 'firebase/firestore';
+import { db } from '../../../firebase';
 
-function BulkUploadModal({ show, onClose, assigneeId = null }) {
+function BulkUploadModal({ show, onClose, allUsers = null, currentUser = null }) {
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [assignToMe, setAssignToMe] = useState(false);
+  const [selectedAssignee, setSelectedAssignee] = useState('');
+  const [users, setUsers] = useState({});
+
+  // Fetch users if not provided as props
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (allUsers) {
+        setUsers(allUsers);
+        return;
+      }
+
+      try {
+        const usersQuery = query(collection(db, "users"));
+        const usersSnapshot = await getDocs(usersQuery);
+        const usersData = {};
+        usersSnapshot.forEach((doc) => {
+          usersData[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        setUsers(usersData);
+      } catch (error) {
+        console.error("Error fetching users:", error);
+      }
+    };
+
+    if (show) {
+      fetchUsers();
+    }
+  }, [show, allUsers]);
+
+  // Set default assignee to current user when modal opens
+  useEffect(() => {
+    if (show && currentUser) {
+      setSelectedAssignee(currentUser.uid || currentUser.id || '');
+    }
+  }, [show, currentUser]);
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
@@ -47,7 +83,7 @@ function BulkUploadModal({ show, onClose, assigneeId = null }) {
       console.log("🚀 Starting Excel upload process...");
 
       // Determine assignee ID
-      const finalAssigneeId = assignToMe && assigneeId ? assigneeId : null;
+      const finalAssigneeId = selectedAssignee || null;
       if (finalAssigneeId) {
         console.log("👤 Leads will be assigned to user:", finalAssigneeId);
       }
@@ -60,15 +96,13 @@ function BulkUploadModal({ show, onClose, assigneeId = null }) {
       console.log("🎊 Upload completed successfully!");
       console.log(`📈 Summary: ${result.totalCompanies} companies uploaded in ${result.totalBatches} batches`);
       console.log(`🧠 Smart batching: ${result.batchesUpdated || 0} batches updated, ${result.batchesCreated || result.totalBatches} batches created`);
-      console.log(`🧹 Deduplication: ${result.duplicatesRemoved || 0} duplicates removed, ${result.totalExisting || 0} companies already existed`);
 
       setProgress(100);
-      const duplicateInfo = result.duplicatesRemoved > 0 ? `\n• ${result.duplicatesRemoved} duplicates removed (${result.totalExisting} already existed)` : '';
-      alert(`Successfully uploaded ${result.totalCompanies} companies!\n\nSmart batching results:\n• ${result.batchesUpdated || 0} existing batches updated\n• ${result.batchesCreated || result.totalBatches} new batches created\n• Total batches: ${result.totalBatches}${duplicateInfo}${finalAssigneeId ? '\n• Leads have been assigned to you.' : ''}`);
+      alert(`Successfully uploaded ${result.totalCompanies} companies!\n\nSmart batching results:\n• ${result.batchesUpdated || 0} existing batches updated\n• ${result.batchesCreated || result.totalBatches} new batches created\n• Total batches: ${result.totalBatches}${finalAssigneeId ? '\n• Leads have been assigned to the selected user.' : ''}`);
 
       setUploading(false);
       setFile(null);
-      setAssignToMe(false);
+      setSelectedAssignee(currentUser?.uid || currentUser?.id || '');
       onClose();
 
     } catch (error) {
@@ -114,19 +148,29 @@ function BulkUploadModal({ show, onClose, assigneeId = null }) {
             />
           </div>
 
-          {assigneeId && (
+          {Object.keys(users).length > 0 && (
             <div className="mb-4">
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={assignToMe}
-                  onChange={(e) => setAssignToMe(e.target.checked)}
-                  className="mr-2 h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                />
-                <span className="text-sm text-gray-700">Assign all leads to me</span>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Assign leads to:
               </label>
+              <select
+                value={selectedAssignee}
+                onChange={(e) => setSelectedAssignee(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              >
+                <option value="">Don't assign (leave unassigned)</option>
+                {Object.values(users)
+                  .filter(user => user.departments?.includes("Placement") || user.department === "Placement")
+                  .sort((a, b) => (a.name || a.displayName || '').localeCompare(b.name || b.displayName || ''))
+                  .map(user => (
+                    <option key={user.uid || user.id} value={user.uid || user.id}>
+                      {user.name || user.displayName || user.email || 'Unknown User'}
+                      {user.role && ` (${user.role})`}
+                    </option>
+                  ))}
+              </select>
               <p className="text-xs text-gray-500 mt-1">
-                When checked, all uploaded leads will be assigned to your account immediately.
+                Select a user from the Placement department to assign all uploaded leads to them immediately.
               </p>
             </div>
           )}
@@ -180,7 +224,6 @@ function BulkUploadModal({ show, onClose, assigneeId = null }) {
               ⏱️ 2-second delay between batches to prevent rate limiting.<br/><br/>
               � Failed batches will be retried up to 3 times with exponential backoff.<br/><br/>
               🧠 <strong>Smart batching enabled:</strong> Automatically detects existing batches and continues numbering from the highest batch found. If the last batch has space (&lt;999 records), new records will be appended to it. Otherwise, a new batch is created automatically.<br/><br/>
-              🧹 <strong>Deduplication enabled:</strong> Automatically checks for existing companies using Company Name + Contact Person + Phone as unique identifier. Prevents duplicate uploads and shows exactly how many duplicates were removed.<br/><br/>
               �💡 Uses Base64 encoding for efficient storage and reduced document size.
             </p>
             

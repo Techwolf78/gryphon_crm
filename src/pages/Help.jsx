@@ -217,37 +217,41 @@ const Help = () => {
  
   const fetchTickets = useCallback(async () => {
     try {
-      let q;
+      let ticketsData = [];
       if (isAdmin) {
-        q = query(collection(db, "tickets"), orderBy("createdAt", "desc"));
+        const q = query(collection(db, "tickets"), orderBy("createdAt", "desc"));
+        const querySnapshot = await getDocs(q);
+        ticketsData = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+          createdAt: doc.data().createdAt?.toDate() || new Date(),
+        }));
       } else {
-        q = query(
-          collection(db, "tickets"),
-          where("createdBy", "==", user.email),
-          orderBy("createdAt", "desc")
-        );
+        // Fetch tickets created by user
+        const q1 = query(collection(db, "tickets"), where("createdBy", "==", user.email));
+        const snapshot1 = await getDocs(q1);
+        const tickets1 = snapshot1.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+          createdAt: doc.data().createdAt?.toDate() || new Date(),
+        }));
+
+        // Fetch tickets raised on behalf of user
+        const q2 = query(collection(db, "tickets"), where("onBehalfOf", "==", user.email));
+        const snapshot2 = await getDocs(q2);
+        const tickets2 = snapshot2.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+          createdAt: doc.data().createdAt?.toDate() || new Date(),
+        }));
+
+        // Combine and sort by createdAt descending
+        ticketsData = [...tickets1, ...tickets2].sort((a, b) => b.createdAt - a.createdAt);
       }
 
-      const querySnapshot = await getDocs(q);
-
-      // This is a valid empty state - no need to show error
-      if (querySnapshot.empty) {
-        setTickets([]);
-        return;
-      }
-
-      const ticketsData = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        // Convert Firestore timestamp to JS Date
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-      }));
       setTickets(ticketsData);
     } catch (error) {
-
-      // Only show toast for actual errors, not empty collections
       if (error.code !== "permission-denied") {
-        // You might want to handle permission errors differently
         toast.error("Failed to load tickets");
       }
     }
@@ -372,7 +376,7 @@ const Help = () => {
   ];
  
   return (
-    <div className="min-h-screen bg-gray-50/50 py-2">
+    <div className="min-h-screen bg-gray-50/50 ">
       {/* Under Development Popup */}
       {showPopup && (
         <div className="fixed inset-0 bg-gray-900/70 backdrop-blur-sm flex items-center justify-center z-54 p-4 animate-fadeIn">
@@ -920,8 +924,8 @@ const Help = () => {
  
       <div className="w-full">
         {/* Header aligned left */}
-        <div className="mb-3">
-          <div className="inline-flex items-center justify-start bg-linear-to-br from-blue-100 to-indigo-100 rounded-lg p-2 mb-1 shadow-sm border border-white">
+        <div className="mb-2">
+          <div className="inline-flex items-center justify-start bg-linear-to-br from-blue-100 to-indigo-100 rounded-lg p-1 mb-1 shadow-sm border border-white">
             <FiHelpCircle className="text-blue-600 w-4 h-4" />
           </div>
           <h1 className="text-lg sm:text-xl font-bold text-gray-900 mb-1 leading-tight">

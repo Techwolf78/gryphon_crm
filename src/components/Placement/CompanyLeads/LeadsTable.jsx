@@ -335,9 +335,9 @@ function LeadsTable({
 
                       return (
                         <>
-                          {paginatedLeads.map((lead) => (
+                          {paginatedLeads.map((lead, index) => (
                             <tr
-                              key={lead.id}
+                              key={`${lead.id}-${index}`}
                               className={`hover:bg-${leadStatus === 'hot' ? 'red' : leadStatus === 'warm' ? 'orange' : leadStatus === 'cold' ? 'blue' : leadStatus === 'called' ? 'purple' : 'green'}-50 cursor-pointer bg-white border-l-4 ${colors.leftBorder} transition-colors duration-150`}
                               onClick={() => onLeadClick(lead)}
                             >
@@ -603,7 +603,7 @@ function LeadsTable({
                 // Render regular flat list for other tabs
                 currentLeads.map((lead, index) => (
                   <tr
-                    key={lead.id}
+                    key={`${lead.id}-${index}`}
                     className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-25'} hover:bg-gray-50 cursor-pointer transition-colors`}
                     onClick={() => onLeadClick(lead)}
                   >
