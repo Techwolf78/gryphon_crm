@@ -68,14 +68,14 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
             panNumber: data.pan || "",
             trainerEmail: data.email || "",
             trainerPhone: data.phone || "",
-            gst: data.gst ? "0" : "NA",
+            gst: prev.gst || (data.gst ? "0" : "NA"),
           }));
         } else {
           // Trainer document doesn't exist - this is expected for new trainers
           console.warn(`Trainer document not found for trainerId: ${queryDeps.trainerId}`);
           setInvoiceData((prev) => ({
             ...prev,
-            gst: "NA", // Default to NA if trainer not found
+            gst: prev.gst || "NA", // Default to NA if trainer not found
           }));
         }
       } catch (error) {
@@ -119,7 +119,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
             ...prev,
             ...latestInvoice,
             billingDate: latestInvoice.billingDate || new Date().toISOString().split("T")[0],
-            gst: latestInvoice.gst !== undefined ? latestInvoice.gst : (queryDeps.gst ? "0" : "NA"),
+            gst: latestInvoice.gst !== undefined ? String(latestInvoice.gst) : (queryDeps.gst ? "0" : "NA"),
           }));
         }
       } catch (error) {

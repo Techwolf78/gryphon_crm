@@ -188,8 +188,25 @@ function TrainerRow({
         </div>
       </td>
       <td className="px-3 py-3">
-        <div className="text-sm font-semibold text-green-600">
-          {item.perHourCost && item.totalCollegeHours ? `₹${(item.perHourCost * item.totalCollegeHours).toLocaleString('en-IN')}` : "N/A"}
+        <div className="space-y-1">
+          {invoiceData?.netPayment ? (
+            <div className="text-sm font-semibold text-green-600">
+              ₹{invoiceData.netPayment.toLocaleString('en-IN')}
+            </div>
+          ) : (
+            <div className="text-sm font-semibold text-green-600">
+              {(() => {
+                // Calculate net payment for pending trainers using default values
+                const trainingFees = Math.round((item.perHourCost || 0) * (item.totalCollegeHours || 0));
+                const gstAmount = 0; // Default to NA (no GST)
+                const taxableAmount = trainingFees + gstAmount;
+                const tdsAmount = Math.round((taxableAmount * 0.1)); // Default 10% TDS
+                const otherExpenses = (item.totalConveyance || 0) + (item.totalFood || 0) + (item.totalLodging || 0);
+                const netPayment = Math.round(taxableAmount - tdsAmount + otherExpenses);
+                return `₹${netPayment.toLocaleString('en-IN')}`;
+              })()}
+            </div>
+          )}
         </div>
       </td>
       <td className="px-3 py-3">
@@ -202,21 +219,17 @@ function TrainerRow({
           {/* Stack additional info based on status */}
           {invoiceData && (
             <>
-              {invoiceData.createdAt && !isNaN(new Date(invoiceData.createdAt).getTime()) && invoiceData.status !== "rejected" && (
-                <div className="text-xs text-gray-500">
-                  {invoiceData.status === "generated" ? "Generated" : invoiceData.status === "approved" ? "Approved" : "Paid"}: {formatDate(new Date(invoiceData.createdAt))}
-                </div>
-              )}
-              {invoiceData.approvedAt && invoiceData.status === "approved" && (
-                <div className="text-xs text-gray-500">
-                  Approved: {formatDate(new Date(invoiceData.approvedAt))}
-                </div>
-              )}
-              {invoiceData.paidAt && invoiceData.status === "paid" && (
-                <div className="text-xs text-gray-500">
-                  Paid: {formatDate(new Date(invoiceData.paidAt))}
-                </div>
-              )}
+              {(() => {
+                const createdAt = invoiceData.createdAt?.toDate?.() || invoiceData.createdAt;
+                return createdAt && !isNaN(new Date(createdAt).getTime()) && invoiceData.status !== "rejected" && (
+                  <div className="text-xs text-gray-500">
+                    Generated: {(() => {
+                      const date = new Date(createdAt);
+                      return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
+                    })()}
+                  </div>
+                );
+              })()}
             </>
           )}
           
@@ -334,7 +347,7 @@ function TrainerRow({
                       {invoiceData.remarks.text}
                     </p>
                     <span className="text-gray-500 text-xs mt-1 block">
-                      Added on {new Date(invoiceData.remarks.addedAt).toLocaleDateString()}
+                      Added on {new Date(invoiceData.remarks.addedAt?.toDate?.() || invoiceData.remarks.addedAt).toLocaleDateString()}
                     </span>
                   </div>
                 </div>

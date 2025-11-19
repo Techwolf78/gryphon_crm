@@ -25,6 +25,19 @@ const LeadViewEditModal = ({
     name: '',
     email: '',
     phone: '',
+    landline: '',
+    location: '',
+    designation: '',
+    linkedin: ''
+  });
+
+  // POC editing state
+  const [editingPOCIndex, setEditingPOCIndex] = useState(null);
+  const [editingPOCData, setEditingPOCData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    landline: '',
     location: '',
     designation: '',
     linkedin: ''
@@ -40,6 +53,7 @@ const LeadViewEditModal = ({
     workingSince: '',
     pocLocation: '',
     pocPhone: '',
+    pocLandline: '',
     pocMail: '',
     pocDesignation: '',
     pocLinkedin: '',
@@ -79,6 +93,7 @@ const LeadViewEditModal = ({
         workingSince: lead.workingSince || '',
         pocLocation: lead.pocLocation || '',
         pocPhone: String(lead.pocPhone || ''),
+        pocLandline: String(lead.pocLandline || ''),
         pocMail: lead.pocMail || '',
         pocDesignation: lead.pocDesignation || '',
         pocLinkedin: lead.pocLinkedin || '',
@@ -133,6 +148,13 @@ const LeadViewEditModal = ({
     // Allow international formats with + and numbers, spaces, hyphens, parentheses
     const phoneRegex = /^[+]?[1-9][\d\s\-()]{8,}$/;
     return phoneRegex.test(phone.replace(/\s/g, ''));
+  };
+
+  const validateLandline = (landline) => {
+    if (!landline) return true; // Optional field
+    // Allow formats like: 022-12345678, (022) 12345678, 022 12345678, +91-22-12345678
+    const landlineRegex = /^[+]?[\d\s\-()]{6,}$/;
+    return landlineRegex.test(landline.replace(/\s/g, ''));
   };
 
   const validateLinkedIn = (url) => {
@@ -195,6 +217,11 @@ const LeadViewEditModal = ({
           error = "Please enter a valid phone number";
         }
         break;
+      case "pocLandline":
+        if (value && !validateLandline(value)) {
+          error = "Please enter a valid landline number";
+        }
+        break;
       case "pocMail":
         if (value && !validateEmail(value)) {
           error = "Please enter a valid email address";
@@ -242,6 +269,133 @@ const LeadViewEditModal = ({
     }));
   };
 
+  // POC editing functions
+  const startEditingPOC = (index, contact) => {
+    setEditingPOCIndex(index);
+    setEditingPOCData({
+      name: contact.name || '',
+      email: contact.email || '',
+      phone: contact.phone || '',
+      landline: contact.landline || '',
+      location: contact.location || '',
+      designation: contact.designation || '',
+      linkedin: contact.linkedin || ''
+    });
+  };
+
+  const cancelEditingPOC = () => {
+    setEditingPOCIndex(null);
+    setEditingPOCData({
+      name: '',
+      email: '',
+      phone: '',
+      landline: '',
+      location: '',
+      designation: '',
+      linkedin: ''
+    });
+  };
+
+  const handlePOCDataChange = (field, value) => {
+    setEditingPOCData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const savePOCChanges = async () => {
+    if (!editingPOCData.name.trim()) {
+      toast.error('POC name is required', {
+        position: "bottom-left",
+        autoClose: 3000,
+        hideProgressBar: true,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: false,
+        theme: "light",
+        className: "text-sm font-medium",
+        bodyClassName: "text-sm"
+      });
+      return;
+    }
+
+    try {
+      // Update the contact in the lead's contacts array
+      const updatedContacts = [...(lead.contacts || [])];
+      updatedContacts[editingPOCIndex] = {
+        ...updatedContacts[editingPOCIndex],
+        name: editingPOCData.name,
+        email: editingPOCData.email,
+        phone: editingPOCData.phone,
+        landline: editingPOCData.landline,
+        location: editingPOCData.location,
+        designation: editingPOCData.designation,
+        linkedin: editingPOCData.linkedin,
+        updatedAt: new Date().toISOString()
+      };
+
+      // Update the lead with the modified contacts array
+      const updatedData = {
+        contacts: updatedContacts,
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (onUpdateLead) {
+        const result = await onUpdateLead(lead.id, updatedData);
+        if (result && result.success) {
+          toast.success('POC updated successfully!', {
+            position: "bottom-left",
+            autoClose: 3000,
+            hideProgressBar: true,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: false,
+            theme: "light",
+            className: "text-sm font-medium",
+            bodyClassName: "text-sm"
+          });
+        } else {
+          toast.error(`Failed to update POC: ${result?.error || 'Unknown error'}`, {
+            position: "bottom-left",
+            autoClose: 3000,
+            hideProgressBar: true,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: false,
+            theme: "light",
+            className: "text-sm font-medium",
+            bodyClassName: "text-sm"
+          });
+          return;
+        }
+      }
+
+      setEditingPOCIndex(null);
+      setEditingPOCData({
+        name: '',
+        email: '',
+        phone: '',
+        landline: '',
+        location: '',
+        designation: '',
+        linkedin: ''
+      });
+    } catch (error) {
+      console.error('Error updating POC:', error);
+      toast.error('Failed to update POC. Please try again.', {
+        position: "bottom-left",
+        autoClose: 3000,
+        hideProgressBar: true,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: false,
+        theme: "light",
+        className: "text-sm font-medium",
+        bodyClassName: "text-sm"
+      });
+    }
+  };
+
   const handleAddContactInternal = async () => {
     try {
       if (!newContact.name) {
@@ -263,6 +417,7 @@ const LeadViewEditModal = ({
         name: newContact.name,
         email: newContact.email,
         phone: newContact.phone,
+        landline: newContact.landline,
         location: newContact.location,
         designation: newContact.designation,
         linkedin: newContact.linkedin,
@@ -320,6 +475,7 @@ const LeadViewEditModal = ({
         name: '',
         email: '',
         phone: '',
+        landline: '',
         location: '',
         designation: '',
         linkedin: ''
@@ -381,6 +537,7 @@ const LeadViewEditModal = ({
       workingSince: editData.workingSince,
       location: editData.pocLocation, // Map pocLocation to location
       phone: editData.pocPhone, // Map pocPhone to phone
+      landline: editData.pocLandline, // Map pocLandline to landline
       email: editData.pocMail, // Map pocMail to email
       designation: editData.pocDesignation, // Map pocDesignation to designation
       linkedinUrl: editData.pocLinkedin, // Map pocLinkedin to linkedinUrl
@@ -549,15 +706,19 @@ const LeadViewEditModal = ({
               <div className="space-y-2">
                 <h3 className="text-base font-semibold text-gray-800 border-b pb-1">Contact Information</h3>
 
-                <div className="bg-blue-50 p-2 rounded-lg border border-blue-200">
-                  <h4 className="font-medium text-blue-800 mb-1 text-sm">Primary Contact</h4>
+                {/* Primary POC */}
+                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                  <h4 className="font-medium text-blue-800 mb-2 text-sm flex items-center">
+                    <span className="inline-block w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+                    Primary POC - {lead.pocDesignation || "Contact"}
+                  </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     <div>
                       <label className="block text-xs font-medium text-blue-600 mb-0.5">Name</label>
                       <p className="text-gray-900 text-sm">{lead.pocName || "-"}</p>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-blue-600 mb-0.5">Designation</label>
+                      <label className="block text-xs font-medium text-blue-600 mb-0.5">Role</label>
                       <p className="text-gray-900 text-sm">{lead.pocDesignation || "-"}</p>
                     </div>
                     <div>
@@ -586,6 +747,19 @@ const LeadViewEditModal = ({
                         <p className="text-gray-900 text-sm">-</p>
                       )}
                     </div>
+                    <div>
+                      <label className="block text-xs font-medium text-blue-600 mb-0.5">Landline</label>
+                      {lead.pocLandline ? (
+                        <a
+                          href={`tel:${lead.pocLandline}`}
+                          className="text-blue-600 hover:text-blue-800 hover:underline text-sm"
+                        >
+                          {lead.pocLandline}
+                        </a>
+                      ) : (
+                        <p className="text-gray-900 text-sm">-</p>
+                      )}
+                    </div>
                     <div className="md:col-span-2">
                       <label className="block text-xs font-medium text-blue-600 mb-0.5">Location</label>
                       <p className="text-gray-900 text-sm">{lead.pocLocation || "-"}</p>
@@ -608,70 +782,208 @@ const LeadViewEditModal = ({
                   </div>
                 </div>
 
+                {/* Additional POCs */}
                 {lead.contacts && lead.contacts.length > 0 && (
-                  <div className="space-y-1">
-                    <h4 className="font-medium text-gray-700 text-sm">Additional Contacts ({lead.contacts.length})</h4>
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-gray-700 text-sm">Additional POCs ({lead.contacts.length})</h4>
                     {lead.contacts.map((contact, index) => (
-                      <div key={index} className="bg-gray-50 p-2 rounded-lg border border-gray-200">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1">Name</label>
-                            <p className="text-gray-900">{contact.name || "-"}</p>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1">Designation</label>
-                            <p className="text-gray-900">{contact.designation || "-"}</p>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1">Email</label>
-                            {contact.email ? (
-                              <a
-                                href={`mailto:${contact.email}`}
-                                className="text-blue-600 hover:text-blue-800 hover:underline"
+                      <div key={index} className="bg-green-50 p-3 rounded-lg border border-green-200 relative">
+                        {/* Edit button in top right corner */}
+                        {editingPOCIndex !== index && (
+                          <button
+                            onClick={() => startEditingPOC(index, contact)}
+                            className="absolute top-2 right-2 p-1.5 rounded-full bg-green-100 hover:bg-green-200 transition-colors"
+                            title="Edit POC"
+                          >
+                            <PencilIcon className="h-4 w-4 text-green-600" />
+                          </button>
+                        )}
+
+                        {editingPOCIndex === index ? (
+                          // EDIT MODE for this POC
+                          <>
+                            <h5 className="font-medium text-green-800 mb-3 text-sm flex items-center">
+                              <span className="inline-block w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                              Edit POC
+                            </h5>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-sm font-medium text-green-700 mb-1">Name*</label>
+                                <input
+                                  type="text"
+                                  value={editingPOCData.name}
+                                  onChange={(e) => handlePOCDataChange('name', e.target.value)}
+                                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                  placeholder="POC name"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-green-700 mb-1">POC Role</label>
+                                <select
+                                  value={editingPOCData.designation}
+                                  onChange={(e) => handlePOCDataChange('designation', e.target.value)}
+                                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                >
+                                  <option value="">Select POC Role</option>
+                                  {designationOptions.map((option) => (
+                                    <option key={option} value={option}>
+                                      {option}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-green-700 mb-1">Email</label>
+                                <input
+                                  type="email"
+                                  value={editingPOCData.email}
+                                  onChange={(e) => handlePOCDataChange('email', e.target.value)}
+                                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                  placeholder="Email address"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-green-700 mb-1">Phone</label>
+                                <input
+                                  type="tel"
+                                  value={editingPOCData.phone}
+                                  onChange={(e) => handlePOCDataChange('phone', e.target.value)}
+                                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                  placeholder="Phone number"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-green-700 mb-1">Landline</label>
+                                <input
+                                  type="tel"
+                                  value={editingPOCData.landline}
+                                  onChange={(e) => handlePOCDataChange('landline', e.target.value)}
+                                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                  placeholder="Landline number"
+                                />
+                              </div>
+                              <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-green-700 mb-1">Location</label>
+                                <input
+                                  type="text"
+                                  value={editingPOCData.location}
+                                  onChange={(e) => handlePOCDataChange('location', e.target.value)}
+                                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                  placeholder="Location"
+                                />
+                              </div>
+                              <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-green-700 mb-1">LinkedIn</label>
+                                <input
+                                  type="url"
+                                  value={editingPOCData.linkedin}
+                                  onChange={(e) => handlePOCDataChange('linkedin', e.target.value)}
+                                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                  placeholder="LinkedIn profile URL"
+                                />
+                              </div>
+                            </div>
+                            <div className="mt-4 flex justify-end space-x-3">
+                              <button
+                                onClick={cancelEditingPOC}
+                                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100"
                               >
-                                {contact.email}
-                              </a>
-                            ) : (
-                              <p className="text-gray-900">-</p>
-                            )}
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1">Phone</label>
-                            {contact.phone ? (
-                              <a
-                                href={`tel:${contact.phone}`}
-                                className="text-blue-600 hover:text-blue-800 hover:underline"
+                                Cancel
+                              </button>
+                              <button
+                                onClick={savePOCChanges}
+                                disabled={!editingPOCData.name.trim()}
+                                className={`px-3 py-1.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 flex items-center ${
+                                  editingPOCData.name.trim()
+                                    ? "bg-green-600 text-white hover:bg-green-700"
+                                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                }`}
                               >
-                                {contact.phone}
-                              </a>
-                            ) : (
-                              <p className="text-gray-900">-</p>
-                            )}
-                          </div>
-                          <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-600 mb-1">Location</label>
-                            <p className="text-gray-900">{contact.location || "-"}</p>
-                          </div>
-                          <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-600 mb-1">LinkedIn</label>
-                            {contact.linkedin ? (
-                              <a
-                                href={contact.linkedin.startsWith('http') ? contact.linkedin : `https://${contact.linkedin}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-800 hover:underline"
-                              >
-                                {contact.linkedin}
-                              </a>
-                            ) : (
-                              <p className="text-gray-900">-</p>
-                            )}
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1">Added On</label>
-                            <p className="text-gray-900">{formatDate(contact.addedAt)}</p>
-                          </div>
-                        </div>
+                                Save
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          // VIEW MODE for this POC
+                          <>
+                            <h5 className="font-medium text-green-800 mb-2 text-sm flex items-center">
+                              <span className="inline-block w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                              POC - {contact.designation || "Contact"}
+                            </h5>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-sm font-medium text-green-700 mb-1">Name</label>
+                                <p className="text-gray-900">{contact.name || "-"}</p>
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-green-700 mb-1">Role</label>
+                                <p className="text-gray-900">{contact.designation || "-"}</p>
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-green-700 mb-1">Email</label>
+                                {contact.email ? (
+                                  <a
+                                    href={`mailto:${contact.email}`}
+                                    className="text-blue-600 hover:text-blue-800 hover:underline"
+                                  >
+                                    {contact.email}
+                                  </a>
+                                ) : (
+                                  <p className="text-gray-900">-</p>
+                                )}
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-green-700 mb-1">Phone</label>
+                                {contact.phone ? (
+                                  <a
+                                    href={`tel:${contact.phone}`}
+                                    className="text-blue-600 hover:text-blue-800 hover:underline"
+                                  >
+                                    {contact.phone}
+                                  </a>
+                                ) : (
+                                  <p className="text-gray-900">-</p>
+                                )}
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-green-700 mb-1">Landline</label>
+                                {contact.landline ? (
+                                  <a
+                                    href={`tel:${contact.landline}`}
+                                    className="text-blue-600 hover:text-blue-800 hover:underline"
+                                  >
+                                    {contact.landline}
+                                  </a>
+                                ) : (
+                                  <p className="text-gray-900">-</p>
+                                )}
+                              </div>
+                              <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-green-700 mb-1">Location</label>
+                                <p className="text-gray-900">{contact.location || "-"}</p>
+                              </div>
+                              <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-green-700 mb-1">LinkedIn</label>
+                                {contact.linkedin ? (
+                                  <a
+                                    href={contact.linkedin.startsWith('http') ? contact.linkedin : `https://${contact.linkedin}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:text-blue-800 hover:underline"
+                                  >
+                                    {contact.linkedin}
+                                  </a>
+                                ) : (
+                                  <p className="text-gray-900">-</p>
+                                )}
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-green-700 mb-1">Added On</label>
+                                <p className="text-gray-900">{formatDate(contact.addedAt)}</p>
+                              </div>
+                            </div>
+                          </>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -684,12 +996,12 @@ const LeadViewEditModal = ({
                       className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center"
                     >
                       <PlusIcon className="h-4 w-4 mr-2" />
-                      Add Contact
+                      Add POC
                     </button>
                   </div>
                 ) : (
                   <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                    <h4 className="font-medium text-gray-700 mb-3">Add New Contact</h4>
+                    <h4 className="font-medium text-gray-700 mb-3">Add New POC</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-sm font-medium text-gray-600 mb-1">Name*</label>
@@ -699,20 +1011,25 @@ const LeadViewEditModal = ({
                           value={newContact.name}
                           onChange={handleContactChange}
                           className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="Contact name"
+                          placeholder="POC name"
                           required
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-600 mb-1">Designation</label>
-                        <input
-                          type="text"
+                        <label className="block text-sm font-medium text-gray-600 mb-1">POC Role</label>
+                        <select
                           name="designation"
                           value={newContact.designation}
                           onChange={handleContactChange}
                           className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="Designation"
-                        />
+                        >
+                          <option value="">Select POC Role</option>
+                          {designationOptions.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-600 mb-1">Email</label>
@@ -734,6 +1051,17 @@ const LeadViewEditModal = ({
                           onChange={handleContactChange}
                           className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           placeholder="Phone number"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Landline</label>
+                        <input
+                          type="tel"
+                          name="landline"
+                          value={newContact.landline}
+                          onChange={handleContactChange}
+                          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="Landline number"
                         />
                       </div>
                       <div className="md:col-span-2">
@@ -767,6 +1095,7 @@ const LeadViewEditModal = ({
                             name: '',
                             email: '',
                             phone: '',
+                            landline: '',
                             location: '',
                             designation: '',
                             linkedin: ''
@@ -786,7 +1115,7 @@ const LeadViewEditModal = ({
                         }`}
                       >
                         <PlusIcon className="h-4 w-4 mr-2" />
-                        Add Contact
+                        Add POC
                       </button>
                     </div>
                   </div>
@@ -1012,6 +1341,24 @@ const LeadViewEditModal = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-0.5">
+                    POC Landline
+                  </label>
+                  <input
+                    type="text"
+                    value={editData.pocLandline}
+                    onChange={(e) => updateEditField('pocLandline', e.target.value)}
+                    placeholder="e.g. 022-12345678"
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                      validationErrors.pocLandline && touchedFields.pocLandline ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                  />
+                  {validationErrors.pocLandline && touchedFields.pocLandline && (
+                    <span className="text-red-500 text-xs mt-1">{validationErrors.pocLandline}</span>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-0.5">
                     POC Mail
                   </label>
                   <input
@@ -1025,7 +1372,7 @@ const LeadViewEditModal = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-0.5">
-                    POC Designation
+                    POC Role <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={editData.pocDesignation}
@@ -1034,7 +1381,7 @@ const LeadViewEditModal = ({
                       validationErrors.pocDesignation && touchedFields.pocDesignation ? 'border-red-500' : 'border-gray-300'
                     }`}
                   >
-                    <option value="">Select Designation</option>
+                    <option value="">Select POC Role</option>
                     {designationOptions.map((option) => (
                       <option key={option} value={option}>
                         {option}
