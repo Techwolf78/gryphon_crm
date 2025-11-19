@@ -1,15 +1,42 @@
 import React, { useCallback, useState } from 'react';
 import specializationOptions from './specializationOptions';
+import { parseSalaryInput, parseStipendInput, formatSalary, formatStipend } from "../../../utils/salaryUtils";
 
 function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClose, placementUsers, isLoadingUsers }) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [otherRound, setOtherRound] = useState('');
+  const [validationErrors, setValidationErrors] = useState({});
 
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;
     setHasUnsavedChanges(true);
-    setFormData({ ...formData, [name]: value });
-  }, [formData, setFormData]);
+
+    // Parse salary and stipend inputs
+    let processedValue = value;
+    if (name === 'salary') {
+      processedValue = parseSalaryInput(value);
+    } else if (name === 'stipend') {
+      processedValue = parseStipendInput(value);
+    }
+
+    setFormData({ ...formData, [name]: processedValue });
+
+    // Validate minimum amounts
+    const newValidationErrors = { ...validationErrors };
+    if (name === 'salary' && processedValue !== null && processedValue < 100000) {
+      newValidationErrors.salary = 'Minimum salary is 1 LPA (₹1,00,000)';
+    } else if (name === 'salary') {
+      delete newValidationErrors.salary;
+    }
+
+    if (name === 'stipend' && processedValue !== null && processedValue < 1000) {
+      newValidationErrors.stipend = 'Minimum stipend is ₹1,000/month';
+    } else if (name === 'stipend') {
+      delete newValidationErrors.stipend;
+    }
+
+    setValidationErrors(newValidationErrors);
+  }, [formData, setFormData, validationErrors]);
 
   const handleSpecializationChange = (e) => {
     const { value, checked } = e.target;
@@ -510,24 +537,178 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
         />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Salary (CTC)
-        </label>
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <span className="text-gray-500">₹</span>
+      {/* Compensation Fields - Dynamic based on Job Type */}
+      {formData.jobType === "Internship" && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Stipend
+          </label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <span className="text-gray-500">₹</span>
+            </div>
+            <input
+              type="text"
+              name="stipend"
+              value={formData.stipend || ''}
+              onChange={handleChange}
+              placeholder="e.g. 25000"
+              className="w-full pl-8 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+            />
+            {formData.stipend && (
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                <span className="text-xs text-gray-500">({formatStipend(formData.stipend)})</span>
+              </div>
+            )}
           </div>
-          <input
-            type="text"
-            name="salary"
-            value={formData.salary}
-            onChange={handleChange}
-            placeholder="e.g. 500000"
-            className="w-full pl-8 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-          />
+          {validationErrors.stipend && (
+            <p className="mt-1 text-sm text-red-600">{validationErrors.stipend}</p>
+          )}
         </div>
-      </div>
+      )}
+
+      {formData.jobType === "Int + PPO" && (
+        <>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Stipend
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <span className="text-gray-500">₹</span>
+              </div>
+              <input
+                type="text"
+                name="stipend"
+                value={formData.stipend || ''}
+                onChange={handleChange}
+                placeholder="e.g. 25000"
+                className="w-full pl-8 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+              />
+              {formData.stipend && (
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  <span className="text-xs text-gray-500">({formatStipend(formData.stipend)})</span>
+                </div>
+              )}
+            </div>
+            {validationErrors.stipend && (
+              <p className="mt-1 text-sm text-red-600">{validationErrors.stipend}</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Salary (CTC)
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <span className="text-gray-500">₹</span>
+              </div>
+              <input
+                type="text"
+                name="salary"
+                value={formData.salary || ''}
+                onChange={handleChange}
+                placeholder="e.g. 500000"
+                className="w-full pl-8 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+              />
+              {formData.salary && (
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  <span className="text-xs text-gray-500">({formatSalary(formData.salary)})</span>
+                </div>
+              )}
+            </div>
+            {validationErrors.salary && (
+              <p className="mt-1 text-sm text-red-600">{validationErrors.salary}</p>
+            )}
+          </div>
+        </>
+      )}
+
+      {formData.jobType === "Full Time" && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Salary (CTC)
+          </label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <span className="text-gray-500">₹</span>
+            </div>
+            <input
+              type="text"
+              name="salary"
+              value={formData.salary || ''}
+              onChange={handleChange}
+              placeholder="e.g. 500000"
+              className="w-full pl-8 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+            />
+            {formData.salary && (
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                <span className="text-xs text-gray-500">({formatSalary(formData.salary)})</span>
+              </div>
+            )}
+          </div>
+          {validationErrors.salary && (
+            <p className="mt-1 text-sm text-red-600">{validationErrors.salary}</p>
+          )}
+        </div>
+      )}
+
+      {formData.jobType === "Training + FT" && (
+        <>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Training Stipend (per month)
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <span className="text-gray-500">₹</span>
+              </div>
+              <input
+                type="text"
+                name="stipend"
+                value={formData.stipend || ''}
+                onChange={handleChange}
+                placeholder="e.g. 25000"
+                className="w-full pl-8 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+              />
+              {formData.stipend && (
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  <span className="text-xs text-gray-500">({formatStipend(formData.stipend)})</span>
+                </div>
+              )}
+            </div>
+            {validationErrors.stipend && (
+              <p className="mt-1 text-sm text-red-600">{validationErrors.stipend}</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              FT Salary (LPA)
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <span className="text-gray-500">₹</span>
+              </div>
+              <input
+                type="text"
+                name="salary"
+                value={formData.salary || ''}
+                onChange={handleChange}
+                placeholder="e.g. 500000"
+                className="w-full pl-8 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+              />
+              {formData.salary && (
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  <span className="text-xs text-gray-500">({formatSalary(formData.salary)})</span>
+                </div>
+              )}
+            </div>
+            {validationErrors.salary && (
+              <p className="mt-1 text-sm text-red-600">{validationErrors.salary}</p>
+            )}
+          </div>
+        </>
+      )}
 
       {/* UPDATED: Hiring Rounds Field with HR Round and Resume Screening */}
       <div className="col-span-2">
@@ -594,7 +775,7 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
       </div>
 
       {/* Rest of the form remains the same */}
-      {formData.jobType === "Internship" || formData.jobType === "Int + PPO" ? (
+      {formData.jobType === "Internship" || formData.jobType === "Int + PPO" || formData.jobType === "Training + FT" ? (
         <>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -608,24 +789,6 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
               placeholder="e.g. 6 months"
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Stipend
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <span className="text-gray-500">₹</span>
-              </div>
-              <input
-                type="text"
-                name="stipend"
-                value={formData.stipend}
-                onChange={handleChange}
-                placeholder="e.g. 25000"
-                className="w-full pl-8 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-              />
-            </div>
           </div>
         </>
       ) : null}

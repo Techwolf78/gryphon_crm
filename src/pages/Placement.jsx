@@ -556,7 +556,7 @@ function Placement() {
               ) : (
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                   {/* Compact Modern Header */}
-                  <div className="bg-gradient-to-r from-blue-500 via-indigo-600 to-indigo-700 px-4 py-3">
+                  <div className="bg-linear-to-r from-blue-500 via-indigo-600 to-indigo-700 px-4 py-3">
                     <div className="flex items-center justify-between">
                       <h3 className="text-white text-base font-semibold">Training Programs</h3>
                       <div className="flex items-center space-x-2">
@@ -786,7 +786,7 @@ function Placement() {
                                   {item.courses.slice(0, 3).map((course, idx) => (
                                     <div
                                       key={idx}
-                                      className="bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 px-1.5 py-0.5 rounded-md text-xs font-medium border border-indigo-200 flex items-center gap-1"
+                                      className="bg-linear-to-r from-indigo-50 to-purple-50 text-indigo-700 px-1.5 py-0.5 rounded-md text-xs font-medium border border-indigo-200 flex items-center gap-1"
                                       title={`${course.specialization || 'N/A'}: ${course.students || 'N/A'} students`}
                                     >
                                       <span className="font-semibold">{course.specialization || 'N/A'}</span>

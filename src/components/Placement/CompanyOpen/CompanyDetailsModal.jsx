@@ -1,49 +1,11 @@
 import React, { useState,  } from "react";
 import { XIcon } from "@heroicons/react/outline";
 import StudentDataView from './StudentDataView';
-import { db } from '../../../firebase';
-import { collection, getDocs, } from 'firebase/firestore';
+import { formatSalary } from "../../../utils/salaryUtils";
 
 function CompanyDetails({ company, onClose }) {
   const [showStudentData, setShowStudentData] = useState(false);
-  const [students, setStudents] = useState([]);
-  const [loadingStudents, setLoadingStudents] = useState(false);
-
-  // Fetch students from Firebase
-  const fetchStudents = async () => {
-    if (!company?.companyName) return;
-    
-    setLoadingStudents(true);
-    try {
-      const companyCode = company.companyName.replace(/\s+/g, '_').toUpperCase();
-      const uploadsCollectionRef = collection(db, 'studentList', companyCode, 'uploads');
-      
-      // Get all uploads for this company
-      const querySnapshot = await getDocs(uploadsCollectionRef);
-      
-      const allStudents = [];
-      querySnapshot.forEach((doc) => {
-        const uploadData = doc.data();
-        if (uploadData.students && Array.isArray(uploadData.students)) {
-          // Add upload metadata to each student
-          const studentsWithMeta = uploadData.students.map(student => ({
-            ...student,
-            uploadedAt: uploadData.uploadedAt,
-            college: uploadData.college
-          }));
-          allStudents.push(...studentsWithMeta);
-        }
-      });
-      
-      setStudents(allStudents);
-      console.log(`✅ Fetched ${allStudents.length} students for ${company.companyName}`);
-    } catch (error) {
-      console.error('❌ Error fetching students:', error);
-      alert('Error fetching student data: ' + error.message);
-    } finally {
-      setLoadingStudents(false);
-    }
-  };
+  const students = [];
 
   // Filter students by college if needed
   const getFilteredStudents = () => {
@@ -59,7 +21,7 @@ function CompanyDetails({ company, onClose }) {
       <div className="fixed inset-0 bg-opacity-50 backdrop-blur" onClick={onClose}></div>
 
       <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto z-50">
-        <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white px-6 py-4 flex justify-between items-center sticky top-0">
+        <div className="bg-linear-to-r from-blue-600 to-blue-500 text-white px-6 py-4 flex justify-between items-center sticky top-0">
           <h2 className="text-lg font-semibold">Company Details</h2>
           <button onClick={onClose} className="p-1 rounded-full hover:bg-blue-700 transition">
             <XIcon className="h-5 w-5 text-white" />
@@ -128,7 +90,7 @@ function CompanyDetails({ company, onClose }) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-500">Salary</label>
-                <p className="mt-1 text-gray-900">{company.salary ? `${company.salary} LPA` : "-"}</p>
+                <p className="mt-1 text-gray-900">{company.salary ? formatSalary(company.salary) : "-"}</p>
               </div>
             </div>
           </div>

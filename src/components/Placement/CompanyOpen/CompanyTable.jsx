@@ -11,6 +11,7 @@ import {
 import CompanyDropdownActions from "./CompanyDropdownActions";
 import StudentDataView from "./StudentDataView";
 import StudentSelectionModal from "./StudentSelectionModal";
+import { formatSalary, formatStipend } from "../../../utils/salaryUtils.js";
 
 const borderColorMap = {
   complete: "border-l-4 border-green-500",
@@ -146,7 +147,7 @@ const RoundStatus = ({
 
   return (
     <div
-      className="flex flex-col items-center gap-1 min-w-[80px]"
+      className="flex flex-col items-center gap-1 min-w-20"
       onClick={(e) => e.stopPropagation()}
     >
       {/* Round Name and Student Count */}
@@ -644,11 +645,11 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
                 className={`grid grid-cols-8 gap-2 px-2 py-1 text-xs font-medium rounded-lg ml-4 ${headerColorMap[activeTab]}`}
               >
                 <div>College</div>
-                <div>Eligibility</div>
                 <div>Job Type</div>
                 <div>Salary/Stipend</div>
                 <div>Job Designation</div>
                 <div className="col-span-2 text-center">Hiring Process</div>
+                <div>Eligibility</div>
                 <div className="text-center">Actions</div>
               </div>
 
@@ -677,41 +678,41 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
                           {getCollegeAbbreviation(company.college) || "-"}
                         </div>
 
-                        {/* Eligibility - Column 2 */}
-                        <div className="text-sm text-gray-700 flex items-center h-full">
-                          <div className="min-w-0">
-                            <div className="text-xs text-gray-500 leading-tight">
-                              {formatEligibility(company)}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Job Type - Column 3 */}
+                        {/* Job Type - Column 2 */}
                         <div className="text-sm text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis flex items-center h-full">
                           {company.jobType || "-"}
                         </div>
 
-                        {/* Salary/Stipend - Column 4 */}
+                        {/* Salary/Stipend - Column 3 */}
                         <div className="text-sm text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis flex items-center h-full">
-                          {company.salary ? (
+                          {company.jobType === "Int + PPO" && company.salary && company.stipend ? (
+                            <div className="flex flex-col gap-1">
+                              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                {formatSalary(company.salary)}
+                              </span>
+                              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                {formatStipend(company.stipend)}
+                              </span>
+                            </div>
+                          ) : company.salary ? (
                             <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                              {company.salary} LPA
+                              {formatSalary(company.salary)}
                             </span>
                           ) : company.stipend ? (
                             <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                              ₹{company.stipend}/month
+                              {formatStipend(company.stipend)}
                             </span>
                           ) : (
                             "-"
                           )}
                         </div>
 
-                        {/* Job Designation - Column 5 */}
+                        {/* Job Designation - Column 4 */}
                         <div className="text-sm text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis flex items-center h-full">
                           {company.jobDesignation || "-"}
                         </div>
 
-                        {/* Hiring Process - Column 6 & 7 */}
+                        {/* Hiring Process - Column 5 & 6 */}
                         <div
                           className="col-span-2 flex items-center h-full"
                           onClick={(e) => e.stopPropagation()}
@@ -727,6 +728,15 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
                                 No rounds
                               </span>
                             )}
+                          </div>
+                        </div>
+
+                        {/* Eligibility - Column 7 */}
+                        <div className="text-sm text-gray-700 flex items-center h-full">
+                          <div className="min-w-0">
+                            <div className="text-xs text-gray-500 leading-tight">
+                              {formatEligibility(company)}
+                            </div>
                           </div>
                         </div>
 

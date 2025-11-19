@@ -12,6 +12,7 @@ import {
   FiRefreshCw,
   FiCheck
 } from "react-icons/fi";
+import { formatSalary } from "../../../utils/salaryUtils";
 
 function CompanyFilter({
   filters,
@@ -244,7 +245,7 @@ function CompanyFilter({
                         .sort((a, b) => a - b)
                         .map((salary) => (
                           <option key={salary} value={salary}>
-                            {salary} LPA
+                            {formatSalary(salary)}
                           </option>
                         ))}
                     </select>
