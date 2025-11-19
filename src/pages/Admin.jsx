@@ -232,7 +232,13 @@ const Admin = () => {
       await cleanupStaleSessions();
 
       let q = collection(db, "user_sessions");
-      if (filter === '7days') {
+      if (filter === '1day') {
+        const oneDayAgo = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000);
+        q = query(q, where('startTime', '>=', oneDayAgo));
+      } else if (filter === '3days') {
+        const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+        q = query(q, where('startTime', '>=', threeDaysAgo));
+      } else if (filter === '7days') {
         const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
         q = query(q, where('startTime', '>=', sevenDaysAgo));
       } else if (filter === '30days') {
@@ -764,10 +770,15 @@ const Admin = () => {
             <div className="flex flex-col sm:flex-row gap-3">
               <select
                 value={timeFilter}
-                onChange={(e) => setTimeFilter(e.target.value)}
+                onChange={(e) => {
+                  setTimeFilter(e.target.value);
+                  fetchTimeReports(e.target.value);
+                }}
                 className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               >
                 <option value="all">All Time</option>
+                <option value="1day">Last 1 Day</option>
+                <option value="3days">Last 3 Days</option>
                 <option value="7days">Last 7 Days</option>
                 <option value="30days">Last 30 Days</option>
               </select>
