@@ -6,6 +6,18 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   base: "/", // 👈 this is critical
   plugins: [react(), tailwindcss()],
+  define: {
+    global: "globalThis",
+  },
+  resolve: {
+    alias: {
+      stream: "stream-browserify",
+      buffer: "buffer",
+      util: "util",
+      process: "process/browser",
+      events: "events",
+    },
+  },
   build: {
     rollupOptions: {
       output: {

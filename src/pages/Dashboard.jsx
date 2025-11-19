@@ -48,6 +48,7 @@ const Dashboard = () => {
         'learning-development': 'learning-development',
         'placement': 'placement',
         'marketing': 'marketing',
+        'dm': 'marketing',
         'admin': 'sales'
       };
 
@@ -84,7 +85,8 @@ const Dashboard = () => {
       'ld': 'learning-development',
       'learning-development': 'learning-development',
       'placement': 'placement',
-      'marketing': 'marketing'
+      'marketing': 'marketing',
+      'dm': 'marketing'
     };
 
     return userDepts.some(userDept => {

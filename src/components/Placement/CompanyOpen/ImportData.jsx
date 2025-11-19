@@ -17,6 +17,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../../firebase";
 import { getAuth } from "firebase/auth";
+import { normalizeSalaryForStorage, normalizeStipendForStorage } from "../../../utils/salaryUtils";
 
 const ImportData = ({ handleImportComplete }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -223,8 +224,8 @@ const ImportData = ({ handleImportComplete }) => {
           specialization: company.specialization || "",
           jobType: company.jobType || "Full Time",
           source: company.source || "",
-          salary: company.salary ? Number(company.salary) : null,
-          stipend: company.stipend ? Number(company.stipend) : null,
+          salary: normalizeSalaryForStorage(company.salary),
+          stipend: normalizeStipendForStorage(company.stipend),
           jobLocation: company.jobLocation || "",
           companyWebsite: company.companyWebsite || "",
           marksCriteria: company.marksCriteria || "",

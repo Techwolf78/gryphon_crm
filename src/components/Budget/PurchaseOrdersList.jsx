@@ -2,7 +2,6 @@ import { useState } from "react";
 import { exportPurchaseOrderToPDF } from "./utils/exportPOtoPDF"; // Make sure this path is correct
 import ViewPurchaseOrderModal from "./ViewPurchaseOrderModal";
 
-
 const PurchaseOrdersList = ({
   orders,
   budgetComponents,
@@ -136,11 +135,7 @@ const PurchaseOrdersList = ({
   const formatDate = (timestamp) => {
     const date = convertTimestamp(timestamp);
     if (!date) return "N/A";
-    return date.toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
+    return date.toLocaleDateString("en-IN");
   };
 
   const getSavings = (order) => {
@@ -167,12 +162,13 @@ const PurchaseOrdersList = ({
   };
 
   return (
-    <div className="space-y-6" onClick={handleClickOutside}>
+    <div className="space-y-4" onClick={handleClickOutside}>
       {/* Filters */}
-      <div className="bg-gray-50  rounded-lg">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="bg-gray-50 rounded-lg p-3 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          {/* Status Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-xs font-medium text-gray-700 mb-1">
               Status
             </label>
             <select
@@ -180,7 +176,7 @@ const PurchaseOrdersList = ({
               onChange={(e) =>
                 onFiltersChange({ ...filters, status: e.target.value })
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs bg-white"
             >
               <option value="">All Status</option>
               <option value="approved">Approved</option>
@@ -189,8 +185,9 @@ const PurchaseOrdersList = ({
             </select>
           </div>
 
+          {/* Component Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-xs font-medium text-gray-700 mb-1">
               Component
             </label>
             <select
@@ -198,7 +195,7 @@ const PurchaseOrdersList = ({
               onChange={(e) =>
                 onFiltersChange({ ...filters, component: e.target.value })
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs bg-white"
             >
               <option value="">All Components</option>
               {Object.entries(budgetComponents).map(([key, label]) => (
@@ -209,8 +206,9 @@ const PurchaseOrdersList = ({
             </select>
           </div>
 
+          {/* From Date Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-xs font-medium text-gray-700 mb-1">
               From Date
             </label>
             <input
@@ -222,7 +220,7 @@ const PurchaseOrdersList = ({
                   dateRange: { ...filters.dateRange, start: e.target.value },
                 })
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs bg-white"
             />
           </div>
         </div>
@@ -230,31 +228,31 @@ const PurchaseOrdersList = ({
 
       {/* Results Count */}
       <div className="flex justify-between items-center">
-        <p className="text-sm text-gray-600">
+        <p className="text-xs text-gray-600">
           Showing {sortedOrders.length} purchase order
           {sortedOrders.length !== 1 ? "s" : ""}
         </p>
       </div>
 
       {/* Orders Table */}
-      <div className="bg-white border border-gray-200 rounded-lg">
+      <div className="bg-white border border-gray-200 rounded-lg text-sm">
         <div className="">
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
                 {showDepartment && (
-                  <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="p-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Department
                   </th>
                 )}
-                <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="p-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   PO Number
                 </th>
-                <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="p-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Component
                 </th>
                 <th
-                  className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                  className="p-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                   onClick={() => handleSort("finalPrice")}
                 >
                   <div className="flex items-center">
@@ -266,17 +264,17 @@ const PurchaseOrdersList = ({
                     )}
                   </div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="p-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Savings
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="p-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Vendor
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="p-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
                 <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                  className="p-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                   onClick={() => handleSort("createdAt")}
                 >
                   <div className="flex items-center">
@@ -288,7 +286,7 @@ const PurchaseOrdersList = ({
                     )}
                   </div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+                <th className="p-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
                   Actions
                 </th>
               </tr>
@@ -299,19 +297,19 @@ const PurchaseOrdersList = ({
                 return (
                   <tr key={order.id} className="hover:bg-gray-50">
                     {showDepartment && (
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="p-2 whitespace-nowrap text-xs text-gray-900">
                         {order.department?.toUpperCase() || "Unknown"}
                       </td>
                     )}
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="p-2 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">
                         {order.poNumber ||
                           `PO-${order.id?.slice(-6).toUpperCase()}`}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="p-2 whitespace-nowrap">
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                           componentColors[order.budgetComponent] ||
                           "bg-gray-100 text-gray-800"
                         }`}
@@ -320,38 +318,38 @@ const PurchaseOrdersList = ({
                           order.budgetComponent}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="p-2 whitespace-nowrap text-sm text-gray-900">
                       ₹{order.finalAmount?.toLocaleString("en-In") || "0"}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="p-2 whitespace-nowrap">
                       {savings > 0 ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                           +₹{savings.toLocaleString("en-In")}
                         </span>
                       ) : savings < 0 ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                           -₹{Math.abs(savings).toLocaleString("en-In")}
                         </span>
                       ) : (
                         <span className="text-xs text-gray-500">-</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="p-2 whitespace-nowrap text-sm text-gray-900">
                       {getVendorName(order)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="p-2 whitespace-nowrap">
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
                           order.status
                         )}`}
                       >
                         {order.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="p-2 whitespace-nowrap text-xs text-gray-500">
                       {formatDate(order.createdAt)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium relative">
+                    <td className="p-2 whitespace-nowrap text-xs font-medium relative">
                       {/* 3-dot Dropdown Menu */}
                       <div className="relative">
                         <button
@@ -362,7 +360,7 @@ const PurchaseOrdersList = ({
                           className="flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
                         >
                           <svg
-                            className="w-5 h-5"
+                            className="w-4 h-4"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -378,7 +376,7 @@ const PurchaseOrdersList = ({
 
                         {/* Dropdown Menu */}
                         {activeDropdown === order.id && (
-                          <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
+                          <div className="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-10 text-xs">
                             <div className="py-1">
                               {/* View Action */}
                               <button
@@ -386,10 +384,10 @@ const PurchaseOrdersList = ({
                                   e.stopPropagation();
                                   setViewModal(order);
                                 }}
-                                className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                className="flex items-center w-full px-3 py-1.5 text-gray-700 hover:bg-gray-100"
                               >
                                 <svg
-                                  className="w-4 h-4 mr-2"
+                                  className="w-3.5 h-3.5 mr-2"
                                   fill="none"
                                   stroke="currentColor"
                                   viewBox="0 0 24 24"
@@ -416,10 +414,10 @@ const PurchaseOrdersList = ({
                                   e.stopPropagation();
                                   handleExport(order);
                                 }}
-                                className="flex items-center w-full px-4 py-2 text-sm text-blue-600 hover:bg-blue-50"
+                                className="flex items-center w-full px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50"
                               >
                                 <svg
-                                  className="w-4 h-4 mr-2"
+                                  className="w-3.5 h-3.5 mr-2"
                                   fill="none"
                                   stroke="currentColor"
                                   viewBox="0 0 24 24"
@@ -446,9 +444,9 @@ const PurchaseOrdersList = ({
         </div>
 
         {sortedOrders.length === 0 && (
-          <div className="text-center py-12">
+          <div className="text-center py-8">
             <svg
-              className="w-12 h-12 text-gray-400 mx-auto mb-4"
+              className="w-10 h-10 text-gray-400 mx-auto mb-3"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -460,8 +458,8 @@ const PurchaseOrdersList = ({
                 d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
               />
             </svg>
-            <p className="text-gray-500 text-lg">No purchase orders found</p>
-            <p className="text-gray-400 mt-2">
+            <p className="text-gray-500 text-base">No purchase orders found</p>
+            <p className="text-gray-400 mt-1.5 text-xs">
               Purchase orders will appear here once created
             </p>
           </div>

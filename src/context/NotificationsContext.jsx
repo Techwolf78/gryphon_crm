@@ -24,16 +24,31 @@ export const NotificationsProvider = ({ children }) => {
 
     const fetchTicketAlerts = async () => {
       try {
-        const q = query(
+        // Query tickets created by user
+        const q1 = query(
           collection(db, "tickets"),
           where("createdBy", "==", user.email),
           where("status", "==", "resolved")
         );
-        const snapshot = await getDocs(q);
-        const alerts = snapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter(ticket => !ticket.dismissedBy || !ticket.dismissedBy.includes(user.email));
-        setTicketAlerts(alerts);
+        const snapshot1 = await getDocs(q1);
+        const alerts1 = snapshot1.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        // Query tickets raised on behalf of user
+        const q2 = query(
+          collection(db, "tickets"),
+          where("onBehalfOf", "==", user.email),
+          where("status", "==", "resolved")
+        );
+        const snapshot2 = await getDocs(q2);
+        const alerts2 = snapshot2.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        // Combine and filter out dismissed
+        const allAlerts = [...alerts1, ...alerts2];
+        const uniqueAlerts = allAlerts.filter((alert, index, self) =>
+          index === self.findIndex(a => a.id === alert.id)
+        ).filter(ticket => !ticket.dismissedBy || !ticket.dismissedBy.includes(user.email));
+
+        setTicketAlerts(uniqueAlerts);
       } catch (error) {
         console.error("Error fetching ticket alerts:", error);
       }

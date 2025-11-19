@@ -295,7 +295,12 @@ const PlacementLeadAlert = ({
         >
           <p>
             Follow-up with{' '}
-            <span className="font-medium">{reminderPopup.company}</span> {reminderPopup.urgent ? 'now' : `at ${reminderPopup.time}`}.
+            <span className="font-medium">
+              {reminderPopup.company}
+              {reminderPopup.contactPerson && reminderPopup.contactPerson !== 'N/A' && ` | ${reminderPopup.contactPerson}`}
+              {reminderPopup.contactPhone && reminderPopup.contactPhone !== 'N/A' && ` | ${reminderPopup.contactPhone}`}
+            </span>{' '}
+            {reminderPopup.urgent ? 'now' : `at ${reminderPopup.time}`}.
           </p>
         </AlertBase>
       )}

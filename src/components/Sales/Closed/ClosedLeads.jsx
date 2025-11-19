@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import PropTypes from "prop-types";
 import { FiChevronLeft, FiChevronRight, FiDownload, FiFilter, FiTrendingUp, FiRotateCw } from "react-icons/fi";
-import { collection, getDocs, doc, getDoc, writeBatch } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
 import ClosedLeadsTable from "./ClosedLeadsTable";
 import ClosedLeadsStats from "./ClosedLeadsStats";
@@ -153,7 +153,6 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
     const trainingFormData = cachedData;
 
     // Process all leads using the fetched training form data
-    const closureTypeUpdates = [];
     for (const [id, lead] of Object.entries(leads)) {
       try {
         const projectCode = lead.projectCode;
@@ -176,8 +175,8 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
         const trainingFormDataItem = trainingFormData[docId];
 
         if (trainingFormDataItem) {
-          // Check contract end date and update closureType if needed
-          let updatedClosureType = lead.closureType || "new";
+          // Check contract end date and calculate closureType dynamically
+          let updatedClosureType = "new";
           if (trainingFormDataItem.contractEndDate) {
             const endDate = new Date(trainingFormDataItem.contractEndDate);
             const today = new Date();
@@ -186,16 +185,6 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
 
             if (diffDays <= 90 && diffDays >= 0) {
               updatedClosureType = "renewal";
-            } else {
-              updatedClosureType = "new";
-            }
-
-            // Collect closureType updates for batch processing
-            if (updatedClosureType !== (lead.closureType || "new")) {
-              closureTypeUpdates.push({
-                leadId: id,
-                closureType: updatedClosureType
-              });
             }
           }
 
@@ -209,7 +198,14 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
             netPayableAmount: parseFloat(trainingFormDataItem.netPayableAmount) || lead.totalCost,
             contractEndDate: trainingFormDataItem.contractEndDate || lead.contractEndDate, // 🆕 Add contractEndDate from trainingForms
             contractStartDate: trainingFormDataItem.contractStartDate || lead.contractStartDate, // 🆕 Add contractStartDate from trainingForms
-            closureType: updatedClosureType, // Use the updated closureType
+            closureType: updatedClosureType, // Use the dynamically calculated closureType
+            courses: trainingFormDataItem.courses || lead.courses, // 🆕 Add courses data from trainingForms
+            topics: trainingFormDataItem.topics || lead.topics, // 🆕 Add topics data from trainingForms
+            deliveryType: trainingFormDataItem.deliveryType || lead.deliveryType, // 🆕 Add delivery type
+            course: trainingFormDataItem.course || lead.course, // 🆕 Add course
+            year: trainingFormDataItem.year || lead.year, // 🆕 Add year
+            passingYear: trainingFormDataItem.passingYear || lead.passingYear, // 🆕 Add passing year
+            totalHours: trainingFormDataItem.totalHours || lead.totalHours, // 🆕 Add total hours
           };
         } else {
           // For leads without training forms, calculate totalCost from available data
@@ -230,22 +226,6 @@ const ClosedLeads = ({ leads, viewMyLeadsOnly, currentUser, users, onCountChange
       } catch (error) {
         console.error("Error enriching lead data:", error);
         enriched[id] = lead;
-      }
-    }
-
-    // Batch update closureType changes
-    if (closureTypeUpdates.length > 0) {
-      const batch = writeBatch(db);
-      closureTypeUpdates.forEach(({ leadId, closureType }) => {
-        const leadRef = doc(db, "leads", leadId);
-        batch.update(leadRef, { closureType });
-      });
-
-      try {
-        await batch.commit();
-        console.log(`Successfully updated closureType for ${closureTypeUpdates.length} leads`);
-      } catch (batchError) {
-        console.error("Error batch updating closureType:", batchError);
       }
     }
 

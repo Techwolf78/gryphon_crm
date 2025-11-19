@@ -1,6 +1,77 @@
 import * as XLSX from 'xlsx';
 import { db } from "../firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
+
+// Smart batching utility to find the next available batch number and check existing batches
+const getNextBatchInfo = async () => {
+  try {
+    console.log("🔍 Checking existing batches in Firestore...");
+
+    // Query all batch documents ordered by batch number (assuming batch_1, batch_2, etc.)
+    const batchesQuery = query(collection(db, "companyleads"), orderBy("__name__"));
+    const batchesSnapshot = await getDocs(batchesQuery);
+
+    let highestBatchNumber = 0;
+    let lastBatchData = null;
+    let lastBatchId = null;
+
+    batchesSnapshot.forEach((doc) => {
+      const batchId = doc.id;
+      // Extract batch number from batch_1, batch_2, etc.
+      const match = batchId.match(/^batch_(\d+)$/);
+      if (match) {
+        const batchNum = parseInt(match[1]);
+        if (batchNum > highestBatchNumber) {
+          highestBatchNumber = batchNum;
+          lastBatchId = batchId;
+          lastBatchData = doc.data();
+        }
+      }
+    });
+
+    console.log(`� Found ${highestBatchNumber} existing batches. Last batch: ${lastBatchId}`);
+
+    // Check if the last batch has space (<999 records)
+    let shouldCreateNewBatch = true;
+    let nextBatchNumber = highestBatchNumber + 1;
+
+    if (lastBatchData && lastBatchData.companies) {
+      const lastBatchSize = lastBatchData.companies.length;
+      console.log(`📏 Last batch (${lastBatchId}) has ${lastBatchSize} records`);
+
+      if (lastBatchSize < 999) {
+        // Last batch has space, we can append to it
+        shouldCreateNewBatch = false;
+        nextBatchNumber = highestBatchNumber;
+        console.log(`✅ Will append to existing batch_${nextBatchNumber} (${lastBatchSize}/999 records)`);
+      } else {
+        // Last batch is full, create new batch
+        console.log(`� Last batch is full (${lastBatchSize}/999), will create batch_${nextBatchNumber}`);
+      }
+    } else if (highestBatchNumber === 0) {
+      // No existing batches, start from 1
+      nextBatchNumber = 1;
+      console.log("🆕 No existing batches found, starting from batch_1");
+    }
+
+    return {
+      nextBatchNumber,
+      shouldCreateNewBatch,
+      lastBatchData: shouldCreateNewBatch ? null : lastBatchData,
+      lastBatchId: shouldCreateNewBatch ? null : lastBatchId
+    };
+  } catch (error) {
+    console.error("❌ Error checking existing batches:", error);
+    // If we can't check existing batches, start from batch_1
+    console.log("⚠️ Could not check existing batches, starting from batch_1");
+    return {
+      nextBatchNumber: 1,
+      shouldCreateNewBatch: true,
+      lastBatchData: null,
+      lastBatchId: null
+    };
+  }
+};
 
 // Utility function to handle Firestore index errors
 const handleFirestoreIndexError = (error, operation = "operation") => {
@@ -25,8 +96,6 @@ const handleFirestoreIndexError = (error, operation = "operation") => {
     }
   }
 };
-
-// Complete implementation for uploading 58,000 companies from Excel
 // Requirements:
 // 1. Read Excel file using xlsx library in browser/Node
 // 2. Convert each row to company object with specific structure
@@ -77,6 +146,9 @@ export const uploadCompaniesFromExcel = async (file, onProgress = null, assignee
 
         // 2. Convert each row to company object
         const companies = jsonData.map(row => {
+          const status = row['Status'] || row['status'] || 'cold';
+          const currentTimestamp = new Date().toISOString();
+          
           const company = {
             name: row['CompanyName'] || row['Company Name'] || row['companyName'] || row['company_name'] || '',
             contactPerson: row['ContactPerson'] || row['Contact Person'] || row['contactPerson'] || row['contact_person'] || '',
@@ -91,9 +163,23 @@ export const uploadCompaniesFromExcel = async (file, onProgress = null, assignee
             companySize: row['CompanySize'] || row['Company Size'] || row['companySize'] || row['company_size'] || '',
             source: row['Source'] || row['source'] || 'Excel Upload',
             notes: row['Notes'] || row['notes'] || '',
-            status: row['Status'] || row['status'] || 'cold',
+            status: status.toLowerCase() || 'cold',
             contacts: [], // Initialize empty contacts array
           };
+
+          // Add status-specific timestamp when company is created from Excel
+          const statusLower = status.toLowerCase();
+          if (statusLower === "hot") {
+            company.hotAt = currentTimestamp;
+          } else if (statusLower === "warm") {
+            company.warmAt = currentTimestamp;
+          } else if (statusLower === "cold") {
+            company.coldAt = currentTimestamp;
+          } else if (statusLower === "called") {
+            company.calledAt = currentTimestamp;
+          } else if (statusLower === "onboarded") {
+            company.onboardedAt = currentTimestamp;
+          }
 
           // If assigneeId is provided, assign the company to that user
           if (assigneeId) {
@@ -117,45 +203,88 @@ export const uploadCompaniesFromExcel = async (file, onProgress = null, assignee
 
         console.log(`✨ Encoded ${encodedCompanies.length} companies as Base64 strings`);
 
-        // 4. Split into chunks of 1500 items per batch (under Firestore 1MB limit)
-        const chunkSize = 1500;
-        const chunks = [];
-        for (let i = 0; i < encodedCompanies.length; i += chunkSize) {
-          chunks.push(encodedCompanies.slice(i, i + chunkSize));
+        // 4. Get smart batching information
+        const batchInfo = await getNextBatchInfo();
+        const { nextBatchNumber, shouldCreateNewBatch, lastBatchData, lastBatchId } = batchInfo;
+
+        console.log(`🎯 Smart batching: Starting from batch_${nextBatchNumber}, Create new: ${shouldCreateNewBatch}`);
+
+        // 5. Handle batching logic with batch size limit
+        let batchesToUpload = [];
+        let currentBatchNumber = nextBatchNumber;
+        const chunkSize = 1000; // Batch size limit
+
+        if (!shouldCreateNewBatch && lastBatchData) {
+          // Append to existing batch
+          const existingCompanies = lastBatchData.companies || [];
+          const availableSpace = chunkSize - existingCompanies.length;
+
+          console.log(`📎 Appending to existing batch_${currentBatchNumber} (${existingCompanies.length}/${chunkSize} used, ${availableSpace} available)`);
+
+          // Split new companies to fill existing batch and create new ones if needed
+          const companiesForExistingBatch = encodedCompanies.slice(0, availableSpace);
+          const remainingCompanies = encodedCompanies.slice(availableSpace);
+
+          // Update existing batch with additional companies
+          const updatedBatchData = {
+            companies: [...existingCompanies, ...companiesForExistingBatch]
+          };
+
+          batchesToUpload.push({
+            batchId: lastBatchId,
+            data: updatedBatchData,
+            isUpdate: true
+          });
+
+          // Create additional batches for remaining companies
+          for (let i = 0; i < remainingCompanies.length; i += chunkSize) {
+            currentBatchNumber++;
+            const chunk = remainingCompanies.slice(i, i + chunkSize);
+            batchesToUpload.push({
+              batchId: `batch_${currentBatchNumber}`,
+              data: { companies: chunk },
+              isUpdate: false
+            });
+          }
+        } else {
+          // Create new batches from scratch
+          for (let i = 0; i < encodedCompanies.length; i += chunkSize) {
+            const chunk = encodedCompanies.slice(i, i + chunkSize);
+            batchesToUpload.push({
+              batchId: `batch_${currentBatchNumber}`,
+              data: { companies: chunk },
+              isUpdate: false
+            });
+            currentBatchNumber++;
+          }
         }
 
-        console.log(`📦 Split into ${chunks.length} batches of ${chunkSize} companies each`);
+        console.log(`📦 Prepared ${batchesToUpload.length} batch operations (${batchesToUpload.filter(b => b.isUpdate).length} updates, ${batchesToUpload.filter(b => !b.isUpdate).length} new) with ${chunkSize} companies per batch`);
 
-        // 5-6. Upload each batch to Firestore collection 'companies'
-        const totalBatches = chunks.length;
+        // 6. Upload batches
+        const totalBatches = batchesToUpload.length;
         let uploadedBatches = 0;
 
-        for (let i = 0; i < chunks.length; i++) {
-          const batchId = `batch_${i + 1}`;
-          const chunk = chunks[i];
-
-          // Create document data
-          const batchData = {
-            companies: chunk
-          };
+        for (const batch of batchesToUpload) {
+          const { batchId, data, isUpdate } = batch;
 
           let retryCount = 0;
           const maxRetries = 3;
 
           while (retryCount <= maxRetries) {
             try {
-              // 6. Use setDoc for each batch
-              await setDoc(doc(db, "companyleads", batchId), batchData);
+              // Use setDoc for both new batches and updates
+              await setDoc(doc(db, "companyleads", batchId), data);
               break; // Success, exit retry loop
             } catch (error) {
               retryCount++;
               if (retryCount > maxRetries) {
-                console.error(`❌ Failed to upload ${batchId} after ${maxRetries} retries:`, error);
+                console.error(`❌ Failed to ${isUpdate ? 'update' : 'upload'} ${batchId} after ${maxRetries} retries:`, error);
                 throw error; // Re-throw to stop the entire upload
               }
-              
+
               const delay = Math.pow(2, retryCount) * 1000; // Exponential backoff: 1s, 2s, 4s
-              console.log(`⚠️ Upload failed for ${batchId}, retrying in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
+              console.log(`⚠️ ${isUpdate ? 'Update' : 'Upload'} failed for ${batchId}, retrying in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
               await new Promise(resolve => setTimeout(resolve, delay));
             }
           }
@@ -168,11 +297,12 @@ export const uploadCompaniesFromExcel = async (file, onProgress = null, assignee
             onProgress(progressPercent);
           }
 
-          // 7. Log upload progress
-          console.log(`✅ Uploaded ${batchId} (${chunk.length} records) - ${uploadedBatches}/${totalBatches} batches complete`);
+          // Log upload progress
+          const recordCount = data.companies.length;
+          console.log(`${isUpdate ? '🔄 Updated' : '✅ Uploaded'} ${batchId} (${recordCount} records) - ${uploadedBatches}/${totalBatches} batches complete`);
 
           // Add delay between batches to prevent overwhelming Firestore write stream
-          if (i < chunks.length - 1) { // Don't delay after the last batch
+          if (uploadedBatches < totalBatches) { // Don't delay after the last batch
             console.log(`⏳ Waiting 2000ms before next batch...`);
             await new Promise(resolve => setTimeout(resolve, 2000));
           }
@@ -182,7 +312,11 @@ export const uploadCompaniesFromExcel = async (file, onProgress = null, assignee
         resolve({
           totalCompanies: encodedCompanies.length,
           totalBatches,
-          batchSize: chunkSize
+          batchSize: chunkSize,
+          smartBatching: true,
+          batchesUpdated: batchesToUpload.filter(b => b.isUpdate).length,
+          batchesCreated: batchesToUpload.filter(b => !b.isUpdate).length,
+          originalCompaniesCount: companies.length
         });
 
       } catch (error) {

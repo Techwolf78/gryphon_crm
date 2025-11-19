@@ -953,7 +953,7 @@ useEffect(() => {
   if (!lead) return null;
 
   return (
-    <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-[100] p-2">
+    <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-100 p-2">
       {/* Confirmation Dialog */}
       {showConfirmation && (
         <div className="fixed inset-0  bg-opacity-30 backdrop-blur-sm flex items-center justify-center z-60">
@@ -998,7 +998,7 @@ useEffect(() => {
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col relative">
         {/* Loading Overlay */}
         {loading && (
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-indigo-100 bg-opacity-95 backdrop-blur-md flex items-center justify-center z-50 rounded-xl border-2 border-blue-200">
+          <div className="absolute inset-0 bg-linear-to-br from-blue-50 to-indigo-100 bg-opacity-95 backdrop-blur-md flex items-center justify-center z-50 rounded-xl border-2 border-blue-200">
             <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center max-w-sm mx-4">
               <div className="relative mb-4">
                 <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
@@ -1008,7 +1008,7 @@ useEffect(() => {
               <p className="text-sm text-gray-600 text-center">Please wait while we process your request...</p>
               <div className="mt-4 w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                 <div 
-                  className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-full transition-all duration-300 ease-out"
+                  className="bg-linear-to-r from-blue-500 to-indigo-600 h-2 rounded-full transition-all duration-300 ease-out"
                   style={{width: `${Math.min(progress, 100)}%`}}
                 ></div>
               </div>
@@ -1016,7 +1016,7 @@ useEffect(() => {
           </div>
         )}
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-3">
+        <div className="bg-linear-to-r from-blue-600 to-blue-800 text-white p-3">
           <div className="flex justify-between items-center mb-2">
             <h2 className="text-lg font-semibold">Edit Lead Details</h2>
             <span className="text-blue-100 text-xs">
@@ -1028,7 +1028,7 @@ useEffect(() => {
               </span>
               <button
                 onClick={onClose}
-                className="text-blue-100 hover:text-white transition-colors p-1 rounded-full flex-shrink-0"
+                className="text-blue-100 hover:text-white transition-colors p-1 rounded-full shrink-0"
                 disabled={loading}
               >
                 <FiX className="h-4 w-4" />
@@ -1054,7 +1054,7 @@ useEffect(() => {
               <button
                 key={section}
                 onClick={() => setActiveSection(section)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-t-md transition-colors whitespace-nowrap flex-shrink-0 ${
+                className={`px-3 py-1.5 text-xs font-medium rounded-t-md transition-colors whitespace-nowrap shrink-0 ${
                   activeSection === section
                     ? "bg-white text-blue-800"
                     : "text-blue-200 hover:text-white hover:bg-blue-700"

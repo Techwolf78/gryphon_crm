@@ -52,6 +52,7 @@ const Help = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshClicks, setRefreshClicks] = useState([]);
   const [rateLimitCountdown, setRateLimitCountdown] = useState(0);
+  const [users, setUsers] = useState([]);
  
  
  
@@ -59,6 +60,7 @@ const Help = () => {
     title: "",
     description: "",
     priority: "medium",
+    onBehalfOf: "",
   });
  
   const isAdmin = user?.department === "Admin";
@@ -150,6 +152,7 @@ const Help = () => {
         status: "not-resolved",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+        onBehalfOf: ticketForm.onBehalfOf || null,
       });
  
       // Send email using EmailJS
@@ -173,6 +176,7 @@ const Help = () => {
               minute: "2-digit",
             }),
             year: new Date().getFullYear(),
+            on_behalf_of: ticketForm.onBehalfOf || "N/A",
             // reply_to should match your EmailJS template settings
             reply_to: user.email,
           },
@@ -199,6 +203,7 @@ const Help = () => {
         title: "",
         description: "",
         priority: "medium",
+        onBehalfOf: "",
       });
       setShowTicketForm(false);
       fetchTickets();
@@ -212,43 +217,59 @@ const Help = () => {
  
   const fetchTickets = useCallback(async () => {
     try {
-      let q;
+      let ticketsData = [];
       if (isAdmin) {
-        q = query(collection(db, "tickets"), orderBy("createdAt", "desc"));
+        const q = query(collection(db, "tickets"), orderBy("createdAt", "desc"));
+        const querySnapshot = await getDocs(q);
+        ticketsData = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+          createdAt: doc.data().createdAt?.toDate() || new Date(),
+        }));
       } else {
-        q = query(
-          collection(db, "tickets"),
-          where("createdBy", "==", user.email),
-          orderBy("createdAt", "desc")
-        );
+        // Fetch tickets created by user
+        const q1 = query(collection(db, "tickets"), where("createdBy", "==", user.email));
+        const snapshot1 = await getDocs(q1);
+        const tickets1 = snapshot1.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+          createdAt: doc.data().createdAt?.toDate() || new Date(),
+        }));
+
+        // Fetch tickets raised on behalf of user
+        const q2 = query(collection(db, "tickets"), where("onBehalfOf", "==", user.email));
+        const snapshot2 = await getDocs(q2);
+        const tickets2 = snapshot2.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+          createdAt: doc.data().createdAt?.toDate() || new Date(),
+        }));
+
+        // Combine and sort by createdAt descending
+        ticketsData = [...tickets1, ...tickets2].sort((a, b) => b.createdAt - a.createdAt);
       }
- 
-      const querySnapshot = await getDocs(q);
- 
-      // This is a valid empty state - no need to show error
-      if (querySnapshot.empty) {
-        setTickets([]);
-        return;
-      }
- 
-      const ticketsData = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        // Convert Firestore timestamp to JS Date
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-      }));
+
       setTickets(ticketsData);
     } catch (error) {
- 
-      // Only show toast for actual errors, not empty collections
       if (error.code !== "permission-denied") {
-        // You might want to handle permission errors differently
         toast.error("Failed to load tickets");
       }
     }
   }, [isAdmin, user?.email]);
- 
-  const updateTicketStatus = async (ticketId, status) => {
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "users"));
+      const usersData = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setUsers(usersData);
+    } catch (error) {
+      console.error("Failed to fetch users:", error);
+      toast.error("Failed to load users");
+    }
+  }, []);  const updateTicketStatus = async (ticketId, status) => {
     try {
       const ticketRef = doc(db, "tickets", ticketId);
       await updateDoc(ticketRef, {
@@ -283,8 +304,11 @@ const Help = () => {
   useEffect(() => {
     if (user) {
       fetchTickets();
+      if (isAdmin) {
+        fetchUsers();
+      }
     }
-  }, [user, fetchTickets]);
+  }, [user, fetchTickets, isAdmin, fetchUsers]);
 
   // Update countdown timer for rate limiting
   useEffect(() => {
@@ -352,7 +376,7 @@ const Help = () => {
   ];
  
   return (
-    <div className="min-h-screen bg-gray-50/50 py-2">
+    <div className="min-h-screen bg-gray-50/50 ">
       {/* Under Development Popup */}
       {showPopup && (
         <div className="fixed inset-0 bg-gray-900/70 backdrop-blur-sm flex items-center justify-center z-54 p-4 animate-fadeIn">
@@ -702,6 +726,26 @@ const Help = () => {
                     placeholder="your@email.com"
                   />
                 </div>
+                {isAdmin && (
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Raise on behalf of (optional)
+                    </label>
+                    <select
+                      name="onBehalfOf"
+                      value={ticketForm.onBehalfOf}
+                      onChange={handleTicketFormChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Select user...</option>
+                      {users.map((u) => (
+                        <option key={u.email} value={u.email}>
+                          {u.name} ({u.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="mb-3">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Title
@@ -810,7 +854,7 @@ const Help = () => {
               </div>
  
               <div className="flex items-center text-sm text-gray-500 mb-4">
-                <span>Created by: {activeTicket.createdBy}</span>
+                <span>Created by: {activeTicket.onBehalfOf || activeTicket.createdBy}</span>
                 <span className="mx-2">•</span>
                 <span>
                   Status:
@@ -880,8 +924,8 @@ const Help = () => {
  
       <div className="w-full">
         {/* Header aligned left */}
-        <div className="mb-3">
-          <div className="inline-flex items-center justify-start bg-linear-to-br from-blue-100 to-indigo-100 rounded-lg p-2 mb-1 shadow-sm border border-white">
+        <div className="mb-2">
+          <div className="inline-flex items-center justify-start bg-linear-to-br from-blue-100 to-indigo-100 rounded-lg p-1 mb-1 shadow-sm border border-white">
             <FiHelpCircle className="text-blue-600 w-4 h-4" />
           </div>
           <h1 className="text-lg sm:text-xl font-bold text-gray-900 mb-1 leading-tight">
@@ -1007,7 +1051,7 @@ const Help = () => {
                   </td>
                   {isAdmin && (
                     <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
-                      {ticket.createdBy}
+                      {ticket.onBehalfOf || ticket.createdBy}
                     </td>
                   )}
                   <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">

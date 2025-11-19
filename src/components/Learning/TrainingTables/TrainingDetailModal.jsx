@@ -41,7 +41,7 @@ const TrainingDetailModal = ({ training, onClose }) => {
         className="bg-white rounded-2xl w-full max-w-4xl max-h-[95vh] overflow-hidden shadow-2xl border border-gray-100 animate-slideUp transform transition-all duration-300"
       >
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-3 py-2 flex justify-between items-center sticky top-0 z-10">
+        <div className="bg-linear-to-r from-blue-600 to-blue-700 px-3 py-2 flex justify-between items-center sticky top-0 z-10">
           <div className="flex items-center space-x-2">
             <div className="p-1 rounded-lg bg-white/10 backdrop-blur-sm">
               <IoIosSchool className="text-white text-lg" />
@@ -77,7 +77,7 @@ const TrainingDetailModal = ({ training, onClose }) => {
             title="Institution Details"
             icon={<IoMdBusiness className="text-blue-500" />}
             badge={`${training?.collegeCode || 'No Code'}`}
-            className="bg-gradient-to-br from-blue-50 to-blue-50/70"
+            className="bg-linear-to-br from-blue-50 to-blue-50/70"
           >
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
               <DetailCard label="College Name" value={training?.collegeName} iconColor="text-blue-400" />
@@ -94,7 +94,7 @@ const TrainingDetailModal = ({ training, onClose }) => {
           <ModernSection
             title="Contact Information"
             icon={<MdPeople className="text-purple-500" />}
-            className="bg-gradient-to-br from-purple-50 to-purple-50/70"
+            className="bg-linear-to-br from-purple-50 to-purple-50/70"
           >
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
               <ContactCard
@@ -129,7 +129,7 @@ const TrainingDetailModal = ({ training, onClose }) => {
             title="Program Details"
             icon={<IoIosSchool className="text-green-500" />}
             badge={`${training?.studentCount || '0'} Students`}
-            className="bg-gradient-to-br from-green-50 to-green-50/70"
+            className="bg-linear-to-br from-green-50 to-green-50/70"
           >
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
               <DetailCard label="Course" value={training?.course} iconColor="text-green-400" />
@@ -138,32 +138,37 @@ const TrainingDetailModal = ({ training, onClose }) => {
               <DetailCard label="Passing Year" value={training?.passingYear} iconColor="text-green-400" />
 
               {/* Course Specializations Table */}
-              {training?.courses?.length > 0 && (
-                <div className="col-span-full mt-2">
-                  <h4 className="font-medium text-gray-700 mb-3 flex items-center gap-2">
-                    <IoIosSchool className="text-green-500" />
-                    Course Specializations
-                  </h4>
-                  <div className="border rounded-xl overflow-hidden border-gray-200">
-                    <table className="w-full text-sm">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="text-left px-3 py-2 font-medium text-gray-600">Specialization</th>
-                          <th className="text-left px-3 py-2 font-medium text-gray-600">Students</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {training.courses.map((course, index) => (
+              <div className="col-span-full mt-2">
+                <h4 className="font-medium text-gray-700 mb-3 flex items-center gap-2">
+                  <IoIosSchool className="text-green-500" />
+                  Course Specializations
+                </h4>
+                <div className="border rounded-xl overflow-hidden border-gray-200">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="text-left px-3 py-2 font-medium text-gray-600">Specialization</th>
+                        <th className="text-left px-3 py-2 font-medium text-gray-600">Students</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {training.courses && training.courses.length > 0 ? (
+                        training.courses.map((course, index) => (
                           <tr key={index} className="hover:bg-gray-50 transition-colors">
                             <td className="px-3 py-2">{course.specialization || 'N/A'}</td>
                             <td className="px-3 py-2 font-medium">{course.students || 'N/A'}</td>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        ))
+                      ) : (
+                        <tr className="hover:bg-gray-50 transition-colors">
+                          <td className="px-3 py-2">N/A</td>
+                          <td className="px-3 py-2 font-medium">N/A</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
-              )}
+              </div>
               <DetailCard label="Total Students" value={training?.studentCount} iconColor="text-green-400" />
               <DetailCard label="Total Hours" value={training?.totalHours} iconColor="text-green-400" />
               <DetailCard
@@ -209,7 +214,7 @@ const TrainingDetailModal = ({ training, onClose }) => {
             title="Financial Information"
             icon={<FaRupeeSign className="text-amber-500" />}
             badge={formatCurrency(training?.netPayableAmount || training?.totalCost)}
-            className="bg-gradient-to-br from-amber-50 to-amber-50/70"
+            className="bg-linear-to-br from-amber-50 to-amber-50/70"
           >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               <DetailCard
@@ -257,7 +262,7 @@ const TrainingDetailModal = ({ training, onClose }) => {
             title="Contract Details"
             icon={<FaFilePdf className="text-red-500" />}
             badge={training?.mouFileUrl ? "MOU Uploaded" : "No MOU"}
-            className="bg-gradient-to-br from-red-50 to-red-50/70"
+            className="bg-linear-to-br from-red-50 to-red-50/70"
           >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               <DetailCard

@@ -17,12 +17,12 @@ const BudgetOverview = ({
 
   if (!departmentBudget)
     return (
-      <div className="text-center py-12">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-8 max-w-md mx-auto">
-          <h3 className="text-lg font-semibold text-yellow-800 mb-2">
+      <div className="text-center py-8">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 max-w-md mx-auto">
+          <h3 className="text-base font-semibold text-yellow-800 mb-1.5">
             No Budget Created
           </h3>
-          <p className="text-yellow-700 mb-4">
+          <p className="text-yellow-700 mb-3 text-sm">
             Create a budget to start tracking expenses and purchase intents.
           </p>
         </div>
@@ -136,9 +136,9 @@ const BudgetOverview = ({
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         {[
           {
             title: "Total Budget",
@@ -167,19 +167,19 @@ const BudgetOverview = ({
         ].map(({ title, value, icon: Icon, color }) => (
           <div
             key={title}
-            className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm"
+            className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">{title}</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-xs text-gray-600">{title}</p>
+                <p className="text-lg font-bold text-gray-900">
                   {typeof value === "number"
                     ? `₹${value.toLocaleString("en-IN")}`
                     : value}
                 </p>
               </div>
-              <div className={`p-3 rounded-lg ${color}`}>
-                <Icon className="w-6 h-6" />
+              <div className={`p-2 rounded-lg ${color}`}>
+                <Icon className="w-5 h-5" />
               </div>
             </div>
           </div>
@@ -187,7 +187,7 @@ const BudgetOverview = ({
       </div>
 
       {/* Distribution */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <SummaryCard
           label="Fixed Costs"
           amount={totalFixed}
@@ -202,17 +202,17 @@ const BudgetOverview = ({
       </div>
 
       {/* Interactive Chart */}
-      <div className="bg-white border border-gray-200 rounded-xl p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-base font-semibold text-gray-900">
             Budget Visualization
           </h3>
-          <div className="flex gap-2">
+          <div className="flex gap-1.5">
             {["pie", "bar"].map((mode) => (
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
-                className={`px-3 py-2 rounded-lg text-sm font-medium ${
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-medium ${
                   viewMode === mode
                     ? "bg-blue-500 text-white"
                     : "bg-gray-100 text-gray-700"
@@ -225,17 +225,17 @@ const BudgetOverview = ({
         </div>
         <div
           id="budgetChartContainer"
-          className="w-full h-[400px]"
+          className="w-full h-[350px]"
           ref={chartRef}
         ></div>
       </div>
 
       {/* Detailed Utilization List */}
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-6">
-        <h4 className="text-lg font-semibold mb-3">Detailed Utilization</h4>
-        <div className="space-y-2">
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+        <h4 className="text-base font-semibold mb-2">Detailed Utilization</h4>
+        <div className="space-y-1.5">
           {allItems.map((item) => (
-            <div key={item.id} className="flex justify-between text-sm">
+            <div key={item.id} className="flex justify-between text-xs">
               <span>{item.label}</span>
               <span
                 className={`font-semibold ${getColor(item.utilizationRate)}`}
@@ -251,9 +251,9 @@ const BudgetOverview = ({
 };
 
 const SummaryCard = ({ label, amount, color }) => (
-  <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-    <p className={`text-sm font-medium ${color}`}>{label}</p>
-    <p className="text-xl font-bold text-gray-900">
+  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+    <p className={`text-xs font-medium ${color}`}>{label}</p>
+    <p className="text-lg font-bold text-gray-900">
       ₹{amount.toLocaleString("en-IN")}
     </p>
   </div>

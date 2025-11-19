@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { XIcon, PencilIcon, EyeIcon, PlusIcon } from "@heroicons/react/outline";
 import { useAuth } from "../../../context/AuthContext";
+import { toast } from "react-toastify";
 
 const statusOptions = [
   "Hot",
@@ -14,7 +15,8 @@ const LeadViewEditModal = ({
   onClose,
   onAddContact,
   onUpdateLead,
-  formatDate
+  formatDate,
+  allUsers = {}
 }) => {
   const { user } = useAuth();
   const [mode, setMode] = useState('view'); // 'view' or 'edit'
@@ -105,7 +107,19 @@ const LeadViewEditModal = ({
       return 'ME'; // Fallback to ME if no display name
     }
     
-    // For other users, show "OT" (Other) since we don't have their display names
+    // For other users, try to get initials from allUsers data
+    const assignedUser = Object.values(allUsers).find(u => u.uid === assignedTo || u.id === assignedTo);
+    if (assignedUser?.displayName || assignedUser?.name) {
+      const displayName = assignedUser.displayName || assignedUser.name;
+      const names = displayName.trim().split(' ');
+      if (names.length >= 2) {
+        return (names[0][0] + names[names.length - 1][0]).toUpperCase();
+      } else if (names.length === 1) {
+        return names[0].substring(0, 2).toUpperCase();
+      }
+    }
+    
+    // Fallback to "OT" if user data not found
     return 'OT';
   };
 
@@ -156,9 +170,7 @@ const LeadViewEditModal = ({
         }
         break;
       case "companySize":
-        if (!value.trim()) {
-          error = "Company size is required";
-        } else if (!validateCompanySize(value)) {
+        if (value.trim() && !validateCompanySize(value)) {
           error = "Company size must be between 1-100,000";
         }
         break;
@@ -171,7 +183,7 @@ const LeadViewEditModal = ({
         if (!value.trim()) error = "POC name is required";
         break;
       case "workingSince":
-        if (!value) error = "Working since date is required";
+        // Optional field - no validation required
         break;
       case "pocLocation":
         if (!value.trim()) error = "POC location is required";
@@ -188,12 +200,13 @@ const LeadViewEditModal = ({
           error = "Please enter a valid email address";
         }
         break;
+      case "pocDesignation":
+        // Optional field - no validation required
+        break;
       case "pocLinkedin":
         if (value && !validateLinkedIn(value)) {
           error = "Please enter a valid LinkedIn URL";
         }
-        break;
-      default:
         break;
     }
     
@@ -232,7 +245,17 @@ const LeadViewEditModal = ({
   const handleAddContactInternal = async () => {
     try {
       if (!newContact.name) {
-        alert('Contact name is required');
+        toast.error('Contact name is required', {
+          position: "bottom-left",
+          autoClose: 3000,
+          hideProgressBar: true,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: false,
+          theme: "light",
+          className: "text-sm font-medium",
+          bodyClassName: "text-sm"
+        });
         return;
       }
 
@@ -249,11 +272,48 @@ const LeadViewEditModal = ({
       if (!lead.groupId) {
         // For leads without groupId, add to the lead's contacts array
         if (onAddContact) {
-          onAddContact(lead.id, contactData);
+          const result = await onAddContact(lead.id, contactData);
+          if (result && result.success) {
+            toast.success('Contact added successfully!', {
+              position: "bottom-left",
+              autoClose: 3000,
+              hideProgressBar: true,
+              closeOnClick: true,
+              pauseOnHover: true,
+              draggable: false,
+              theme: "light",
+              className: "text-sm font-medium",
+              bodyClassName: "text-sm"
+            });
+          } else {
+            toast.error(`Failed to add contact: ${result?.error || 'Unknown error'}`, {
+              position: "bottom-left",
+              autoClose: 3000,
+              hideProgressBar: true,
+              closeOnClick: true,
+              pauseOnHover: true,
+              draggable: false,
+              theme: "light",
+              className: "text-sm font-medium",
+              bodyClassName: "text-sm"
+            });
+            return;
+          }
         }
       } else {
         // Handle group-based contacts if needed
-        alert('Group-based contact addition not implemented yet');
+        toast.error('Group-based contact addition not implemented yet', {
+          position: "bottom-left",
+          autoClose: 3000,
+          hideProgressBar: true,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: false,
+          theme: "light",
+          className: "text-sm font-medium",
+          bodyClassName: "text-sm"
+        });
+        return;
       }
 
       setNewContact({
@@ -267,13 +327,23 @@ const LeadViewEditModal = ({
       setShowAddContactForm(false);
     } catch (error) {
       console.error('Error adding contact:', error);
-      alert('Failed to add contact. Please try again.');
+      toast.error('Failed to add contact. Please try again.', {
+        position: "bottom-left",
+        autoClose: 3000,
+        hideProgressBar: true,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: false,
+        theme: "light",
+        className: "text-sm font-medium",
+        bodyClassName: "text-sm"
+      });
     }
   };
 
-  const handleSaveChanges = () => {
+  const handleSaveChanges = async () => {
     // Validate all required fields
-    const requiredFields = ['companyName', 'industry', 'companySize', 'pocName', 'workingSince', 'pocLocation', 'pocPhone', 'pocDesignation'];
+    const requiredFields = ['companyName', 'industry', 'pocName', 'pocLocation', 'pocPhone'];
     let hasErrors = false;
 
     requiredFields.forEach(field => {
@@ -287,7 +357,17 @@ const LeadViewEditModal = ({
     const hasValidationErrors = Object.values(validationErrors).some(error => error !== '');
 
     if (hasErrors || hasValidationErrors) {
-      alert('Please fill all required fields and correct validation errors');
+      toast.error('Please fill all required fields and correct validation errors', {
+        position: "bottom-left",
+        autoClose: 3000,
+        hideProgressBar: true,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: false,
+        theme: "light",
+        className: "text-sm font-medium",
+        bodyClassName: "text-sm"
+      });
       return;
     }
 
@@ -308,12 +388,52 @@ const LeadViewEditModal = ({
       updatedAt: new Date().toISOString(),
     };
 
-    if (onUpdateLead) {
-      onUpdateLead(lead.id, updatedData);
+    try {
+      if (onUpdateLead) {
+        const result = await onUpdateLead(lead.id, updatedData);
+        if (result && result.success) {
+          setHasUnsavedChanges(false);
+          setMode('view');
+          // Show success message
+          toast.success('Company details updated successfully!', {
+            position: "bottom-left",
+            autoClose: 3000,
+            hideProgressBar: true,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: false,
+            theme: "light",
+            className: "text-sm font-medium",
+            bodyClassName: "text-sm"
+          });
+        } else {
+          toast.error(`Failed to update company: ${result?.error || 'Unknown error'}`, {
+            position: "bottom-left",
+            autoClose: 3000,
+            hideProgressBar: true,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: false,
+            theme: "light",
+            className: "text-sm font-medium",
+            bodyClassName: "text-sm"
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error saving changes:', error);
+      toast.error('Failed to update company. Please try again.', {
+        position: "bottom-left",
+        autoClose: 3000,
+        hideProgressBar: true,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: false,
+        theme: "light",
+        className: "text-sm font-medium",
+        bodyClassName: "text-sm"
+      });
     }
-
-    setHasUnsavedChanges(false);
-    setMode('view');
   };
 
   const handleClose = () => {
@@ -712,7 +832,10 @@ const LeadViewEditModal = ({
                       </span>
                       <span className="text-gray-900 text-sm">
                         {lead.assignedTo === user?.uid ? 'You' : 
-                         lead.assignedTo ? 'Other User' : 'Unassigned'}
+                         (() => {
+                           const assignedUser = Object.values(allUsers).find(u => u.uid === lead.assignedTo || u.id === lead.assignedTo);
+                           return assignedUser ? (assignedUser.displayName || assignedUser.name || 'Unknown User') : 'Unassigned';
+                         })()}
                       </span>
                     </div>
                   </div>
@@ -784,7 +907,7 @@ const LeadViewEditModal = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-0.5">
-                    Company Size <span className="text-red-500">*</span>
+                    Company Size
                   </label>
                   <input
                     type="number"
@@ -794,7 +917,6 @@ const LeadViewEditModal = ({
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                       validationErrors.companySize && touchedFields.companySize ? 'border-red-500' : 'border-gray-300'
                     }`}
-                    required
                   />
                   {validationErrors.companySize && touchedFields.companySize && (
                     <span className="text-red-500 text-xs mt-1">{validationErrors.companySize}</span>
@@ -835,7 +957,7 @@ const LeadViewEditModal = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-0.5">
-                    Working Since <span className="text-red-500">*</span>
+                    Working Since
                   </label>
                   <input
                     type="date"
@@ -844,7 +966,6 @@ const LeadViewEditModal = ({
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                       validationErrors.workingSince && touchedFields.workingSince ? 'border-red-500' : 'border-gray-300'
                     }`}
-                    required
                   />
                   {validationErrors.workingSince && touchedFields.workingSince && (
                     <span className="text-red-500 text-xs mt-1">{validationErrors.workingSince}</span>
@@ -904,7 +1025,7 @@ const LeadViewEditModal = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-0.5">
-                    POC Designation <span className="text-red-500">*</span>
+                    POC Designation
                   </label>
                   <select
                     value={editData.pocDesignation}
@@ -912,7 +1033,6 @@ const LeadViewEditModal = ({
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                       validationErrors.pocDesignation && touchedFields.pocDesignation ? 'border-red-500' : 'border-gray-300'
                     }`}
-                    required
                   >
                     <option value="">Select Designation</option>
                     {designationOptions.map((option) => (
@@ -974,9 +1094,10 @@ const LeadViewEditModal = ({
               </button>
               <button
                 onClick={handleSaveChanges}
-                disabled={!editData.companyName.trim() || !editData.pocName.trim()}
+                disabled={!editData.companyName.trim() || !editData.pocName.trim() || !hasUnsavedChanges}
+                title={!hasUnsavedChanges ? "No new changes to save" : ""}
                 className={`px-4 py-1.5 rounded-lg text-sm font-medium text-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-200 backdrop-blur-sm border border-green-200/50 ${
-                  editData.companyName.trim() && editData.pocName.trim()
+                  editData.companyName.trim() && editData.pocName.trim() && hasUnsavedChanges
                     ? "bg-green-100/80 hover:bg-green-200/90 shadow-lg hover:shadow-xl"
                     : "bg-gray-100/50 cursor-not-allowed text-gray-400"
                 }`}

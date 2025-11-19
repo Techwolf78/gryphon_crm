@@ -9,18 +9,79 @@ const statusColorMap = {
   onboarded: "text-green-600 hover:bg-green-50",
 };
 
+const statusBgColorMap = {
+  hot: { bg: "from-red-50 to-red-100", border: "border-red-200", hover: "hover:from-red-100 hover:to-red-200", icon: "bg-red-600", leftBorder: "border-l-red-200" },
+  warm: { bg: "from-orange-50 to-orange-100", border: "border-orange-200", hover: "hover:from-orange-100 hover:to-orange-200", icon: "bg-orange-600", leftBorder: "border-l-orange-200" },
+  cold: { bg: "from-blue-50 to-blue-100", border: "border-blue-200", hover: "hover:from-blue-100 hover:to-blue-200", icon: "bg-blue-600", leftBorder: "border-l-blue-200" },
+  called: { bg: "from-purple-50 to-purple-100", border: "border-purple-200", hover: "hover:from-purple-100 hover:to-purple-200", icon: "bg-purple-600", leftBorder: "border-l-purple-200" },
+  onboarded: { bg: "from-green-50 to-green-100", border: "border-green-200", hover: "hover:from-green-100 hover:to-green-200", icon: "bg-green-600", leftBorder: "border-l-green-200" },
+};
+
 function LeadsTable({
   leads,
+  groupedLeads,
+  activeTab,
   onLeadClick,
   onStatusChange,
   onScheduleMeeting,
   onDeleteLead,
+  onAssignLead,
   currentUserId,
   currentUser,
+  allUsers,
+  formatDate, // Add formatDate prop
 }) {
   const [dropdownOpen, setDropdownOpen] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [assignSubmenuOpen, setAssignSubmenuOpen] = useState(null);
+  const [currentPage, setCurrentPage] = useState(() => {
+    const saved = localStorage.getItem("leadsTableCurrentPage");
+    return saved ? parseInt(saved, 10) : 1;
+  });
+
   const itemsPerPage = 100; // Show 100 items per page for better performance
+
+  // Persist current page changes
+  useEffect(() => {
+    localStorage.setItem("leadsTableCurrentPage", currentPage.toString());
+  }, [currentPage]);
+
+  // Reset page to 1 if current page is invalid (e.g., after filtering or data changes)
+  useEffect(() => {
+    const totalPages = groupedLeads ? 1 : Math.ceil(leads.length / itemsPerPage);
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1);
+    }
+  }, [leads.length, groupedLeads, currentPage, itemsPerPage]);
+
+  // State for date group pagination
+  const [dateGroupPage, setDateGroupPage] = useState({});
+  const itemsPerDateGroup = 20; // Show 20 items per date group for performance
+
+  // State for tracking expanded/collapsed date groups
+  const [expandedDates, setExpandedDates] = useState(() => {
+    if (!groupedLeads) return {};
+    
+    const today = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+    
+    // Only expand current date by default, collapse all others
+    const initialState = {};
+    Object.keys(groupedLeads).forEach(date => {
+      initialState[date] = date === today;
+    });
+    return initialState;
+  });
+
+  // Function to toggle date group expansion
+  const toggleDateExpansion = useCallback((date) => {
+    setExpandedDates(prev => ({
+      ...prev,
+      [date]: !prev[date]
+    }));
+  }, []);
 
   // Function to get initials from display name
   const getInitials = (assignedTo, currentUserId, currentUser) => {
@@ -39,17 +100,111 @@ function LeadsTable({
       return 'ME'; // Fallback to ME if no display name
     }
     
-    // For other users, show "OT" (Other) since we don't have their display names
+    // For other users, try to get initials from allUsers data
+    const assignedUser = Object.values(allUsers).find(u => u.uid === assignedTo || u.id === assignedTo);
+    if (assignedUser?.displayName || assignedUser?.name) {
+      const displayName = assignedUser.displayName || assignedUser.name;
+      const names = displayName.trim().split(' ');
+      if (names.length >= 2) {
+        return (names[0][0] + names[names.length - 1][0]).toUpperCase();
+      } else if (names.length === 1) {
+        return names[0].substring(0, 2).toUpperCase();
+      }
+    }
+    
+    // Fallback to "OT" if user data not found
     return 'OT';
+  };
+
+  // Function to get the latest follow-up remark
+  const getLatestRemark = (lead) => {
+    if (!lead.followups || lead.followups.length === 0) {
+      return 'No remarks';
+    }
+
+    // Sort followups by date and time (most recent first)
+    const sortedFollowups = [...lead.followups].sort((a, b) => {
+      const dateA = new Date(`${a.date}T${a.time || '00:00'}`);
+      const dateB = new Date(`${b.date}T${b.time || '00:00'}`);
+      return dateB - dateA;
+    });
+
+    // Return the remarks of the most recent follow-up
+    return sortedFollowups[0].remarks || 'No remarks';
+  };
+
+  // Helper functions to concatenate contact information
+  const getAllContactNames = (lead) => {
+    const names = [];
+    if (lead.pocName && lead.pocName.trim()) names.push(lead.pocName.trim());
+    if (lead.contacts && lead.contacts.length > 0) {
+      lead.contacts.forEach(contact => {
+        if (contact.name && contact.name.trim()) names.push(contact.name.trim());
+      });
+    }
+    return names.length > 0 ? names.join(', ') : 'N/A';
+  };
+
+  const getAllDesignations = (lead) => {
+    const designations = [];
+    if (lead.pocDesignation && lead.pocDesignation.trim()) designations.push(lead.pocDesignation.trim());
+    if (lead.contacts && lead.contacts.length > 0) {
+      lead.contacts.forEach(contact => {
+        if (contact.designation && contact.designation.trim()) designations.push(contact.designation.trim());
+      });
+    }
+    return designations.length > 0 ? designations.join(', ') : 'N/A';
+  };
+
+  const getAllPhones = (lead) => {
+    const phones = [];
+    if (lead.pocPhone && lead.pocPhone.toString().trim()) phones.push(lead.pocPhone.toString().trim());
+    if (lead.contacts && lead.contacts.length > 0) {
+      lead.contacts.forEach(contact => {
+        if (contact.phone && contact.phone.toString().trim()) phones.push(contact.phone.toString().trim());
+      });
+    }
+    return phones.length > 0 ? phones.join(', ') : 'N/A';
+  };
+
+  const getAllEmails = (lead) => {
+    const emails = [];
+    if (lead.pocMail && lead.pocMail.trim()) emails.push(lead.pocMail.trim());
+    if (lead.contacts && lead.contacts.length > 0) {
+      lead.contacts.forEach(contact => {
+        if (contact.email && contact.email.trim()) emails.push(contact.email.trim());
+      });
+    }
+    return emails.length > 0 ? emails.join(', ') : 'N/A';
+  };
+
+  const getAllLinkedIns = (lead) => {
+    const linkedins = [];
+    if (lead.pocLinkedin && lead.pocLinkedin.trim()) linkedins.push(lead.pocLinkedin.trim());
+    if (lead.contacts && lead.contacts.length > 0) {
+      lead.contacts.forEach(contact => {
+        if (contact.linkedin && contact.linkedin.trim()) linkedins.push(contact.linkedin.trim());
+      });
+    }
+    return linkedins.length > 0 ? linkedins.join(', ') : 'N/A';
   };
 
   const handleActionClick = (leadId, e) => {
     e.stopPropagation();
     setDropdownOpen(dropdownOpen === leadId ? null : leadId);
+    setAssignSubmenuOpen(null); // Close assign submenu when opening main dropdown
+  };
+
+  const handleAssignLead = (leadId, userId, e) => {
+    e.stopPropagation();
+    onAssignLead(leadId, userId);
+    setAssignSubmenuOpen(null);
+    setDropdownOpen(null);
   };
 
   const closeDropdown = useCallback(() => {
     setDropdownOpen(null);
+    setAssignSubmenuOpen(null);
   }, []);
 
   useEffect(() => {
@@ -62,15 +217,16 @@ function LeadsTable({
     return () => document.removeEventListener('click', handleClickOutside);
   }, [dropdownOpen, closeDropdown]);
 
-  // Calculate pagination
-  const totalPages = Math.ceil(leads.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentLeads = leads.slice(startIndex, endIndex);
+  // Calculate pagination or grouped display
+  const totalPages = groupedLeads ? 1 : Math.ceil(leads.length / itemsPerPage);
+  const startIndex = groupedLeads ? 0 : (currentPage - 1) * itemsPerPage;
+  const endIndex = groupedLeads ? leads.length : startIndex + itemsPerPage;
+  const currentLeads = groupedLeads ? leads : leads.slice(startIndex, endIndex);
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
     setDropdownOpen(null); // Close any open dropdowns
+    setAssignSubmenuOpen(null); // Close any open assign submenus
   };
 
   if (leads.length === 0) {
@@ -105,196 +261,564 @@ function LeadsTable({
       {/* Table Container with Fixed Height */}
       <div className="flex-1 overflow-hidden border border-gray-300 rounded-lg">
         <div className="h-full overflow-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-linear-to-r from-blue-500 via-indigo-600 to-indigo-700 text-white sticky top-0 z-10">
+          <table className="w-full divide-y divide-gray-200" style={{ tableLayout: 'fixed' }}>
+            <thead className={`sticky top-0 z-10 text-black ${activeTab && statusBgColorMap[activeTab] ? `bg-linear-to-r ${statusBgColorMap[activeTab].bg}` : 'bg-linear-to-r from-blue-500 via-indigo-600 to-indigo-700'}`}>
               <tr>
-                <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 min-w-[150px]">
+                <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-[120px]">
                   Company Name
                 </th>
-                <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 min-w-[120px]">
+                <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-[90px]">
                   Contact Person
                 </th>
-                <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 min-w-[120px]">
+                <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-[90px]">
                   Designation
                 </th>
-                <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 min-w-[120px]">
+                <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-[90px]">
                   Contact Details
                 </th>
-                <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 min-w-[150px]">
+                <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-[120px]">
                   email ID
                 </th>
-                <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-20">
+                <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-[70px]">
                   LinkedIn Profile
                 </th>
-                <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-12">
+                <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-[150px]">
+                  Remarks
+                </th>
+                <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-10">
                   ASSGN
                 </th>
-                <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-16">
+                <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-[50px]">
                   Actions
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {currentLeads.map((lead) => (
-                <tr
-                  key={lead.id}
-                  className="hover:bg-gray-50 cursor-pointer"
-                  onClick={() => onLeadClick(lead)}
-                >
-                  <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[150px]">
-                    {lead.companyWebsite ? (
-                      <a
-                        href={lead.companyWebsite.startsWith('http') ? lead.companyWebsite : `https://${lead.companyWebsite}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800 hover:underline"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {lead.companyName || "N/A"}
-                      </a>
-                    ) : (
-                      lead.companyName || "N/A"
-                    )}
-                  </td>
-                  <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[120px]">
-                    {lead.pocName || "N/A"}
-                  </td>
-                  <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[120px]">
-                    {lead.pocDesignation || "N/A"}
-                  </td>
-                  <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[120px]">
-                    {lead.pocPhone || "N/A"}
-                  </td>
-                  <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[150px]">
-                    {lead.pocMail || "N/A"}
-                  </td>
-                  <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate w-20">
-                    {lead.pocLinkedin ? (
-                      <a
-                        href={lead.pocLinkedin.startsWith('http') ? lead.pocLinkedin : `https://${lead.pocLinkedin}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        LinkedIn
-                      </a>
-                    ) : (
-                      "N/A"
-                    )}
-                  </td>
-                  <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 text-center">
-                    <span className="inline-flex items-center justify-center w-5 h-5 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">
-                      {getInitials(lead.assignedTo, currentUserId, currentUser)}
-                    </span>
-                  </td>
-                  <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-500 relative border border-gray-300">
-                    <div className="relative inline-block" data-dropdown-container>
-                      <button
-                        onClick={(e) => handleActionClick(lead.id, e)}
-                        className="text-gray-500 hover:text-gray-700 focus:outline-none p-2 rounded-full hover:bg-gray-100 transition-colors"
-                        aria-expanded={dropdownOpen === lead.id}
-                        aria-haspopup="true"
-                        data-lead-id={lead.id}
-                      >
-                        <FaEllipsisV size={16} />
-                      </button>
-
-                      {/* Dropdown positioned relative to the button */}
-                      {dropdownOpen === lead.id && (
-                        <div
-                          className="absolute right-0 top-full z-20 mt-1 w-48 rounded-xl shadow-2xl backdrop-blur-xl bg-white/90 border border-white/20 overflow-hidden"
-                          style={{
-                            boxShadow: '0px 25px 50px -12px rgba(0, 0, 0, 0.15), 0px 0px 0px 1px rgba(255, 255, 255, 0.05), inset 0px 1px 0px rgba(255, 255, 255, 0.1)'
-                          }}
-                          data-dropdown-container
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <div className="py-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onScheduleMeeting(lead);
-                                closeDropdown();
-                              }}
-                              className="flex items-center w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50/80 hover:text-blue-700 transition-all duration-200 group"
-                            >
-                              <svg className="w-4 h-4 mr-3 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              {groupedLeads ? (
+                // Render grouped leads by date
+                Object.entries(groupedLeads).map(([date, dateLeads]) => {
+                  const leadStatus = dateLeads[0]?.status || 'hot';
+                  const colors = statusBgColorMap[leadStatus] || statusBgColorMap.hot;
+                  
+                  return (
+                  <React.Fragment key={date}>
+                    {/* Date header with improved styling - now clickable */}
+                    <tr>
+                      <td colSpan="9" className={`px-3 py-1.5 bg-linear-to-r ${colors.bg} border-b-2 ${colors.border} cursor-pointer ${colors.hover} transition-colors duration-200`} onClick={() => toggleDateExpansion(date)}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-1.5">
+                            {/* Expand/Collapse Icon */}
+                            <div className={`flex items-center justify-center w-5 h-5 ${colors.icon} rounded-full transition-transform duration-200 ${expandedDates[date] ? 'rotate-90' : ''}`}>
+                              <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                               </svg>
-                              Schedule Meeting
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onLeadClick(lead);
-                                closeDropdown();
-                              }}
-                              className="flex items-center w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-purple-50/80 hover:text-purple-700 transition-all duration-200 group"
-                            >
-                              <svg className="w-4 h-4 mr-3 text-gray-400 group-hover:text-purple-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                              </svg>
-                              View/Edit
-                            </button>
-
-                            <div className="border-t border-gray-200/50 my-2 mx-2"></div>
-
-                            <div className="px-2 py-1">
-                              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Change Status</p>
-                              {["called", "hot", "warm", "cold", "onboarded"]
-                                .filter((status) => status !== lead.status)
-                                .map((status) => (
-                                  <button
-                                    key={status}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onStatusChange(lead.id, status);
-                                      closeDropdown();
-                                    }}
-                                    className={`flex items-center w-full text-left px-3 py-2 text-sm rounded-lg mb-1 transition-all duration-200 ${statusColorMap[status]} hover:shadow-sm`}
-                                  >
-                                    <div className={`w-2 h-2 rounded-full mr-3 ${
-                                      status === 'hot' ? 'bg-red-500' :
-                                      status === 'warm' ? 'bg-orange-500' :
-                                      status === 'cold' ? 'bg-blue-500' :
-                                      status === 'called' ? 'bg-purple-500' :
-                                      'bg-green-500'
-                                    }`}></div>
-                                    Mark as {status.charAt(0).toUpperCase() + status.slice(1)}
-                                  </button>
-                                ))}
                             </div>
-
-                            <div className="border-t border-gray-200/50 my-2 mx-2"></div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onDeleteLead(lead.id);
-                                closeDropdown();
-                              }}
-                              className="flex items-center w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50/80 hover:text-red-700 transition-all duration-200 group"
-                            >
-                              <svg className="w-4 h-4 mr-3 text-red-400 group-hover:text-red-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                              Delete Lead
-                            </button>
+                            <div>
+                              <h3 className="text-sm font-semibold text-gray-900">{formatDate ? formatDate(date) : date}</h3>
+                            </div>
+                          </div>
+                          <div className="flex items-center">
+                            <span className="text-xs text-gray-600">
+                              {dateLeads.length} lead{dateLeads.length !== 1 ? 's' : ''} {leadStatus}
+                            </span>
                           </div>
                         </div>
+                      </td>
+                    </tr>
+                    {/* Leads for this date - only show if expanded */}
+                    {expandedDates[date] && (() => {
+                      const currentPage = dateGroupPage[date] || 1;
+                      const startIndex = (currentPage - 1) * itemsPerDateGroup;
+                      const endIndex = startIndex + itemsPerDateGroup;
+                      const paginatedLeads = dateLeads.slice(startIndex, endIndex);
+                      const totalPages = Math.ceil(dateLeads.length / itemsPerDateGroup);
+
+                      return (
+                        <>
+                          {paginatedLeads.map((lead, index) => (
+                            <tr
+                              key={`${lead.id}-${index}`}
+                              className={`hover:bg-${leadStatus === 'hot' ? 'red' : leadStatus === 'warm' ? 'orange' : leadStatus === 'cold' ? 'blue' : leadStatus === 'called' ? 'purple' : 'green'}-50 cursor-pointer bg-white border-l-4 ${colors.leftBorder} transition-colors duration-150`}
+                              onClick={() => onLeadClick(lead)}
+                            >
+                              <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[150px]">
+                                {lead.companyWebsite ? (
+                                  <a
+                                    href={lead.companyWebsite.startsWith('http') ? lead.companyWebsite : `https://${lead.companyWebsite}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:text-blue-800 hover:underline"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {lead.companyName || "N/A"}
+                                  </a>
+                                ) : (
+                                  lead.companyName || "N/A"
+                                )}
+                              </td>
+                              <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[120px]">
+                                {getAllContactNames(lead)}
+                              </td>
+                              <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[120px]">
+                                {getAllDesignations(lead)}
+                              </td>
+                              <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[120px]">
+                                {getAllPhones(lead)}
+                              </td>
+                              <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[150px]">
+                                {getAllEmails(lead)}
+                              </td>
+                              <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate w-20">
+                                {getAllLinkedIns(lead) !== 'N/A' ? (
+                                  getAllLinkedIns(lead).split(', ').map((linkedin, index) => (
+                                    <span key={index}>
+                                      {linkedin && linkedin !== 'N/A' ? (
+                                        <a
+                                          href={linkedin.startsWith('http') ? linkedin : `https://${linkedin}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-blue-600 hover:text-blue-800"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          LinkedIn{index > 0 ? ` ${index + 1}` : ''}
+                                        </a>
+                                      ) : 'N/A'}
+                                      {index < getAllLinkedIns(lead).split(', ').length - 1 && ', '}
+                                    </span>
+                                  ))
+                                ) : (
+                                  "N/A"
+                                )}
+                              </td>
+                              <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[200px]" title={getLatestRemark(lead)}>
+                                {getLatestRemark(lead)}
+                              </td>
+                              <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 text-center">
+                                <span className="inline-flex items-center justify-center w-5 h-5 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">
+                                  {getInitials(lead.assignedTo, currentUserId, currentUser)}
+                                </span>
+                              </td>
+                              <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-500 relative border border-gray-300">
+                                <div className="relative inline-block" data-dropdown-container>
+                                  <button
+                                    onClick={(e) => handleActionClick(lead.id, e)}
+                                    className="text-gray-500 hover:text-gray-700 focus:outline-none p-2 rounded-full hover:bg-gray-100 transition-colors"
+                                    aria-expanded={dropdownOpen === lead.id}
+                                    aria-haspopup="true"
+                                    data-lead-id={lead.id}
+                                  >
+                                    <FaEllipsisV size={16} />
+                                  </button>
+
+                                  {/* Dropdown positioned relative to the button */}
+                                  {dropdownOpen === lead.id && (
+                                    <div
+                                      className="absolute right-0 top-full z-20 mt-1 w-48 rounded-xl shadow-2xl backdrop-blur-xl bg-white/90 border border-white/20 overflow-hidden"
+                                      style={{
+                                        boxShadow: '0px 25px 50px -12px rgba(0, 0, 0, 0.15), 0px 0px 0px 1px rgba(255, 255, 255, 0.05), inset 0px 1px 0px rgba(255, 255, 255, 0.1)'
+                                      }}
+                                      data-dropdown-container
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <div className="py-2">
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            onScheduleMeeting(lead);
+                                            closeDropdown();
+                                          }}
+                                          className="flex items-center w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50/80 hover:text-blue-700 transition-all duration-200 group"
+                                        >
+                                          <svg className="w-4 h-4 mr-3 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                          </svg>
+                                          Schedule Meeting
+                                        </button>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            onLeadClick(lead);
+                                            closeDropdown();
+                                          }}
+                                          className="flex items-center w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-purple-50/80 hover:text-purple-700 transition-all duration-200 group"
+                                        >
+                                          <svg className="w-4 h-4 mr-3 text-gray-400 group-hover:text-purple-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                          </svg>
+                                          View/Edit
+                                        </button>
+
+                                        <div className="border-t border-gray-200/50 my-2 mx-2"></div>
+
+                                        <div className="px-2 py-1">
+                                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Assign Lead</p>
+                                          <div className="relative">
+                                            <button
+                                              onClick={() => setAssignSubmenuOpen(assignSubmenuOpen === lead.id ? null : lead.id)}
+                                              className="flex items-center w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-green-50/80 hover:text-green-700 transition-all duration-200 group rounded-lg"
+                                            >
+                                              <svg className="w-4 h-4 mr-3 text-gray-400 group-hover:text-green-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                              </svg>
+                                              Assign to:
+                                            </button>
+
+                                            {/* Assign submenu positioned relative to the button */}
+                                            {assignSubmenuOpen === lead.id && (
+                                              <div
+                                                className="absolute top-full left-0 z-50 mt-1 w-48 rounded-xl shadow-2xl backdrop-blur-xl bg-white/95 border border-white/20 overflow-hidden"
+                                              >
+                                                <div className="py-1 max-h-48 overflow-y-auto">
+                                                  {Object.values(allUsers)
+                                                    .filter(user => user.departments && user.departments.some(dept => dept.toLowerCase().includes('placement')))
+                                                    .map(user => (
+                                                    <button
+                                                      key={user.id}
+                                                      onClick={(e) => handleAssignLead(lead.id, user.id, e)}
+                                                      className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-green-50/80 hover:text-green-700 transition-all duration-200"
+                                                    >
+                                                      <div className="w-2 h-2 rounded-full bg-green-500 mr-3"></div>
+                                                      {user.displayName || user.name || 'Unknown User'}
+                                                    </button>
+                                                    ))}
+                                                  {Object.values(allUsers).filter(user => user.departments && user.departments.some(dept => dept.toLowerCase().includes('placement'))).length === 0 && (
+                                                    <div className="px-4 py-2 text-sm text-gray-500">
+                                                      No placement users found
+                                                      <br />
+                                                      <small>Total users: {Object.keys(allUsers).length}</small>
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        <div className="border-t border-gray-200/50 my-2 mx-2"></div>
+
+                                        <div className="px-2 py-1">
+                                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Change Status</p>
+                                          {["called", "hot", "warm", "cold", "onboarded"]
+                                            .filter((status) => status !== lead.status)
+                                            .map((status) => (
+                                              <button
+                                                key={status}
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  onStatusChange(lead.id, status);
+                                                  closeDropdown();
+                                                }}
+                                                className={`flex items-center w-full text-left px-3 py-2 text-sm rounded-lg mb-1 transition-all duration-200 ${statusColorMap[status]} hover:shadow-sm`}
+                                              >
+                                                <div className={`w-2 h-2 rounded-full mr-3 ${
+                                                  status === 'hot' ? 'bg-red-500' :
+                                                  status === 'warm' ? 'bg-orange-500' :
+                                                  status === 'cold' ? 'bg-blue-500' :
+                                                  status === 'called' ? 'bg-purple-500' :
+                                                  'bg-green-500'
+                                                }`}></div>
+                                                Mark as {status.charAt(0).toUpperCase() + status.slice(1)}
+                                              </button>
+                                            ))}
+                                        </div>
+
+                                        <div className="border-t border-gray-200/50 my-2 mx-2"></div>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            onDeleteLead(lead.id);
+                                            closeDropdown();
+                                          }}
+                                          className="flex items-center w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50/80 hover:text-red-700 transition-all duration-200 group"
+                                        >
+                                          <svg className="w-4 h-4 mr-3 text-red-400 group-hover:text-red-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                          </svg>
+                                          Delete Lead
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                          
+                          {/* Pagination controls for date group */}
+                          {totalPages > 1 && (
+                            <tr>
+                              <td colSpan="9" className="px-4 py-2 bg-gray-50 border border-gray-300">
+                                <div className="flex items-center justify-between">
+                                  <div className="text-xs text-gray-600">
+                                    Showing {startIndex + 1}-{Math.min(endIndex, dateLeads.length)} of {dateLeads.length} leads for {date}
+                                  </div>
+                                  <div className="flex items-center space-x-1">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDateGroupPage(prev => ({
+                                          ...prev,
+                                          [date]: Math.max(1, (prev[date] || 1) - 1)
+                                        }));
+                                      }}
+                                      disabled={currentPage === 1}
+                                      className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      ‹
+                                    </button>
+                                    <span className="text-xs text-gray-600 px-2">
+                                      {currentPage} of {totalPages}
+                                    </span>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDateGroupPage(prev => ({
+                                          ...prev,
+                                          [date]: Math.min(totalPages, (prev[date] || 1) + 1)
+                                        }));
+                                      }}
+                                      disabled={currentPage === totalPages}
+                                      className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      ›
+                                    </button>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </>
+                      );
+                    })()}
+                    {/* Add spacing between date groups */}
+                    <tr>
+                      <td colSpan="9" className="h-2 bg-gray-50"></td>
+                    </tr>
+                  </React.Fragment>
+                  );
+                })
+              ) : (
+                // Render regular flat list for other tabs
+                currentLeads.map((lead, index) => (
+                  <tr
+                    key={`${lead.id}-${index}`}
+                    className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-25'} hover:bg-gray-50 cursor-pointer transition-colors`}
+                    onClick={() => onLeadClick(lead)}
+                  >
+                    <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[150px]">
+                      {lead.companyWebsite ? (
+                        <a
+                          href={lead.companyWebsite.startsWith('http') ? lead.companyWebsite : `https://${lead.companyWebsite}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 hover:underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {lead.companyName || "N/A"}
+                        </a>
+                      ) : (
+                        lead.companyName || "N/A"
                       )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[120px]">
+                      {getAllContactNames(lead)}
+                    </td>
+                    <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[120px]">
+                      {getAllDesignations(lead)}
+                    </td>
+                    <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[120px]">
+                      {getAllPhones(lead)}
+                    </td>
+                    <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[150px]">
+                      {getAllEmails(lead)}
+                    </td>
+                    <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate w-20">
+                      {getAllLinkedIns(lead) !== 'N/A' ? (
+                        getAllLinkedIns(lead).split(', ').map((linkedin, index) => (
+                          <span key={index}>
+                            {linkedin && linkedin !== 'N/A' ? (
+                              <a
+                                href={linkedin.startsWith('http') ? linkedin : `https://${linkedin}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-800"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                LinkedIn{index > 0 ? ` ${index + 1}` : ''}
+                              </a>
+                            ) : 'N/A'}
+                            {index < getAllLinkedIns(lead).split(', ').length - 1 && ', '}
+                          </span>
+                        ))
+                      ) : (
+                        "N/A"
+                      )}
+                    </td>
+                    <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[200px]" title={getLatestRemark(lead)}>
+                      {getLatestRemark(lead)}
+                    </td>
+                    <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 text-center">
+                      <span className="inline-flex items-center justify-center w-5 h-5 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">
+                        {getInitials(lead.assignedTo, currentUserId, currentUser)}
+                      </span>
+                    </td>
+                    <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-500 relative border border-gray-300">
+                      <div className="relative inline-block" data-dropdown-container>
+                        <button
+                          onClick={(e) => handleActionClick(lead.id, e)}
+                          className="text-gray-500 hover:text-gray-700 focus:outline-none p-2 rounded-full hover:bg-gray-100 transition-colors"
+                          aria-expanded={dropdownOpen === lead.id}
+                          aria-haspopup="true"
+                          data-lead-id={lead.id}
+                        >
+                          <FaEllipsisV size={16} />
+                        </button>
+
+                        {/* Dropdown positioned relative to the button */}
+                        {dropdownOpen === lead.id && (
+                          <div
+                            className="absolute right-0 top-full z-20 mt-1 w-48 rounded-xl shadow-2xl backdrop-blur-xl bg-white/90 border border-white/20 overflow-hidden"
+                            style={{
+                              boxShadow: '0px 25px 50px -12px rgba(0, 0, 0, 0.15), 0px 0px 0px 1px rgba(255, 255, 255, 0.05), inset 0px 1px 0px rgba(255, 255, 255, 0.1)'
+                            }}
+                            data-dropdown-container
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="py-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onScheduleMeeting(lead);
+                                  closeDropdown();
+                                }}
+                                className="flex items-center w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50/80 hover:text-blue-700 transition-all duration-200 group"
+                              >
+                                <svg className="w-4 h-4 mr-3 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                Schedule Meeting
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onLeadClick(lead);
+                                  closeDropdown();
+                                }}
+                                className="flex items-center w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-purple-50/80 hover:text-purple-700 transition-all duration-200 group"
+                              >
+                                <svg className="w-4 h-4 mr-3 text-gray-400 group-hover:text-purple-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                                View/Edit
+                              </button>
+
+                              <div className="border-t border-gray-200/50 my-2 mx-2"></div>
+
+                              <div className="px-2 py-1">
+                                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Assign Lead</p>
+                                <div className="relative">
+                                  <button
+                                    onClick={() => setAssignSubmenuOpen(assignSubmenuOpen === lead.id ? null : lead.id)}
+                                    className="flex items-center w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-green-50/80 hover:text-green-700 transition-all duration-200 group rounded-lg"
+                                  >
+                                    <svg className="w-4 h-4 mr-3 text-gray-400 group-hover:text-green-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                    </svg>
+                                    Assign to:
+                                  </button>
+
+                                  {/* Assign submenu positioned relative to the button */}
+                                  {assignSubmenuOpen === lead.id && (
+                                    <div
+                                      className="absolute top-full left-0 z-50 mt-1 w-48 rounded-xl shadow-2xl backdrop-blur-xl bg-white/95 border border-white/20 overflow-hidden"
+                                    >
+                                      <div className="py-1 max-h-48 overflow-y-auto">
+                                        {Object.values(allUsers)
+                                          .filter(user => user.departments && user.departments.some(dept => dept.toLowerCase().includes('placement')))
+                                          .map(user => (
+                                            <button
+                                              key={user.id}
+                                              onClick={(e) => handleAssignLead(lead.id, user.id, e)}
+                                              className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-green-50/80 hover:text-green-700 transition-all duration-200"
+                                            >
+                                              <div className="w-2 h-2 rounded-full bg-green-500 mr-3"></div>
+                                              {user.displayName || user.name || 'Unknown User'}
+                                            </button>
+                                          ))}
+                                        {Object.values(allUsers).filter(user => user.departments && user.departments.some(dept => dept.toLowerCase().includes('placement'))).length === 0 && (
+                                          <div className="px-4 py-2 text-sm text-gray-500">
+                                            No placement users found
+                                            <br />
+                                            <small>Total users: {Object.keys(allUsers).length}</small>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="border-t border-gray-200/50 my-2 mx-2"></div>
+
+                              <div className="px-2 py-1">
+                                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Change Status</p>
+                                {["called", "hot", "warm", "cold", "onboarded"]
+                                  .filter((status) => status !== lead.status)
+                                  .map((status) => (
+                                    <button
+                                      key={status}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onStatusChange(lead.id, status);
+                                        closeDropdown();
+                                      }}
+                                      className={`flex items-center w-full text-left px-3 py-2 text-sm rounded-lg mb-1 transition-all duration-200 ${statusColorMap[status]} hover:shadow-sm`}
+                                    >
+                                      <div className={`w-2 h-2 rounded-full mr-3 ${
+                                        status === 'hot' ? 'bg-red-500' :
+                                        status === 'warm' ? 'bg-orange-500' :
+                                        status === 'cold' ? 'bg-blue-500' :
+                                        status === 'called' ? 'bg-purple-500' :
+                                        'bg-green-500'
+                                      }`}></div>
+                                      Mark as {status.charAt(0).toUpperCase() + status.slice(1)}
+                                    </button>
+                                  ))}
+                              </div>
+
+                              <div className="border-t border-gray-200/50 my-2 mx-2"></div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onDeleteLead(lead.id);
+                                  closeDropdown();
+                                }}
+                                className="flex items-center w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50/80 hover:text-red-700 transition-all duration-200 group"
+                              >
+                                <svg className="w-4 h-4 mr-3 text-red-400 group-hover:text-red-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                Delete Lead
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Pagination Controls - Fixed at bottom */}
-      {totalPages > 1 && (
+      {/* Pagination Controls - Only show for non-grouped views */}
+      {!groupedLeads && totalPages > 1 && (
         <div className="flex items-center justify-between mt-4 px-4 py-3 bg-gray-50 rounded-lg shrink-0">
           <div className="text-sm text-gray-700">
             Showing {startIndex + 1}-{Math.min(endIndex, leads.length)} of {leads.length} companies

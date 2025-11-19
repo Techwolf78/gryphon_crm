@@ -1099,9 +1099,7 @@ if (selectedUserId) {
       const usersRef = collection(db, "users");
       
       let usersQuery;
-      if (currentUser?.department === "sales") {
-        usersQuery = query(usersRef, where("department", "==", "sales"));
-      } else if (currentUser?.department === "Admin") {
+      if (currentUser?.department?.toLowerCase() === "sales" || currentUser?.department?.toLowerCase() === "dm" || currentUser?.department === "Admin") {
         usersQuery = query(usersRef);
       } else {
         usersQuery = query(
@@ -1159,7 +1157,38 @@ if (selectedUserId) {
         return false;
       });
 
-      const currentData = processLeadsData(currentLeads, range);
+      // Fetch DM contracts
+      const dmRef = collection(db, "digitalMarketing");
+      const dmSnapshot = await getDocs(dmRef);
+      let dmContracts = dmSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      // Filter DM contracts by contractStartDate
+      let dmContractsFiltered = dmContracts.filter(dm => {
+        if (dm.contractStartDate) {
+          const contractStart = new Date(dm.contractStartDate);
+          return contractStart >= range.start && contractStart <= range.end;
+        }
+        return false;
+      });
+
+      // Map DM contracts to look like leads
+      const dmAsLeads = dmContractsFiltered.map(dm => ({
+        id: dm.id,
+        businessName: dm.collegeName,
+        phase: "closed",
+        totalCost: dm.totalCost,
+        contractStartDate: dm.contractStartDate,
+        assignedTo: dm.createdBy,
+        courses: [{ courseType: dm.course }],
+        createdAt: dm.createdAt,
+        studentCount: dm.studentCount,
+        tcv: dm.totalCost, // For projected, but since closed, use totalCost
+      }));
+
+      // Combine leads and DM contracts
+      const allDocs = [...currentLeads, ...dmAsLeads];
+
+      const currentData = processLeadsData(allDocs, range);
 
       // Fetch previous period data for growth calculations
       const prevRange = getPrevDateRange(timePeriod, range.start);
@@ -1177,7 +1206,31 @@ if (selectedUserId) {
         return false;
       });
 
-      const prevData = processLeadsData(prevLeads, prevRange);
+      // Filter prev DM contracts
+      let prevDmContractsFiltered = dmContracts.filter(dm => {
+        if (dm.contractStartDate) {
+          const contractStart = new Date(dm.contractStartDate);
+          return contractStart >= prevRange.start && contractStart <= prevRange.end;
+        }
+        return false;
+      });
+
+      const prevDmAsLeads = prevDmContractsFiltered.map(dm => ({
+        id: dm.id,
+        businessName: dm.collegeName,
+        phase: "closed",
+        totalCost: dm.totalCost,
+        contractStartDate: dm.contractStartDate,
+        assignedTo: dm.createdBy,
+        courses: [{ courseType: dm.course }],
+        createdAt: dm.createdAt,
+        studentCount: dm.studentCount,
+        tcv: dm.totalCost,
+      }));
+
+      const prevAllDocs = [...prevLeads, ...prevDmAsLeads];
+
+      const prevData = processLeadsData(prevAllDocs, prevRange);
 
       // Merge current and previous data
       const mergedData = {
@@ -1323,15 +1376,44 @@ if (selectedUserId) {
     setModalLeads([]); // Clear previous
 
     try {
+      let uid = member.id;
+      const user = users.find(u => u.id === member.id);
+      if (user) {
+        uid = user.uid;
+      }
+
       const leadsRef = collection(db, "leads");
-      const user = users.find((u) => u.name.toLowerCase().trim() === member.name.toLowerCase().trim());
-      if (!user) return;
-      const leadsQuery = query(leadsRef, where("assignedTo.uid", "==", user.uid));
+      const leadsQuery = query(leadsRef, where("assignedTo.uid", "==", uid));
       const snapshot = await getDocs(leadsQuery);
       let leads = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
+      // Fetch DM contracts
+      const dmRef = collection(db, "digitalMarketing");
+      const dmSnapshot = await getDocs(dmRef);
+      let dmContracts = dmSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
+      // Filter DM by createdBy.uid
+      let memberDmContracts = dmContracts.filter(dm => dm.createdBy?.uid === uid);
+
+      // Map DM to similar structure
+      const dmAsLeads = memberDmContracts.map(dm => ({
+        id: dm.id,
+        businessName: dm.collegeName,
+        phase: "closed",
+        totalCost: dm.totalCost,
+        contractStartDate: dm.contractStartDate,
+        assignedTo: dm.createdBy,
+        courses: [{ courseType: dm.course }],
+        createdAt: dm.createdAt,
+        studentCount: dm.studentCount,
+        tcv: dm.totalCost,
+      }));
+
+      // Combine
+      let allLeads = [...leads, ...dmAsLeads];
+
       // Filter by the current date range (selected year) like the dashboard doe
-      leads = leads.filter(lead => {
+      allLeads = allLeads.filter(lead => {
         if (!lead.createdAt && !lead.contractStartDate) return true; // Include if missing both dates
         if (lead.phase === "closed" && lead.contractStartDate) {
           // For closed leads, check contractStartDate for FY membership
@@ -1347,13 +1429,13 @@ if (selectedUserId) {
 
       // Sort leads: CL first, then H, then W, then C
       const phasePriority = { closed: 1, hot: 2, warm: 3, cold: 4 };
-      leads = leads.sort((a, b) => {
+      allLeads = allLeads.sort((a, b) => {
         const priorityA = phasePriority[a.phase] || 5;
         const priorityB = phasePriority[b.phase] || 5;
         return priorityA - priorityB;
       });
 
-      setModalLeads(leads);
+      setModalLeads(allLeads);
     } catch {
       setModalLeads([]);
     }

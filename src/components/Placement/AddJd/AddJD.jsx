@@ -90,7 +90,7 @@ function AddJD({ show, onClose, company }) {
     try {
       const usersQuery = query(
         collection(db, "users"),
-        where("department", "==", "Placement")
+        where("departments", "array-contains", "Placement")
       );
 
       const querySnapshot = await getDocs(usersQuery);
