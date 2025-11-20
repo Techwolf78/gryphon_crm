@@ -124,56 +124,128 @@ function ExpensesPanel({
   }
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="text-center">
-        <p className="text-gray-600 text-lg">
-          Manage shared company costs and department salaries
-        </p>
+    <div className="space-y-6">
+      {/* Header Section */}
+      <div className="bg-linear-to-r from-blue-50 via-indigo-50 to-purple-50 backdrop-blur-sm rounded-2xl p-4 border border-white/20 shadow-lg">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+            <Building2 className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Manage Expenses</h2>
+            <p className="text-sm text-gray-600 mt-1">Manage shared company costs and department salaries</p>
+          </div>
+        </div>
       </div>
 
-      {/* Expense Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {hrExpenseCategories.map((exp) => {
-          const Icon = exp.icon;
-          const isAvailable = activeBudgets.length > 0;
+      {/* Shared Company Costs Section */}
+      <div className="bg-white/70 backdrop-blur-sm border border-gray-200/50 rounded-xl shadow-lg overflow-hidden">
+        <div className="bg-linear-to-r from-gray-50 to-slate-50 border-b border-gray-200/50 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gray-100 rounded-lg">
+              <Building2 className="w-5 h-5 text-gray-600" />
+            </div>
+            <div>
+              <h4 className="text-lg font-bold text-gray-900">Shared Company Costs</h4>
+              <p className="text-sm text-gray-600">Apply company-wide expenses across all departments</p>
+            </div>
+          </div>
+        </div>
 
-          return (
-            <button
-              key={exp.key}
-              onClick={() => isAvailable && setActiveExpenseType(exp.key)}
-              disabled={!isAvailable}
-              className={`
-                group relative p-6 text-left rounded-xl
-                bg-white border border-gray-200 shadow-sm
-                transition-all duration-300 ease-out
-                hover:shadow-md hover:-translate-y-1 hover:border-gray-300
-                ${!isAvailable ? "opacity-50 cursor-not-allowed" : ""}
-              `}
-            >
-              <div className="flex items-center gap-4">
-                <div
-                  className={`p-3 rounded-xl bg-gray-100 group-hover:bg-gray-200 transition-colors`}
+        <div className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {hrExpenseCategories.filter(exp => exp.type === "fixed").map((exp) => {
+              const Icon = exp.icon;
+              const isAvailable = activeBudgets.length > 0;
+
+              return (
+                <button
+                  key={exp.key}
+                  onClick={() => isAvailable && setActiveExpenseType(exp.key)}
+                  disabled={!isAvailable}
+                  className={`
+                    group relative p-4 text-left rounded-lg
+                    bg-white border border-gray-200 shadow-sm
+                    transition-all duration-300 ease-out
+                    hover:shadow-md hover:-translate-y-1 hover:border-blue-300
+                    ${!isAvailable ? "opacity-50 cursor-not-allowed" : ""}
+                  `}
                 >
-                  <Icon className="w-6 h-6 text-gray-700" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                    {exp.label}
-                  </h3>
-                  <p className="text-sm text-gray-600 leading-relaxed">
-                    {exp.type === "fixed"
-                      ? "Apply shared company-wide cost"
-                      : "Manage departmental salary expenses"}
-                  </p>
-                </div>
-              </div>
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`p-2.5 rounded-lg bg-blue-100 group-hover:bg-blue-200 transition-colors`}
+                    >
+                      <Icon className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-sm font-semibold text-gray-900 mb-1">
+                        {exp.label}
+                      </h3>
+                      <p className="text-xs text-gray-600 leading-relaxed">
+                        Apply shared company-wide cost
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
 
-              {/* Decorative bottom bar */}
-              <div className="absolute bottom-0 left-0 w-full h-[3px] bg-gray-100 group-hover:bg-blue-500 transition-all rounded-b-xl" />
-            </button>
-          );
-        })}
+      {/* Department Salaries Section */}
+      <div className="bg-white/70 backdrop-blur-sm border border-gray-200/50 rounded-xl shadow-lg overflow-hidden">
+        <div className="bg-linear-to-r from-green-50 to-emerald-50 border-b border-gray-200/50 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-green-100 rounded-lg">
+              <Users className="w-5 h-5 text-green-600" />
+            </div>
+            <div>
+              <h4 className="text-lg font-bold text-gray-900">Department Salaries</h4>
+              <p className="text-sm text-gray-600">Manage departmental salary expenses</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {hrExpenseCategories.filter(exp => exp.type === "salary").map((exp) => {
+              const Icon = exp.icon;
+              const isAvailable = activeBudgets.length > 0;
+
+              return (
+                <button
+                  key={exp.key}
+                  onClick={() => isAvailable && setActiveExpenseType(exp.key)}
+                  disabled={!isAvailable}
+                  className={`
+                    group relative p-4 text-left rounded-lg
+                    bg-white border border-gray-200 shadow-sm
+                    transition-all duration-300 ease-out
+                    hover:shadow-md hover:-translate-y-1 hover:border-green-300
+                    ${!isAvailable ? "opacity-50 cursor-not-allowed" : ""}
+                  `}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`p-2.5 rounded-lg bg-green-100 group-hover:bg-green-200 transition-colors`}
+                    >
+                      <Icon className="w-5 h-5 text-green-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-sm font-semibold text-gray-900 mb-1">
+                        {exp.label}
+                      </h3>
+                      <p className="text-xs text-gray-600 leading-relaxed">
+                        Manage departmental salary expenses
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {/* Modal Renderer */}

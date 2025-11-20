@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   collection,
   onSnapshot,
-  addDoc,
   deleteDoc,
   query,
   where,
@@ -11,7 +10,6 @@ import {
   increment,
   updateDoc,
   doc,
-  setDoc,
   getDocs,
   runTransaction,
 } from "firebase/firestore";
@@ -224,14 +222,14 @@ const ActionDropdown = ({ budget, onEdit, onDelete, onView, onSelect }) => {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-10 text-sm">
+        <div className="absolute right-0 mt-1 w-fit bg-white rounded-lg shadow-lg border border-gray-200 z-10 text-sm">
           <div className="py-1">
             <button
               onClick={() => {
                 onSelect(budget);
                 setIsOpen(false);
               }}
-              className="flex items-center w-full px-3 py-1.5 text-green-600 hover:bg-gray-100"
+              className="flex items-center w-full px-3 py-1.5 text-green-600 hover:bg-gray-100 whitespace-nowrap"
             >
               <svg
                 className="w-3.5 h-3.5 mr-2"
@@ -246,14 +244,14 @@ const ActionDropdown = ({ budget, onEdit, onDelete, onView, onSelect }) => {
                   d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
                 />
               </svg>
-              View Overview
+              Change Overview
             </button>
             <button
               onClick={() => {
                 onView(budget);
                 setIsOpen(false);
               }}
-              className="flex items-center w-full px-3 py-1.5 text-gray-700 hover:bg-gray-100"
+              className="flex items-center w-full px-3 py-1.5 text-gray-700 hover:bg-gray-100 whitespace-nowrap"
             >
               <svg
                 className="w-3.5 h-3.5 mr-2"
@@ -281,7 +279,7 @@ const ActionDropdown = ({ budget, onEdit, onDelete, onView, onSelect }) => {
                 onEdit(budget);
                 setIsOpen(false);
               }}
-              className="flex items-center w-full px-3 py-1.5 text-blue-600 hover:bg-gray-100"
+              className="flex items-center w-full px-3 py-1.5 text-blue-600 hover:bg-gray-100 whitespace-nowrap"
             >
               <svg
                 className="w-3.5 h-3.5 mr-2"
@@ -303,7 +301,7 @@ const ActionDropdown = ({ budget, onEdit, onDelete, onView, onSelect }) => {
                 exportBudget(budget.department, budget.fiscalYear, budget);
                 setIsOpen(false);
               }}
-              className="flex items-center w-full px-3 py-1.5 text-emerald-600 hover:bg-gray-100"
+              className="flex items-center w-full px-3 py-1.5 text-emerald-600 hover:bg-gray-100 whitespace-nowrap"
             >
               <svg
                 className="w-3.5 h-3.5 mr-2"
@@ -325,7 +323,7 @@ const ActionDropdown = ({ budget, onEdit, onDelete, onView, onSelect }) => {
                 onDelete(budget);
                 setIsOpen(false);
               }}
-              className="flex items-center w-full px-3 py-1.5 text-red-600 hover:bg-gray-100"
+              className="flex items-center w-full px-3 py-1.5 text-red-600 hover:bg-gray-100 whitespace-nowrap"
             >
               <svg
                 className="w-3.5 h-3.5 mr-2"
@@ -400,9 +398,11 @@ const generatePurchaseOrderNumber = async (
 
 function Purchase() {
   // State management
-  const [activeTab, setActiveTab] = useState("budgets");
+  const [activeTab, setActiveTab] = useState(() => {
+    // Read from localStorage on initialization, fallback to "budgets"
+    return localStorage.getItem("purchase-dashboard-active-tab") || "budgets";
+  });
   const [currentUser, setCurrentUser] = useState(null);
-  const [users, setUsers] = useState({});
   const [loading, setLoading] = useState(true);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deletingBudget, setDeletingBudget] = useState(false);
@@ -426,12 +426,9 @@ function Purchase() {
   const [vendors, setVendors] = useState([]);
 
   // Modal states
-  const [showBudgetForm, setShowBudgetForm] = useState(false);
   const [showBudgetUpdateForm, setShowBudgetUpdateForm] = useState(false);
-  const [showPurchaseIntentModal, setShowPurchaseIntentModal] = useState(false);
   const [showPurchaseOrderModal, setShowPurchaseOrderModal] = useState(false);
   const [selectedIntent, setSelectedIntent] = useState(null);
-  const [selectedOrder, setSelectedOrder] = useState(null);
   const [editingBudget, setEditingBudget] = useState(null);
 
   // Filters
@@ -441,7 +438,6 @@ function Purchase() {
     dateRange: { start: "", end: "" },
   });
 
-  const department = "purchase";
   const currentFiscalYear = getCurrentFiscalYear();
 
   // Add this helper function to query users by email
@@ -548,14 +544,11 @@ function Purchase() {
     // Users data - this is critical for department info
     const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
       const userData = {};
-      let userCount = 0;
 
       snapshot.forEach((doc) => {
         userData[doc.id] = { id: doc.id, ...doc.data() };
-        userCount++;
       });
 
-      setUsers(userData);
       setUsersLoaded(true);
 
       // Debug: Check if we can find current user by email
@@ -1070,6 +1063,11 @@ function Purchase() {
     }
   }, [budgetHistory, selectedBudgetForOverview]);
 
+  // Save active tab to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem("purchase-dashboard-active-tab", activeTab);
+  }, [activeTab]);
+
   const handleExpenseSubmit = async (expenseData, fiscalYear) => {
     try {
       await runTransaction(db, async (transaction) => {
@@ -1141,7 +1139,7 @@ function Purchase() {
 
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 text-sm">
-      <div className="max-w-8xl mx-auto px-3 sm:px-4 lg:px-6 py-4">
+      <div className=" mx-auto">
         {/* Header */}
         <div className="bg-white rounded-xl shadow-md border border-gray-200 p-4 mb-4">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
@@ -1209,7 +1207,7 @@ function Purchase() {
         </div>
 
         {/* Main Content */}
-        <div className="bg-gray-100 rounded-xl  border border-gray-200 p-4">
+        <div className="bg-gray-100 rounded-xl  border border-gray-200 ">
           <Suspense fallback={<ComponentLoader />}>
             {activeTab === "budgets" && (
               <>
@@ -1505,67 +1503,196 @@ function Purchase() {
             )}
 
             {activeTab === "history" && (
-              <div className="space-y-3">
-                <h3 className="text-lg font-bold text-gray-900 mb-3">
-                  Budget Analytics - FY{currentFiscalYear}
-                </h3>
+              <div className="space-y-6">
+                {/* Header Section */}
+                <div className="bg-linear-to-r from-indigo-500/10 to-purple-500/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20 shadow-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-linear-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-gray-900">Budget Analytics</h2>
+                      <p className="text-sm text-gray-600 mt-1">Comprehensive budget performance overview across all departments</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex items-center gap-4">
+                    <div className="bg-white/60 backdrop-blur-sm rounded-xl px-4 py-2 border border-white/40">
+                      <span className="text-sm font-medium text-gray-600">Fiscal Year:</span>
+                      <span className="ml-2 font-bold text-gray-900">FY{currentFiscalYear}</span>
+                    </div>
+                    <div className="bg-white/60 backdrop-blur-sm rounded-xl px-4 py-2 border border-white/40">
+                      <span className="text-sm font-medium text-gray-600">Total Budgets:</span>
+                      <span className="ml-2 font-bold text-gray-900">{budgetHistory.length}</span>
+                    </div>
+                    <div className="bg-white/60 backdrop-blur-sm rounded-xl px-4 py-2 border border-white/40">
+                      <span className="text-sm font-medium text-gray-600">Active Budgets:</span>
+                      <span className="ml-2 font-bold text-emerald-600">{budgetHistory.filter(b => b.status === 'active').length}</span>
+                    </div>
+                  </div>
+                </div>
+
                 {budgetHistory.length > 0 ? (
-                  <div className="grid gap-3">
-                    {budgetHistory.map((budget) => (
-                      <div
-                        key={budget.id}
-                        className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 transition-colors text-sm"
-                      >
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h4 className="font-semibold text-gray-900">
-                              FY{budget.fiscalYear} Budget
-                            </h4>
-                            <p className="text-gray-600">
-                              {budget.department} • {budget.status}
-                            </p>
-                            <p className="text-gray-600">
-                              Total Budget: ₹
-                              {budget.summary?.totalBudget?.toLocaleString(
-                                "en-IN"
-                              )}
-                              Spent: ₹
-                              {budget.summary?.totalSpent?.toLocaleString(
-                                "en-IN"
-                              )}
-                              Utilization:{" "}
-                              {budget.summary?.totalBudget
-                                ? (
-                                    (budget.summary.totalSpent /
-                                      budget.summary.totalBudget) *
-                                    100
-                                  ).toFixed(1)
-                                : 0}
-                              %
-                            </p>
-                          </div>
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              budget.status === "active"
-                                ? "bg-green-100 text-green-800"
-                                : budget.status === "draft"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-gray-100 text-gray-800"
-                            }`}
-                          >
-                            {budget.status}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="bg-white/80 backdrop-blur-sm rounded-xl border border-white/30 shadow-lg overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50/80 border-b border-gray-200/50">
+                          <tr>
+                            <th className="text-left py-3 px-4 font-semibold text-gray-700">Department</th>
+                            <th className="text-left py-3 px-4 font-semibold text-gray-700">Fiscal Year</th>
+                            <th className="text-left py-3 px-4 font-semibold text-gray-700">Total Budget</th>
+                            <th className="text-left py-3 px-4 font-semibold text-gray-700">Total Spent</th>
+                            <th className="text-left py-3 px-4 font-semibold text-gray-700">Remaining</th>
+                            <th className="text-left py-3 px-4 font-semibold text-gray-700">Utilization</th>
+                            <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {budgetHistory
+                            .sort((a, b) => {
+                              // Sort active budgets first, then by fiscal year (newest first)
+                              if (a.status === "active" && b.status !== "active") return -1;
+                              if (a.status !== "active" && b.status === "active") return 1;
+
+                              // If both have same status, sort by fiscal year (newest first)
+                              const yearA = parseInt(a.fiscalYear.split("-")[0]);
+                              const yearB = parseInt(b.fiscalYear.split("-")[0]);
+                              return yearB - yearA;
+                            })
+                            .map((budget) => {
+                              const utilizationRate = budget.summary?.totalBudget
+                                ? (budget.summary.totalSpent / budget.summary.totalBudget) * 100
+                                : 0;
+
+                              const getUtilizationColor = (rate) => {
+                                if (rate >= 80) return "bg-red-500";
+                                if (rate >= 60) return "bg-orange-500";
+                                if (rate >= 40) return "bg-yellow-500";
+                                if (rate >= 20) return "bg-blue-500";
+                                return "bg-emerald-500";
+                              };
+
+                              const getDepartmentColor = (dept) => {
+                                const colors = {
+                                  placement: "from-purple-500 to-purple-600",
+                                  lnd: "from-blue-500 to-blue-600",
+                                  dm: "from-green-500 to-green-600",
+                                  sales: "from-indigo-500 to-indigo-600",
+                                  hr: "from-pink-500 to-pink-600",
+                                  purchase: "from-cyan-500 to-cyan-600",
+                                  admin: "from-gray-500 to-gray-600",
+                                  management: "from-slate-500 to-slate-600",
+                                  cr: "from-violet-500 to-violet-600"
+                                };
+                                return colors[dept] || "from-gray-500 to-gray-600";
+                              };
+
+                              return (
+                                <tr
+                                  key={budget.id}
+                                  className={`border-b border-gray-100/50 hover:bg-gray-50/50 transition-colors ${
+                                    budget.status === "active"
+                                      ? "bg-emerald-50/30"
+                                      : ""
+                                  }`}
+                                >
+                                  {/* Department */}
+                                  <td className="py-3 px-4">
+                                    <div className="flex items-center gap-3">
+                                      <div className={`w-8 h-8 bg-linear-to-br ${getDepartmentColor(budget.department)} rounded-lg flex items-center justify-center shadow-sm`}>
+                                        <span className="text-white font-bold text-xs uppercase">
+                                          {budget.department.substring(0, 2)}
+                                        </span>
+                                      </div>
+                                      <span className="font-medium text-gray-900 capitalize">
+                                        {budget.department}
+                                      </span>
+                                    </div>
+                                  </td>
+
+                                  {/* Fiscal Year */}
+                                  <td className="py-3 px-4">
+                                    <span className="font-semibold text-gray-900">
+                                      FY{budget.fiscalYear}
+                                    </span>
+                                  </td>
+
+                                  {/* Total Budget */}
+                                  <td className="py-3 px-4">
+                                    <span className="font-bold text-gray-900">
+                                      ₹{budget.summary?.totalBudget?.toLocaleString("en-IN") || "0"}
+                                    </span>
+                                  </td>
+
+                                  {/* Total Spent */}
+                                  <td className="py-3 px-4">
+                                    <span className="text-gray-700">
+                                      ₹{budget.summary?.totalSpent?.toLocaleString("en-IN") || "0"}
+                                    </span>
+                                  </td>
+
+                                  {/* Remaining */}
+                                  <td className="py-3 px-4">
+                                    <span
+                                      className={`font-semibold ${
+                                        (budget.summary?.totalBudget || 0) - (budget.summary?.totalSpent || 0) >= 0
+                                          ? "text-emerald-600"
+                                          : "text-red-600"
+                                      }`}
+                                    >
+                                      ₹{((budget.summary?.totalBudget || 0) - (budget.summary?.totalSpent || 0)).toLocaleString("en-IN")}
+                                    </span>
+                                  </td>
+
+                                  {/* Utilization */}
+                                  <td className="py-3 px-4">
+                                    <div className="flex items-center gap-2">
+                                      <div className="flex-1 min-w-20">
+                                        <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                                          <div
+                                            className={`h-2 rounded-full ${getUtilizationColor(utilizationRate)} transition-all duration-500`}
+                                            style={{ width: `${Math.min(utilizationRate, 100)}%` }}
+                                          ></div>
+                                        </div>
+                                      </div>
+                                      <span className="text-xs font-bold text-gray-900 min-w-8">
+                                        {utilizationRate.toFixed(0)}%
+                                      </span>
+                                    </div>
+                                  </td>
+
+                                  {/* Status */}
+                                  <td className="py-3 px-4">
+                                    <span
+                                      className={`px-2 py-1 rounded-full text-xs font-bold border ${
+                                        budget.status === "active"
+                                          ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                                          : budget.status === "draft"
+                                          ? "bg-amber-100 text-amber-800 border-amber-200"
+                                          : "bg-gray-100 text-gray-800 border-gray-200"
+                                      }`}
+                                    >
+                                      {budget.status}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 ) : (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500 text-base">
-                      No budget history found
-                    </p>
-                    <p className="text-gray-400 mt-1.5 text-sm">
-                      Create a budget to get started
+                  <div className="bg-white/70 backdrop-blur-sm border border-white/30 rounded-2xl p-12 text-center shadow-lg">
+                    <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-bold text-amber-800 mb-2">No Budget History Found</h3>
+                    <p className="text-amber-700 text-sm leading-relaxed max-w-md mx-auto">
+                      No budgets have been created yet. Start by creating your first budget to see analytics and performance insights here.
                     </p>
                   </div>
                 )}

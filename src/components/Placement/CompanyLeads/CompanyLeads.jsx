@@ -248,53 +248,10 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
   // Get team member IDs based on role-based logic (matches Sales module)
   const getTeamMemberIds = useCallback((managerUid, users = allUsers) => {
-    const user = Object.values(users).find((u) => u.uid === managerUid);
-    if (!user) return [];
-
-    const isPlacementDept = user.departments?.includes("Placement") || user.department === "Placement";
-    const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
-
-    if (user.role === "Director") {
-      // Director sees all placement team leads
-      return Object.values(users)
-        .filter(u => u.departments?.includes("Placement") || u.department === "Placement")
-        .map(u => u.uid || u.id);
-    } else if (user.role === "Head") {
-      // Head sees Managers and their subordinates in Placement (regardless of Head's own department)
-      const teamMembers = [];
-      
-      // Find all Managers in Placement
-      const managers = Object.values(users).filter(
-        (u) => u.role === "Manager" && 
-        (u.departments?.includes("Placement") || u.department === "Placement")
-      );
-      teamMembers.push(...managers.map(u => u.uid || u.id));
-      
-        // Find subordinates of those Managers
-        managers.forEach(manager => {
-          const subordinates = Object.values(users).filter(
-            (u) =>
-              u.reportingManager === manager.name &&
-              ["Assistant Manager", "Executive"].includes(u.role) &&
-              (u.departments?.includes("Placement") || u.department === "Placement")
-          );
-          teamMembers.push(...subordinates.map(u => u.uid || u.id));
-        });      return teamMembers;
-    } else if (isPlacementDept && isHigherRole) {
-      if (user.role === "Manager") {
-        // Manager sees direct subordinates (Assistant Manager, Executive)
-        const subordinates = Object.values(users).filter(
-          (u) =>
-            u.reportingManager === user.name &&
-            ["Assistant Manager", "Executive"].includes(u.role) &&
-            (u.departments?.includes("Placement") || u.department === "Placement")
-        );
-        return subordinates.map((u) => u.uid || u.id);
-      }
-    }
-
-    // Lower roles or non-placement users see no team members
-    return [];
+    // All users can see leads from all other users (complete transparency)
+    return Object.values(users)
+      .filter(u => u.uid !== managerUid)
+      .map(u => u.uid || u.id);
   }, [allUsers]);
 
   // Fetch today's follow-ups from all companies

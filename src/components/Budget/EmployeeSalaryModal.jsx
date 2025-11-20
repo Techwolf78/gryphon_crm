@@ -56,82 +56,94 @@ function EmployeeSalaryModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[1000]">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden border border-gray-100">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-1000">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden border border-gray-200/50">
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b border-gray-200">
-          <div>
-            <h3 className="text-2xl font-semibold text-gray-900">
-              Employee Salary Deduction
-            </h3>
-            <p className="text-sm text-gray-500">
-              Manage monthly salary expense allocation by department
-            </p>
+        <div className="bg-linear-to-r from-blue-50 via-indigo-50 to-purple-50 border-b border-gray-200/50 p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">
+                Employee Salary Deduction
+              </h2>
+              <p className="text-xs text-gray-600">
+                Manage monthly salary expense allocation by department
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1 hover:bg-gray-100 rounded-lg transition-all duration-200 hover:scale-105"
+            >
+              <X className="w-4 h-4 text-gray-600" />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700"
-            aria-label="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
         </div>
 
-        {/* Form */}
+        {/* Content */}
         <form
           onSubmit={handleSubmit}
-          className="p-6 space-y-6 max-h-[70vh] overflow-y-auto"
+          className="overflow-y-auto max-h-[calc(90vh-85px)]"
         >
-          {entries.map((entry) => (
-            <div
-              key={entry.department}
-              className="flex flex-col sm:flex-row justify-between items-center gap-4 border border-gray-200 rounded-xl bg-gray-50 hover:bg-gray-100 transition-all p-5 shadow-sm"
-            >
-              <div className="flex flex-col items-start w-full sm:w-auto">
-                <h4 className="text-lg font-semibold capitalize text-gray-900">
-                  {entry.department}
-                </h4>
-                <p className="text-sm text-gray-600 mt-1">
-                  Remaining Salary Budget:{" "}
-                  <span
-                    className={`font-medium ${
-                      entry.remainingSalary <= 0
-                        ? "text-red-600"
-                        : "text-gray-900"
-                    }`}
-                  >
-                    ₹{entry.remainingSalary.toLocaleString("en-IN")}
-                  </span>
-                </p>
+          <div className="p-6 space-y-6">
+
+            {/* Department Salary Allocations Section */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-1 h-6 bg-green-500 rounded-full"></div>
+                <h3 className="text-lg font-bold text-gray-900">Department Salary Allocations</h3>
               </div>
 
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="Enter amount (₹)"
-                value={entry.amount}
-                onChange={(e) => handleChange(entry.department, e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 w-full sm:w-48 text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow"
-              />
-            </div>
-          ))}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {entries.map((entry) => (
+                  <div
+                    key={entry.department}
+                    className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-all duration-200"
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex-1">
+                        <h4 className="text-sm font-semibold capitalize text-gray-900">
+                          {entry.department}
+                        </h4>
+                        <p className="text-xs text-gray-600 mt-1">
+                          Remaining Salary Budget: ₹{entry.remainingSalary.toLocaleString("en-IN")}
+                        </p>
+                      </div>
+                    </div>
 
-          {/* Action buttons */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium transition-all"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold shadow-sm hover:shadow-md transition-all"
-            >
-              Deduct Salaries
-            </button>
+                    <div className="space-y-2">
+                      <label className="block text-xs font-medium text-gray-700">
+                        Enter amount (₹)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={entry.amount}
+                        onChange={(e) => handleChange(entry.department, e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold disabled:opacity-50 flex items-center text-sm"
+              >
+                Deduct Salaries
+              </button>
+            </div>
           </div>
         </form>
       </div>

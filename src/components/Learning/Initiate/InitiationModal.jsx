@@ -1189,13 +1189,17 @@ function InitiationModal({ training, onClose, onConfirm }) {
           return restoredRow;
         });
 
-        // if there is no table data in current phase but courses exist, fallback to auto-generated rows
-        if (
-          (!rowsForDomain || rowsForDomain.length === 0) &&
-          courses.length > 0
-        ) {
-          const domainHours = getDomainHours(domain, currentPhase);
-          loadedTable1Data[domain] = courses.map((course) => ({
+        // Always generate rows for all courses, merging with existing data
+        const existingRows = rowsForDomain || [];
+        const existingMap = new Map(existingRows.map(row => [row.batch, row]));
+        const domainHours = getDomainHours(domain, currentPhase);
+        loadedTable1Data[domain] = courses.map((course) => {
+          const existing = existingMap.get(course.specialization);
+          if (existing) {
+            // Update stdCount in case it changed
+            return { ...existing, stdCount: course.students };
+          }
+          return {
             batch: course.specialization,
             stdCount: course.students,
             hrs: domainHours,
@@ -1208,10 +1212,8 @@ function InitiationModal({ training, onClose, onConfirm }) {
                 trainers: [],
               },
             ],
-          }));
-        } else {
-          loadedTable1Data[domain] = rowsForDomain;
-        }
+          };
+        });
       }
 
       setSelectedDomains(loadedDomains);

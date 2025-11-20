@@ -45,8 +45,6 @@ function SendSchedule({
 
   const [feePerHour, setFeePerHour] = useState(0);
 
-  const [trainerDetails, setTrainerDetails] = useState([]);
-
   const [success, setSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -115,8 +113,6 @@ useEffect(() => {
     food: totalFood,
     lodging: totalLodging
   });
-
-  setTrainerDetails(trainerDetails);
 }, [selectedTrainer, trainersData, phaseData?.excludeDays]);
 
 
@@ -418,21 +414,10 @@ useEffect(() => {
       // Calculate total training days from assignments
       const totalDays = new Set(trainerAssignments.map(a => a.date)).size;
 
-      // Get trainer details for accurate fee calculation
-      const trainerDetails = trainersData.filter(trainer => 
-        trainer.trainerId === selectedTrainer.trainerId || trainer.id === selectedTrainer.id
-      );
-
       // FIXED: Use new calculation logic (matching InvoiceModal)
       const roundToNearestWhole = (num) => Math.round(num);
       
-      const trainingFees = roundToNearestWhole(
-        trainerDetails.reduce((acc, detail) => {
-          const hours = detail.assignedHours || 0;
-          const rate = detail.perHourCost || 0;
-          return acc + (hours * rate);
-        }, 0)
-      );
+      const trainingFees = roundToNearestWhole(totalHours * feePerHour);
       
       // Calculate expenses the same way as InitiationTrainingDetails
       // Conveyance is one-time, food and lodging are already totals from assignments
@@ -770,13 +755,7 @@ useEffect(() => {
                 // Round to nearest whole number (matching InvoiceModal)
                 const roundToNearestWhole = (num) => Math.round(num);
 
-                const trainingFees = roundToNearestWhole(
-                  trainerDetails.reduce((acc, detail) => {
-                    const hours = detail.assignedHours || 0;
-                    const rate = detail.perHourCost || 0;
-                    return acc + (hours * rate);
-                  }, 0)
-                );
+                const trainingFees = roundToNearestWhole(totalHours * feePerHour);
                 
                 // Calculate expenses the same way as InitiationTrainingDetails
                 // Conveyance is one-time, food and lodging are already totals from assignments

@@ -66,6 +66,20 @@ const PurchaseOrdersList = ({
     return "N/A";
   };
 
+  // Get vendor address for display
+  const getVendorAddress = (order) => {
+    if (order.vendorId) {
+      const vendor = getVendorDetails(order.vendorId);
+      if (vendor?.address) {
+        const addr = vendor.address;
+        const parts = [];
+        if (addr.street) parts.push(addr.street);
+        return parts.join(", ");
+      }
+    }
+    return "N/A";
+  };
+
   // Helper function to convert Firestore timestamp to Date
   const convertTimestamp = (timestamp) => {
     if (!timestamp) return null;
@@ -149,6 +163,7 @@ const PurchaseOrdersList = ({
       contact: getVendorContact(order),
       email: getVendorEmail(order),
       phone: getVendorPhone(order),
+      address: getVendorAddress(order),
     };
 
     console.log(vendorData.name);
