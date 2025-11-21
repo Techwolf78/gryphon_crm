@@ -228,46 +228,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
     fetchTrainingDetails();
   }, [training]);
 
-  useEffect(() => {
-    setTable1DataByDomain((prev) => {
-      const updated = { ...prev };
-      selectedDomains.forEach((domain) => {
-        if (!updated[domain] || updated[domain].length === 0) {
-          const domainHours = getDomainHours(domain, getMainPhase());
-          updated[domain] = courses.map((course) => ({
-            batch: course.specialization,
-            stdCount: course.students,
-            hrs: domainHours,
-            assignedHours: 0,
-            batches: [
-              {
-                batchPerStdCount: "",
-                batchCode: `${course.specialization}1`,
-                assignedHours: 0,
-                trainers: [],
-              },
-            ],
-          }));
-        }
-      });
-      // Store original table data for undo functionality (only if not already set)
-      if (Object.keys(originalTable1DataByDomain.current).length === 0) {
-        originalTable1DataByDomain.current = JSON.parse(JSON.stringify(updated));
-      }
-      return updated;
-    });
-    
-    // Store original custom phase hours for undo functionality (only if not already set)
-    if (Object.keys(originalCustomPhaseHours.current).length === 0) {
-      originalCustomPhaseHours.current = JSON.parse(JSON.stringify(customPhaseHours));
-    }
-    
-    // Store original selected domains for undo functionality (only if not already set)
-    if (originalSelectedDomains.current.length === 0) {
-      originalSelectedDomains.current = [...selectedDomains];
-    }
-  }, [selectedDomains, courses, topics, getDomainHours, getMainPhase, customPhaseHours]);
-
   // Track changes for undo functionality
   useEffect(() => {
     const hasTableDataChanged = JSON.stringify(table1DataByDomain) !== JSON.stringify(originalTable1DataByDomain.current);
@@ -1189,30 +1149,37 @@ function InitiationModal({ training, onClose, onConfirm }) {
           return restoredRow;
         });
 
-        // Always generate rows for all courses, merging with existing data
-        const existingRows = rowsForDomain || [];
-        const existingMap = new Map(existingRows.map(row => [row.batch, row]));
+        // Start with existing saved data
+        loadedTable1Data[domain] = [...rowsForDomain];
+
+        // Add any new courses that are not already included in existing batches (considering merged batches)
         const domainHours = getDomainHours(domain, currentPhase);
-        loadedTable1Data[domain] = courses.map((course) => {
-          const existing = existingMap.get(course.specialization);
-          if (existing) {
-            // Update stdCount in case it changed
-            return { ...existing, stdCount: course.students };
+        courses.forEach((course) => {
+          const spec = course.specialization;
+          const isAlreadyIncluded = rowsForDomain.some(row => {
+            if (row.batch === spec) return true;
+            if (row.batch.includes('+')) {
+              const parts = row.batch.split('+');
+              return parts.includes(spec);
+            }
+            return false;
+          });
+          if (!isAlreadyIncluded) {
+            loadedTable1Data[domain].push({
+              batch: spec,
+              stdCount: course.students,
+              hrs: domainHours,
+              assignedHours: 0,
+              batches: [
+                {
+                  batchPerStdCount: "",
+                  batchCode: `${spec}1`,
+                  assignedHours: 0,
+                  trainers: [],
+                },
+              ],
+            });
           }
-          return {
-            batch: course.specialization,
-            stdCount: course.students,
-            hrs: domainHours,
-            assignedHours: 0,
-            batches: [
-              {
-                batchPerStdCount: "",
-                batchCode: `${course.specialization}1`,
-                assignedHours: 0,
-                trainers: [],
-              },
-            ],
-          };
         });
       }
 

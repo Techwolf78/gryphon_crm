@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, addDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
 import AddJD from "../AddJd/AddJD";
 import CompanyDetailsModal from "./CompanyDetailsModal";
@@ -228,7 +228,8 @@ function CompanyOpen() {
           const studentsWithMeta = uploadData.students.map(student => ({
             ...student,
             uploadedAt: uploadData.uploadedAt,
-            college: uploadData.college
+            college: uploadData.college,
+            uploadId: doc.id
           }));
           allStudents.push(...studentsWithMeta);
         }
@@ -243,20 +244,27 @@ function CompanyOpen() {
 
   // TrainingForms se students fetch karne ka function
   const fetchTrainingFormStudents = async (collegeName) => {
+    console.log('fetchTrainingFormStudents called for college:', collegeName);
+    
     if (!collegeName) return [];
     
     try {
       const collegeAbbr = getCollegeAbbreviation(collegeName);
+      console.log('College abbreviation for fetching:', collegeAbbr);
+      
       const trainingFormsSnapshot = await getDocs(collection(db, "trainingForms"));
+      console.log('Training forms documents found:', trainingFormsSnapshot.docs.length);
       
       let allStudents = [];
       
       for (const docSnap of trainingFormsSnapshot.docs) {
         const docId = docSnap.id;
+        console.log('Checking document:', docId, 'starts with:', collegeAbbr, '?', docId.startsWith(collegeAbbr));
         
         if (docId.startsWith(collegeAbbr)) {
           const studentsRef = collection(doc(db, "trainingForms", docId), "students");
           const studentsSnapshot = await getDocs(studentsRef);
+          console.log('Students in document', docId, ':', studentsSnapshot.docs.length);
           
           const students = studentsSnapshot.docs.map(doc => ({
             id: doc.id,
@@ -267,10 +275,181 @@ function CompanyOpen() {
         }
       }
       
+      console.log('Total training form students fetched:', allStudents.length);
       return allStudents;
     } catch (error) {
       console.error("Error fetching training form students:", error);
       return [];
+    }
+  };
+
+  // Function to delete unmatched student from backend
+  const deleteUnmatchedStudent = async (student, company) => {
+    if (!student || !company?.companyName) return;
+    
+    try {
+      const companyCode = company.companyName.replace(/\s+/g, '_').toUpperCase();
+      const uploadsCollectionRef = collection(db, 'studentList', companyCode, 'uploads');
+      
+      // Get all upload documents to find the one containing this student
+      const querySnapshot = await getDocs(uploadsCollectionRef);
+      
+      let foundUploadDoc = null;
+      let foundUploadId = null;
+      
+      // Search through all upload documents
+      for (const uploadDoc of querySnapshot.docs) {
+        const uploadData = uploadDoc.data();
+        if (uploadData.students && Array.isArray(uploadData.students)) {
+          const studentExists = uploadData.students.some(s => 
+            s.email === student.email && s.studentName === student.studentName
+          );
+          if (studentExists) {
+            foundUploadDoc = uploadDoc;
+            foundUploadId = uploadDoc.id;
+            break;
+          }
+        }
+      }
+      
+      if (!foundUploadDoc) {
+        console.error('Student not found in any upload document:', student.studentName);
+        return;
+      }
+      
+      const uploadData = foundUploadDoc.data();
+      const updatedStudents = uploadData.students.filter(s => 
+        !(s.email === student.email && s.studentName === student.studentName)
+      );
+      
+      const uploadDocRef = doc(db, 'studentList', companyCode, 'uploads', foundUploadId);
+      await updateDoc(uploadDocRef, {
+        students: updatedStudents,
+        updatedAt: new Date()
+      });
+      
+      console.log('Student deleted successfully from backend:', student.studentName);
+    } catch (error) {
+      console.error('Error deleting student from backend:', error);
+      alert('Failed to delete student. Please try again.');
+    }
+  };
+
+  // Function to accept unmatched student - add to training forms
+  const acceptUnmatchedStudent = async (student, company) => {
+    console.log('acceptUnmatchedStudent called with student:', student.studentName, 'company:', company.companyName);
+    
+    if (!student || !company?.college) return;
+    
+    try {
+      // Get college abbreviation
+      const collegeAbbr = getCollegeAbbreviation(company.college);
+      console.log('College abbreviation:', collegeAbbr);
+      
+      // Find the existing training form document for this college
+      const trainingFormsSnapshot = await getDocs(collection(db, "trainingForms"));
+      let targetDocId = null;
+      
+      for (const docSnap of trainingFormsSnapshot.docs) {
+        const docId = docSnap.id;
+        if (docId.startsWith(collegeAbbr)) {
+          targetDocId = docId;
+          break;
+        }
+      }
+      
+      if (!targetDocId) {
+        // If no existing document found, create one with college abbreviation
+        targetDocId = collegeAbbr;
+        console.log('No existing training form document found, will create:', targetDocId);
+      }
+      
+      console.log('Target training form document:', targetDocId);
+      
+      // Reference to training forms students collection
+      const trainingStudentsRef = collection(db, 'trainingForms', targetDocId, 'students');
+      console.log('Training students ref path:', `trainingForms/${targetDocId}/students`);
+      
+      // Check if student already exists in training forms
+      const existingStudentsQuery = await getDocs(trainingStudentsRef);
+      console.log('Existing students in training forms:', existingStudentsQuery.docs.length);
+      const studentExists = existingStudentsQuery.docs.some(doc => {
+        const data = doc.data();
+        return data['EMAIL ID']?.toLowerCase().trim() === student.email?.toLowerCase().trim() || 
+               data['FULL NAME OF STUDENT']?.toLowerCase().trim() === student.studentName?.toLowerCase().trim();
+      });
+      
+      if (studentExists) {
+        alert('Student already exists in training data!');
+        console.log('Student already exists in training forms:', student.studentName);
+        return;
+      }
+      
+      // Map upload student data to training forms schema
+      const trainingStudentData = {
+        'FULL NAME OF STUDENT': student.studentName,
+        'EMAIL ID': student.email,
+        'PHONE NUMBER': student.phone || '',
+        'ENROLLMENT NUMBER': student.enrollmentNo || '',
+        'COURSE': student.course || '',
+        'SPECIALIZATION': student.specialization || '',
+        'CURRENT YEAR': student.currentYear || '',
+        '10TH MARKS %': student.tenthMarks || '',
+        '12TH MARKS %': student.twelfthMarks || '',
+        'CGPA': student.cgpa || '',
+        'ACTIVE BACKLOGS': student.activeBacklogs || 0,
+        'GENDER': student.gender || '',
+        'COLLEGE': student.college || company.college,
+        'STATUS': 'active',
+        'CREATED_AT': new Date(),
+        'ACCEPTED_FROM_COMPANY': company.companyName,
+        'SOURCE': 'manual_acceptance'
+      };
+      
+      console.log('Adding student data to training forms:', trainingStudentData);
+      // Add to training forms
+      await addDoc(trainingStudentsRef, trainingStudentData);
+      
+      // Add a small delay to ensure Firestore consistency
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      console.log('Student accepted and added to training forms:', student.studentName);
+      
+      // Optional: Update status in upload document to mark as accepted
+      try {
+        const companyCode = company.companyName.replace(/\s+/g, '_').toUpperCase();
+        const uploadsCollectionRef = collection(db, 'studentList', companyCode, 'uploads');
+        const querySnapshot = await getDocs(uploadsCollectionRef);
+        
+        for (const uploadDoc of querySnapshot.docs) {
+          const uploadData = uploadDoc.data();
+          if (uploadData.students && Array.isArray(uploadData.students)) {
+            const studentIndex = uploadData.students.findIndex(s => 
+              s.email === student.email && s.studentName === student.studentName
+            );
+            if (studentIndex !== -1) {
+              // Mark student as accepted in upload document
+              uploadData.students[studentIndex].acceptedStatus = 'accepted';
+              uploadData.students[studentIndex].acceptedAt = new Date();
+              
+              const uploadDocRef = doc(db, 'studentList', companyCode, 'uploads', uploadDoc.id);
+              await updateDoc(uploadDocRef, {
+                students: uploadData.students,
+                updatedAt: new Date()
+              });
+              console.log('Updated acceptance status in upload document for:', student.studentName);
+              break;
+            }
+          }
+        }
+      } catch (updateError) {
+        console.warn('Could not update acceptance status in upload document:', updateError);
+        // Don't fail the whole operation for this
+      }
+      
+    } catch (error) {
+      console.error('Error accepting student:', error);
+      alert('Failed to accept student. Please try again.');
     }
   };
 
@@ -393,6 +572,8 @@ function CompanyOpen() {
           fetchCompanyStudents={fetchCompanyStudents}
           fetchTrainingFormStudents={fetchTrainingFormStudents}
           onMatchStatsUpdate={handleMatchStatsUpdate}
+          deleteUnmatchedStudent={deleteUnmatchedStudent}
+          acceptUnmatchedStudent={acceptUnmatchedStudent}
         />
 
         {selectedCompany && (

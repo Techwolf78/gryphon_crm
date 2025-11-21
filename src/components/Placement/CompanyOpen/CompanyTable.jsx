@@ -127,7 +127,6 @@ const RoundStatus = ({
   roundIndex,
   eligibleStudents = [],
   currentSelected = [],
-  isFirstRound = false,
 }) => {
   const statusConfig =
     roundStatusOptions.find((option) => option.value === status) ||
@@ -139,8 +138,6 @@ const RoundStatus = ({
     e.stopPropagation();
     e.nativeEvent.stopImmediatePropagation();
 
-    console.log(`Opening student modal for ${roundName}, eligible: ${eligibleStudents.length}, currently selected: ${currentSelected.length}`);
-    
     // Call parent function to open modal
     onStudentSelection(eligibleStudents, roundName, currentSelected, companyId, roundIndex);
   };
@@ -210,6 +207,8 @@ function CompanyTable({
   fetchCompanyStudents,
   fetchTrainingFormStudents,
   onMatchStatsUpdate,
+  deleteUnmatchedStudent,
+  acceptUnmatchedStudent,
 }) {
   const [expandedCompanies, setExpandedCompanies] = useState({});
   const [selectedCompanyForStudents, setSelectedCompanyForStudents] = useState(null);
@@ -243,7 +242,6 @@ function CompanyTable({
         },
       };
 
-      console.log(`Company ${companyId}, Round ${roundIndex} selected:`, selectedStudentIds);
       return updated;
     });
   };
@@ -261,7 +259,7 @@ const handleOpenStudentModal = React.useCallback((students, roundName, currentSe
       roundIndex
     });
   } else {
-    console.log('No students available for selection');
+    // No students available for selection
   }
 }, []);
 
@@ -299,8 +297,9 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
 
     // Filter companyStudents based on previous round selection
     return companyStudents.filter((student) => {
-      const studentId = student.id || student.email || student.studentName;
-      return previousRoundStudents.includes(studentId);
+      return previousRoundStudents.some(selected => 
+        selected.studentName === student.studentName && selected.email === student.email
+      );
     });
   };
 
@@ -309,11 +308,6 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
     const companyRounds = roundStudents[companyId];
     if (!companyRounds || !companyRounds[roundIndex]) return [];
     return companyRounds[roundIndex];
-  };
-
-  // Function to get student count for a specific round
-  const getRoundStudentCount = (companyId, roundIndex) => {
-    return getCurrentSelectedForRound(companyId, roundIndex).length;
   };
 
   const getStudentsForCompany = async (company) => {
@@ -343,6 +337,7 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
       setLoadingMatches((prev) => ({ ...prev, [company.companyName]: true }));
 
       const studentListStudents = await fetchCompanyStudents(company);
+      
       const trainingFormStudents = await fetchTrainingFormStudents(
         company.college
       );
@@ -352,12 +347,14 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
       studentListStudents.forEach((studentListStudent) => {
         const matched = trainingFormStudents.some((trainingStudent) => {
           const nameMatch =
-            studentListStudent.studentName?.toLowerCase() ===
-            trainingStudent["FULL NAME OF STUDENT"]?.toLowerCase();
+            studentListStudent.studentName?.toLowerCase().trim() ===
+            trainingStudent["FULL NAME OF STUDENT"]?.toLowerCase().trim();
           const emailMatch =
-            studentListStudent.email?.toLowerCase() ===
-            trainingStudent["EMAIL ID"]?.toLowerCase();
-          return nameMatch || emailMatch;
+            studentListStudent.email?.toLowerCase().trim() ===
+            trainingStudent["EMAIL ID"]?.toLowerCase().trim();
+          const isMatch = nameMatch || emailMatch;
+          
+          return isMatch;
         });
 
         if (!matched) {
@@ -455,6 +452,25 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
     setSelectedCompanyForStudents(null);
   };
 
+  // Handle student deletion - refetch data
+  const handleStudentDeleted = async () => {
+    if (selectedCompanyForStudents) {
+      const company = selectedCompanyForStudents;
+      
+      const students = await fetchCompanyStudents(company);
+      
+      const matchStats = await checkStudentMatches(company);
+
+      const updatedCompanyWithStudents = {
+        ...company,
+        studentList: students,
+        matchStats: matchStats,
+      };
+      
+      setSelectedCompanyForStudents(updatedCompanyWithStudents);
+    }
+  };
+
   // Calculate stats for company group
   const getCompanyStats = (companies, companyName) => {
     const uniqueColleges = [
@@ -496,7 +512,6 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
     );
     
     const currentSelected = getCurrentSelectedForRound(company.id, index);
-    const isFirstRound = index === 0;
 
     return (
       <RoundStatus
@@ -507,7 +522,6 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
         totalStudents={eligibleStudents.length}
         eligibleStudents={eligibleStudents}
         currentSelected={currentSelected}
-        isFirstRound={isFirstRound}
         onClick={(e) => {
           e.stopPropagation();
           handleRoundStatusClick(
@@ -535,6 +549,10 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
           onClose={handleCloseStudentView}
           companyName={selectedCompanyForStudents.companyName}
           collegeName={selectedCompanyForStudents.college}
+          deleteUnmatchedStudent={deleteUnmatchedStudent}
+          company={selectedCompanyForStudents}
+          onStudentDeleted={handleStudentDeleted}
+          acceptUnmatchedStudent={acceptUnmatchedStudent}
         />
       )}
 
