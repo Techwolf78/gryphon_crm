@@ -1194,6 +1194,33 @@ function InitiationModal({ training, onClose, onConfirm }) {
     fetchPhaseDomains();
   }, [training?.id, currentPhase, courses, getDomainHours]);
 
+  // Initialize table1Data for newly selected domains with courses
+  useEffect(() => {
+    setTable1DataByDomain(prev => {
+      const newData = { ...prev };
+      selectedDomains.forEach(domain => {
+        if (!newData[domain] || newData[domain].length === 0) {
+          const domainHours = getDomainHours(domain, currentPhase);
+          newData[domain] = courses.map(course => ({
+            batch: course.specialization,
+            stdCount: course.students,
+            hrs: domainHours,
+            assignedHours: 0,
+            batches: [
+              {
+                batchPerStdCount: "",
+                batchCode: `${course.specialization}1`,
+                assignedHours: 0,
+                trainers: [],
+              },
+            ],
+          }));
+        }
+      });
+      return newData;
+    });
+  }, [selectedDomains, courses, currentPhase, getDomainHours]);
+
   // Load phase-specific data when currentPhase is set
   useEffect(() => {
     if (!training?.id || !currentPhase) return;
