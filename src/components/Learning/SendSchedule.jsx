@@ -448,7 +448,6 @@ useEffect(() => {
   <td>${getTimingForSlot(assignment.dayDuration)}</td>
   <td>${hoursPerDay.toFixed(2)}</td>
   <td>₹ ${assignment.rate || 0}</td>
-  <td>₹ ${perDayCost.toFixed(2)}</td>
 </tr>`;
         })
         .join("");
