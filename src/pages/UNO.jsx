@@ -101,6 +101,9 @@ const UNO = () => {
   const [showCreateOptionsModal, setShowCreateOptionsModal] = useState(false);
   const [showShareLinkModal, setShowShareLinkModal] = useState(false);
   const [createdGameId, setCreatedGameId] = useState('');
+  const [showMultiplayerSettingsModal, setShowMultiplayerSettingsModal] = useState(false);
+  const [numPlayersSelected, setNumPlayersSelected] = useState(2);
+  const [includeBots, setIncludeBots] = useState(false);
 
   const [deck, setDeck] = useState([]);
   const [discard, setDiscard] = useState([]);
@@ -113,8 +116,11 @@ const UNO = () => {
   const [numPlayers, setNumPlayers] = useState(4);
   const [timeLeft, setTimeLeft] = useState(0); // in seconds
   const [showColorModal, setShowColorModal] = useState(false);
+  /* eslint-disable-next-line no-unused-vars */
   const [pendingWild, setPendingWild] = useState(null);
   const [unoCalled, setUnoCalled] = useState([]);
+  const [expectedPlayers, setExpectedPlayers] = useState(4);
+  const [gameStarted, setGameStarted] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [turnTimeLeft, setTurnTimeLeft] = useState(10);
 
@@ -123,15 +129,25 @@ const UNO = () => {
     useSensor(KeyboardSensor)
   );
 
-  const createGame = async (withBots = true) => {
+  const chooseColor = (color) => {
+    setCurrentColor(color);
+    setShowColorModal(false);
+    setWildChosen(true);
+    if (pendingWild) {
+      playCard(pendingWild.playerIndex, pendingWild.cardIndex);
+      setPendingWild(null);
+    }
+  };
+
+  const createGame = async (withBots = true, totalPlayers = 4, expectedPlayers = 4) => {
     if (!user) return;
     const newGameId = Math.random().toString(36).substr(2, 9);
     const gameRef = ref(rtdb, 'unoGames/' + newGameId);
-    const players = [{ uid: user.uid, name: user.displayName || user.email, hand: [] }];
+    const players = [{ uid: user.uid, name: 'Player 1', hand: [] }];
     if (withBots) {
-      players.push({ uid: 'bot1', name: 'Bot 1', hand: [] });
-      players.push({ uid: 'bot2', name: 'Bot 2', hand: [] });
-      players.push({ uid: 'bot3', name: 'Bot 3', hand: [] });
+      for (let i = 1; i < totalPlayers; i++) {
+        players.push({ uid: 'bot' + i, name: 'Bot ' + i, hand: [] });
+      }
     }
     const initialGameState = {
       deck: shuffle(createDeck()),
@@ -143,6 +159,8 @@ const UNO = () => {
       gameOver: false,
       winner: null,
       numPlayers: players.length,
+      expectedPlayers: expectedPlayers,
+      gameStarted: withBots && totalPlayers === expectedPlayers,
       timeLimit: 10,
       timeLeft: 10 * 60,
       unoCalled: new Array(players.length).fill(false),
@@ -162,7 +180,8 @@ const UNO = () => {
     setGameId(newGameId);
     setPlayerIndex(0);
     setShowCreateOptionsModal(false);
-    if (withBots) {
+    setShowMultiplayerSettingsModal(false);
+    if (withBots && totalPlayers === 4) {
       setShowMultiplayerModal(false);
     } else {
       setCreatedGameId(newGameId);
@@ -176,13 +195,14 @@ const UNO = () => {
     const gameSnap = await get(gameRef);
     if (gameSnap.exists()) {
       const gameData = gameSnap.val();
-      if (gameData.players.length < 4) {
-        const newPlayers = [...gameData.players, { uid: user.uid, name: user.displayName || user.email, hand: [] }];
+      if (gameData.players.filter(p => !p.uid.startsWith('bot')).length < gameData.expectedPlayers) {
+        const newPlayers = [...gameData.players, { uid: user.uid, name: 'Player ' + (gameData.players.length + 1), hand: [] }];
         // Deal cards to new player
         for (let i = 0; i < 7; i++) {
           newPlayers[newPlayers.length - 1].hand.push(gameData.deck.pop());
         }
-        await update(gameRef, { players: newPlayers, deck: gameData.deck, numPlayers: newPlayers.length });
+        const updateObj = { players: newPlayers, deck: gameData.deck, numPlayers: newPlayers.length, unoCalled: [...gameData.unoCalled, false] };
+        await update(gameRef, updateObj);
         setGameId(joinGameId);
         setPlayerIndex(newPlayers.length - 1);
         setShowMultiplayerModal(false);
@@ -212,6 +232,9 @@ const UNO = () => {
         setUnoCalled(data.unoCalled);
         setFullPlayers(data.players);
         setPlayerNames(data.players.map(p => p.name));
+        setExpectedPlayers(data.expectedPlayers);
+        setGameStarted(data.gameStarted);
+        setTurnTimeLeft(data.turnTimeLeft);
       }
     });
     return unsubscribe;
@@ -225,6 +248,7 @@ const UNO = () => {
   }, [currentColor]);
 
   const playCard = useCallback(async (playerIndex, cardIndex) => {
+    if (!gameStarted) return;
     if (!players[playerIndex] || !players[playerIndex][cardIndex]) return;
     const card = players[playerIndex][cardIndex];
     const topCard = discard[discard.length - 1];
@@ -321,9 +345,10 @@ const UNO = () => {
     }
 
     await update(gameRef, updateData);
-  }, [players, discard, isValidPlay, gameId, fullPlayers, user.uid, wildChosen]);
+  }, [players, discard, isValidPlay, gameId, fullPlayers, user.uid, wildChosen, gameStarted]);
 
   const drawCard = useCallback(async (playerIndex) => {
+    if (!gameStarted) return;
     const gameRef = ref(rtdb, 'unoGames/' + gameId);
     const gameSnap = await get(gameRef);
     if (!gameSnap.exists()) return;
@@ -349,25 +374,16 @@ const UNO = () => {
       currentPlayer: newCurrentPlayer,
     });
     setErrorMessage('');
-  }, [gameId]);
+  }, [gameId, gameStarted]);
 
   const handleDragStart = (event) => {
     setDraggedCard(event.active.id);
   };
 
-  const chooseColor = (color) => {
-    setCurrentColor(color);
-    setShowColorModal(false);
-    setWildChosen(true);
-    if (pendingWild) {
-      playCard(pendingWild.playerIndex, pendingWild.cardIndex);
-      setPendingWild(null);
-    }
-  };
-
   const handleDragEnd = (event) => {
     const { active, over } = event;
     setDraggedCard(null);
+    if (!gameStarted) return;
     if (over && over.id === 'discard' && currentPlayer === playerIndex) {
       const cardIndex = parseInt(active.id.split('-')[1]);
       const card = players[playerIndex][cardIndex];
@@ -382,7 +398,7 @@ const UNO = () => {
 
   // Bot turns
   useEffect(() => {
-    if (currentPlayer !== playerIndex && !gameOver && fullPlayers[currentPlayer]?.uid.startsWith('bot')) {
+    if (!gameStarted || currentPlayer !== playerIndex && !gameOver && fullPlayers[currentPlayer]?.uid.startsWith('bot')) {
       const timer = setTimeout(() => {
         try {
           const botHand = players[currentPlayer];
@@ -410,7 +426,7 @@ const UNO = () => {
       }, 2500); // 2.5 second delay for bots to "think"
       return () => clearTimeout(timer);
     }
-  }, [currentPlayer, playerIndex, players, discard, gameOver, isValidPlay, playCard, drawCard, fullPlayers]);
+  }, [currentPlayer, playerIndex, players, discard, gameOver, isValidPlay, playCard, drawCard, fullPlayers, gameStarted]);
 
   useEffect(() => {
     if (turnTimeLeft > 0 && !gameOver && currentPlayer === playerIndex) {
@@ -448,9 +464,9 @@ const UNO = () => {
       });
       const winnerIndex = winners[Math.floor(Math.random() * winners.length)];
       setGameOver(true);
-      setWinner(winnerIndex === 0 ? 'Human' : `Bot ${winnerIndex}`);
+      setWinner(playerNames[winnerIndex] || `Player ${winnerIndex + 1}`);
     }
-  }, [timeLeft, gameOver, players]);
+  }, [timeLeft, gameOver, players, playerNames]);
 
   if (showMultiplayerModal) {
     return (
@@ -498,10 +514,10 @@ const UNO = () => {
               Play with Bots
             </button>
             <button
-              onClick={() => createGame(false)}
+              onClick={() => { setShowCreateOptionsModal(false); setShowMultiplayerSettingsModal(true); }}
               className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
             >
-              Create Multiplayer Room
+              Create Room
             </button>
           </div>
           <button
@@ -534,6 +550,32 @@ const UNO = () => {
           >
             Back
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (showMultiplayerSettingsModal) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-100">
+        <div className="bg-white p-6 rounded-lg shadow-lg">
+          <h2 className="text-2xl font-bold mb-4">Room Settings</h2>
+          <div className="mb-4">
+            <label className="block mb-2">Number of Human Players (1-4):</label>
+            <select value={numPlayersSelected} onChange={(e) => setNumPlayersSelected(parseInt(e.target.value))} className="border border-gray-300 rounded px-3 py-2">
+              <option value={2}>2</option>
+              <option value={3}>3</option>
+              <option value={4}>4</option>
+            </select>
+          </div>
+          <div className="mb-4">
+            <label className="flex items-center">
+              <input type="checkbox" checked={includeBots} onChange={(e) => setIncludeBots(e.target.checked)} className="mr-2" />
+              Include bots for remaining players
+            </label>
+          </div>
+          <button onClick={() => createGame(includeBots, includeBots ? 4 : numPlayersSelected, numPlayersSelected)} className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 mr-4">Create Room</button>
+          <button onClick={() => { setShowMultiplayerSettingsModal(false); setShowCreateOptionsModal(true); }} className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">Back</button>
         </div>
       </div>
     );
@@ -575,19 +617,44 @@ const UNO = () => {
     );
   }
 
+  if (!gameStarted) {
+    const isHost = fullPlayers[0]?.uid === user.uid;
+    const humanCount = fullPlayers.filter(p => !p.uid.startsWith('bot')).length;
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-100">
+        <div className="bg-white p-6 rounded-lg shadow-lg">
+          <h2 className="text-2xl font-bold mb-4">Waiting for Players...</h2>
+          <p>Players joined: {humanCount} / {expectedPlayers}</p>
+          {isHost && humanCount === expectedPlayers && (
+            <button
+              onClick={() => {
+                const gameRef = ref(rtdb, 'unoGames/' + gameId);
+                update(gameRef, { gameStarted: true });
+              }}
+              className="mt-4 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+            >
+              Start Game
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="flex flex-col items-center p-4">
-        <h1 className="text-2xl font-bold mb-4">UNO Game</h1>
-        <div className="mb-2 text-sm">Game ID: {gameId}</div>
-        <button onClick={() => { setGameId(null); setShowMultiplayerModal(true); }} className="mb-2 px-4 py-2 bg-red-500 text-white rounded">Exit Game</button>
-        <div className="mb-4 text-lg">Time Left: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')} | Turn Time: {turnTimeLeft}</div>
-        {errorMessage && <div className="mb-4 text-red-500">{errorMessage}</div>}
-        <div className="relative w-full max-w-4xl h-96">
-          {/* Bot 1 (right) */}
-          {numPlayers >= 2 && (
+      <div className="flex p-4">
+        <div className="flex-1 flex flex-col items-center">
+          <h1 className="text-2xl font-bold mb-4">UNO Game</h1>
+          <div className="mb-2 text-sm">Game ID: {gameId}</div>
+          <button onClick={() => { setGameId(null); setShowMultiplayerModal(true); }} className="mb-2 px-4 py-2 bg-red-500 text-white rounded">Exit Game</button>
+          <div className="mb-4 text-lg">Time Left: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')} | Turn Time: {turnTimeLeft}</div>
+          {errorMessage && <div className="mb-4 text-red-500">{errorMessage}</div>}
+          <div className="relative w-full max-w-4xl h-96">
+          {/* Player 2 (right) */}
+          {numPlayers >= 2 && players[1] && (
             <div className="absolute right-0 top-1/2 transform -translate-y-1/2 flex flex-col items-center">
-              <div className="text-sm mb-2 transform rotate-90">{currentPlayer === 1 ? <span className="font-bold text-red-500">CU </span> : ''}{playerNames[1]} ({players[1]?.length || 0} cards)</div>
+              <div className="text-sm mb-2 transform rotate-90">{currentPlayer === 1 ? <span className="font-bold text-red-500">CU </span> : ''}{playerNames[1] || 'Player 2'} ({players[1]?.length || 0} cards)</div>
               <div className="flex flex-col space-y-1">
                 {players[1]?.map((_, i) => (
                   <div key={i} className="w-8 h-12 bg-blue-500 rounded"></div>
@@ -595,10 +662,10 @@ const UNO = () => {
               </div>
             </div>
           )}
-          {/* Bot 2 (top) */}
-          {numPlayers >= 3 && (
+          {/* Player 3 (top) */}
+          {numPlayers >= 3 && players[2] && (
             <div className="absolute top-0 left-1/2 transform -translate-x-1/2 flex flex-col items-center">
-              <div className="text-sm mb-2">{currentPlayer === 2 ? <span className="font-bold text-red-500">CU </span> : ''}{playerNames[2]} ({players[2]?.length || 0} cards)</div>
+              <div className="text-sm mb-2">{currentPlayer === 2 ? <span className="font-bold text-red-500">CU </span> : ''}{playerNames[2] || 'Player 3'} ({players[2]?.length || 0} cards)</div>
               <div className="flex space-x-1">
                 {players[2]?.map((_, i) => (
                   <div key={i} className="w-8 h-12 bg-green-500 rounded"></div>
@@ -606,10 +673,10 @@ const UNO = () => {
               </div>
             </div>
           )}
-          {/* Bot 3 (left) */}
-          {numPlayers >= 4 && (
+          {/* Player 4 (left) */}
+          {numPlayers >= 4 && players[3] && (
             <div className="absolute left-0 top-1/2 transform -translate-y-1/2 flex flex-col items-center">
-              <div className="text-sm mb-2 transform -rotate-90">{currentPlayer === 3 ? <span className="font-bold text-red-500">CU </span> : ''}{playerNames[3]} ({players[3]?.length || 0} cards)</div>
+              <div className="text-sm mb-2 transform -rotate-90">{currentPlayer === 3 ? <span className="font-bold text-red-500">CU </span> : ''}{playerNames[3] || 'Player 4'} ({players[3]?.length || 0} cards)</div>
               <div className="flex flex-col space-y-1">
                 {players[3]?.map((_, i) => (
                   <div key={i} className="w-8 h-12 bg-yellow-500 rounded"></div>
@@ -622,6 +689,7 @@ const UNO = () => {
             <div className="flex flex-col items-center">
               <div className="text-sm mb-2">Deck ({deck.length})</div>
               <div className="w-20 h-28 bg-gray-300 rounded-lg flex items-center justify-center cursor-pointer" onClick={() => {
+                if (!gameStarted) return;
                 if (currentPlayer === playerIndex) {
                   const hasValid = players[playerIndex].some(card => isValidPlay(card, discard[discard.length - 1]));
                   if (hasValid) {
@@ -638,7 +706,7 @@ const UNO = () => {
           </div>
           {/* Human (bottom) */}
           <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 flex flex-col items-center">
-            <div className="text-sm mb-2">{currentPlayer === playerIndex ? <span className="font-bold text-red-500">CU </span> : ''}{playerNames[playerIndex] || 'Player'} ({players[playerIndex]?.length || 0} cards)</div>
+            <div className="text-sm mb-2">{currentPlayer === playerIndex ? <span className="font-bold text-red-500">CU </span> : ''}You ({players[playerIndex]?.length || 0} cards)</div>
             <div className="flex space-x-1">
               {(players[playerIndex] || []).map((card, i) => (
                 <Card key={`human-${i}`} card={card} id={`human-${i}`} />
@@ -652,8 +720,9 @@ const UNO = () => {
           </div>
         </div>
         <div className="mt-4 text-center">
-          <p>Current Player: {playerNames[currentPlayer] || 'Player'}</p>
+          <p>Current Player: {currentPlayer === playerIndex ? 'You' : (playerNames[currentPlayer] || 'Player')}</p>
           <p>Current Color: {currentColor}</p>
+        </div>
         </div>
       </div>
       <DragOverlay>
