@@ -624,6 +624,13 @@ const UNO = () => {
       <div className="flex items-center justify-center min-h-screen bg-gray-100">
         <div className="bg-white p-6 rounded-lg shadow-lg">
           <h2 className="text-2xl font-bold mb-4">Waiting for Players...</h2>
+          <p className="mb-4">Game ID: {gameId}</p>
+          <button
+            onClick={() => navigator.clipboard.writeText(gameId)}
+            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 mr-4"
+          >
+            Copy ID
+          </button>
           <p>Players joined: {humanCount} / {expectedPlayers}</p>
           {isHost && humanCount === expectedPlayers && (
             <button
