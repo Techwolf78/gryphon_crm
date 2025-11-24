@@ -22,7 +22,9 @@ const HR = () => {
     setActiveTab(tab);
     try {
       localStorage.setItem("hr_activeTab", tab);
-    } catch {}
+    } catch {
+      // Ignore localStorage errors
+    }
   };
 
   // Calculate active tab index for sliding indicator

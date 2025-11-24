@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { XIcon, DownloadIcon, TrashIcon, CheckIcon } from '@heroicons/react/outline';
+import { XIcon, DownloadIcon } from '@heroicons/react/outline';
 import * as XLSX from 'xlsx';
 
-const StudentDataView = ({ students, onClose, companyName, collegeName, unmatchedStudents = [], deleteUnmatchedStudent, company, onStudentDeleted, acceptUnmatchedStudent }) => {
+const StudentDataView = ({ students, onClose, companyName, collegeName, unmatchedStudents = [] }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, _setStatusFilter] = useState('all');
 
@@ -23,8 +23,7 @@ const StudentDataView = ({ students, onClose, companyName, collegeName, unmatche
     { displayName: 'GENDER', fieldName: 'gender' },
     { displayName: 'COLLEGE', fieldName: 'college' },
     { displayName: 'UPLOAD DATE', fieldName: 'uploadedAt' },
-    { displayName: 'MATCH STATUS', fieldName: 'isMatched' },
-    { displayName: 'ACTIONS', fieldName: 'actions', isActions: true }
+    { displayName: 'MATCH STATUS', fieldName: 'isMatched' }
   ], []);
 
   // Normalize student data - map different field names to consistent ones
@@ -66,7 +65,7 @@ const StudentDataView = ({ students, onClose, companyName, collegeName, unmatche
     return columnMapping.filter(col => {
       if (col.isSrNo) return true; // Always show SR NO
       if (col.fieldName === 'isMatched') return true; // Always show match status
-      if (col.isActions) return true; // Always show actions
+      // Removed: if (col.isActions) return true; // Always show actions
       
       // Check if any student has this field with data
       return normalizedStudents.some(student => {
@@ -203,42 +202,6 @@ const StudentDataView = ({ students, onClose, companyName, collegeName, unmatche
     return { matched, unmatched, total: normalizedStudents.length };
   }, [normalizedStudents]);
 
-  // Handle delete unmatched student
-  const handleDeleteStudent = async (student) => {
-    if (!student.isMatched && deleteUnmatchedStudent && company) {
-      const confirmDelete = window.confirm(`Are you sure you want to delete student "${student.studentName}" from the backend? This action cannot be undone.`);
-      if (confirmDelete) {
-        try {
-          await deleteUnmatchedStudent(student, company);
-          // Refresh the data without reloading the page
-          if (onStudentDeleted) {
-            await onStudentDeleted();
-          }
-        } catch (error) {
-          console.error('Failed to delete student:', student.studentName, error);
-        }
-      }
-    }
-  };
-
-  // Handle accept unmatched student
-  const handleAcceptStudent = async (student) => {
-    if (!student.isMatched && acceptUnmatchedStudent && company) {
-      const confirmAccept = window.confirm(`Are you sure you want to accept student "${student.studentName}" and add them to the training database?`);
-      if (confirmAccept) {
-        try {
-          await acceptUnmatchedStudent(student, company);
-          // Refresh the data without reloading the page
-          if (onStudentDeleted) {
-            await onStudentDeleted();
-          }
-        } catch (error) {
-          console.error('Failed to accept student:', student.studentName, error);
-        }
-      }
-    }
-  };
-
   return (
     <div className="fixed inset-0 flex items-center justify-center z-60 bg-black bg-opacity-50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-95vw max-h-[95vh] overflow-hidden mx-4">
@@ -331,26 +294,7 @@ const StudentDataView = ({ students, onClose, companyName, collegeName, unmatche
                         {col.isSrNo 
                           ? _index + 1
                           : col.isActions
-                          ? (!student.isMatched ? (
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={() => handleAcceptStudent(student)}
-                                  className="px-3 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600 transition flex items-center gap-1"
-                                  title="Accept this student and add to training database"
-                                >
-                                  <CheckIcon className="h-4 w-4" />
-                                  Accept
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteStudent(student)}
-                                  className="px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 transition flex items-center gap-1"
-                                  title="Delete this student from backend"
-                                >
-                                  <TrashIcon className="h-4 w-4" />
-                                  Delete
-                                </button>
-                              </div>
-                            ) : null)
+                          ? null
                           : formatCellValue(student[col.fieldName], col.fieldName)
                         }
                       </td>

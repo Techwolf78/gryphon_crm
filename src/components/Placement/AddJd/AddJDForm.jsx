@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import specializationOptions from './specializationOptions';
 import { parseSalaryInput, parseStipendInput, formatSalary, formatStipend } from "../../../utils/salaryUtils";
 
-function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClose, placementUsers, isLoadingUsers }) {
+function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClose, placementUsers, isLoadingUsers, jobFiles, setJobFiles }) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [otherRound, setOtherRound] = useState('');
   const [validationErrors, setValidationErrors] = useState({});
@@ -107,930 +107,659 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
   }, [hasUnsavedChanges, onClose]);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {/* Company Info */}
-      <div className="col-span-2">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Company Name<span className="text-red-500 ml-1">*</span>
-        </label>
-        <div className="relative">
-          <input
-            type="text"
-            name="companyName"
-            value={formData.companyName}
-            onChange={handleChange}
-            placeholder="e.g. Acme Corporation"
-            className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-              formErrors.companyName ? "border-red-500" : "border-gray-300"
-            }`}
-          />
-          {formErrors.companyName && (
-            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-              <svg
-                className="h-5 w-5 text-red-500"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </div>
-          )}
-        </div>
-        {formErrors.companyName && (
-          <p className="mt-1 text-sm text-red-600">{formErrors.companyName}</p>
-        )}
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Company Website
-        </label>
-        <input
-          type="text"
-          name="companyWebsite"
-          value={formData.companyWebsite}
-          onChange={handleChange}
-          placeholder="e.g. https://company.com"
-          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-        />
-      </div>
-
-      <div className="col-span-2">
-        <h3 className="text-lg font-semibold text-blue-700 mt-4">Eligibility<span className="text-red-500 ml-1">*</span></h3>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Course/Degree<span className="text-red-500 ml-1">*</span>
-        </label>
-        <div className="relative">
-          <select
-            name="course"
-            value={formData.course}
-            onChange={(e) => {
-              setHasUnsavedChanges(true);
-              setFormData({ ...formData, course: e.target.value, specialization: [] });
-            }}
-            className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white ${
-              formErrors.course ? "border-red-500" : "border-gray-300"
-            }`}
-          >
-            <option value="">Select Course</option>
-            <option>Engineering</option>
-            <option>MBA</option>
-            <option>BBA</option>
-            <option>BCA</option>
-            <option>MCA</option>
-            <option>BSC</option>
-            <option>MSC</option>
-            <option>Diploma</option>
-            <option>Others</option>
-          </select>
-          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-            <svg
-              className="h-4 w-4"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
-              <path
-                fillRule="evenodd"
-                d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                clipRule="evenodd"
-              />
-            </svg>
+    <div className="space-y-4">
+      {/* Company Information */}
+      <div className="bg-gray-50/50 p-3 border border-gray-100">
+        <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+          <div className="w-1 h-4 bg-blue-500 rounded-full mr-2"></div>
+          Company Information
+        </h3>
+        <div className="grid grid-cols-1 gap-3">
+          <div className="bg-white p-3 border border-gray-100">
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Company Name*</label>
+            <input
+              type="text"
+              name="companyName"
+              value={formData.companyName}
+              onChange={handleChange}
+              placeholder="e.g. Acme Corporation"
+              className={`w-full px-3 py-2 text-sm border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                formErrors.companyName ? "border-red-500" : "border-gray-300"
+              }`}
+            />
+            {formErrors.companyName && (
+              <p className="mt-1 text-sm text-red-600">{formErrors.companyName}</p>
+            )}
           </div>
-          {formErrors.course && (
-            <div className="absolute inset-y-0 right-7 pr-3 flex items-center pointer-events-none">
-              <svg
-                className="h-5 w-5 text-red-500"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </div>
-          )}
+          <div className="bg-white p-3 border border-gray-100">
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Website</label>
+            <input
+              type="text"
+              name="companyWebsite"
+              value={formData.companyWebsite}
+              onChange={handleChange}
+              placeholder="e.g. https://company.com"
+              className="w-full px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
         </div>
-        {formErrors.course && (
-          <p className="mt-1 text-sm text-red-600">{formErrors.course}</p>
-        )}
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Specialization(s)<span className="text-red-500 ml-1">*</span>
-        </label>
-        <div className={`p-2 border rounded-lg bg-gray-50 ${
-          formErrors.specialization ? "border-red-500" : "border-gray-300"
-        }`}>
-          {formData.course ? (
-            <div className="flex flex-wrap gap-4">
-              {specializationOptions[formData.course]?.map((spec) => (
-                <div key={spec} className="flex items-center">
+      {/* Eligibility Criteria */}
+      <div className="bg-gray-50/50 p-3 border border-gray-100">
+        <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+          <div className="w-1 h-4 bg-green-500 rounded-full mr-2"></div>
+          Eligibility Criteria
+        </h3>
+        <div className="grid grid-cols-1 gap-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white p-3 border border-gray-100">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Course/Degree*</label>
+              <select
+                name="course"
+                value={formData.course}
+                onChange={(e) => {
+                  setHasUnsavedChanges(true);
+                  setFormData({ ...formData, course: e.target.value, specialization: [] });
+                }}
+                className={`w-full px-3 py-2 text-sm border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white ${
+                  formErrors.course ? "border-red-500" : "border-gray-300"
+                }`}
+              >
+                <option value="">Select Course</option>
+                <option>Engineering</option>
+                <option>MBA</option>
+                <option>BBA</option>
+                <option>BCA</option>
+                <option>MCA</option>
+                <option>BSC</option>
+                <option>MSC</option>
+                <option>Diploma</option>
+                <option>Others</option>
+              </select>
+              {formErrors.course && (
+                <p className="mt-1 text-sm text-red-600">{formErrors.course}</p>
+              )}
+            </div>
+            <div className="bg-white p-3 border border-gray-100">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Passing Year*</label>
+              <select
+                name="passingYear"
+                value={formData.passingYear}
+                onChange={handleChange}
+                className={`w-full px-3 py-2 text-sm border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white ${
+                  formErrors.passingYear ? "border-red-500" : "border-gray-300"
+                }`}
+              >
+                <option value="">Select Year</option>
+                {[2022,2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030, 2031, 2032,2034].map((yr) => (
+                  <option key={yr}>{yr}</option>
+                ))}
+              </select>
+              {formErrors.passingYear && (
+                <p className="mt-1 text-sm text-red-600">{formErrors.passingYear}</p>
+              )}
+            </div>
+          </div>
+          <div className="bg-white p-3 border border-gray-100">
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Specialization(s)*</label>
+            <div className={`p-2 border bg-gray-50 ${
+              formErrors.specialization ? "border-red-500" : "border-gray-300"
+            }`}>
+              {formData.course ? (
+                <div className="flex flex-wrap gap-3">
+                  {specializationOptions[formData.course]?.map((spec) => (
+                    <div key={spec} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id={spec}
+                        value={spec}
+                        checked={formData.specialization.includes(spec)}
+                        onChange={handleSpecializationChange}
+                        className="h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300"
+                      />
+                      <label htmlFor={spec} className="ml-2 text-xs text-gray-700">
+                        {spec}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 text-xs">Select a course first</p>
+              )}
+            </div>
+            {formErrors.specialization && (
+              <p className="mt-1 text-sm text-red-600">{formErrors.specialization}</p>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white p-3 border border-gray-100">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Gender*</label>
+              <select
+                name="gender"
+                value={formData.gender}
+                onChange={handleChange}
+                className={`w-full px-3 py-2 text-sm border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white ${
+                  formErrors.gender ? "border-red-500" : "border-gray-300"
+                }`}
+              >
+                <option value="">Select Gender</option>
+                <option>Male</option>
+                <option>Female</option>
+                <option>Male/Female</option>
+              </select>
+              {formErrors.gender && (
+                <p className="mt-1 text-sm text-red-600">{formErrors.gender}</p>
+              )}
+            </div>
+            <div className="bg-white p-3 border border-gray-100">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Marks Criteria*</label>
+              <select
+                name="marksCriteria"
+                value={formData.marksCriteria}
+                onChange={handleChange}
+                className={`w-full px-3 py-2 text-sm border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white ${
+                  formErrors.marksCriteria ? "border-red-500" : "border-gray-300"
+                }`}
+              >
+                <option value="">Select Criteria</option>
+                <option>No Criteria</option>
+                <option>50% & Above Throughout</option>
+                <option>55% & Above Throughout</option>
+                <option>60% & Above Throughout</option>
+                <option>65% & Above Throughout</option>
+                <option>70% & Above Throughout</option>
+                <option>75% & Above Throughout</option>
+                <option>80% & Above Throughout</option>
+                <option>85% & Above Throughout</option>
+              </select>
+              {formErrors.marksCriteria && (
+                <p className="mt-1 text-sm text-red-600">{formErrors.marksCriteria}</p>
+              )}
+            </div>
+          </div>
+          <div className="bg-white p-3 border border-gray-100">
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Backlog Criteria</label>
+            <select
+              name="backlogCriteria"
+              value={formData.backlogCriteria}
+              onChange={handleChange}
+              className="w-full px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+            >
+              <option value="">Select Criteria</option>
+              <option>No Criteria</option>
+              <option>No Active Backlog</option>
+              <option>No History of Backlog</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Job Details */}
+      <div className="bg-gray-50/50 p-3 border border-gray-100">
+        <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+          <div className="w-1 h-4 bg-purple-500 rounded-full mr-2"></div>
+          Job Details
+        </h3>
+        <div className="grid grid-cols-1 gap-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white p-3 border border-gray-100">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Job Type*</label>
+              <select
+                name="jobType"
+                value={formData.jobType}
+                onChange={handleChange}
+                className={`w-full px-3 py-2 text-sm border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white ${
+                  formErrors.jobType ? "border-red-500" : "border-gray-300"
+                }`}
+              >
+                <option value="">Select Type</option>
+                <option>Internship</option>
+                <option>Int + PPO</option>
+                <option>Full Time</option>
+                <option>Training + FT</option>
+              </select>
+              {formErrors.jobType && (
+                <p className="mt-1 text-sm text-red-600">{formErrors.jobType}</p>
+              )}
+            </div>
+            <div className="bg-white p-3 border border-gray-100">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Job Designation</label>
+              <input
+                type="text"
+                name="jobDesignation"
+                value={formData.jobDesignation}
+                onChange={handleChange}
+                placeholder="e.g. Software Engineer"
+                className="w-full px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white p-3 border border-gray-100">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Job Location</label>
+              <input
+                type="text"
+                name="jobLocation"
+                value={formData.jobLocation}
+                onChange={handleChange}
+                placeholder="e.g. Bangalore"
+                className="w-full px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <div className="bg-white p-3 border border-gray-100">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Mode of Work</label>
+              <select
+                name="modeOfWork"
+                value={formData.modeOfWork}
+                onChange={handleChange}
+                className="w-full px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+              >
+                <option value="">Select Mode</option>
+                <option>Work From Office</option>
+                <option>Work From Home</option>
+                <option>Hybrid</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Compensation Fields - Dynamic based on Job Type */}
+          {formData.jobType === "Internship" && (
+            <div className="bg-white p-3 border border-gray-100">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Stipend</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <span className="text-gray-500 text-sm">₹</span>
+                </div>
+                <input
+                  type="text"
+                  name="stipend"
+                  value={formData.stipend || ''}
+                  onChange={handleChange}
+                  placeholder="e.g. 25000"
+                  className="w-full pl-8 px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                {formData.stipend && (
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <span className="text-xs text-gray-500">({formatStipend(formData.stipend)})</span>
+                  </div>
+                )}
+              </div>
+              {validationErrors.stipend && (
+                <p className="mt-1 text-sm text-red-600">{validationErrors.stipend}</p>
+              )}
+            </div>
+          )}
+
+          {formData.jobType === "Int + PPO" && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white p-3 border border-gray-100">
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Stipend</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span className="text-gray-500 text-sm">₹</span>
+                  </div>
+                  <input
+                    type="text"
+                    name="stipend"
+                    value={formData.stipend || ''}
+                    onChange={handleChange}
+                    placeholder="e.g. 25000"
+                    className="w-full pl-8 px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  {formData.stipend && (
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                      <span className="text-xs text-gray-500">({formatStipend(formData.stipend)})</span>
+                    </div>
+                  )}
+                </div>
+                {validationErrors.stipend && (
+                  <p className="mt-1 text-sm text-red-600">{validationErrors.stipend}</p>
+                )}
+              </div>
+              <div className="bg-white p-3 border border-gray-100">
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Salary (CTC)</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span className="text-gray-500 text-sm">₹</span>
+                  </div>
+                  <input
+                    type="text"
+                    name="salary"
+                    value={formData.salary || ''}
+                    onChange={handleChange}
+                    placeholder="e.g. 500000"
+                    className="w-full pl-8 px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  {formData.salary && (
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                      <span className="text-xs text-gray-500">({formatSalary(formData.salary)})</span>
+                    </div>
+                  )}
+                </div>
+                {validationErrors.salary && (
+                  <p className="mt-1 text-sm text-red-600">{validationErrors.salary}</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {formData.jobType === "Full Time" && (
+            <div className="bg-white p-3 border border-gray-100">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Salary (CTC)</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <span className="text-gray-500 text-sm">₹</span>
+                </div>
+                <input
+                  type="text"
+                  name="salary"
+                  value={formData.salary || ''}
+                  onChange={handleChange}
+                  placeholder="e.g. 500000"
+                  className="w-full pl-8 px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                {formData.salary && (
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <span className="text-xs text-gray-500">({formatSalary(formData.salary)})</span>
+                  </div>
+                )}
+              </div>
+              {validationErrors.salary && (
+                <p className="mt-1 text-sm text-red-600">{validationErrors.salary}</p>
+              )}
+            </div>
+          )}
+
+          {formData.jobType === "Training + FT" && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white p-3 border border-gray-100">
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Training Stipend (per month)</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span className="text-gray-500 text-sm">₹</span>
+                  </div>
+                  <input
+                    type="text"
+                    name="stipend"
+                    value={formData.stipend || ''}
+                    onChange={handleChange}
+                    placeholder="e.g. 25000"
+                    className="w-full pl-8 px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  {formData.stipend && (
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                      <span className="text-xs text-gray-500">({formatStipend(formData.stipend)})</span>
+                    </div>
+                  )}
+                </div>
+                {validationErrors.stipend && (
+                  <p className="mt-1 text-sm text-red-600">{validationErrors.stipend}</p>
+                )}
+              </div>
+              <div className="bg-white p-3 border border-gray-100">
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">FT Salary (LPA)</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span className="text-gray-500 text-sm">₹</span>
+                  </div>
+                  <input
+                    type="text"
+                    name="salary"
+                    value={formData.salary || ''}
+                    onChange={handleChange}
+                    placeholder="e.g. 500000"
+                    className="w-full pl-8 px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  {formData.salary && (
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                      <span className="text-xs text-gray-500">({formatSalary(formData.salary)})</span>
+                    </div>
+                  )}
+                </div>
+                {validationErrors.salary && (
+                  <p className="mt-1 text-sm text-red-600">{validationErrors.salary}</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Hiring Rounds */}
+          <div className="bg-white p-3 border border-gray-100">
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Hiring Rounds</label>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {[
+                'Resume Screening',
+                'GD (Group Discussion)',
+                'CR (Coding Round)',
+                'TI (Technical Interview)',
+                'HR Round',
+                'PI (Personal Interview)'
+              ].map((round) => (
+                <div key={round} className="flex items-center">
                   <input
                     type="checkbox"
-                    id={spec}
-                    value={spec}
-                    checked={formData.specialization.includes(spec)}
-                    onChange={handleSpecializationChange}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    id={round}
+                    value={round}
+                    checked={formData.hiringRounds?.includes(round) || false}
+                    onChange={handleHiringRoundsChange}
+                    className="h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300"
                   />
-                  <label htmlFor={spec} className="ml-2 text-sm text-gray-700">
-                    {spec}
+                  <label htmlFor={round} className="ml-2 text-xs text-gray-700">
+                    {round}
                   </label>
                 </div>
               ))}
-            </div>
-          ) : (
-            <p className="text-gray-500 text-sm">Select a course first</p>
-          )}
-        </div>
-        {formErrors.specialization && (
-          <p className="mt-1 text-sm text-red-600">{formErrors.specialization}</p>
-        )}
-      </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Passing Year<span className="text-red-500 ml-1">*</span>
-        </label>
-        <div className="relative">
-          <select
-            name="passingYear"
-            value={formData.passingYear}
-            onChange={handleChange}
-            className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white ${
-              formErrors.passingYear ? "border-red-500" : "border-gray-300"
-            }`}
-          >
-            <option value="">Select Year</option>
-            {[2022,2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030, 2031, 2032,2034].map((yr) => (
-              <option key={yr}>{yr}</option>
-            ))}
-          </select>
-          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-            <svg
-              className="h-4 w-4"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
-              <path
-                fillRule="evenodd"
-                d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </div>
-          {formErrors.passingYear && (
-            <div className="absolute inset-y-0 right-7 pr-3 flex items-center pointer-events-none">
-              <svg
-                className="h-5 w-5 text-red-500"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </div>
-          )}
-        </div>
-        {formErrors.passingYear && (
-          <p className="mt-1 text-sm text-red-600">{formErrors.passingYear}</p>
-        )}
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Gender<span className="text-red-500 ml-1">*</span>
-        </label>
-        <div className="relative">
-          <select
-            name="gender"
-            value={formData.gender}
-            onChange={handleChange}
-            className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white ${
-              formErrors.gender ? "border-red-500" : "border-gray-300"
-            }`}
-          >
-            <option value="">Select Gender</option>
-            <option>Male</option>
-            <option>Female</option>
-            <option>Male/Female</option>
-          </select>
-          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-            <svg
-              className="h-4 w-4"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
-              <path
-                fillRule="evenodd"
-                d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </div>
-          {formErrors.gender && (
-            <div className="absolute inset-y-0 right-7 pr-3 flex items-center pointer-events-none">
-              <svg
-                className="h-5 w-5 text-red-500"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </div>
-          )}
-        </div>
-        {formErrors.gender && (
-          <p className="mt-1 text-sm text-red-600">{formErrors.gender}</p>
-        )}
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Marks Criteria<span className="text-red-500 ml-1">*</span>
-        </label>
-        <div className="relative">
-          <select
-            name="marksCriteria"
-            value={formData.marksCriteria}
-            onChange={handleChange}
-            className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white ${
-              formErrors.marksCriteria ? "border-red-500" : "border-gray-300"
-            }`}
-          >
-            <option value="">Select Criteria</option>
-            <option>No Criteria</option>
-            <option>50% & Above Throughout</option>
-            <option>55% & Above Throughout</option>
-            <option>60% & Above Throughout</option>
-            <option>65% & Above Throughout</option>
-            <option>70% & Above Throughout</option>
-            <option>75% & Above Throughout</option>
-            <option>80% & Above Throughout</option>
-            <option>85% & Above Throughout</option>
-          </select>
-          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-            <svg
-              className="h-4 w-4"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
-              <path
-                fillRule="evenodd"
-                d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </div>
-          {formErrors.marksCriteria && (
-            <div className="absolute inset-y-0 right-7 pr-3 flex items-center pointer-events-none">
-              <svg
-                className="h-5 w-5 text-red-500"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </div>
-          )}
-        </div>
-        {formErrors.marksCriteria && (
-          <p className="mt-1 text-sm text-red-600">{formErrors.marksCriteria}</p>
-        )}
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Backlog Criteria
-        </label>
-        <div className="relative">
-          <select
-            name="backlogCriteria"
-            value={formData.backlogCriteria}
-            onChange={handleChange}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
-          >
-            <option value="">Select Criteria</option>
-            <option>No Criteria</option>
-            <option>No Active Backlog</option>
-            <option>No History of Backlog</option>
-          </select>
-          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-            <svg
-              className="h-4 w-4"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
-              <path
-                fillRule="evenodd"
-                d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </div>
-        </div>
-      </div>
-
-      <div className="col-span-2">
-        <h3 className="text-lg font-semibold text-blue-700 mt-4">Job Details<span className="text-red-500 ml-1">*</span></h3>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Job Type<span className="text-red-500 ml-1">*</span>
-        </label>
-        <div className="relative">
-          <select
-            name="jobType"
-            value={formData.jobType}
-            onChange={handleChange}
-            className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white ${
-              formErrors.jobType ? "border-red-500" : "border-gray-300"
-            }`}
-          >
-            <option value="">Select Type</option>
-            <option>Internship</option>
-            <option>Int + PPO</option>
-            <option>Full Time</option>
-            <option>Training + FT</option>
-          </select>
-          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-            <svg
-              className="h-4 w-4"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
-              <path
-                fillRule="evenodd"
-                d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </div>
-          {formErrors.jobType && (
-            <div className="absolute inset-y-0 right-7 pr-3 flex items-center pointer-events-none">
-              <svg
-                className="h-5 w-5 text-red-500"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </div>
-          )}
-        </div>
-        {formErrors.jobType && (
-          <p className="mt-1 text-sm text-red-600">{formErrors.jobType}</p>
-        )}
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Job Designation
-        </label>
-        <input
-          type="text"
-          name="jobDesignation"
-          value={formData.jobDesignation}
-          onChange={handleChange}
-          placeholder="e.g. Software Engineer"
-          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Job Location
-        </label>
-        <input
-          type="text"
-          name="jobLocation"
-          value={formData.jobLocation}
-          onChange={handleChange}
-          placeholder="e.g. Bangalore"
-          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-        />
-      </div>
-
-      {/* Compensation Fields - Dynamic based on Job Type */}
-      {formData.jobType === "Internship" && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Stipend
-          </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <span className="text-gray-500">₹</span>
-            </div>
-            <input
-              type="text"
-              name="stipend"
-              value={formData.stipend || ''}
-              onChange={handleChange}
-              placeholder="e.g. 25000"
-              className="w-full pl-8 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-            />
-            {formData.stipend && (
-              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                <span className="text-xs text-gray-500">({formatStipend(formData.stipend)})</span>
-              </div>
-            )}
-          </div>
-          {validationErrors.stipend && (
-            <p className="mt-1 text-sm text-red-600">{validationErrors.stipend}</p>
-          )}
-        </div>
-      )}
-
-      {formData.jobType === "Int + PPO" && (
-        <>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Stipend
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <span className="text-gray-500">₹</span>
-              </div>
-              <input
-                type="text"
-                name="stipend"
-                value={formData.stipend || ''}
-                onChange={handleChange}
-                placeholder="e.g. 25000"
-                className="w-full pl-8 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-              />
-              {formData.stipend && (
-                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                  <span className="text-xs text-gray-500">({formatStipend(formData.stipend)})</span>
-                </div>
-              )}
-            </div>
-            {validationErrors.stipend && (
-              <p className="mt-1 text-sm text-red-600">{validationErrors.stipend}</p>
-            )}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Salary (CTC)
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <span className="text-gray-500">₹</span>
-              </div>
-              <input
-                type="text"
-                name="salary"
-                value={formData.salary || ''}
-                onChange={handleChange}
-                placeholder="e.g. 500000"
-                className="w-full pl-8 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-              />
-              {formData.salary && (
-                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                  <span className="text-xs text-gray-500">({formatSalary(formData.salary)})</span>
-                </div>
-              )}
-            </div>
-            {validationErrors.salary && (
-              <p className="mt-1 text-sm text-red-600">{validationErrors.salary}</p>
-            )}
-          </div>
-        </>
-      )}
-
-      {formData.jobType === "Full Time" && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Salary (CTC)
-          </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <span className="text-gray-500">₹</span>
-            </div>
-            <input
-              type="text"
-              name="salary"
-              value={formData.salary || ''}
-              onChange={handleChange}
-              placeholder="e.g. 500000"
-              className="w-full pl-8 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-            />
-            {formData.salary && (
-              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                <span className="text-xs text-gray-500">({formatSalary(formData.salary)})</span>
-              </div>
-            )}
-          </div>
-          {validationErrors.salary && (
-            <p className="mt-1 text-sm text-red-600">{validationErrors.salary}</p>
-          )}
-        </div>
-      )}
-
-      {formData.jobType === "Training + FT" && (
-        <>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Training Stipend (per month)
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <span className="text-gray-500">₹</span>
-              </div>
-              <input
-                type="text"
-                name="stipend"
-                value={formData.stipend || ''}
-                onChange={handleChange}
-                placeholder="e.g. 25000"
-                className="w-full pl-8 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-              />
-              {formData.stipend && (
-                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                  <span className="text-xs text-gray-500">({formatStipend(formData.stipend)})</span>
-                </div>
-              )}
-            </div>
-            {validationErrors.stipend && (
-              <p className="mt-1 text-sm text-red-600">{validationErrors.stipend}</p>
-            )}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              FT Salary (LPA)
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <span className="text-gray-500">₹</span>
-              </div>
-              <input
-                type="text"
-                name="salary"
-                value={formData.salary || ''}
-                onChange={handleChange}
-                placeholder="e.g. 500000"
-                className="w-full pl-8 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-              />
-              {formData.salary && (
-                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                  <span className="text-xs text-gray-500">({formatSalary(formData.salary)})</span>
-                </div>
-              )}
-            </div>
-            {validationErrors.salary && (
-              <p className="mt-1 text-sm text-red-600">{validationErrors.salary}</p>
-            )}
-          </div>
-        </>
-      )}
-
-      {/* UPDATED: Hiring Rounds Field with HR Round and Resume Screening */}
-      <div className="col-span-2">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Hiring Rounds
-        </label>
-        <div className="p-4 border border-gray-300 rounded-lg bg-gray-50">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
-            {[
-              'Resume Screening',
-              'GD (Group Discussion)', 
-              'CR (Coding Round)', 
-              'TI (Technical Interview)',
-              'HR Round',
-              'PI (Personal Interview)'
-            ].map((round) => (
-              <div key={round} className="flex items-center">
+              {/* Others option */}
+              <div className="flex items-center">
                 <input
                   type="checkbox"
-                  id={round}
-                  value={round}
-                  checked={formData.hiringRounds?.includes(round) || false}
+                  id="others"
+                  value="Others"
+                  checked={formData.hiringRounds?.includes('Others') || false}
                   onChange={handleHiringRoundsChange}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300"
                 />
-                <label htmlFor={round} className="ml-2 text-sm text-gray-700">
-                  {round}
+                <label htmlFor="others" className="ml-2 text-xs text-gray-700">
+                  Others
                 </label>
               </div>
-            ))}
-            
-            {/* Others option */}
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="others"
-                value="Others"
-                checked={formData.hiringRounds?.includes('Others') || false}
-                onChange={handleHiringRoundsChange}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label htmlFor="others" className="ml-2 text-sm text-gray-700">
-                Others
-              </label>
             </div>
+
+            {/* Other Round Input */}
+            {formData.hiringRounds?.includes('Others') && (
+              <div className="mt-3">
+                <input
+                  type="text"
+                  value={otherRound}
+                  onChange={handleOtherRoundChange}
+                  placeholder="e.g. Aptitude Test, Case Study, etc."
+                  className="w-full px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            )}
           </div>
 
-          {/* Other Round Input */}
-          {formData.hiringRounds?.includes('Others') && (
-            <div className="mt-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Specify Other Rounds
-              </label>
+          {/* Additional fields */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-white p-3 border border-gray-100">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Mode of Interview</label>
+              <select
+                name="modeOfInterview"
+                value={formData.modeOfInterview}
+                onChange={handleChange}
+                className="w-full px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+              >
+                <option value="">Select Mode</option>
+                <option>Online</option>
+                <option>Offline</option>
+                <option>Hybrid</option>
+              </select>
+            </div>
+            <div className="bg-white p-3 border border-gray-100">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Joining Period</label>
               <input
                 type="text"
-                value={otherRound}
-                onChange={handleOtherRoundChange}
-                placeholder="e.g. Aptitude Test, Case Study, etc."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                name="joiningPeriod"
+                value={formData.joiningPeriod}
+                onChange={handleChange}
+                placeholder="e.g. Immediate/15 days"
+                className="w-full px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
-          )}
-        </div>
-      </div>
+            <div className="bg-white p-3 border border-gray-100">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Company Open Date*</label>
+              <input
+                type="date"
+                name="companyOpenDate"
+                value={formData.companyOpenDate}
+                onChange={handleChange}
+                className={`w-full px-3 py-2 text-sm border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                  formErrors.companyOpenDate ? "border-red-500" : "border-gray-300"
+                }`}
+              />
+              {formErrors.companyOpenDate && (
+                <p className="mt-1 text-sm text-red-600">{formErrors.companyOpenDate}</p>
+              )}
+            </div>
+          </div>
 
-      {/* Rest of the form remains the same */}
-      {formData.jobType === "Internship" || formData.jobType === "Int + PPO" || formData.jobType === "Training + FT" ? (
-        <>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Internship Duration
-            </label>
-            <input
-              type="text"
-              name="internshipDuration"
-              value={formData.internshipDuration}
+          {formData.jobType === "Internship" || formData.jobType === "Int + PPO" || formData.jobType === "Training + FT" ? (
+            <div className="bg-white p-3 border border-gray-100">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Internship Duration</label>
+              <input
+                type="text"
+                name="internshipDuration"
+                value={formData.internshipDuration}
+                onChange={handleChange}
+                placeholder="e.g. 6 months"
+                className="w-full px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+          ) : null}
+
+          <div className="bg-white p-3 border border-gray-100">
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Job Description</label>
+            <textarea
+              name="jobDescription"
+              value={formData.jobDescription}
               onChange={handleChange}
-              placeholder="e.g. 6 months"
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+              rows={3}
+              placeholder="Enter job description details..."
+              className="w-full px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
-        </>
-      ) : null}
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Mode of Interview
-        </label>
-        <div className="relative">
-          <select
-            name="modeOfInterview"
-            value={formData.modeOfInterview}
-            onChange={handleChange}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
-          >
-            <option value="">Select Mode</option>
-            <option>Online</option>
-            <option>Offline</option>
-            <option>Hybrid</option>
-          </select>
-          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-            <svg
-              className="h-4 w-4"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
-              <path
-                fillRule="evenodd"
-                d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </div>
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Joining Period
-        </label>
-        <input
-          type="text"
-          name="joiningPeriod"
-          value={formData.joiningPeriod}
-          onChange={handleChange}
-          placeholder="e.g. Immediate/15 days"
-          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Company Open Date<span className="text-red-500 ml-1">*</span>
-        </label>
-        <div className="relative">
-          <input
-            type="date"
-            name="companyOpenDate"
-            value={formData.companyOpenDate}
-            onChange={handleChange}
-            className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-              formErrors.companyOpenDate ? "border-red-500" : "border-gray-300"
-            }`}
-          />
-          {formErrors.companyOpenDate && (
-            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-              <svg
-                className="h-5 w-5 text-red-500"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </div>
-          )}
-        </div>
-        {formErrors.companyOpenDate && (
-          <p className="mt-1 text-sm text-red-600">{formErrors.companyOpenDate}</p>
-        )}
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Mode of Work
-        </label>
-        <div className="relative">
-          <select
-            name="modeOfWork"
-            value={formData.modeOfWork}
-            onChange={handleChange}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
-          >
-            <option value="">Select Mode</option>
-            <option>Work From Office</option>
-            <option>Work From Home</option>
-            <option>Hybrid</option>
-          </select>
-          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-            <svg
-              className="h-4 w-4"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
-              <path
-                fillRule="evenodd"
-                d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </div>
-        </div>
-      </div>
-
-      <div className="col-span-2">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Job Description
-        </label>
-        <textarea
-          name="jobDescription"
-          value={formData.jobDescription}
-          onChange={handleChange}
-          rows="3"
-          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-          placeholder="Enter job description details..."
-        ></textarea>
-      </div>
-
-      <div className="col-span-2">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Upload Job Files (JD, PPT, etc.)
-        </label>
-        <input
-          type="file"
-          multiple
-          onChange={(e) => {
-            setHasUnsavedChanges(true);
-            handleFileChange(e);
-          }}
-          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-        />
-      </div>
-
-      <div className="col-span-2">
-        <h3 className="text-lg font-semibold text-blue-700 mt-4">Internal Use Only<span className="text-red-500 ml-1">*</span></h3>
-      </div>
-
-       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Source<span className="text-red-500 ml-1">*</span>
-        </label>
-        <div className="relative">
-          <input
-            type="text"
-            name="source"
-            value={formData.source}
-            onChange={handleChange}
-            placeholder="e.g. LinkedIn, Referral, etc."
-            className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-              formErrors.source ? "border-red-500" : "border-gray-300"
-            }`}
-          />
-          {formErrors.source && (
-            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-            </div>
-          )}
-        </div>
-        {formErrors.source && (
-          <p className="mt-1 text-sm text-red-600">{formErrors.source}</p>
-        )}
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Coordinator<span className="text-red-500 ml-1">*</span>
-        </label>
-        <div className="relative">
-          {isLoadingUsers ? (
-            <div className="flex items-center justify-center py-2.5 border border-gray-300 rounded-lg bg-gray-100">
-              <span className="text-gray-500 text-sm">Loading coordinators...</span>
-            </div>
-          ) : (
-            <>
-              <select
-                name="coordinator"
-                value={formData.coordinator}
-                onChange={handleChange}
-                className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white ${
-                  formErrors.coordinator ? "border-red-500" : "border-gray-300"
-                }`}
-              >
-                <option value="">Select Coordinator</option>
-                {placementUsers.map((user) => (
-                  <option key={user.id} value={user.name }>
-                    {user.name} 
-                  </option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
+          <div className="bg-white p-3 border border-gray-100">
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Upload Job Files (JD, PPT, etc.)</label>
+            <input
+              type="file"
+              multiple
+              onChange={(e) => {
+                setHasUnsavedChanges(true);
+                handleFileChange(e);
+              }}
+              className="w-full px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+            {jobFiles && jobFiles.length > 0 && (
+              <div className="mt-2">
+                <p className="text-xs text-gray-600 mb-2">Selected files:</p>
+                <div className="space-y-1">
+                  {Array.from(jobFiles).map((file, index) => (
+                    <div key={index} className="flex items-center justify-between bg-gray-50 px-2 py-1 rounded text-xs">
+                      <span className="text-gray-700 truncate">{file.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updatedFiles = Array.from(jobFiles).filter((_, i) => i !== index);
+                          setJobFiles(updatedFiles);
+                        }}
+                        className="text-red-500 hover:text-red-700 ml-2"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </>
-          )}
-          {formErrors.coordinator && (
-            <div className="absolute inset-y-0 right-7 pr-3 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-        {formErrors.coordinator && (
-          <p className="mt-1 text-sm text-red-600">{formErrors.coordinator}</p>
-        )}
-        
-        {/* Available coordinators count */}
-        {!isLoadingUsers && placementUsers.length > 0 && (
-          <p className="mt-1 text-xs text-gray-500">
-            {placementUsers.length} placement coordinator(s) available
-          </p>
-        )}
-        
-        {!isLoadingUsers && placementUsers.length === 0 && (
-          <p className="mt-1 text-xs text-red-500">
-            No placement coordinators found. Please add users with 'placement' department.
-          </p>
-        )}
+      </div>      {/* Internal Use Only */}
+      <div className="bg-gray-50/50 p-3 border border-gray-100">
+        <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+          <div className="w-1 h-4 bg-orange-500 rounded-full mr-2"></div>
+          Internal Use Only
+        </h3>
+        <div className="grid grid-cols-1 gap-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white p-3 border border-gray-100">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Source*</label>
+              <input
+                type="text"
+                name="source"
+                value={formData.source}
+                onChange={handleChange}
+                placeholder="e.g. LinkedIn, Referral, etc."
+                className={`w-full px-3 py-2 text-sm border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                  formErrors.source ? "border-red-500" : "border-gray-300"
+                }`}
+              />
+              {formErrors.source && (
+                <p className="mt-1 text-sm text-red-600">{formErrors.source}</p>
+              )}
+            </div>
+            <div className="bg-white p-3 border border-gray-100">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Coordinator*</label>
+              {isLoadingUsers ? (
+                <div className="flex items-center justify-center py-2 border border-gray-300 bg-gray-100">
+                  <span className="text-gray-500 text-sm">Loading coordinators...</span>
+                </div>
+              ) : (
+                <select
+                  name="coordinator"
+                  value={formData.coordinator}
+                  onChange={handleChange}
+                  className={`w-full px-3 py-2 text-sm border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white ${
+                    formErrors.coordinator ? "border-red-500" : "border-gray-300"
+                  }`}
+                >
+                  <option value="">Select Coordinator</option>
+                  {placementUsers.map((user) => (
+                    <option key={user.id} value={user.name}>
+                      {user.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {formErrors.coordinator && (
+                <p className="mt-1 text-sm text-red-600">{formErrors.coordinator}</p>
+              )}
+
+              {/* Available coordinators count */}
+              {!isLoadingUsers && placementUsers.length > 0 && (
+                <p className="mt-1 text-xs text-gray-500">
+                  {placementUsers.length} placement coordinator(s) available
+                </p>
+              )}
+
+              {!isLoadingUsers && placementUsers.length === 0 && (
+                <p className="mt-1 text-xs text-red-500">
+                  No placement coordinators found. Please add users with 'placement' department.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="col-span-2 flex justify-end pt-4">
+      {/* Cancel Button */}
+      <div className="flex justify-end pt-3">
         <button
           type="button"
           onClick={handleClose}
-          className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-100"
+          className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         >
           Cancel
         </button>

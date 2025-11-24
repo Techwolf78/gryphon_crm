@@ -314,6 +314,21 @@ useEffect(() => {
           const end = new Date(detail.endDate);
           const excludeDays = phaseData?.excludeDays || "None";
 
+          // First, calculate the number of training days
+          let days = 0;
+          for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            const dayOfWeek = d.getDay();
+            let include = true;
+            if (excludeDays === "Saturday" && dayOfWeek === 6) include = false;
+            else if (excludeDays === "Sunday" && dayOfWeek === 0) include = false;
+            else if (excludeDays === "Both" && (dayOfWeek === 0 || dayOfWeek === 6)) include = false;
+            if (include) days++;
+          }
+
+          // Calculate hours per day
+          const hoursPerDay = days > 0 ? (detail.assignedHours || 0) / days : 0;
+
+          // Now generate assignments for each day
           for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
             const dayOfWeek = d.getDay();
             let include = true;
@@ -330,7 +345,7 @@ useEffect(() => {
                 batchCode: detail.batchCode,
                 trainerId: detail.trainerId,
                 sourceTrainingId: training.id,
-                assignedHours: detail.assignedHours || 0,
+                assignedHours: hoursPerDay,
                 rate: detail.perHourCost || 0
               });
             }

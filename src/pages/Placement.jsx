@@ -183,7 +183,7 @@ function Placement() {
         setFilters(newFilters);
       }
     }
-  }, [trainingData, hasUserInteracted]);
+  }, [trainingData, hasUserInteracted, filters]);
 
   const fetchStudentData = useCallback(async (trainingDocId, projectCode) => {
     try {

@@ -115,7 +115,7 @@ const getRoundAbbreviation = (roundName) => {
   );
 };
 
-// ✅ SIMPLE RoundStatus Component - No Auto-select
+// ✅ UPDATED RoundStatus Component - Always show count, green when selected
 const RoundStatus = ({
   status,
   roundName,
@@ -127,6 +127,8 @@ const RoundStatus = ({
   roundIndex,
   eligibleStudents = [],
   currentSelected = [],
+  isDisabled = false,
+  previousRoundName = null,
 }) => {
   const statusConfig =
     roundStatusOptions.find((option) => option.value === status) ||
@@ -138,55 +140,85 @@ const RoundStatus = ({
     e.stopPropagation();
     e.nativeEvent.stopImmediatePropagation();
 
+    if (isDisabled) {
+      alert(`Please complete the previous round "${previousRoundName}" before selecting students for this round.`);
+      return;
+    }
+
     // Call parent function to open modal
     onStudentSelection(eligibleStudents, roundName, currentSelected, companyId, roundIndex);
   };
 
   return (
     <div
-      className="flex flex-col items-center gap-1 min-w-20"
+      className={`flex flex-col items-center gap-1 min-w-20 ${isDisabled ? 'opacity-50' : ''}`}
       onClick={(e) => e.stopPropagation()}
     >
       {/* Round Name and Student Count */}
       <div className="flex items-center gap-1 w-full justify-center">
-        <span
-          className="text-xs text-gray-600 font-medium truncate"
-          title={roundName}
-        >
-          {roundAbbr}
-        </span>
-        {totalStudents > 0 && (
-          <button
-            onClick={handleStudentListClick}
-            className={`text-xs rounded-full w-5 h-5 flex items-center justify-center hover:scale-110 transition cursor-pointer text-center ${
-              studentCount === totalStudents
-                ? "bg-blue-200 text-blue-800 border border-blue-300"
-                : studentCount > 0
-                ? "bg-orange-200 text-orange-800 border border-orange-300"
-                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-            }`}
-            title={`${studentCount}/${totalStudents} students - Click to manage`}
+        <div className="flex items-center gap-1">
+          <span
+            className={`text-xs font-medium truncate ${isDisabled ? 'text-gray-400' : 'text-gray-600'}`}
+            title={isDisabled ? `Complete "${previousRoundName}" first` : roundName}
           >
-            {studentCount}
-          </button>
-        )}
+            {roundAbbr}
+          </span>
+          {isDisabled && (
+            <svg 
+              className="w-3 h-3 text-amber-500" 
+              fill="currentColor" 
+              viewBox="0 0 20 20"
+              title={`Waiting for "${previousRoundName}" to be completed`}
+            >
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+          )}
+        </div>
+        {/* Always show student count button */}
+        <button
+          onClick={handleStudentListClick}
+          disabled={isDisabled}
+          className={`text-xs rounded-full w-5 h-5 flex items-center justify-center transition cursor-pointer text-center ${
+            isDisabled 
+              ? "bg-gray-100 text-gray-400 cursor-not-allowed" 
+              : studentCount > 0
+              ? "bg-green-500 text-white border border-green-600 shadow-md hover:scale-110"
+              : "bg-gray-200 text-gray-700 hover:bg-gray-300 border border-gray-300 hover:scale-110"
+          }`}
+          title={
+            isDisabled 
+              ? `Complete "${previousRoundName}" first before selecting students`
+              : `${studentCount}/${totalStudents || 0} students selected - Click to manage`
+          }
+        >
+          {studentCount}
+        </button>
       </div>
 
       {/* Status Button */}
       <button
         onClick={onClick}
-        className={`w-full px-2 py-1 rounded-full text-xs font-medium cursor-pointer transition-all hover:scale-105 active:scale-95 ${statusConfig.color} border border-transparent hover:border-gray-300`}
-        title={`${roundName} - Click to change status (Current: ${statusConfig.label})`}
+        disabled={isDisabled}
+        className={`w-full px-2 py-1 rounded-full text-xs font-medium transition-all border border-transparent ${
+          isDisabled 
+            ? "bg-gray-100 text-gray-400 cursor-not-allowed" 
+            : `cursor-pointer hover:scale-105 active:scale-95 hover:border-gray-300 ${statusConfig.color}`
+        }`}
+        title={
+          isDisabled 
+            ? `Complete "${previousRoundName}" first before changing status`
+            : `${roundName} - Click to change status (Current: ${statusConfig.label})`
+        }
       >
         {statusConfig.label}
       </button>
 
-      {/* Progress Bar */}
+      {/* Progress Bar - only show if there are eligible students */}
       {totalStudents > 0 && (
         <div className="w-full bg-gray-200 rounded-full h-1">
           <div
             className={`h-1 rounded-full transition-all ${
-              studentCount === totalStudents ? "bg-green-500" : "bg-blue-500"
+              isDisabled ? "bg-gray-300" : studentCount === totalStudents ? "bg-green-500" : "bg-blue-500"
             }`}
             style={{ width: `${(studentCount / totalStudents) * 100}%` }}
           ></div>
@@ -207,14 +239,21 @@ function CompanyTable({
   fetchCompanyStudents,
   fetchTrainingFormStudents,
   onMatchStatsUpdate,
-  deleteUnmatchedStudent,
-  acceptUnmatchedStudent,
+  onEditJD,
 }) {
   const [expandedCompanies, setExpandedCompanies] = useState({});
   const [selectedCompanyForStudents, setSelectedCompanyForStudents] = useState(null);
   const [companyMatchStats, setCompanyMatchStats] = useState({});
-  const [loadingMatches, setLoadingMatches] = useState({});
-  const [roundStudents, setRoundStudents] = useState({});
+  const [roundStudents, setRoundStudents] = useState(() => {
+    // Load from localStorage on initial render
+    try {
+      const saved = localStorage.getItem('placementRoundSelections');
+      return saved ? JSON.parse(saved) : {};
+    } catch (error) {
+      console.error('Error loading round selections from localStorage:', error);
+      return {};
+    }
+  });
   const [companyStudentsData, setCompanyStudentsData] = useState({});
   
   // NEW STATE FOR STUDENT MODAL
@@ -226,6 +265,15 @@ function CompanyTable({
     companyId: null,
     roundIndex: null
   });
+
+  // Save to localStorage whenever roundStudents changes
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('placementRoundSelections', JSON.stringify(roundStudents));
+    } catch (error) {
+      console.error('Error saving round selections to localStorage:', error);
+    }
+  }, [roundStudents]);
 
   // Function to handle round student selection
   const handleRoundStudentSelection = (
@@ -246,22 +294,60 @@ function CompanyTable({
     });
   };
 
-// ✅ FIXED: handleOpenStudentModal - Only open modal on user click
-const handleOpenStudentModal = React.useCallback((students, roundName, currentSelected, companyId, roundIndex) => {
-  // ✅ Only open modal if there are students to select
-  if (students.length > 0) {
-    setStudentModalData({
-      isOpen: true,
-      students,
-      roundName,
-      currentSelected,
-      companyId,
-      roundIndex
+  // Function to get students for a specific round (CARRY-FORWARD)
+  const getStudentsForRound = React.useCallback((companyId, roundIndex, companyStudents) => {
+    if (roundIndex === 0) {
+      // First round - all students are eligible
+      return companyStudents;
+    }
+
+    // For subsequent rounds, only students selected in previous round are eligible
+    const previousRoundStudents = roundStudents[companyId]?.[roundIndex - 1];
+    if (!previousRoundStudents || previousRoundStudents.length === 0) {
+      return [];
+    }
+
+    // Filter companyStudents based on previous round selection
+    return companyStudents.filter((student) => {
+      return previousRoundStudents.some(selected => 
+        selected.studentName === student.studentName && selected.email === student.email
+      );
     });
-  } else {
-    // No students available for selection
+  }, [roundStudents]);
+
+// ✅ FIXED: handleOpenStudentModal - Always open modal and load students if needed
+const handleOpenStudentModal = React.useCallback(async (eligibleStudents, roundName, currentSelected, companyId, roundIndex) => {
+  // Find the company object from filteredCompanies
+  const company = filteredCompanies.find(c => c.id === companyId);
+  
+  // Ensure students are loaded for this company
+  let companyStudents = companyStudentsData[companyId];
+  if (!companyStudents && company) {
+    try {
+      companyStudents = await fetchCompanyStudents(company);
+      setCompanyStudentsData((prev) => ({
+        ...prev,
+        [companyId]: companyStudents,
+      }));
+    } catch (error) {
+      console.error("Error loading students for modal:", error);
+      companyStudents = [];
+    }
   }
-}, []);
+  
+  // Get eligible students for this round (use fresh data if available)
+  const finalEligibleStudents = companyStudents ? getStudentsForRound(companyId, roundIndex, companyStudents) : eligibleStudents;
+  
+  // ✅ Always open modal
+  setStudentModalData({
+    isOpen: true,
+    students: finalEligibleStudents,
+    roundName,
+    currentSelected,
+    companyId,
+    roundIndex
+  });
+}, [filteredCompanies, companyStudentsData, fetchCompanyStudents, getStudentsForRound]);
 
 // ✅ FIXED: handleStudentSelection with useCallback
 const handleStudentSelection = React.useCallback((selectedStudents) => {
@@ -281,27 +367,6 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
     roundIndex: null
   });
 }, [studentModalData.companyId, studentModalData.roundIndex]);
-
-  // Function to get students for a specific round (CARRY-FORWARD)
-  const getStudentsForRound = (companyId, roundIndex, companyStudents) => {
-    if (roundIndex === 0) {
-      // First round - all students are eligible
-      return companyStudents;
-    }
-
-    // For subsequent rounds, only students selected in previous round are eligible
-    const previousRoundStudents = roundStudents[companyId]?.[roundIndex - 1];
-    if (!previousRoundStudents || previousRoundStudents.length === 0) {
-      return [];
-    }
-
-    // Filter companyStudents based on previous round selection
-    return companyStudents.filter((student) => {
-      return previousRoundStudents.some(selected => 
-        selected.studentName === student.studentName && selected.email === student.email
-      );
-    });
-  };
 
   // Function to get currently selected students for a round
   const getCurrentSelectedForRound = (companyId, roundIndex) => {
@@ -334,8 +399,6 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
       return { matched: 0, total: 0, unmatched: [] };
 
     try {
-      setLoadingMatches((prev) => ({ ...prev, [company.companyName]: true }));
-
       const studentListStudents = await fetchCompanyStudents(company);
       
       const trainingFormStudents = await fetchTrainingFormStudents(
@@ -373,7 +436,7 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
 
       setCompanyMatchStats((prev) => ({
         ...prev,
-        [company.companyName]: result,
+        [company.id]: result,  // Store by company ID instead of company name
       }));
 
       if (onMatchStatsUpdate) {
@@ -384,8 +447,6 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
     } catch (error) {
       console.error("Error matching students:", error);
       return { matched: 0, total: 0, unmatched: [] };
-    } finally {
-      setLoadingMatches((prev) => ({ ...prev, [company.companyName]: false }));
     }
   };
 
@@ -401,11 +462,11 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
 
   // Toggle expand/collapse for company group
   const toggleCompanyExpand = async (companyName, companies) => {
-    const company = companies[0];
-
     if (!expandedCompanies[companyName]) {
-      await checkStudentMatches(company);
-      await getStudentsForCompany(company);
+      // Check student matches for each college in the company group
+      await Promise.all(companies.map(company => checkStudentMatches(company)));
+      // Load students for each company
+      await Promise.all(companies.map(company => getStudentsForCompany(company)));
     }
 
     setExpandedCompanies((prev) => ({
@@ -436,7 +497,7 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
 
     const students = await fetchCompanyStudents(company);
     const matchStats =
-      companyMatchStats[company.companyName] ||
+      companyMatchStats[company.id] ||
       (await checkStudentMatches(company));
 
     const companyWithStudents = {
@@ -450,25 +511,6 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
   // Close student data view
   const handleCloseStudentView = () => {
     setSelectedCompanyForStudents(null);
-  };
-
-  // Handle student deletion - refetch data
-  const handleStudentDeleted = async () => {
-    if (selectedCompanyForStudents) {
-      const company = selectedCompanyForStudents;
-      
-      const students = await fetchCompanyStudents(company);
-      
-      const matchStats = await checkStudentMatches(company);
-
-      const updatedCompanyWithStudents = {
-        ...company,
-        studentList: students,
-        matchStats: matchStats,
-      };
-      
-      setSelectedCompanyForStudents(updatedCompanyWithStudents);
-    }
   };
 
   // Calculate stats for company group
@@ -505,13 +547,22 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
 
   // Render Round Status helper function
   const renderRoundStatus = (company, round, index, companyStudents) => {
+    // Ensure we have students loaded, load them if not
+    const actualCompanyStudents = companyStudents.length > 0 ? companyStudents : 
+      (companyStudentsData[company.id] || []);
+    
     const eligibleStudents = getStudentsForRound(
       company.id,
       index,
-      companyStudents
+      actualCompanyStudents
     );
     
     const currentSelected = getCurrentSelectedForRound(company.id, index);
+
+    // Check if previous round is completed (not pending)
+    const previousRoundCompleted = index === 0 || 
+      (company.roundStatus && company.roundStatus[index - 1] && 
+       company.roundStatus[index - 1] === "completed");
 
     return (
       <RoundStatus
@@ -524,6 +575,11 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
         currentSelected={currentSelected}
         onClick={(e) => {
           e.stopPropagation();
+          if (!previousRoundCompleted) {
+            // Show warning if previous round is not completed
+            alert(`Please complete the previous round "${company.hiringRounds[index - 1]}" before proceeding to this round.`);
+            return;
+          }
           handleRoundStatusClick(
             company.id,
             index,
@@ -532,9 +588,17 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
             updateRoundStatus
           );
         }}
-        onStudentSelection={handleOpenStudentModal}
+        onStudentSelection={(eligibleStudents, roundName, currentSelected, companyId, roundIndex) => {
+          if (!previousRoundCompleted) {
+            alert(`Please complete the previous round "${company.hiringRounds[index - 1]}" before selecting students for this round.`);
+            return;
+          }
+          handleOpenStudentModal(eligibleStudents, roundName, currentSelected, companyId, roundIndex);
+        }}
         companyId={company.id}
         roundIndex={index}
+        isDisabled={!previousRoundCompleted}
+        previousRoundName={index > 0 ? company.hiringRounds[index - 1] : null}
       />
     );
   };
@@ -549,10 +613,6 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
           onClose={handleCloseStudentView}
           companyName={selectedCompanyForStudents.companyName}
           collegeName={selectedCompanyForStudents.college}
-          deleteUnmatchedStudent={deleteUnmatchedStudent}
-          company={selectedCompanyForStudents}
-          onStudentDeleted={handleStudentDeleted}
-          acceptUnmatchedStudent={acceptUnmatchedStudent}
         />
       )}
 
@@ -572,7 +632,6 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
         Object.entries(groupedCompanies).map(([companyName, companies]) => {
           const stats = getCompanyStats(companies, companyName);
           const isExpanded = expandedCompanies[companyName];
-          const isLoading = loadingMatches[companyName];
 
           return (
             <div key={companyName} className="space-y-1">
@@ -595,51 +654,6 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
                         {stats.collegeCount !== 1 ? "s" : ""}
                       </span>
 
-                      {/* STUDENT COUNT - NOW CLICKABLE */}
-                      <button
-                        onClick={(e) => handleViewStudentList(companies[0], e)}
-                        className="flex items-center gap-1 bg-white px-2 py-1 rounded-full text-green-700 hover:bg-green-50 hover:text-green-800 transition-colors cursor-pointer"
-                        title="View Student List"
-                      >
-                        <FaUsers className="text-green-500" />
-                        {stats.totalStudents} Student
-                        {stats.totalStudents !== 1 ? "s" : ""}
-                      </button>
-
-                      {/* Match Statistics Badge - NOW CLICKABLE */}
-                      {stats.matchStats.total > 0 && (
-                        <button
-                          onClick={(e) =>
-                            handleViewStudentList(companies[0], e)
-                          }
-                          className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium cursor-pointer hover:scale-105 transition-all ${
-                            stats.matchStats.matched === stats.matchStats.total
-                              ? "bg-green-100 text-green-700 hover:bg-green-200"
-                              : "bg-red-100 text-red-700 hover:bg-red-200"
-                          }`}
-                          title="View Student List"
-                        >
-                          <FaUsers />
-                          {isLoading ? (
-                            <span className="animate-pulse">Checking...</span>
-                          ) : (
-                            <>
-                              {stats.matchStats.matched}/
-                              {stats.matchStats.total} Matched
-                              {stats.matchStats.matched !==
-                                stats.matchStats.total && (
-                                <span className="ml-1">
-                                  (
-                                  {stats.matchStats.total -
-                                    stats.matchStats.matched}{" "}
-                                  Not Found)
-                                </span>
-                              )}
-                            </>
-                          )}
-                        </button>
-                      )}
-
                       {/* Open Date in Header */}
                       <span className="flex items-center gap-1 bg-white px-2 py-1 rounded-full text-purple-700">
                         <FaCalendar className="text-purple-500" />
@@ -660,7 +674,7 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
 
               {/* Column Headers for each company group */}
               <div
-                className={`grid grid-cols-8 gap-2 px-2 py-1 text-xs font-medium rounded-lg ml-4 ${headerColorMap[activeTab]}`}
+                className={`grid grid-cols-10 gap-2 px-2 py-1 text-xs font-medium rounded-lg ml-4 ${headerColorMap[activeTab]}`}
               >
                 <div>College</div>
                 <div>Job Type</div>
@@ -668,6 +682,8 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
                 <div>Job Designation</div>
                 <div className="col-span-2 text-center">Hiring Process</div>
                 <div>Eligibility</div>
+                <div>Students</div>
+                <div>Match Status</div>
                 <div className="text-center">Actions</div>
               </div>
 
@@ -683,7 +699,7 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
                       onClick={() => setSelectedCompany(company)}
                     >
                       <div
-                        className={`grid grid-cols-8 gap-2 p-2 rounded-lg bg-white shadow-sm hover:shadow-md transition-all duration-200 ease-out ${
+                        className={`grid grid-cols-10 gap-2 p-2 rounded-lg bg-white shadow-sm hover:shadow-md transition-all duration-200 ease-out ${
                           borderColorMap[activeTab]
                         } ${
                           company.isTransitioning
@@ -758,7 +774,40 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
                           </div>
                         </div>
 
-                        {/* Actions - Column 8 */}
+                        {/* Students - Column 8 */}
+                        <div className="text-sm text-gray-700 flex items-center h-full">
+                          <button
+                            onClick={(e) => handleViewStudentList(company, e)}
+                            className="flex items-center gap-1 bg-green-50 px-2 py-1 rounded text-xs text-green-700 hover:bg-green-100 transition-colors"
+                            title="View Student List"
+                          >
+                            <FaUsers className="text-green-500" />
+                            {company.studentCount || 0}
+                          </button>
+                        </div>
+
+                        {/* Match Status - Column 9 */}
+                        <div className="text-sm text-gray-700 flex items-center h-full">
+                          {company.studentCount > 0 && (
+                            <div className={`text-xs px-1 py-0.5 rounded-full max-w-16 truncate ${
+                              companyMatchStats[company.id]?.matched === company.studentCount
+                                ? "bg-green-100 text-green-700"
+                                : "bg-red-100 text-red-700"
+                            }`} title={
+                              companyMatchStats[company.id] 
+                                ? `${companyMatchStats[company.id].matched || 0}/${company.studentCount} students matched`
+                                : "Match status not checked"
+                            }>
+                              {companyMatchStats[company.id] ? (
+                                `${companyMatchStats[company.id].matched || 0}/${company.studentCount}`
+                              ) : (
+                                "?"
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Actions - Column 10 */}
                         <div className="flex justify-center items-center gap-1">
                           <button
                             onClick={(e) => {
@@ -797,6 +846,7 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
                           setSelectedCompany={setSelectedCompany}
                           updateCompanyStatus={updateCompanyStatus}
                           activeTab={activeTab}
+                          onEditJD={onEditJD}
                         />
                       )}
                     </div>
