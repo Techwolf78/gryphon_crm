@@ -81,11 +81,11 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
     body: [
       [
         "Vendor Name:",
-        order.vendorDetails.contactPerson || "_______________________",
+        vendorData.contact || "_______________________",
       ],
-      ["Business Name:", order.vendorDetails.name || "_______________________"],
-      ["Address:", order.vendorDetails.address || "_______________________"],
-      ["Phone:", order.vendorDetails.phone || "_______________________"],
+      ["Business Name:", vendorData.name || "_______________________"],
+      ["Address:", vendorData.address || "_______________________"],
+      ["Phone:", vendorData.phone || "_______________________"],
     ],
     theme: "grid",
     styles: {

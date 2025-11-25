@@ -31,6 +31,7 @@ function AddLeads({ show, onClose, onAddLead }) {
   const [workingSince, setWorkingSince] = useState("");
   const [pocLocation, setPocLocation] = useState("");
   const [pocPhone, setPocPhone] = useState("");
+  const [pocLandline, setPocLandline] = useState("");
   const [pocMail, setPocMail] = useState("");
   const [pocDesignation, setPocDesignation] = useState("");
   const [pocLinkedin, setPocLinkedin] = useState("");
@@ -101,6 +102,13 @@ function AddLeads({ show, onClose, onAddLead }) {
     // Allow international formats with + and numbers, spaces, hyphens, parentheses
     const phoneRegex = /^[+]?[1-9][\d\s\-()]{8,}$/;
     return phoneRegex.test(phone.replace(/\s/g, ''));
+  };
+
+  const validateLandline = (landline) => {
+    if (!landline) return true; // Optional field
+    // Allow formats like: 022-12345678, (022) 12345678, 022 12345678, +91-22-12345678
+    const landlineRegex = /^[+]?[\d\s\-()]{6,}$/;
+    return landlineRegex.test(landline.replace(/\s/g, ''));
   };
 
   const validateLinkedIn = (url) => {
@@ -190,6 +198,11 @@ function AddLeads({ show, onClose, onAddLead }) {
           error = "Please enter a valid phone number";
         }
         break;
+      case "pocLandline":
+        if (value && !validateLandline(value)) {
+          error = "Please enter a valid landline number";
+        }
+        break;
       case "pocMail":
         if (value && !validateEmail(value)) {
           error = "Please enter a valid email address";
@@ -245,6 +258,7 @@ function AddLeads({ show, onClose, onAddLead }) {
     setWorkingSince("");
     setPocLocation("");
     setPocPhone("");
+    setPocLandline("");
     setPocMail("");
     setPocDesignation("");
     setPocLinkedin("");
@@ -286,6 +300,7 @@ function AddLeads({ show, onClose, onAddLead }) {
       contactPerson: pocName,
       designation: finalDesignation,
       phone: pocPhone,
+      landline: pocLandline,
       companyUrl: companyWebsite,
       linkedinUrl: pocLinkedin,
       email: pocMail,
@@ -387,6 +402,7 @@ function AddLeads({ show, onClose, onAddLead }) {
         pocName: companyData.contactPerson,
         pocDesignation: companyData.designation,
         pocPhone: companyData.phone,
+        pocLandline: companyData.landline,
         companyUrl: companyData.companyUrl,
         companyWebsite: companyData.companyUrl,
         linkedinUrl: companyData.linkedinUrl,
@@ -745,6 +761,24 @@ function AddLeads({ show, onClose, onAddLead }) {
                     />
                     {validationErrors.pocPhone && touchedFields.pocPhone && (
                       <span className="text-red-500 text-xs mt-0.5 block">{validationErrors.pocPhone}</span>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wide">
+                      POC Landline
+                    </label>
+                    <input
+                      type="text"
+                      value={pocLandline}
+                      onChange={(e) => updateField(setPocLandline, e.target.value, "pocLandline")}
+                      placeholder="e.g. 022-12345678"
+                      className={`w-full px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all duration-200 shadow-sm ${
+                        validationErrors.pocLandline && touchedFields.pocLandline ? 'border-red-400 bg-red-50' : 'border-gray-200'
+                      }`}
+                    />
+                    {validationErrors.pocLandline && touchedFields.pocLandline && (
+                      <span className="text-red-500 text-xs mt-0.5 block">{validationErrors.pocLandline}</span>
                     )}
                   </div>
 

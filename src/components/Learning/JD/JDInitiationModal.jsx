@@ -574,9 +574,9 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
   return (
     <>
       <div className="fixed inset-0 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
-        <div className="relative top-20 mx-auto p-5 border w-full bg-white min-h-screen overflow-y-auto">
+        <div className="relative top-20 mx-auto p-5 border w-full bg-white rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto">
           <div className="mt-3">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-6">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">
                   {selectedColleges?.length > 0 ? (
@@ -605,7 +605,7 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                 {onBack && (
                   <button
                     onClick={onBack}
-                    className="flex items-center px-3 py-1 rounded text-sm font-medium transition-colors text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                    className="flex items-center px-3 py-2 rounded-xl text-sm font-medium transition-colors text-blue-600 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     disabled={loading}
                   >
                     <FiChevronLeft className="w-4 h-4 mr-1" />
@@ -614,30 +614,30 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                 )}
                 <button
                   onClick={onClose}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="p-2 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
                   disabled={loading}
                 >
-                  <FiX className="w-6 h-6" />
+                  <FiX className="w-5 h-5" />
                 </button>
               </div>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Selected Colleges Summary */}
-                <div className="space-y-3">
-                  <div className="pb-2 border-b border-gray-200">
+                <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                  <div className="pb-3 border-b border-gray-200">
                     <h2 className="text-base font-semibold text-gray-900">
                       Selected Colleges for JD Training
                     </h2>
-                    <p className="mt-0.5 text-sm text-gray-500">
+                    <p className="mt-1 text-sm text-gray-600">
                       Configure training details for {selectedColleges?.length > 1 ? 'merged colleges' : 'college'} ({selectedColleges?.length || 0} college{selectedColleges?.length !== 1 ? 's' : ''})
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-2 mb-2 min-h-8">
+                  <div className="flex flex-wrap gap-2 mt-3 min-h-8">
                     {selectedColleges.map((college) => (
                       <span
                         key={college.id}
-                        className="flex items-center bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs font-medium"
+                        className="flex items-center bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-medium"
                       >
                         {college.collegeName}
                         {college.projectCode && (
@@ -648,7 +648,7 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                       </span>
                     ))}
                   </div>
-                  <div className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded p-2">
+                  <div className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg p-3 mt-3">
                     💰 Trainer costs will be {selectedColleges.length > 1 ? `divided equally among these ${selectedColleges.length} colleges` : 'assigned to this college'}
                   </div>
                 </div>
@@ -665,18 +665,18 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                 />
 
                 {/* Training Domain + Batch Details */}
-                <div className="space-y-3">
-                  <div className="pb-2 border-b border-gray-200">
+                <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                  <div className="pb-3 border-b border-gray-200">
                     <h2 className="text-base font-semibold text-gray-900">
                       Training Domains
                     </h2>
-                    <p className="mt-0.5 text-xs text-gray-500">
+                    <p className="mt-1 text-xs text-gray-500">
                       JD domain configuration for this training program.
                     </p>
                   </div>
                   {/* JD Domain Display */}
-                  <div className="flex flex-wrap gap-2 mb-2 min-h-8">
-                    <span className="flex items-center bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs font-medium">
+                  <div className="flex flex-wrap gap-2 mt-3 min-h-8">
+                    <span className="flex items-center bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-medium">
                       JD
                       <span className="ml-1 text-blue-600">
                         (Fixed domain for JD training)
@@ -686,56 +686,58 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                 </div>
 
                 {/* Batch Details Table for JD */}
-                <div className="space-y-3 mt-4 border-l-4 border-blue-400 bg-blue-50 pl-4 rounded overflow-visible">
-                  <div className="pb-2 border-b border-gray-200 flex items-center justify-between">
+                <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                  <div className="pb-3 border-b border-gray-200 flex items-center justify-between">
                     <div>
                       <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
                         Batch & Trainer Assignment for
-                        <span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold uppercase bg-blue-100 border-blue-300">
+                        <span className="inline-block px-2 py-1 rounded-full text-xs font-bold uppercase bg-blue-100 border border-blue-300">
                           JD
                         </span>
                       </h2>
-                      <p className="mt-0.5 text-xs text-gray-500">
+                      <p className="mt-1 text-xs text-gray-500">
                         Configure batch details and assign trainers for JD training.
                       </p>
                     </div>
                   </div>
-                  <div className="border-b border-gray-100">
+                  <div className="border-b border-gray-100 mt-3">
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex gap-4">
-                        <div className="bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                        <div className="bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
                           <span className="text-xs text-blue-600 font-medium">Domain Total Hours</span>
-                          <span className="text-sm font-semibold text-blue-800 ml-1">{getTotalAssignedHours()}</span>
+                          <span className="text-sm font-semibold text-blue-800 ml-2">{getTotalAssignedHours()}</span>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <JDBatchTable
-                    table1Data={Array.isArray(table1DataByDomain["JD"]) ? table1DataByDomain["JD"] : []}
-                    setTable1Data={(data) =>
-                      setTable1DataByDomain((prev) => ({
-                        ...prev,
-                        "JD": data,
-                      }))
-                    }
-                    commonFields={commonFields || {}}
-                    globalTrainerAssignments={Array.isArray(globalTrainerAssignments) ? globalTrainerAssignments : []}
-                    excludeDays={excludeDays || "None"}
-                    onValidationChange={handleValidationChange}
-                    selectedDomain="JD"
-                  />
+                  <div className="mt-4">
+                    <JDBatchTable
+                      table1Data={Array.isArray(table1DataByDomain["JD"]) ? table1DataByDomain["JD"] : []}
+                      setTable1Data={(data) =>
+                        setTable1DataByDomain((prev) => ({
+                          ...prev,
+                          "JD": data,
+                        }))
+                      }
+                      commonFields={commonFields || {}}
+                      globalTrainerAssignments={Array.isArray(globalTrainerAssignments) ? globalTrainerAssignments : []}
+                      excludeDays={excludeDays || "None"}
+                      onValidationChange={handleValidationChange}
+                      selectedDomain="JD"
+                    />
+                  </div>
                 </div>
 
                 {/* Status Messages */}
                 {error && (
-                  <div className="rounded bg-red-50 border border-red-200 p-3">
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-4 shadow-sm">
                     <div className="flex">
                       <div className="shrink-0">
-                        <FiAlertCircle className="h-4 w-4 text-red-400" />
+                        <FiAlertCircle className="h-5 w-5 text-red-400" />
                       </div>
-                      <div className="ml-2">
-                        <h3 className="text-xs font-medium text-red-800">
+                      <div className="ml-3">
+                        <h3 className="text-sm font-medium text-red-800">
                           {error}
                         </h3>
                       </div>
@@ -744,13 +746,13 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                 )}
 
                 {success && (
-                  <div className="rounded bg-green-50 border border-green-200 p-3">
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-4 shadow-sm">
                     <div className="flex">
                       <div className="shrink-0">
-                        <FiCheck className="h-4 w-4 text-green-400" />
+                        <FiCheck className="h-5 w-5 text-green-400" />
                       </div>
-                      <div className="ml-2">
-                        <h3 className="text-xs font-medium text-green-800">
+                      <div className="ml-3">
+                        <h3 className="text-sm font-medium text-green-800">
                           {success}
                         </h3>
                       </div>
@@ -760,13 +762,13 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
 
                 {/* Duplicate trainers validation error */}
                 {hasValidationErrors() && (
-                  <div className="rounded bg-red-50 border border-red-200 p-3">
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-4 shadow-sm">
                     <div className="flex items-start">
                       <div className="shrink-0">
-                        <FiAlertCircle className="h-4 w-4 text-red-400" />
+                        <FiAlertCircle className="h-5 w-5 text-red-400" />
                       </div>
                       <div className="ml-3">
-                        <h3 className="text-xs font-medium text-red-800 mb-1">
+                        <h3 className="text-sm font-medium text-red-800 mb-2">
                           Duplicate Trainer Assignments Detected
                         </h3>
                         <div className="text-xs text-red-700">
@@ -778,7 +780,7 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                                   <strong className="text-red-800">{domain} domain:</strong>
                                   <div className="mt-2 space-y-3">
                                     {validation.errors.map((error, index) => (
-                                      <div key={index} className="bg-red-100 border border-red-200 rounded p-2">
+                                      <div key={index} className="bg-red-100 border border-red-200 rounded-lg p-3">
                                         <pre className="whitespace-pre-wrap text-xs text-red-800 font-mono">
                                           {error.message}
                                         </pre>
@@ -789,7 +791,7 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
                               );
                             }
                           )}
-                          <p className="mt-3 font-medium text-red-800 bg-red-100 border border-red-200 rounded p-2">
+                          <p className="mt-3 font-medium text-red-800 bg-red-100 border border-red-200 rounded-lg p-3">
                             Please remove duplicate assignments or modify
                             trainer details (dates, duration) before proceeding.
                           </p>
@@ -801,57 +803,57 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
               </form>
 
               {/* Page Footer */}
-              <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 rounded-b-lg">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+              <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 rounded-b-2xl">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                      disabled={loading}
+                    >
+                      Cancel
+                    </button>
+                  </div>
                   <button
-                    type="button"
-                    onClick={onClose}
-                    className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-                    disabled={loading}
+                    type="submit"
+                    onClick={handleSubmit}
+                    disabled={loading || submitDisabled || !isChecklistComplete}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-xl shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-green-400 disabled:cursor-not-allowed transition-colors"
                   >
-                    Cancel
+                    {loading ? (
+                      <>
+                        <FiClock className="animate-spin -ml-1 mr-2 h-4 w-4" />
+                        Processing...
+                      </>
+                    ) : (
+                      !isChecklistComplete ? (
+                        "Complete All Requirements to Submit"
+                      ) : (
+                        "Submit JD Training"
+                      )
+                    )}
                   </button>
                 </div>
-                <button
-                  type="submit"
-                  onClick={handleSubmit}
-                  disabled={loading || submitDisabled || !isChecklistComplete}
-                  className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-green-400 disabled:cursor-not-allowed transition-colors"
-                >
-                  {loading ? (
-                    <>
-                      <FiClock className="animate-spin -ml-1 mr-2 h-4 w-4" />
-                      Processing...
-                    </>
-                  ) : (
-                    !isChecklistComplete ? (
-                      "Complete All Requirements to Submit"
-                    ) : (
-                      "Submit JD Training"
-                    )
-                  )}
-                </button>
-              </div>
 
-              {/* Submission Requirements Checklist - Below buttons */}
-              <div className="mt-4">
-                <SubmissionChecklist
-                  selectedPhases={["JD"]}
-                  selectedDomains={["JD"]}
-                  trainingStartDate={commonFields.trainingStartDate}
-                  trainingEndDate={commonFields.trainingEndDate}
-                  collegeStartTime={commonFields.collegeStartTime}
-                  collegeEndTime={commonFields.collegeEndTime}
-                  lunchStartTime={commonFields.lunchStartTime}
-                  lunchEndTime={commonFields.lunchEndTime}
-                  table1DataByDomain={table1DataByDomain}
-                  hasValidationErrors={hasValidationErrors()}
-                  onChecklistComplete={setIsChecklistComplete}
-                  key={`${Object.keys(table1DataByDomain).length}-${table1DataByDomain.JD ? table1DataByDomain.JD.length : 0}-${commonFields.trainingStartDate || ''}-${commonFields.trainingEndDate || ''}`}
-                />
+                {/* Submission Requirements Checklist - Below buttons */}
+                <div className="mt-6">
+                  <SubmissionChecklist
+                    selectedPhases={["JD"]}
+                    selectedDomains={["JD"]}
+                    trainingStartDate={commonFields.trainingStartDate}
+                    trainingEndDate={commonFields.trainingEndDate}
+                    collegeStartTime={commonFields.collegeStartTime}
+                    collegeEndTime={commonFields.collegeEndTime}
+                    lunchStartTime={commonFields.lunchStartTime}
+                    lunchEndTime={commonFields.lunchEndTime}
+                    table1DataByDomain={table1DataByDomain}
+                    hasValidationErrors={hasValidationErrors()}
+                    onChecklistComplete={setIsChecklistComplete}
+                    key={`${Object.keys(table1DataByDomain).length}-${table1DataByDomain.JD ? table1DataByDomain.JD.length : 0}-${commonFields.trainingStartDate || ''}-${commonFields.trainingEndDate || ''}`}
+                  />
+                </div>
               </div>
-            </div>
           </div>
         </div>
       </div>

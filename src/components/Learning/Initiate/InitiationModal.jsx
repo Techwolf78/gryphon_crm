@@ -228,46 +228,6 @@ function InitiationModal({ training, onClose, onConfirm }) {
     fetchTrainingDetails();
   }, [training]);
 
-  useEffect(() => {
-    setTable1DataByDomain((prev) => {
-      const updated = { ...prev };
-      selectedDomains.forEach((domain) => {
-        if (!updated[domain] || updated[domain].length === 0) {
-          const domainHours = getDomainHours(domain, getMainPhase());
-          updated[domain] = courses.map((course) => ({
-            batch: course.specialization,
-            stdCount: course.students,
-            hrs: domainHours,
-            assignedHours: 0,
-            batches: [
-              {
-                batchPerStdCount: "",
-                batchCode: `${course.specialization}1`,
-                assignedHours: 0,
-                trainers: [],
-              },
-            ],
-          }));
-        }
-      });
-      // Store original table data for undo functionality (only if not already set)
-      if (Object.keys(originalTable1DataByDomain.current).length === 0) {
-        originalTable1DataByDomain.current = JSON.parse(JSON.stringify(updated));
-      }
-      return updated;
-    });
-    
-    // Store original custom phase hours for undo functionality (only if not already set)
-    if (Object.keys(originalCustomPhaseHours.current).length === 0) {
-      originalCustomPhaseHours.current = JSON.parse(JSON.stringify(customPhaseHours));
-    }
-    
-    // Store original selected domains for undo functionality (only if not already set)
-    if (originalSelectedDomains.current.length === 0) {
-      originalSelectedDomains.current = [...selectedDomains];
-    }
-  }, [selectedDomains, courses, topics, getDomainHours, getMainPhase, customPhaseHours]);
-
   // Track changes for undo functionality
   useEffect(() => {
     const hasTableDataChanged = JSON.stringify(table1DataByDomain) !== JSON.stringify(originalTable1DataByDomain.current);
@@ -1189,13 +1149,59 @@ function InitiationModal({ training, onClose, onConfirm }) {
           return restoredRow;
         });
 
-        // if there is no table data in current phase but courses exist, fallback to auto-generated rows
-        if (
-          (!rowsForDomain || rowsForDomain.length === 0) &&
-          courses.length > 0
-        ) {
+        // Start with existing saved data
+        loadedTable1Data[domain] = [...rowsForDomain];
+
+        // Add any new courses that are not already included in existing batches (considering merged batches)
+        const domainHours = getDomainHours(domain, currentPhase);
+        courses.forEach((course) => {
+          const spec = course.specialization;
+          const isAlreadyIncluded = rowsForDomain.some(row => {
+            if (row.batch === spec) return true;
+            if (row.batch.includes('+')) {
+              const parts = row.batch.split('+');
+              return parts.includes(spec);
+            }
+            return false;
+          });
+          if (!isAlreadyIncluded) {
+            loadedTable1Data[domain].push({
+              batch: spec,
+              stdCount: course.students,
+              hrs: domainHours,
+              assignedHours: 0,
+              batches: [
+                {
+                  batchPerStdCount: "",
+                  batchCode: `${spec}1`,
+                  assignedHours: 0,
+                  trainers: [],
+                },
+              ],
+            });
+          }
+        });
+      }
+
+      setSelectedDomains(loadedDomains);
+      setTable1DataByDomain(loadedTable1Data);
+
+      // Store original data for undo functionality
+      originalTable1DataByDomain.current = JSON.parse(JSON.stringify(loadedTable1Data));
+      originalSelectedDomains.current = [...loadedDomains];
+      setHasChanges(false);
+    };
+    fetchPhaseDomains();
+  }, [training?.id, currentPhase, courses, getDomainHours]);
+
+  // Initialize table1Data for newly selected domains with courses
+  useEffect(() => {
+    setTable1DataByDomain(prev => {
+      const newData = { ...prev };
+      selectedDomains.forEach(domain => {
+        if (!newData[domain] || newData[domain].length === 0) {
           const domainHours = getDomainHours(domain, currentPhase);
-          loadedTable1Data[domain] = courses.map((course) => ({
+          newData[domain] = courses.map(course => ({
             batch: course.specialization,
             stdCount: course.students,
             hrs: domainHours,
@@ -1209,21 +1215,11 @@ function InitiationModal({ training, onClose, onConfirm }) {
               },
             ],
           }));
-        } else {
-          loadedTable1Data[domain] = rowsForDomain;
         }
-      }
-
-      setSelectedDomains(loadedDomains);
-      setTable1DataByDomain(loadedTable1Data);
-
-      // Store original data for undo functionality
-      originalTable1DataByDomain.current = JSON.parse(JSON.stringify(loadedTable1Data));
-      originalSelectedDomains.current = [...loadedDomains];
-      setHasChanges(false);
-    };
-    fetchPhaseDomains();
-  }, [training?.id, currentPhase, courses, getDomainHours]);
+      });
+      return newData;
+    });
+  }, [selectedDomains, courses, currentPhase, getDomainHours]);
 
   // Load phase-specific data when currentPhase is set
   useEffect(() => {

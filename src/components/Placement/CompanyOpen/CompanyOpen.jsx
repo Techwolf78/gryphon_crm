@@ -30,9 +30,10 @@ function CompanyOpen() {
   const [error, setError] = useState(null);
   const [students, setStudents] = useState([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
-  const [showPlacedStudent, setShowPlacedStudent] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [globalMatchStats, setGlobalMatchStats] = useState({ total: 0, matched: 0 });
+  const [showPlacedStudentDashboard, setShowPlacedStudentDashboard] = useState(false);
+  const [editingCompany, setEditingCompany] = useState(null);
 
   // Fetch companies with student counts
   const fetchCompanies = async () => {
@@ -47,22 +48,24 @@ function CompanyOpen() {
             ...doc.data(),
           };
           
-          // Pre-fetch student count for each company
+          // Pre-fetch student count for each company (college-specific)
           try {
             const companyCode = companyData.companyName?.replace(/\s+/g, '_').toUpperCase();
             if (companyCode) {
               const uploadsCollectionRef = collection(db, 'studentList', companyCode, 'uploads');
               const querySnapshot = await getDocs(uploadsCollectionRef);
               
-              let totalStudents = 0;
+              let collegeStudents = 0;
               querySnapshot.forEach((uploadDoc) => {
                 const uploadData = uploadDoc.data();
-                if (uploadData.students && Array.isArray(uploadData.students)) {
-                  totalStudents += uploadData.students.length;
+                // Only count students uploaded by this specific college
+                if (uploadData.college === companyData.college && 
+                    uploadData.students && Array.isArray(uploadData.students)) {
+                  collegeStudents += uploadData.students.length;
                 }
               });
               
-              companyData.studentCount = totalStudents;
+              companyData.studentCount = collegeStudents;
             }
           } catch (error) {
             console.error(`Error fetching student count for ${companyData.companyName}:`, error);
@@ -213,7 +216,7 @@ function CompanyOpen() {
 
   // Add this function in CompanyOpen component
   const fetchCompanyStudents = async (company) => {
-    if (!company?.companyName) return [];
+    if (!company?.companyName || !company?.college) return [];
     
     try {
       const companyCode = company.companyName.replace(/\s+/g, '_').toUpperCase();
@@ -221,20 +224,23 @@ function CompanyOpen() {
       
       const querySnapshot = await getDocs(uploadsCollectionRef);
       
-      const allStudents = [];
+      const collegeStudents = [];
       querySnapshot.forEach((doc) => {
         const uploadData = doc.data();
-        if (uploadData.students && Array.isArray(uploadData.students)) {
+        // Only include students uploaded by this specific college
+        if (uploadData.college === company.college && 
+            uploadData.students && Array.isArray(uploadData.students)) {
           const studentsWithMeta = uploadData.students.map(student => ({
             ...student,
             uploadedAt: uploadData.uploadedAt,
-            college: uploadData.college
+            college: uploadData.college,
+            uploadId: doc.id
           }));
-          allStudents.push(...studentsWithMeta);
+          collegeStudents.push(...studentsWithMeta);
         }
       });
       
-      return allStudents;
+      return collegeStudents;
     } catch (error) {
       console.error('Error fetching students:', error);
       return [];
@@ -247,6 +253,7 @@ function CompanyOpen() {
     
     try {
       const collegeAbbr = getCollegeAbbreviation(collegeName);
+      
       const trainingFormsSnapshot = await getDocs(collection(db, "trainingForms"));
       
       let allStudents = [];
@@ -278,6 +285,13 @@ function CompanyOpen() {
     setGlobalMatchStats(stats);
   };
 
+  // Handle editing a JD
+  const handleEditJD = (company) => {
+    setEditingCompany(company);
+    setShowJDForm(true);
+  };
+
+  // Fetch companies and users on component mount
   useEffect(() => {
     fetchCompanies();
     fetchUsers();
@@ -363,37 +377,44 @@ function CompanyOpen() {
   return (
     <div className="bg-linear-to-br from-gray-50 to-gray-100 min-h-screen font-sans">
       <div className="mx-auto p-0">
-        <CompanyHeader
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          companies={companies}
-          filteredCompanies={filteredCompanies}
-          isFilterOpen={isFilterOpen}
-          setIsFilterOpen={setIsFilterOpen}
-          filters={filters}
-          setFilters={setFilters}
-          users={users}
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          setShowJDForm={setShowJDForm}
-          setShowPlacedStudent={setShowPlacedStudent}
-          fetchCompanies={fetchCompanies}
-          matchStats={globalMatchStats}
-        />
-
-        <CompanyTable
-          filteredCompanies={filteredCompanies}
-          activeTab={activeTab}
-          setSelectedCompany={setSelectedCompany}
-          dropdownOpen={dropdownOpen}
-          setDropdownOpen={setDropdownOpen}
-          setShowJDForm={setShowJDForm}
-          updateCompanyStatus={updateCompanyStatus}
-          updateRoundStatus={updateRoundStatus}
-          fetchCompanyStudents={fetchCompanyStudents}
-          fetchTrainingFormStudents={fetchTrainingFormStudents}
-          onMatchStatsUpdate={handleMatchStatsUpdate}
-        />
+        {showPlacedStudentDashboard ? (
+          <PlacedStudent onClose={() => setShowPlacedStudentDashboard(false)} />
+        ) : (
+          <>
+            <CompanyHeader
+              searchTerm={searchTerm}
+              setSearchTerm={setSearchTerm}
+              companies={companies}
+              filteredCompanies={filteredCompanies}
+              isFilterOpen={isFilterOpen}
+              setIsFilterOpen={setIsFilterOpen}
+              filters={filters}
+              setFilters={setFilters}
+              users={users}
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              setShowJDForm={setShowJDForm}
+              fetchCompanies={fetchCompanies}
+              matchStats={globalMatchStats}
+              showPlacedStudentDashboard={showPlacedStudentDashboard}
+              setShowPlacedStudentDashboard={setShowPlacedStudentDashboard}
+            />
+            <CompanyTable
+              filteredCompanies={filteredCompanies}
+              activeTab={activeTab}
+              setSelectedCompany={setSelectedCompany}
+              dropdownOpen={dropdownOpen}
+              setDropdownOpen={setDropdownOpen}
+              setShowJDForm={setShowJDForm}
+              updateCompanyStatus={updateCompanyStatus}
+              updateRoundStatus={updateRoundStatus}
+              fetchCompanyStudents={fetchCompanyStudents}
+              fetchTrainingFormStudents={fetchTrainingFormStudents}
+              onMatchStatsUpdate={handleMatchStatsUpdate}
+              onEditJD={handleEditJD}
+            />
+          </>
+        )}
 
         {selectedCompany && (
           <CompanyDetailsModal
@@ -409,16 +430,14 @@ function CompanyOpen() {
         )}
 
         {showJDForm && (
-          <AddJD show={showJDForm} onClose={() => {
-            setShowJDForm(false);
-            fetchCompanies();
-          }} />
-        )}
-
-        {showPlacedStudent && (
-          <PlacedStudent
-            show={showPlacedStudent}
-            onClose={() => setShowPlacedStudent(false)}
+          <AddJD 
+            show={showJDForm} 
+            onClose={() => {
+              setShowJDForm(false);
+              setEditingCompany(null);
+              fetchCompanies();
+            }}
+            company={editingCompany}
           />
         )}
       </div>

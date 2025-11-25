@@ -50,6 +50,9 @@ const Maintenance = React.lazy(() => import("./pages/Maintenance"));
 const UploadStudentData = React.lazy(() => import("./components/Placement/AddJd/UploadStudentData")); // ✅ Space removed
 const Purchase = React.lazy(() => import("./pages/Purchase"));
 
+// Lazy load UNO page
+const UNO = React.lazy(() => import("./pages/UNO"));
+
 // Loading component
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -119,6 +122,7 @@ const AppContent = () => {
             <Route path="hr" element={<HR />} />
             <Route path="ca" element={<CA />} />
             <Route path="purchase" element={<Purchase />} />
+            <Route path="uno" element={<UNO />} />
           </Route>
 
           {/* Add the 404 route - catch all unmatched routes */}
@@ -141,7 +145,7 @@ const App = () => (
     <ErrorBoundary>
       <AuthProvider>
         <NotificationsProvider>
-          <Router basename="/">
+          <Router basename="">
             <AppContent />
           </Router>
         </NotificationsProvider>

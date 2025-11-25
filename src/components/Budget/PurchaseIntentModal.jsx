@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { X, AlertCircle } from "lucide-react";
 
 const PurchaseIntentModal = ({
   show,
@@ -206,19 +207,6 @@ const PurchaseIntentModal = ({
     onSubmit(submissionData);
   };
 
-  if (!show) return null;
-
-  const estimatedTotal = calculateTotalEstimate();
-  const remainingBudget = getRemainingBudget();
-  const exceedsBudget = estimatedTotal > remainingBudget;
-
-  const availableCategories = Object.entries(budgetComponents || {})
-    .filter(([key]) => currentBudget?.departmentExpenses?.[key])
-    .map(([key, label]) => ({
-      value: key,
-      label: label,
-    }));
-
   useEffect(() => {
     const preventScrollChange = (e) => {
       if (
@@ -234,6 +222,19 @@ const PurchaseIntentModal = ({
     return () => window.removeEventListener("wheel", preventScrollChange);
   }, []);
 
+  if (!show) return null;
+
+  const estimatedTotal = calculateTotalEstimate();
+  const remainingBudget = getRemainingBudget();
+  const exceedsBudget = estimatedTotal > remainingBudget;
+
+  const availableCategories = Object.entries(budgetComponents || {})
+    .filter(([key]) => currentBudget?.departmentExpenses?.[key])
+    .map(([key, label]) => ({
+      value: key,
+      label: label,
+    }));
+
   // ====== BUDGET CHECK ======
   const hasBudget =
     currentBudget &&
@@ -241,286 +242,298 @@ const PurchaseIntentModal = ({
     currentBudget.csddExpenses; // or any key you rely on
 
   return (
-    <div className="mt-10 fixed inset-0 bg-black/30 bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-        <div className="flex justify-between items-center p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-900">
-            Create Purchase Intent
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-1000">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden border border-gray-200/50">
+        {/* Header */}
+        <div className="bg-linear-to-r from-blue-50 via-indigo-50 to-purple-50 border-b border-gray-200/50 p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">
+                Create Purchase Intent
+              </h2>
+              <p className="text-xs text-gray-600">
+                Submit a new purchase request for approval
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1 hover:bg-gray-100 rounded-lg transition-all duration-200 hover:scale-105"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
+              <X className="w-4 h-4 text-gray-600" />
+            </button>
+          </div>
         </div>
+
+        {/* Content */}
         {!hasBudget ? (
           <div className="p-8 text-center">
-            <h2 className="text-xl font-bold text-red-600 mb-2">
-              ❗ No Budget Found
-            </h2>
-            <p className="text-gray-600">
-              The CSDD budget for FY {fiscalYear} has not been created yet.
-            </p>
-            <p className="text-gray-500 mt-1">
-              Please ask Finance/Admin to set it up.
-            </p>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+              <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+              <h2 className="text-xl font-bold text-red-600 mb-2">
+                No Budget Found
+              </h2>
+              <p className="text-gray-600">
+                The CSDD budget for FY {fiscalYear} has not been created yet.
+              </p>
+              <p className="text-gray-500 mt-1">
+                Please ask Finance/Admin to set it up.
+              </p>
+            </div>
           </div>
         ) : (
           <form
             onSubmit={handleSubmit}
-            className="p-6 overflow-y-auto max-h-[70vh]"
+            className="overflow-y-auto max-h-[calc(90vh-85px)]"
           >
-            {/* Basic Information */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Intent Title *
-                </label>
-                <input
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, title: e.target.value }))
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="e.g., Laptops for New Team Members"
-                  required
-                />
-              </div>
+            <div className="p-6 space-y-6">
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Budget Component *
-                </label>
-                <select
-                  value={formData.budgetComponent}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      budgetComponent: e.target.value,
-                    }))
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  required
-                >
-                  <option value="">Select Component</option>
-                  {availableCategories.map((cat) => (
-                    <option key={cat.value} value={cat.value}>
-                      {cat.label}
-                    </option>
-                  ))}
-                </select>
-                {formData.budgetComponent && currentBudget && (
-                  <div className="mt-2 text-sm">
-                    <span className="text-gray-600">Remaining Budget: </span>
-                    <span
-                      className={`font-semibold ${
-                        exceedsBudget ? "text-red-600" : "text-green-600"
-                      }`}
-                    >
-                      ₹{remainingBudget.toLocaleString()}
-                    </span>
+              {/* Basic Information Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-1 h-6 bg-blue-500 rounded-full"></div>
+                  <h3 className="text-lg font-bold text-gray-900">Basic Information</h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">Intent Title *</label>
+                    <input
+                      type="text"
+                      value={formData.title}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, title: e.target.value }))
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="e.g., Laptops for New Team Members"
+                      required
+                    />
                   </div>
-                )}
-              </div>
-            </div>
 
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Description
-              </label>
-              <textarea
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    description: e.target.value,
-                  }))
-                }
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Describe the purpose and requirements for this purchase..."
-              />
-            </div>
-
-            {/* Requested Items List */}
-            <div className="mb-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Requested Items
-                </h3>
-                <button
-                  type="button"
-                  onClick={addItem}
-                  className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium"
-                >
-                  + Add Item
-                </button>
-              </div>
-
-              {formData.requestedItems.map((item, index) => (
-                <div key={index} className="bg-gray-50 p-4 rounded-lg mb-3">
-                  <div className="flex justify-between items-start mb-3">
-                    <h4 className="font-medium text-gray-900">
-                      Item {item.sno}
-                    </h4>
-                    {formData.requestedItems.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeItem(index)}
-                        className="text-red-600 hover:text-red-800 text-sm"
-                      >
-                        Remove
-                      </button>
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">Budget Component *</label>
+                    <select
+                      value={formData.budgetComponent}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          budgetComponent: e.target.value,
+                        }))
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      required
+                    >
+                      <option value="">Select Component</option>
+                      {availableCategories.map((cat) => (
+                        <option key={cat.value} value={cat.value}>
+                          {cat.label}
+                        </option>
+                      ))}
+                    </select>
+                    {formData.budgetComponent && currentBudget && (
+                      <div className="mt-2 text-sm">
+                        <span className="text-gray-600">Remaining Budget: </span>
+                        <span
+                          className={`font-semibold ${
+                            exceedsBudget ? "text-red-600" : "text-green-600"
+                          }`}
+                        >
+                          ₹{remainingBudget.toLocaleString()}
+                        </span>
+                      </div>
                     )}
                   </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Category *
-                      </label>
-                      <input
-                        type="text"
-                        value={
-                          budgetComponents[formData.budgetComponent] ||
-                          formData.budgetComponent ||
-                          "—"
-                        }
-                        readOnly
-                        className="w-full px-3 py-2 border border-gray-300 bg-gray-100 rounded-lg text-sm cursor-not-allowed"
-                        placeholder="Auto-set from Budget Component"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Description *
-                      </label>
-                      <input
-                        type="text"
-                        value={item.description}
-                        onChange={(e) =>
-                          handleItemChange(index, "description", e.target.value)
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                        placeholder="e.g., Dell Latitude 5440 Laptop"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Quantity *
-                      </label>
-                      <input
-                        type="number"
-                        value={item.quantity}
-                        onChange={(e) =>
-                          handleItemChange(index, "quantity", e.target.value)
-                        }
-                        min="1"
-                        step="1"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Estimated Price (₹) *
-                      </label>
-                      <input
-                        type="number"
-                        value={item.estPricePerUnit}
-                        onChange={(e) =>
-                          handleItemChange(
-                            index,
-                            "estPricePerUnit",
-                            e.target.value
-                          )
-                        }
-                        min="0"
-                        step="0.01"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mt-2 text-xs text-gray-600">
-                    Item Total: ₹{(item.estTotal || 0).toLocaleString()}
-                  </div>
                 </div>
-              ))}
-            </div>
-
-            {/* Additional Details */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Required By Date
-                </label>
-                <input
-                  type="date"
-                  value={formData.requiredBy}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      requiredBy: e.target.value,
-                    }))
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Total Estimated Cost
-                </label>
-                <div
-                  className={`p-2 rounded-lg text-center font-semibold ${
-                    exceedsBudget
-                      ? "bg-red-100 text-red-800"
-                      : "bg-green-100 text-green-800"
-                  }`}
+              {/* Description Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-1 h-6 bg-green-500 rounded-full"></div>
+                  <h3 className="text-lg font-bold text-gray-900">Description</h3>
+                </div>
+
+                <div className="space-y-2">
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        description: e.target.value,
+                      }))
+                    }
+                    rows={4}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Describe the purpose and requirements for this purchase..."
+                  />
+                </div>
+              </div>
+
+              {/* Requested Items Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1 h-6 bg-purple-500 rounded-full"></div>
+                    <h3 className="text-lg font-bold text-gray-900">Requested Items</h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addItem}
+                    className="px-3 py-1 text-blue-600 hover:text-blue-800 font-medium border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+                  >
+                    + Add Item
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {formData.requestedItems.map((item, index) => (
+                    <div key={index} className="bg-white border border-gray-200 rounded-lg p-4">
+                      <div className="flex justify-between items-start mb-4">
+                        <h4 className="font-semibold text-gray-900">
+                          Item {item.sno}
+                        </h4>
+                        {formData.requestedItems.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeItem(index)}
+                            className="text-red-600 hover:text-red-800 text-sm font-medium"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="space-y-2">
+                          <label className="block text-sm font-medium text-gray-700">Category *</label>
+                          <input
+                            type="text"
+                            value={
+                              budgetComponents[formData.budgetComponent] ||
+                              formData.budgetComponent ||
+                              "—"
+                            }
+                            readOnly
+                            className="w-full px-3 py-2 border border-gray-300 bg-gray-50 rounded-lg text-gray-700 cursor-not-allowed"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="block text-sm font-medium text-gray-700">Description *</label>
+                          <input
+                            type="text"
+                            value={item.description}
+                            onChange={(e) =>
+                              handleItemChange(index, "description", e.target.value)
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="e.g., Dell Latitude 5440 Laptop"
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="block text-sm font-medium text-gray-700">Quantity *</label>
+                          <input
+                            type="number"
+                            value={item.quantity}
+                            onChange={(e) =>
+                              handleItemChange(index, "quantity", e.target.value)
+                            }
+                            min="1"
+                            step="1"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="block text-sm font-medium text-gray-700">Estimated Price (₹) *</label>
+                          <input
+                            type="number"
+                            value={item.estPricePerUnit}
+                            onChange={(e) =>
+                              handleItemChange(
+                                index,
+                                "estPricePerUnit",
+                                e.target.value
+                              )
+                            }
+                            min="0"
+                            step="0.01"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <div className="text-sm font-medium text-gray-700">
+                          Item Total: ₹{(item.estTotal || 0).toLocaleString("en-IN")}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Additional Details Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-1 h-6 bg-indigo-500 rounded-full"></div>
+                  <h3 className="text-lg font-bold text-gray-900">Additional Details</h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">Required By Date</label>
+                    <input
+                      type="date"
+                      value={formData.requiredBy}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          requiredBy: e.target.value,
+                        }))
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="dd-mm-yyyy"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">Total Estimated Cost</label>
+                    <div
+                      className={`p-3 rounded-lg text-center font-bold text-lg ${
+                        exceedsBudget
+                          ? "bg-red-50 text-red-800 border border-red-200"
+                          : "bg-green-50 text-green-800 border border-green-200"
+                      }`}
+                    >
+                      ₹{estimatedTotal.toLocaleString("en-IN")}
+                      {exceedsBudget && (
+                        <div className="text-sm mt-1 font-normal">Exceeds remaining budget</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 text-sm"
                 >
-                  ₹{estimatedTotal.toLocaleString()}
-                  {exceedsBudget && (
-                    <div className="text-xs mt-1">Exceeds remaining budget</div>
-                  )}
-                </div>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold disabled:opacity-50 flex items-center text-sm"
+                >
+                  Submit Purchase Intent
+                </button>
               </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex justify-end gap-3 pt-6 border-t border-gray-200">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-6 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
-              >
-                Submit Purchase Intent
-              </button>
             </div>
           </form>
         )}

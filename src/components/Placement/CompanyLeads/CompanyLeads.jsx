@@ -121,7 +121,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
   // Export modal state
   const [showExportModal, setShowExportModal] = useState(false);
-  const [exportStatuses, setExportStatuses] = useState(['hot', 'warm', 'called', 'onboarded', 'deleted']); // Default selected statuses (cold only available for myleads)
+  const [exportStatuses, setExportStatuses] = useState(['hot', 'warm', 'called', 'onboarded']); // Default selected statuses (cold only available for myleads)
 
   // Debounced search term for performance
   const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
@@ -248,53 +248,10 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
   // Get team member IDs based on role-based logic (matches Sales module)
   const getTeamMemberIds = useCallback((managerUid, users = allUsers) => {
-    const user = Object.values(users).find((u) => u.uid === managerUid);
-    if (!user) return [];
-
-    const isPlacementDept = user.departments?.includes("Placement") || user.department === "Placement";
-    const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
-
-    if (user.role === "Director") {
-      // Director sees all placement team leads
-      return Object.values(users)
-        .filter(u => u.departments?.includes("Placement") || u.department === "Placement")
-        .map(u => u.uid || u.id);
-    } else if (user.role === "Head") {
-      // Head sees Managers and their subordinates in Placement (regardless of Head's own department)
-      const teamMembers = [];
-      
-      // Find all Managers in Placement
-      const managers = Object.values(users).filter(
-        (u) => u.role === "Manager" && 
-        (u.departments?.includes("Placement") || u.department === "Placement")
-      );
-      teamMembers.push(...managers.map(u => u.uid || u.id));
-      
-        // Find subordinates of those Managers
-        managers.forEach(manager => {
-          const subordinates = Object.values(users).filter(
-            (u) =>
-              u.reportingManager === manager.name &&
-              ["Assistant Manager", "Executive"].includes(u.role) &&
-              (u.departments?.includes("Placement") || u.department === "Placement")
-          );
-          teamMembers.push(...subordinates.map(u => u.uid || u.id));
-        });      return teamMembers;
-    } else if (isPlacementDept && isHigherRole) {
-      if (user.role === "Manager") {
-        // Manager sees direct subordinates (Assistant Manager, Executive)
-        const subordinates = Object.values(users).filter(
-          (u) =>
-            u.reportingManager === user.name &&
-            ["Assistant Manager", "Executive"].includes(u.role) &&
-            (u.departments?.includes("Placement") || u.department === "Placement")
-        );
-        return subordinates.map((u) => u.uid || u.id);
-      }
-    }
-
-    // Lower roles or non-placement users see no team members
-    return [];
+    // All users can see leads from all other users (complete transparency)
+    return Object.values(users)
+      .filter(u => u.uid !== managerUid)
+      .map(u => u.uid || u.id);
   }, [allUsers]);
 
   // Fetch today's follow-ups from all companies
@@ -391,6 +348,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                 pocMail: decodedCompany.email || decodedCompany.pocMail || 
                         (decodedCompany.companyUrl && decodedCompany.companyUrl.includes('@') ? decodedCompany.companyUrl : ''),
                 pocLocation: decodedCompany.location || decodedCompany.pocLocation || '',
+                pocLandline: decodedCompany.landline || decodedCompany.pocLandline || '',
                 industry: decodedCompany.industry || decodedCompany.sector || '',
                 companySize: decodedCompany.companySize || decodedCompany.employeeCount || '',
                 source: decodedCompany.source || 'Excel Upload',
@@ -439,6 +397,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                 pocMail: decodedCompany.email || decodedCompany.pocMail || 
                         (decodedCompany.companyUrl && decodedCompany.companyUrl.includes('@') ? decodedCompany.companyUrl : ''),
                 pocLocation: decodedCompany.location || decodedCompany.pocLocation || '',
+                pocLandline: decodedCompany.landline || decodedCompany.pocLandline || '',
                 industry: decodedCompany.industry || decodedCompany.sector || '',
                 companySize: decodedCompany.companySize || decodedCompany.employeeCount || '',
                 source: decodedCompany.source || 'Excel Upload',
@@ -1027,18 +986,32 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     return sortedGrouped;
   }, [filteredLeads, activeTab, viewMyLeadsOnly, viewMode]);
 
-  // Group leads by status for tab counts (calculate based on what user can actually see)
+  // Group leads by status for tab counts (filtered by current view mode)
   const leadsByStatus = useMemo(() => {
     const counts = { hot: 0, warm: 0, cold: 0, called: 0, onboarded: 0, deleted: 0 };
 
-    leads.forEach(lead => {
+    // Apply the same view mode filtering as fetchLeads
+    let teamMemberIds = [];
+    if (!viewMyLeadsOnly && user) {
+      teamMemberIds = getTeamMemberIds(user.uid, allUsers);
+    }
+
+    let userLeads = user ? leads.filter(lead => {
+      if (viewMyLeadsOnly) {
+        return lead.assignedTo === user.uid;
+      } else {
+        return !lead.assignedTo || lead.assignedTo === user.uid || teamMemberIds.includes(lead.assignedTo);
+      }
+    }) : leads;
+
+    userLeads.forEach(lead => {
       if (lead.status && counts[lead.status] !== undefined) {
         counts[lead.status]++;
       }
     });
 
     return counts;
-  }, [leads]);
+  }, [leads, viewMyLeadsOnly, user, allUsers, getTeamMemberIds]);
 
   const handleAddLead = (newLead) => {
     setLeads((prevLeads) => [
@@ -1440,6 +1413,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         pocLocation: updatedData.location || updatedData.pocLocation,
         companyWebsite: updatedData.companyUrl || updatedData.companyWebsite,
         pocLinkedin: updatedData.linkedinUrl || updatedData.pocLinkedin,
+        pocLandline: updatedData.landline,
         industry: updatedData.industry,
         companySize: updatedData.companySize,
         status: updatedData.status,
@@ -1801,8 +1775,17 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           }
 
           // Get assigned user name
+          const assignedUserData = Object.values(allUsers).find(u => 
+            u.uid === lead.assignedTo || 
+            u.id === lead.assignedTo || 
+            u.email === lead.assignedTo
+          );
           const assignedUser = lead.assignedTo ? 
-            (allUsers[lead.assignedTo]?.displayName || allUsers[lead.assignedTo]?.name || 'Unknown') : 
+            (assignedUserData?.displayName || 
+             assignedUserData?.name || 
+             assignedUserData?.email || 
+             `${assignedUserData?.firstName || ''} ${assignedUserData?.lastName || ''}`.trim() || 
+             'Unknown') : 
             'Unassigned';
 
           return {
@@ -2450,7 +2433,6 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                   { value: 'warm', label: 'WARM' },
                   { value: 'called', label: 'CALLED' },
                   { value: 'onboarded', label: 'ONBOARDED' },
-                  { value: 'deleted', label: 'DELETED' },
                   { value: 'cold', label: 'COLD' }
                 ].map((status) => {
                   const isDisabled = status.value === 'cold' && !viewMyLeadsOnly;

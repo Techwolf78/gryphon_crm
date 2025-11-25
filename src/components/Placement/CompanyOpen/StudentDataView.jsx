@@ -4,10 +4,10 @@ import * as XLSX from 'xlsx';
 
 const StudentDataView = ({ students, onClose, companyName, collegeName, unmatchedStudents = [] }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, _setStatusFilter] = useState('all');
 
   // Fixed column mapping with proper field mapping
-  const columnMapping = [
+  const columnMapping = useMemo(() => [
     { displayName: 'SR NO', fieldName: 'srNo', isSrNo: true },
     { displayName: 'STUDENT NAME', fieldName: 'studentName' },
     { displayName: 'ENROLLMENT NUMBER', fieldName: 'enrollmentNo' },
@@ -24,15 +24,15 @@ const StudentDataView = ({ students, onClose, companyName, collegeName, unmatche
     { displayName: 'COLLEGE', fieldName: 'college' },
     { displayName: 'UPLOAD DATE', fieldName: 'uploadedAt' },
     { displayName: 'MATCH STATUS', fieldName: 'isMatched' }
-  ];
+  ], []);
 
   // Normalize student data - map different field names to consistent ones
   const normalizedStudents = useMemo(() => {
-    return students.map((student, index) => {
+    return students.map((student) => {
       // Check if student is unmatched
       const isUnmatched = unmatchedStudents.some(unmatched => 
-        unmatched.studentName?.toLowerCase() === student.studentName?.toLowerCase() ||
-        unmatched.email?.toLowerCase() === student.email?.toLowerCase()
+        unmatched.studentName?.toLowerCase().trim() === student.studentName?.toLowerCase().trim() ||
+        unmatched.email?.toLowerCase().trim() === student.email?.toLowerCase().trim()
       );
       
       return {
@@ -65,6 +65,7 @@ const StudentDataView = ({ students, onClose, companyName, collegeName, unmatche
     return columnMapping.filter(col => {
       if (col.isSrNo) return true; // Always show SR NO
       if (col.fieldName === 'isMatched') return true; // Always show match status
+      // Removed: if (col.isActions) return true; // Always show actions
       
       // Check if any student has this field with data
       return normalizedStudents.some(student => {
@@ -72,7 +73,7 @@ const StudentDataView = ({ students, onClose, companyName, collegeName, unmatche
         return value !== null && value !== undefined && value !== '' && value !== 'N/A';
       });
     });
-  }, [normalizedStudents]);
+  }, [normalizedStudents, columnMapping]);
 
   // Filter students
   const filteredStudents = useMemo(() => {
@@ -206,7 +207,7 @@ const StudentDataView = ({ students, onClose, companyName, collegeName, unmatche
       <div className="bg-white rounded-lg shadow-xl w-full max-w-95vw max-h-[95vh] overflow-hidden mx-4">
         
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-6 py-4 flex justify-between items-center sticky top-0">
+        <div className="bg-linear-to-r from-blue-600 to-indigo-700 text-white px-6 py-4 flex justify-between items-center sticky top-0">
           <div>
             <h2 className="text-xl font-semibold">Student Data</h2>
             <p className="text-green-100 text-sm">
@@ -266,9 +267,9 @@ const StudentDataView = ({ students, onClose, companyName, collegeName, unmatche
             <table className="w-full min-w-[1200px]">
               <thead className="bg-gray-50 sticky top-0">
                 <tr>
-                  {displayColumns.map((col, index) => (
+                  {displayColumns.map((col, _index) => (
                     <th 
-                      key={index} 
+                      key={_index} 
                       className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border bg-gray-100"
                     >
                       {col.displayName}
@@ -277,9 +278,9 @@ const StudentDataView = ({ students, onClose, companyName, collegeName, unmatche
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredStudents.map((student, index) => (
+                {filteredStudents.map((student, _index) => (
                   <tr 
-                    key={index} 
+                    key={_index} 
                     className={`hover:bg-gray-50 ${getRowClassName(student)}`}
                     title={!student.isMatched ? "Student not found in training Data" : ""}
                   >
@@ -291,7 +292,9 @@ const StudentDataView = ({ students, onClose, companyName, collegeName, unmatche
                         } ${!student.isMatched && colIndex > 0 ? 'text-red-700 font-medium' : ''}`}
                       >
                         {col.isSrNo 
-                          ? index + 1
+                          ? _index + 1
+                          : col.isActions
+                          ? null
                           : formatCellValue(student[col.fieldName], col.fieldName)
                         }
                       </td>
@@ -321,7 +324,7 @@ const StudentDataView = ({ students, onClose, companyName, collegeName, unmatche
             <button
               onClick={exportToExcel}
               disabled={filteredStudents.length === 0}
-              className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-medium rounded-lg hover:from-blue-700 hover:to-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center gap-2"
+              className="px-6 py-2.5 bg-linear-to-r from-blue-600 to-indigo-700 text-white font-medium rounded-lg hover:from-blue-700 hover:to-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center gap-2"
             >
               <DownloadIcon className="h-4 w-4 mr-2" />
               Export Excel

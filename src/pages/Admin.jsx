@@ -56,7 +56,26 @@ const Admin = () => {
   const [timeReports, setTimeReports] = useState([]);
   const [timeFilter, setTimeFilter] = useState('all');
   const [loadingTime, setLoadingTime] = useState(false);
-  const [sortOrder, setSortOrder] = useState(null); // null, 'asc', 'desc'
+  const [sortOrder, setSortOrder] = useState(null);
+  const formatTimeAgo = (date) => {
+    if (!date) return "Unknown";
+    
+    const now = new Date();
+    const diffMs = now - date;
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHour / 24);
+    const diffMonth = Math.floor(diffDay / 30);
+    const diffYear = Math.floor(diffMonth / 12);
+
+    if (diffSec < 60) return `Last Active ${diffSec}s ago`;
+    if (diffMin < 60) return `Last Active ${diffMin}m ago`;
+    if (diffHour < 24) return `Last Active ${diffHour}h ago`;
+    if (diffDay < 30) return `Last Active ${diffDay}d ago`;
+    if (diffMonth < 12) return `Last Active ${diffMonth}M ago`;
+    return `Last Active ${diffYear}y ago`;
+  }; // null, 'asc', 'desc'
 
   useEffect(() => {
     const cachedLogs = sessionStorage.getItem("auditLogs");
@@ -213,7 +232,13 @@ const Admin = () => {
       await cleanupStaleSessions();
 
       let q = collection(db, "user_sessions");
-      if (filter === '7days') {
+      if (filter === '1day') {
+        const oneDayAgo = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000);
+        q = query(q, where('startTime', '>=', oneDayAgo));
+      } else if (filter === '3days') {
+        const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+        q = query(q, where('startTime', '>=', threeDaysAgo));
+      } else if (filter === '7days') {
         const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
         q = query(q, where('startTime', '>=', sevenDaysAgo));
       } else if (filter === '30days') {
@@ -226,7 +251,9 @@ const Admin = () => {
       const userTotals = {};
       const userLocations = {};
       const userLastActive = {};
+      const userLastEndTime = {};
       const now = new Date();
+      
       sessions.forEach(s => {
         let dur = s.duration || 0;
         if (s.isActive) {
@@ -237,14 +264,17 @@ const Admin = () => {
           userTotals[s.userId] = 0;
           userLocations[s.userId] = s.location || { address: "Unknown" };
           userLastActive[s.userId] = s.isActive ? "Active now" : "Last session";
+          userLastEndTime[s.userId] = s.endTime ? s.endTime.toDate() : null;
         } else {
           // Update location if this session has location data and current is unknown
           if (s.location && !s.location.error && userLocations[s.userId].address === "Unknown") {
             userLocations[s.userId] = s.location;
           }
-          // Update active status
+          // Update active status and last end time
           if (s.isActive) {
             userLastActive[s.userId] = "Active now";
+          } else if (s.endTime && (!userLastEndTime[s.userId] || s.endTime.toDate() > userLastEndTime[s.userId])) {
+            userLastEndTime[s.userId] = s.endTime.toDate();
           }
         }
         userTotals[s.userId] += dur;
@@ -272,6 +302,8 @@ const Admin = () => {
         const minutes = Math.floor((totalSeconds % 3600) / 60);
         const seconds = totalSeconds % 60;
         const location = userLocations[uid];
+        const lastEndTime = userLastEndTime[uid];
+        const status = userLastActive[uid] === "Active now" ? "Active now" : formatTimeAgo(lastEndTime);
         return {
           userId: uid,
           name: userNames[uid] || 'Unknown',
@@ -279,7 +311,7 @@ const Admin = () => {
           location: location.error ? "Location unavailable" : location.address || "Unknown",
           city: location.city || "Unknown",
           country: location.country || "Unknown",
-          status: userLastActive[uid] || "Offline",
+          status: status,
           totalSeconds: totalSeconds
         };
       });
@@ -738,10 +770,15 @@ const Admin = () => {
             <div className="flex flex-col sm:flex-row gap-3">
               <select
                 value={timeFilter}
-                onChange={(e) => setTimeFilter(e.target.value)}
+                onChange={(e) => {
+                  setTimeFilter(e.target.value);
+                  fetchTimeReports(e.target.value);
+                }}
                 className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               >
                 <option value="all">All Time</option>
+                <option value="1day">Last 1 Day</option>
+                <option value="3days">Last 3 Days</option>
                 <option value="7days">Last 7 Days</option>
                 <option value="30days">Last 30 Days</option>
               </select>
@@ -794,13 +831,15 @@ const Admin = () => {
                             {report.name}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                              report.status === "Active now" 
-                                ? "bg-green-100 text-green-800" 
-                                : "bg-gray-100 text-gray-800"
-                            }`}>
-                              {report.status}
-                            </span>
+                            {report.status === "Active now" ? (
+                              <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                                {report.status}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-gray-600">
+                                {report.status}
+                              </span>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-gray-500">
                             <div className="text-sm">
