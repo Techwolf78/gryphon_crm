@@ -417,9 +417,9 @@ useEffect(() => {
     setEmailData((prev) => ({
       ...prev,
       to: prev.to || "", // Keep existing email if already entered
-      subject: `Training Schedule for ${
-        selectedTrainer?.name || selectedTrainer?.trainerName
-      } - ${trainingFormDoc?.collegeName || trainingData?.collegeName || ""}`,
+      subject: `Assignment Mail for ${
+        trainingFormDoc?.collegeName || trainingData?.collegeName || ""
+      } - Gryphon Academy Pvt. Ltd.`,
       message: `Dear ${
         selectedTrainer?.name || selectedTrainer?.trainerName
       },\n\nPlease find your training schedule details below:\n\nCollege: ${
@@ -439,8 +439,27 @@ useEffect(() => {
   };
 
   // Function to import email from trainer data
-  const handleImportEmail = () => {
-    const trainerEmail = selectedTrainer?.email || selectedTrainer?.trainerEmail || "";
+  const handleImportEmail = async () => {
+    // First try to get email from selectedTrainer (if already loaded)
+    let trainerEmail = selectedTrainer?.email || selectedTrainer?.trainerEmail || "";
+    
+    if (!trainerEmail && selectedTrainer?.trainerId) {
+      // If not available, fetch from Firestore trainers collection
+      try {
+        const trainerQuery = query(
+          collection(db, "trainers"),
+          where("trainerId", "==", selectedTrainer.trainerId)
+        );
+        const trainerSnap = await getDocs(trainerQuery);
+        if (!trainerSnap.empty) {
+          const trainerData = trainerSnap.docs[0].data();
+          trainerEmail = trainerData.email || "";
+        }
+      } catch (err) {
+        console.error("Error fetching trainer email:", err);
+      }
+    }
+    
     setEmailData((prev) => ({ ...prev, to: trainerEmail }));
   };
 
@@ -490,8 +509,6 @@ useEffect(() => {
       const scheduleRows = selectedAssignmentsData
         .map((assignment) => {
           let hoursPerDay = assignment.assignedHours || 0;
-
-          const perDayCost = (assignment.rate || 0) * hoursPerDay;
 
           return `
 <tr>
@@ -1149,7 +1166,7 @@ useEffect(() => {
                       Email Preview
                     </h5>
                     <div className="text-xs text-blue-700 space-y-1">
-                      <p><strong>Subject:</strong> Training Schedule for {selectedTrainer?.name || selectedTrainer?.trainerName}</p>
+                      <p><strong>Subject:</strong> Assignment Mail for {trainingFormDoc?.collegeName || trainingData?.collegeName || ""} - Gryphon Academy Pvt. Ltd.</p>
                       <p><strong>To:</strong> {emailData.to || 'trainer@example.com'}</p>
                       <p className="mt-2">
                         Includes detailed schedule table, financial breakdown, venue information, and contact details.
