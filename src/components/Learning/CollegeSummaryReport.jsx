@@ -8,13 +8,15 @@ const PHASE_LABELS = {
   "phase-1": "Phase 1",
   "phase-2": "Phase 2",
   "phase-3": "Phase 3",
+  "JD": "JD",
 };
 
 const DOMAIN_COLORS = {
   Technical: "bg-blue-100 border-blue-300 text-blue-800",
-  "Soft Skills": "bg-green-100 border-green-300 text-green-800",
+  "Soft skills": "bg-green-100 border-green-300 text-green-800",
   Aptitude: "bg-purple-100 border-purple-300 text-purple-800",
   Tools: "bg-yellow-100 border-yellow-300 text-yellow-800",
+  JD: "border-blue-400 bg-blue-50",
 };
 
 function formatDate(input) {
@@ -23,11 +25,7 @@ function formatDate(input) {
   let date;
 
   // Handle Firestore Timestamp
-  if (
-    typeof input === "object" &&
-    input !== null &&
-    typeof input.toDate === "function"
-  ) {
+  if (typeof input === "object" && input !== null && typeof input.toDate === "function") {
     date = input.toDate();
   }
   // Handle timestamp (number)
@@ -62,7 +60,7 @@ function getTimingForSlot(slot, training) {
   const { collegeStartTime, lunchStartTime, lunchEndTime, collegeEndTime } =
     training || {};
 
-  if (s.includes("AM & PM")) {
+  if (s.includes("AM & PM") || (s.includes("AM") && s.includes("PM"))) {
     if (collegeStartTime && collegeEndTime)
       return `${collegeStartTime} - ${collegeEndTime}`;
     return "AM & PM";
@@ -176,7 +174,7 @@ function CollegeSummaryReport({
                     const dates = [];
                     const startDate = new Date(trainer.startDate);
                     const endDate = new Date(trainer.endDate);
-                    const excludeDays = trainingData?.excludeDays || "None";
+                    const excludeDays = phaseData?.excludeDays || "None";
                     let current = new Date(startDate);
 
                     while (current <= endDate) {
@@ -442,7 +440,7 @@ function CollegeSummaryReport({
                     const dates = [];
                     const startDate = new Date(trainer.startDate);
                     const endDate = new Date(trainer.endDate);
-                    const excludeDays = trainingData?.excludeDays || "None";
+                    const excludeDays = phaseData?.excludeDays || "None";
                     let current = new Date(startDate);
 
                     while (current <= endDate) {

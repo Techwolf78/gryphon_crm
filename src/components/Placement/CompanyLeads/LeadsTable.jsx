@@ -30,6 +30,10 @@ function LeadsTable({
   currentUser,
   allUsers,
   formatDate, // Add formatDate prop
+  showCheckboxes = false,
+  selectedLeads = [],
+  onSelectionChange = () => {},
+  isDeleting = false
 }) {
   const [dropdownOpen, setDropdownOpen] = useState(null);
   const [assignSubmenuOpen, setAssignSubmenuOpen] = useState(null);
@@ -264,6 +268,11 @@ function LeadsTable({
           <table className="w-full divide-y divide-gray-200" style={{ tableLayout: 'fixed' }}>
             <thead className={`sticky top-0 z-10 text-black ${activeTab && statusBgColorMap[activeTab] ? `bg-linear-to-r ${statusBgColorMap[activeTab].bg}` : 'bg-linear-to-r from-blue-500 via-indigo-600 to-indigo-700'}`}>
               <tr>
+                {showCheckboxes && (
+                  <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-10">
+                    Select
+                  </th>
+                )}
                 <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-[120px]">
                   Company Name
                 </th>
@@ -304,7 +313,7 @@ function LeadsTable({
                   <React.Fragment key={date}>
                     {/* Date header with improved styling - now clickable */}
                     <tr>
-                      <td colSpan="9" className={`px-3 py-1.5 bg-linear-to-r ${colors.bg} border-b-2 ${colors.border} cursor-pointer ${colors.hover} transition-colors duration-200`} onClick={() => toggleDateExpansion(date)}>
+                      <td colSpan={showCheckboxes ? "10" : "9"} className={`px-3 py-1.5 bg-linear-to-r ${colors.bg} border-b-2 ${colors.border} cursor-pointer ${colors.hover} transition-colors duration-200`} onClick={() => toggleDateExpansion(date)}>
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-1.5">
                             {/* Expand/Collapse Icon */}
@@ -341,6 +350,24 @@ function LeadsTable({
                               className={`hover:bg-${leadStatus === 'hot' ? 'red' : leadStatus === 'warm' ? 'orange' : leadStatus === 'cold' ? 'blue' : leadStatus === 'called' ? 'purple' : 'green'}-50 cursor-pointer bg-white border-l-4 ${colors.leftBorder} transition-colors duration-150`}
                               onClick={() => onLeadClick(lead)}
                             >
+                              {showCheckboxes && (
+                                <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedLeads.includes(lead.id)}
+                                    disabled={isDeleting}
+                                    onChange={(e) => {
+                                      if (!isDeleting && e.target.checked) {
+                                        onSelectionChange(prev => [...prev, lead.id]);
+                                      } else if (!isDeleting && !e.target.checked) {
+                                        onSelectionChange(prev => prev.filter(id => id !== lead.id));
+                                      }
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50"
+                                  />
+                                </td>
+                              )}
                               <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[150px]">
                                 {lead.companyWebsite ? (
                                   <a
@@ -549,7 +576,7 @@ function LeadsTable({
                           {/* Pagination controls for date group */}
                           {totalPages > 1 && (
                             <tr>
-                              <td colSpan="9" className="px-4 py-2 bg-gray-50 border border-gray-300">
+                              <td colSpan={showCheckboxes ? "10" : "9"} className="px-4 py-2 bg-gray-50 border border-gray-300">
                                 <div className="flex items-center justify-between">
                                   <div className="text-xs text-gray-600">
                                     Showing {startIndex + 1}-{Math.min(endIndex, dateLeads.length)} of {dateLeads.length} leads for {date}
@@ -594,7 +621,7 @@ function LeadsTable({
                     })()}
                     {/* Add spacing between date groups */}
                     <tr>
-                      <td colSpan="9" className="h-2 bg-gray-50"></td>
+                      <td colSpan={showCheckboxes ? "10" : "9"} className="h-2 bg-gray-50"></td>
                     </tr>
                   </React.Fragment>
                   );
@@ -607,6 +634,24 @@ function LeadsTable({
                     className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-25'} hover:bg-gray-50 cursor-pointer transition-colors`}
                     onClick={() => onLeadClick(lead)}
                   >
+                    {showCheckboxes && (
+                      <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300">
+                        <input
+                          type="checkbox"
+                          checked={selectedLeads.includes(lead.id)}
+                          disabled={isDeleting}
+                          onChange={(e) => {
+                            if (!isDeleting && e.target.checked) {
+                              onSelectionChange(prev => [...prev, lead.id]);
+                            } else if (!isDeleting && !e.target.checked) {
+                              onSelectionChange(prev => prev.filter(id => id !== lead.id));
+                            }
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50"
+                        />
+                      </td>
+                    )}
                     <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[150px]">
                       {lead.companyWebsite ? (
                         <a

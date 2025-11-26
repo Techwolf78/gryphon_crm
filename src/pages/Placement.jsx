@@ -365,7 +365,7 @@ function Placement() {
   };
 
   return (
-    <div className="p-0 -mt-1">
+    <div className="p-0 -mt-4">
       <style>{tableStyles}</style>
       <h2 className="text-xl font-bold mb-2 text-blue-800 mt-0">
         Placement Management
