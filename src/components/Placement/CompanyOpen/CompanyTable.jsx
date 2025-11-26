@@ -7,6 +7,7 @@ import {
   FaUsers,
   FaCalendar,
   FaUniversity,
+  FaDownload,
 } from "react-icons/fa";
 import CompanyDropdownActions from "./CompanyDropdownActions";
 import StudentDataView from "./StudentDataView";
@@ -460,6 +461,9 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
     return acc;
   }, {});
 
+  // State to track visibility of per-company match lists for each company group
+  const [showGroupMatchList, setShowGroupMatchList] = useState({});
+
   // Toggle expand/collapse for company group
   const toggleCompanyExpand = async (companyName, companies) => {
     if (!expandedCompanies[companyName]) {
@@ -473,6 +477,157 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
       ...prev,
       [companyName]: !prev[companyName],
     }));
+  };
+
+  // Toggle match-count list visibility. Ensure match data is loaded first.
+  const toggleGroupMatchListVisibility = async (companyName, companies, e) => {
+    if (e) e.stopPropagation();
+    // Make sure matches are computed for all companies in the group
+    await Promise.all(companies.map((company) => checkStudentMatches(company)));
+
+    setShowGroupMatchList((prev) => ({
+      ...prev,
+      [companyName]: !prev[companyName],
+    }));
+  };
+
+  // Export matched students across colleges in a group to CSV
+  const exportMatchedStudentsCSV = async (companyName, companies, e) => {
+    if (e) e.stopPropagation();
+
+    // Ensure match stats and students are loaded
+    await Promise.all(companies.map((c) => checkStudentMatches(c)));
+    await Promise.all(companies.map((c) => getStudentsForCompany(c)));
+
+    // Build rows for matched students
+    const rows = [];
+    companies.forEach((comp) => {
+      const students = companyStudentsData[comp.id] || [];
+      const unmatched = companyMatchStats[comp.id]?.unmatched || [];
+      const unmatchedKeys = new Set(unmatched.map(u => ((u.email || u.studentName || '') + '').toLowerCase().trim()));
+
+      const matched = students.filter(s => {
+        const key = ((s.email || s.studentName || '') + '').toLowerCase().trim();
+        return !unmatchedKeys.has(key);
+      });
+
+      matched.forEach((m) => {
+        rows.push({
+          studentName: m.studentName || m['FULL NAME OF STUDENT'] || m.name || '',
+          email: m.email || m['EMAIL ID'] || '',
+          phone: m.phone || m.mobile || '',
+          college: m.college || comp.college || '',
+          companyName: comp.companyName || companyName || '',
+          enrollmentNo: m.enrollmentNo || m.enrollment || m['ENROLLMENT NUMBER'] || ''
+        });
+      });
+    });
+
+    if (!rows.length) {
+      alert('No matched students found for this group.');
+      return;
+    }
+
+    // Build CSV
+    const headers = ['SR NO', 'STUDENT NAME', 'ENROLLMENT NO', 'EMAIL', 'PHONE', 'COLLEGE', 'COMPANY'];
+    const csvRows = [headers.join(',')];
+
+    rows.forEach((r, i) => {
+      const safe = (v) => {
+        if (v === null || v === undefined) return '';
+        const s = String(v).replace(/"/g, '""');
+        return `"${s}"`;
+      };
+      csvRows.push([
+        i + 1,
+        safe(r.studentName),
+        safe(r.enrollmentNo),
+        safe(r.email),
+        safe(r.phone),
+        safe(r.college),
+        safe(r.companyName),
+      ].join(','));
+    });
+
+    const csvContent = '\uFEFF' + csvRows.join('\n'); // BOM for Excel
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const fileName = `${companyName.replace(/\s+/g, '_')}_matched_students_${new Date().toISOString().split('T')[0]}.csv`;
+    if (navigator.msSaveBlob) {
+      navigator.msSaveBlob(blob, fileName);
+    } else {
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+    }
+  };
+
+  // Export matched students for a single company to CSV
+  const exportMatchedForCompanyCSV = async (company, e) => {
+    if (e) e.stopPropagation();
+
+    await checkStudentMatches(company);
+    await getStudentsForCompany(company);
+
+    const students = companyStudentsData[company.id] || [];
+    const unmatched = companyMatchStats[company.id]?.unmatched || [];
+    const unmatchedKeys = new Set(unmatched.map(u => ((u.email || u.studentName || '') + '').toLowerCase().trim()));
+
+    const matched = students.filter(s => {
+      const key = ((s.email || s.studentName || '') + '').toLowerCase().trim();
+      return !unmatchedKeys.has(key);
+    });
+
+    if (!matched.length) {
+      alert('No matched students found for this college.');
+      return;
+    }
+
+    const rows = matched.map((m) => ({
+      studentName: m.studentName || m['FULL NAME OF STUDENT'] || m.name || '',
+      email: m.email || m['EMAIL ID'] || '',
+      phone: m.phone || m.mobile || '',
+      college: m.college || company.college || '',
+      companyName: company.companyName || '',
+      enrollmentNo: m.enrollmentNo || m.enrollment || m['ENROLLMENT NUMBER'] || ''
+    }));
+
+    // CSV
+    const headers = ['SR NO', 'STUDENT NAME', 'ENROLLMENT NO', 'EMAIL', 'PHONE', 'COLLEGE', 'COMPANY'];
+    const csvRows = [headers.join(',')];
+    rows.forEach((r, i) => {
+      const safe = (v) => {
+        if (v === null || v === undefined) return '';
+        const s = String(v).replace(/"/g, '""');
+        return `"${s}"`;
+      };
+      csvRows.push([
+        i + 1,
+        safe(r.studentName),
+        safe(r.enrollmentNo),
+        safe(r.email),
+        safe(r.phone),
+        safe(r.college),
+        safe(r.companyName),
+      ].join(','));
+    });
+
+    const csvContent = '\uFEFF' + csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const fileName = `${(company.college || 'college').replace(/\s+/g, '_')}_matched_students_${new Date().toISOString().split('T')[0]}.csv`;
+    if (navigator.msSaveBlob) navigator.msSaveBlob(blob, fileName);
+    else {
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+    }
   };
 
   // Function to handle round status click
@@ -514,7 +669,7 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
   };
 
   // Calculate stats for company group
-  const getCompanyStats = (companies, companyName) => {
+  const getCompanyStats = (companies) => {
     const uniqueColleges = [
       ...new Set(companies.map((comp) => comp.college).filter(Boolean)),
     ];
@@ -530,10 +685,33 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
       (comp) => comp.studentList && comp.studentList.length > 0
     );
 
-    const matchStats = companyMatchStats[companyName] || {
-      matched: 0,
-      total: 0,
-      unmatched: [],
+    // Build per-college match stats using companyMatchStats keyed by company.id
+    const perCollegeMatchStats = companies.map((comp) => {
+      const s = companyMatchStats[comp.id];
+      return {
+        college: comp.college || "Unknown",
+        matched: s?.matched ?? null,
+        total: s?.total ?? (comp.studentCount ?? 0),
+        companyId: comp.id,
+      };
+    });
+
+    const anyUnknown = perCollegeMatchStats.some((c) => c.matched === null);
+
+    const aggregatedMatched = perCollegeMatchStats.reduce(
+      (s, c) => s + (typeof c.matched === "number" ? c.matched : 0),
+      0
+    );
+    const aggregatedTotal = perCollegeMatchStats.reduce(
+      (s, c) => s + (typeof c.total === "number" ? c.total : 0),
+      0
+    );
+
+    const matchStats = {
+      aggregatedMatched,
+      aggregatedTotal,
+      perCollegeMatchStats,
+      anyUnknown,
     };
 
     return {
@@ -630,14 +808,14 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
 
       {Object.keys(groupedCompanies).length > 0 ? (
         Object.entries(groupedCompanies).map(([companyName, companies]) => {
-          const stats = getCompanyStats(companies, companyName);
+          const stats = getCompanyStats(companies);
           const isExpanded = expandedCompanies[companyName];
 
           return (
             <div key={companyName} className="space-y-1">
               {/* Company Header - Clickable for Expand/Collapse */}
               <div
-                className="bg-blue-50 border-l-4 border-blue-500 p-2 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors"
+                className="bg-blue-50 border-l-4 border-blue-500 p-2 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors relative"
                 onClick={() => toggleCompanyExpand(companyName, companies)}
               >
                 <div className="flex items-center justify-between">
@@ -658,6 +836,71 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
                       <span className="flex items-center gap-1 bg-white px-2 py-1 rounded-full text-purple-700">
                         <FaCalendar className="text-purple-500" />
                         Open: {companies[0]?.companyOpenDate || "-"}
+                      </span>
+
+                      {/* Aggregated Match Stats Badge */}
+                      <span className="relative">
+                        <button
+                          onClick={(e) => toggleGroupMatchListVisibility(companyName, companies, e)}
+                          className={`flex items-center gap-1 bg-white px-2 py-1 rounded-full text-sm hover:bg-green-50 transition-colors ${
+                            stats.matchStats?.aggregatedMatched === stats.matchStats?.aggregatedTotal && stats.matchStats?.aggregatedTotal > 0
+                              ? 'text-green-700'
+                              : 'text-red-700'
+                          }`}
+                          title={`Match: ${stats.matchStats?.aggregatedMatched ?? "?"}/${stats.matchStats?.aggregatedTotal ?? "?"}`}
+                        >
+                          <FaUsers className="text-green-500" />
+                          {stats.matchStats?.aggregatedMatched ?? 0}/{stats.matchStats?.aggregatedTotal ?? 0}
+                        </button>
+
+                        {/* Per-college match list popover */}
+                        {showGroupMatchList[companyName] && (
+                          <div
+                            className="absolute right-0 mt-2 w-56 bg-white border rounded-md p-2 shadow-lg text-xs z-50"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="flex items-center justify-between mb-2 gap-2">
+                              <div className="font-semibold text-gray-800">Match Details</div>
+                              <div>
+                                <button
+                                  onClick={(e) => exportMatchedStudentsCSV(companyName, companies, e)}
+                                  className={`text-xs flex items-center gap-1 px-2 py-1 rounded bg-white border ${stats.matchStats?.aggregatedTotal > 0 ? 'text-gray-700 hover:bg-gray-50' : 'text-gray-400 cursor-not-allowed'}`}
+                                  disabled={!stats.matchStats?.aggregatedTotal}
+                                  title={stats.matchStats?.aggregatedTotal ? 'Export matched students' : 'No students to export'}
+                                >
+                                  <FaDownload className="h-3 w-3" />
+                                  Export
+                                </button>
+                              </div>
+                            </div>
+                            <div className="space-y-1 max-h-48 overflow-auto">
+                              {stats.matchStats?.perCollegeMatchStats?.map((pc) => {
+                                const comp = companies.find(c => c.id === pc.companyId) || { id: pc.companyId, college: pc.college, companyName };
+                                return (
+                                  <div className="flex justify-between items-center" key={pc.companyId}>
+                                    <div className="truncate text-xs text-gray-700">{pc.college || "Unknown"}</div>
+                                    <div className="flex items-center gap-2">
+                                      <div className="text-xs text-gray-600">{pc.matched === null ? "?" : `${pc.matched}/${pc.total}`}</div>
+                                      <button
+                                        onClick={(e) => exportMatchedForCompanyCSV(comp, e)}
+                                        disabled={pc.matched === null || (pc.total || 0) === 0}
+                                        className={`text-xs px-2 py-0.5 rounded bg-white border ${pc.matched === null || (pc.total || 0) === 0 ? 'text-gray-300 cursor-not-allowed' : 'text-blue-700 hover:bg-blue-50'}`}
+                                        title={pc.matched === null ? 'Match not computed yet' : (pc.matched === 0 ? 'No matched students' : 'Export matched students for this college')}
+                                      >
+                                        <FaDownload className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            <div className="mt-2 pt-2 border-t text-xs text-gray-500">
+                              Aggregated: {stats.matchStats?.aggregatedMatched ?? 0}/{stats.matchStats?.aggregatedTotal ?? 0}
+                              {stats.matchStats?.anyUnknown ? " (some unknown)" : ""}
+                            </div>
+                          </div>
+                        )}
                       </span>
                     </div>
                   </div>
