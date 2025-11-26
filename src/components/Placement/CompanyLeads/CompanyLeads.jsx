@@ -16,7 +16,7 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { db } from "../../../firebase";
-import LeadsFilters from "./LeadsFilters";
+import LeadStatusTabs from "./LeadStatusTabs";
 import LeadsTable from "./LeadsTable";
 import LeadViewEditModal from "./LeadViewEditModal";
 import FollowUpCompany from "./FollowUpCompany";
@@ -52,6 +52,7 @@ function CompanyLeads() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddLeadForm, setShowAddLeadForm] = useState(false);
   const [leads, setLeads] = useState([]);
+  const [allLeads, setAllLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedLead, setSelectedLead] = useState(null);
   const [showLeadDetails, setShowLeadDetails] = useState(false);
@@ -262,13 +263,14 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       const today = new Date().toISOString().split('T')[0]; // Get today's date in YYYY-MM-DD format
       const allFollowUps = [];
 
-      // Use the already filtered leads from state
+      // Filter allLeads to get only leads assigned to the current user
+      let userAccessibleLeads = allLeads;
+      if (user) {
+        userAccessibleLeads = allLeads.filter(lead => lead.assignedTo === user.uid);
+      }
 
-      // Extract follow-ups from each company
-      leads.forEach(lead => {
-        // Only process hot leads for follow-up alerts
-        if (lead.status !== "hot") return;
-        
+      // Extract follow-ups from each accessible lead
+      userAccessibleLeads.forEach(lead => {
         const followups = lead.followups || [];
         followups.forEach(followup => {
           // Check if follow-up is for today
@@ -288,15 +290,29 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           }
         });
       });
-      setTodayFollowUps(allFollowUps);
 
-      // Show alert if there are follow-ups
-      setShowTodayFollowUpAlert(allFollowUps.length > 0);
+      // Check localStorage for already shown alerts for today
+      const shownAlertsKey = `shownFollowUpAlerts_${user.uid}_${today}`;
+      const shownAlerts = JSON.parse(localStorage.getItem(shownAlertsKey) || '[]');
+
+      // Filter out follow-ups that have already been shown today
+      const newFollowUps = allFollowUps.filter(followup => !shownAlerts.includes(followup.id));
+
+      setTodayFollowUps(allFollowUps); // Keep all follow-ups for display
+
+      // Show alert only for new follow-ups
+      setShowTodayFollowUpAlert(newFollowUps.length > 0);
+
+      // If there are new follow-ups, store them in localStorage after showing
+      if (newFollowUps.length > 0) {
+        const updatedShownAlerts = [...shownAlerts, ...newFollowUps.map(f => f.id)];
+        localStorage.setItem(shownAlertsKey, JSON.stringify(updatedShownAlerts));
+      }
 
     } catch (error) {
       console.error("Error fetching today's follow-ups:", error);
     }
-  }, [user, leads]);
+  }, [allLeads, user]);
 
   // Caching constants
   const CACHE_KEY = 'companyLeadsCache';
@@ -423,6 +439,9 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         }
       });
 
+      // Set all leads before filtering
+      setAllLeads(allCompanies);
+
       // Filter leads by current user based on view mode and user filter
       let teamMemberIds = [];
       if (!viewMyLeadsOnly && user) {
@@ -517,6 +536,9 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           assignedTo: doc.data().assignedTo || null,
         }));
         
+        // Set all leads before filtering
+        setAllLeads(leadsData);
+
         // Filter leads by current user for fallback collection too
         let teamMemberIds = [];
         if (!viewMyLeadsOnly && user) {
@@ -727,6 +749,13 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       setExportStatuses(prev => prev.filter(status => status !== 'cold'));
     }
   }, [viewMyLeadsOnly]);
+
+  // Fetch today's follow-ups when allLeads is loaded
+  useEffect(() => {
+    if (allLeads.length > 0) {
+      fetchTodayFollowUps();
+    }
+  }, [allLeads, fetchTodayFollowUps]);
   
   const calculateCompletenessScore = useCallback((lead) => {
     let score = 0;
@@ -2093,7 +2122,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
             </button>
           )}
         </div>
-      </div>      <LeadsFilters
+      </div>      <LeadStatusTabs
         activeTab={activeTab}
         onTabChange={(tab) => {
           // Log tab change activity

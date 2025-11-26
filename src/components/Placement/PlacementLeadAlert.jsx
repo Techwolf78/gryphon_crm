@@ -144,9 +144,8 @@ const PlacementLeadAlert = ({
 
   // Check if today's follow-up alert should be shown (once per day)
   const shouldShowTodayAlert = () => {
-    const today = new Date().toDateString();
-    const lastShown = localStorage.getItem('placementTodayFollowupAlertLastShown');
-    return lastShown !== today;
+    // Always show if there are follow-ups (remove once-per-day restriction)
+    return todayFollowUps.length > 0;
   };
 
   // Mark today's follow-up alert as shown for today
@@ -231,7 +230,7 @@ const PlacementLeadAlert = ({
           color="indigo"
           title="Today's Follow-ups"
           onClose={handleCloseTodayAlert}
-          autoDismiss={true}
+          autoDismiss={false}  // Temporarily disabled for testing
           actions={
             <>
               <button

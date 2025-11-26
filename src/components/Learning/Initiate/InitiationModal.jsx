@@ -1540,7 +1540,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
         {/* Main Content */}
         <div className="mx-auto py-3">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200">
             {/* Page Content */}
             <div className="p-3">
               <form onSubmit={handleSubmit} className="space-y-6">
@@ -1561,10 +1561,10 @@ function InitiationModal({ training, onClose, onConfirm }) {
                         return (
                           <label
                             key={phase}
-                            className={`flex items-center px-3 py-2 rounded-lg border text-sm font-medium transition-all min-w-20 ${
+                            className={`flex items-center px-3 py-2 rounded-xl border text-sm font-medium transition-all min-w-20 ${
                               selectedPhases.includes(phase)
                                 ? "border-blue-500 bg-blue-50 text-blue-700"
-                                : "border-gray-200 bg-white hover:border-gray-300"
+                                : "border-gray-200 bg-white hover:bg-blue-50 hover:border-blue-300"
                             } cursor-pointer`}
                           >
                             <input
@@ -1601,7 +1601,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                           }}
                           dateFormat="yyyy-MM-dd"
                           placeholderText="Select date"
-                          className="w-32 h-10 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-sm px-3"
+                          className="w-32 h-10 rounded border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 text-sm px-3"
                           calendarClassName="small-datepicker"
                           popperClassName="small-datepicker-popper"
                         />
@@ -1625,7 +1625,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                           }}
                           dateFormat="yyyy-MM-dd"
                           placeholderText="Select date"
-                          className="w-32 h-10 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-sm px-3"
+                          className="w-32 h-10 rounded border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 text-sm px-3"
                           calendarClassName="small-datepicker"
                           popperClassName="small-datepicker-popper"
                         />
@@ -1642,13 +1642,13 @@ function InitiationModal({ training, onClose, onConfirm }) {
                           <button
                             type="button"
                             onClick={() => setExcludeDropdownOpen(!excludeDropdownOpen)}
-                            className="min-w-[140px] h-8 rounded border border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs px-2 bg-white flex items-center justify-between hover:bg-gray-50 transition-colors"
+                            className="min-w-[140px] h-8 rounded border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 text-xs px-2 bg-white flex items-center justify-between hover:bg-gray-50 transition-colors"
                           >
                             <span>{excludeDays}</span>
                             <FiChevronDown className={`w-3 h-3 transition-transform ${excludeDropdownOpen ? 'rotate-180' : ''}`} />
                           </button>
                           {excludeDropdownOpen && (
-                            <div className="absolute z-10 mt-1 min-w-[140px] bg-white border border-gray-300 rounded shadow-lg">
+                            <div className="absolute z-10 mt-1 min-w-[140px] bg-white border border-gray-300 rounded-xl shadow-sm">
                               <div className="py-1">
                                 <button
                                   type="button"
@@ -1656,7 +1656,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                                     setExcludeDays("None");
                                     setExcludeDropdownOpen(false);
                                   }}
-                                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
+                                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 focus:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 >
                                   None
                                 </button>
@@ -1666,7 +1666,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                                     setExcludeDays("Saturday");
                                     setExcludeDropdownOpen(false);
                                   }}
-                                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
+                                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 focus:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 >
                                   Saturday
                                 </button>
@@ -1676,7 +1676,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                                     setExcludeDays("Sunday");
                                     setExcludeDropdownOpen(false);
                                   }}
-                                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
+                                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 focus:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 >
                                   Sunday
                                 </button>
@@ -1686,7 +1686,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                                     setExcludeDays("Both");
                                     setExcludeDropdownOpen(false);
                                   }}
-                                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
+                                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 focus:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 >
                                   Saturday + Sunday
                                 </button>
@@ -1760,11 +1760,11 @@ function InitiationModal({ training, onClose, onConfirm }) {
                                   ? "This domain has 0 configured hours"
                                   : undefined
                               }
-                              className={`flex items-center px-2 py-1 rounded cursor-pointer text-xs transition
+                              className={`flex items-center px-2 py-1 rounded-xl cursor-pointer text-xs transition
                                 ${
                                   isSelected
                                     ? "bg-blue-50 text-blue-700 border border-blue-200"
-                                    : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
+                                    : "bg-white text-gray-700 border border-gray-200 hover:bg-blue-50"
                                 }
                                 ${zeroClasses}
                               `}
@@ -1820,7 +1820,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                       return (
                         <div
                           key={domain}
-                          className={`space-y-3 mt-4 border-l-4 pl-4 rounded overflow-visible ${
+                          className={`space-y-3 mt-4 border-l-4 pl-4 rounded-xl overflow-visible ${
                             DOMAIN_COLORS[domain] ||
                             "border-gray-300 bg-gray-50"
                           }`}
@@ -1847,7 +1847,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                           <div className=" border-b border-gray-100">
                             <div className="flex items-center justify-between gap-4">
                               <div className="flex gap-4">
-                                <div className="bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                                <div className="bg-blue-50 px-1.5 py-0.5 rounded-xl border border-blue-200">
                                   <span className="text-xs text-blue-600 font-medium">Domain Total Hours</span>
                                   <span className="text-sm font-semibold text-blue-800 ml-1">{getDomainHours(domain, currentPhase)}</span>
                                 </div>
@@ -1899,7 +1899,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
                 {/* Status Messages */}
                 {error && (
-                  <div className="rounded bg-red-50 border border-red-200 p-3">
+                  <div className="rounded-xl bg-red-50 border border-red-200 p-3">
                     <div className="flex">
                       <div className="shrink-0">
                         <FiAlertCircle className="h-4 w-4 text-red-400" />
@@ -1914,7 +1914,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                 )}
 
                 {success && (
-                  <div className="rounded bg-green-50 border border-green-200 p-3">
+                  <div className="rounded-xl bg-green-50 border border-green-200 p-3">
                     <div className="flex">
                       <div className="shrink-0">
                         <FiCheck className="h-4 w-4 text-green-400" />
@@ -1930,7 +1930,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
                 {/* Zero-hour domains warning with auto-deselect option */}
                 {showZeroHourWarning && zeroHourDomains.length > 0 && (
-                  <div className="rounded bg-yellow-50 border border-yellow-200 p-3">
+                  <div className="rounded-xl bg-yellow-50 border border-yellow-200 p-3">
                     <div className="flex items-start justify-between">
                       <div>
                         <div className="text-xs font-medium text-yellow-800 mb-1">
@@ -1950,7 +1950,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                           type="button"
                           onClick={handleAutoDeselectZeroHourDomains}
                           disabled={deselectingZeroDomains}
-                          className={`inline-flex items-center px-3 py-1.5 bg-yellow-600 text-white text-xs font-medium rounded shadow-sm hover:bg-yellow-700 disabled:opacity-70`}
+                          className={`inline-flex items-center px-3 py-1.5 bg-yellow-600 text-white text-xs font-medium rounded-xl shadow-sm hover:bg-yellow-700 disabled:opacity-70`}
                         >
                           {deselectingZeroDomains ? (
                             <>
@@ -1968,7 +1968,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                             setZeroHourDomains([]);
                             setError(null);
                           }}
-                          className="inline-flex items-center px-3 py-1.5 border border-yellow-200 bg-white text-yellow-700 text-xs font-medium rounded"
+                          className="inline-flex items-center px-3 py-1.5 border border-yellow-200 bg-white text-yellow-700 text-xs font-medium rounded-xl"
                         >
                           Cancel
                         </button>
@@ -1979,7 +1979,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
 
                 {/* Duplicate trainers validation error */}
                 {hasValidationErrors() && (
-                  <div className="rounded bg-red-50 border border-red-200 p-3">
+                  <div className="rounded-xl bg-red-50 border border-red-200 p-3">
                     <div className="flex items-start">
                       <div className="shrink-0">
                         <FiAlertCircle className="h-4 w-4 text-red-400" />
@@ -1997,7 +1997,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                                   <strong className="text-red-800">{domain} domain:</strong>
                                   <div className="mt-2 space-y-3">
                                     {validation.errors.map((error, index) => (
-                                      <div key={index} className="bg-red-100 border border-red-200 rounded p-2">
+                                      <div key={index} className="bg-red-100 border border-red-200 rounded-xl p-2">
                                         <pre className="whitespace-pre-wrap text-xs text-red-800 font-mono">
                                           {error.message}
                                         </pre>
@@ -2008,7 +2008,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                               );
                             }
                           )}
-                          <p className="mt-3 font-medium text-red-800 bg-red-100 border border-red-200 rounded p-2">
+                          <p className="mt-3 font-medium text-red-800 bg-red-100 border border-red-200 rounded-xl p-2">
                             Please remove duplicate assignments or modify
                             trainer details (dates, duration) before proceeding.
                           </p>
@@ -2023,7 +2023,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
             </div>
 
             {/* Page Footer */}
-            <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 rounded-b-lg">
+            <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 rounded-b-xl">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   {/* Undo button - only show if there are changes */}
@@ -2031,7 +2031,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                     <button
                       type="button"
                       onClick={handleUndo}
-                      className="inline-flex items-center px-3 py-1.5 border border-yellow-300 shadow-sm text-xs font-medium rounded text-yellow-700 bg-yellow-50 hover:bg-yellow-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors"
+                      className="inline-flex items-center px-3 py-1.5 border border-yellow-300 shadow-sm text-xs font-medium rounded-xl text-yellow-700 bg-yellow-50 hover:bg-yellow-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                       disabled={loading}
                       title="Undo all changes and revert to original state"
                     >
@@ -2053,7 +2053,7 @@ function InitiationModal({ training, onClose, onConfirm }) {
                   type="submit"
                   onClick={handleSubmit}
                   disabled={loading || submitDisabled || !isChecklistComplete}
-                  className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-green-400 disabled:cursor-not-allowed transition-colors"
+                  className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-xl shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-green-400 disabled:cursor-not-allowed transition-colors"
                 >
                   {loading ? (
                     <>
