@@ -56,6 +56,11 @@ function LeadFilters({
         }))
         .filter((user) => user.displayName)
         .filter((user) => {
+          // Only show users from placement department
+          const userObj = Object.values(allUsers).find(u => (u.uid || u.id) === user.uid);
+          return userObj && userObj.departments && Array.isArray(userObj.departments) && userObj.departments.includes('Placement');
+        })
+        .filter((user) => {
           if (viewMyLeadsOnly) {
             return user.uid === currentUser?.uid;
           } else {
