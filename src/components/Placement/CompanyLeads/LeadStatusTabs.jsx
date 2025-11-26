@@ -62,7 +62,7 @@ const tabLabels = {
   deleted: "Deleted"
 };
 
-const LeadsFilters = ({ activeTab, setActiveTab, leadsByStatus = {}, user }) => {
+const LeadStatusTabs = ({ activeTab, setActiveTab, leadsByStatus = {}, user }) => {
   // Get available tabs based on user permissions
   const getAvailableTabs = () => {
     const baseTabs = ['hot', 'warm', 'cold', 'called', 'onboarded'];
@@ -124,4 +124,4 @@ const LeadsFilters = ({ activeTab, setActiveTab, leadsByStatus = {}, user }) => 
   );
 };
 
-export default LeadsFilters;
+export default LeadStatusTabs;
