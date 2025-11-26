@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from "../../../firebase";
 import {
   XIcon,
   ChevronDownIcon,
@@ -15,39 +17,7 @@ import {
 import { FiCalendar, FiTrendingUp, FiUsers, FiAward } from "react-icons/fi";
 import PlacedStdCalendar from "./PlacedStdCalendar";
 
-// Dummy data for demonstration
-const dummyData = [
-  { id: "1", studentName: "Rahul Sharma", college: "IIT Delhi", companyName: "Google", jobDesignation: "Software Engineer", salary: "28", placedDate: { seconds: Date.now() / 1000 - 86400 * 30 }, course: "B.Tech Computer Science", specialization: "Machine Learning" },
-  { id: "2", studentName: "Priya Patel", college: "IIT Bombay", companyName: "Microsoft", jobDesignation: "Product Manager", salary: "32", placedDate: { seconds: Date.now() / 1000 - 86400 * 15 }, course: "B.Tech Information Technology", specialization: "Data Science" },
-  { id: "3", studentName: "Amit Kumar", college: "IIT Delhi", companyName: "Amazon", jobDesignation: "System Engineer", salary: "24", placedDate: { seconds: Date.now() / 1000 - 86400 * 7 }, course: "B.Tech Computer Science", specialization: "Cyber Security" },
-  { id: "4", studentName: "Sneha Reddy", college: "IIT Madras", companyName: "Adobe", jobDesignation: "UI/UX Designer", salary: "18", placedDate: { seconds: Date.now() / 1000 - 86400 * 45 }, course: "B.Des", specialization: "Digital Design" },
-  { id: "5", studentName: "Vikram Singh", college: "IIT Kanpur", companyName: "Flipkart", jobDesignation: "Data Analyst", salary: "16", placedDate: { seconds: Date.now() / 1000 - 86400 * 20 }, course: "B.Tech Computer Science", specialization: "Data Analytics" },
-  { id: "6", studentName: "Kavita Jain", college: "IIT Bombay", companyName: "Goldman Sachs", jobDesignation: "Business Analyst", salary: "22", placedDate: { seconds: Date.now() / 1000 - 86400 * 10 }, course: "B.Tech Information Technology", specialization: "Finance" },
-  { id: "7", studentName: "Rohit Verma", college: "IIT Delhi", companyName: "Netflix", jobDesignation: "DevOps Engineer", salary: "26", placedDate: { seconds: Date.now() / 1000 - 86400 * 25 }, course: "B.Tech Computer Science", specialization: "Cloud Computing" },
-  { id: "8", studentName: "Anjali Gupta", college: "IIT Madras", companyName: "Tesla", jobDesignation: "Software Engineer", salary: "30", placedDate: { seconds: Date.now() / 1000 - 86400 * 5 }, course: "B.Tech Electrical Engineering", specialization: "Embedded Systems" },
-  { id: "9", studentName: "Arjun Nair", college: "IIT Kanpur", companyName: "Apple", jobDesignation: "iOS Developer", salary: "27", placedDate: { seconds: Date.now() / 1000 - 86400 * 12 }, course: "B.Tech Computer Science", specialization: "Mobile Development" },
-  { id: "10", studentName: "Meera Joshi", college: "IIT Delhi", companyName: "Facebook", jobDesignation: "Frontend Developer", salary: "25", placedDate: { seconds: Date.now() / 1000 - 86400 * 18 }, course: "B.Tech Information Technology", specialization: "Web Development" },
-  { id: "11", studentName: "Sandeep Rao", college: "IIT Bombay", companyName: "Oracle", jobDesignation: "Database Administrator", salary: "23", placedDate: { seconds: Date.now() / 1000 - 86400 * 22 }, course: "B.Tech Computer Science", specialization: "Database Management" },
-  { id: "12", studentName: "Pooja Sharma", college: "IIT Madras", companyName: "IBM", jobDesignation: "Cloud Architect", salary: "29", placedDate: { seconds: Date.now() / 1000 - 86400 * 8 }, course: "B.Tech Computer Science", specialization: "Cloud Computing" },
-  { id: "13", studentName: "Rajesh Kumar", college: "IIT Kanpur", companyName: "Cisco", jobDesignation: "Network Engineer", salary: "21", placedDate: { seconds: Date.now() / 1000 - 86400 * 35 }, course: "B.Tech Electrical Engineering", specialization: "Networking" },
-  { id: "14", studentName: "Kiran Patel", college: "IIT Delhi", companyName: "SAP", jobDesignation: "ERP Consultant", salary: "26", placedDate: { seconds: Date.now() / 1000 - 86400 * 14 }, course: "B.Tech Information Technology", specialization: "Enterprise Software" },
-  { id: "15", studentName: "Neha Singh", college: "IIT Bombay", companyName: "Accenture", jobDesignation: "Software Consultant", salary: "24", placedDate: { seconds: Date.now() / 1000 - 86400 * 28 }, course: "B.Tech Computer Science", specialization: "Consulting" },
-  { id: "16", studentName: "Vivek Gupta", college: "IIT Madras", companyName: "Deloitte", jobDesignation: "Technology Analyst", salary: "22", placedDate: { seconds: Date.now() / 1000 - 86400 * 16 }, course: "B.Tech Information Technology", specialization: "Business Intelligence" },
-  { id: "17", studentName: "Anita Reddy", college: "IIT Kanpur", companyName: "PwC", jobDesignation: "Risk Consultant", salary: "25", placedDate: { seconds: Date.now() / 1000 - 86400 * 9 }, course: "B.Tech Computer Science", specialization: "Risk Management" },
-  { id: "18", studentName: "Manoj Jain", college: "IIT Delhi", companyName: "EY", jobDesignation: "Assurance Associate", salary: "20", placedDate: { seconds: Date.now() / 1000 - 86400 * 40 }, course: "B.Com", specialization: "Finance" },
-  { id: "19", studentName: "Swati Verma", college: "IIT Bombay", companyName: "KPMG", jobDesignation: "Audit Associate", salary: "19", placedDate: { seconds: Date.now() / 1000 - 86400 * 50 }, course: "B.Com", specialization: "Accounting" },
-  { id: "20", studentName: "Ravi Kumar", college: "IIT Madras", companyName: "ZS Associates", jobDesignation: "Business Analyst", salary: "21", placedDate: { seconds: Date.now() / 1000 - 86400 * 6 }, course: "B.Tech Information Technology", specialization: "Analytics" },
-  { id: "21", studentName: "Priyanka Singh", college: "IIT Kanpur", companyName: "Mu Sigma", jobDesignation: "Decision Scientist", salary: "23", placedDate: { seconds: Date.now() / 1000 - 86400 * 11 }, course: "B.Tech Computer Science", specialization: "Data Science" },
-  { id: "22", studentName: "Amit Sharma", college: "IIT Delhi", companyName: "Fractal Analytics", jobDesignation: "Data Scientist", salary: "27", placedDate: { seconds: Date.now() / 1000 - 86400 * 13 }, course: "B.Tech Computer Science", specialization: "Machine Learning" },
-  { id: "23", studentName: "Kavita Patel", college: "IIT Bombay", companyName: "Tiger Analytics", jobDesignation: "Senior Analyst", salary: "24", placedDate: { seconds: Date.now() / 1000 - 86400 * 17 }, course: "B.Tech Information Technology", specialization: "Analytics" },
-  { id: "24", studentName: "Suresh Reddy", college: "IIT Madras", companyName: "Genpact", jobDesignation: "Process Associate", salary: "18", placedDate: { seconds: Date.now() / 1000 - 86400 * 32 }, course: "B.Tech Computer Science", specialization: "Operations" },
-  { id: "25", studentName: "Meena Gupta", college: "IIT Kanpur", companyName: "Wipro", jobDesignation: "Project Engineer", salary: "20", placedDate: { seconds: Date.now() / 1000 - 86400 * 26 }, course: "B.Tech Computer Science", specialization: "Software Development" },
-  { id: "26", studentName: "Raj Kumar", college: "IIT Delhi", companyName: "TCS", jobDesignation: "Systems Engineer", salary: "19", placedDate: { seconds: Date.now() / 1000 - 86400 * 38 }, course: "B.Tech Information Technology", specialization: "Systems" },
-  { id: "27", studentName: "Sunita Jain", college: "IIT Bombay", companyName: "Infosys", jobDesignation: "Technology Analyst", salary: "21", placedDate: { seconds: Date.now() / 1000 - 86400 * 4 }, course: "B.Tech Computer Science", specialization: "Technology" },
-  { id: "28", studentName: "Vijay Singh", college: "IIT Madras", companyName: "HCL", jobDesignation: "Software Developer", salary: "22", placedDate: { seconds: Date.now() / 1000 - 86400 * 19 }, course: "B.Tech Computer Science", specialization: "Development" },
-  { id: "29", studentName: "Rekha Patel", college: "IIT Kanpur", companyName: "Tech Mahindra", jobDesignation: "Associate Engineer", salary: "20", placedDate: { seconds: Date.now() / 1000 - 86400 * 23 }, course: "B.Tech Information Technology", specialization: "Engineering" },
-  { id: "30", studentName: "Anil Kumar", college: "IIT Delhi", companyName: "Cognizant", jobDesignation: "Programmer Analyst", salary: "18", placedDate: { seconds: Date.now() / 1000 - 86400 * 41 }, course: "B.Tech Computer Science", specialization: "Programming" },
-];
+// No dummy data - Placed students will be loaded from Firestore 'placedStudents' collection.
 
 // Loading Skeleton Component
 const LoadingSkeleton = ({ type }) => {
@@ -102,17 +72,21 @@ const PlacedStudent = ({ onClose }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
 
-  const fetchPlacedStudents = useCallback(() => {
+  const fetchPlacedStudents = useCallback(async () => {
     setLoading(true);
     try {
-      // For now, using dummy data instead of Firebase
-      // Simulate API delay
-      setTimeout(() => {
-        setPlacedStudents(dummyData);
-        setLoading(false);
-      }, 1000);
+      const placedRef = collection(db, 'placedStudents');
+      const snapshot = await getDocs(placedRef);
+      const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      if (fetched && fetched.length > 0) {
+        setPlacedStudents(fetched);
+      } else {
+        setPlacedStudents([]);
+      }
+      setLoading(false);
     } catch (error) {
       console.error("Error fetching placed students:", error);
+      setPlacedStudents([]);
       setLoading(false);
     }
   }, []);
@@ -465,7 +439,17 @@ const PlacedStudent = ({ onClose }) => {
               </div>
 
               <div className="overflow-x-auto rounded-xl border border-gray-200 ">
-                <table className="min-w-full divide-y divide-gray-200 ">
+                {filteredStudents.length === 0 ? (
+                  <div className="p-6 text-center text-gray-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 mx-auto text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v1H3V7z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 11h18v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6z" />
+                    </svg>
+                    <h3 className="mt-2 text-sm font-medium text-gray-900">No placed students found</h3>
+                    <p className="mt-1 text-xs text-gray-500">Placed students will appear here once finalised.</p>
+                  </div>
+                ) : (
+                  <table className="min-w-full divide-y divide-gray-200 ">
                   <thead className="bg-linear-to-r from-gray-50 to-gray-100 ">
                     <tr>
                       <th
@@ -588,15 +572,16 @@ const PlacedStudent = ({ onClose }) => {
                           </div>
                         </td>
                         <td className="whitespace-nowrap px-4 py-3">
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 shadow-sm">
-                            <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></div>
-                            Placed
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${student.status === 'Placed' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'} shadow-sm`}>
+                            <div className={`${student.status === 'Placed' ? 'w-2 h-2 bg-green-500' : 'w-2 h-2 bg-gray-400'} rounded-full mr-1 ${student.status === 'Placed' ? 'animate-pulse' : ''}`}></div>
+                            {student.status || 'Placed'}
                           </span>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                )}
               </div>
 
               {/* Pagination */}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, writeBatch, query, where } from "firebase/firestore";
+import { toast } from 'react-toastify';
 import { db } from "../../../firebase";
 import AddJD from "../AddJd/AddJD";
 import CompanyDetailsModal from "./CompanyDetailsModal";
@@ -123,6 +124,7 @@ function CompanyOpen() {
 
           const students = studentsSnapshot.docs.map(doc => ({
             id: doc.id,
+            formDocId: docId,
             ...doc.data()
           }));
 
@@ -135,6 +137,119 @@ function CompanyOpen() {
       console.error("Error fetching students:", error);
     } finally {
       setLoadingStudents(false);
+    }
+  };
+
+  // Save selected students for a company round to Firestore
+  const saveRoundSelection = async (companyId, roundIndex, selectedStudents) => {
+    try {
+      const companyRef = doc(db, "companies", companyId);
+
+      // Build array of minimal student data (email, studentName, uploadId, trainingFormId if present)
+      const payload = (selectedStudents || []).map(s => ({
+        studentName: s.studentName || s['FULL NAME OF STUDENT'] || s.name || '',
+        email: s.email || s['EMAIL ID'] || '',
+        uploadId: s.uploadId || null,
+        trainingFormId: s.formDocId || null,
+        studentDocId: s.id || null
+      }));
+
+      // Read current company's roundSelections (if any)
+      const companyData = companies.find(c => c.id === companyId) || {};
+      const existingSelections = companyData.roundSelections || {};
+      const updatedSelections = { ...existingSelections, [roundIndex]: payload };
+
+      await updateDoc(companyRef, { roundSelections: updatedSelections, updatedAt: new Date() });
+
+      toast.success('Saved selections for the round successfully');
+
+      // Update local state for companies
+      setCompanies(prev => prev.map(c => c.id === companyId ? { ...c, roundSelections: updatedSelections, updatedAt: new Date() } : c));
+
+      // If this is the final round AND the round status for this index is "completed", mark the selected students as placed
+      const hiringRoundsLength = (companyData?.hiringRounds || []).length;
+      const currentRoundStatus = (companyData?.roundStatus || [])[roundIndex];
+      if (roundIndex === hiringRoundsLength - 1 && currentRoundStatus === 'completed') {
+        await finalizePlacedStudents(companyData, payload);
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Error saving round selection to DB:", error);
+      toast.error('Failed to save round selection. Please try again.');
+      return false;
+    }
+  };
+
+  // Finalize placed students by updating training form docs and creating placedStudents entries
+  const finalizePlacedStudents = async (company, selectedStudents) => {
+    if (!company || !selectedStudents || selectedStudents.length === 0) return;
+
+    try {
+      const batch = writeBatch(db);
+      // Fetch training form students to map by email
+      const trainingFormStudents = await fetchTrainingFormStudents(company.college);
+      const trainingByEmail = {};
+      trainingFormStudents.forEach(tf => {
+        const emailKey = (tf['EMAIL ID'] || tf.email || '').toLowerCase().trim();
+        if (emailKey) trainingByEmail[emailKey] = tf;
+      });
+
+      let addedCount = 0;
+
+      // Build existing placements set for this company to avoid duplicates with single query
+      const existingPlacedQuery = query(collection(db, 'placedStudents'), where('companyId', '==', company.id));
+      const existingSnapshot = await getDocs(existingPlacedQuery);
+      const existingSet = new Set(existingSnapshot.docs.map(d => ((d.data().email || '') + '').toLowerCase().trim()));
+
+      for (const s of selectedStudents) {
+        const emailKey = (s.email || '').toLowerCase().trim();
+        const placedData = {
+          studentName: s.studentName || '',
+          email: s.email || '',
+          college: company.college || '',
+          companyName: company.companyName || '',
+          jobDesignation: company.jobDesignation || '',
+          salary: company.salary || company.stipend || null,
+          placedDate: new Date(),
+          companyId: company.id,
+          status: 'Placed',
+        };
+
+        // Deduplicate: check if placedStudents already contains this email + companyId
+        try {
+          const emailKey = (placedData.email || '').toLowerCase().trim();
+          if (!existingSet.has(emailKey)) {
+            const placedCollectionRef = collection(db, 'placedStudents');
+            const newPlacedDocRef = doc(placedCollectionRef); // get auto-id
+            batch.set(newPlacedDocRef, placedData);
+            existingSet.add(emailKey);
+            addedCount += 1;
+          }
+        } catch (err) {
+          console.error('Error checking placed students duplicate:', err);
+        }
+
+        // Update training form student doc if present
+        const tf = trainingByEmail[emailKey];
+        if (tf && tf.formDocId && tf.id) {
+          const studentDocRef = doc(db, 'trainingForms', tf.formDocId, 'students', tf.id);
+          batch.update(studentDocRef, { placement: { ...placedData, placedDate: new Date() }, isPlaced: true });
+        }
+      }
+
+      // Commit batched updates to training student docs and added placed students
+      await batch.commit();
+      // Refresh companies to reflect new roundSelections and counts
+      fetchCompanies();
+      if (addedCount > 0) {
+        toast.success(`Marked ${addedCount} student(s) as placed in ${company.companyName}`);
+      } else {
+        toast.info(`No new placements were added (duplicates skipped).`);
+      }
+      toast.success(`Marked ${selectedStudents.length} student(s) as placed in ${company.companyName}`);
+    } catch (error) {
+      console.error('Error finalizing placed students:', error);
     }
   };
 
@@ -167,6 +282,22 @@ function CompanyOpen() {
       ));
 
       console.log(`Updated round status: ${hiringRounds[roundIndex]} -> ${newStatus}`);
+
+      // If this is the last round and it was marked completed, try to finalize placements
+      const hiringRoundsLen = (companyDoc?.hiringRounds || []).length;
+      if (roundIndex === hiringRoundsLen - 1 && newStatus === 'completed') {
+        // Look up saved selections for this company and round
+        const companySelections = companyDoc.roundSelections || {};
+        const selectedForFinal = companySelections[roundIndex] || [];
+        if (!selectedForFinal || selectedForFinal.length === 0) {
+          // No selections saved; none to finalize
+          console.warn('No selections found for final round; skipping finalize.');
+          toast.warn('No student selections saved for the final round. Please select students before marking the final round as completed.');
+        } else {
+          // Finalize placements using stored selection
+          await finalizePlacedStudents(companyDoc, selectedForFinal);
+        }
+      }
 
     } catch (error) {
       console.error("Error updating round status:", error);
@@ -412,6 +543,7 @@ function CompanyOpen() {
               fetchTrainingFormStudents={fetchTrainingFormStudents}
               onMatchStatsUpdate={handleMatchStatsUpdate}
               onEditJD={handleEditJD}
+              saveRoundSelection={saveRoundSelection}
             />
           </>
         )}

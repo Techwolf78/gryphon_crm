@@ -241,6 +241,7 @@ function CompanyTable({
   fetchTrainingFormStudents,
   onMatchStatsUpdate,
   onEditJD,
+  saveRoundSelection,
 }) {
   const [expandedCompanies, setExpandedCompanies] = useState({});
   const [selectedCompanyForStudents, setSelectedCompanyForStudents] = useState(null);
@@ -274,7 +275,7 @@ function CompanyTable({
     } catch (error) {
       console.error('Error saving round selections to localStorage:', error);
     }
-  }, [roundStudents]);
+  }, [roundStudents, filteredCompanies]);
 
   // Function to handle round student selection
   const handleRoundStudentSelection = (
@@ -305,6 +306,21 @@ function CompanyTable({
     // For subsequent rounds, only students selected in previous round are eligible
     const previousRoundStudents = roundStudents[companyId]?.[roundIndex - 1];
     if (!previousRoundStudents || previousRoundStudents.length === 0) {
+      // Try to fallback to selections persisted in company doc (DB)
+      const companyFromProps = filteredCompanies.find(c => c.id === companyId);
+      const dbPrev = companyFromProps?.roundSelections?.[roundIndex - 1];
+      if (dbPrev && dbPrev.length > 0) {
+        // Match by email or studentName
+        return companyStudents.filter((student) => {
+          const studEmail = (student.email || '').toLowerCase().trim();
+          const studName = (student.studentName || '').toLowerCase().trim();
+          return dbPrev.some(selected => {
+            const selEmail = (selected.email || '').toLowerCase().trim();
+            const selName = (selected.studentName || '').toLowerCase().trim();
+            return (selEmail && selEmail === studEmail) || (selName && selName === studName);
+          });
+        });
+      }
       return [];
     }
 
@@ -314,7 +330,7 @@ function CompanyTable({
         selected.studentName === student.studentName && selected.email === student.email
       );
     });
-  }, [roundStudents]);
+  }, [roundStudents, filteredCompanies]);
 
 // ✅ FIXED: handleOpenStudentModal - Always open modal and load students if needed
 const handleOpenStudentModal = React.useCallback(async (eligibleStudents, roundName, currentSelected, companyId, roundIndex) => {
@@ -337,7 +353,16 @@ const handleOpenStudentModal = React.useCallback(async (eligibleStudents, roundN
   }
   
   // Get eligible students for this round (use fresh data if available)
-  const finalEligibleStudents = companyStudents ? getStudentsForRound(companyId, roundIndex, companyStudents) : eligibleStudents;
+  let finalEligibleStudents = companyStudents ? getStudentsForRound(companyId, roundIndex, companyStudents) : eligibleStudents;
+
+  // Only include matched students in the modal (fallback to companyMatchStats if matchStatus not defined)
+  finalEligibleStudents = finalEligibleStudents.filter((s) => {
+    if (s.matchStatus) return s.matchStatus !== 'unmatched';
+    const unmatched = companyMatchStats[companyId]?.unmatched || [];
+    const key = ((s.email || s.studentName || '') + '').toLowerCase().trim();
+    const unmatchedKeys = new Set(unmatched.map(u => ((u.email || u.studentName || '') + '').toLowerCase().trim()));
+    return !unmatchedKeys.has(key);
+  });
   
   // ✅ Always open modal
   setStudentModalData({
@@ -348,14 +373,16 @@ const handleOpenStudentModal = React.useCallback(async (eligibleStudents, roundN
     companyId,
     roundIndex
   });
-}, [filteredCompanies, companyStudentsData, fetchCompanyStudents, getStudentsForRound]);
+}, [filteredCompanies, companyStudentsData, fetchCompanyStudents, getStudentsForRound, companyMatchStats]);
 
 // ✅ FIXED: handleStudentSelection with useCallback
-const handleStudentSelection = React.useCallback((selectedStudents) => {
-  if (studentModalData.companyId !== null && studentModalData.roundIndex !== null) {
+const handleStudentSelection = React.useCallback(async (selectedStudents) => {
+  const companyIdForSave = studentModalData.companyId;
+  const roundIndexForSave = studentModalData.roundIndex;
+  if (companyIdForSave !== null && roundIndexForSave !== null) {
     handleRoundStudentSelection(
-      studentModalData.companyId,
-      studentModalData.roundIndex,
+      companyIdForSave,
+      roundIndexForSave,
       selectedStudents
     );
   }
@@ -367,13 +394,32 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
     companyId: null,
     roundIndex: null
   });
-}, [studentModalData.companyId, studentModalData.roundIndex]);
+
+  // Persist selection to backend if function provided
+  try {
+    if (typeof saveRoundSelection === 'function') {
+      await saveRoundSelection(companyIdForSave, roundIndexForSave, selectedStudents);
+    }
+  } catch (error) {
+    console.error('Error saving round selection via prop:', error);
+    // Optionally, show toast or alert here to inform user of failure
+  }
+}, [studentModalData.companyId, studentModalData.roundIndex, saveRoundSelection]);
 
   // Function to get currently selected students for a round
   const getCurrentSelectedForRound = (companyId, roundIndex) => {
     const companyRounds = roundStudents[companyId];
     if (!companyRounds || !companyRounds[roundIndex]) return [];
     return companyRounds[roundIndex];
+  };
+
+  // Fallback to persisted DB selections if local state is missing
+  const getCurrentSelectedForRoundWithFallback = (company, roundIndex) => {
+    const companyId = company.id;
+    const local = getCurrentSelectedForRound(companyId, roundIndex);
+    if (local && local.length > 0) return local;
+    const dbSel = company?.roundSelections?.[roundIndex] || [];
+    return dbSel;
   };
 
   const getStudentsForCompany = async (company) => {
@@ -443,6 +489,18 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
       if (onMatchStatsUpdate) {
         onMatchStatsUpdate(result);
       }
+
+      // Update companyStudentsData with matchStatus for each student (if loaded)
+      setCompanyStudentsData((prev) => {
+        const students = prev[company.id] || studentListStudents;
+        const unmatchedKeys = new Set(unmatchedStudents.map(u => ((u.email || u.studentName || '') + '').toLowerCase().trim()));
+        const updatedStudents = students.map((s) => ({
+          ...s,
+          matchStatus: unmatchedKeys.has(((s.email || s.studentName || '') + '').toLowerCase().trim()) ? 'unmatched' : 'matched'
+        }));
+
+        return { ...prev, [company.id]: updatedStudents };
+      });
 
       return result;
     } catch (error) {
@@ -735,7 +793,7 @@ const handleStudentSelection = React.useCallback((selectedStudents) => {
       actualCompanyStudents
     );
     
-    const currentSelected = getCurrentSelectedForRound(company.id, index);
+    const currentSelected = getCurrentSelectedForRoundWithFallback(company, index);
 
     // Check if previous round is completed (not pending)
     const previousRoundCompleted = index === 0 || 
