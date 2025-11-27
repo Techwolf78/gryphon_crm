@@ -4,8 +4,6 @@ import { db } from "../../../firebase";
 import {
   collection,
   addDoc,
-  updateDoc,
-  doc,
   serverTimestamp,
   query,
   where,
@@ -19,9 +17,9 @@ import ExcelUploadModal from "./ExcelUploadModal";
 
 // EmailJS configuration
 const EMAILJS_CONFIG = {
-  SERVICE_ID: "service_pskknsn",
-  TEMPLATE_ID: "template_p2as3pp",
-  PUBLIC_KEY: "zEVWxxT-QvGIrhvTV",
+  SERVICE_ID: "service_sl0i7kr",
+  TEMPLATE_ID: "template_q0oarab",
+  PUBLIC_KEY: "V5rET66jxvg4gqulO",
 };
 
 // Academic year calculation helper
@@ -115,6 +113,9 @@ function AddJD({ show, onClose, company }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [availableColleges, setAvailableColleges] = useState([]);
+  const [studentsData, setStudentsData] = useState({});
+  const [viewingCollege, setViewingCollege] = useState(null);
+  const [isLoadingStudents, setIsLoadingStudents] = useState(false);
   const [otherCollegesInput, setOtherCollegesInput] = useState("");
   const [showOtherCollegesInput, setShowOtherCollegesInput] = useState(false);
   const [submissionError, setSubmissionError] = useState(null);
@@ -166,19 +167,12 @@ function AddJD({ show, onClose, company }) {
   };
 
   const handleFileChange = (e) => {
-    const newFiles = Array.from(e.target.files);
-    setJobFiles(prevFiles => [...prevFiles, ...newFiles]);
+    setJobFiles([...e.target.files]);
   };
 
   const handleSubmit = () => {
     if (!validateStep1()) return;
-    if (company) {
-      // For editing, skip college selection and submit directly
-      handleFinalSubmit();
-    } else {
-      // For new JD, go to college selection
-      setCurrentStep(2);
-    }
+    setCurrentStep(2);
   };
 
   const fetchFilteredColleges = useCallback(async () => {
@@ -199,8 +193,8 @@ function AddJD({ show, onClose, company }) {
       const collegeDataMap = {};
 
       const q = query(
-        collection(db, "trainingForms"),
-        where("course", "==", formData.course.toUpperCase()),
+        collection(db, "placementData"),
+        where("course", "==", formData.course),
         where("passingYear", "==", firebasePassingYear)
       );
 
@@ -246,6 +240,58 @@ function AddJD({ show, onClose, company }) {
       setAvailableColleges(["Other"]);
     }
   }, [formData.course, formData.passingYear, formData.specialization]);
+
+  const fetchStudentsForCollege = async (college) => {
+    setIsLoadingStudents(true);
+    try {
+      const placementQuery = query(
+        collection(db, "placementData"),
+        where("collegeName", "==", college)
+      );
+
+      const placementSnapshot = await getDocs(placementQuery);
+
+      if (placementSnapshot.empty) {
+        setStudentsData((prev) => ({ ...prev, [college]: [] }));
+        return;
+      }
+
+      const collegeDoc = placementSnapshot.docs[0];
+      const collegeDocId = collegeDoc.id;
+
+      const studentsQuery = query(
+        collection(db, "placementData", collegeDocId, "students")
+      );
+
+      const studentsSnapshot = await getDocs(studentsQuery);
+      const students = studentsSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      console.log(
+        `Fetched ${students.length} students for ${college}:`,
+        students
+      );
+      setStudentsData((prev) => ({ ...prev, [college]: students }));
+    } catch (error) {
+      console.error("Error fetching students for college:", college, error);
+      setStudentsData((prev) => ({ ...prev, [college]: [] }));
+    } finally {
+      setIsLoadingStudents(false);
+    }
+  };
+
+  const viewStudents = (college) => {
+    if (college === "Other" || !availableColleges.includes(college)) return;
+
+    setViewingCollege(college);
+
+    if (!studentsData[college]) {
+      fetchStudentsForCollege(college);
+    }
+  };
+
 
   const handleDownloadTemplate = (college) => {
     setSelectedCollegeForUpload(college);
@@ -293,24 +339,6 @@ function AddJD({ show, onClose, company }) {
         return;
       }
 
-      // Validate required form data
-      if (!formData.companyName || !formData.course || !formData.passingYear) {
-        throw new Error("Missing required form data: company name, course, or passing year");
-      }
-
-      const formatDate = (dateString) => {
-        if (!dateString) return "TBD";
-        try {
-          const date = new Date(dateString);
-          return date.toLocaleDateString("en-IN", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-          });
-        } catch {
-          return dateString || "TBD";
-        }
-      };
 
       // Create template fields with styling
       const fieldNames = {
@@ -349,39 +377,45 @@ function AddJD({ show, onClose, company }) {
           }">${fieldName}</span>`;
         })
         .join("");
+        
 
       // Send individual emails to each college
       const emailPromises = collegesWithTPO
         .filter(({ tpoEmail }) => tpoEmail && tpoEmail.trim() !== "")
         .map(async ({ college, tpoEmail }) => {
-          const templateParams = {
-            to_email: "deepgryphon@gmail.com",
-            subject: `Student Data Submission Required - ${formData.companyName || 'Company'}`,
-            company_name: formData.companyName || 'Company',
-            last_date: formatDate(formData.companyOpenDate) || 'TBD',
-            passing_year: formData.passingYear || 'TBD',
-            course: formData.course || 'TBD',
-            job_designation: formData.jobDesignation || formData.jobTitle || 'TBD',
-            job_location: formData.jobLocation || 'TBD',
-            salary: formData.salary || formData.stipend || 'TBD',
-            college_count: validEmails.length,
-            college_name: college || 'College',
-            template_fields: templateFieldsHTML || 'No fields specified',
-            field_count: templateFields.length || 0,
-            upload_link: `http://localhost:5173/upload-student-data?college=${encodeURIComponent(
-              college || 'College'
-            )}&company=${encodeURIComponent(
-              formData.companyName || 'Company'
-            )}&course=${encodeURIComponent(
-              formData.course || 'Course'
-            )}&fields=${encodeURIComponent(JSON.stringify(templateFields || []))}`,
-            coordinator_name: formData.coordinator || 'Coordinator',
-            coordinator_phone: "+91-9876543210",
-            bcc: tpoEmail,
-          };
-
-          console.log("Sending email with params:", templateParams);
-
+const templateParams = {
+    to_email: "placements@gryphonacademy.co.in",
+    company_name: formData.companyName,
+    company_website: formData.companyWebsite || "Not provided", 
+    job_designation: formData.jobDesignation,
+    job_location: formData.jobLocation,
+    salary: formData.salary,
+    job_type: formData.jobType, 
+    mode_of_interview: formData.modeOfInterview, 
+    course: formData.course,
+    passing_year: formData.passingYear,
+    Gender: formData.gender, 
+    marks_criteria: formData.marksCriteria, 
+    backlog_criteria: formData.backlogCriteria,
+    college_count: validEmails.length,
+    college_name: college,
+    template_fields: templateFieldsHTML,
+    field_count: templateFields.length,
+    hiring_rounds_html: formData.hiringRounds
+      .map(round => `<li>${round}</li>`)
+      .join(''),
+      
+    upload_link: `http://localhost:5173/upload-student-data?college=${encodeURIComponent(
+        college
+    )}&company=${encodeURIComponent(
+        formData.companyName
+    )}&course=${encodeURIComponent(
+        formData.course
+    )}&fields=${encodeURIComponent(JSON.stringify(templateFields))}`,
+    coordinator_name: formData.coordinator,
+    coordinator_phone: "+91-9876543210",
+    bcc: tpoEmail,
+};
           return emailjs.send(
             EMAILJS_CONFIG.SERVICE_ID,
             EMAILJS_CONFIG.TEMPLATE_ID,
@@ -399,43 +433,11 @@ function AddJD({ show, onClose, company }) {
       );
     } catch (error) {
       console.error("Error sending emails:", error);
-
-      // Provide more specific error messages
-      let errorMessage = "Failed to send emails";
-      if (error.status === 412) {
-        errorMessage = "Email template parameters are invalid. Please check all required fields are filled.";
-      } else if (error.status === 400) {
-        errorMessage = "Invalid email configuration. Please contact support.";
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-
-      setSubmissionError(errorMessage);
-      throw new Error(errorMessage);
+      throw new Error("Failed to send emails");
     }
   };
 
   const handleFinalSubmit = async () => {
-    // First validate the form data
-    const errors = {};
-    if (!formData.companyName.trim()) errors.companyName = "Company name is required";
-    if (!formData.course) errors.course = "Course is required";
-    if (formData.specialization.length === 0) errors.specialization = "At least one specialization is required";
-    if (!formData.passingYear) errors.passingYear = "Passing year is required";
-    if (!formData.gender) errors.gender = "Gender is required";
-    if (!formData.marksCriteria) errors.marksCriteria = "Marks criteria is required";
-    if (!formData.jobType) errors.jobType = "Job type is required";
-    if (!formData.companyOpenDate) errors.companyOpenDate = "Company open date is required";
-    if (!formData.source.trim()) errors.source = "Source is required";
-    if (!formData.coordinator.trim()) errors.coordinator = "Coordinator is required";
-
-    if (Object.keys(errors).length > 0) {
-      setSubmissionError("Please go back and fill all required fields in the form");
-      setCurrentStep(1); // Go back to form step
-      setFormErrors(errors);
-      return;
-    }
-
     if (
       selectedColleges.length === 0 ||
       (selectedColleges.includes("Other") && otherCollegesInput.trim() === "")
@@ -470,39 +472,23 @@ function AddJD({ show, onClose, company }) {
         tpoEmail: getCollegeEmail(college),
       }));
 
-      if (company) {
-        // Editing existing company - update the document
-        const companyRef = doc(db, "companies", company.id);
+      // Save to database with template fields
+      const promises = collegesToSubmit.map((college) => {
         const companyData = {
           ...formData,
-          college: collegesToSubmit[0], // For editing, use the first selected college
-          tpoEmail: getCollegeEmail(collegesToSubmit[0]),
-          templateFields: selectedTemplateFields,
+          college,
+          tpoEmail: getCollegeEmail(college),
+          templateFields: selectedTemplateFields, // ✅ Save selected columns
           jobFiles: jobFiles.map((file) => file.name),
           updatedAt: serverTimestamp(),
         };
-        await updateDoc(companyRef, companyData);
-        
-        alert("JD updated successfully!");
-      } else {
-        // Creating new company - save to database with template fields
-        const promises = collegesToSubmit.map((college) => {
-          const companyData = {
-            ...formData,
-            college,
-            tpoEmail: getCollegeEmail(college),
-            templateFields: selectedTemplateFields, // ✅ Save selected columns
-            jobFiles: jobFiles.map((file) => file.name),
-            updatedAt: serverTimestamp(),
-          };
-          return addDoc(collection(db, "companies"), companyData);
-        });
+        return addDoc(collection(db, "companies"), companyData);
+      });
 
-        await Promise.all(promises);
+      await Promise.all(promises);
 
-        // Send emails with template fields info
-        await sendBulkEmail(collegesWithTPO, selectedTemplateFields);
-      }
+      // Send emails with template fields info
+      await sendBulkEmail(collegesWithTPO, selectedTemplateFields);
 
       setTimeout(() => {
         onClose();
@@ -517,39 +503,12 @@ function AddJD({ show, onClose, company }) {
 
   useEffect(() => {
     if (show && company) {
-      // Pre-fill form with company data for editing
+      // Pre-fill form with company data
       setFormData(prev => ({
+        ...prev,
         companyName: company.companyName || company.name || "",
         companyWebsite: company.companyUrl || company.companyWebsite || "",
-        course: company.course || "",
-        specialization: Array.isArray(company.specialization) ? company.specialization : 
-                       (company.specialization ? [company.specialization] : []),
-        passingYear: company.passingYear || "",
-        gender: company.gender || "",
-        marksCriteria: company.marksCriteria || "",
-        otherCriteria: company.otherCriteria || "",
-        jobType: company.jobType || "",
-        jobDesignation: company.jobDesignation || "",
-        jobLocation: company.jobLocation || "",
-        salary: company.salary || "",
-        hiringRounds: company.hiringRounds || [],
-        internshipDuration: company.internshipDuration || "",
-        stipend: company.stipend || "",
-        modeOfInterview: company.modeOfInterview || "",
-        joiningPeriod: company.joiningPeriod || "",
-        companyOpenDate: company.companyOpenDate || "",
-        modeOfWork: company.modeOfWork || "",
-        jobDescription: company.jobDescription || "",
-        source: company.source || "",
-        coordinator: company.coordinator || "",
-        status: company.status || "ongoing",
-        createdAt: company.createdAt || serverTimestamp(),
       }));
-      
-      // Set selected colleges if editing
-      if (company.college) {
-        setSelectedColleges([company.college]);
-      }
     } else if (!show) {
       // Reset form when modal closes
       setFormData({
@@ -565,7 +524,6 @@ function AddJD({ show, onClose, company }) {
         jobDesignation: "",
         jobLocation: "",
         salary: "",
-        hiringRounds: [], 
         internshipDuration: "",
         stipend: "",
         modeOfInterview: "",
@@ -583,7 +541,6 @@ function AddJD({ show, onClose, company }) {
       setFormErrors({});
       setSubmissionError(null);
       setEmailSent(false);
-      setJobFiles([]); // Reset job files
     }
   }, [show, company]);
 
@@ -601,15 +558,15 @@ function AddJD({ show, onClose, company }) {
 
   return (
     <div className="fixed inset-0 z-52 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-4xl shadow-2xl overflow-hidden h-[95vh] flex flex-col">
+      <div className="bg-white w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden">
         {/* Modal Header */}
-        <div className="bg-gray-50/50 border-b border-gray-100 px-4 py-3 flex justify-between items-center sticky top-0 z-10">
-          <h2 className="text-lg font-semibold text-gray-900">
-            {currentStep === 1 ? (company ? "Edit JD Form" : "Add JD Form") : "Select Colleges"}
+        <div className="bg-linear-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center">
+          <h2 className="text-xl font-semibold text-white">
+            {currentStep === 1 ? "Add JD Form" : "Select Colleges"}
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 focus:outline-none p-1"
+            className="text-white hover:text-gray-200 focus:outline-none"
           >
             <XIcon className="h-5 w-5" />
           </button>
@@ -617,7 +574,7 @@ function AddJD({ show, onClose, company }) {
 
         {currentStep === 1 ? (
           <>
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="p-6 overflow-y-auto max-h-[calc(100vh-180px)]">
               <AddJDForm
                 formData={formData}
                 setFormData={setFormData}
@@ -626,31 +583,29 @@ function AddJD({ show, onClose, company }) {
                 onClose={onClose}
                 placementUsers={placementUsers}
                 isLoadingUsers={isLoadingUsers}
-                jobFiles={jobFiles}
-                setJobFiles={setJobFiles}
               />
             </div>
 
-            <div className="bg-gray-50/50 border-t border-gray-100 px-4 py-3 flex justify-end sticky bottom-0 z-10">
+            <div className="bg-gray-50 px-6 py-4 flex justify-end">
               <div className="flex space-x-3">
                 <button
                   onClick={onClose}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSubmit}
-                  className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="px-6 py-2.5 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition"
                 >
-                  {company ? "Update JD" : "Save & Next"}
+                  Save & Next
                 </button>
               </div>
             </div>
           </>
         ) : (
           <>
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="p-6 overflow-y-auto max-h-[calc(100vh-180px)]">
               <CollegeSelection
                 formData={formData}
                 availableColleges={availableColleges}
@@ -660,6 +615,7 @@ function AddJD({ show, onClose, company }) {
                 setOtherCollegesInput={setOtherCollegesInput}
                 showOtherCollegesInput={showOtherCollegesInput}
                 setShowOtherCollegesInput={setShowOtherCollegesInput}
+                viewStudents={viewStudents}
                 collegeEmails={collegeEmails}
                 manualEmails={manualEmails}
                 handleEmailChange={handleEmailChange}
@@ -673,7 +629,7 @@ function AddJD({ show, onClose, company }) {
               />
 
               {emailSent && (
-                <div className="mt-4 p-3 bg-green-50 border border-green-200">
+                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                   <p className="text-green-700 text-sm">
                     ✅ Email sent successfully to all selected colleges!
                   </p>
@@ -681,17 +637,17 @@ function AddJD({ show, onClose, company }) {
               )}
             </div>
 
-            <div className="bg-gray-50/50 border-t border-gray-100 px-4 py-3 flex justify-between items-center sticky bottom-0 z-10">
+            <div className="bg-gray-50 px-6 py-4 flex justify-between">
               <button
                 onClick={() => setCurrentStep(1)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition"
               >
-                ← Back
+                Back
               </button>
               <div className="flex space-x-3">
                 <button
                   onClick={onClose}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition"
                 >
                   Cancel
                 </button>
@@ -708,7 +664,7 @@ function AddJD({ show, onClose, company }) {
                       otherCollegesInput.trim() === "") ||
                     isSubmitting
                   }
-                  className={`px-4 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                  className={`px-6 py-2.5 rounded-lg text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition ${
                     selectedColleges.length === 0 ||
                     (selectedColleges.includes("Other") &&
                       otherCollegesInput.trim() === "") ||
@@ -719,8 +675,6 @@ function AddJD({ show, onClose, company }) {
                 >
                   {isSubmitting
                     ? "Submitting..."
-                    : company
-                    ? "Update JD"
                     : `Send to ${
                         selectedColleges.filter((c) => c !== "Other").length
                       } college(s)`}
