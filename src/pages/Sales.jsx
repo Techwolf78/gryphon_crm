@@ -706,7 +706,7 @@ function Sales() {
         {/* Sticky Header Section */}
         <div className="sticky top-0 z-20 bg-linear-to-br from-gray-50 to-gray-100 pb-2 border-b border-gray-200">
           {/* Dashboard Title and Description */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-2 " data-tour="sales-header">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-1 " data-tour="sales-header">
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
                 Sales Dashboard
@@ -719,12 +719,12 @@ function Sales() {
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setShowModal(true)}
-                className="bg-linear-to-r from-blue-600 to-indigo-700 text-white px-5 py-2.5 rounded-xl font-semibold hover:opacity-90 transition-all shadow-md flex items-center"
+                className="bg-linear-to-r from-blue-600 to-indigo-700 text-white px-3 py-1.5 rounded-xl font-semibold hover:opacity-90 transition-all shadow-md flex items-center"
                 data-tour="add-college-button"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 mr-2"
+                  className="h-4 w-4 mr-2"
                   viewBox="0 0 20 20"
                   fill="currentColor"
                 >
@@ -738,11 +738,11 @@ function Sales() {
               </button>
               <button
                 onClick={() => setShowBudget(true)}
-                className="bg-white text-green-600 border border-green-300 px-4 py-2 rounded-lg font-medium hover:bg-green-50 transition-colors shadow-sm flex items-center"
+                className="bg-white text-green-600 border border-green-300 px-3 py-1.5 rounded-lg font-medium hover:bg-green-50 transition-colors shadow-sm flex items-center"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 mr-2"
+                  className="h-4 w-4 mr-2"
                   viewBox="0 0 20 20"
                   fill="currentColor"
                 >

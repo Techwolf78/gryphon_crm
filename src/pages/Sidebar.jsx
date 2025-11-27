@@ -216,11 +216,11 @@ const Sidebar = ({ collapsed, onToggle }) => {
       icon: <FiHome />,
       skipRedirect: true,
     },
-    {
-      label: "Intro",
-      path: "/dashboard/intro",
-      icon: <FiBook />,
-    },
+    // {
+    //   label: "Intro",
+    //   path: "/dashboard/intro",
+    //   icon: <FiBook />,
+    // },
     ...departmentLinks,
     {
       label: "Help",
