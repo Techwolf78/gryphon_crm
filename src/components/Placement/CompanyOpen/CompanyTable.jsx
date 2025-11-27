@@ -454,16 +454,15 @@ const handleStudentSelection = React.useCallback(async (selectedStudents) => {
 
       const unmatchedStudents = [];
 
+      // Helper to normalize fields for matching
+      const normalizeName = (s) => ((s && (s.studentName || s.name || s['FULL NAME OF STUDENT'] || s['full name of student'] || s['Full Name of Student'] || '')) + '').toLowerCase().trim();
+      const normalizeEmail = (s) => ((s && (s.email || s['EMAIL ID'] || s['email id'] || s.emailId || '')) + '').toLowerCase().trim();
+
       studentListStudents.forEach((studentListStudent) => {
         const matched = trainingFormStudents.some((trainingStudent) => {
-          const nameMatch =
-            studentListStudent.studentName?.toLowerCase().trim() ===
-            trainingStudent["FULL NAME OF STUDENT"]?.toLowerCase().trim();
-          const emailMatch =
-            studentListStudent.email?.toLowerCase().trim() ===
-            trainingStudent["EMAIL ID"]?.toLowerCase().trim();
+          const nameMatch = normalizeName(studentListStudent) === normalizeName(trainingStudent);
+          const emailMatch = normalizeEmail(studentListStudent) === normalizeEmail(trainingStudent);
           const isMatch = nameMatch || emailMatch;
-          
           return isMatch;
         });
 

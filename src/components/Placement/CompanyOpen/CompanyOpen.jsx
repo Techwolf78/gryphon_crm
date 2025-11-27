@@ -361,12 +361,29 @@ function CompanyOpen() {
         // Only include students uploaded by this specific college
         if (uploadData.college === company.college && 
             uploadData.students && Array.isArray(uploadData.students)) {
-          const studentsWithMeta = uploadData.students.map(student => ({
-            ...student,
-            uploadedAt: uploadData.uploadedAt,
-            college: uploadData.college,
-            uploadId: doc.id
-          }));
+          // Normalize each uploaded student to standard keys so matching works
+          const studentsWithMeta = uploadData.students.map(student => {
+            const normalized = {
+              // Prefer common camelCase keys if present, otherwise attempt various capitalized names
+              studentName: student.studentName || student.name || student['FULL NAME OF STUDENT'] || student['full name of student'] || student['Full Name of Student'] || '',
+              email: student.email || student['EMAIL ID'] || student['email id'] || student['Email ID'] || student.emailId || '',
+              phone: student.phone || student.mobile || student['PHONE NUMBER'] || student.phoneNumber || '',
+              enrollmentNo: student.enrollmentNo || student.enrollment || student['ENROLLMENT NUMBER'] || '',
+              course: student.course || student['COURSE'] || student.degree || '',
+              specialization: student.specialization || student['SPECIALIZATION'] || student.branch || '',
+              activeBacklogs: student.activeBacklogs || student['ACTIVE BACKLOGS'] || student.backlogs || 0,
+              status: student.status || student.STATUS || 'submitted',
+              // Keep raw upload object so debugging is easy
+              _raw: student,
+            };
+
+            return {
+              ...normalized,
+              uploadedAt: uploadData.uploadedAt,
+              college: uploadData.college,
+              uploadId: doc.id,
+            };
+          });
           collegeStudents.push(...studentsWithMeta);
         }
       });

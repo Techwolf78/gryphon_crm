@@ -95,6 +95,21 @@ const PlacedStudent = ({ onClose }) => {
     fetchPlacedStudents();
   }, [fetchPlacedStudents]);
 
+  // Close calendar modal on Escape key
+  useEffect(() => {
+    const handleKeydown = (e) => {
+      if (e.key === "Escape") {
+        setShowCalendar(false);
+      }
+    };
+    if (showCalendar) {
+      document.addEventListener("keydown", handleKeydown);
+    }
+    return () => {
+      document.removeEventListener("keydown", handleKeydown);
+    };
+  }, [showCalendar]);
+
   // Calculate statistics
   const totalPlaced = placedStudents.length;
   const avgPackage =
@@ -643,21 +658,32 @@ const PlacedStudent = ({ onClose }) => {
 
         {/* Calendar Modal */}
         {showCalendar && (
-          <div className="fixed inset-0 flex items-center justify-center z-60">
+          <div
+            className="fixed inset-0 flex items-center justify-center z-60"
+            onClick={(e) => {
+              // Close modal when clicking outside of modal content
+              if (e.target === e.currentTarget) setShowCalendar(false);
+            }}
+          >
             <div
-              className="fixed inset-0  bg-opacity-50 backdrop-blur-sm"
+              className="fixed inset-0 bg-black/30 backdrop-blur-sm"
               onClick={() => setShowCalendar(false)}
             ></div>
-            <div className="bg-white rounded-xl shadow-2xl overflow-hidden z-60 relative">
+            <div
+              className="bg-white rounded-xl shadow-2xl overflow-hidden z-60 relative"
+              onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+            >
               <button
                 onClick={() => setShowCalendar(false)}
                 className="absolute top-5 right-3 z-10 p-1.5 rounded-full bg-white/80 backdrop-blur-sm border border-gray-200 hover:bg-white hover:border-gray-300 transition-all duration-200 shadow-sm"
               >
                 <XIcon className="h-4 w-4 text-gray-500 hover:text-gray-700" />
               </button>
-              <div>
-                <PlacedStdCalendar placedStudents={placedStudents} />
-              </div>
+                <div>
+                  <PlacedStdCalendar placedStudents={placedStudents} />
+                </div>
             </div>
           </div>
         )}
