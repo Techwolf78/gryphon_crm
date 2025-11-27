@@ -430,7 +430,7 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
     <div className="fixed inset-0 z-54 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden transform transition-all">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-3 flex justify-between items-center">
+        <div className="bg-linear-to-r from-blue-600 to-indigo-700 p-3 flex justify-between items-center">
           <div>
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
               <FiInfo className="text-white" />
@@ -879,7 +879,7 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 bg-white p-4 flex-shrink-0 flex justify-end gap-3">
+        <div className="border-t border-gray-200 bg-white p-4 shrink-0 flex justify-end gap-3">
           <button
             onClick={onClose}
             className="px-2 py-1 text-sm sm:text-base text-gray-600 hover:text-gray-800 font-medium rounded-lg transition-colors"

@@ -288,7 +288,7 @@ function LeadsTable({
                 <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-[100px]">
                   email ID
                 </th>
-                <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-[80px]">
+                <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-20">
                   CTC
                 </th>
                 <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-[120px]">
