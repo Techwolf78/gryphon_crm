@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, Suspense, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 import { useDebounce } from 'use-debounce';
 import { PlusIcon, CloudUploadIcon } from "@heroicons/react/outline";
 import AddLeads from "./AddLeads";
@@ -938,7 +938,22 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     });
   }, [leads, activeTab, debouncedSearchTerm, selectedUserFilter, companyFilter, phoneFilter, dateFilterType, singleDate, startDate, endDate, calculateCompletenessScore]);
 
-  // Group leads by date for all tabs (hot, warm, cold, called, onboarded, deleted)
+  const formatDate = useCallback((dateString) => {
+    if (dateString === 'Unknown Date') return 'Unknown Date';
+    try {
+      return dateString
+        ? new Date(dateString).toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "-";
+    } catch {
+      return "-";
+    }
+  }, []);
   const groupedLeads = useMemo(() => {
     // Only group for specific tabs and when view mode is "date"
     if (viewMode !== "date" || !["hot", "warm", "cold", "called", "onboarded", "deleted"].includes(activeTab)) return null;
@@ -1737,23 +1752,6 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     await fetchLeads();
   };
 
-  const formatDate = useCallback((dateString) => {
-    if (dateString === 'Unknown Date') return 'Unknown Date';
-    try {
-      return dateString
-        ? new Date(dateString).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          })
-        : "-";
-    } catch {
-      return "-";
-    }
-  }, []);
-
   // Filter follow-ups based on view mode (My Leads vs My Team)
   const filteredFollowUps = useMemo(() => {
     if (!user) {
@@ -1845,7 +1843,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
             'Designation': lead.pocDesignation || lead.designation || '',
             'Contact Details': lead.pocPhone || lead.phone || '',
             'Email ID': lead.pocMail || lead.email || '',
-            'LinkedIn Profile': lead.pocLinkedin || lead.linkedinUrl || '',
+            'CTC': lead.ctc || '',
             'Remarks': remarks,
             'ASSGN': assignedUser
           };
@@ -1861,7 +1859,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           { wch: 20 }, // Designation
           { wch: 15 }, // Contact Details
           { wch: 25 }, // Email ID
-          { wch: 25 }, // LinkedIn Profile
+          { wch: 15 }, // CTC
           { wch: 40 }, // Remarks
           { wch: 15 }  // ASSGN
         ];
@@ -2129,13 +2127,13 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                   }
                   window.history.replaceState(null, '', url);
                 }}
-                className="px-3 py-1 bg-orange-500 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-orange-600 focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 shadow-md transition-all duration-200 text-xs h-full"
+                className="px-3 py-1 bg-blue-500 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md transition-all duration-200 text-xs h-full"
               >
                 Followups
               </button>
               <button
                 onClick={() => setShowAddLeadForm(true)}
-                className="px-3 py-1 bg-linear-to-r from-blue-600 to-indigo-700 text-white rounded-lg font-semibold flex items-center justify-center hover:from-blue-700 hover:to-indigo-800 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md transition-all duration-200 text-xs h-full"
+                className="px-3 py-1 bg-linear-to-r from-blue-600 to-blue-700 text-white rounded-lg font-semibold flex items-center justify-center hover:from-blue-700 hover:to-blue-800 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md transition-all duration-200 text-xs h-full"
               >
                 <PlusIcon className="h-3 w-3 mr-1" />
                 Add Company
@@ -2148,7 +2146,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                          user?.role === "Admin") && (
                 <button
                   onClick={() => setShowBulkUploadForm(true)}
-                  className="px-3 py-1 bg-green-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-md text-xs h-full"
+                  className="px-3 py-1 bg-blue-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md text-xs h-full"
                 >
                   <CloudUploadIcon className="h-3 w-3 mr-1" />
                   Bulk Upload
@@ -2157,7 +2155,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
               {user && (user?.role === "Director" || user?.role === "Head") && !viewMyLeadsOnly && (
                 <button
                   onClick={() => setShowBulkAssignModal(true)}
-                  className="px-3 py-1 bg-purple-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-purple-700 focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 shadow-md text-xs h-full"
+                  className="px-3 py-1 bg-blue-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md text-xs h-full"
                 >
                   Bulk Assign
                 </button>
@@ -2299,7 +2297,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
               </span>
             )}
             {phoneFilter.trim() && (
-              <span className="ml-2 text-purple-600">
+              <span className="ml-2 text-blue-600">
                 (phone: "{phoneFilter.trim()}")
               </span>
             )}
@@ -2307,7 +2305,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           <div className="flex gap-2">
             <button
               onClick={() => setShowExportModal(true)}
-              className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
+              className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
               title="Export leads report with follow-ups"
             >
               Export Report
@@ -2644,9 +2642,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         }}
       />
 
-    </div>
-
-    
+    </div>    
   );
 }
 

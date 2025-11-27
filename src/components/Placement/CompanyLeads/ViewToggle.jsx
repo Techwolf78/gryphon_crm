@@ -8,7 +8,7 @@ const ViewToggle = ({ viewMode, setViewMode }) => {
           onClick={() => setViewMode('date')}
           className={`px-2 py-1 text-xs font-semibold rounded-lg transition-all duration-200 transform ${
             viewMode === 'date'
-              ? 'bg-linear-to-r from-blue-500 to-indigo-600 text-white shadow-sm scale-105'
+              ? 'bg-linear-to-r from-blue-500 to-blue-600 text-white shadow-sm scale-105'
               : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100/70'
           }`}
         >
@@ -18,7 +18,7 @@ const ViewToggle = ({ viewMode, setViewMode }) => {
           onClick={() => setViewMode('table')}
           className={`px-2 py-1 text-xs font-semibold rounded-lg transition-all duration-200 transform ${
             viewMode === 'table'
-              ? 'bg-linear-to-r from-blue-500 to-indigo-600 text-white shadow-sm scale-105'
+              ? 'bg-linear-to-r from-blue-500 to-blue-600 text-white shadow-sm scale-105'
               : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100/70'
           }`}
         >

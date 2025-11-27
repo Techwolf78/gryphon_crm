@@ -2,19 +2,19 @@ import React, { useState, useEffect, useCallback } from "react";
 import { FaEllipsisV } from "react-icons/fa";
 
 const statusColorMap = {
-  hot: "text-red-600 hover:bg-red-50",
-  warm: "text-orange-600 hover:bg-orange-50",
+  hot: "text-blue-600 hover:bg-blue-50",
+  warm: "text-blue-600 hover:bg-blue-50",
   cold: "text-blue-600 hover:bg-blue-50",
-  called: "text-purple-600 hover:bg-purple-50",
-  onboarded: "text-green-600 hover:bg-green-50",
+  called: "text-blue-600 hover:bg-blue-50",
+  onboarded: "text-blue-600 hover:bg-blue-50",
 };
 
 const statusBgColorMap = {
-  hot: { bg: "from-red-50 to-red-100", border: "border-red-200", hover: "hover:from-red-100 hover:to-red-200", icon: "bg-red-600", leftBorder: "border-l-red-200" },
-  warm: { bg: "from-orange-50 to-orange-100", border: "border-orange-200", hover: "hover:from-orange-100 hover:to-orange-200", icon: "bg-orange-600", leftBorder: "border-l-orange-200" },
+  hot: { bg: "from-blue-50 to-blue-100", border: "border-blue-200", hover: "hover:from-blue-100 hover:to-blue-200", icon: "bg-blue-600", leftBorder: "border-l-blue-200" },
+  warm: { bg: "from-blue-50 to-blue-100", border: "border-blue-200", hover: "hover:from-blue-100 hover:to-blue-200", icon: "bg-blue-600", leftBorder: "border-l-blue-200" },
   cold: { bg: "from-blue-50 to-blue-100", border: "border-blue-200", hover: "hover:from-blue-100 hover:to-blue-200", icon: "bg-blue-600", leftBorder: "border-l-blue-200" },
-  called: { bg: "from-purple-50 to-purple-100", border: "border-purple-200", hover: "hover:from-purple-100 hover:to-purple-200", icon: "bg-purple-600", leftBorder: "border-l-purple-200" },
-  onboarded: { bg: "from-green-50 to-green-100", border: "border-green-200", hover: "hover:from-green-100 hover:to-green-200", icon: "bg-green-600", leftBorder: "border-l-green-200" },
+  called: { bg: "from-blue-50 to-blue-100", border: "border-blue-200", hover: "hover:from-blue-100 hover:to-blue-200", icon: "bg-blue-600", leftBorder: "border-l-blue-200" },
+  onboarded: { bg: "from-blue-50 to-blue-100", border: "border-blue-200", hover: "hover:from-blue-100 hover:to-blue-200", icon: "bg-blue-600", leftBorder: "border-l-blue-200" },
 };
 
 function LeadsTable({
@@ -265,15 +265,15 @@ function LeadsTable({
       {/* Table Container with Fixed Height */}
       <div className="flex-1 overflow-hidden border border-gray-300 rounded-lg">
         <div className="h-full overflow-auto">
-          <table className="w-full divide-y divide-gray-200" style={{ tableLayout: 'fixed' }}>
-            <thead className={`sticky top-0 z-10 text-black ${activeTab && statusBgColorMap[activeTab] ? `bg-linear-to-r ${statusBgColorMap[activeTab].bg}` : 'bg-linear-to-r from-blue-500 via-indigo-600 to-indigo-700'}`}>
+          <table className="w-full divide-y divide-gray-200">
+            <thead className={`sticky top-0 z-10 text-black ${activeTab && statusBgColorMap[activeTab] ? `bg-linear-to-r ${statusBgColorMap[activeTab].bg}` : 'bg-linear-to-r from-blue-500 via-blue-600 to-blue-700'}`}>
               <tr>
                 {showCheckboxes && (
                   <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-10">
                     Select
                   </th>
                 )}
-                <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-[120px]">
+                <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-[100px]">
                   Company Name
                 </th>
                 <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-[90px]">
@@ -285,13 +285,13 @@ function LeadsTable({
                 <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-[90px]">
                   Contact Details
                 </th>
-                <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-[120px]">
+                <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-[100px]">
                   email ID
                 </th>
-                <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-[70px]">
-                  LinkedIn Profile
+                <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-[80px]">
+                  CTC
                 </th>
-                <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-[150px]">
+                <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-[120px]">
                   Remarks
                 </th>
                 <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider border border-gray-300 w-10">
@@ -347,7 +347,7 @@ function LeadsTable({
                           {paginatedLeads.map((lead, index) => (
                             <tr
                               key={`${lead.id}-${index}`}
-                              className={`hover:bg-${leadStatus === 'hot' ? 'red' : leadStatus === 'warm' ? 'orange' : leadStatus === 'cold' ? 'blue' : leadStatus === 'called' ? 'purple' : 'green'}-50 cursor-pointer bg-white border-l-4 ${colors.leftBorder} transition-colors duration-150`}
+                              className={`hover:bg-blue-50 cursor-pointer bg-white border-l-4 ${colors.leftBorder} transition-colors duration-150`}
                               onClick={() => onLeadClick(lead)}
                             >
                               {showCheckboxes && (
@@ -369,19 +369,21 @@ function LeadsTable({
                                 </td>
                               )}
                               <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[150px]">
-                                {lead.companyWebsite ? (
-                                  <a
-                                    href={lead.companyWebsite.startsWith('http') ? lead.companyWebsite : `https://${lead.companyWebsite}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-blue-600 hover:text-blue-800 hover:underline"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    {lead.companyName || "N/A"}
-                                  </a>
-                                ) : (
-                                  lead.companyName || "N/A"
-                                )}
+                                <div className="flex items-center space-x-1">
+                                  {lead.companyWebsite ? (
+                                    <a
+                                      href={lead.companyWebsite.startsWith('http') ? lead.companyWebsite : `https://${lead.companyWebsite}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-blue-600 hover:text-blue-800 hover:underline"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      {lead.companyName || "N/A"}
+                                    </a>
+                                  ) : (
+                                    lead.companyName || "N/A"
+                                  )}
+                                </div>
                               </td>
                               <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[120px]">
                                 {getAllContactNames(lead)}
@@ -395,27 +397,8 @@ function LeadsTable({
                               <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[150px]">
                                 {getAllEmails(lead)}
                               </td>
-                              <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate w-20">
-                                {getAllLinkedIns(lead) !== 'N/A' ? (
-                                  getAllLinkedIns(lead).split(', ').map((linkedin, index) => (
-                                    <span key={index}>
-                                      {linkedin && linkedin !== 'N/A' ? (
-                                        <a
-                                          href={linkedin.startsWith('http') ? linkedin : `https://${linkedin}`}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="text-blue-600 hover:text-blue-800"
-                                          onClick={(e) => e.stopPropagation()}
-                                        >
-                                          LinkedIn{index > 0 ? ` ${index + 1}` : ''}
-                                        </a>
-                                      ) : 'N/A'}
-                                      {index < getAllLinkedIns(lead).split(', ').length - 1 && ', '}
-                                    </span>
-                                  ))
-                                ) : (
-                                  "N/A"
-                                )}
+                              <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[120px]">
+                                {lead.ctc || 'N/A'}
                               </td>
                               <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[200px]" title={getLatestRemark(lead)}>
                                 {getLatestRemark(lead)}
@@ -467,9 +450,9 @@ function LeadsTable({
                                             onLeadClick(lead);
                                             closeDropdown();
                                           }}
-                                          className="flex items-center w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-purple-50/80 hover:text-purple-700 transition-all duration-200 group"
+                                          className="flex items-center w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50/80 hover:text-blue-700 transition-all duration-200 group"
                                         >
-                                          <svg className="w-4 h-4 mr-3 text-gray-400 group-hover:text-purple-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <svg className="w-4 h-4 mr-3 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                           </svg>
@@ -483,9 +466,9 @@ function LeadsTable({
                                           <div className="relative">
                                             <button
                                               onClick={() => setAssignSubmenuOpen(assignSubmenuOpen === lead.id ? null : lead.id)}
-                                              className="flex items-center w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-green-50/80 hover:text-green-700 transition-all duration-200 group rounded-lg"
+                                              className="flex items-center w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-blue-50/80 hover:text-blue-700 transition-all duration-200 group rounded-lg"
                                             >
-                                              <svg className="w-4 h-4 mr-3 text-gray-400 group-hover:text-green-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <svg className="w-4 h-4 mr-3 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                               </svg>
                                               Assign to:
@@ -503,9 +486,9 @@ function LeadsTable({
                                                     <button
                                                       key={user.id}
                                                       onClick={(e) => handleAssignLead(lead.id, user.id, e)}
-                                                      className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-green-50/80 hover:text-green-700 transition-all duration-200"
+                                                      className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50/80 hover:text-blue-700 transition-all duration-200"
                                                     >
-                                                      <div className="w-2 h-2 rounded-full bg-green-500 mr-3"></div>
+                                                      <div className="w-2 h-2 rounded-full bg-blue-500 mr-3"></div>
                                                       {user.displayName || user.name || 'Unknown User'}
                                                     </button>
                                                     ))}
@@ -538,13 +521,7 @@ function LeadsTable({
                                                 }}
                                                 className={`flex items-center w-full text-left px-3 py-2 text-sm rounded-lg mb-1 transition-all duration-200 ${statusColorMap[status]} hover:shadow-sm`}
                                               >
-                                                <div className={`w-2 h-2 rounded-full mr-3 ${
-                                                  status === 'hot' ? 'bg-red-500' :
-                                                  status === 'warm' ? 'bg-orange-500' :
-                                                  status === 'cold' ? 'bg-blue-500' :
-                                                  status === 'called' ? 'bg-purple-500' :
-                                                  'bg-green-500'
-                                                }`}></div>
+                                                <div className={`w-2 h-2 rounded-full mr-3 bg-blue-500`}></div>
                                                 Mark as {status.charAt(0).toUpperCase() + status.slice(1)}
                                               </button>
                                             ))}
@@ -653,19 +630,21 @@ function LeadsTable({
                       </td>
                     )}
                     <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[150px]">
-                      {lead.companyWebsite ? (
-                        <a
-                          href={lead.companyWebsite.startsWith('http') ? lead.companyWebsite : `https://${lead.companyWebsite}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {lead.companyName || "N/A"}
-                        </a>
-                      ) : (
-                        lead.companyName || "N/A"
-                      )}
+                      <div className="flex items-center space-x-1">
+                        {lead.companyWebsite ? (
+                          <a
+                            href={lead.companyWebsite.startsWith('http') ? lead.companyWebsite : `https://${lead.companyWebsite}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {lead.companyName || "N/A"}
+                          </a>
+                        ) : (
+                          lead.companyName || "N/A"
+                        )}
+                      </div>
                     </td>
                     <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[120px]">
                       {getAllContactNames(lead)}
@@ -679,27 +658,8 @@ function LeadsTable({
                     <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[150px]">
                       {getAllEmails(lead)}
                     </td>
-                    <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate w-20">
-                      {getAllLinkedIns(lead) !== 'N/A' ? (
-                        getAllLinkedIns(lead).split(', ').map((linkedin, index) => (
-                          <span key={index}>
-                            {linkedin && linkedin !== 'N/A' ? (
-                              <a
-                                href={linkedin.startsWith('http') ? linkedin : `https://${linkedin}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-800"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                LinkedIn{index > 0 ? ` ${index + 1}` : ''}
-                              </a>
-                            ) : 'N/A'}
-                            {index < getAllLinkedIns(lead).split(', ').length - 1 && ', '}
-                          </span>
-                        ))
-                      ) : (
-                        "N/A"
-                      )}
+                    <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[120px]">
+                      {lead.ctc || 'N/A'}
                     </td>
                     <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900 border border-gray-300 truncate max-w-[200px]" title={getLatestRemark(lead)}>
                       {getLatestRemark(lead)}
@@ -751,9 +711,9 @@ function LeadsTable({
                                   onLeadClick(lead);
                                   closeDropdown();
                                 }}
-                                className="flex items-center w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-purple-50/80 hover:text-purple-700 transition-all duration-200 group"
+                                className="flex items-center w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50/80 hover:text-blue-700 transition-all duration-200 group"
                               >
-                                <svg className="w-4 h-4 mr-3 text-gray-400 group-hover:text-purple-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-4 h-4 mr-3 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                 </svg>
@@ -767,9 +727,9 @@ function LeadsTable({
                                 <div className="relative">
                                   <button
                                     onClick={() => setAssignSubmenuOpen(assignSubmenuOpen === lead.id ? null : lead.id)}
-                                    className="flex items-center w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-green-50/80 hover:text-green-700 transition-all duration-200 group rounded-lg"
+                                    className="flex items-center w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-blue-50/80 hover:text-blue-700 transition-all duration-200 group rounded-lg"
                                   >
-                                    <svg className="w-4 h-4 mr-3 text-gray-400 group-hover:text-green-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg className="w-4 h-4 mr-3 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                     </svg>
                                     Assign to:
@@ -787,9 +747,9 @@ function LeadsTable({
                                             <button
                                               key={user.id}
                                               onClick={(e) => handleAssignLead(lead.id, user.id, e)}
-                                              className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-green-50/80 hover:text-green-700 transition-all duration-200"
+                                              className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50/80 hover:text-blue-700 transition-all duration-200"
                                             >
-                                              <div className="w-2 h-2 rounded-full bg-green-500 mr-3"></div>
+                                              <div className="w-2 h-2 rounded-full bg-blue-500 mr-3"></div>
                                               {user.displayName || user.name || 'Unknown User'}
                                             </button>
                                           ))}
@@ -822,13 +782,7 @@ function LeadsTable({
                                       }}
                                       className={`flex items-center w-full text-left px-3 py-2 text-sm rounded-lg mb-1 transition-all duration-200 ${statusColorMap[status]} hover:shadow-sm`}
                                     >
-                                      <div className={`w-2 h-2 rounded-full mr-3 ${
-                                        status === 'hot' ? 'bg-red-500' :
-                                        status === 'warm' ? 'bg-orange-500' :
-                                        status === 'cold' ? 'bg-blue-500' :
-                                        status === 'called' ? 'bg-purple-500' :
-                                        'bg-green-500'
-                                      }`}></div>
+                                      <div className={`w-2 h-2 rounded-full mr-3 bg-blue-500`}></div>
                                       Mark as {status.charAt(0).toUpperCase() + status.slice(1)}
                                     </button>
                                   ))}

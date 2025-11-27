@@ -2,53 +2,53 @@ import React from "react";
 
 const statusColorMap = {
   hot: {
-    bg: "bg-red-50",
-    text: "text-red-600",
-    border: "border-red-300",
-    activeBg: "bg-red-100",
+    bg: "bg-blue-50",
+    text: "text-blue-600",
+    border: "border-blue-300",
+    activeBg: "bg-blue-100",
     tab: {
-      active: "bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg",
-      inactive: "bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
+      active: "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg",
+      inactive: "bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200"
     }
   },
   warm: {
-    bg: "bg-orange-50",
-    text: "text-orange-600",
-    border: "border-orange-300",
-    activeBg: "bg-orange-100",
+    bg: "bg-blue-50",
+    text: "text-blue-600",
+    border: "border-blue-300",
+    activeBg: "bg-blue-100",
     tab: {
-      active: "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg",
-      inactive: "bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200"
+      active: "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg",
+      inactive: "bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200"
     }
   },
   called: {
-    bg: "bg-purple-50",
-    text: "text-purple-600",
-    border: "border-purple-300",
-    activeBg: "bg-purple-100",
+    bg: "bg-blue-50",
+    text: "text-blue-600",
+    border: "border-blue-300",
+    activeBg: "bg-blue-100",
     tab: {
-      active: "bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg",
-      inactive: "bg-purple-50 text-purple-600 hover:bg-purple-100 border border-purple-200"
+      active: "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg",
+      inactive: "bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200"
     }
   },
   onboarded: {
-    bg: "bg-green-50",
-    text: "text-green-600",
-    border: "border-green-300",
-    activeBg: "bg-green-100",
+    bg: "bg-blue-50",
+    text: "text-blue-600",
+    border: "border-blue-300",
+    activeBg: "bg-blue-100",
     tab: {
-      active: "bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg",
-      inactive: "bg-green-50 text-green-600 hover:bg-green-100 border border-green-200"
+      active: "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg",
+      inactive: "bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200"
     }
   },
   deleted: {
-    bg: "bg-gray-50",
-    text: "text-gray-600",
-    border: "border-gray-300",
-    activeBg: "bg-gray-100",
+    bg: "bg-blue-50",
+    text: "text-blue-600",
+    border: "border-blue-300",
+    activeBg: "bg-blue-100",
     tab: {
-      active: "bg-gradient-to-r from-gray-600 to-gray-700 text-white shadow-lg",
-      inactive: "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200"
+      active: "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg",
+      inactive: "bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200"
     }
   }
 };
@@ -99,17 +99,17 @@ const LeadStatusTabs = ({ activeTab, setActiveTab, leadsByStatus = {}, user }) =
           } ${
             activeTab === key
               ? key === "hot"
-                ? "ring-red-500"
-                : key === "warm"
-                ? "ring-orange-400"
-                : key === "cold"
                 ? "ring-blue-500"
+                : key === "warm"
+                ? "ring-blue-400"
+                : key === "cold"
+                ? "ring-blue-400"
                 : key === "called"
-                ? "ring-purple-500"
+                ? "ring-blue-500"
                 : key === "onboarded"
-                ? "ring-green-500"
+                ? "ring-blue-400"
                 : key === "deleted"
-                ? "ring-gray-500"
+                ? "ring-blue-400"
                 : "ring-gray-500"
               : ""
           }`}

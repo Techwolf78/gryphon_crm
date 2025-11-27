@@ -53,6 +53,9 @@ const Purchase = React.lazy(() => import("./pages/Purchase"));
 // Lazy load UNO page
 const UNO = React.lazy(() => import("./pages/UNO"));
 
+// Lazy load Intro page
+const Intro = React.lazy(() => import("./pages/Intro"));
+
 // Loading component
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -123,6 +126,7 @@ const AppContent = () => {
             <Route path="ca" element={<CA />} />
             <Route path="purchase" element={<Purchase />} />
             <Route path="uno" element={<UNO />} />
+            <Route path="intro" element={<Intro />} />
           </Route>
 
           {/* Add the 404 route - catch all unmatched routes */}
