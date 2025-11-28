@@ -4,6 +4,8 @@ import { db } from "../../../firebase";
 import {
   collection,
   addDoc,
+  updateDoc,
+  doc,
   serverTimestamp,
   query,
   where,
@@ -68,7 +70,7 @@ function AddJD({ show, onClose, company }) {
     jobDesignation: "",
     jobLocation: "",
     salary: "",
-    hiringRounds: [], 
+    hiringRounds: [],
     internshipDuration: "",
     stipend: "",
     modeOfInterview: "",
@@ -79,7 +81,7 @@ function AddJD({ show, onClose, company }) {
     source: "",
     coordinator: "",
     status: "ongoing",
-    
+
     createdAt: serverTimestamp(),
   });
   const [placementUsers, setPlacementUsers] = useState([]);
@@ -292,7 +294,6 @@ function AddJD({ show, onClose, company }) {
     }
   };
 
-
   const handleDownloadTemplate = (college) => {
     setSelectedCollegeForUpload(college);
     setShowTemplateModal(true);
@@ -339,7 +340,6 @@ function AddJD({ show, onClose, company }) {
         return;
       }
 
-
       // Create template fields with styling
       const fieldNames = {
         studentName: "Student Name*",
@@ -377,45 +377,46 @@ function AddJD({ show, onClose, company }) {
           }">${fieldName}</span>`;
         })
         .join("");
-        
 
       // Send individual emails to each college
       const emailPromises = collegesWithTPO
         .filter(({ tpoEmail }) => tpoEmail && tpoEmail.trim() !== "")
         .map(async ({ college, tpoEmail }) => {
-const templateParams = {
-    to_email: "placements@gryphonacademy.co.in",
-    company_name: formData.companyName,
-    company_website: formData.companyWebsite || "Not provided", 
-    job_designation: formData.jobDesignation,
-    job_location: formData.jobLocation,
-    salary: formData.salary,
-    job_type: formData.jobType, 
-    mode_of_interview: formData.modeOfInterview, 
-    course: formData.course,
-    passing_year: formData.passingYear,
-    Gender: formData.gender, 
-    marks_criteria: formData.marksCriteria, 
-    backlog_criteria: formData.backlogCriteria,
-    college_count: validEmails.length,
-    college_name: college,
-    template_fields: templateFieldsHTML,
-    field_count: templateFields.length,
-    hiring_rounds_html: formData.hiringRounds
-      .map(round => `<li>${round}</li>`)
-      .join(''),
-      
-    upload_link: `${window.location.origin}/upload-student-data?college=${encodeURIComponent(
-        college
-    )}&company=${encodeURIComponent(
-        formData.companyName
-    )}&course=${encodeURIComponent(
-        formData.course
-    )}&fields=${encodeURIComponent(JSON.stringify(templateFields))}`,
-    coordinator_name: formData.coordinator,
-    coordinator_phone: "+91-9876543210",
-    bcc: tpoEmail,
-};
+          const templateParams = {
+            to_email: "placements@gryphonacademy.co.in",
+            company_name: formData.companyName,
+            company_website: formData.companyWebsite || "Not provided",
+            job_designation: formData.jobDesignation,
+            job_location: formData.jobLocation,
+            salary: formData.salary,
+            job_type: formData.jobType,
+            mode_of_interview: formData.modeOfInterview,
+            course: formData.course,
+            passing_year: formData.passingYear,
+            Gender: formData.gender,
+            marks_criteria: formData.marksCriteria,
+            backlog_criteria: formData.backlogCriteria,
+            college_count: validEmails.length,
+            college_name: college,
+            template_fields: templateFieldsHTML,
+            field_count: templateFields.length,
+            hiring_rounds_html: formData.hiringRounds
+              .map((round) => `<li>${round}</li>`)
+              .join(""),
+
+            upload_link: `${
+              window.location.origin
+            }/upload-student-data?college=${encodeURIComponent(
+              college
+            )}&company=${encodeURIComponent(
+              formData.companyName
+            )}&course=${encodeURIComponent(
+              formData.course
+            )}&fields=${encodeURIComponent(JSON.stringify(templateFields))}`,
+            coordinator_name: formData.coordinator,
+            coordinator_phone: "+91-9876543210",
+            bcc: tpoEmail,
+          };
           return emailjs.send(
             EMAILJS_CONFIG.SERVICE_ID,
             EMAILJS_CONFIG.TEMPLATE_ID,
@@ -482,7 +483,18 @@ const templateParams = {
           jobFiles: jobFiles.map((file) => file.name),
           updatedAt: serverTimestamp(),
         };
-        return addDoc(collection(db, "companies"), companyData);
+
+        // If editing an existing company, update it instead of creating new
+        if (company && company.id) {
+          // Find the existing company document for this college and update it
+          return updateDoc(doc(db, "companies", company.id), {
+            ...companyData,
+            updatedAt: serverTimestamp(),
+          });
+        } else {
+          // Create new company document
+          return addDoc(collection(db, "companies"), companyData);
+        }
       });
 
       await Promise.all(promises);
@@ -503,11 +515,33 @@ const templateParams = {
 
   useEffect(() => {
     if (show && company) {
-      // Pre-fill form with company data
-      setFormData(prev => ({
+      // Pre-fill form with company data for editing
+      setFormData((prev) => ({
         ...prev,
         companyName: company.companyName || company.name || "",
         companyWebsite: company.companyUrl || company.companyWebsite || "",
+        course: company.course || "",
+        specialization: Array.isArray(company.specialization) ? company.specialization : (company.specialization ? [company.specialization] : []),
+        passingYear: company.passingYear || "",
+        gender: company.gender || "",
+        marksCriteria: company.marksCriteria || "",
+        otherCriteria: company.otherCriteria || "",
+        jobType: company.jobType || "",
+        jobDesignation: company.jobDesignation || "",
+        jobLocation: company.jobLocation || "",
+        salary: company.salary || "",
+        hiringRounds: Array.isArray(company.hiringRounds) ? company.hiringRounds : (company.hiringRounds ? [company.hiringRounds] : []),
+        internshipDuration: company.internshipDuration || "",
+        stipend: company.stipend || "",
+        modeOfInterview: company.modeOfInterview || "",
+        joiningPeriod: company.joiningPeriod || "",
+        companyOpenDate: company.companyOpenDate || "",
+        modeOfWork: company.modeOfWork || "",
+        jobDescription: company.jobDescription || "",
+        source: company.source || "",
+        coordinator: company.coordinator || "",
+        status: company.status || "ongoing",
+        createdAt: company.createdAt || serverTimestamp(),
       }));
     } else if (!show) {
       // Reset form when modal closes
@@ -552,7 +586,12 @@ const templateParams = {
 
   useEffect(() => {
     fetchFilteredColleges();
-  }, [formData.course, formData.passingYear, formData.specialization, fetchFilteredColleges]);
+  }, [
+    formData.course,
+    formData.passingYear,
+    formData.specialization,
+    fetchFilteredColleges,
+  ]);
 
   if (!show) return null;
 
@@ -562,7 +601,7 @@ const templateParams = {
         {/* Modal Header */}
         <div className="bg-linear-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center">
           <h2 className="text-xl font-semibold text-white">
-            {currentStep === 1 ? "Add JD Form" : "Select Colleges"}
+            {currentStep === 1 ? (company ? "Edit JD Form" : "Add JD Form") : "Select Colleges"}
           </h2>
           <button
             onClick={onClose}
@@ -598,7 +637,7 @@ const templateParams = {
                   onClick={handleSubmit}
                   className="px-6 py-2.5 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition"
                 >
-                  Save & Next
+                  {company ? "Update & Next" : "Save & Next"}
                 </button>
               </div>
             </div>
@@ -683,8 +722,6 @@ const templateParams = {
             </div>
           </>
         )}
-
-       
 
         {/* Template Download Modal */}
         <TemplateDownloadModal
